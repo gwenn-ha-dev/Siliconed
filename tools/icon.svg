@@ -1,0 +1,72 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FFC56E"/>
+      <stop offset="0.55" stop-color="#FF8FB1"/>
+      <stop offset="1" stop-color="#A57CFF"/>
+    </linearGradient>
+    <linearGradient id="chip" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#8FF5DE"/>
+      <stop offset="1" stop-color="#22B79C"/>
+    </linearGradient>
+    <linearGradient id="pin" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#6FE3CB"/>
+      <stop offset="1" stop-color="#1E9F88"/>
+    </linearGradient>
+    <radialGradient id="gloss" cx="0.32" cy="0.22" r="0.5">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.75"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <!-- The Siliconed icon: the source, versioned. `tools/app.sh` renders it to PNG and `iconutil`
+       makes the .icns from it, again only when this file changes.
+       A silicon chip made of silicone: a squishy, smiling gummy with round pins, on a warm
+       amber-to-lavender ground, a few sparkles for what it makes. The wires' hues (amber, lavender,
+       sea green). On the macOS icon grid (824 px squircle at 100 px, 185 px corners). -->
+  <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#bg)"/>
+
+  <!-- Its shadow on the ground -->
+  <ellipse cx="512" cy="800" rx="250" ry="34" fill="#5A2A7A" opacity="0.28"/>
+
+  <!-- The pins: round nubs, three a side -->
+  <g fill="url(#pin)">
+    <rect x="232" y="380" width="80" height="54" rx="27"/>
+    <rect x="232" y="482" width="80" height="54" rx="27"/>
+    <rect x="232" y="584" width="80" height="54" rx="27"/>
+    <rect x="712" y="380" width="80" height="54" rx="27"/>
+    <rect x="712" y="482" width="80" height="54" rx="27"/>
+    <rect x="712" y="584" width="80" height="54" rx="27"/>
+  </g>
+
+  <!-- The body: a soft, slightly bulging chip -->
+  <path fill="url(#chip)" d="M 512 268
+    C 700 262 740 290 742 480
+    C 744 690 712 760 512 762
+    C 312 760 280 690 282 480
+    C 284 290 324 262 512 268 Z"/>
+  <path fill="url(#gloss)" d="M 512 268
+    C 700 262 740 290 742 480
+    C 744 690 712 760 512 762
+    C 312 760 280 690 282 480
+    C 284 290 324 262 512 268 Z"/>
+  <!-- The light on the dome -->
+  <path fill="none" stroke="#FFFFFF" stroke-opacity="0.85" stroke-width="26" stroke-linecap="round"
+        d="M 336 400 C 342 336 380 312 452 306"/>
+
+  <!-- The face -->
+  <ellipse cx="438" cy="492" rx="34" ry="46" fill="#14303A"/>
+  <ellipse cx="586" cy="492" rx="34" ry="46" fill="#14303A"/>
+  <circle cx="450" cy="474" r="12" fill="#FFFFFF"/>
+  <circle cx="598" cy="474" r="12" fill="#FFFFFF"/>
+  <ellipse cx="390" cy="566" rx="34" ry="20" fill="#FF7AA8" opacity="0.65"/>
+  <ellipse cx="634" cy="566" rx="34" ry="20" fill="#FF7AA8" opacity="0.65"/>
+  <path fill="#14303A" d="M 446 580 C 470 650 554 650 578 580 Z"/>
+  <path fill="#FF6F91" d="M 474 618 C 492 640 532 640 550 618 C 536 606 488 606 474 618 Z"/>
+
+  <!-- Sparkles -->
+  <g fill="#FFFFFF">
+    <path d="M 792 214 C 798 254 806 262 846 268 C 806 274 798 282 792 322 C 786 282 778 274 738 268 C 778 262 786 254 792 214 Z"/>
+    <path d="M 214 668 C 218 692 223 697 247 701 C 223 705 218 710 214 734 C 210 710 205 705 181 701 C 205 697 210 692 214 668 Z" opacity="0.9"/>
+    <path d="M 730 700 C 733 716 736 719 752 722 C 736 725 733 728 730 744 C 727 728 724 725 708 722 C 724 719 727 716 730 700 Z" opacity="0.8"/>
+  </g>
+</svg>

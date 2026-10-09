@@ -1,0 +1,5 @@
+/.build/
+/.swiftpm/
+/Siliconed.app/
+*.dmg
+.DS_Store

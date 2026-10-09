@@ -1,0 +1,482 @@
+{
+ "repo": "unsloth/Qwen-Image-2.1-GGUF",
+ "revision": "2c31ccd392b367a6637841a143813320a02dff55",
+ "file": "qwen-image-2.1-Q4_K_M.gguf",
+ "url": "https://huggingface.co/unsloth/Qwen-Image-2.1-GGUF/resolve/2c31ccd392b367a6637841a143813320a02dff55/qwen-image-2.1-Q4_K_M.gguf",
+ "format": "gguf",
+ "family": "qwen-image-2.1",
+ "file_bytes": 4199565024,
+ "header": {
+  "bytes": 26336,
+  "sha256": "a9614cae720c468b940529347190b29e185a6813cf51c9b6ba30bbbaf35b4958",
+  "version": 3,
+  "alignment": 32,
+  "tensors": 265,
+  "metadata": 0
+ },
+ "rows": 256,
+ "types": {
+  "BF16": 4,
+  "F32": 65,
+  "Q4_K": 163,
+  "Q5_K": 28,
+  "Q6_K": 1,
+  "Q8_0": 4
+ },
+ "libraries": {
+  "torch": "2.14.1",
+  "diffusers": "0.41.0",
+  "gguf": "0.19.0",
+  "numpy": "2.5.3"
+ },
+ "quantized": [
+  "transformer_blocks.0.attn.to_q.weight",
+  "transformer_blocks.0.img_mlp.out.weight",
+  "transformer_blocks.0.img_mlp.gate_layer.weight",
+  "transformer_blocks.0.img_mlp.proj.weight",
+  "transformer_blocks.31.attn.to_out.0.weight",
+  "modulation.1.weight",
+  "transformer_blocks.27.attn.to_v.weight",
+  "transformer_blocks.1.attn.to_v.weight"
+ ],
+ "plain": [
+  "img_in.weight",
+  "norm_out.linear.weight",
+  "transformer_blocks.0.attn.norm_k.weight"
+ ],
+ "published": {
+  "model.diffusion_model.img_in.weight": {
+   "type": "BF16",
+   "ne": [
+    64,
+    4096
+   ],
+   "piece_ne": [
+    64,
+    256
+   ],
+   "rows": [
+    [
+     0,
+     256
+    ]
+   ],
+   "range": [
+    [
+     26336,
+     59103
+    ]
+   ],
+   "map": [
+    "img_in.weight"
+   ]
+  },
+  "model.diffusion_model.modulation.1.weight": {
+   "type": "Q5_K",
+   "ne": [
+    4096,
+    16384
+   ],
+   "piece_ne": [
+    4096,
+    256
+   ],
+   "rows": [
+    [
+     0,
+     256
+    ]
+   ],
+   "range": [
+    [
+     550624,
+     1271519
+    ]
+   ],
+   "map": [
+    "modulation.1.weight"
+   ]
+  },
+  "model.diffusion_model.norm_out.linear.weight": {
+   "type": "F32",
+   "ne": [
+    4096,
+    4096
+   ],
+   "piece_ne": [
+    4096,
+    256
+   ],
+   "rows": [
+    [
+     0,
+     256
+    ]
+   ],
+   "range": [
+    [
+     46687968,
+     50882271
+    ]
+   ],
+   "map": [
+    "norm_out.linear.weight"
+   ]
+  },
+  "model.diffusion_model.transformer_blocks.0.attn.norm_k.weight": {
+   "type": "F32",
+   "ne": [
+    128
+   ],
+   "piece_ne": [
+    128
+   ],
+   "rows": [
+    [
+     0,
+     1
+    ]
+   ],
+   "range": [
+    [
+     133015264,
+     133015775
+    ]
+   ],
+   "map": [
+    "transformer_blocks.0.attn.norm_k.weight"
+   ]
+  },
+  "model.diffusion_model.transformer_blocks.0.attn.to_q.weight": {
+   "type": "Q5_K",
+   "ne": [
+    4096,
+    4096
+   ],
+   "piece_ne": [
+    4096,
+    256
+   ],
+   "rows": [
+    [
+     0,
+     256
+    ]
+   ],
+   "range": [
+    [
+     153987808,
+     154708703
+    ]
+   ],
+   "map": [
+    "transformer_blocks.0.attn.to_q.weight"
+   ]
+  },
+  "model.diffusion_model.transformer_blocks.0.img_mlp.gate_up.weight": {
+   "type": "Q4_K",
+   "ne": [
+    4096,
+    24576
+   ],
+   "piece_ne": [
+    4096,
+    512
+   ],
+   "rows": [
+    [
+     0,
+     256
+    ],
+    [
+     12288,
+     12544
+    ]
+   ],
+   "range": [
+    [
+     174959328,
+     175549151
+    ],
+    [
+     203270880,
+     203860703
+    ]
+   ],
+   "map": [
+    "transformer_blocks.0.img_mlp.gate_layer.weight",
+    "transformer_blocks.0.img_mlp.proj.weight"
+   ]
+  },
+  "model.diffusion_model.transformer_blocks.0.img_mlp.out.weight": {
+   "type": "Q4_K",
+   "ne": [
+    12288,
+    4096
+   ],
+   "piece_ne": [
+    12288,
+    256
+   ],
+   "rows": [
+    [
+     0,
+     256
+    ]
+   ],
+   "range": [
+    [
+     231582432,
+     233351903
+    ]
+   ],
+   "map": [
+    "transformer_blocks.0.img_mlp.out.weight"
+   ]
+  },
+  "model.diffusion_model.transformer_blocks.1.attn.to_v.weight": {
+   "type": "Q8_0",
+   "ne": [
+    4096,
+    4096
+   ],
+   "piece_ne": [
+    4096,
+    256
+   ],
+   "rows": [
+    [
+     0,
+     256
+    ]
+   ],
+   "range": [
+    [
+     288206560,
+     289320671
+    ]
+   ],
+   "map": [
+    "transformer_blocks.1.attn.to_v.weight"
+   ]
+  },
+  "model.diffusion_model.transformer_blocks.27.attn.to_v.weight": {
+   "type": "Q6_K",
+   "ne": [
+    4096,
+    4096
+   ],
+   "piece_ne": [
+    4096,
+    256
+   ],
+   "rows": [
+    [
+     0,
+     256
+    ]
+   ],
+   "range": [
+    [
+     2650667744,
+     2651527903
+    ]
+   ],
+   "map": [
+    "transformer_blocks.27.attn.to_v.weight"
+   ]
+  },
+  "model.diffusion_model.transformer_blocks.31.attn.to_out.0.weight": {
+   "type": "Q4_K",
+   "ne": [
+    4096,
+    4096
+   ],
+   "piece_ne": [
+    4096,
+    256
+   ],
+   "rows": [
+    [
+     0,
+     256
+    ]
+   ],
+   "range": [
+    [
+     3257929440,
+     3258519263
+    ]
+   ],
+   "map": [
+    "transformer_blocks.31.attn.to_out.0.weight"
+   ]
+  }
+ },
+ "comparisons": {
+  "model.diffusion_model.transformer_blocks.0.attn.to_q.weight": {
+   "kind": "GGUF Q5_K",
+   "values": 1048576,
+   "gguf_py": {
+    "different_bits": 0,
+    "different_values": 0
+   },
+   "fl32_of_exact": {
+    "different_bits": 0
+   },
+   "vs_exact_fp64": {
+    "different": 0,
+    "max_abs": 0.0
+   },
+   "publisher_default_path": {
+    "dtype": "float16",
+    "different_from_fp32_reference": 1039128,
+    "max_abs": 0.000820159912109375,
+    "max_rel": 145.28571428571428
+   }
+  },
+  "model.diffusion_model.transformer_blocks.0.img_mlp.out.weight": {
+   "kind": "GGUF Q4_K",
+   "values": 3145728,
+   "gguf_py": {
+    "different_bits": 0,
+    "different_values": 0
+   },
+   "fl32_of_exact": {
+    "different_bits": 0
+   },
+   "vs_exact_fp64": {
+    "different": 0,
+    "max_abs": 0.0
+   },
+   "publisher_default_path": {
+    "dtype": "float16",
+    "different_from_fp32_reference": 3097732,
+    "max_abs": 0.0004291534423828125,
+    "max_rel": 65.0
+   }
+  },
+  "model.diffusion_model.transformer_blocks.0.img_mlp.gate_up.weight": {
+   "kind": "GGUF Q4_K",
+   "values": 2097152,
+   "gguf_py": {
+    "different_bits": 0,
+    "different_values": 0
+   },
+   "fl32_of_exact": {
+    "different_bits": 0
+   },
+   "vs_exact_fp64": {
+    "different": 0,
+    "max_abs": 0.0
+   },
+   "publisher_default_path": {
+    "dtype": "float16",
+    "different_from_fp32_reference": 2065681,
+    "max_abs": 0.0003151893615722656,
+    "max_rel": 41.666666666666664
+   }
+  },
+  "model.diffusion_model.transformer_blocks.31.attn.to_out.0.weight": {
+   "kind": "GGUF Q4_K",
+   "values": 1048576,
+   "gguf_py": {
+    "different_bits": 0,
+    "different_values": 0
+   },
+   "fl32_of_exact": {
+    "different_bits": 0
+   },
+   "vs_exact_fp64": {
+    "different": 0,
+    "max_abs": 0.0
+   },
+   "publisher_default_path": {
+    "dtype": "float16",
+    "different_from_fp32_reference": 1033543,
+    "max_abs": 0.00048160552978515625,
+    "max_rel": 31.0
+   }
+  },
+  "model.diffusion_model.modulation.1.weight": {
+   "kind": "GGUF Q5_K",
+   "values": 1048576,
+   "gguf_py": {
+    "different_bits": 0,
+    "different_values": 0
+   },
+   "fl32_of_exact": {
+    "different_bits": 0
+   },
+   "vs_exact_fp64": {
+    "different": 0,
+    "max_abs": 0.0
+   },
+   "publisher_default_path": {
+    "dtype": "float16",
+    "different_from_fp32_reference": 1029087,
+    "max_abs": 0.0003027915954589844,
+    "max_rel": 65.0
+   }
+  },
+  "model.diffusion_model.transformer_blocks.27.attn.to_v.weight": {
+   "kind": "GGUF Q6_K",
+   "values": 1048576,
+   "gguf_py": {
+    "different_bits": 0,
+    "different_values": 0
+   },
+   "fl32_of_exact": {
+    "different_bits": 0
+   },
+   "vs_exact_fp64": {
+    "different": 0,
+    "max_abs": 0.0
+   },
+   "publisher_default_path": {
+    "dtype": "float16",
+    "different_from_fp32_reference": 925312,
+    "max_abs": 0.000240325927734375,
+    "max_rel": 0.0009474396571170765
+   }
+  },
+  "model.diffusion_model.transformer_blocks.1.attn.to_v.weight": {
+   "kind": "GGUF Q8_0",
+   "values": 1048576,
+   "gguf_py": {
+    "different_bits": 0,
+    "different_values": 0
+   },
+   "vs_d_times_q_fp32": {
+    "different": 0,
+    "max_abs": 0.0
+   },
+   "d_subnormal": 0,
+   "d_zero": 0,
+   "vs_exact_fp64": {
+    "different": 0,
+    "max_abs": 0.0
+   },
+   "publisher_default_path": {
+    "dtype": "float16",
+    "different_from_fp32_reference": 848046,
+    "max_abs": 0.0001201629638671875,
+    "max_rel": 0.00048146364949446316
+   }
+  }
+ },
+ "pieces": {
+  "file": "pieces.gguf",
+  "bytes": 11183584,
+  "sha256": "f3be79ff60a5e8d4974e613e416cb8180abd59d84218ff86ad89a0c275dd6d3f"
+ },
+ "references": {
+  "file": "references.safetensors",
+  "bytes": 46204752,
+  "sha256": "be5e6e26e625dda493a557fe928214b27d7991ece998520800c871fd758acf90"
+ },
+ "header_file": {
+  "file": "header.gguf",
+  "sha256": "a9614cae720c468b940529347190b29e185a6813cf51c9b6ba30bbbaf35b4958"
+ }
+}

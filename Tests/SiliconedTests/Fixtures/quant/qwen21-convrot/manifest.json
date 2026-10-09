@@ -1,0 +1,691 @@
+{
+ "repo": "Comfy-Org/Qwen-Image-2.1",
+ "revision": "cb504a4090723e43f17ad01cec0359490e2de613",
+ "file": "diffusion_models/qwen_image_2.1_int8_convrot.safetensors",
+ "url": "https://huggingface.co/Comfy-Org/Qwen-Image-2.1/resolve/cb504a4090723e43f17ad01cec0359490e2de613/diffusion_models/qwen_image_2.1_int8_convrot.safetensors",
+ "format": "convrot",
+ "family": "qwen-image-2.1",
+ "file_bytes": 7256783064,
+ "header": {
+  "bytes": 74448,
+  "sha256": "64ac1c737e46bf4f181d302e4836591306e26e4f62d547b2bef08270c9c97567",
+  "tensors": 649
+ },
+ "rows": 256,
+ "group": 256,
+ "comfy": {
+  "manifest": "../comfy/manifest.json",
+  "functions": "kitchen/comfy_kitchen/backends/eager/quantization.py: dequantize_int8_convrot_weight; kitchen/comfy_kitchen/tensor/int8_utils.py: _build_hadamard, _rotate_weight"
+ },
+ "libraries": {
+  "torch": "2.14.1",
+  "diffusers": "0.41.0.dev0",
+  "safetensors": "0.8.0"
+ },
+ "quantized": [
+  "transformer_blocks.0.attn.to_q.weight",
+  "transformer_blocks.0.img_mlp.out.weight",
+  "transformer_blocks.0.img_mlp.gate_layer.weight",
+  "transformer_blocks.0.img_mlp.proj.weight",
+  "transformer_blocks.31.attn.to_out.0.weight"
+ ],
+ "plain": [
+  "img_in.weight",
+  "transformer_blocks.0.attn.norm_k.weight"
+ ],
+ "published": {
+  "img_in.weight": {
+   "dtype": "BF16",
+   "shape": [
+    4096,
+    64
+   ],
+   "piece_shape": [
+    4096,
+    64
+   ],
+   "rows": [
+    [
+     0,
+     4096
+    ]
+   ],
+   "range": [
+    [
+     5841624,
+     6365911
+    ]
+   ],
+   "map": [
+    "img_in.weight"
+   ]
+  },
+  "transformer_blocks.0.attn.norm_k.weight": {
+   "dtype": "BF16",
+   "shape": [
+    128
+   ],
+   "piece_shape": [
+    128
+   ],
+   "rows": [
+    [
+     0,
+     128
+    ]
+   ],
+   "range": [
+    [
+     210313944,
+     210314199
+    ]
+   ],
+   "map": [
+    "transformer_blocks.0.attn.norm_k.weight"
+   ]
+  },
+  "transformer_blocks.0.attn.to_q.comfy_quant": {
+   "dtype": "U8",
+   "shape": [
+    72
+   ],
+   "piece_shape": [
+    72
+   ],
+   "rows": [
+    [
+     0,
+     72
+    ]
+   ],
+   "range": [
+    [
+     7256769384,
+     7256769455
+    ]
+   ],
+   "map": []
+  },
+  "transformer_blocks.0.attn.to_q.weight": {
+   "dtype": "I8",
+   "shape": [
+    4096,
+    4096
+   ],
+   "piece_shape": [
+    256,
+    4096
+   ],
+   "rows": [
+    [
+     0,
+     256
+    ]
+   ],
+   "range": [
+    [
+     311001816,
+     312050391
+    ]
+   ],
+   "map": [
+    "transformer_blocks.0.attn.to_q.weight"
+   ]
+  },
+  "transformer_blocks.0.attn.to_q.weight_scale": {
+   "dtype": "F32",
+   "shape": [
+    4096,
+    1
+   ],
+   "piece_shape": [
+    256,
+    1
+   ],
+   "rows": [
+    [
+     0,
+     256
+    ]
+   ],
+   "range": [
+    [
+     107224,
+     108247
+    ]
+   ],
+   "map": []
+  },
+  "transformer_blocks.0.img_mlp.gate_up.comfy_quant": {
+   "dtype": "U8",
+   "shape": [
+    72
+   ],
+   "piece_shape": [
+    72
+   ],
+   "rows": [
+    [
+     0,
+     72
+    ]
+   ],
+   "range": [
+    [
+     7256769528,
+     7256769599
+    ]
+   ],
+   "map": []
+  },
+  "transformer_blocks.0.img_mlp.gate_up.weight": {
+   "dtype": "I8",
+   "shape": [
+    24576,
+    4096
+   ],
+   "piece_shape": [
+    512,
+    4096
+   ],
+   "rows": [
+    [
+     0,
+     256
+    ],
+    [
+     12288,
+     12544
+    ]
+   ],
+   "range": [
+    [
+     344556248,
+     345604823
+    ],
+    [
+     394887896,
+     395936471
+    ]
+   ],
+   "map": [
+    "transformer_blocks.0.img_mlp.gate_layer.weight",
+    "transformer_blocks.0.img_mlp.proj.weight"
+   ]
+  },
+  "transformer_blocks.0.img_mlp.gate_up.weight_scale": {
+   "dtype": "F32",
+   "shape": [
+    24576,
+    1
+   ],
+   "piece_shape": [
+    512,
+    1
+   ],
+   "rows": [
+    [
+     0,
+     256
+    ],
+    [
+     12288,
+     12544
+    ]
+   ],
+   "range": [
+    [
+     139992,
+     141015
+    ],
+    [
+     189144,
+     190167
+    ]
+   ],
+   "map": []
+  },
+  "transformer_blocks.0.img_mlp.out.comfy_quant": {
+   "dtype": "U8",
+   "shape": [
+    72
+   ],
+   "piece_shape": [
+    72
+   ],
+   "rows": [
+    [
+     0,
+     72
+    ]
+   ],
+   "range": [
+    [
+     7256769600,
+     7256769671
+    ]
+   ],
+   "map": []
+  },
+  "transformer_blocks.0.img_mlp.out.weight": {
+   "dtype": "I8",
+   "shape": [
+    4096,
+    12288
+   ],
+   "piece_shape": [
+    256,
+    12288
+   ],
+   "rows": [
+    [
+     0,
+     256
+    ]
+   ],
+   "range": [
+    [
+     445219544,
+     448365271
+    ]
+   ],
+   "map": [
+    "transformer_blocks.0.img_mlp.out.weight"
+   ]
+  },
+  "transformer_blocks.0.img_mlp.out.weight_scale": {
+   "dtype": "F32",
+   "shape": [
+    4096,
+    1
+   ],
+   "piece_shape": [
+    256,
+    1
+   ],
+   "rows": [
+    [
+     0,
+     256
+    ]
+   ],
+   "range": [
+    [
+     238296,
+     239319
+    ]
+   ],
+   "map": []
+  },
+  "transformer_blocks.31.attn.to_out.0.comfy_quant": {
+   "dtype": "U8",
+   "shape": [
+    72
+   ],
+   "piece_shape": [
+    72
+   ],
+   "rows": [
+    [
+     0,
+     72
+    ]
+   ],
+   "range": [
+    [
+     7256780112,
+     7256780183
+    ]
+   ],
+   "map": []
+  },
+  "transformer_blocks.31.attn.to_out.0.weight": {
+   "dtype": "I8",
+   "shape": [
+    4096,
+    4096
+   ],
+   "piece_shape": [
+    256,
+    4096
+   ],
+   "rows": [
+    [
+     0,
+     256
+    ]
+   ],
+   "range": [
+    [
+     5746819800,
+     5747868375
+    ]
+   ],
+   "map": [
+    "transformer_blocks.31.attn.to_out.0.weight"
+   ]
+  },
+  "transformer_blocks.31.attn.to_out.0.weight_scale": {
+   "dtype": "F32",
+   "shape": [
+    4096,
+    1
+   ],
+   "piece_shape": [
+    256,
+    1
+   ],
+   "rows": [
+    [
+     0,
+     256
+    ]
+   ],
+   "range": [
+    [
+     4596440,
+     4597463
+    ]
+   ],
+   "map": []
+  }
+ },
+ "comparisons": {
+  "transformer_blocks.0.attn.to_q.weight": {
+   "kind": "ComfyUI int8_tensorwise convrot",
+   "group": 256,
+   "values": 1048576,
+   "comfy_fp32_vs_exact_fp64": {
+    "different_from_rounded_exact": 940353,
+    "max_abs": 3.50060872733593e-07,
+    "channel_error_worst": 3.053207964117998e-07,
+    "channel_error_median": 2.8929806721667384e-07
+   },
+   "rounded_exact_vs_exact_fp64": {
+    "channel_error_worst": 2.676473302828962e-08,
+    "channel_error_median": 2.525392742971343e-08
+   },
+   "comfy_default_bf16": {
+    "different_from_fp32_reference": 1047777,
+    "max_rel": 0.0038821929869136936,
+    "channel_error_worst": 0.0017272585225074461,
+    "channel_error_median": 0.0016495875193210587
+   },
+   "smallest_nonzero_abs_qR": 0.0625,
+   "smallest_scale": 0.0007459116750396788
+  },
+  "transformer_blocks.0.img_mlp.out.weight": {
+   "kind": "ComfyUI int8_tensorwise convrot",
+   "group": 256,
+   "values": 3145728,
+   "comfy_fp32_vs_exact_fp64": {
+    "different_from_rounded_exact": 2807093,
+    "max_abs": 2.8079375624656677e-07,
+    "channel_error_worst": 3.1143729266883205e-07,
+    "channel_error_median": 2.8949997933676036e-07
+   },
+   "rounded_exact_vs_exact_fp64": {
+    "channel_error_worst": 2.6588591454256017e-08,
+    "channel_error_median": 2.525786576209142e-08
+   },
+   "comfy_default_bf16": {
+    "different_from_fp32_reference": 3143127,
+    "max_rel": 0.0038897885458481422,
+    "channel_error_worst": 0.001690782873716126,
+    "channel_error_median": 0.001651035460684711
+   },
+   "smallest_nonzero_abs_qR": 0.0625,
+   "smallest_scale": 0.0005502863205038011
+  },
+  "transformer_blocks.0.img_mlp.gate_up.weight": {
+   "kind": "ComfyUI int8_tensorwise convrot",
+   "group": 256,
+   "values": 2097152,
+   "comfy_fp32_vs_exact_fp64": {
+    "different_from_rounded_exact": 1881457,
+    "max_abs": 2.2817403078079224e-07,
+    "channel_error_worst": 3.066723101032974e-07,
+    "channel_error_median": 2.897008211248898e-07
+   },
+   "rounded_exact_vs_exact_fp64": {
+    "channel_error_worst": 2.9725640609582764e-08,
+    "channel_error_median": 2.5241680261403658e-08
+   },
+   "comfy_default_bf16": {
+    "different_from_fp32_reference": 2095515,
+    "max_rel": 0.003889952995704464,
+    "channel_error_worst": 0.001722158710284572,
+    "channel_error_median": 0.0016510687570387482
+   },
+   "smallest_nonzero_abs_qR": 0.0625,
+   "smallest_scale": 0.0007520552608184516
+  },
+  "transformer_blocks.31.attn.to_out.0.weight": {
+   "kind": "ComfyUI int8_tensorwise convrot",
+   "group": 256,
+   "values": 1048576,
+   "comfy_fp32_vs_exact_fp64": {
+    "different_from_rounded_exact": 932370,
+    "max_abs": 3.0011869966983795e-07,
+    "channel_error_worst": 3.07691608989318e-07,
+    "channel_error_median": 2.8940813633295056e-07
+   },
+   "rounded_exact_vs_exact_fp64": {
+    "channel_error_worst": 2.650943366816478e-08,
+    "channel_error_median": 2.528985255243152e-08
+   },
+   "comfy_default_bf16": {
+    "different_from_fp32_reference": 1047600,
+    "max_rel": 0.0038865907945271117,
+    "channel_error_worst": 0.0017150661254219937,
+    "channel_error_median": 0.001655581078904319
+   },
+   "smallest_nonzero_abs_qR": 0.0625,
+   "smallest_scale": 0.0004134444461669773
+  }
+ },
+ "comfy_quant": {
+  "transformer_blocks.0.attn.to_k.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.0.attn.to_out.0.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.0.attn.to_q.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.0.attn.to_v.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.0.img_mlp.gate_up.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.0.img_mlp.out.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.1.attn.to_k.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.1.attn.to_out.0.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.1.attn.to_q.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.1.attn.to_v.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.1.img_mlp.gate_up.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.1.img_mlp.out.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.10.attn.to_k.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.10.attn.to_out.0.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.10.attn.to_q.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.10.attn.to_v.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.10.img_mlp.gate_up.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.10.img_mlp.out.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.11.attn.to_k.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.11.attn.to_out.0.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.11.attn.to_q.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.11.attn.to_v.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.11.img_mlp.gate_up.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.11.img_mlp.out.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.12.attn.to_k.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.12.attn.to_out.0.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.12.attn.to_q.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.12.attn.to_v.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.12.img_mlp.gate_up.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.12.img_mlp.out.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.13.attn.to_k.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.13.attn.to_out.0.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.13.attn.to_q.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.13.attn.to_v.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.13.img_mlp.gate_up.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.13.img_mlp.out.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.14.attn.to_k.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.14.attn.to_out.0.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.14.attn.to_q.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.14.attn.to_v.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.14.img_mlp.gate_up.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.14.img_mlp.out.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.15.attn.to_k.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.15.attn.to_out.0.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.15.attn.to_q.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.15.attn.to_v.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.15.img_mlp.gate_up.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.15.img_mlp.out.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.16.attn.to_k.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.16.attn.to_out.0.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.16.attn.to_q.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.16.attn.to_v.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.16.img_mlp.gate_up.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.16.img_mlp.out.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.17.attn.to_k.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.17.attn.to_out.0.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.17.attn.to_q.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.17.attn.to_v.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.17.img_mlp.gate_up.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.17.img_mlp.out.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.18.attn.to_k.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.18.attn.to_out.0.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.18.attn.to_q.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.18.attn.to_v.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.18.img_mlp.gate_up.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.18.img_mlp.out.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.19.attn.to_k.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.19.attn.to_out.0.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.19.attn.to_q.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.19.attn.to_v.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.19.img_mlp.gate_up.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.19.img_mlp.out.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.2.attn.to_k.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.2.attn.to_out.0.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.2.attn.to_q.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.2.attn.to_v.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.2.img_mlp.gate_up.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.2.img_mlp.out.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.20.attn.to_k.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.20.attn.to_out.0.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.20.attn.to_q.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.20.attn.to_v.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.20.img_mlp.gate_up.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.20.img_mlp.out.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.21.attn.to_k.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.21.attn.to_out.0.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.21.attn.to_q.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.21.attn.to_v.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.21.img_mlp.gate_up.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.21.img_mlp.out.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.22.attn.to_k.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.22.attn.to_out.0.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.22.attn.to_q.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.22.attn.to_v.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.22.img_mlp.gate_up.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.22.img_mlp.out.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.23.attn.to_k.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.23.attn.to_out.0.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.23.attn.to_q.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.23.attn.to_v.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.23.img_mlp.gate_up.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.23.img_mlp.out.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.24.attn.to_k.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.24.attn.to_out.0.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.24.attn.to_q.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.24.attn.to_v.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.24.img_mlp.gate_up.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.24.img_mlp.out.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.25.attn.to_k.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.25.attn.to_out.0.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.25.attn.to_q.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.25.attn.to_v.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.25.img_mlp.gate_up.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.25.img_mlp.out.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.26.attn.to_k.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.26.attn.to_out.0.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.26.attn.to_q.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.26.attn.to_v.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.26.img_mlp.gate_up.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.26.img_mlp.out.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.27.attn.to_k.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.27.attn.to_out.0.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.27.attn.to_q.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.27.attn.to_v.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.27.img_mlp.gate_up.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.27.img_mlp.out.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.28.attn.to_k.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.28.attn.to_out.0.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.28.attn.to_q.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.28.attn.to_v.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.28.img_mlp.gate_up.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.28.img_mlp.out.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.29.attn.to_k.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.29.attn.to_out.0.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.29.attn.to_q.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.29.attn.to_v.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.29.img_mlp.gate_up.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.29.img_mlp.out.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.3.attn.to_k.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.3.attn.to_out.0.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.3.attn.to_q.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.3.attn.to_v.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.3.img_mlp.gate_up.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.3.img_mlp.out.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.30.attn.to_k.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.30.attn.to_out.0.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.30.attn.to_q.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.30.attn.to_v.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.30.img_mlp.gate_up.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.30.img_mlp.out.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.31.attn.to_k.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.31.attn.to_out.0.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.31.attn.to_q.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.31.attn.to_v.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.31.img_mlp.gate_up.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.31.img_mlp.out.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.4.attn.to_k.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.4.attn.to_out.0.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.4.attn.to_q.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.4.attn.to_v.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.4.img_mlp.gate_up.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.4.img_mlp.out.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.5.attn.to_k.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.5.attn.to_out.0.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.5.attn.to_q.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.5.attn.to_v.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.5.img_mlp.gate_up.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.5.img_mlp.out.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.6.attn.to_k.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.6.attn.to_out.0.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.6.attn.to_q.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.6.attn.to_v.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.6.img_mlp.gate_up.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.6.img_mlp.out.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.7.attn.to_k.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.7.attn.to_out.0.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.7.attn.to_q.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.7.attn.to_v.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.7.img_mlp.gate_up.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.7.img_mlp.out.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.8.attn.to_k.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.8.attn.to_out.0.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.8.attn.to_q.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.8.attn.to_v.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.8.img_mlp.gate_up.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.8.img_mlp.out.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.9.attn.to_k.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.9.attn.to_out.0.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.9.attn.to_q.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.9.attn.to_v.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.9.img_mlp.gate_up.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "transformer_blocks.9.img_mlp.out.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}"
+ },
+ "pieces": {
+  "file": "pieces.safetensors",
+  "bytes": 7873304,
+  "sha256": "df51adeacaf6a378c72aa2e6ea6f780039dd87f358112d76ae7d6e317ec2dd3d"
+ },
+ "references": {
+  "file": "references.safetensors",
+  "bytes": 89131072,
+  "sha256": "bbfdb0460339d056e926829e026f10d9d278fe7261ca4e8c0dbfa399e58c0421"
+ }
+}

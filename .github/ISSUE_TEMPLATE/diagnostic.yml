@@ -1,0 +1,80 @@
+# Diagnostic report, opened by the app's "Report my configuration" button.
+#
+# GitHub prefills an issue form from the query string of the "new issue" URL: `template` names this
+# file, `title` sets the title, and every other key is the `id` of a field below. Values are
+# percent-encoded (RFC 3986). The app opens, on one line:
+#
+#   https://github.com/gwenn-ha-dev/Siliconed/issues/new?template=diagnostic.yml
+#     &title=Diagnostic%3A%20Apple%20M1%20Pro%2C%2016%20GB
+#     &chip=Apple%20M1%20Pro%20(8%20CPU%3A%206P%2B2E%2C%2014%20GPU)
+#     &memory=16%20GB
+#     &macos=15.6%20(24G84)
+#     &version=0.1.0%20(abc1234)
+#     &report=%7B...%7D
+#
+#   template  diagnostic.yml (this file)
+#   title     "Diagnostic: <chip>, <memory>"
+#   chip      chip name with its CPU (P+E) and GPU core counts
+#   memory    physical memory, e.g. "16 GB"
+#   macos     macOS version and build
+#   version   app version and the engine's commit
+#   report    the JSON report, only if the whole URL stays under ~8 000 characters
+#
+# Labels come from `labels:` below; a `labels=` parameter is ignored for users without triage
+# rights, so the app does not rely on it. A browser or GitHub may truncate a long URL: when the JSON
+# does not fit, the app leaves `report` out, copies the JSON to the clipboard and says to paste it.
+name: Diagnostic report
+description: The report produced by the app's "Report my configuration" button. One per machine and app version.
+title: "Diagnostic: "
+labels: [diagnostic, engine]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you. These reports fill the per-chip table in the README: one machine is not a benchmark.
+        The fields below were prefilled by the app; check them, paste the JSON if it is empty, and submit.
+        The report holds no image, no prompt and no file path.
+  - type: input
+    id: chip
+    attributes:
+      label: Chip
+      description: Chip name, CPU cores (performance + efficiency) and GPU cores.
+      placeholder: Apple M1 Pro (8 CPU, 6P+2E, 14 GPU)
+    validations:
+      required: true
+  - type: input
+    id: memory
+    attributes:
+      label: Memory
+      placeholder: 16 GB
+    validations:
+      required: true
+  - type: input
+    id: macos
+    attributes:
+      label: macOS
+      placeholder: 15.6 (24G84)
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: App version
+      placeholder: 0.1.0 (abc1234)
+    validations:
+      required: true
+  - type: textarea
+    id: report
+    attributes:
+      label: Diagnostic JSON
+      description: Prefilled by the app, or on your clipboard if it was too long for the link. Paste it unchanged.
+      render: json
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Anything else
+      description: Other apps running, on battery or on the power adapter, an external display. Optional.
+    validations:
+      required: false

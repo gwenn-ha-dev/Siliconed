@@ -1,0 +1,272 @@
+{
+ "repo": "unsloth/Qwen-Image-2.1-FP8",
+ "revision": "bb21a8ba7f0371c19ad1f72c82a5e8fc10f39939",
+ "file": "Qwen-Image-2.1-FP8.safetensors",
+ "url": "https://huggingface.co/unsloth/Qwen-Image-2.1-FP8/resolve/bb21a8ba7f0371c19ad1f72c82a5e8fc10f39939/Qwen-Image-2.1-FP8.safetensors",
+ "header": {
+  "bytes": 269424,
+  "sha256": "c9a88e86944b562e96d4cb2ddb09acf0085702ea6c58c0e961d3cc52422dcdd7"
+ },
+ "rows": 256,
+ "libraries": {
+  "torch": "2.14.1",
+  "torchao": "0.18.0",
+  "sdnq": "0.2.7",
+  "safetensors": "0.8.0"
+ },
+ "quantized": [
+  {
+   "weight": "transformer_blocks.0.attn.to_q.weight",
+   "q": "transformer_blocks.0.attn.to_q._weight_qdata",
+   "s": "transformer_blocks.0.attn.to_q._weight_scale"
+  },
+  {
+   "weight": "transformer_blocks.0.img_mlp.out.weight",
+   "q": "transformer_blocks.0.img_mlp.out._weight_qdata",
+   "s": "transformer_blocks.0.img_mlp.out._weight_scale"
+  },
+  {
+   "weight": "transformer_blocks.31.attn.to_out.0.weight",
+   "q": "transformer_blocks.31.attn.to_out.0._weight_qdata",
+   "s": "transformer_blocks.31.attn.to_out.0._weight_scale"
+  },
+  {
+   "weight": "modulation.1.weight",
+   "q": "modulation.1._weight_qdata",
+   "s": "modulation.1._weight_scale"
+  }
+ ],
+ "plain": [
+  "img_in.weight",
+  "transformer_blocks.0.attn.norm_k.weight"
+ ],
+ "tensors": {
+  "img_in.weight": {
+   "dtype": "BF16",
+   "published_shape": [
+    4096,
+    64
+   ],
+   "shape": [
+    4096,
+    64
+   ],
+   "range": [
+    6167672,
+    6691959
+   ]
+  },
+  "modulation.1._weight_qdata": {
+   "dtype": "F8_E4M3",
+   "published_shape": [
+    16384,
+    4096
+   ],
+   "shape": [
+    256,
+    4096
+   ],
+   "range": [
+    9337976,
+    10386551
+   ]
+  },
+  "modulation.1._weight_scale": {
+   "dtype": "F32",
+   "published_shape": [
+    16384,
+    1
+   ],
+   "shape": [
+    256,
+    1
+   ],
+   "range": [
+    269432,
+    270455
+   ]
+  },
+  "transformer_blocks.0.attn.norm_k.weight": {
+   "dtype": "BF16",
+   "published_shape": [
+    128
+   ],
+   "shape": [
+    128
+   ],
+   "range": [
+    9313400,
+    9313655
+   ]
+  },
+  "transformer_blocks.0.attn.to_q._weight_qdata": {
+   "dtype": "F8_E4M3",
+   "published_shape": [
+    4096,
+    4096
+   ],
+   "shape": [
+    256,
+    4096
+   ],
+   "range": [
+    143555704,
+    144604279
+   ]
+  },
+  "transformer_blocks.0.attn.to_q._weight_scale": {
+   "dtype": "F32",
+   "published_shape": [
+    4096,
+    1
+   ],
+   "shape": [
+    256,
+    1
+   ],
+   "range": [
+    400504,
+    401527
+   ]
+  },
+  "transformer_blocks.0.img_mlp.out._weight_qdata": {
+   "dtype": "F8_E4M3",
+   "published_shape": [
+    4096,
+    12288
+   ],
+   "shape": [
+    256,
+    12288
+   ],
+   "range": [
+    227441784,
+    230587511
+   ]
+  },
+  "transformer_blocks.0.img_mlp.out._weight_scale": {
+   "dtype": "F32",
+   "published_shape": [
+    4096,
+    1
+   ],
+   "shape": [
+    256,
+    1
+   ],
+   "range": [
+    482424,
+    483447
+   ]
+  },
+  "transformer_blocks.31.attn.to_out.0._weight_qdata": {
+   "dtype": "F8_E4M3",
+   "published_shape": [
+    4096,
+    4096
+   ],
+   "shape": [
+    256,
+    4096
+   ],
+   "range": [
+    5579373688,
+    5580422263
+   ]
+  },
+  "transformer_blocks.31.attn.to_out.0._weight_scale": {
+   "dtype": "F32",
+   "published_shape": [
+    4096,
+    1
+   ],
+   "shape": [
+    256,
+    1
+   ],
+   "range": [
+    4889720,
+    4890743
+   ]
+  }
+ },
+ "comparisons": {
+  "transformer_blocks.0.attn.to_q.weight": {
+   "kind": "Float8Tensor",
+   "values": 1048576,
+   "vs_q_times_s_fp32": {
+    "different": 0,
+    "max_abs": 0.0
+   },
+   "vs_exact_fp64": {
+    "different": 0,
+    "max_abs": 0.0
+   },
+   "publisher_default_path": {
+    "dtype": "bfloat16",
+    "different_from_fp32_reference": 787549,
+    "max_abs": 0.001953125,
+    "max_rel": 0.0038314176245210726
+   }
+  },
+  "transformer_blocks.0.img_mlp.out.weight": {
+   "kind": "Float8Tensor",
+   "values": 3145728,
+   "vs_q_times_s_fp32": {
+    "different": 0,
+    "max_abs": 0.0
+   },
+   "vs_exact_fp64": {
+    "different": 0,
+    "max_abs": 0.0
+   },
+   "publisher_default_path": {
+    "dtype": "bfloat16",
+    "different_from_fp32_reference": 2456900,
+    "max_abs": 0.00146484375,
+    "max_rel": 0.0038314176245210726
+   }
+  },
+  "transformer_blocks.31.attn.to_out.0.weight": {
+   "kind": "Float8Tensor",
+   "values": 1048576,
+   "vs_q_times_s_fp32": {
+    "different": 0,
+    "max_abs": 0.0
+   },
+   "vs_exact_fp64": {
+    "different": 0,
+    "max_abs": 0.0
+   },
+   "publisher_default_path": {
+    "dtype": "bfloat16",
+    "different_from_fp32_reference": 798126,
+    "max_abs": 0.0009765625,
+    "max_rel": 0.003745318352059925
+   }
+  },
+  "modulation.1.weight": {
+   "kind": "Float8Tensor",
+   "values": 1048576,
+   "vs_q_times_s_fp32": {
+    "different": 0,
+    "max_abs": 0.0
+   },
+   "vs_exact_fp64": {
+    "different": 0,
+    "max_abs": 0.0
+   },
+   "publisher_default_path": {
+    "dtype": "bfloat16",
+    "different_from_fp32_reference": 773498,
+    "max_abs": 0.000732421875,
+    "max_rel": 0.0038314176245210726
+   }
+  }
+ },
+ "pieces": {
+  "file": "pieces.safetensors",
+  "bytes": 31992696,
+  "sha256": "3bf105bcaa2c20894b0d94bdf5b0791f7bf3b0c79581aaa6d7bcaf96ad71e99f"
+ }
+}

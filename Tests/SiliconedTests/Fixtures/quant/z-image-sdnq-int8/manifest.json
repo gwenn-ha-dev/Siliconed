@@ -1,0 +1,303 @@
+{
+ "repo": "Disty0/Z-Image-Turbo-SDNQ-int8",
+ "revision": "43d0947f91c14b93da75704be27565ee30694f21",
+ "file": "transformer/diffusion_pytorch_model.safetensors",
+ "url": "https://huggingface.co/Disty0/Z-Image-Turbo-SDNQ-int8/resolve/43d0947f91c14b93da75704be27565ee30694f21/transformer/diffusion_pytorch_model.safetensors",
+ "header": {
+  "bytes": 82976,
+  "sha256": "fa4cab27707c0de4b7dca9fd4c47512e1bc20e911954a0cd61ebefe87ba555e2"
+ },
+ "rows": 256,
+ "libraries": {
+  "torch": "2.14.1",
+  "torchao": "0.18.0",
+  "sdnq": "0.2.7",
+  "safetensors": "0.8.0"
+ },
+ "quantized": [
+  {
+   "weight": "layers.0.attention.to_q.weight",
+   "q": "layers.0.attention.to_q.weight",
+   "s": "layers.0.attention.to_q.scale"
+  },
+  {
+   "weight": "layers.0.feed_forward.w2.weight",
+   "q": "layers.0.feed_forward.w2.weight",
+   "s": "layers.0.feed_forward.w2.scale"
+  },
+  {
+   "weight": "layers.29.attention.to_out.0.weight",
+   "q": "layers.29.attention.to_out.0.weight",
+   "s": "layers.29.attention.to_out.0.scale"
+  },
+  {
+   "weight": "context_refiner.0.attention.to_k.weight",
+   "q": "context_refiner.0.attention.to_k.weight",
+   "s": "context_refiner.0.attention.to_k.scale"
+  }
+ ],
+ "plain": [
+  "layers.0.adaLN_modulation.0.weight",
+  "layers.0.attention.norm_k.weight"
+ ],
+ "tensors": {
+  "context_refiner.0.attention.to_k.scale": {
+   "dtype": "BF16",
+   "published_shape": [
+    3840,
+    1
+   ],
+   "shape": [
+    256,
+    1
+   ],
+   "range": [
+    22729384,
+    22729895
+   ]
+  },
+  "context_refiner.0.attention.to_k.weight": {
+   "dtype": "I8",
+   "published_shape": [
+    3840,
+    3840
+   ],
+   "shape": [
+    256,
+    3840
+   ],
+   "range": [
+    37347496,
+    38330535
+   ]
+  },
+  "layers.0.adaLN_modulation.0.weight": {
+   "dtype": "BF16",
+   "published_shape": [
+    15360,
+    256
+   ],
+   "shape": [
+    15360,
+    256
+   ],
+   "range": [
+    22980776,
+    30845095
+   ]
+  },
+  "layers.0.attention.norm_k.weight": {
+   "dtype": "BF16",
+   "published_shape": [
+    128
+   ],
+   "shape": [
+    128
+   ],
+   "range": [
+    30845096,
+    30845351
+   ]
+  },
+  "layers.0.attention.to_q.scale": {
+   "dtype": "BF16",
+   "published_shape": [
+    3840,
+    1
+   ],
+   "shape": [
+    256,
+    1
+   ],
+   "range": [
+    30860968,
+    30861479
+   ]
+  },
+  "layers.0.attention.to_q.weight": {
+   "dtype": "I8",
+   "published_shape": [
+    3840,
+    3840
+   ],
+   "shape": [
+    256,
+    3840
+   ],
+   "range": [
+    420733096,
+    421716135
+   ]
+  },
+  "layers.0.feed_forward.w2.scale": {
+   "dtype": "BF16",
+   "published_shape": [
+    3840,
+    1
+   ],
+   "shape": [
+    256,
+    1
+   ],
+   "range": [
+    30912168,
+    30912679
+   ]
+  },
+  "layers.0.feed_forward.w2.weight": {
+   "dtype": "I8",
+   "published_shape": [
+    3840,
+    10240
+   ],
+   "shape": [
+    256,
+    10240
+   ],
+   "range": [
+    489545896,
+    492167335
+   ]
+  },
+  "layers.29.attention.to_out.0.scale": {
+   "dtype": "BF16",
+   "published_shape": [
+    3840,
+    1
+   ],
+   "shape": [
+    256,
+    1
+   ],
+   "range": [
+    34637992,
+    34638503
+   ]
+  },
+  "layers.29.attention.to_out.0.weight": {
+   "dtype": "I8",
+   "published_shape": [
+    3840,
+    3840
+   ],
+   "shape": [
+    256,
+    3840
+   ],
+   "range": [
+    4385333416,
+    4386316455
+   ]
+  }
+ },
+ "comparisons": {
+  "layers.0.attention.to_q.weight": {
+   "kind": "SDNQ int8 symmetric",
+   "values": 983040,
+   "vs_q_times_s_fp32": {
+    "different": 0,
+    "max_abs": 0.0
+   },
+   "vs_exact_fp64": {
+    "different": 0,
+    "max_abs": 0.0
+   },
+   "publisher_default_path": {
+    "dtype": "bfloat16",
+    "different_from_fp32_reference": 718154,
+    "max_abs": 0.0035400390625,
+    "max_rel": 0.003861003861003861
+   }
+  },
+  "layers.0.feed_forward.w2.weight": {
+   "kind": "SDNQ int8 symmetric",
+   "values": 2621440,
+   "vs_q_times_s_fp32": {
+    "different": 0,
+    "max_abs": 0.0
+   },
+   "vs_exact_fp64": {
+    "different": 0,
+    "max_abs": 0.0
+   },
+   "publisher_default_path": {
+    "dtype": "bfloat16",
+    "different_from_fp32_reference": 1696392,
+    "max_abs": 0.012939453125,
+    "max_rel": 0.003861003861003861
+   }
+  },
+  "layers.29.attention.to_out.0.weight": {
+   "kind": "SDNQ int8 symmetric",
+   "values": 983040,
+   "vs_q_times_s_fp32": {
+    "different": 0,
+    "max_abs": 0.0
+   },
+   "vs_exact_fp64": {
+    "different": 0,
+    "max_abs": 0.0
+   },
+   "publisher_default_path": {
+    "dtype": "bfloat16",
+    "different_from_fp32_reference": 660391,
+    "max_abs": 0.00341796875,
+    "max_rel": 0.003861003861003861
+   }
+  },
+  "context_refiner.0.attention.to_k.weight": {
+   "kind": "SDNQ int8 symmetric",
+   "values": 983040,
+   "vs_q_times_s_fp32": {
+    "different": 0,
+    "max_abs": 0.0
+   },
+   "vs_exact_fp64": {
+    "different": 0,
+    "max_abs": 0.0
+   },
+   "publisher_default_path": {
+    "dtype": "bfloat16",
+    "different_from_fp32_reference": 741178,
+    "max_abs": 0.001953125,
+    "max_rel": 0.003861003861003861
+   }
+  }
+ },
+ "pieces": {
+  "file": "pieces.safetensors",
+  "bytes": 35721944,
+  "sha256": "895d7e2b15f1d04d89f4b78597a70656f717e9cfafa76d3389e702aaf9de08e7"
+ },
+ "quantization_config": {
+  "add_skip_keys": true,
+  "dequantize_fp32": false,
+  "group_size": -1,
+  "is_integer": true,
+  "is_training": false,
+  "modules_dtype_dict": {},
+  "modules_to_not_convert": [
+   "layers.0.adaLN_modulation.0.weight",
+   "all_x_embedder",
+   "t_embedder",
+   "cap_embedder",
+   "all_final_layer"
+  ],
+  "non_blocking": false,
+  "quant_conv": false,
+  "quant_method": "sdnq",
+  "quantization_device": "xpu",
+  "quantized_matmul_dtype": null,
+  "return_device": "cpu",
+  "sdnq_version": "0.1.2",
+  "svd_rank": 32,
+  "svd_steps": 8,
+  "use_grad_ckpt": true,
+  "use_quantized_matmul": false,
+  "use_quantized_matmul_conv": false,
+  "use_static_quantization": true,
+  "use_stochastic_rounding": false,
+  "use_svd": false,
+  "weights_dtype": "int8"
+ }
+}

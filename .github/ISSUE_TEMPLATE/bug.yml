@@ -1,0 +1,55 @@
+name: Bug
+description: Something does not work as it should, in the app or in the engine.
+title: "Bug: "
+labels: [bug]
+body:
+  - type: dropdown
+    id: area
+    attributes:
+      label: Where
+      description: The app (window, queue, history, installation, silicontrol) or the engine (a render, an edit, a LoRA, wrong or broken images).
+      options:
+        - app
+        - engine
+        - not sure
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Model, size, seed, prompt, LoRA, reference images — what is needed to see it again.
+      placeholder: |
+        1. Model Qwen-Image-2.1 Turbo, 1024×1024, seed 42
+        2. Prompt "a woman posing in a library"
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual
+      description: What happened instead. The error message as shown, a screenshot if it helps.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: App version and machine
+      placeholder: 0.1.0 (abc1234), Apple M1 Pro, 16 GB, macOS 15.6
+    validations:
+      required: true
+  - type: textarea
+    id: report
+    attributes:
+      label: Diagnostic JSON
+      description: Optional. From the app's "Report my configuration" button; it tells us the machine and whether the engine is accurate on it.
+      render: json
+    validations:
+      required: false

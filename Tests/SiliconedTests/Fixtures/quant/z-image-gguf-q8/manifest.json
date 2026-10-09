@@ -1,0 +1,258 @@
+{
+ "repo": "unsloth/Z-Image-Turbo-GGUF",
+ "revision": "6c80814333b7b6a70a2e5b469a7c6437ce65de0f",
+ "file": "z-image-turbo-Q8_0.gguf",
+ "url": "https://huggingface.co/unsloth/Z-Image-Turbo-GGUF/resolve/6c80814333b7b6a70a2e5b469a7c6437ce65de0f/z-image-turbo-Q8_0.gguf",
+ "format": "gguf",
+ "family": "z-image",
+ "file_bytes": 7224707136,
+ "header": {
+  "bytes": 30528,
+  "sha256": "25c58eb6c6bc5bb781d1146cdb9459f50409b6489e4e1c75747769bc82aa7a01",
+  "version": 3,
+  "alignment": 32,
+  "tensors": 453,
+  "metadata": 3
+ },
+ "rows": 256,
+ "libraries": {
+  "torch": "2.14.1",
+  "diffusers": "0.41.0.dev0",
+  "gguf": "0.19.0"
+ },
+ "quantized": [
+  "layers.0.attention.to_k.weight",
+  "layers.0.attention.to_q.weight",
+  "layers.0.attention.to_v.weight",
+  "layers.0.feed_forward.w2.weight",
+  "layers.29.attention.to_out.0.weight"
+ ],
+ "plain": [
+  "all_final_layer.2-1.linear.weight",
+  "layers.0.attention.norm_k.weight"
+ ],
+ "published": {
+  "final_layer.linear.weight": {
+   "type": "BF16",
+   "ne": [
+    3840,
+    64
+   ],
+   "piece_ne": [
+    3840,
+    64
+   ],
+   "rows": [
+    [
+     0,
+     64
+    ]
+   ],
+   "range": [
+    [
+     729627712,
+     730119231
+    ]
+   ],
+   "map": [
+    "all_final_layer.2-1.linear.weight"
+   ]
+  },
+  "layers.0.attention.k_norm.weight": {
+   "type": "F32",
+   "ne": [
+    128
+   ],
+   "piece_ne": [
+    128
+   ],
+   "rows": [
+    [
+     0,
+     1
+    ]
+   ],
+   "range": [
+    [
+     734358592,
+     734359103
+    ]
+   ],
+   "map": [
+    "layers.0.attention.norm_k.weight"
+   ]
+  },
+  "layers.0.attention.qkv.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    11520
+   ],
+   "piece_ne": [
+    3840,
+    768
+   ],
+   "rows": [
+    [
+     0,
+     256
+    ],
+    [
+     3840,
+     4096
+    ],
+    [
+     7680,
+     7936
+    ]
+   ],
+   "range": [
+    [
+     750026816,
+     751071295
+    ],
+    [
+     765694016,
+     766738495
+    ],
+    [
+     781361216,
+     782405695
+    ]
+   ],
+   "map": [
+    "layers.0.attention.to_k.weight",
+    "layers.0.attention.to_q.weight",
+    "layers.0.attention.to_v.weight"
+   ]
+  },
+  "layers.0.feed_forward.w2.weight": {
+   "type": "Q8_0",
+   "ne": [
+    10240,
+    3840
+   ],
+   "piece_ne": [
+    10240,
+    256
+   ],
+   "rows": [
+    [
+     0,
+     256
+    ]
+   ],
+   "range": [
+    [
+     838838336,
+     841623615
+    ]
+   ],
+   "map": [
+    "layers.0.feed_forward.w2.weight"
+   ]
+  },
+  "layers.29.attention.out.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    3840
+   ],
+   "piece_ne": [
+    3840,
+    256
+   ],
+   "rows": [
+    [
+     0,
+     256
+    ]
+   ],
+   "range": [
+    [
+     4965140032,
+     4966184511
+    ]
+   ],
+   "map": [
+    "layers.29.attention.to_out.0.weight"
+   ]
+  }
+ },
+ "comparisons": {
+  "layers.0.attention.qkv.weight": {
+   "kind": "GGUF Q8_0",
+   "values": 2949120,
+   "vs_d_times_q_fp32": {
+    "different": 0,
+    "max_abs": 0.0
+   },
+   "vs_exact_fp64": {
+    "different": 0,
+    "max_abs": 0.0
+   },
+   "publisher_default_path": {
+    "dtype": "float16",
+    "different_from_fp32_reference": 2404537,
+    "max_abs": 0.00048065185546875,
+    "max_rel": 0.00048146364949446316
+   },
+   "d_subnormal": 0,
+   "d_zero": 0
+  },
+  "layers.0.feed_forward.w2.weight": {
+   "kind": "GGUF Q8_0",
+   "values": 2621440,
+   "vs_d_times_q_fp32": {
+    "different": 0,
+    "max_abs": 0.0
+   },
+   "vs_exact_fp64": {
+    "different": 0,
+    "max_abs": 0.0
+   },
+   "publisher_default_path": {
+    "dtype": "float16",
+    "different_from_fp32_reference": 2027729,
+    "max_abs": 0.001312255859375,
+    "max_rel": 0.00048146364949446316
+   },
+   "d_subnormal": 0,
+   "d_zero": 0
+  },
+  "layers.29.attention.out.weight": {
+   "kind": "GGUF Q8_0",
+   "values": 983040,
+   "vs_d_times_q_fp32": {
+    "different": 0,
+    "max_abs": 0.0
+   },
+   "vs_exact_fp64": {
+    "different": 0,
+    "max_abs": 0.0
+   },
+   "publisher_default_path": {
+    "dtype": "float16",
+    "different_from_fp32_reference": 801377,
+    "max_abs": 0.00048065185546875,
+    "max_rel": 0.00048146364949446316
+   },
+   "d_subnormal": 0,
+   "d_zero": 0
+  }
+ },
+ "pieces": {
+  "file": "pieces.gguf",
+  "bytes": 7455744,
+  "sha256": "782038fb26a735480a59096384f8000b432dcb7204acdfd277bffe550b9f5802"
+ },
+ "references": {
+  "file": "references.safetensors",
+  "bytes": 27198832,
+  "sha256": "99dbd46d23afe36d33cf5fb56962bc8037e661f3a6944e5fe9ed1b9ca157e68b"
+ },
+ "header_file": {
+  "file": "header.gguf",
+  "sha256": "25c58eb6c6bc5bb781d1146cdb9459f50409b6489e4e1c75747769bc82aa7a01"
+ }
+}

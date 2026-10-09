@@ -1,0 +1,317 @@
+{
+ "repo": "unsloth/Z-Image-Turbo-GGUF",
+ "revision": "6c80814333b7b6a70a2e5b469a7c6437ce65de0f",
+ "file": "z-image-turbo-Q4_K_M.gguf",
+ "url": "https://huggingface.co/unsloth/Z-Image-Turbo-GGUF/resolve/6c80814333b7b6a70a2e5b469a7c6437ce65de0f/z-image-turbo-Q4_K_M.gguf",
+ "format": "gguf",
+ "family": "z-image",
+ "file_bytes": 5017613376,
+ "header": {
+  "bytes": 30528,
+  "sha256": "60f152d7c8653b3e93b0fda2b5657508098781e87664fb76e717802a8bcc2304",
+  "version": 3,
+  "alignment": 32,
+  "tensors": 453,
+  "metadata": 3
+ },
+ "rows": 256,
+ "types": {
+  "BF16": 28,
+  "F32": 245,
+  "Q4_K": 112,
+  "Q5_K": 36,
+  "Q6_K": 32
+ },
+ "libraries": {
+  "torch": "2.14.1",
+  "diffusers": "0.41.0",
+  "gguf": "0.19.0",
+  "numpy": "2.5.3"
+ },
+ "quantized": [
+  "layers.0.attention.to_k.weight",
+  "layers.0.attention.to_q.weight",
+  "layers.0.attention.to_v.weight",
+  "layers.0.feed_forward.w2.weight",
+  "layers.29.attention.to_out.0.weight",
+  "layers.1.attention.to_out.0.weight"
+ ],
+ "plain": [
+  "all_final_layer.2-1.linear.weight",
+  "layers.0.attention.norm_k.weight"
+ ],
+ "published": {
+  "final_layer.linear.weight": {
+   "type": "BF16",
+   "ne": [
+    3840,
+    64
+   ],
+   "piece_ne": [
+    3840,
+    64
+   ],
+   "rows": [
+    [
+     0,
+     64
+    ]
+   ],
+   "range": [
+    [
+     729627712,
+     730119231
+    ]
+   ],
+   "map": [
+    "all_final_layer.2-1.linear.weight"
+   ]
+  },
+  "layers.0.attention.k_norm.weight": {
+   "type": "F32",
+   "ne": [
+    128
+   ],
+   "piece_ne": [
+    128
+   ],
+   "rows": [
+    [
+     0,
+     1
+    ]
+   ],
+   "range": [
+    [
+     732884032,
+     732884543
+    ]
+   ],
+   "map": [
+    "layers.0.attention.norm_k.weight"
+   ]
+  },
+  "layers.0.attention.qkv.weight": {
+   "type": "Q6_K",
+   "ne": [
+    3840,
+    11520
+   ],
+   "piece_ne": [
+    3840,
+    768
+   ],
+   "rows": [
+    [
+     0,
+     256
+    ],
+    [
+     3840,
+     4096
+    ],
+    [
+     7680,
+     7936
+    ]
+   ],
+   "range": [
+    [
+     743022656,
+     743829055
+    ],
+    [
+     755118656,
+     755925055
+    ],
+    [
+     767214656,
+     768021055
+    ]
+   ],
+   "map": [
+    "layers.0.attention.to_k.weight",
+    "layers.0.attention.to_q.weight",
+    "layers.0.attention.to_v.weight"
+   ]
+  },
+  "layers.0.feed_forward.w2.weight": {
+   "type": "Q6_K",
+   "ne": [
+    10240,
+    3840
+   ],
+   "piece_ne": [
+    10240,
+    256
+   ],
+   "rows": [
+    [
+     0,
+     256
+    ]
+   ],
+   "range": [
+    [
+     806374976,
+     808525375
+    ]
+   ],
+   "map": [
+    "layers.0.feed_forward.w2.weight"
+   ]
+  },
+  "layers.1.attention.out.weight": {
+   "type": "Q4_K",
+   "ne": [
+    3840,
+    3840
+   ],
+   "piece_ne": [
+    3840,
+    256
+   ],
+   "rows": [
+    [
+     0,
+     256
+    ]
+   ],
+   "range": [
+    [
+     867969088,
+     868522047
+    ]
+   ],
+   "map": [
+    "layers.1.attention.to_out.0.weight"
+   ]
+  },
+  "layers.29.attention.out.weight": {
+   "type": "Q5_K",
+   "ne": [
+    3840,
+    3840
+   ],
+   "piece_ne": [
+    3840,
+    256
+   ],
+   "rows": [
+    [
+     0,
+     256
+    ]
+   ],
+   "range": [
+    [
+     3336711232,
+     3337387071
+    ]
+   ],
+   "map": [
+    "layers.29.attention.to_out.0.weight"
+   ]
+  }
+ },
+ "comparisons": {
+  "layers.0.attention.qkv.weight": {
+   "kind": "GGUF Q6_K",
+   "values": 2949120,
+   "gguf_py": {
+    "different_bits": 0,
+    "different_values": 0
+   },
+   "fl32_of_exact": {
+    "different_bits": 0
+   },
+   "vs_exact_fp64": {
+    "different": 0,
+    "max_abs": 0.0
+   },
+   "publisher_default_path": {
+    "dtype": "float16",
+    "different_from_fp32_reference": 2699930,
+    "max_abs": 0.0006792545318603516,
+    "max_rel": 0.0009474396571170765
+   }
+  },
+  "layers.0.feed_forward.w2.weight": {
+   "kind": "GGUF Q6_K",
+   "values": 2621440,
+   "gguf_py": {
+    "different_bits": 0,
+    "different_values": 0
+   },
+   "fl32_of_exact": {
+    "different_bits": 0
+   },
+   "vs_exact_fp64": {
+    "different": 0,
+    "max_abs": 0.0
+   },
+   "publisher_default_path": {
+    "dtype": "float16",
+    "different_from_fp32_reference": 2310162,
+    "max_abs": 0.001708984375,
+    "max_rel": 0.0009474396571170765
+   }
+  },
+  "layers.29.attention.out.weight": {
+   "kind": "GGUF Q5_K",
+   "values": 983040,
+   "gguf_py": {
+    "different_bits": 0,
+    "different_values": 0
+   },
+   "fl32_of_exact": {
+    "different_bits": 0
+   },
+   "vs_exact_fp64": {
+    "different": 0,
+    "max_abs": 0.0
+   },
+   "publisher_default_path": {
+    "dtype": "float16",
+    "different_from_fp32_reference": 970760,
+    "max_abs": 0.0012655258178710938,
+    "max_rel": 33.0
+   }
+  },
+  "layers.1.attention.out.weight": {
+   "kind": "GGUF Q4_K",
+   "values": 983040,
+   "gguf_py": {
+    "different_bits": 0,
+    "different_values": 0
+   },
+   "fl32_of_exact": {
+    "different_bits": 0
+   },
+   "vs_exact_fp64": {
+    "different": 0,
+    "max_abs": 0.0
+   },
+   "publisher_default_path": {
+    "dtype": "float16",
+    "different_from_fp32_reference": 969178,
+    "max_abs": 0.0010433197021484375,
+    "max_rel": 63.0
+   }
+  }
+ },
+ "pieces": {
+  "file": "pieces.gguf",
+  "bytes": 6291008,
+  "sha256": "8a8f061dafa45ddf20583f17bf0cd3e7123fc15ad3abf99b4cd9a89ab85b6b1a"
+ },
+ "references": {
+  "file": "references.safetensors",
+  "bytes": 31131112,
+  "sha256": "f693ccfba8f9c28c1093eedc57b87974f77b348baa69a1a173b8ac94ddeb2736"
+ },
+ "header_file": {
+  "file": "header.gguf",
+  "sha256": "60f152d7c8653b3e93b0fda2b5657508098781e87664fb76e717802a8bcc2304"
+ }
+}

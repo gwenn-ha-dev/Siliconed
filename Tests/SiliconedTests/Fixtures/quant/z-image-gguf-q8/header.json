@@ -1,0 +1,4971 @@
+{
+ "version": 3,
+ "alignment": 32,
+ "data_start": 30528,
+ "metadata": {
+  "general.architecture": {
+   "type": "string",
+   "value": "lumina2"
+  },
+  "general.quantization_version": {
+   "type": "u32",
+   "value": 2
+  },
+  "general.file_type": {
+   "type": "u32",
+   "value": 7
+  }
+ },
+ "tensors": {
+  "cap_embedder.0.weight": {
+   "type": "F32",
+   "ne": [
+    2560
+   ],
+   "shape": [
+    2560
+   ],
+   "offset": 0
+  },
+  "cap_embedder.1.bias": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 10240
+  },
+  "cap_embedder.1.weight": {
+   "type": "BF16",
+   "ne": [
+    2560,
+    3840
+   ],
+   "shape": [
+    3840,
+    2560
+   ],
+   "offset": 25600
+  },
+  "cap_pad_token": {
+   "type": "F32",
+   "ne": [
+    3840,
+    1
+   ],
+   "shape": [
+    1,
+    3840
+   ],
+   "offset": 19686400
+  },
+  "context_refiner.0.attention.k_norm.weight": {
+   "type": "F32",
+   "ne": [
+    128
+   ],
+   "shape": [
+    128
+   ],
+   "offset": 19701760
+  },
+  "context_refiner.0.attention.out.weight": {
+   "type": "BF16",
+   "ne": [
+    3840,
+    3840
+   ],
+   "shape": [
+    3840,
+    3840
+   ],
+   "offset": 19702272
+  },
+  "context_refiner.0.attention.q_norm.weight": {
+   "type": "F32",
+   "ne": [
+    128
+   ],
+   "shape": [
+    128
+   ],
+   "offset": 49193472
+  },
+  "context_refiner.0.attention.qkv.weight": {
+   "type": "BF16",
+   "ne": [
+    3840,
+    11520
+   ],
+   "shape": [
+    11520,
+    3840
+   ],
+   "offset": 49193984
+  },
+  "context_refiner.0.attention_norm1.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 137667584
+  },
+  "context_refiner.0.attention_norm2.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 137682944
+  },
+  "context_refiner.0.feed_forward.w1.weight": {
+   "type": "BF16",
+   "ne": [
+    3840,
+    10240
+   ],
+   "shape": [
+    10240,
+    3840
+   ],
+   "offset": 137698304
+  },
+  "context_refiner.0.feed_forward.w2.weight": {
+   "type": "BF16",
+   "ne": [
+    10240,
+    3840
+   ],
+   "shape": [
+    3840,
+    10240
+   ],
+   "offset": 216341504
+  },
+  "context_refiner.0.feed_forward.w3.weight": {
+   "type": "BF16",
+   "ne": [
+    3840,
+    10240
+   ],
+   "shape": [
+    10240,
+    3840
+   ],
+   "offset": 294984704
+  },
+  "context_refiner.0.ffn_norm1.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 373627904
+  },
+  "context_refiner.0.ffn_norm2.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 373643264
+  },
+  "context_refiner.1.attention.k_norm.weight": {
+   "type": "F32",
+   "ne": [
+    128
+   ],
+   "shape": [
+    128
+   ],
+   "offset": 373658624
+  },
+  "context_refiner.1.attention.out.weight": {
+   "type": "BF16",
+   "ne": [
+    3840,
+    3840
+   ],
+   "shape": [
+    3840,
+    3840
+   ],
+   "offset": 373659136
+  },
+  "context_refiner.1.attention.q_norm.weight": {
+   "type": "F32",
+   "ne": [
+    128
+   ],
+   "shape": [
+    128
+   ],
+   "offset": 403150336
+  },
+  "context_refiner.1.attention.qkv.weight": {
+   "type": "BF16",
+   "ne": [
+    3840,
+    11520
+   ],
+   "shape": [
+    11520,
+    3840
+   ],
+   "offset": 403150848
+  },
+  "context_refiner.1.attention_norm1.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 491624448
+  },
+  "context_refiner.1.attention_norm2.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 491639808
+  },
+  "context_refiner.1.feed_forward.w1.weight": {
+   "type": "BF16",
+   "ne": [
+    3840,
+    10240
+   ],
+   "shape": [
+    10240,
+    3840
+   ],
+   "offset": 491655168
+  },
+  "context_refiner.1.feed_forward.w2.weight": {
+   "type": "BF16",
+   "ne": [
+    10240,
+    3840
+   ],
+   "shape": [
+    3840,
+    10240
+   ],
+   "offset": 570298368
+  },
+  "context_refiner.1.feed_forward.w3.weight": {
+   "type": "BF16",
+   "ne": [
+    3840,
+    10240
+   ],
+   "shape": [
+    10240,
+    3840
+   ],
+   "offset": 648941568
+  },
+  "context_refiner.1.ffn_norm1.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 727584768
+  },
+  "context_refiner.1.ffn_norm2.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 727600128
+  },
+  "final_layer.adaLN_modulation.1.bias": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 727615488
+  },
+  "final_layer.adaLN_modulation.1.weight": {
+   "type": "BF16",
+   "ne": [
+    256,
+    3840
+   ],
+   "shape": [
+    3840,
+    256
+   ],
+   "offset": 727630848
+  },
+  "final_layer.linear.bias": {
+   "type": "F32",
+   "ne": [
+    64
+   ],
+   "shape": [
+    64
+   ],
+   "offset": 729596928
+  },
+  "final_layer.linear.weight": {
+   "type": "BF16",
+   "ne": [
+    3840,
+    64
+   ],
+   "shape": [
+    64,
+    3840
+   ],
+   "offset": 729597184
+  },
+  "layers.0.adaLN_modulation.0.bias": {
+   "type": "F32",
+   "ne": [
+    15360
+   ],
+   "shape": [
+    15360
+   ],
+   "offset": 730088704
+  },
+  "layers.0.adaLN_modulation.0.weight": {
+   "type": "Q8_0",
+   "ne": [
+    256,
+    15360
+   ],
+   "shape": [
+    15360,
+    256
+   ],
+   "offset": 730150144
+  },
+  "layers.0.attention.k_norm.weight": {
+   "type": "F32",
+   "ne": [
+    128
+   ],
+   "shape": [
+    128
+   ],
+   "offset": 734328064
+  },
+  "layers.0.attention.out.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    3840
+   ],
+   "shape": [
+    3840,
+    3840
+   ],
+   "offset": 734328576
+  },
+  "layers.0.attention.q_norm.weight": {
+   "type": "F32",
+   "ne": [
+    128
+   ],
+   "shape": [
+    128
+   ],
+   "offset": 749995776
+  },
+  "layers.0.attention.qkv.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    11520
+   ],
+   "shape": [
+    11520,
+    3840
+   ],
+   "offset": 749996288
+  },
+  "layers.0.attention_norm1.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 796997888
+  },
+  "layers.0.attention_norm2.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 797013248
+  },
+  "layers.0.feed_forward.w1.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    10240
+   ],
+   "shape": [
+    10240,
+    3840
+   ],
+   "offset": 797028608
+  },
+  "layers.0.feed_forward.w2.weight": {
+   "type": "Q8_0",
+   "ne": [
+    10240,
+    3840
+   ],
+   "shape": [
+    3840,
+    10240
+   ],
+   "offset": 838807808
+  },
+  "layers.0.feed_forward.w3.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    10240
+   ],
+   "shape": [
+    10240,
+    3840
+   ],
+   "offset": 880587008
+  },
+  "layers.0.ffn_norm1.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 922366208
+  },
+  "layers.0.ffn_norm2.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 922381568
+  },
+  "layers.1.adaLN_modulation.0.bias": {
+   "type": "F32",
+   "ne": [
+    15360
+   ],
+   "shape": [
+    15360
+   ],
+   "offset": 922396928
+  },
+  "layers.1.adaLN_modulation.0.weight": {
+   "type": "Q8_0",
+   "ne": [
+    256,
+    15360
+   ],
+   "shape": [
+    15360,
+    256
+   ],
+   "offset": 922458368
+  },
+  "layers.1.attention.k_norm.weight": {
+   "type": "F32",
+   "ne": [
+    128
+   ],
+   "shape": [
+    128
+   ],
+   "offset": 926636288
+  },
+  "layers.1.attention.out.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    3840
+   ],
+   "shape": [
+    3840,
+    3840
+   ],
+   "offset": 926636800
+  },
+  "layers.1.attention.q_norm.weight": {
+   "type": "F32",
+   "ne": [
+    128
+   ],
+   "shape": [
+    128
+   ],
+   "offset": 942304000
+  },
+  "layers.1.attention.qkv.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    11520
+   ],
+   "shape": [
+    11520,
+    3840
+   ],
+   "offset": 942304512
+  },
+  "layers.1.attention_norm1.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 989306112
+  },
+  "layers.1.attention_norm2.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 989321472
+  },
+  "layers.1.feed_forward.w1.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    10240
+   ],
+   "shape": [
+    10240,
+    3840
+   ],
+   "offset": 989336832
+  },
+  "layers.1.feed_forward.w2.weight": {
+   "type": "Q8_0",
+   "ne": [
+    10240,
+    3840
+   ],
+   "shape": [
+    3840,
+    10240
+   ],
+   "offset": 1031116032
+  },
+  "layers.1.feed_forward.w3.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    10240
+   ],
+   "shape": [
+    10240,
+    3840
+   ],
+   "offset": 1072895232
+  },
+  "layers.1.ffn_norm1.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 1114674432
+  },
+  "layers.1.ffn_norm2.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 1114689792
+  },
+  "layers.10.adaLN_modulation.0.bias": {
+   "type": "F32",
+   "ne": [
+    15360
+   ],
+   "shape": [
+    15360
+   ],
+   "offset": 1114705152
+  },
+  "layers.10.adaLN_modulation.0.weight": {
+   "type": "Q8_0",
+   "ne": [
+    256,
+    15360
+   ],
+   "shape": [
+    15360,
+    256
+   ],
+   "offset": 1114766592
+  },
+  "layers.10.attention.k_norm.weight": {
+   "type": "F32",
+   "ne": [
+    128
+   ],
+   "shape": [
+    128
+   ],
+   "offset": 1118944512
+  },
+  "layers.10.attention.out.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    3840
+   ],
+   "shape": [
+    3840,
+    3840
+   ],
+   "offset": 1118945024
+  },
+  "layers.10.attention.q_norm.weight": {
+   "type": "F32",
+   "ne": [
+    128
+   ],
+   "shape": [
+    128
+   ],
+   "offset": 1134612224
+  },
+  "layers.10.attention.qkv.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    11520
+   ],
+   "shape": [
+    11520,
+    3840
+   ],
+   "offset": 1134612736
+  },
+  "layers.10.attention_norm1.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 1181614336
+  },
+  "layers.10.attention_norm2.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 1181629696
+  },
+  "layers.10.feed_forward.w1.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    10240
+   ],
+   "shape": [
+    10240,
+    3840
+   ],
+   "offset": 1181645056
+  },
+  "layers.10.feed_forward.w2.weight": {
+   "type": "Q8_0",
+   "ne": [
+    10240,
+    3840
+   ],
+   "shape": [
+    3840,
+    10240
+   ],
+   "offset": 1223424256
+  },
+  "layers.10.feed_forward.w3.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    10240
+   ],
+   "shape": [
+    10240,
+    3840
+   ],
+   "offset": 1265203456
+  },
+  "layers.10.ffn_norm1.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 1306982656
+  },
+  "layers.10.ffn_norm2.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 1306998016
+  },
+  "layers.11.adaLN_modulation.0.bias": {
+   "type": "F32",
+   "ne": [
+    15360
+   ],
+   "shape": [
+    15360
+   ],
+   "offset": 1307013376
+  },
+  "layers.11.adaLN_modulation.0.weight": {
+   "type": "Q8_0",
+   "ne": [
+    256,
+    15360
+   ],
+   "shape": [
+    15360,
+    256
+   ],
+   "offset": 1307074816
+  },
+  "layers.11.attention.k_norm.weight": {
+   "type": "F32",
+   "ne": [
+    128
+   ],
+   "shape": [
+    128
+   ],
+   "offset": 1311252736
+  },
+  "layers.11.attention.out.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    3840
+   ],
+   "shape": [
+    3840,
+    3840
+   ],
+   "offset": 1311253248
+  },
+  "layers.11.attention.q_norm.weight": {
+   "type": "F32",
+   "ne": [
+    128
+   ],
+   "shape": [
+    128
+   ],
+   "offset": 1326920448
+  },
+  "layers.11.attention.qkv.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    11520
+   ],
+   "shape": [
+    11520,
+    3840
+   ],
+   "offset": 1326920960
+  },
+  "layers.11.attention_norm1.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 1373922560
+  },
+  "layers.11.attention_norm2.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 1373937920
+  },
+  "layers.11.feed_forward.w1.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    10240
+   ],
+   "shape": [
+    10240,
+    3840
+   ],
+   "offset": 1373953280
+  },
+  "layers.11.feed_forward.w2.weight": {
+   "type": "Q8_0",
+   "ne": [
+    10240,
+    3840
+   ],
+   "shape": [
+    3840,
+    10240
+   ],
+   "offset": 1415732480
+  },
+  "layers.11.feed_forward.w3.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    10240
+   ],
+   "shape": [
+    10240,
+    3840
+   ],
+   "offset": 1457511680
+  },
+  "layers.11.ffn_norm1.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 1499290880
+  },
+  "layers.11.ffn_norm2.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 1499306240
+  },
+  "layers.12.adaLN_modulation.0.bias": {
+   "type": "F32",
+   "ne": [
+    15360
+   ],
+   "shape": [
+    15360
+   ],
+   "offset": 1499321600
+  },
+  "layers.12.adaLN_modulation.0.weight": {
+   "type": "Q8_0",
+   "ne": [
+    256,
+    15360
+   ],
+   "shape": [
+    15360,
+    256
+   ],
+   "offset": 1499383040
+  },
+  "layers.12.attention.k_norm.weight": {
+   "type": "F32",
+   "ne": [
+    128
+   ],
+   "shape": [
+    128
+   ],
+   "offset": 1503560960
+  },
+  "layers.12.attention.out.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    3840
+   ],
+   "shape": [
+    3840,
+    3840
+   ],
+   "offset": 1503561472
+  },
+  "layers.12.attention.q_norm.weight": {
+   "type": "F32",
+   "ne": [
+    128
+   ],
+   "shape": [
+    128
+   ],
+   "offset": 1519228672
+  },
+  "layers.12.attention.qkv.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    11520
+   ],
+   "shape": [
+    11520,
+    3840
+   ],
+   "offset": 1519229184
+  },
+  "layers.12.attention_norm1.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 1566230784
+  },
+  "layers.12.attention_norm2.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 1566246144
+  },
+  "layers.12.feed_forward.w1.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    10240
+   ],
+   "shape": [
+    10240,
+    3840
+   ],
+   "offset": 1566261504
+  },
+  "layers.12.feed_forward.w2.weight": {
+   "type": "Q8_0",
+   "ne": [
+    10240,
+    3840
+   ],
+   "shape": [
+    3840,
+    10240
+   ],
+   "offset": 1608040704
+  },
+  "layers.12.feed_forward.w3.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    10240
+   ],
+   "shape": [
+    10240,
+    3840
+   ],
+   "offset": 1649819904
+  },
+  "layers.12.ffn_norm1.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 1691599104
+  },
+  "layers.12.ffn_norm2.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 1691614464
+  },
+  "layers.13.adaLN_modulation.0.bias": {
+   "type": "F32",
+   "ne": [
+    15360
+   ],
+   "shape": [
+    15360
+   ],
+   "offset": 1691629824
+  },
+  "layers.13.adaLN_modulation.0.weight": {
+   "type": "Q8_0",
+   "ne": [
+    256,
+    15360
+   ],
+   "shape": [
+    15360,
+    256
+   ],
+   "offset": 1691691264
+  },
+  "layers.13.attention.k_norm.weight": {
+   "type": "F32",
+   "ne": [
+    128
+   ],
+   "shape": [
+    128
+   ],
+   "offset": 1695869184
+  },
+  "layers.13.attention.out.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    3840
+   ],
+   "shape": [
+    3840,
+    3840
+   ],
+   "offset": 1695869696
+  },
+  "layers.13.attention.q_norm.weight": {
+   "type": "F32",
+   "ne": [
+    128
+   ],
+   "shape": [
+    128
+   ],
+   "offset": 1711536896
+  },
+  "layers.13.attention.qkv.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    11520
+   ],
+   "shape": [
+    11520,
+    3840
+   ],
+   "offset": 1711537408
+  },
+  "layers.13.attention_norm1.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 1758539008
+  },
+  "layers.13.attention_norm2.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 1758554368
+  },
+  "layers.13.feed_forward.w1.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    10240
+   ],
+   "shape": [
+    10240,
+    3840
+   ],
+   "offset": 1758569728
+  },
+  "layers.13.feed_forward.w2.weight": {
+   "type": "Q8_0",
+   "ne": [
+    10240,
+    3840
+   ],
+   "shape": [
+    3840,
+    10240
+   ],
+   "offset": 1800348928
+  },
+  "layers.13.feed_forward.w3.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    10240
+   ],
+   "shape": [
+    10240,
+    3840
+   ],
+   "offset": 1842128128
+  },
+  "layers.13.ffn_norm1.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 1883907328
+  },
+  "layers.13.ffn_norm2.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 1883922688
+  },
+  "layers.14.adaLN_modulation.0.bias": {
+   "type": "F32",
+   "ne": [
+    15360
+   ],
+   "shape": [
+    15360
+   ],
+   "offset": 1883938048
+  },
+  "layers.14.adaLN_modulation.0.weight": {
+   "type": "Q8_0",
+   "ne": [
+    256,
+    15360
+   ],
+   "shape": [
+    15360,
+    256
+   ],
+   "offset": 1883999488
+  },
+  "layers.14.attention.k_norm.weight": {
+   "type": "F32",
+   "ne": [
+    128
+   ],
+   "shape": [
+    128
+   ],
+   "offset": 1888177408
+  },
+  "layers.14.attention.out.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    3840
+   ],
+   "shape": [
+    3840,
+    3840
+   ],
+   "offset": 1888177920
+  },
+  "layers.14.attention.q_norm.weight": {
+   "type": "F32",
+   "ne": [
+    128
+   ],
+   "shape": [
+    128
+   ],
+   "offset": 1903845120
+  },
+  "layers.14.attention.qkv.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    11520
+   ],
+   "shape": [
+    11520,
+    3840
+   ],
+   "offset": 1903845632
+  },
+  "layers.14.attention_norm1.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 1950847232
+  },
+  "layers.14.attention_norm2.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 1950862592
+  },
+  "layers.14.feed_forward.w1.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    10240
+   ],
+   "shape": [
+    10240,
+    3840
+   ],
+   "offset": 1950877952
+  },
+  "layers.14.feed_forward.w2.weight": {
+   "type": "Q8_0",
+   "ne": [
+    10240,
+    3840
+   ],
+   "shape": [
+    3840,
+    10240
+   ],
+   "offset": 1992657152
+  },
+  "layers.14.feed_forward.w3.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    10240
+   ],
+   "shape": [
+    10240,
+    3840
+   ],
+   "offset": 2034436352
+  },
+  "layers.14.ffn_norm1.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 2076215552
+  },
+  "layers.14.ffn_norm2.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 2076230912
+  },
+  "layers.15.adaLN_modulation.0.bias": {
+   "type": "F32",
+   "ne": [
+    15360
+   ],
+   "shape": [
+    15360
+   ],
+   "offset": 2076246272
+  },
+  "layers.15.adaLN_modulation.0.weight": {
+   "type": "Q8_0",
+   "ne": [
+    256,
+    15360
+   ],
+   "shape": [
+    15360,
+    256
+   ],
+   "offset": 2076307712
+  },
+  "layers.15.attention.k_norm.weight": {
+   "type": "F32",
+   "ne": [
+    128
+   ],
+   "shape": [
+    128
+   ],
+   "offset": 2080485632
+  },
+  "layers.15.attention.out.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    3840
+   ],
+   "shape": [
+    3840,
+    3840
+   ],
+   "offset": 2080486144
+  },
+  "layers.15.attention.q_norm.weight": {
+   "type": "F32",
+   "ne": [
+    128
+   ],
+   "shape": [
+    128
+   ],
+   "offset": 2096153344
+  },
+  "layers.15.attention.qkv.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    11520
+   ],
+   "shape": [
+    11520,
+    3840
+   ],
+   "offset": 2096153856
+  },
+  "layers.15.attention_norm1.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 2143155456
+  },
+  "layers.15.attention_norm2.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 2143170816
+  },
+  "layers.15.feed_forward.w1.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    10240
+   ],
+   "shape": [
+    10240,
+    3840
+   ],
+   "offset": 2143186176
+  },
+  "layers.15.feed_forward.w2.weight": {
+   "type": "Q8_0",
+   "ne": [
+    10240,
+    3840
+   ],
+   "shape": [
+    3840,
+    10240
+   ],
+   "offset": 2184965376
+  },
+  "layers.15.feed_forward.w3.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    10240
+   ],
+   "shape": [
+    10240,
+    3840
+   ],
+   "offset": 2226744576
+  },
+  "layers.15.ffn_norm1.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 2268523776
+  },
+  "layers.15.ffn_norm2.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 2268539136
+  },
+  "layers.16.adaLN_modulation.0.bias": {
+   "type": "F32",
+   "ne": [
+    15360
+   ],
+   "shape": [
+    15360
+   ],
+   "offset": 2268554496
+  },
+  "layers.16.adaLN_modulation.0.weight": {
+   "type": "Q8_0",
+   "ne": [
+    256,
+    15360
+   ],
+   "shape": [
+    15360,
+    256
+   ],
+   "offset": 2268615936
+  },
+  "layers.16.attention.k_norm.weight": {
+   "type": "F32",
+   "ne": [
+    128
+   ],
+   "shape": [
+    128
+   ],
+   "offset": 2272793856
+  },
+  "layers.16.attention.out.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    3840
+   ],
+   "shape": [
+    3840,
+    3840
+   ],
+   "offset": 2272794368
+  },
+  "layers.16.attention.q_norm.weight": {
+   "type": "F32",
+   "ne": [
+    128
+   ],
+   "shape": [
+    128
+   ],
+   "offset": 2288461568
+  },
+  "layers.16.attention.qkv.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    11520
+   ],
+   "shape": [
+    11520,
+    3840
+   ],
+   "offset": 2288462080
+  },
+  "layers.16.attention_norm1.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 2335463680
+  },
+  "layers.16.attention_norm2.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 2335479040
+  },
+  "layers.16.feed_forward.w1.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    10240
+   ],
+   "shape": [
+    10240,
+    3840
+   ],
+   "offset": 2335494400
+  },
+  "layers.16.feed_forward.w2.weight": {
+   "type": "Q8_0",
+   "ne": [
+    10240,
+    3840
+   ],
+   "shape": [
+    3840,
+    10240
+   ],
+   "offset": 2377273600
+  },
+  "layers.16.feed_forward.w3.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    10240
+   ],
+   "shape": [
+    10240,
+    3840
+   ],
+   "offset": 2419052800
+  },
+  "layers.16.ffn_norm1.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 2460832000
+  },
+  "layers.16.ffn_norm2.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 2460847360
+  },
+  "layers.17.adaLN_modulation.0.bias": {
+   "type": "F32",
+   "ne": [
+    15360
+   ],
+   "shape": [
+    15360
+   ],
+   "offset": 2460862720
+  },
+  "layers.17.adaLN_modulation.0.weight": {
+   "type": "Q8_0",
+   "ne": [
+    256,
+    15360
+   ],
+   "shape": [
+    15360,
+    256
+   ],
+   "offset": 2460924160
+  },
+  "layers.17.attention.k_norm.weight": {
+   "type": "F32",
+   "ne": [
+    128
+   ],
+   "shape": [
+    128
+   ],
+   "offset": 2465102080
+  },
+  "layers.17.attention.out.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    3840
+   ],
+   "shape": [
+    3840,
+    3840
+   ],
+   "offset": 2465102592
+  },
+  "layers.17.attention.q_norm.weight": {
+   "type": "F32",
+   "ne": [
+    128
+   ],
+   "shape": [
+    128
+   ],
+   "offset": 2480769792
+  },
+  "layers.17.attention.qkv.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    11520
+   ],
+   "shape": [
+    11520,
+    3840
+   ],
+   "offset": 2480770304
+  },
+  "layers.17.attention_norm1.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 2527771904
+  },
+  "layers.17.attention_norm2.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 2527787264
+  },
+  "layers.17.feed_forward.w1.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    10240
+   ],
+   "shape": [
+    10240,
+    3840
+   ],
+   "offset": 2527802624
+  },
+  "layers.17.feed_forward.w2.weight": {
+   "type": "Q8_0",
+   "ne": [
+    10240,
+    3840
+   ],
+   "shape": [
+    3840,
+    10240
+   ],
+   "offset": 2569581824
+  },
+  "layers.17.feed_forward.w3.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    10240
+   ],
+   "shape": [
+    10240,
+    3840
+   ],
+   "offset": 2611361024
+  },
+  "layers.17.ffn_norm1.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 2653140224
+  },
+  "layers.17.ffn_norm2.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 2653155584
+  },
+  "layers.18.adaLN_modulation.0.bias": {
+   "type": "F32",
+   "ne": [
+    15360
+   ],
+   "shape": [
+    15360
+   ],
+   "offset": 2653170944
+  },
+  "layers.18.adaLN_modulation.0.weight": {
+   "type": "Q8_0",
+   "ne": [
+    256,
+    15360
+   ],
+   "shape": [
+    15360,
+    256
+   ],
+   "offset": 2653232384
+  },
+  "layers.18.attention.k_norm.weight": {
+   "type": "F32",
+   "ne": [
+    128
+   ],
+   "shape": [
+    128
+   ],
+   "offset": 2657410304
+  },
+  "layers.18.attention.out.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    3840
+   ],
+   "shape": [
+    3840,
+    3840
+   ],
+   "offset": 2657410816
+  },
+  "layers.18.attention.q_norm.weight": {
+   "type": "F32",
+   "ne": [
+    128
+   ],
+   "shape": [
+    128
+   ],
+   "offset": 2673078016
+  },
+  "layers.18.attention.qkv.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    11520
+   ],
+   "shape": [
+    11520,
+    3840
+   ],
+   "offset": 2673078528
+  },
+  "layers.18.attention_norm1.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 2720080128
+  },
+  "layers.18.attention_norm2.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 2720095488
+  },
+  "layers.18.feed_forward.w1.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    10240
+   ],
+   "shape": [
+    10240,
+    3840
+   ],
+   "offset": 2720110848
+  },
+  "layers.18.feed_forward.w2.weight": {
+   "type": "Q8_0",
+   "ne": [
+    10240,
+    3840
+   ],
+   "shape": [
+    3840,
+    10240
+   ],
+   "offset": 2761890048
+  },
+  "layers.18.feed_forward.w3.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    10240
+   ],
+   "shape": [
+    10240,
+    3840
+   ],
+   "offset": 2803669248
+  },
+  "layers.18.ffn_norm1.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 2845448448
+  },
+  "layers.18.ffn_norm2.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 2845463808
+  },
+  "layers.19.adaLN_modulation.0.bias": {
+   "type": "F32",
+   "ne": [
+    15360
+   ],
+   "shape": [
+    15360
+   ],
+   "offset": 2845479168
+  },
+  "layers.19.adaLN_modulation.0.weight": {
+   "type": "Q8_0",
+   "ne": [
+    256,
+    15360
+   ],
+   "shape": [
+    15360,
+    256
+   ],
+   "offset": 2845540608
+  },
+  "layers.19.attention.k_norm.weight": {
+   "type": "F32",
+   "ne": [
+    128
+   ],
+   "shape": [
+    128
+   ],
+   "offset": 2849718528
+  },
+  "layers.19.attention.out.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    3840
+   ],
+   "shape": [
+    3840,
+    3840
+   ],
+   "offset": 2849719040
+  },
+  "layers.19.attention.q_norm.weight": {
+   "type": "F32",
+   "ne": [
+    128
+   ],
+   "shape": [
+    128
+   ],
+   "offset": 2865386240
+  },
+  "layers.19.attention.qkv.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    11520
+   ],
+   "shape": [
+    11520,
+    3840
+   ],
+   "offset": 2865386752
+  },
+  "layers.19.attention_norm1.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 2912388352
+  },
+  "layers.19.attention_norm2.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 2912403712
+  },
+  "layers.19.feed_forward.w1.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    10240
+   ],
+   "shape": [
+    10240,
+    3840
+   ],
+   "offset": 2912419072
+  },
+  "layers.19.feed_forward.w2.weight": {
+   "type": "Q8_0",
+   "ne": [
+    10240,
+    3840
+   ],
+   "shape": [
+    3840,
+    10240
+   ],
+   "offset": 2954198272
+  },
+  "layers.19.feed_forward.w3.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    10240
+   ],
+   "shape": [
+    10240,
+    3840
+   ],
+   "offset": 2995977472
+  },
+  "layers.19.ffn_norm1.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 3037756672
+  },
+  "layers.19.ffn_norm2.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 3037772032
+  },
+  "layers.2.adaLN_modulation.0.bias": {
+   "type": "F32",
+   "ne": [
+    15360
+   ],
+   "shape": [
+    15360
+   ],
+   "offset": 3037787392
+  },
+  "layers.2.adaLN_modulation.0.weight": {
+   "type": "Q8_0",
+   "ne": [
+    256,
+    15360
+   ],
+   "shape": [
+    15360,
+    256
+   ],
+   "offset": 3037848832
+  },
+  "layers.2.attention.k_norm.weight": {
+   "type": "F32",
+   "ne": [
+    128
+   ],
+   "shape": [
+    128
+   ],
+   "offset": 3042026752
+  },
+  "layers.2.attention.out.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    3840
+   ],
+   "shape": [
+    3840,
+    3840
+   ],
+   "offset": 3042027264
+  },
+  "layers.2.attention.q_norm.weight": {
+   "type": "F32",
+   "ne": [
+    128
+   ],
+   "shape": [
+    128
+   ],
+   "offset": 3057694464
+  },
+  "layers.2.attention.qkv.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    11520
+   ],
+   "shape": [
+    11520,
+    3840
+   ],
+   "offset": 3057694976
+  },
+  "layers.2.attention_norm1.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 3104696576
+  },
+  "layers.2.attention_norm2.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 3104711936
+  },
+  "layers.2.feed_forward.w1.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    10240
+   ],
+   "shape": [
+    10240,
+    3840
+   ],
+   "offset": 3104727296
+  },
+  "layers.2.feed_forward.w2.weight": {
+   "type": "Q8_0",
+   "ne": [
+    10240,
+    3840
+   ],
+   "shape": [
+    3840,
+    10240
+   ],
+   "offset": 3146506496
+  },
+  "layers.2.feed_forward.w3.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    10240
+   ],
+   "shape": [
+    10240,
+    3840
+   ],
+   "offset": 3188285696
+  },
+  "layers.2.ffn_norm1.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 3230064896
+  },
+  "layers.2.ffn_norm2.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 3230080256
+  },
+  "layers.20.adaLN_modulation.0.bias": {
+   "type": "F32",
+   "ne": [
+    15360
+   ],
+   "shape": [
+    15360
+   ],
+   "offset": 3230095616
+  },
+  "layers.20.adaLN_modulation.0.weight": {
+   "type": "Q8_0",
+   "ne": [
+    256,
+    15360
+   ],
+   "shape": [
+    15360,
+    256
+   ],
+   "offset": 3230157056
+  },
+  "layers.20.attention.k_norm.weight": {
+   "type": "F32",
+   "ne": [
+    128
+   ],
+   "shape": [
+    128
+   ],
+   "offset": 3234334976
+  },
+  "layers.20.attention.out.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    3840
+   ],
+   "shape": [
+    3840,
+    3840
+   ],
+   "offset": 3234335488
+  },
+  "layers.20.attention.q_norm.weight": {
+   "type": "F32",
+   "ne": [
+    128
+   ],
+   "shape": [
+    128
+   ],
+   "offset": 3250002688
+  },
+  "layers.20.attention.qkv.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    11520
+   ],
+   "shape": [
+    11520,
+    3840
+   ],
+   "offset": 3250003200
+  },
+  "layers.20.attention_norm1.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 3297004800
+  },
+  "layers.20.attention_norm2.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 3297020160
+  },
+  "layers.20.feed_forward.w1.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    10240
+   ],
+   "shape": [
+    10240,
+    3840
+   ],
+   "offset": 3297035520
+  },
+  "layers.20.feed_forward.w2.weight": {
+   "type": "Q8_0",
+   "ne": [
+    10240,
+    3840
+   ],
+   "shape": [
+    3840,
+    10240
+   ],
+   "offset": 3338814720
+  },
+  "layers.20.feed_forward.w3.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    10240
+   ],
+   "shape": [
+    10240,
+    3840
+   ],
+   "offset": 3380593920
+  },
+  "layers.20.ffn_norm1.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 3422373120
+  },
+  "layers.20.ffn_norm2.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 3422388480
+  },
+  "layers.21.adaLN_modulation.0.bias": {
+   "type": "F32",
+   "ne": [
+    15360
+   ],
+   "shape": [
+    15360
+   ],
+   "offset": 3422403840
+  },
+  "layers.21.adaLN_modulation.0.weight": {
+   "type": "Q8_0",
+   "ne": [
+    256,
+    15360
+   ],
+   "shape": [
+    15360,
+    256
+   ],
+   "offset": 3422465280
+  },
+  "layers.21.attention.k_norm.weight": {
+   "type": "F32",
+   "ne": [
+    128
+   ],
+   "shape": [
+    128
+   ],
+   "offset": 3426643200
+  },
+  "layers.21.attention.out.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    3840
+   ],
+   "shape": [
+    3840,
+    3840
+   ],
+   "offset": 3426643712
+  },
+  "layers.21.attention.q_norm.weight": {
+   "type": "F32",
+   "ne": [
+    128
+   ],
+   "shape": [
+    128
+   ],
+   "offset": 3442310912
+  },
+  "layers.21.attention.qkv.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    11520
+   ],
+   "shape": [
+    11520,
+    3840
+   ],
+   "offset": 3442311424
+  },
+  "layers.21.attention_norm1.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 3489313024
+  },
+  "layers.21.attention_norm2.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 3489328384
+  },
+  "layers.21.feed_forward.w1.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    10240
+   ],
+   "shape": [
+    10240,
+    3840
+   ],
+   "offset": 3489343744
+  },
+  "layers.21.feed_forward.w2.weight": {
+   "type": "Q8_0",
+   "ne": [
+    10240,
+    3840
+   ],
+   "shape": [
+    3840,
+    10240
+   ],
+   "offset": 3531122944
+  },
+  "layers.21.feed_forward.w3.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    10240
+   ],
+   "shape": [
+    10240,
+    3840
+   ],
+   "offset": 3572902144
+  },
+  "layers.21.ffn_norm1.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 3614681344
+  },
+  "layers.21.ffn_norm2.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 3614696704
+  },
+  "layers.22.adaLN_modulation.0.bias": {
+   "type": "F32",
+   "ne": [
+    15360
+   ],
+   "shape": [
+    15360
+   ],
+   "offset": 3614712064
+  },
+  "layers.22.adaLN_modulation.0.weight": {
+   "type": "Q8_0",
+   "ne": [
+    256,
+    15360
+   ],
+   "shape": [
+    15360,
+    256
+   ],
+   "offset": 3614773504
+  },
+  "layers.22.attention.k_norm.weight": {
+   "type": "F32",
+   "ne": [
+    128
+   ],
+   "shape": [
+    128
+   ],
+   "offset": 3618951424
+  },
+  "layers.22.attention.out.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    3840
+   ],
+   "shape": [
+    3840,
+    3840
+   ],
+   "offset": 3618951936
+  },
+  "layers.22.attention.q_norm.weight": {
+   "type": "F32",
+   "ne": [
+    128
+   ],
+   "shape": [
+    128
+   ],
+   "offset": 3634619136
+  },
+  "layers.22.attention.qkv.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    11520
+   ],
+   "shape": [
+    11520,
+    3840
+   ],
+   "offset": 3634619648
+  },
+  "layers.22.attention_norm1.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 3681621248
+  },
+  "layers.22.attention_norm2.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 3681636608
+  },
+  "layers.22.feed_forward.w1.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    10240
+   ],
+   "shape": [
+    10240,
+    3840
+   ],
+   "offset": 3681651968
+  },
+  "layers.22.feed_forward.w2.weight": {
+   "type": "Q8_0",
+   "ne": [
+    10240,
+    3840
+   ],
+   "shape": [
+    3840,
+    10240
+   ],
+   "offset": 3723431168
+  },
+  "layers.22.feed_forward.w3.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    10240
+   ],
+   "shape": [
+    10240,
+    3840
+   ],
+   "offset": 3765210368
+  },
+  "layers.22.ffn_norm1.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 3806989568
+  },
+  "layers.22.ffn_norm2.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 3807004928
+  },
+  "layers.23.adaLN_modulation.0.bias": {
+   "type": "F32",
+   "ne": [
+    15360
+   ],
+   "shape": [
+    15360
+   ],
+   "offset": 3807020288
+  },
+  "layers.23.adaLN_modulation.0.weight": {
+   "type": "Q8_0",
+   "ne": [
+    256,
+    15360
+   ],
+   "shape": [
+    15360,
+    256
+   ],
+   "offset": 3807081728
+  },
+  "layers.23.attention.k_norm.weight": {
+   "type": "F32",
+   "ne": [
+    128
+   ],
+   "shape": [
+    128
+   ],
+   "offset": 3811259648
+  },
+  "layers.23.attention.out.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    3840
+   ],
+   "shape": [
+    3840,
+    3840
+   ],
+   "offset": 3811260160
+  },
+  "layers.23.attention.q_norm.weight": {
+   "type": "F32",
+   "ne": [
+    128
+   ],
+   "shape": [
+    128
+   ],
+   "offset": 3826927360
+  },
+  "layers.23.attention.qkv.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    11520
+   ],
+   "shape": [
+    11520,
+    3840
+   ],
+   "offset": 3826927872
+  },
+  "layers.23.attention_norm1.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 3873929472
+  },
+  "layers.23.attention_norm2.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 3873944832
+  },
+  "layers.23.feed_forward.w1.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    10240
+   ],
+   "shape": [
+    10240,
+    3840
+   ],
+   "offset": 3873960192
+  },
+  "layers.23.feed_forward.w2.weight": {
+   "type": "Q8_0",
+   "ne": [
+    10240,
+    3840
+   ],
+   "shape": [
+    3840,
+    10240
+   ],
+   "offset": 3915739392
+  },
+  "layers.23.feed_forward.w3.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    10240
+   ],
+   "shape": [
+    10240,
+    3840
+   ],
+   "offset": 3957518592
+  },
+  "layers.23.ffn_norm1.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 3999297792
+  },
+  "layers.23.ffn_norm2.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 3999313152
+  },
+  "layers.24.adaLN_modulation.0.bias": {
+   "type": "F32",
+   "ne": [
+    15360
+   ],
+   "shape": [
+    15360
+   ],
+   "offset": 3999328512
+  },
+  "layers.24.adaLN_modulation.0.weight": {
+   "type": "Q8_0",
+   "ne": [
+    256,
+    15360
+   ],
+   "shape": [
+    15360,
+    256
+   ],
+   "offset": 3999389952
+  },
+  "layers.24.attention.k_norm.weight": {
+   "type": "F32",
+   "ne": [
+    128
+   ],
+   "shape": [
+    128
+   ],
+   "offset": 4003567872
+  },
+  "layers.24.attention.out.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    3840
+   ],
+   "shape": [
+    3840,
+    3840
+   ],
+   "offset": 4003568384
+  },
+  "layers.24.attention.q_norm.weight": {
+   "type": "F32",
+   "ne": [
+    128
+   ],
+   "shape": [
+    128
+   ],
+   "offset": 4019235584
+  },
+  "layers.24.attention.qkv.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    11520
+   ],
+   "shape": [
+    11520,
+    3840
+   ],
+   "offset": 4019236096
+  },
+  "layers.24.attention_norm1.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 4066237696
+  },
+  "layers.24.attention_norm2.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 4066253056
+  },
+  "layers.24.feed_forward.w1.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    10240
+   ],
+   "shape": [
+    10240,
+    3840
+   ],
+   "offset": 4066268416
+  },
+  "layers.24.feed_forward.w2.weight": {
+   "type": "Q8_0",
+   "ne": [
+    10240,
+    3840
+   ],
+   "shape": [
+    3840,
+    10240
+   ],
+   "offset": 4108047616
+  },
+  "layers.24.feed_forward.w3.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    10240
+   ],
+   "shape": [
+    10240,
+    3840
+   ],
+   "offset": 4149826816
+  },
+  "layers.24.ffn_norm1.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 4191606016
+  },
+  "layers.24.ffn_norm2.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 4191621376
+  },
+  "layers.25.adaLN_modulation.0.bias": {
+   "type": "F32",
+   "ne": [
+    15360
+   ],
+   "shape": [
+    15360
+   ],
+   "offset": 4191636736
+  },
+  "layers.25.adaLN_modulation.0.weight": {
+   "type": "Q8_0",
+   "ne": [
+    256,
+    15360
+   ],
+   "shape": [
+    15360,
+    256
+   ],
+   "offset": 4191698176
+  },
+  "layers.25.attention.k_norm.weight": {
+   "type": "F32",
+   "ne": [
+    128
+   ],
+   "shape": [
+    128
+   ],
+   "offset": 4195876096
+  },
+  "layers.25.attention.out.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    3840
+   ],
+   "shape": [
+    3840,
+    3840
+   ],
+   "offset": 4195876608
+  },
+  "layers.25.attention.q_norm.weight": {
+   "type": "F32",
+   "ne": [
+    128
+   ],
+   "shape": [
+    128
+   ],
+   "offset": 4211543808
+  },
+  "layers.25.attention.qkv.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    11520
+   ],
+   "shape": [
+    11520,
+    3840
+   ],
+   "offset": 4211544320
+  },
+  "layers.25.attention_norm1.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 4258545920
+  },
+  "layers.25.attention_norm2.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 4258561280
+  },
+  "layers.25.feed_forward.w1.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    10240
+   ],
+   "shape": [
+    10240,
+    3840
+   ],
+   "offset": 4258576640
+  },
+  "layers.25.feed_forward.w2.weight": {
+   "type": "Q8_0",
+   "ne": [
+    10240,
+    3840
+   ],
+   "shape": [
+    3840,
+    10240
+   ],
+   "offset": 4300355840
+  },
+  "layers.25.feed_forward.w3.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    10240
+   ],
+   "shape": [
+    10240,
+    3840
+   ],
+   "offset": 4342135040
+  },
+  "layers.25.ffn_norm1.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 4383914240
+  },
+  "layers.25.ffn_norm2.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 4383929600
+  },
+  "layers.26.adaLN_modulation.0.bias": {
+   "type": "F32",
+   "ne": [
+    15360
+   ],
+   "shape": [
+    15360
+   ],
+   "offset": 4383944960
+  },
+  "layers.26.adaLN_modulation.0.weight": {
+   "type": "Q8_0",
+   "ne": [
+    256,
+    15360
+   ],
+   "shape": [
+    15360,
+    256
+   ],
+   "offset": 4384006400
+  },
+  "layers.26.attention.k_norm.weight": {
+   "type": "F32",
+   "ne": [
+    128
+   ],
+   "shape": [
+    128
+   ],
+   "offset": 4388184320
+  },
+  "layers.26.attention.out.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    3840
+   ],
+   "shape": [
+    3840,
+    3840
+   ],
+   "offset": 4388184832
+  },
+  "layers.26.attention.q_norm.weight": {
+   "type": "F32",
+   "ne": [
+    128
+   ],
+   "shape": [
+    128
+   ],
+   "offset": 4403852032
+  },
+  "layers.26.attention.qkv.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    11520
+   ],
+   "shape": [
+    11520,
+    3840
+   ],
+   "offset": 4403852544
+  },
+  "layers.26.attention_norm1.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 4450854144
+  },
+  "layers.26.attention_norm2.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 4450869504
+  },
+  "layers.26.feed_forward.w1.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    10240
+   ],
+   "shape": [
+    10240,
+    3840
+   ],
+   "offset": 4450884864
+  },
+  "layers.26.feed_forward.w2.weight": {
+   "type": "Q8_0",
+   "ne": [
+    10240,
+    3840
+   ],
+   "shape": [
+    3840,
+    10240
+   ],
+   "offset": 4492664064
+  },
+  "layers.26.feed_forward.w3.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    10240
+   ],
+   "shape": [
+    10240,
+    3840
+   ],
+   "offset": 4534443264
+  },
+  "layers.26.ffn_norm1.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 4576222464
+  },
+  "layers.26.ffn_norm2.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 4576237824
+  },
+  "layers.27.adaLN_modulation.0.bias": {
+   "type": "F32",
+   "ne": [
+    15360
+   ],
+   "shape": [
+    15360
+   ],
+   "offset": 4576253184
+  },
+  "layers.27.adaLN_modulation.0.weight": {
+   "type": "Q8_0",
+   "ne": [
+    256,
+    15360
+   ],
+   "shape": [
+    15360,
+    256
+   ],
+   "offset": 4576314624
+  },
+  "layers.27.attention.k_norm.weight": {
+   "type": "F32",
+   "ne": [
+    128
+   ],
+   "shape": [
+    128
+   ],
+   "offset": 4580492544
+  },
+  "layers.27.attention.out.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    3840
+   ],
+   "shape": [
+    3840,
+    3840
+   ],
+   "offset": 4580493056
+  },
+  "layers.27.attention.q_norm.weight": {
+   "type": "F32",
+   "ne": [
+    128
+   ],
+   "shape": [
+    128
+   ],
+   "offset": 4596160256
+  },
+  "layers.27.attention.qkv.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    11520
+   ],
+   "shape": [
+    11520,
+    3840
+   ],
+   "offset": 4596160768
+  },
+  "layers.27.attention_norm1.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 4643162368
+  },
+  "layers.27.attention_norm2.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 4643177728
+  },
+  "layers.27.feed_forward.w1.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    10240
+   ],
+   "shape": [
+    10240,
+    3840
+   ],
+   "offset": 4643193088
+  },
+  "layers.27.feed_forward.w2.weight": {
+   "type": "Q8_0",
+   "ne": [
+    10240,
+    3840
+   ],
+   "shape": [
+    3840,
+    10240
+   ],
+   "offset": 4684972288
+  },
+  "layers.27.feed_forward.w3.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    10240
+   ],
+   "shape": [
+    10240,
+    3840
+   ],
+   "offset": 4726751488
+  },
+  "layers.27.ffn_norm1.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 4768530688
+  },
+  "layers.27.ffn_norm2.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 4768546048
+  },
+  "layers.28.adaLN_modulation.0.bias": {
+   "type": "F32",
+   "ne": [
+    15360
+   ],
+   "shape": [
+    15360
+   ],
+   "offset": 4768561408
+  },
+  "layers.28.adaLN_modulation.0.weight": {
+   "type": "Q8_0",
+   "ne": [
+    256,
+    15360
+   ],
+   "shape": [
+    15360,
+    256
+   ],
+   "offset": 4768622848
+  },
+  "layers.28.attention.k_norm.weight": {
+   "type": "F32",
+   "ne": [
+    128
+   ],
+   "shape": [
+    128
+   ],
+   "offset": 4772800768
+  },
+  "layers.28.attention.out.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    3840
+   ],
+   "shape": [
+    3840,
+    3840
+   ],
+   "offset": 4772801280
+  },
+  "layers.28.attention.q_norm.weight": {
+   "type": "F32",
+   "ne": [
+    128
+   ],
+   "shape": [
+    128
+   ],
+   "offset": 4788468480
+  },
+  "layers.28.attention.qkv.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    11520
+   ],
+   "shape": [
+    11520,
+    3840
+   ],
+   "offset": 4788468992
+  },
+  "layers.28.attention_norm1.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 4835470592
+  },
+  "layers.28.attention_norm2.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 4835485952
+  },
+  "layers.28.feed_forward.w1.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    10240
+   ],
+   "shape": [
+    10240,
+    3840
+   ],
+   "offset": 4835501312
+  },
+  "layers.28.feed_forward.w2.weight": {
+   "type": "Q8_0",
+   "ne": [
+    10240,
+    3840
+   ],
+   "shape": [
+    3840,
+    10240
+   ],
+   "offset": 4877280512
+  },
+  "layers.28.feed_forward.w3.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    10240
+   ],
+   "shape": [
+    10240,
+    3840
+   ],
+   "offset": 4919059712
+  },
+  "layers.28.ffn_norm1.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 4960838912
+  },
+  "layers.28.ffn_norm2.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 4960854272
+  },
+  "layers.29.adaLN_modulation.0.bias": {
+   "type": "F32",
+   "ne": [
+    15360
+   ],
+   "shape": [
+    15360
+   ],
+   "offset": 4960869632
+  },
+  "layers.29.adaLN_modulation.0.weight": {
+   "type": "Q8_0",
+   "ne": [
+    256,
+    15360
+   ],
+   "shape": [
+    15360,
+    256
+   ],
+   "offset": 4960931072
+  },
+  "layers.29.attention.k_norm.weight": {
+   "type": "F32",
+   "ne": [
+    128
+   ],
+   "shape": [
+    128
+   ],
+   "offset": 4965108992
+  },
+  "layers.29.attention.out.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    3840
+   ],
+   "shape": [
+    3840,
+    3840
+   ],
+   "offset": 4965109504
+  },
+  "layers.29.attention.q_norm.weight": {
+   "type": "F32",
+   "ne": [
+    128
+   ],
+   "shape": [
+    128
+   ],
+   "offset": 4980776704
+  },
+  "layers.29.attention.qkv.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    11520
+   ],
+   "shape": [
+    11520,
+    3840
+   ],
+   "offset": 4980777216
+  },
+  "layers.29.attention_norm1.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 5027778816
+  },
+  "layers.29.attention_norm2.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 5027794176
+  },
+  "layers.29.feed_forward.w1.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    10240
+   ],
+   "shape": [
+    10240,
+    3840
+   ],
+   "offset": 5027809536
+  },
+  "layers.29.feed_forward.w2.weight": {
+   "type": "Q8_0",
+   "ne": [
+    10240,
+    3840
+   ],
+   "shape": [
+    3840,
+    10240
+   ],
+   "offset": 5069588736
+  },
+  "layers.29.feed_forward.w3.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    10240
+   ],
+   "shape": [
+    10240,
+    3840
+   ],
+   "offset": 5111367936
+  },
+  "layers.29.ffn_norm1.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 5153147136
+  },
+  "layers.29.ffn_norm2.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 5153162496
+  },
+  "layers.3.adaLN_modulation.0.bias": {
+   "type": "F32",
+   "ne": [
+    15360
+   ],
+   "shape": [
+    15360
+   ],
+   "offset": 5153177856
+  },
+  "layers.3.adaLN_modulation.0.weight": {
+   "type": "Q8_0",
+   "ne": [
+    256,
+    15360
+   ],
+   "shape": [
+    15360,
+    256
+   ],
+   "offset": 5153239296
+  },
+  "layers.3.attention.k_norm.weight": {
+   "type": "F32",
+   "ne": [
+    128
+   ],
+   "shape": [
+    128
+   ],
+   "offset": 5157417216
+  },
+  "layers.3.attention.out.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    3840
+   ],
+   "shape": [
+    3840,
+    3840
+   ],
+   "offset": 5157417728
+  },
+  "layers.3.attention.q_norm.weight": {
+   "type": "F32",
+   "ne": [
+    128
+   ],
+   "shape": [
+    128
+   ],
+   "offset": 5173084928
+  },
+  "layers.3.attention.qkv.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    11520
+   ],
+   "shape": [
+    11520,
+    3840
+   ],
+   "offset": 5173085440
+  },
+  "layers.3.attention_norm1.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 5220087040
+  },
+  "layers.3.attention_norm2.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 5220102400
+  },
+  "layers.3.feed_forward.w1.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    10240
+   ],
+   "shape": [
+    10240,
+    3840
+   ],
+   "offset": 5220117760
+  },
+  "layers.3.feed_forward.w2.weight": {
+   "type": "Q8_0",
+   "ne": [
+    10240,
+    3840
+   ],
+   "shape": [
+    3840,
+    10240
+   ],
+   "offset": 5261896960
+  },
+  "layers.3.feed_forward.w3.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    10240
+   ],
+   "shape": [
+    10240,
+    3840
+   ],
+   "offset": 5303676160
+  },
+  "layers.3.ffn_norm1.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 5345455360
+  },
+  "layers.3.ffn_norm2.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 5345470720
+  },
+  "layers.4.adaLN_modulation.0.bias": {
+   "type": "F32",
+   "ne": [
+    15360
+   ],
+   "shape": [
+    15360
+   ],
+   "offset": 5345486080
+  },
+  "layers.4.adaLN_modulation.0.weight": {
+   "type": "Q8_0",
+   "ne": [
+    256,
+    15360
+   ],
+   "shape": [
+    15360,
+    256
+   ],
+   "offset": 5345547520
+  },
+  "layers.4.attention.k_norm.weight": {
+   "type": "F32",
+   "ne": [
+    128
+   ],
+   "shape": [
+    128
+   ],
+   "offset": 5349725440
+  },
+  "layers.4.attention.out.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    3840
+   ],
+   "shape": [
+    3840,
+    3840
+   ],
+   "offset": 5349725952
+  },
+  "layers.4.attention.q_norm.weight": {
+   "type": "F32",
+   "ne": [
+    128
+   ],
+   "shape": [
+    128
+   ],
+   "offset": 5365393152
+  },
+  "layers.4.attention.qkv.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    11520
+   ],
+   "shape": [
+    11520,
+    3840
+   ],
+   "offset": 5365393664
+  },
+  "layers.4.attention_norm1.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 5412395264
+  },
+  "layers.4.attention_norm2.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 5412410624
+  },
+  "layers.4.feed_forward.w1.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    10240
+   ],
+   "shape": [
+    10240,
+    3840
+   ],
+   "offset": 5412425984
+  },
+  "layers.4.feed_forward.w2.weight": {
+   "type": "Q8_0",
+   "ne": [
+    10240,
+    3840
+   ],
+   "shape": [
+    3840,
+    10240
+   ],
+   "offset": 5454205184
+  },
+  "layers.4.feed_forward.w3.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    10240
+   ],
+   "shape": [
+    10240,
+    3840
+   ],
+   "offset": 5495984384
+  },
+  "layers.4.ffn_norm1.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 5537763584
+  },
+  "layers.4.ffn_norm2.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 5537778944
+  },
+  "layers.5.adaLN_modulation.0.bias": {
+   "type": "F32",
+   "ne": [
+    15360
+   ],
+   "shape": [
+    15360
+   ],
+   "offset": 5537794304
+  },
+  "layers.5.adaLN_modulation.0.weight": {
+   "type": "Q8_0",
+   "ne": [
+    256,
+    15360
+   ],
+   "shape": [
+    15360,
+    256
+   ],
+   "offset": 5537855744
+  },
+  "layers.5.attention.k_norm.weight": {
+   "type": "F32",
+   "ne": [
+    128
+   ],
+   "shape": [
+    128
+   ],
+   "offset": 5542033664
+  },
+  "layers.5.attention.out.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    3840
+   ],
+   "shape": [
+    3840,
+    3840
+   ],
+   "offset": 5542034176
+  },
+  "layers.5.attention.q_norm.weight": {
+   "type": "F32",
+   "ne": [
+    128
+   ],
+   "shape": [
+    128
+   ],
+   "offset": 5557701376
+  },
+  "layers.5.attention.qkv.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    11520
+   ],
+   "shape": [
+    11520,
+    3840
+   ],
+   "offset": 5557701888
+  },
+  "layers.5.attention_norm1.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 5604703488
+  },
+  "layers.5.attention_norm2.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 5604718848
+  },
+  "layers.5.feed_forward.w1.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    10240
+   ],
+   "shape": [
+    10240,
+    3840
+   ],
+   "offset": 5604734208
+  },
+  "layers.5.feed_forward.w2.weight": {
+   "type": "Q8_0",
+   "ne": [
+    10240,
+    3840
+   ],
+   "shape": [
+    3840,
+    10240
+   ],
+   "offset": 5646513408
+  },
+  "layers.5.feed_forward.w3.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    10240
+   ],
+   "shape": [
+    10240,
+    3840
+   ],
+   "offset": 5688292608
+  },
+  "layers.5.ffn_norm1.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 5730071808
+  },
+  "layers.5.ffn_norm2.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 5730087168
+  },
+  "layers.6.adaLN_modulation.0.bias": {
+   "type": "F32",
+   "ne": [
+    15360
+   ],
+   "shape": [
+    15360
+   ],
+   "offset": 5730102528
+  },
+  "layers.6.adaLN_modulation.0.weight": {
+   "type": "Q8_0",
+   "ne": [
+    256,
+    15360
+   ],
+   "shape": [
+    15360,
+    256
+   ],
+   "offset": 5730163968
+  },
+  "layers.6.attention.k_norm.weight": {
+   "type": "F32",
+   "ne": [
+    128
+   ],
+   "shape": [
+    128
+   ],
+   "offset": 5734341888
+  },
+  "layers.6.attention.out.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    3840
+   ],
+   "shape": [
+    3840,
+    3840
+   ],
+   "offset": 5734342400
+  },
+  "layers.6.attention.q_norm.weight": {
+   "type": "F32",
+   "ne": [
+    128
+   ],
+   "shape": [
+    128
+   ],
+   "offset": 5750009600
+  },
+  "layers.6.attention.qkv.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    11520
+   ],
+   "shape": [
+    11520,
+    3840
+   ],
+   "offset": 5750010112
+  },
+  "layers.6.attention_norm1.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 5797011712
+  },
+  "layers.6.attention_norm2.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 5797027072
+  },
+  "layers.6.feed_forward.w1.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    10240
+   ],
+   "shape": [
+    10240,
+    3840
+   ],
+   "offset": 5797042432
+  },
+  "layers.6.feed_forward.w2.weight": {
+   "type": "Q8_0",
+   "ne": [
+    10240,
+    3840
+   ],
+   "shape": [
+    3840,
+    10240
+   ],
+   "offset": 5838821632
+  },
+  "layers.6.feed_forward.w3.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    10240
+   ],
+   "shape": [
+    10240,
+    3840
+   ],
+   "offset": 5880600832
+  },
+  "layers.6.ffn_norm1.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 5922380032
+  },
+  "layers.6.ffn_norm2.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 5922395392
+  },
+  "layers.7.adaLN_modulation.0.bias": {
+   "type": "F32",
+   "ne": [
+    15360
+   ],
+   "shape": [
+    15360
+   ],
+   "offset": 5922410752
+  },
+  "layers.7.adaLN_modulation.0.weight": {
+   "type": "Q8_0",
+   "ne": [
+    256,
+    15360
+   ],
+   "shape": [
+    15360,
+    256
+   ],
+   "offset": 5922472192
+  },
+  "layers.7.attention.k_norm.weight": {
+   "type": "F32",
+   "ne": [
+    128
+   ],
+   "shape": [
+    128
+   ],
+   "offset": 5926650112
+  },
+  "layers.7.attention.out.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    3840
+   ],
+   "shape": [
+    3840,
+    3840
+   ],
+   "offset": 5926650624
+  },
+  "layers.7.attention.q_norm.weight": {
+   "type": "F32",
+   "ne": [
+    128
+   ],
+   "shape": [
+    128
+   ],
+   "offset": 5942317824
+  },
+  "layers.7.attention.qkv.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    11520
+   ],
+   "shape": [
+    11520,
+    3840
+   ],
+   "offset": 5942318336
+  },
+  "layers.7.attention_norm1.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 5989319936
+  },
+  "layers.7.attention_norm2.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 5989335296
+  },
+  "layers.7.feed_forward.w1.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    10240
+   ],
+   "shape": [
+    10240,
+    3840
+   ],
+   "offset": 5989350656
+  },
+  "layers.7.feed_forward.w2.weight": {
+   "type": "Q8_0",
+   "ne": [
+    10240,
+    3840
+   ],
+   "shape": [
+    3840,
+    10240
+   ],
+   "offset": 6031129856
+  },
+  "layers.7.feed_forward.w3.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    10240
+   ],
+   "shape": [
+    10240,
+    3840
+   ],
+   "offset": 6072909056
+  },
+  "layers.7.ffn_norm1.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 6114688256
+  },
+  "layers.7.ffn_norm2.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 6114703616
+  },
+  "layers.8.adaLN_modulation.0.bias": {
+   "type": "F32",
+   "ne": [
+    15360
+   ],
+   "shape": [
+    15360
+   ],
+   "offset": 6114718976
+  },
+  "layers.8.adaLN_modulation.0.weight": {
+   "type": "Q8_0",
+   "ne": [
+    256,
+    15360
+   ],
+   "shape": [
+    15360,
+    256
+   ],
+   "offset": 6114780416
+  },
+  "layers.8.attention.k_norm.weight": {
+   "type": "F32",
+   "ne": [
+    128
+   ],
+   "shape": [
+    128
+   ],
+   "offset": 6118958336
+  },
+  "layers.8.attention.out.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    3840
+   ],
+   "shape": [
+    3840,
+    3840
+   ],
+   "offset": 6118958848
+  },
+  "layers.8.attention.q_norm.weight": {
+   "type": "F32",
+   "ne": [
+    128
+   ],
+   "shape": [
+    128
+   ],
+   "offset": 6134626048
+  },
+  "layers.8.attention.qkv.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    11520
+   ],
+   "shape": [
+    11520,
+    3840
+   ],
+   "offset": 6134626560
+  },
+  "layers.8.attention_norm1.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 6181628160
+  },
+  "layers.8.attention_norm2.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 6181643520
+  },
+  "layers.8.feed_forward.w1.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    10240
+   ],
+   "shape": [
+    10240,
+    3840
+   ],
+   "offset": 6181658880
+  },
+  "layers.8.feed_forward.w2.weight": {
+   "type": "Q8_0",
+   "ne": [
+    10240,
+    3840
+   ],
+   "shape": [
+    3840,
+    10240
+   ],
+   "offset": 6223438080
+  },
+  "layers.8.feed_forward.w3.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    10240
+   ],
+   "shape": [
+    10240,
+    3840
+   ],
+   "offset": 6265217280
+  },
+  "layers.8.ffn_norm1.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 6306996480
+  },
+  "layers.8.ffn_norm2.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 6307011840
+  },
+  "layers.9.adaLN_modulation.0.bias": {
+   "type": "F32",
+   "ne": [
+    15360
+   ],
+   "shape": [
+    15360
+   ],
+   "offset": 6307027200
+  },
+  "layers.9.adaLN_modulation.0.weight": {
+   "type": "Q8_0",
+   "ne": [
+    256,
+    15360
+   ],
+   "shape": [
+    15360,
+    256
+   ],
+   "offset": 6307088640
+  },
+  "layers.9.attention.k_norm.weight": {
+   "type": "F32",
+   "ne": [
+    128
+   ],
+   "shape": [
+    128
+   ],
+   "offset": 6311266560
+  },
+  "layers.9.attention.out.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    3840
+   ],
+   "shape": [
+    3840,
+    3840
+   ],
+   "offset": 6311267072
+  },
+  "layers.9.attention.q_norm.weight": {
+   "type": "F32",
+   "ne": [
+    128
+   ],
+   "shape": [
+    128
+   ],
+   "offset": 6326934272
+  },
+  "layers.9.attention.qkv.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    11520
+   ],
+   "shape": [
+    11520,
+    3840
+   ],
+   "offset": 6326934784
+  },
+  "layers.9.attention_norm1.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 6373936384
+  },
+  "layers.9.attention_norm2.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 6373951744
+  },
+  "layers.9.feed_forward.w1.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    10240
+   ],
+   "shape": [
+    10240,
+    3840
+   ],
+   "offset": 6373967104
+  },
+  "layers.9.feed_forward.w2.weight": {
+   "type": "Q8_0",
+   "ne": [
+    10240,
+    3840
+   ],
+   "shape": [
+    3840,
+    10240
+   ],
+   "offset": 6415746304
+  },
+  "layers.9.feed_forward.w3.weight": {
+   "type": "Q8_0",
+   "ne": [
+    3840,
+    10240
+   ],
+   "shape": [
+    10240,
+    3840
+   ],
+   "offset": 6457525504
+  },
+  "layers.9.ffn_norm1.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 6499304704
+  },
+  "layers.9.ffn_norm2.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 6499320064
+  },
+  "noise_refiner.0.adaLN_modulation.0.bias": {
+   "type": "F32",
+   "ne": [
+    15360
+   ],
+   "shape": [
+    15360
+   ],
+   "offset": 6499335424
+  },
+  "noise_refiner.0.adaLN_modulation.0.weight": {
+   "type": "BF16",
+   "ne": [
+    256,
+    15360
+   ],
+   "shape": [
+    15360,
+    256
+   ],
+   "offset": 6499396864
+  },
+  "noise_refiner.0.attention.k_norm.weight": {
+   "type": "F32",
+   "ne": [
+    128
+   ],
+   "shape": [
+    128
+   ],
+   "offset": 6507261184
+  },
+  "noise_refiner.0.attention.out.weight": {
+   "type": "BF16",
+   "ne": [
+    3840,
+    3840
+   ],
+   "shape": [
+    3840,
+    3840
+   ],
+   "offset": 6507261696
+  },
+  "noise_refiner.0.attention.q_norm.weight": {
+   "type": "F32",
+   "ne": [
+    128
+   ],
+   "shape": [
+    128
+   ],
+   "offset": 6536752896
+  },
+  "noise_refiner.0.attention.qkv.weight": {
+   "type": "BF16",
+   "ne": [
+    3840,
+    11520
+   ],
+   "shape": [
+    11520,
+    3840
+   ],
+   "offset": 6536753408
+  },
+  "noise_refiner.0.attention_norm1.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 6625227008
+  },
+  "noise_refiner.0.attention_norm2.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 6625242368
+  },
+  "noise_refiner.0.feed_forward.w1.weight": {
+   "type": "BF16",
+   "ne": [
+    3840,
+    10240
+   ],
+   "shape": [
+    10240,
+    3840
+   ],
+   "offset": 6625257728
+  },
+  "noise_refiner.0.feed_forward.w2.weight": {
+   "type": "BF16",
+   "ne": [
+    10240,
+    3840
+   ],
+   "shape": [
+    3840,
+    10240
+   ],
+   "offset": 6703900928
+  },
+  "noise_refiner.0.feed_forward.w3.weight": {
+   "type": "BF16",
+   "ne": [
+    3840,
+    10240
+   ],
+   "shape": [
+    10240,
+    3840
+   ],
+   "offset": 6782544128
+  },
+  "noise_refiner.0.ffn_norm1.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 6861187328
+  },
+  "noise_refiner.0.ffn_norm2.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 6861202688
+  },
+  "noise_refiner.1.adaLN_modulation.0.bias": {
+   "type": "F32",
+   "ne": [
+    15360
+   ],
+   "shape": [
+    15360
+   ],
+   "offset": 6861218048
+  },
+  "noise_refiner.1.adaLN_modulation.0.weight": {
+   "type": "BF16",
+   "ne": [
+    256,
+    15360
+   ],
+   "shape": [
+    15360,
+    256
+   ],
+   "offset": 6861279488
+  },
+  "noise_refiner.1.attention.k_norm.weight": {
+   "type": "F32",
+   "ne": [
+    128
+   ],
+   "shape": [
+    128
+   ],
+   "offset": 6869143808
+  },
+  "noise_refiner.1.attention.out.weight": {
+   "type": "BF16",
+   "ne": [
+    3840,
+    3840
+   ],
+   "shape": [
+    3840,
+    3840
+   ],
+   "offset": 6869144320
+  },
+  "noise_refiner.1.attention.q_norm.weight": {
+   "type": "F32",
+   "ne": [
+    128
+   ],
+   "shape": [
+    128
+   ],
+   "offset": 6898635520
+  },
+  "noise_refiner.1.attention.qkv.weight": {
+   "type": "BF16",
+   "ne": [
+    3840,
+    11520
+   ],
+   "shape": [
+    11520,
+    3840
+   ],
+   "offset": 6898636032
+  },
+  "noise_refiner.1.attention_norm1.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 6987109632
+  },
+  "noise_refiner.1.attention_norm2.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 6987124992
+  },
+  "noise_refiner.1.feed_forward.w1.weight": {
+   "type": "BF16",
+   "ne": [
+    3840,
+    10240
+   ],
+   "shape": [
+    10240,
+    3840
+   ],
+   "offset": 6987140352
+  },
+  "noise_refiner.1.feed_forward.w2.weight": {
+   "type": "BF16",
+   "ne": [
+    10240,
+    3840
+   ],
+   "shape": [
+    3840,
+    10240
+   ],
+   "offset": 7065783552
+  },
+  "noise_refiner.1.feed_forward.w3.weight": {
+   "type": "BF16",
+   "ne": [
+    3840,
+    10240
+   ],
+   "shape": [
+    10240,
+    3840
+   ],
+   "offset": 7144426752
+  },
+  "noise_refiner.1.ffn_norm1.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 7223069952
+  },
+  "noise_refiner.1.ffn_norm2.weight": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 7223085312
+  },
+  "t_embedder.mlp.0.bias": {
+   "type": "F32",
+   "ne": [
+    1024
+   ],
+   "shape": [
+    1024
+   ],
+   "offset": 7223100672
+  },
+  "t_embedder.mlp.0.weight": {
+   "type": "BF16",
+   "ne": [
+    256,
+    1024
+   ],
+   "shape": [
+    1024,
+    256
+   ],
+   "offset": 7223104768
+  },
+  "t_embedder.mlp.2.bias": {
+   "type": "F32",
+   "ne": [
+    256
+   ],
+   "shape": [
+    256
+   ],
+   "offset": 7223629056
+  },
+  "t_embedder.mlp.2.weight": {
+   "type": "BF16",
+   "ne": [
+    1024,
+    256
+   ],
+   "shape": [
+    256,
+    1024
+   ],
+   "offset": 7223630080
+  },
+  "x_embedder.bias": {
+   "type": "F32",
+   "ne": [
+    3840
+   ],
+   "shape": [
+    3840
+   ],
+   "offset": 7224154368
+  },
+  "x_embedder.weight": {
+   "type": "BF16",
+   "ne": [
+    64,
+    3840
+   ],
+   "shape": [
+    3840,
+    64
+   ],
+   "offset": 7224169728
+  },
+  "x_pad_token": {
+   "type": "F32",
+   "ne": [
+    3840,
+    1
+   ],
+   "shape": [
+    1,
+    3840
+   ],
+   "offset": 7224661248
+  }
+ }
+}

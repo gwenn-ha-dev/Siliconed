@@ -1,0 +1,268 @@
+{
+ "repo": "unsloth/Z-Image-Turbo-GGUF",
+ "revision": "6c80814333b7b6a70a2e5b469a7c6437ce65de0f",
+ "file": "z-image-turbo-Q4_0.gguf",
+ "url": "https://huggingface.co/unsloth/Z-Image-Turbo-GGUF/resolve/6c80814333b7b6a70a2e5b469a7c6437ce65de0f/z-image-turbo-Q4_0.gguf",
+ "format": "gguf",
+ "family": "z-image",
+ "file_bytes": 4585244736,
+ "header": {
+  "bytes": 30528,
+  "sha256": "ff73366a9b7b838c862b7ee8095de77845f6e8e72792ba33a642fc330a7317c9",
+  "version": 3,
+  "alignment": 32,
+  "tensors": 453,
+  "metadata": 3
+ },
+ "rows": 256,
+ "types": {
+  "BF16": 28,
+  "F32": 245,
+  "Q4_0": 150,
+  "Q4_1": 30
+ },
+ "libraries": {
+  "torch": "2.14.1",
+  "diffusers": "0.41.0",
+  "gguf": "0.19.0",
+  "numpy": "2.5.3"
+ },
+ "quantized": [
+  "layers.0.attention.to_k.weight",
+  "layers.0.attention.to_q.weight",
+  "layers.0.attention.to_v.weight",
+  "layers.0.feed_forward.w2.weight",
+  "layers.29.attention.to_out.0.weight"
+ ],
+ "plain": [
+  "all_final_layer.2-1.linear.weight",
+  "layers.0.attention.norm_k.weight"
+ ],
+ "published": {
+  "final_layer.linear.weight": {
+   "type": "BF16",
+   "ne": [
+    3840,
+    64
+   ],
+   "piece_ne": [
+    3840,
+    64
+   ],
+   "rows": [
+    [
+     0,
+     64
+    ]
+   ],
+   "range": [
+    [
+     729627712,
+     730119231
+    ]
+   ],
+   "map": [
+    "all_final_layer.2-1.linear.weight"
+   ]
+  },
+  "layers.0.attention.k_norm.weight": {
+   "type": "F32",
+   "ne": [
+    128
+   ],
+   "piece_ne": [
+    128
+   ],
+   "rows": [
+    [
+     0,
+     1
+    ]
+   ],
+   "range": [
+    [
+     732392512,
+     732393023
+    ]
+   ],
+   "map": [
+    "layers.0.attention.norm_k.weight"
+   ]
+  },
+  "layers.0.attention.qkv.weight": {
+   "type": "Q4_0",
+   "ne": [
+    3840,
+    11520
+   ],
+   "piece_ne": [
+    3840,
+    768
+   ],
+   "rows": [
+    [
+     0,
+     256
+    ],
+    [
+     3840,
+     4096
+    ],
+    [
+     7680,
+     7936
+    ]
+   ],
+   "range": [
+    [
+     740687936,
+     741240895
+    ],
+    [
+     748982336,
+     749535295
+    ],
+    [
+     757276736,
+     757829695
+    ]
+   ],
+   "map": [
+    "layers.0.attention.to_k.weight",
+    "layers.0.attention.to_q.weight",
+    "layers.0.attention.to_v.weight"
+   ]
+  },
+  "layers.0.feed_forward.w2.weight": {
+   "type": "Q4_1",
+   "ne": [
+    10240,
+    3840
+   ],
+   "piece_ne": [
+    10240,
+    256
+   ],
+   "rows": [
+    [
+     0,
+     256
+    ]
+   ],
+   "range": [
+    [
+     787720256,
+     789358655
+    ]
+   ],
+   "map": [
+    "layers.0.feed_forward.w2.weight"
+   ]
+  },
+  "layers.29.attention.out.weight": {
+   "type": "Q4_0",
+   "ne": [
+    3840,
+    3840
+   ],
+   "piece_ne": [
+    3840,
+    256
+   ],
+   "rows": [
+    [
+     0,
+     256
+    ]
+   ],
+   "range": [
+    [
+     3027568192,
+     3028121151
+    ]
+   ],
+   "map": [
+    "layers.29.attention.to_out.0.weight"
+   ]
+  }
+ },
+ "comparisons": {
+  "layers.0.attention.qkv.weight": {
+   "kind": "GGUF Q4_0",
+   "values": 2949120,
+   "gguf_py": {
+    "different_bits": 0,
+    "different_values": 0
+   },
+   "fl32_of_exact": {
+    "different_bits": 0
+   },
+   "vs_exact_fp64": {
+    "different": 0,
+    "max_abs": 0.0
+   },
+   "publisher_default_path": {
+    "dtype": "float16",
+    "different_from_fp32_reference": 0,
+    "max_abs": 0.0,
+    "max_rel": 0.0
+   }
+  },
+  "layers.0.feed_forward.w2.weight": {
+   "kind": "GGUF Q4_1",
+   "values": 2621440,
+   "gguf_py": {
+    "different_bits": 0,
+    "different_values": 0
+   },
+   "fl32_of_exact": {
+    "different_bits": 0
+   },
+   "vs_exact_fp64": {
+    "different": 0,
+    "max_abs": 0.0
+   },
+   "publisher_default_path": {
+    "dtype": "float16",
+    "different_from_fp32_reference": 1715323,
+    "max_abs": 0.001708984375,
+    "max_rel": 1.0
+   }
+  },
+  "layers.29.attention.out.weight": {
+   "kind": "GGUF Q4_0",
+   "values": 983040,
+   "gguf_py": {
+    "different_bits": 0,
+    "different_values": 0
+   },
+   "fl32_of_exact": {
+    "different_bits": 0
+   },
+   "vs_exact_fp64": {
+    "different": 0,
+    "max_abs": 0.0
+   },
+   "publisher_default_path": {
+    "dtype": "float16",
+    "different_from_fp32_reference": 0,
+    "max_abs": 0.0,
+    "max_rel": 0.0
+   }
+  }
+ },
+ "pieces": {
+  "file": "pieces.gguf",
+  "bytes": 4342784,
+  "sha256": "e6d97a74eff9e85a7d65ec3d7b93dd152d7397f0ad43d9701ba24f9b3a5db075"
+ },
+ "references": {
+  "file": "references.safetensors",
+  "bytes": 27198832,
+  "sha256": "71105faf27221918ac42d7537d384aa53dd5253903a9bf73623fe7880d28905d"
+ },
+ "header_file": {
+  "file": "header.gguf",
+  "sha256": "ff73366a9b7b838c862b7ee8095de77845f6e8e72792ba33a642fc330a7317c9"
+ }
+}

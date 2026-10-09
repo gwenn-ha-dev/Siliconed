@@ -1,0 +1,723 @@
+{
+ "repo": "unsloth/Qwen-Image-2.1-FP8",
+ "revision": "bb21a8ba7f0371c19ad1f72c82a5e8fc10f39939",
+ "file": "Qwen-Image-2.1-text_encoder-INT8-ConvRot.safetensors",
+ "url": "https://huggingface.co/unsloth/Qwen-Image-2.1-FP8/resolve/bb21a8ba7f0371c19ad1f72c82a5e8fc10f39939/Qwen-Image-2.1-text_encoder-INT8-ConvRot.safetensors",
+ "format": "encoder",
+ "scheme": "convrot",
+ "family": "qwen-image-2.1",
+ "file_bytes": 9349769248,
+ "header": {
+  "bytes": 327512,
+  "sha256": "8dd1f069d479d040f561705abdb0ea0c17dae3bb9127eb42cb6f52cdab1c3a61",
+  "tensors": 1253
+ },
+ "config": {
+  "url": "https://huggingface.co/Qwen/Qwen-Image-2.1/resolve/d26bb61231c349cf6b7896fa83353113880e1ba3/text_encoder/config.json",
+  "sha256": "6001331949f7f86ab6d791a80b12246d4f8da5159fa08c3e62368a39f36d63a9"
+ },
+ "rows": 256,
+ "group": 256,
+ "libraries": {
+  "torch": "2.14.1",
+  "safetensors": "0.8.0"
+ },
+ "quantized": [
+  "model.language_model.layers.0.self_attn.q_proj.weight",
+  "model.language_model.layers.0.self_attn.k_proj.weight",
+  "model.language_model.layers.0.mlp.down_proj.weight"
+ ],
+ "plain": [
+  "model.language_model.layers.0.self_attn.q_norm.weight",
+  "model.language_model.layers.0.input_layernorm.weight",
+  "model.language_model.embed_tokens.weight",
+  "model.visual.blocks.0.attn.qkv.weight",
+  "model.visual.blocks.0.attn.qkv.bias",
+  "model.visual.patch_embed.proj.weight",
+  "model.visual.pos_embed.weight"
+ ],
+ "published": {
+  "model.language_model.embed_tokens.weight": {
+   "dtype": "BF16",
+   "shape": [
+    151936,
+    4096
+   ],
+   "piece_shape": [
+    256,
+    4096
+   ],
+   "rows": [
+    [
+     0,
+     128
+    ],
+    [
+     151643,
+     151771
+    ]
+   ],
+   "range": [
+    [
+     5930848,
+     6979423
+    ],
+    [
+     1248190304,
+     1249238879
+    ]
+   ]
+  },
+  "model.language_model.layers.0.input_layernorm.weight": {
+   "dtype": "BF16",
+   "shape": [
+    4096
+   ],
+   "piece_shape": [
+    4096
+   ],
+   "rows": [
+    [
+     0,
+     4096
+    ]
+   ],
+   "range": [
+    [
+     1250590560,
+     1250598751
+    ]
+   ]
+  },
+  "model.language_model.layers.0.mlp.down_proj.comfy_quant": {
+   "dtype": "U8",
+   "shape": [
+    72
+   ],
+   "piece_shape": [
+    72
+   ],
+   "rows": [
+    [
+     0,
+     72
+    ]
+   ],
+   "range": [
+    [
+     2403983680,
+     2403983751
+    ]
+   ]
+  },
+  "model.language_model.layers.0.mlp.down_proj.weight": {
+   "dtype": "I8",
+   "shape": [
+    4096,
+    12288
+   ],
+   "piece_shape": [
+    256,
+    12288
+   ],
+   "rows": [
+    [
+     0,
+     256
+    ]
+   ],
+   "range": [
+    [
+     2403983752,
+     2407129479
+    ]
+   ]
+  },
+  "model.language_model.layers.0.mlp.down_proj.weight_scale": {
+   "dtype": "F32",
+   "shape": [
+    4096,
+    1
+   ],
+   "piece_shape": [
+    256,
+    1
+   ],
+   "rows": [
+    [
+     0,
+     256
+    ]
+   ],
+   "range": [
+    [
+     327520,
+     328543
+    ]
+   ]
+  },
+  "model.language_model.layers.0.self_attn.k_proj.comfy_quant": {
+   "dtype": "U8",
+   "shape": [
+    72
+   ],
+   "piece_shape": [
+    72
+   ],
+   "rows": [
+    [
+     0,
+     72
+    ]
+   ],
+   "range": [
+    [
+     2554978840,
+     2554978911
+    ]
+   ]
+  },
+  "model.language_model.layers.0.self_attn.k_proj.weight": {
+   "dtype": "I8",
+   "shape": [
+    1024,
+    4096
+   ],
+   "piece_shape": [
+    256,
+    4096
+   ],
+   "rows": [
+    [
+     0,
+     256
+    ]
+   ],
+   "range": [
+    [
+     2554978912,
+     2556027487
+    ]
+   ]
+  },
+  "model.language_model.layers.0.self_attn.k_proj.weight_scale": {
+   "dtype": "F32",
+   "shape": [
+    1024,
+    1
+   ],
+   "piece_shape": [
+    256,
+    1
+   ],
+   "rows": [
+    [
+     0,
+     256
+    ]
+   ],
+   "range": [
+    [
+     442208,
+     443231
+    ]
+   ]
+  },
+  "model.language_model.layers.0.self_attn.q_norm.weight": {
+   "dtype": "BF16",
+   "shape": [
+    128
+   ],
+   "piece_shape": [
+    128
+   ],
+   "rows": [
+    [
+     0,
+     128
+    ]
+   ],
+   "range": [
+    [
+     1250607200,
+     1250607455
+    ]
+   ]
+  },
+  "model.language_model.layers.0.self_attn.q_proj.comfy_quant": {
+   "dtype": "U8",
+   "shape": [
+    72
+   ],
+   "piece_shape": [
+    72
+   ],
+   "rows": [
+    [
+     0,
+     72
+    ]
+   ],
+   "range": [
+    [
+     2575950504,
+     2575950575
+    ]
+   ]
+  },
+  "model.language_model.layers.0.self_attn.q_proj.weight": {
+   "dtype": "I8",
+   "shape": [
+    4096,
+    4096
+   ],
+   "piece_shape": [
+    256,
+    4096
+   ],
+   "rows": [
+    [
+     0,
+     256
+    ]
+   ],
+   "range": [
+    [
+     2575950576,
+     2576999151
+    ]
+   ]
+  },
+  "model.language_model.layers.0.self_attn.q_proj.weight_scale": {
+   "dtype": "F32",
+   "shape": [
+    4096,
+    1
+   ],
+   "piece_shape": [
+    256,
+    1
+   ],
+   "rows": [
+    [
+     0,
+     256
+    ]
+   ],
+   "range": [
+    [
+     462688,
+     463711
+    ]
+   ]
+  },
+  "model.visual.blocks.0.attn.qkv.bias": {
+   "dtype": "BF16",
+   "shape": [
+    3456
+   ],
+   "piece_shape": [
+    3456
+   ],
+   "rows": [
+    [
+     0,
+     3456
+    ]
+   ],
+   "range": [
+    [
+     1253863520,
+     1253870431
+    ]
+   ]
+  },
+  "model.visual.blocks.0.attn.qkv.weight": {
+   "dtype": "BF16",
+   "shape": [
+    3456,
+    1152
+   ],
+   "piece_shape": [
+    3456,
+    1152
+   ],
+   "rows": [
+    [
+     0,
+     3456
+    ]
+   ],
+   "range": [
+    [
+     1253870432,
+     1261833055
+    ]
+   ]
+  },
+  "model.visual.patch_embed.proj.weight": {
+   "dtype": "BF16",
+   "shape": [
+    1152,
+    3,
+    2,
+    16,
+    16
+   ],
+   "piece_shape": [
+    1152,
+    3,
+    2,
+    16,
+    16
+   ],
+   "rows": [
+    [
+     0,
+     1152
+    ]
+   ],
+   "range": [
+    [
+     2395136320,
+     2398675263
+    ]
+   ]
+  },
+  "model.visual.pos_embed.weight": {
+   "dtype": "BF16",
+   "shape": [
+    2304,
+    1152
+   ],
+   "piece_shape": [
+    2304,
+    1152
+   ],
+   "rows": [
+    [
+     0,
+     2304
+    ]
+   ],
+   "range": [
+    [
+     2398675264,
+     2403983679
+    ]
+   ]
+  }
+ },
+ "comparisons": {
+  "model.language_model.layers.0.self_attn.q_proj.weight": {
+   "kind": "ComfyUI int8_tensorwise convrot",
+   "group": 256,
+   "values": 1048576,
+   "comfy_fp32_vs_exact_fp64": {
+    "different_from_rounded_exact": 936644,
+    "channel_error_worst": 3.0439637009778213e-07,
+    "channel_error_median": 2.8970094348129194e-07
+   },
+   "rounded_exact_vs_exact_fp64": {
+    "channel_error_worst": 2.987482930338659e-08,
+    "channel_error_median": 2.534567638609054e-08
+   }
+  },
+  "model.language_model.layers.0.self_attn.k_proj.weight": {
+   "kind": "ComfyUI int8_tensorwise convrot",
+   "group": 256,
+   "values": 1048576,
+   "comfy_fp32_vs_exact_fp64": {
+    "different_from_rounded_exact": 939055,
+    "channel_error_worst": 3.0898592282236067e-07,
+    "channel_error_median": 2.89298813059293e-07
+   },
+   "rounded_exact_vs_exact_fp64": {
+    "channel_error_worst": 2.731346950881225e-08,
+    "channel_error_median": 2.5250693167278294e-08
+   }
+  },
+  "model.language_model.layers.0.mlp.down_proj.weight": {
+   "kind": "ComfyUI int8_tensorwise convrot",
+   "group": 256,
+   "values": 3145728,
+   "comfy_fp32_vs_exact_fp64": {
+    "different_from_rounded_exact": 2813371,
+    "channel_error_worst": 3.0163502483053475e-07,
+    "channel_error_median": 2.8932015869477474e-07
+   },
+   "rounded_exact_vs_exact_fp64": {
+    "channel_error_worst": 2.5934988515248583e-08,
+    "channel_error_median": 2.52417399144778e-08
+   }
+  }
+ },
+ "pieces": {
+  "file": "pieces.safetensors",
+  "bytes": 24172752,
+  "sha256": "93289ba8cc8859ddba06ee5bea302df76cb07667b5e077c1441bf9f60ef7df5c"
+ },
+ "references": {
+  "file": "references.safetensors",
+  "bytes": 62915536,
+  "sha256": "96948aa5b377e9f7bea9afed09ddc2e95c152dbffede14fa57d7a5e464276e25"
+ },
+ "comfy": {
+  "manifest": "../comfy/manifest.json",
+  "functions": "kitchen/comfy_kitchen/backends/eager/quantization.py: dequantize_int8_convrot_weight; kitchen/comfy_kitchen/tensor/int8_utils.py: _build_hadamard, _rotate_weight"
+ },
+ "comfy_quant": {
+  "model.language_model.layers.0.mlp.down_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.0.mlp.gate_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.0.mlp.up_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.0.self_attn.k_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.0.self_attn.o_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.0.self_attn.q_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.0.self_attn.v_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.1.mlp.down_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.1.mlp.gate_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.1.mlp.up_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.1.self_attn.k_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.1.self_attn.o_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.1.self_attn.q_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.1.self_attn.v_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.10.mlp.down_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.10.mlp.gate_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.10.mlp.up_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.10.self_attn.k_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.10.self_attn.o_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.10.self_attn.q_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.10.self_attn.v_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.11.mlp.down_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.11.mlp.gate_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.11.mlp.up_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.11.self_attn.k_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.11.self_attn.o_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.11.self_attn.q_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.11.self_attn.v_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.12.mlp.down_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.12.mlp.gate_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.12.mlp.up_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.12.self_attn.k_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.12.self_attn.o_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.12.self_attn.q_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.12.self_attn.v_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.13.mlp.down_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.13.mlp.gate_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.13.mlp.up_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.13.self_attn.k_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.13.self_attn.o_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.13.self_attn.q_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.13.self_attn.v_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.14.mlp.down_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.14.mlp.gate_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.14.mlp.up_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.14.self_attn.k_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.14.self_attn.o_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.14.self_attn.q_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.14.self_attn.v_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.15.mlp.down_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.15.mlp.gate_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.15.mlp.up_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.15.self_attn.k_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.15.self_attn.o_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.15.self_attn.q_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.15.self_attn.v_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.16.mlp.down_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.16.mlp.gate_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.16.mlp.up_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.16.self_attn.k_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.16.self_attn.o_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.16.self_attn.q_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.16.self_attn.v_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.17.mlp.down_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.17.mlp.gate_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.17.mlp.up_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.17.self_attn.k_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.17.self_attn.o_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.17.self_attn.q_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.17.self_attn.v_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.18.mlp.down_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.18.mlp.gate_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.18.mlp.up_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.18.self_attn.k_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.18.self_attn.o_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.18.self_attn.q_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.18.self_attn.v_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.19.mlp.down_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.19.mlp.gate_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.19.mlp.up_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.19.self_attn.k_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.19.self_attn.o_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.19.self_attn.q_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.19.self_attn.v_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.2.mlp.down_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.2.mlp.gate_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.2.mlp.up_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.2.self_attn.k_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.2.self_attn.o_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.2.self_attn.q_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.2.self_attn.v_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.20.mlp.down_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.20.mlp.gate_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.20.mlp.up_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.20.self_attn.k_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.20.self_attn.o_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.20.self_attn.q_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.20.self_attn.v_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.21.mlp.down_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.21.mlp.gate_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.21.mlp.up_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.21.self_attn.k_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.21.self_attn.o_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.21.self_attn.q_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.21.self_attn.v_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.22.mlp.down_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.22.mlp.gate_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.22.mlp.up_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.22.self_attn.k_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.22.self_attn.o_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.22.self_attn.q_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.22.self_attn.v_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.23.mlp.down_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.23.mlp.gate_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.23.mlp.up_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.23.self_attn.k_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.23.self_attn.o_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.23.self_attn.q_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.23.self_attn.v_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.24.mlp.down_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.24.mlp.gate_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.24.mlp.up_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.24.self_attn.k_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.24.self_attn.o_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.24.self_attn.q_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.24.self_attn.v_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.25.mlp.down_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.25.mlp.gate_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.25.mlp.up_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.25.self_attn.k_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.25.self_attn.o_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.25.self_attn.q_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.25.self_attn.v_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.26.mlp.down_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.26.mlp.gate_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.26.mlp.up_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.26.self_attn.k_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.26.self_attn.o_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.26.self_attn.q_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.26.self_attn.v_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.27.mlp.down_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.27.mlp.gate_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.27.mlp.up_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.27.self_attn.k_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.27.self_attn.o_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.27.self_attn.q_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.27.self_attn.v_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.28.mlp.down_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.28.mlp.gate_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.28.mlp.up_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.28.self_attn.k_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.28.self_attn.o_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.28.self_attn.q_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.28.self_attn.v_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.29.mlp.down_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.29.mlp.gate_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.29.mlp.up_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.29.self_attn.k_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.29.self_attn.o_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.29.self_attn.q_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.29.self_attn.v_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.3.mlp.down_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.3.mlp.gate_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.3.mlp.up_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.3.self_attn.k_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.3.self_attn.o_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.3.self_attn.q_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.3.self_attn.v_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.30.mlp.down_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.30.mlp.gate_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.30.mlp.up_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.30.self_attn.k_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.30.self_attn.o_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.30.self_attn.q_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.30.self_attn.v_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.31.mlp.down_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.31.mlp.gate_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.31.mlp.up_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.31.self_attn.k_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.31.self_attn.o_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.31.self_attn.q_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.31.self_attn.v_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.32.mlp.down_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.32.mlp.gate_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.32.mlp.up_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.32.self_attn.k_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.32.self_attn.o_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.32.self_attn.q_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.32.self_attn.v_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.33.mlp.down_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.33.mlp.gate_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.33.mlp.up_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.33.self_attn.k_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.33.self_attn.o_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.33.self_attn.q_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.33.self_attn.v_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.34.mlp.down_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.34.mlp.gate_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.34.mlp.up_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.34.self_attn.k_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.34.self_attn.o_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.34.self_attn.q_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.34.self_attn.v_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.35.mlp.down_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.35.mlp.gate_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.35.mlp.up_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.35.self_attn.k_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.35.self_attn.o_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.35.self_attn.q_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.35.self_attn.v_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.4.mlp.down_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.4.mlp.gate_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.4.mlp.up_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.4.self_attn.k_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.4.self_attn.o_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.4.self_attn.q_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.4.self_attn.v_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.5.mlp.down_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.5.mlp.gate_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.5.mlp.up_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.5.self_attn.k_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.5.self_attn.o_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.5.self_attn.q_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.5.self_attn.v_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.6.mlp.down_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.6.mlp.gate_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.6.mlp.up_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.6.self_attn.k_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.6.self_attn.o_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.6.self_attn.q_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.6.self_attn.v_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.7.mlp.down_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.7.mlp.gate_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.7.mlp.up_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.7.self_attn.k_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.7.self_attn.o_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.7.self_attn.q_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.7.self_attn.v_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.8.mlp.down_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.8.mlp.gate_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.8.mlp.up_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.8.self_attn.k_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.8.self_attn.o_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.8.self_attn.q_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.8.self_attn.v_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.9.mlp.down_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.9.mlp.gate_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.9.mlp.up_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.9.self_attn.k_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.9.self_attn.o_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.9.self_attn.q_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.language_model.layers.9.self_attn.v_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}"
+ }
+}

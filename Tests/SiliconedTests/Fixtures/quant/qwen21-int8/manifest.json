@@ -1,0 +1,270 @@
+{
+ "repo": "unsloth/Qwen-Image-2.1-FP8",
+ "revision": "bb21a8ba7f0371c19ad1f72c82a5e8fc10f39939",
+ "file": "Qwen-Image-2.1-INT8.safetensors",
+ "url": "https://huggingface.co/unsloth/Qwen-Image-2.1-FP8/resolve/bb21a8ba7f0371c19ad1f72c82a5e8fc10f39939/Qwen-Image-2.1-INT8.safetensors",
+ "header": {
+  "bytes": 224792,
+  "sha256": "cf0f380614748771f256d5b34b5ba96673f042f84f98a03a0fb8dbea5d71c4ce"
+ },
+ "rows": 256,
+ "libraries": {
+  "torch": "2.14.1",
+  "torchao": "0.18.0",
+  "sdnq": "0.2.7",
+  "safetensors": "0.8.0"
+ },
+ "quantized": [
+  {
+   "weight": "transformer_blocks.0.attn.to_q.weight",
+   "q": "transformer_blocks.0.attn.to_q._weight_qdata",
+   "s": "transformer_blocks.0.attn.to_q._weight_scale",
+   "z": "transformer_blocks.0.attn.to_q._weight_zero_point"
+  },
+  {
+   "weight": "transformer_blocks.0.img_mlp.out.weight",
+   "q": "transformer_blocks.0.img_mlp.out._weight_qdata",
+   "s": "transformer_blocks.0.img_mlp.out._weight_scale",
+   "z": "transformer_blocks.0.img_mlp.out._weight_zero_point"
+  },
+  {
+   "weight": "transformer_blocks.31.attn.to_out.0.weight",
+   "q": "transformer_blocks.31.attn.to_out.0._weight_qdata",
+   "s": "transformer_blocks.31.attn.to_out.0._weight_scale",
+   "z": "transformer_blocks.31.attn.to_out.0._weight_zero_point"
+  }
+ ],
+ "plain": [
+  "img_in.weight",
+  "transformer_blocks.0.attn.norm_k.weight"
+ ],
+ "tensors": {
+  "img_in.weight": {
+   "dtype": "BF16",
+   "published_shape": [
+    4096,
+    64
+   ],
+   "shape": [
+    4096,
+    64
+   ],
+   "range": [
+    5991968,
+    6516255
+   ]
+  },
+  "transformer_blocks.0.attn.norm_k.weight": {
+   "dtype": "BF16",
+   "published_shape": [
+    128
+   ],
+   "shape": [
+    128
+   ],
+   "range": [
+    210464288,
+    210464543
+   ]
+  },
+  "transformer_blocks.0.attn.to_q._weight_qdata": {
+   "dtype": "I8",
+   "published_shape": [
+    4096,
+    4096
+   ],
+   "shape": [
+    256,
+    4096
+   ],
+   "range": [
+    311160352,
+    312208927
+   ]
+  },
+  "transformer_blocks.0.attn.to_q._weight_scale": {
+   "dtype": "F32",
+   "published_shape": [
+    4096,
+    1
+   ],
+   "shape": [
+    256,
+    1
+   ],
+   "range": [
+    257568,
+    258591
+   ]
+  },
+  "transformer_blocks.0.attn.to_q._weight_zero_point": {
+   "dtype": "I8",
+   "published_shape": [
+    4096,
+    1
+   ],
+   "shape": [
+    256,
+    1
+   ],
+   "range": [
+    327937568,
+    327937823
+   ]
+  },
+  "transformer_blocks.0.img_mlp.out._weight_qdata": {
+   "dtype": "I8",
+   "published_shape": [
+    4096,
+    12288
+   ],
+   "shape": [
+    256,
+    12288
+   ],
+   "range": [
+    395066912,
+    398212639
+   ]
+  },
+  "transformer_blocks.0.img_mlp.out._weight_scale": {
+   "dtype": "F32",
+   "published_shape": [
+    4096,
+    1
+   ],
+   "shape": [
+    256,
+    1
+   ],
+   "range": [
+    339488,
+    340511
+   ]
+  },
+  "transformer_blocks.0.img_mlp.out._weight_zero_point": {
+   "dtype": "I8",
+   "published_shape": [
+    4096,
+    1
+   ],
+   "shape": [
+    256,
+    1
+   ],
+   "range": [
+    445398560,
+    445398815
+   ]
+  },
+  "transformer_blocks.31.attn.to_out.0._weight_qdata": {
+   "dtype": "I8",
+   "published_shape": [
+    4096,
+    4096
+   ],
+   "shape": [
+    256,
+    4096
+   ],
+   "range": [
+    5748100640,
+    5749149215
+   ]
+  },
+  "transformer_blocks.31.attn.to_out.0._weight_scale": {
+   "dtype": "F32",
+   "published_shape": [
+    4096,
+    1
+   ],
+   "shape": [
+    256,
+    1
+   ],
+   "range": [
+    4746784,
+    4747807
+   ]
+  },
+  "transformer_blocks.31.attn.to_out.0._weight_zero_point": {
+   "dtype": "I8",
+   "published_shape": [
+    4096,
+    1
+   ],
+   "shape": [
+    256,
+    1
+   ],
+   "range": [
+    5764877856,
+    5764878111
+   ]
+  }
+ },
+ "comparisons": {
+  "transformer_blocks.0.attn.to_q.weight": {
+   "kind": "Int8Tensor",
+   "values": 1048576,
+   "vs_q_times_s_fp32": {
+    "different": 0,
+    "max_abs": 0.0
+   },
+   "vs_exact_fp64": {
+    "different": 0,
+    "max_abs": 0.0
+   },
+   "publisher_default_path": {
+    "dtype": "bfloat16",
+    "different_from_fp32_reference": 757782,
+    "max_abs": 0.00341796875,
+    "max_rel": 0.003861003861003861
+   },
+   "zero_point_all_zero": true
+  },
+  "transformer_blocks.0.img_mlp.out.weight": {
+   "kind": "Int8Tensor",
+   "values": 3145728,
+   "vs_q_times_s_fp32": {
+    "different": 0,
+    "max_abs": 0.0
+   },
+   "vs_exact_fp64": {
+    "different": 0,
+    "max_abs": 0.0
+   },
+   "publisher_default_path": {
+    "dtype": "bfloat16",
+    "different_from_fp32_reference": 2222364,
+    "max_abs": 0.00128173828125,
+    "max_rel": 0.003861003861003861
+   },
+   "zero_point_all_zero": true
+  },
+  "transformer_blocks.31.attn.to_out.0.weight": {
+   "kind": "Int8Tensor",
+   "values": 1048576,
+   "vs_q_times_s_fp32": {
+    "different": 0,
+    "max_abs": 0.0
+   },
+   "vs_exact_fp64": {
+    "different": 0,
+    "max_abs": 0.0
+   },
+   "publisher_default_path": {
+    "dtype": "bfloat16",
+    "different_from_fp32_reference": 767367,
+    "max_abs": 0.0009765625,
+    "max_rel": 0.003861003861003861
+   },
+   "zero_point_all_zero": true
+  }
+ },
+ "pieces": {
+  "file": "pieces.safetensors",
+  "bytes": 26748144,
+  "sha256": "1d27b1c57097e3741b80bf38518a973294e65d38f0dbda38c8e6a851c624688a"
+ }
+}

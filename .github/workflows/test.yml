@@ -1,0 +1,17 @@
+# The pure unit tests: no weights are downloaded and nothing touches the GPU.
+name: test
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  swift-test:
+    # Xcode 26 or later: the app uses macOS 26 APIs behind `#available`, which an older SDK does not declare.
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+      - name: Swift version
+        run: swift --version
+      - name: swift test
+        run: swift test

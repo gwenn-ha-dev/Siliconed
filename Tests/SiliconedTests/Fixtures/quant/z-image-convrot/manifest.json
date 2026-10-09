@@ -1,0 +1,815 @@
+{
+ "repo": "Comfy-Org/z_image_turbo",
+ "revision": "6fc90a3b1b653e935a0d175e260736de25b84df5",
+ "file": "split_files/diffusion_models/z_image_turbo_int8_convrot.safetensors",
+ "url": "https://huggingface.co/Comfy-Org/z_image_turbo/resolve/6fc90a3b1b653e935a0d175e260736de25b84df5/split_files/diffusion_models/z_image_turbo_int8_convrot.safetensors",
+ "format": "convrot",
+ "family": "z-image",
+ "file_bytes": 6201001296,
+ "header": {
+  "bytes": 91000,
+  "sha256": "01e93cae3aa75eb2106025889f1a78df19628a95c433b45d9447562b04907814",
+  "tensors": 857
+ },
+ "rows": 256,
+ "group": 256,
+ "comfy": {
+  "manifest": "../comfy/manifest.json",
+  "functions": "kitchen/comfy_kitchen/backends/eager/quantization.py: dequantize_int8_convrot_weight; kitchen/comfy_kitchen/tensor/int8_utils.py: _build_hadamard, _rotate_weight"
+ },
+ "libraries": {
+  "torch": "2.14.1",
+  "diffusers": "0.41.0.dev0",
+  "safetensors": "0.8.0"
+ },
+ "quantized": [
+  "layers.0.attention.to_k.weight",
+  "layers.0.attention.to_q.weight",
+  "layers.0.attention.to_v.weight",
+  "layers.0.feed_forward.w2.weight",
+  "layers.0.adaLN_modulation.0.weight",
+  "layers.29.attention.to_out.0.weight",
+  "context_refiner.0.attention.to_out.0.weight"
+ ],
+ "plain": [
+  "all_final_layer.2-1.linear.weight",
+  "layers.0.attention.norm_k.weight"
+ ],
+ "published": {
+  "context_refiner.0.attention.out.comfy_quant": {
+   "dtype": "U8",
+   "shape": [
+    72
+   ],
+   "piece_shape": [
+    72
+   ],
+   "rows": [
+    [
+     0,
+     72
+    ]
+   ],
+   "range": [
+    [
+     6200986752,
+     6200986823
+    ]
+   ],
+   "map": []
+  },
+  "context_refiner.0.attention.out.weight": {
+   "dtype": "I8",
+   "shape": [
+    3840,
+    3840
+   ],
+   "piece_shape": [
+    256,
+    3840
+   ],
+   "rows": [
+    [
+     0,
+     256
+    ]
+   ],
+   "range": [
+    [
+     58952832,
+     59935871
+    ]
+   ],
+   "map": [
+    "context_refiner.0.attention.to_out.0.weight"
+   ]
+  },
+  "context_refiner.0.attention.out.weight_scale": {
+   "dtype": "F32",
+   "shape": [
+    3840,
+    1
+   ],
+   "piece_shape": [
+    256,
+    1
+   ],
+   "rows": [
+    [
+     0,
+     256
+    ]
+   ],
+   "range": [
+    [
+     39454080,
+     39455103
+    ]
+   ],
+   "map": []
+  },
+  "final_layer.linear.weight": {
+   "dtype": "F32",
+   "shape": [
+    64,
+    3840
+   ],
+   "piece_shape": [
+    64,
+    3840
+   ],
+   "rows": [
+    [
+     0,
+     64
+    ]
+   ],
+   "range": [
+    [
+     43843712,
+     44826751
+    ]
+   ],
+   "map": [
+    "all_final_layer.2-1.linear.weight"
+   ]
+  },
+  "layers.0.adaLN_modulation.0.comfy_quant": {
+   "dtype": "U8",
+   "shape": [
+    72
+   ],
+   "piece_shape": [
+    72
+   ],
+   "rows": [
+    [
+     0,
+     72
+    ]
+   ],
+   "range": [
+    [
+     6200987472,
+     6200987543
+    ]
+   ],
+   "map": []
+  },
+  "layers.0.adaLN_modulation.0.weight": {
+   "dtype": "I8",
+   "shape": [
+    15360,
+    256
+   ],
+   "piece_shape": [
+    256,
+    256
+   ],
+   "rows": [
+    [
+     0,
+     256
+    ]
+   ],
+   "range": [
+    [
+     412847232,
+     412912767
+    ]
+   ],
+   "map": [
+    "layers.0.adaLN_modulation.0.weight"
+   ]
+  },
+  "layers.0.adaLN_modulation.0.weight_scale": {
+   "dtype": "F32",
+   "shape": [
+    15360,
+    1
+   ],
+   "piece_shape": [
+    256,
+    1
+   ],
+   "rows": [
+    [
+     0,
+     256
+    ]
+   ],
+   "range": [
+    [
+     44888192,
+     44889215
+    ]
+   ],
+   "map": []
+  },
+  "layers.0.attention.k_norm.weight": {
+   "dtype": "F32",
+   "shape": [
+    128
+   ],
+   "piece_shape": [
+    128
+   ],
+   "rows": [
+    [
+     0,
+     128
+    ]
+   ],
+   "range": [
+    [
+     44949632,
+     44950143
+    ]
+   ],
+   "map": [
+    "layers.0.attention.norm_k.weight"
+   ]
+  },
+  "layers.0.attention.qkv.comfy_quant": {
+   "dtype": "U8",
+   "shape": [
+    72
+   ],
+   "piece_shape": [
+    72
+   ],
+   "rows": [
+    [
+     0,
+     72
+    ]
+   ],
+   "range": [
+    [
+     6200987616,
+     6200987687
+    ]
+   ],
+   "map": []
+  },
+  "layers.0.attention.qkv.weight": {
+   "dtype": "I8",
+   "shape": [
+    11520,
+    3840
+   ],
+   "piece_shape": [
+    768,
+    3840
+   ],
+   "rows": [
+    [
+     0,
+     256
+    ],
+    [
+     3840,
+     4096
+    ],
+    [
+     7680,
+     7936
+    ]
+   ],
+   "range": [
+    [
+     431524992,
+     432508031
+    ],
+    [
+     446270592,
+     447253631
+    ],
+    [
+     461016192,
+     461999231
+    ]
+   ],
+   "map": [
+    "layers.0.attention.to_k.weight",
+    "layers.0.attention.to_q.weight",
+    "layers.0.attention.to_v.weight"
+   ]
+  },
+  "layers.0.attention.qkv.weight_scale": {
+   "dtype": "F32",
+   "shape": [
+    11520,
+    1
+   ],
+   "piece_shape": [
+    768,
+    1
+   ],
+   "rows": [
+    [
+     0,
+     256
+    ],
+    [
+     3840,
+     4096
+    ],
+    [
+     7680,
+     7936
+    ]
+   ],
+   "range": [
+    [
+     44966016,
+     44967039
+    ],
+    [
+     44981376,
+     44982399
+    ],
+    [
+     44996736,
+     44997759
+    ]
+   ],
+   "map": []
+  },
+  "layers.0.feed_forward.w2.comfy_quant": {
+   "dtype": "U8",
+   "shape": [
+    72
+   ],
+   "piece_shape": [
+    72
+   ],
+   "rows": [
+    [
+     0,
+     72
+    ]
+   ],
+   "range": [
+    [
+     6200987760,
+     6200987831
+    ]
+   ],
+   "map": []
+  },
+  "layers.0.feed_forward.w2.weight": {
+   "dtype": "I8",
+   "shape": [
+    3840,
+    10240
+   ],
+   "piece_shape": [
+    256,
+    10240
+   ],
+   "rows": [
+    [
+     0,
+     256
+    ]
+   ],
+   "range": [
+    [
+     515083392,
+     517704831
+    ]
+   ],
+   "map": [
+    "layers.0.feed_forward.w2.weight"
+   ]
+  },
+  "layers.0.feed_forward.w2.weight_scale": {
+   "dtype": "F32",
+   "shape": [
+    3840,
+    1
+   ],
+   "piece_shape": [
+    256,
+    1
+   ],
+   "rows": [
+    [
+     0,
+     256
+    ]
+   ],
+   "range": [
+    [
+     45083776,
+     45084799
+    ]
+   ],
+   "map": []
+  },
+  "layers.29.attention.out.comfy_quant": {
+   "dtype": "U8",
+   "shape": [
+    72
+   ],
+   "piece_shape": [
+    72
+   ],
+   "rows": [
+    [
+     0,
+     72
+    ]
+   ],
+   "range": [
+    [
+     6200997048,
+     6200997119
+    ]
+   ],
+   "map": []
+  },
+  "layers.29.attention.out.weight": {
+   "dtype": "I8",
+   "shape": [
+    3840,
+    3840
+   ],
+   "piece_shape": [
+    256,
+    3840
+   ],
+   "rows": [
+    [
+     0,
+     256
+    ]
+   ],
+   "range": [
+    [
+     4396125312,
+     4397108351
+    ]
+   ],
+   "map": [
+    "layers.29.attention.to_out.0.weight"
+   ]
+  },
+  "layers.29.attention.out.weight_scale": {
+   "dtype": "F32",
+   "shape": [
+    3840,
+    1
+   ],
+   "piece_shape": [
+    256,
+    1
+   ],
+   "rows": [
+    [
+     0,
+     256
+    ]
+   ],
+   "range": [
+    [
+     52519552,
+     52520575
+    ]
+   ],
+   "map": []
+  }
+ },
+ "comparisons": {
+  "layers.0.attention.qkv.weight": {
+   "kind": "ComfyUI int8_tensorwise convrot",
+   "group": 256,
+   "values": 2949120,
+   "comfy_fp32_vs_exact_fp64": {
+    "different_from_rounded_exact": 2641114,
+    "max_abs": 7.767812348902225e-07,
+    "channel_error_worst": 3.097422967570112e-07,
+    "channel_error_median": 2.8976101974009563e-07
+   },
+   "rounded_exact_vs_exact_fp64": {
+    "channel_error_worst": 2.743347059806766e-08,
+    "channel_error_median": 2.5334357735671446e-08
+   },
+   "comfy_default_bf16": {
+    "different_from_fp32_reference": 2946889,
+    "max_rel": 0.004104253507661179,
+    "channel_error_worst": 0.0017338858955723915,
+    "channel_error_median": 0.001651513928565378
+   },
+   "smallest_nonzero_abs_qR": 0.0625,
+   "smallest_scale": 0.003062896430492401
+  },
+  "layers.0.feed_forward.w2.weight": {
+   "kind": "ComfyUI int8_tensorwise convrot",
+   "group": 256,
+   "values": 2621440,
+   "comfy_fp32_vs_exact_fp64": {
+    "different_from_rounded_exact": 2370072,
+    "max_abs": 1.258275005966425e-06,
+    "channel_error_worst": 3.071193007457861e-07,
+    "channel_error_median": 2.8921915497883513e-07
+   },
+   "rounded_exact_vs_exact_fp64": {
+    "channel_error_worst": 2.6781179802860024e-08,
+    "channel_error_median": 2.528069772841167e-08
+   },
+   "comfy_default_bf16": {
+    "different_from_fp32_reference": 2618689,
+    "max_rel": 0.004341499280257945,
+    "channel_error_worst": 0.0017005692899715987,
+    "channel_error_median": 0.0016395674717501628
+   },
+   "smallest_nonzero_abs_qR": 0.0625,
+   "smallest_scale": 0.00329715758562088
+  },
+  "layers.0.adaLN_modulation.0.weight": {
+   "kind": "ComfyUI int8_tensorwise convrot",
+   "group": 256,
+   "values": 65536,
+   "comfy_fp32_vs_exact_fp64": {
+    "different_from_rounded_exact": 58601,
+    "max_abs": 3.334134817123413e-07,
+    "channel_error_worst": 3.3535917971246773e-07,
+    "channel_error_median": 2.85185662180978e-07
+   },
+   "rounded_exact_vs_exact_fp64": {
+    "channel_error_worst": 3.041947599466117e-08,
+    "channel_error_median": 2.5429875817230328e-08
+   },
+   "comfy_default_bf16": {
+    "different_from_fp32_reference": 65491,
+    "max_rel": 0.0038853724862548088,
+    "channel_error_worst": 0.0018699682502535603,
+    "channel_error_median": 0.0016481319362750535
+   },
+   "smallest_nonzero_abs_qR": 0.0625,
+   "smallest_scale": 0.0011692369589582086
+  },
+  "layers.29.attention.out.weight": {
+   "kind": "ComfyUI int8_tensorwise convrot",
+   "group": 256,
+   "values": 983040,
+   "comfy_fp32_vs_exact_fp64": {
+    "different_from_rounded_exact": 884284,
+    "max_abs": 7.259659469127655e-07,
+    "channel_error_worst": 3.160374549942118e-07,
+    "channel_error_median": 2.8948043701126434e-07
+   },
+   "rounded_exact_vs_exact_fp64": {
+    "channel_error_worst": 2.790011518235384e-08,
+    "channel_error_median": 2.5258840238926187e-08
+   },
+   "comfy_default_bf16": {
+    "different_from_fp32_reference": 981801,
+    "max_rel": 0.003888726741566823,
+    "channel_error_worst": 0.0017349756995138149,
+    "channel_error_median": 0.001653117122491583
+   },
+   "smallest_nonzero_abs_qR": 0.0625,
+   "smallest_scale": 0.0021639105398207903
+  },
+  "context_refiner.0.attention.out.weight": {
+   "kind": "ComfyUI int8_tensorwise convrot",
+   "group": 256,
+   "values": 983040,
+   "comfy_fp32_vs_exact_fp64": {
+    "different_from_rounded_exact": 882290,
+    "max_abs": 4.376750439405441e-06,
+    "channel_error_worst": 3.0664159709435923e-07,
+    "channel_error_median": 2.897215806494225e-07
+   },
+   "rounded_exact_vs_exact_fp64": {
+    "channel_error_worst": 2.6801228603404596e-08,
+    "channel_error_median": 2.526961279954929e-08
+   },
+   "comfy_default_bf16": {
+    "different_from_fp32_reference": 982308,
+    "max_rel": 0.003892617836184214,
+    "channel_error_worst": 0.0017158011864565384,
+    "channel_error_median": 0.0016547621190248693
+   },
+   "smallest_nonzero_abs_qR": 0.0625,
+   "smallest_scale": 0.004002912901341915
+  }
+ },
+ "comfy_quant": {
+  "context_refiner.0.attention.out.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "context_refiner.0.attention.qkv.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "context_refiner.0.feed_forward.w1.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "context_refiner.0.feed_forward.w2.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "context_refiner.0.feed_forward.w3.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "context_refiner.1.attention.out.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "context_refiner.1.attention.qkv.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "context_refiner.1.feed_forward.w1.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "context_refiner.1.feed_forward.w2.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "context_refiner.1.feed_forward.w3.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.0.adaLN_modulation.0.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.0.attention.out.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.0.attention.qkv.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.0.feed_forward.w1.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.0.feed_forward.w2.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.0.feed_forward.w3.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.1.adaLN_modulation.0.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.1.attention.out.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.1.attention.qkv.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.1.feed_forward.w1.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.1.feed_forward.w2.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.1.feed_forward.w3.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.10.adaLN_modulation.0.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.10.attention.out.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.10.attention.qkv.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.10.feed_forward.w1.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.10.feed_forward.w2.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.10.feed_forward.w3.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.11.adaLN_modulation.0.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.11.attention.out.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.11.attention.qkv.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.11.feed_forward.w1.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.11.feed_forward.w2.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.11.feed_forward.w3.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.12.adaLN_modulation.0.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.12.attention.out.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.12.attention.qkv.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.12.feed_forward.w1.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.12.feed_forward.w2.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.12.feed_forward.w3.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.13.adaLN_modulation.0.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.13.attention.out.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.13.attention.qkv.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.13.feed_forward.w1.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.13.feed_forward.w2.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.13.feed_forward.w3.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.14.adaLN_modulation.0.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.14.attention.out.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.14.attention.qkv.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.14.feed_forward.w1.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.14.feed_forward.w2.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.14.feed_forward.w3.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.15.adaLN_modulation.0.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.15.attention.out.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.15.attention.qkv.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.15.feed_forward.w1.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.15.feed_forward.w2.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.15.feed_forward.w3.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.16.adaLN_modulation.0.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.16.attention.out.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.16.attention.qkv.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.16.feed_forward.w1.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.16.feed_forward.w2.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.16.feed_forward.w3.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.17.adaLN_modulation.0.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.17.attention.out.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.17.attention.qkv.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.17.feed_forward.w1.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.17.feed_forward.w2.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.17.feed_forward.w3.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.18.adaLN_modulation.0.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.18.attention.out.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.18.attention.qkv.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.18.feed_forward.w1.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.18.feed_forward.w2.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.18.feed_forward.w3.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.19.adaLN_modulation.0.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.19.attention.out.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.19.attention.qkv.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.19.feed_forward.w1.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.19.feed_forward.w2.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.19.feed_forward.w3.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.2.adaLN_modulation.0.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.2.attention.out.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.2.attention.qkv.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.2.feed_forward.w1.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.2.feed_forward.w2.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.2.feed_forward.w3.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.20.adaLN_modulation.0.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.20.attention.out.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.20.attention.qkv.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.20.feed_forward.w1.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.20.feed_forward.w2.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.20.feed_forward.w3.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.21.adaLN_modulation.0.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.21.attention.out.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.21.attention.qkv.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.21.feed_forward.w1.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.21.feed_forward.w2.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.21.feed_forward.w3.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.22.adaLN_modulation.0.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.22.attention.out.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.22.attention.qkv.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.22.feed_forward.w1.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.22.feed_forward.w2.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.22.feed_forward.w3.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.23.adaLN_modulation.0.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.23.attention.out.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.23.attention.qkv.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.23.feed_forward.w1.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.23.feed_forward.w2.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.23.feed_forward.w3.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.24.adaLN_modulation.0.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.24.attention.out.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.24.attention.qkv.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.24.feed_forward.w1.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.24.feed_forward.w2.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.24.feed_forward.w3.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.25.adaLN_modulation.0.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.25.attention.out.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.25.attention.qkv.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.25.feed_forward.w1.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.25.feed_forward.w2.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.25.feed_forward.w3.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.26.adaLN_modulation.0.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.26.attention.out.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.26.attention.qkv.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.26.feed_forward.w1.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.26.feed_forward.w2.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.26.feed_forward.w3.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.27.adaLN_modulation.0.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.27.attention.out.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.27.attention.qkv.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.27.feed_forward.w1.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.27.feed_forward.w2.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.27.feed_forward.w3.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.28.adaLN_modulation.0.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.28.attention.out.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.28.attention.qkv.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.28.feed_forward.w1.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.28.feed_forward.w2.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.28.feed_forward.w3.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.29.adaLN_modulation.0.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.29.attention.out.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.29.attention.qkv.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.29.feed_forward.w1.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.29.feed_forward.w2.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.29.feed_forward.w3.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.3.adaLN_modulation.0.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.3.attention.out.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.3.attention.qkv.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.3.feed_forward.w1.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.3.feed_forward.w2.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.3.feed_forward.w3.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.4.adaLN_modulation.0.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.4.attention.out.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.4.attention.qkv.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.4.feed_forward.w1.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.4.feed_forward.w2.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.4.feed_forward.w3.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.5.adaLN_modulation.0.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.5.attention.out.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.5.attention.qkv.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.5.feed_forward.w1.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.5.feed_forward.w2.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.5.feed_forward.w3.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.6.adaLN_modulation.0.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.6.attention.out.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.6.attention.qkv.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.6.feed_forward.w1.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.6.feed_forward.w2.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.6.feed_forward.w3.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.7.adaLN_modulation.0.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.7.attention.out.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.7.attention.qkv.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.7.feed_forward.w1.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.7.feed_forward.w2.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.7.feed_forward.w3.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.8.adaLN_modulation.0.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.8.attention.out.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.8.attention.qkv.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.8.feed_forward.w1.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.8.feed_forward.w2.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.8.feed_forward.w3.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.9.adaLN_modulation.0.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.9.attention.out.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.9.attention.qkv.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.9.feed_forward.w1.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.9.feed_forward.w2.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "layers.9.feed_forward.w3.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "noise_refiner.0.adaLN_modulation.0.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "noise_refiner.0.attention.out.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "noise_refiner.0.attention.qkv.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "noise_refiner.0.feed_forward.w1.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "noise_refiner.0.feed_forward.w2.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "noise_refiner.0.feed_forward.w3.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "noise_refiner.1.adaLN_modulation.0.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "noise_refiner.1.attention.out.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "noise_refiner.1.attention.qkv.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "noise_refiner.1.feed_forward.w1.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "noise_refiner.1.feed_forward.w2.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}",
+  "noise_refiner.1.feed_forward.w3.comfy_quant": "{\"format\": \"int8_tensorwise\", \"convrot\": true, \"convrot_groupsize\": 256}"
+ },
+ "pieces": {
+  "file": "pieces.safetensors",
+  "bytes": 8597072,
+  "sha256": "acabd4ab752ae328032b07b0ccbf1f31e562aec1e41fba8fa644a5e80b85334c"
+ },
+ "references": {
+  "file": "references.safetensors",
+  "bytes": 92211656,
+  "sha256": "ef7252be4981926d33bf6feb154f4e9dc603cbacb28701847330f7d1f1a7d96e"
+ }
+}
