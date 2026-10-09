@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<link rel="icon" href="images/icon.svg" type="image/svg+xml">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Siliconed — local AI image generation and editing for Apple silicon Macs</title>
+<meta name="description" content="Free, open-source macOS app that runs Z-Image Turbo and Qwen-Image-2.1 natively in Swift and Metal on Apple silicon: text-to-image and AI image editing, offline, fp32, checked against diffusers, zero swap on a 16 GB Mac.">
+<link rel="canonical" href="https://gwenn-ha-dev.github.io/Siliconed/">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Siliconed — local AI image generation for Apple silicon">
+<meta property="og:description" content="Z-Image Turbo and Qwen-Image-2.1, native in Swift and Metal. Offline, fp32, checked against the reference, zero swap on 16 GB.">
+<meta property="og:url" content="https://gwenn-ha-dev.github.io/Siliconed/">
+<meta property="og:image" content="https://gwenn-ha-dev.github.io/Siliconed/images/social-preview.jpg">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://gwenn-ha-dev.github.io/Siliconed/images/social-preview.jpg">
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"SoftwareApplication","name":"Siliconed",
+ "operatingSystem":"macOS 15 or later (Apple silicon)","applicationCategory":"MultimediaApplication",
+ "description":"Local text-to-image generation and AI image editing on Apple silicon Macs: Z-Image Turbo and Qwen-Image-2.1 in Swift and Metal.",
+ "offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"license":"https://www.apache.org/licenses/LICENSE-2.0",
+ "downloadUrl":"https://github.com/gwenn-ha-dev/Siliconed/releases/latest",
+ "codeRepository":"https://github.com/gwenn-ha-dev/Siliconed","image":"https://gwenn-ha-dev.github.io/Siliconed/images/window.jpg"}
+</script>
+<style>
+  :root {
+    --bg: #111214; --panel: #1b1c1f; --line: #2c2d31; --text: #ececee; --muted: #a2a3a8;
+    --accent: #3b82f6; --accent-text: #fff;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 17px/1.55 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif; }
+  a { color: #8ab4ff; }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 16px; }
+  header { padding: 72px 0 40px; text-align: center; }
+  .icon { width: 96px; height: 96px; }
+  h1 { font-size: clamp(34px, 6vw, 56px); margin: 12px 0 4px; letter-spacing: -0.02em; }
+  .tag { color: var(--muted); font-style: italic; margin: 0 0 20px; }
+  .lead { font-size: clamp(19px, 2.6vw, 23px); max-width: 760px; margin: 0 auto 28px; }
+  .cta { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+  .btn { display: inline-block; padding: 12px 22px; border-radius: 10px; text-decoration: none;
+         font-weight: 600; border: 1px solid var(--line); color: var(--text); background: var(--panel); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+  .req { color: var(--muted); font-size: 14px; margin-top: 12px; }
+  figure { margin: 0; }
+  .shot img, .hero img { width: 100%; height: auto; display: block; border-radius: 12px;
+                         border: 1px solid var(--line); }
+  figcaption { color: var(--muted); font-size: 14px; margin-top: 8px; text-align: center; }
+  section { padding: 48px 0; border-top: 1px solid var(--line); }
+  h2 { font-size: 28px; margin: 0 0 20px; letter-spacing: -0.01em; }
+  .grid3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 18px 20px; }
+  .card h3 { margin: 0 0 6px; font-size: 18px; }
+  .card p { margin: 0; color: var(--muted); font-size: 15.5px; }
+  .split { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; align-items: center; }
+  .split.rev .text { order: 2; }
+  @media (max-width: 760px) { .split { grid-template-columns: 1fr; } .split.rev .text { order: 0; } }
+  table { width: 100%; border-collapse: collapse; font-size: 15.5px; }
+  th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; }
+  .tablewrap { overflow-x: auto; }
+  code { font: 14.5px ui-monospace, "SF Mono", Menlo, monospace; background: var(--panel);
+         padding: 2px 6px; border-radius: 6px; border: 1px solid var(--line); }
+  footer { padding: 36px 0 56px; color: var(--muted); font-size: 14px; text-align: center;
+           border-top: 1px solid var(--line); }
+</style>
+</head>
+<body>
+<header class="wrap">
+  <img class="icon" src="images/icon.svg" width="96" height="96" alt="">
+  <h1>Siliconed</h1>
+  <p class="tag">enhanced by silicone</p>
+  <p class="lead">Local text-to-image generation and AI image editing for Apple silicon Macs.
+    Z-Image Turbo and Qwen-Image-2.1, native in Swift and Metal: no Python, no server, no cloud.</p>
+  <div class="cta">
+    <a class="btn primary" href="https://github.com/gwenn-ha-dev/Siliconed/releases/latest">Download for macOS</a>
+    <a class="btn" href="https://github.com/gwenn-ha-dev/Siliconed">Source on GitHub</a>
+  </div>
+  <p class="req">Free and open source (Apache 2.0) · macOS 15 or later · M1 and later · signed and notarized</p>
+</header>
+
+<div class="wrap hero">
+  <figure>
+    <img src="images/window.jpg" width="1600" height="1045" alt="The Siliconed window: the rack of stages on the left, a Z-Image Turbo image of a woman posing in a library on the right">
+    <figcaption>The rack shows the whole chain — prompt, text encoder, denoiser, decoder — with each stage's time and memory.</figcaption>
+  </figure>
+</div>
+
+<section class="wrap" style="margin-top:48px">
+  <h2>Why Siliconed</h2>
+  <div class="grid3">
+    <div class="card"><h3>Checked against the original</h3><p>Every stage is compared channel by channel with diffusers and transformers in fp32. What cannot be checked against the reference does not ship.</p></div>
+    <div class="card"><h3>Full precision, still fast</h3><p>Z-Image Turbo at 1024² in about 82 s on an M1 Pro, in fp32.</p></div>
+    <div class="card"><h3>33 GB of model, 16 GB of RAM, zero swap</h3><p>Weights stream from disk as needed. Memory and swap are measured at the worst case: 0 bytes swapped.</p></div>
+    <div class="card"><h3>Private by construction</h3><p>Nothing leaves your Mac, and it works offline once a model is installed.</p></div>
+    <div class="card"><h3>Your models</h3><p>Install full size, in 8 bits or in 4 to 6 bits; import LoRAs from Civitai or Hugging Face. Licenses and disk space are shown before the first byte.</p></div>
+    <div class="card"><h3>Built to be driven by an AI</h3><p><code>silicontrol</code> drives the running app from a terminal with JSON output; <code>silicontrol help</code> is all an agent needs.</p></div>
+  </div>
+</section>
+
+<section class="wrap">
+  <div class="split">
+    <div class="text">
+      <h2>Edit with a sentence</h2>
+      <p>Give Qwen-Image-2.1 one to three images and an instruction — “make it a watercolor painting”,
+        “put the dog of image 2 next to her”. Its encoder sees the images. Drag the curtain across
+        the result and its original to see exactly what changed.</p>
+    </div>
+    <figure class="shot"><img src="images/edit.jpg" width="1600" height="1045" alt="An edit by Qwen-Image-2.1: the library photo turned into a watercolor painting" loading="lazy"></figure>
+  </div>
+</section>
+
+<section class="wrap">
+  <div class="split rev">
+    <div class="text">
+      <h2>Explore before you commit</h2>
+      <p>A grid across seeds, steps, LoRA strengths, models or prompt variants, drawn in the canvas
+        with its axes as labels. The cell you pick becomes the finished image, with the same seed.</p>
+    </div>
+    <figure class="shot"><img src="images/grid.jpg" width="1600" height="1045" alt="A grid of four seeds by two lights" loading="lazy"></figure>
+  </div>
+</section>
+
+<section class="wrap">
+  <div class="split">
+    <div class="text">
+      <h2>Install what fits your Mac</h2>
+      <p>Standard, Compact or Light: the publisher's weights, 8-bit versions, or a 4-bit transformer.
+        Every file is pinned to a revision and checked by sha256, and downloads resume where they stopped.</p>
+    </div>
+    <figure class="shot"><img src="images/models.jpg" width="1600" height="1045" alt="The Models window with Standard, Compact and Light, the license and the disk space" loading="lazy"></figure>
+  </div>
+</section>
+
+<section class="wrap">
+  <h2>Models</h2>
+  <div class="tablewrap"><table>
+    <tr><th>Model</th><th>What it does</th><th>License</th></tr>
+    <tr><td><a href="https://huggingface.co/Tongyi-MAI/Z-Image-Turbo">Z-Image Turbo</a></td><td>text-to-image, image-to-image, LoRA</td><td>Apache 2.0</td></tr>
+    <tr><td><a href="https://huggingface.co/Qwen/Qwen-Image-2.1">Qwen-Image-2.1</a></td><td>text-to-image, editing by instruction with 1 to 3 images, LoRA</td><td>Qwen Research (non-commercial)</td></tr>
+  </table></div>
+  <p style="color:var(--muted);font-size:15px">Timings on an M1 Pro with 16 GB, Standard weights: Z-Image Turbo 1024² ~82 s; Qwen-Image-2.1 1024² ~134 s; an edit with one reference ~190 s.</p>
+</section>
+
+<section class="wrap" style="text-align:center">
+  <h2>Get it</h2>
+  <div class="cta">
+    <a class="btn primary" href="https://github.com/gwenn-ha-dev/Siliconed/releases/latest">Download the .dmg</a>
+    <a class="btn" href="https://github.com/gwenn-ha-dev/Siliconed#readme">Read the README</a>
+    <a class="btn" href="https://github.com/gwenn-ha-dev/Siliconed/blob/main/README.fr.md">En français</a>
+  </div>
+  <p class="req">Nothing is preinstalled: pick a model in the app, read its license, and it downloads.</p>
+</section>
+
+<footer class="wrap">
+  Siliconed · Apache 2.0 · <a href="https://github.com/gwenn-ha-dev/Siliconed">github.com/gwenn-ha-dev/Siliconed</a>
+</footer>
+</body>
+</html>
