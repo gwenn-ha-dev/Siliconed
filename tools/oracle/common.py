@@ -28,6 +28,10 @@ REVISIONS = {
     "circlestone-labs/Anima-Base-v1.0-Diffusers": "073c3a9db359c31ad0e8aa268d15775473c2176c",
     "circlestone-labs/Anima": "f973fc41ec7545364ac9776c2440285f43ff2a30",
     "krea/Krea-2-Turbo": "98e0fe118d17c9e3547fbb2e25acdbae2cadf7c7",
+    # MOSS-Image: the reference code is a file of the repository (`pipeline_moss_image.py`), not diffusers';
+    # the 8-step turbo is a community LoRA published in a second repository.
+    "OpenMOSS-Team/MOSS-Image-SFT": "f972bd4b4b9e3852133cc5da954d87bc32cd8fb9",
+    "lodestones/MOSS-Image-SFT-8-steps-dmd": "f95df83b5e90ae91ea412434b3f9b7f1c8c6314f",
 }
 
 # The long prompt of `text --long`: 844 Qwen tokens, 954 T5 tokens, past the 512 the reference pipelines
