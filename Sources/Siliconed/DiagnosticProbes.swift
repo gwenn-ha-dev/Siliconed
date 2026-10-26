@@ -92,15 +92,28 @@ extension Diagnostic {
 
     /// **Median wall seconds of three runs after a warm-up** (pipelines built, pages wired, clocks
     /// up); one run when the warm-up alone passed `longWarmUp`.
-    package static func seconds(_ body: () -> Void) -> Double {
+    ///
+    /// `giveUpAbove`: **a loser is not timed three times**. When the first run after the warm-up is already
+    /// slower than what the rule needs the route to beat, that run is the figure: the route loses whatever two
+    /// more runs say, and the map's minute goes to the routes that may win. One noisy run can only keep a
+    /// winner on the safe side (the route stays off), never make a loser win: a win is still a median of three.
+    package static func seconds(giveUpAbove limit: Double? = nil, _ body: () -> Void) -> Double {
         func once() -> Double {
             let begin = DispatchTime.now().uptimeNanoseconds
             body()
             return Double(DispatchTime.now().uptimeNanoseconds - begin) * 1e-9
         }
         if once() > longWarmUp { return once() }
-        return [once(), once(), once()].sorted()[1]
+        let first = once()
+        if let limit, first > limit { return first }
+        return [first, once(), once()].sorted()[1]
     }
+
+    /// **How much slower than the GPU alone's fp32 product a weight path may run and still be timed in full**:
+    /// what it saves is the weight's widening, at most a few percent of a product of 1 024 rows or more (k · n
+    /// values against 2 · m · k · n flops: on the M1 Pro, 18/10/2026, 8 % at 1 024 rows). At half again the GPU's
+    /// time, the widening would have to cost half a product for the path to win.
+    package static let weightPathGiveUp = 1.5
 
     /// **Uniform in `[−scale, scale]`, the same on every machine**: xorshift by blocks of 2¹⁶ values,
     /// each seeded by its index — whatever the cores, the first `count` values of a longer fill are
@@ -284,9 +297,9 @@ extension Diagnostic {
             let exact = exactRows(rows, a: o.a.floats(), b: o.b.floats(), k: s.k, n: s.n)
             let c = o.c.floats()
             let flops = 2.0 * Double(s.m) * Double(s.k) * Double(s.n)
-            func measure(against truth: [Double]? = nil, _ run: () -> Void) -> (Measure, Double) {
+            func measure(against truth: [Double]? = nil, giveUpAbove limit: Double? = nil, _ run: () -> Void) -> (Measure, Double) {
                 poison(c, rows: rows, n: s.n)
-                let t = seconds(run)
+                let t = seconds(giveUpAbove: limit, run)
                 return (judge(gather(c, rows: rows, n: s.n), truth ?? exact, columns: rows.count, rate: flops / t / 1e12,
                               threshold: fp32Threshold), t)
             }
@@ -345,7 +358,7 @@ extension Diagnostic {
             var tensor: Measure?
             if alone.tensor != nil {
                 try bench.check()
-                tensor = measure {
+                tensor = measure(giveUpAbove: weightPathGiveUp * tGPU) {
                     _ = alone.linear(a: aloneBuffers.0, bf16: bf16, c: aloneBuffers.2, m: s.m, k: s.k, n: s.n,
                                      weightIsTransposed: true)
                 }.0
@@ -366,7 +379,7 @@ extension Diagnostic {
                     exactRows(Array(0..<rows.count), a: $0.baseAddress!, b: o.b.floats(), k: s.k, n: s.n)
                 }
                 Widen.copyBfloat16(source: o.bf16.base, destination: o.b.base, count: s.k * s.n)
-                bf16Act = measure(against: truth) {
+                bf16Act = measure(against: truth, giveUpAbove: weightPathGiveUp * tGPU) {
                     _ = alone.linear(a: aloneBuffers.0, rounding: (aloneBuffers.1, plan.offset, plan.rows), bf16: aloneBuffers.1,
                                      c: aloneBuffers.2, m: s.m, k: s.k, n: s.n, weightIsTransposed: true)
                 }.0
@@ -397,13 +410,13 @@ extension Diagnostic {
                 }
                 if let p = plan(0) {
                     stage(p)
-                    alone = measure(against: truth) { run(p) }.0
+                    alone = measure(against: truth, giveUpAbove: weightPathGiveUp * tGPU) { run(p) }.0
                 }
                 if let share, both.conductor != nil, s.m >= Conductor.minimumRows,
                    let p = plan(WeightProducts.amxColumns(n: s.n, share: share)) {
                     try bench.check()
                     stage(p)
-                    beside = measure(against: truth) { run(p) }.0
+                    beside = measure(against: truth, giveUpAbove: weightPathGiveUp * tGPU) { run(p) }.0
                     columns = s.n - p.amxColumns
                 }
                 Widen.bfloat16ToFloat32(source: o.bf16.base, destination: o.b.base, count: s.k * s.n)
@@ -470,7 +483,8 @@ extension Diagnostic {
     /// 1 024 rows the ANE leaves the line `aneBalance` draws (Krea 2's 16 384 → 6 144, K in two parts: 768 rows
     /// at 319 ms beside a GPU done in 240, the pair slower than the GPU alone, 23/10/2026). Not judged: the
     /// products judge the ANE's arithmetic, which no share changes. Empty when no ANE program runs on this Mac.
-    static func measureANECuts(_ o: Operands, _ bench: Bench, cuts amxCuts: [Cut], products: [Product]) throws -> [Cut] {
+    static func measureANECuts(_ o: Operands, _ bench: Bench, cuts amxCuts: [Cut], products: [Product],
+                               threeSeconds: inout Double) throws -> [Cut] {
         let neural = try GEMM(freezeCut: true, coexecution: false, tensorWeights: false, neuralEngine: true, neuralEngineShare: 0.5)
         guard let engine = neural.neuralEngine else { return [] }
         engine.shares = .none
@@ -493,14 +507,16 @@ extension Diagnostic {
         let threeOperands = try three.map { g in (try g.wrap(o.a.base, bytes: o.a.capacity, name: "diagnostic.a"),
                                                   try g.wrap(o.b.base, bytes: o.b.capacity, name: "diagnostic.b"),
                                                   try g.wrap(o.c.base, bytes: o.c.capacity, name: "diagnostic.c")) }
-        func threeWall(k: Int, n: Int, m: Int, share: Double) -> Double? {
+        /// `best`: the faster pair's wall (ms) — the three are given up past it.
+        func threeWall(k: Int, n: Int, m: Int, share: Double, best: Double) -> Double? {
             guard let g = three, let side = g.neuralEngine, let (a, b, c) = threeOperands,
                   let amxShare = amx?.conductor?.shares.share(k: k, n: n, m: m) else { return nil }
             side.gpuShare = threeWayShare(ane: share, amx: amxShare)
             side.shares = .none
             side.besideAMX = Conductor.Shares([.init(k: k, n: n, m: m, ratio: 1)])
-            let before = side.fallbacks
-            let t = seconds { _ = g.linear(a: a, b: b, c: c, m: m, k: k, n: n, weightIsTransposed: true) }
+            let before = side.fallbacks, began = Date()
+            defer { threeSeconds += Date().timeIntervalSince(began) }
+            let t = seconds(giveUpAbove: best * 1e-3) { _ = g.linear(a: a, b: b, c: c, m: m, k: k, n: n, weightIsTransposed: true) }
             return side.fallbacks == before ? t * 1e3 : nil
         }
         var cuts: [Cut] = []
@@ -513,18 +529,22 @@ extension Diagnostic {
                     let flops = 2 * Double(m * shape.k * shape.n) * 1e-9   // TFLOP/s → milliseconds
                     let beside = amx != nil ? p.coexecution.map { flops / $0.rate } : nil
                     cuts.append(Cut(k: shape.k, n: shape.n, m: m, share: share, ane: flops / ane, gpu: flops / p.gpu.rate,
-                                    amx: beside, three: beside != nil ? threeWall(k: shape.k, n: shape.n, m: m, share: share) : nil))
+                                    amx: beside, three: beside.flatMap { threeWall(k: shape.k, n: shape.n, m: m, share: share,
+                                                                                   best: min($0, flops / ane)) }))
                     continue
                 }
                 let run = { _ = neural.linear(a: a, b: b, c: c, m: m, k: shape.k, n: shape.n, weightIsTransposed: true) }
                 guard let (share, alone) = aneBalance(neural, run: run, m: m, k: shape.k, n: shape.n) else { return [] }
                 engine.gpuShare = share
                 let paired = seconds(run)
+                // Past the ANE's tolerance the AMX's pair cannot take the shape: its exact wall no longer matters.
                 let beside = amx.flatMap { g in operands.map { (a, b, c) in
-                    seconds { _ = g.linear(a: a, b: b, c: c, m: m, k: shape.k, n: shape.n, weightIsTransposed: true) } } }
+                    seconds(giveUpAbove: paired / aneTolerance) {
+                        _ = g.linear(a: a, b: b, c: c, m: m, k: shape.k, n: shape.n, weightIsTransposed: true) } } }
                 cuts.append(Cut(k: shape.k, n: shape.n, m: m, share: share, ane: paired * 1e3, gpu: alone * 1e3,
                                 amx: beside.map { $0 * 1e3 },
-                                three: beside != nil ? threeWall(k: shape.k, n: shape.n, m: m, share: share) : nil))
+                                three: beside.flatMap { threeWall(k: shape.k, n: shape.n, m: m, share: share,
+                                                                  best: min($0, paired) * 1e3) }))
             }
         }
         return cuts

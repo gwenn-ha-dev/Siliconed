@@ -627,10 +627,19 @@ package enum Diagnostic {
             // The products' operands (~1.1 GB) are released before the attention's peak.
             var operands: Operands? = Operands()
             let (products, cuts, aneCuts) = try stage(.products) { () throws -> ([Product], [Cut], [Cut]) in
+                // Its parts timed too (`products.…`): the minute's budget is read, not guessed.
+                var clock = Date()
+                func lap(_ key: String) { stages["products." + key] = Date().timeIntervalSince(clock); clock = Date() }
                 let products = try measureProducts(operands!, bench)
+                lap("products")
                 let shares = products.compactMap(\.gpuShare).sorted()
                 let cuts = try measureCuts(operands!, bench, start: shares.isEmpty ? 0.631 : shares[shares.count / 2])
-                return (products, cuts, try measureANECuts(operands!, bench, cuts: cuts, products: products))
+                lap("cuts")
+                var three = 0.0
+                let aneCuts = try measureANECuts(operands!, bench, cuts: cuts, products: products, threeSeconds: &three)
+                lap("aneCuts")
+                stages["products.aneCuts.three"] = three
+                return (products, cuts, aneCuts)
             }
             let lowPrecision = try stage(.lowPrecision) { try measureLowPrecision(operands!, bench) }
             operands = nil
