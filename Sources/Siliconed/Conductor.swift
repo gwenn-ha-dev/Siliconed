@@ -439,6 +439,11 @@ package final class Conductor: @unchecked Sendable {
 
         /// `T(k, n, m)`, clamped to `range` (`Conductor.fractionRange` for the AMX's cut; the ANE's is wider).
         package func share(k: Int, n: Int, m: Int, range: ClosedRange<Double> = Conductor.fractionRange) -> Double? {
+            ratio(k: k, n: n, m: m).map { min(range.upperBound, max(range.lowerBound, 1 / (1 + $0))) }
+        }
+
+        /// `ρ(k, n, m)` itself, read as `share` reads it, unclamped: what a grid of 0 and 1 (`ane_amx`) says of a product.
+        package func ratio(k: Int, n: Int, m: Int) -> Double? {
             let heights = Array(Set(points.map(\.m))).sorted()
             guard !heights.isEmpty else { return nil }
             /// Linear in `log x` between the two points around `x`, the nearest outside.
@@ -466,8 +471,7 @@ package final class Conductor: @unchecked Sendable {
                 let width = between(level.filter { $0.k == pivot.k }, n, at: \.n, value: \.ratio)
                 return depth * width / pivot.ratio
             }
-            let ratio = between(heights.map { ($0, ratio(at: $0)) }, m, at: \.0, value: \.1)
-            return min(range.upperBound, max(range.lowerBound, 1 / (1 + ratio)))
+            return between(heights.map { ($0, ratio(at: $0)) }, m, at: \.0, value: \.1)
         }
 
         /// `2048×6144@1024=0.601,…` — `k×n@m=ρ`, the setting's text (`amx_shares`), the profile's and the

@@ -58,6 +58,12 @@ package final class NeuralEngine: @unchecked Sendable {
     /// The GPU's share per weight shape and height (`ane_shares`, measured by the map on the cuts' grid):
     /// with a grid, it replaces `gpuShare`.
     package var shares: Conductor.Shares
+    /// **The shapes where the AMX works beside the ANE** (`ane_amx`, ρ = 1 at the points the map gave the three
+    /// engines, 0 elsewhere): there the GPU's side of the rows goes through the conductor, GPU + AMX, instead of
+    /// the GPU alone. Engines are throughputs that add, not alternatives: the map says where they do.
+    package var besideAMX = Conductor.Shares.none
+    /// Whether the AMX takes part of the GPU's side of `m × k → n` (`besideAMX` read at the product, ≥ ½).
+    package func takesAMX(_ m: Int, k: Int, n: Int) -> Bool { (besideAMX.ratio(k: k, n: n, m: m) ?? 0) >= 0.5 }
     /// The shares a grid may give: from the GPU alone (1) down to a twentieth of the rows.
     package static let shareRange = 0.05...1.0
     /// Products whose ANE rows went back to the GPU (a non-finite output, or a program refused).

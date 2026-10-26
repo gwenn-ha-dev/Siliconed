@@ -582,12 +582,57 @@ final class CapacityRulesTests: XCTestCase {
         XCTAssertFalse(Diagnostic.decide(r).amx.on)
     }
 
+    /// **The three engines' split from their pairs**: rows in proportion to each engine's rate — the M1 Pro's
+    /// 3072 → 16384 at 4 096 rows (pairs 0.45 and 0.65) leaves the GPU's side 55.7 %; an AMX that takes nothing
+    /// gives back the ANE's pair.
+    func testThreeWayShareFollowsBothPairs() {
+        XCTAssertEqual(Diagnostic.threeWayShare(ane: 0.45, amx: 0.65), 0.5573, accuracy: 1e-4)
+        XCTAssertEqual(Diagnostic.threeWayShare(ane: 0.6, amx: 1), 0.6, accuracy: 1e-12)
+    }
+
+    /// **All three where they beat both pairs beyond the noise** (`ane_amx`): the shape's ANE share becomes the
+    /// three's, the setting marks it (ρ 1), and the other shapes keep their pair; three that do not clear the margin
+    /// leave no setting. Whichever pair the shape would have gone to.
+    func testThreeEnginesTakeTheShapesWhereTheyAddUp() throws {
+        var rates = m1Pro
+        rates.drift = (1.0, 1.0)
+        rates.ane = rates.both.map { $0.map { $0 * 1.05 } }
+        var r = report(rates)
+        r.cuts = Diagnostic.cutDepths.flatMap { k in Diagnostic.heights.map { m in
+            Diagnostic.Cut(k: k, n: Diagnostic.cutWidth, m: m, share: 0.65) } }
+        // 3072 → 16384: the three 8 % under the ANE's pair (M1 Pro, 26/10/2026); 8192 → 3072: the three slower (the ANE's pair).
+        r.aneCuts = [Diagnostic.Cut(k: 3072, n: 16384, m: 4096, share: 0.45, ane: 65.0, gpu: 120, amx: 76.1, three: 59.6),
+                     Diagnostic.Cut(k: 8192, n: 3072, m: 4096, share: 0.45, ane: 31.4, gpu: 58.8, amx: 43.7, three: 35.7)]
+        let d = Diagnostic.decide(r)
+        XCTAssertTrue(d.ane!.on); XCTAssertTrue(d.amx.on)
+        let text = try XCTUnwrap(d.aneAMX)
+        XCTAssertEqual(d.settings["ane_amx"] as? String, text)
+        let engine = NeuralEngine(gpuShare: 0.5, shares: try XCTUnwrap(Conductor.Shares(text: try XCTUnwrap(d.aneShares))))
+        engine.besideAMX = try XCTUnwrap(Conductor.Shares(text: text))
+        XCTAssertTrue(engine.takesAMX(4096, k: 3072, n: 16384))
+        XCTAssertFalse(engine.takesAMX(4096, k: 8192, n: 3072))
+        let shares = engine.shares
+        XCTAssertEqual(shares.share(k: 3072, n: 16384, m: 4096, range: NeuralEngine.shareRange)!,
+                       Diagnostic.threeWayShare(ane: 0.45, amx: 0.65), accuracy: 0.001)
+        XCTAssertEqual(shares.share(k: 8192, n: 3072, m: 4096, range: NeuralEngine.shareRange)!, 0.45, accuracy: 0.001)
+        // Three within the margin of the best pair: no shape for them, no setting.
+        r.aneCuts![0].three = 63
+        XCTAssertNil(Diagnostic.decide(r).aneAMX)
+        XCTAssertNil(Diagnostic.decide(r).settings["ane_amx"])
+        // The ANE's pair out of its tolerance against the AMX's, the three still faster than both: the three.
+        r.aneCuts![0] = Diagnostic.Cut(k: 3072, n: 16384, m: 4096, share: 0.45, ane: 90, gpu: 120, amx: 76.1, three: 65)
+        XCTAssertNotNil(Diagnostic.decide(r).aneAMX)
+    }
+
     /// The walls survive the report's JSON, after the share; a cut without them reads as before.
     func testCutWallsRoundTrip() throws {
         let cut = Diagnostic.Cut(k: 6144, n: 1536, m: 4096, share: 0.612, ane: 15.5, gpu: 24.4, amx: 17.4)
-        let data = try JSONEncoder().encode([cut, Diagnostic.Cut(k: 2048, n: 6144, m: 1024, share: 0.5)])
-        XCTAssertEqual(String(decoding: data, as: UTF8.self), "[[6144,1536,4096,0.612,15.5,24.4,17.4],[2048,6144,1024,0.5]]")
-        XCTAssertEqual(try JSONDecoder().decode([Diagnostic.Cut].self, from: data).first, cut)
+        let three = Diagnostic.Cut(k: 3072, n: 16384, m: 4096, share: 0.45, ane: 65, gpu: 120, amx: 76.1, three: 59.6)
+        let data = try JSONEncoder().encode([cut, Diagnostic.Cut(k: 2048, n: 6144, m: 1024, share: 0.5), three])
+        XCTAssertEqual(String(decoding: data, as: UTF8.self),
+                       "[[6144,1536,4096,0.612,15.5,24.4,17.4],[2048,6144,1024,0.5],[3072,16384,4096,0.45,65,120,76.1,59.6]]")
+        let read = try JSONDecoder().decode([Diagnostic.Cut].self, from: data)
+        XCTAssertEqual(read.first, cut); XCTAssertEqual(read.last, three)
     }
 
     /// **A grid of a family's shapes** (the ANE's): a shape measured reads its own share, at its height

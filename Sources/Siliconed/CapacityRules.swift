@@ -14,6 +14,7 @@ import Foundation
 ///        │                                     g_m = Σ t(GPU alone) / Σ t(GPU + ANE)    ─▶ gemm_ane (beside amx, shape by shape)
 ///        │                                     share = Σ f · T*_ane / Σ f               ─▶ ane_fraction
 ///        │  ANE cuts, the families' shapes       ρ = (1 − T*) / T* where its pair wins, 0 where the AMX's does ─▶ ane_shares
+///        │                                     t(GPU + AMX + ANE) < min(both pairs) · (1 − margin)      ─▶ ane_amx
 ///        │                                     g_m = Σ [t(fp32 path) + t(widen k·n)]
 ///        │                                         / Σ [t(bf16 weight) + t(copy k·n)]    ─▶ gemm_tensor
 ///        │                                     g_m = Σ [t(fp32 path) + t(widen k·n)]
@@ -78,7 +79,15 @@ import Foundation
 ///     alone and keeps 90 % of the AMX's speed** (`aneTolerance`), to the AMX elsewhere: thermal efficiency —
 ///     the ANE does the work at a fraction of the CPU cores' power. One engine for every shape was wrong both
 ///     ways on this M1 Pro (23/10/2026): Z-Image 1024² under the ANE 4 % slower for 10 % less energy, Krea 2 22 %
-///     slower and 10 % MORE energy, its down projection (K = 16 384) 317 ms beside the ANE, 183 beside the AMX. The ANE's
+///     slower and 10 % MORE energy, its down projection (K = 16 384) 317 ms beside the ANE, 183 beside the AMX.
+///     **And all three where they add up** (`ane_amx`): a shape where the three engines at once beat both pairs by
+///     more than the margin takes them all — the ANE on its rows, the GPU beside the AMX on the rest —, whichever
+///     pair it would otherwise have gone to. The three at once were once ruled out on one whole render (the line
+///     above); one product at a time they add up on some shapes and not on others (M1 Pro, MOSS-Image's block at
+///     4 096 rows, 26/10/2026: 3072 → 16384 6.92 TFLOP/s against GPU + ANE 6.34, 8192 → 3072 5.77 against 6.56),
+///     so it is the grid's to say, on each Mac. The split is not swept: each engine takes rows in proportion to its
+///     rate, which both pairs give (`threeWayShare`). The ANE keeps its 10 % against the AMX's pair; the three
+///     have no such favour — they add the CPU's power and heat to the ANE's pair. The ANE's
 ///     products are judged against bf16's error + 25 % (invariant 3: it computes in fp16), not the fp32
 ///     threshold; the paths that replace the fp32 one (`gemm_tensor`, `gemm_int8`, `gemm_q8`) are then
 ///     judged against GPU + ANE. `ane_fraction` is each product's balanced share weighted by its flops;
@@ -145,11 +154,13 @@ extension Diagnostic {
         /// The GPU's share beside the ANE per weight shape and height (`ane_shares`) when `ane` is on and the
         /// report measured `aneCuts`.
         package var aneShares: String?
+        /// The shapes the three engines take at once (`ane_amx`: ρ 1 there, 0 elsewhere) — only when some do.
+        package var aneAMX: String?
 
         package init(margin: Double, amx: Decision, amxFraction: Double?, flash: Decision, headSplit: Decision,
                     tensor: Decision? = nil, amxShares: String? = nil, int8: Decision? = nil, q8: Decision? = nil,
                     bf16Act: Decision? = nil, ane: Decision? = nil, aneFraction: Double? = nil, aneShares: String? = nil,
-                    headSplitFraction: Double? = nil) {
+                    headSplitFraction: Double? = nil, aneAMX: String? = nil) {
             self.margin = Diagnostic.significant(margin, 3); self.amx = amx
             self.amxFraction = amxFraction.map { Diagnostic.significant($0, 3) }
             self.amxShares = amxShares
@@ -157,11 +168,11 @@ extension Diagnostic {
             self.bf16Act = bf16Act
             self.q8 = q8; self.ane = ane
             self.aneFraction = aneFraction.map { Diagnostic.significant($0, 3) }
-            self.aneShares = aneShares
+            self.aneShares = aneShares; self.aneAMX = aneAMX
             self.headSplitFraction = headSplitFraction.map { Diagnostic.significant($0, 3) }
         }
 
-        private enum CodingKeys: String, CodingKey { case margin, amx, amxFraction, amxShares, flash, headSplit, tensor, bf16Act, int8, q8, ane, aneFraction, aneShares, headSplitFraction }
+        private enum CodingKeys: String, CodingKey { case margin, amx, amxFraction, amxShares, flash, headSplit, tensor, bf16Act, int8, q8, ane, aneFraction, aneShares, aneAMX, headSplitFraction }
         package func encode(to encoder: any Encoder) throws {
             var c = encoder.container(keyedBy: CodingKeys.self)
             try c.encode(margin, forKey: .margin); try c.encode(amx, forKey: .amx)
@@ -173,6 +184,7 @@ extension Diagnostic {
             try c.encodeIfPresent(bf16Act, forKey: .bf16Act)
             try c.encodeIfPresent(ane, forKey: .ane); try c.encodeIfPresent(aneFraction, forKey: .aneFraction)
             try c.encodeIfPresent(aneShares, forKey: .aneShares)
+            try c.encodeIfPresent(aneAMX, forKey: .aneAMX)
             try c.encodeIfPresent(headSplitFraction, forKey: .headSplitFraction)
         }
 
@@ -187,10 +199,22 @@ extension Diagnostic {
             if headSplit.on, let headSplitFraction { values["head_split_fraction"] = headSplitFraction }
             if aneOn, let aneFraction { values["ane_fraction"] = aneFraction }
             if aneOn, let aneShares { values["ane_shares"] = aneShares }
+            if aneOn, amx.on, let aneAMX { values["ane_amx"] = aneAMX }
             if amx.on, !tensorOn, let amxFraction { values["amx_fraction"] = amxFraction }
             if amx.on, !tensorOn, let amxShares { values["amx_shares"] = amxShares; values["amx_quantum"] = 64 }
             return values
         }
+    }
+
+    /// **The three engines' split from their two pairs**: each engine takes rows in proportion to its rate, and the
+    /// pairs give the rates' ratios — ρ_ane = (1 − T_ane) / T_ane beside the GPU (`aneShare`), ρ_amx likewise
+    /// (`amxShare`, the AMX's grid). The GPU's side (GPU + AMX) keeps `(1 + ρ_amx) / (1 + ρ_ane + ρ_amx)` of the
+    /// rows, the ANE the rest; the conductor then cuts the GPU's side at its own share. M1 Pro, 3072 → 16384 at
+    /// 4 096 rows (26/10/2026): pairs 0.45 and 0.65 give the ANE 44 %, the AMX 20 % — the best of a sweep was 41 %
+    /// and 19 %.
+    package static func threeWayShare(ane aneShare: Double, amx amxShare: Double) -> Double {
+        let (ane, amx) = ((1 - aneShare) / aneShare, (1 - amxShare) / amxShare)
+        return (1 + amx) / (1 + ane + amx)
     }
 
     /// The margin's floor: below it, two runs of one machine already disagree (invariant 6: 4 to 13 %
@@ -252,11 +276,29 @@ extension Diagnostic {
             guard amx.on, let beside = cut.amx else { return true }
             return paired * aneTolerance <= beside
         }
-        if ane.on && routed && !aneCuts.contains(where: aneTakes) { ane.on = false }
+        // The AMX's grid (`amx_shares`), which the GPU's side follows when the three engines take a shape.
+        let amxGrid = amx.on && !cuts.isEmpty
+            ? Conductor.Shares(cuts.map { .init(k: $0.k, n: $0.n, m: $0.m, ratio: (1 - $0.share) / $0.share) }) : nil
+        /// The ANE's share of the GPU's side when all three take the shape, or `nil` when they do not: they must beat
+        /// both pairs beyond the noise.
+        func threeShare(_ cut: Cut) -> Double? {
+            guard ane.passed, amx.on, let three = cut.three, let paired = cut.ane, let beside = cut.amx,
+                  three < min(paired, beside) * (1 - margin),
+                  let amxShare = amxGrid?.share(k: cut.k, n: cut.n, m: cut.m) else { return nil }
+            return threeWayShare(ane: cut.share, amx: amxShare)
+        }
+        if ane.on && routed && !aneCuts.contains(where: { aneTakes($0) || threeShare($0) != nil }) { ane.on = false }
         if ane.on && amx.on && !routed { if ane.gain >= aneTolerance * amx.gain { amx.on = false } else { ane.on = false } }
         // The grid the GEMM reads: ρ where the ANE takes the shape, 0 (the GPU's whole share) where it does not.
+        func aneRatio(_ cut: Cut) -> Double {
+            if routed, let three = threeShare(cut) { return (1 - three) / three }
+            return !routed || aneTakes(cut) ? (1 - cut.share) / cut.share : 0
+        }
         let aneGrid = ane.on && !aneCuts.isEmpty
-            ? Conductor.Shares(aneCuts.map { .init(k: $0.k, n: $0.n, m: $0.m, ratio: !routed || aneTakes($0) ? (1 - $0.share) / $0.share : 0) })
+            ? Conductor.Shares(aneCuts.map { .init(k: $0.k, n: $0.n, m: $0.m, ratio: aneRatio($0)) })
+            : nil
+        let threeGrid = ane.on && routed && aneCuts.contains(where: { threeShare($0) != nil })
+            ? Conductor.Shares(aneCuts.map { .init(k: $0.k, n: $0.n, m: $0.m, ratio: threeShare($0) != nil ? 1 : 0) }).description
             : nil
         var aneFraction: Double?
         if ane.on {
@@ -384,7 +426,8 @@ extension Diagnostic {
         let aneShares = aneGrid?.description
         return Decisions(margin: margin, amx: amx, amxFraction: fraction, flash: flash, headSplit: split, tensor: tensor,
                          amxShares: shares, int8: int8, q8: q8, bf16Act: bf16Act, ane: products.contains { $0.ane != nil } ? ane : nil,
-                         aneFraction: aneFraction, aneShares: aneShares, headSplitFraction: headSplitFraction)
+                         aneFraction: aneFraction, aneShares: aneShares, headSplitFraction: headSplitFraction,
+                         aneAMX: threeGrid)
     }
 
     /// The rules applied to `report`'s measures (never to its stored `decisions`: the rules live in the code).

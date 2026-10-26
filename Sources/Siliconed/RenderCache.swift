@@ -115,7 +115,7 @@ package struct RenderCache: Sendable {
     package static func numerics(reproducible: Bool, neuralEngine: Bool = false) -> String {
         let s = EngineSettings.effective
         // The Neural Engine computes in fp16: a K/V the DiT wrote with it is not one written without.
-        let ane = neuralEngine && s.gemmANE ? " ane \(s.aneFraction) \(s.aneShares)" : ""
+        let ane = neuralEngine && s.gemmANE ? " ane \(s.aneFraction) \(s.aneShares)" + (s.aneAMX.isEmpty || !s.amx ? "" : " amx \(s.aneAMX)") : ""
         return "amx \(s.amx) \(s.amxFraction) \(s.amxShares) \(s.amxQuantum) \(s.amxMinimumRows) "
             + "frozen \(reproducible) flash \(s.flash) split \(s.headSplit) \(s.headSplitFraction) parallel \(s.parallel)" + ane
     }

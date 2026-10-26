@@ -94,8 +94,9 @@ package enum Diagnostic {
     /// **10** (22/10/2026): the Neural Engine beside the GPU (`products[].ane`, `aneGPUShare`, and `aneCuts` on
     /// the cuts' grid); the decisions add `ane`, `aneFraction` and `aneShares`.
     /// **11** (25/10/2026): the products on an activation rounded to bf16 (`products[].bf16Act`); the decisions
-    /// add `bf16Act`.
-    package static let schema = 11
+    /// add `bf16Act`. **12** (26/10/2026): the three engines at once on the ANE's grid (`aneCuts`' eighth figure,
+    /// `three`), and MOSS-Image's shapes in it; the decisions add `aneAMX`.
+    package static let schema = 12
     package static let repository = "https://github.com/gwenn-ha-dev/Siliconed"
 
     /// **The fp32 threshold**: the AMX check's (`siliconed-dev amx`), a row of an fp32 product or
@@ -396,12 +397,16 @@ package enum Diagnostic {
         package var share: Double
         /// The ANE's grid only (`aneCuts`), milliseconds of one product: the GPU beside the ANE at `share`,
         /// the GPU alone, the GPU beside the AMX at its own grid's share (`nil` without co-execution) — what
-        /// `CapacityRules` routes each shape by. Written after the share: `[k, n, m, share, ane, gpu, amx]`.
-        package var ane, gpu, amx: Double?
-        package init(k: Int, n: Int, m: Int, share: Double, ane: Double? = nil, gpu: Double? = nil, amx: Double? = nil) {
+        /// `CapacityRules` routes each shape by. Written after the share: `[k, n, m, share, ane, gpu, amx, three]`.
+        /// `three` (schema 12): the three engines at once — the ANE on its rows at the share both pairs give
+        /// (`Diagnostic.threeWayShare`), the GPU beside the AMX on the rest at the AMX's grid's share.
+        package var ane, gpu, amx, three: Double?
+        package init(k: Int, n: Int, m: Int, share: Double, ane: Double? = nil, gpu: Double? = nil, amx: Double? = nil,
+                     three: Double? = nil) {
             self.k = k; self.n = n; self.m = m; self.share = Diagnostic.significant(share, 3)
             (self.ane, self.gpu, self.amx) = (ane.map { Diagnostic.significant($0, 3) }, gpu.map { Diagnostic.significant($0, 3) },
                                               amx.map { Diagnostic.significant($0, 3) })
+            self.three = three.map { Diagnostic.significant($0, 3) }
         }
         package init(from decoder: any Decoder) throws {
             var c = try decoder.unkeyedContainer()
@@ -409,11 +414,15 @@ package enum Diagnostic {
             if !c.isAtEnd { ane = try c.decodeNil() ? nil : try c.decode(Double.self) }
             if !c.isAtEnd { gpu = try c.decodeNil() ? nil : try c.decode(Double.self) }
             if !c.isAtEnd { amx = try c.decodeNil() ? nil : try c.decode(Double.self) }
+            if !c.isAtEnd { three = try c.decodeNil() ? nil : try c.decode(Double.self) }
         }
         package func encode(to encoder: any Encoder) throws {
             var c = encoder.unkeyedContainer()
             try c.encode(k); try c.encode(n); try c.encode(m); try c.encode(share)
-            if let ane, let gpu { try c.encode(ane); try c.encode(gpu); if let amx { try c.encode(amx) } }
+            if let ane, let gpu {
+                try c.encode(ane); try c.encode(gpu)
+                if let amx { try c.encode(amx); if let three { try c.encode(three) } }
+            }
         }
     }
 

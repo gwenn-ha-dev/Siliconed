@@ -72,8 +72,8 @@ final class DiagnosticTests: XCTestCase {
         // Sorted keys: `attention` before `machine` before `products` before `schema` before `widening`.
         let order = ["\"attention\"", "\"machine\"", "\"products\"", "\"schema\"", "\"widening\""].map { text.range(of: $0)!.lowerBound }
         XCTAssertEqual(order, order.sorted())
-        XCTAssertTrue(text.contains("\"schema\" : 11"))
-        XCTAssertEqual(Diagnostic.schema, 11)
+        XCTAssertTrue(text.contains("\"schema\" : 12"))
+        XCTAssertEqual(Diagnostic.schema, 12)
         XCTAssertEqual(String(decoding: try JSONEncoder().encode(Diagnostic.Cut(k: 16384, n: 6144, m: 4096, share: 0.68764)), as: UTF8.self),
                        "[16384,6144,4096,0.688]", "a cut is a quadruple, its share rounded")
     }

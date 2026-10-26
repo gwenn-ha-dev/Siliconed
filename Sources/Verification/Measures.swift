@@ -125,11 +125,12 @@ package enum NeuralEngineRun {
         setenv("SILICONED_GEMM_ANE", "1", 1)
         setenv("SILICONED_ANE_FRACTION", "0.5", 1)
         setenv("SILICONED_ANE_SHARES", "", 1)
+        setenv("SILICONED_ANE_AMX", "", 1)   // the GPU alone beside the ANE: the pair judged, not the three
         // Every product of 512 rows or more, not only those the render's threshold takes (1024): the
         // conditions of an edit (1 021 rows for a short prompt) and its steps (988 at 512²) included.
         setenv("SILICONED_ANE_MIN", "\(2 * NeuralEngine.rowUnit)", 1)
         let settings = EngineSettings.effective
-        guard settings.gemmANE, settings.aneFraction == 0.5, settings.aneShares.isEmpty,
+        guard settings.gemmANE, settings.aneFraction == 0.5, settings.aneShares.isEmpty, settings.aneAMX.isEmpty,
               settings.aneMinimumRows == 2 * NeuralEngine.rowUnit else {
             throw UsageError("--neural-engine: the engine's settings were read before it")
         }

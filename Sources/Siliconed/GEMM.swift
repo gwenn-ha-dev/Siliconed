@@ -196,6 +196,7 @@ package final class GEMM {
         tensorQ8 = tensor?.readsBlocks == true && q8Weights
         if neuralEngine {
             self.neuralEngine = NeuralEngine(gpuShare: neuralEngineShare, shares: EngineSettings.effective.aneShares)
+            self.neuralEngine?.besideAMX = EngineSettings.effective.aneAMX
         }
     }
 
@@ -242,9 +243,9 @@ package final class GEMM {
     ///   (1.578 against 3.564 TFLOP/s) and −23.6 % on a whole block.
     package func linear(a: MTLBuffer, b: MTLBuffer, c: MTLBuffer, m: Int, k: Int, n: Int,
                        weightIsTransposed: Bool = false) -> Double {
-        // The Neural Engine on the last rows, the GPU alone on the first — the pair the map measured, the AMX
-        // left to the shapes the ANE's grid does not take (`ane_shares`): at the same time, each row one
-        // engine's. Its rows refused or non-finite: the whole product again on the GPU — the bits of the GPU
+        // The Neural Engine on the last rows, the GPU on the first — alone, or beside the AMX on the shapes the
+        // map gave all three (`ane_amx`); the AMX alone beside the GPU on the shapes the ANE's grid does not take
+        // (`ane_shares`): at the same time, each row one engine's. Its rows refused or non-finite: the whole product again on the GPU — the bits of the GPU
         // alone, never a half-computed output.
         if let ane = neuralEngine, weightIsTransposed, case let rows = ane.rows(m, k: k, n: n), rows > 0, ane.accepts(rows: rows, k: k, n: n) {
             let first = m - rows
@@ -259,7 +260,9 @@ package final class GEMM {
                 computed = ane.product(a: pa, w: pb, c: pc, first: first, rows: rows, k: k, n: n)
                 aneWall = Double(DispatchTime.now().uptimeNanoseconds - began) * 1e-9
             }
-            _ = gpuLinear(a: a, b: b, c: c, m: first, k: k, n: n, weightIsTransposed: weightIsTransposed, conductor: false)
+            // The GPU's side alone, or beside the AMX where the map gave the shape all three (`ane_amx`).
+            _ = gpuLinear(a: a, b: b, c: c, m: first, k: k, n: n, weightIsTransposed: weightIsTransposed,
+                          conductor: ane.takesAMX(m, k: k, n: n))
             let gpuWall = Double(DispatchTime.now().uptimeNanoseconds - began) * 1e-9
             group.wait()
             lastSides = (gpuWall, first, aneWall, rows)

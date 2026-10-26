@@ -76,11 +76,13 @@ extension Diagnostic {
     /// than the AMX's. A product of another shape takes its nearest (`Conductor.Shares`).
     package static var aneShapes: [(k: Int, n: Int)] {
         let z = DiT.Config(header: [:]), q = QwenImage21DiT.Config(header: [:])
-        let krea = Krea2DiT.Config(header: [:]), anima = AnimaDiT.Config(header: [:])
+        let krea = Krea2DiT.Config(header: [:]), anima = AnimaDiT.Config(header: [:]), moss = MossImageDiT.Config(header: [:])
         var shapes: [(k: Int, n: Int)] = []
         for (dim, hidden) in [(z.dim, z.hidden), (q.dim, q.hidden), (krea.dim, krea.hidden), (anima.dim, anima.hidden)] {
             shapes += [(dim, dim), (dim, hidden), (hidden, dim)]
         }
+        // MOSS-Image's FFN is one fused Linear: up and gate together, `2 · hidden` wide.
+        shapes += [(moss.dim, moss.dim), (moss.dim, 2 * moss.hidden), (moss.hidden, moss.dim)]
         shapes += [(krea.dim, krea.kvWidth), (anima.textDim, anima.dim)]
         var seen = Set<[Int]>()
         return shapes.filter { seen.insert([$0.k, $0.n]).inserted }
@@ -483,6 +485,24 @@ extension Diagnostic {
         let operands = try amx.map { g in (try g.wrap(o.a.base, bytes: o.a.capacity, name: "diagnostic.a"),
                                            try g.wrap(o.b.base, bytes: o.b.capacity, name: "diagnostic.b"),
                                            try g.wrap(o.c.base, bytes: o.c.capacity, name: "diagnostic.c")) }
+        // The three at once: the ANE on its rows, the GPU beside the AMX on the rest (`ane_amx`), at the share
+        // both pairs give — one wall per point, no sweep (on the M1 Pro, 26/10/2026, the derived split lands on a sweep's best).
+        let three = amx == nil ? nil : try GEMM(freezeCut: true, coexecution: true, tensorWeights: false, neuralEngine: true,
+                                                 neuralEngineShare: 0.5)
+        if let conductor = three?.conductor, let grid = amx?.conductor?.shares { conductor.shares = grid }
+        let threeOperands = try three.map { g in (try g.wrap(o.a.base, bytes: o.a.capacity, name: "diagnostic.a"),
+                                                  try g.wrap(o.b.base, bytes: o.b.capacity, name: "diagnostic.b"),
+                                                  try g.wrap(o.c.base, bytes: o.c.capacity, name: "diagnostic.c")) }
+        func threeWall(k: Int, n: Int, m: Int, share: Double) -> Double? {
+            guard let g = three, let side = g.neuralEngine, let (a, b, c) = threeOperands,
+                  let amxShare = amx?.conductor?.shares.share(k: k, n: n, m: m) else { return nil }
+            side.gpuShare = threeWayShare(ane: share, amx: amxShare)
+            side.shares = .none
+            side.besideAMX = Conductor.Shares([.init(k: k, n: n, m: m, ratio: 1)])
+            let before = side.fallbacks
+            let t = seconds { _ = g.linear(a: a, b: b, c: c, m: m, k: k, n: n, weightIsTransposed: true) }
+            return side.fallbacks == before ? t * 1e3 : nil
+        }
         var cuts: [Cut] = []
         for shape in aneShapes {
             for m in heights {
@@ -491,8 +511,9 @@ extension Diagnostic {
                 if let p = products.first(where: { $0.k == shape.k && $0.n == shape.n && $0.m == m }),
                    let share = p.aneGPUShare, let ane = p.ane?.rate, ane > 0, p.gpu.rate > 0 {
                     let flops = 2 * Double(m * shape.k * shape.n) * 1e-9   // TFLOP/s → milliseconds
+                    let beside = amx != nil ? p.coexecution.map { flops / $0.rate } : nil
                     cuts.append(Cut(k: shape.k, n: shape.n, m: m, share: share, ane: flops / ane, gpu: flops / p.gpu.rate,
-                                    amx: amx != nil ? p.coexecution.map { flops / $0.rate } : nil))
+                                    amx: beside, three: beside != nil ? threeWall(k: shape.k, n: shape.n, m: m, share: share) : nil))
                     continue
                 }
                 let run = { _ = neural.linear(a: a, b: b, c: c, m: m, k: shape.k, n: shape.n, weightIsTransposed: true) }
@@ -502,7 +523,8 @@ extension Diagnostic {
                 let beside = amx.flatMap { g in operands.map { (a, b, c) in
                     seconds { _ = g.linear(a: a, b: b, c: c, m: m, k: shape.k, n: shape.n, weightIsTransposed: true) } } }
                 cuts.append(Cut(k: shape.k, n: shape.n, m: m, share: share, ane: paired * 1e3, gpu: alone * 1e3,
-                                amx: beside.map { $0 * 1e3 }))
+                                amx: beside.map { $0 * 1e3 },
+                                three: beside != nil ? threeWall(k: shape.k, n: shape.n, m: m, share: share) : nil))
             }
         }
         return cuts
