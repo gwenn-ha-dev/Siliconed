@@ -29,6 +29,10 @@ package enum Family: String, CaseIterable, Sendable, Codable {
         }
     }
 
+    /// **Still in beta**: its fast recipe is not its publisher's. MOSS-Image's 8 steps are lodestones' community
+    /// DMD LoRA, until an official turbo exists; the app says so wherever the model is chosen.
+    package var isBeta: Bool { self == .mossImage }
+
     /// The `kind` of the DiT map — what the engine requires in order to read it.
     package var ditKind: String {
         switch self {

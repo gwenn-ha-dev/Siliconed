@@ -10,6 +10,9 @@ English · [Français](RELEASE-NOTES.fr.md)
   Krea 2, Z-Image, Qwen-Image-2.1 and Anima. A single-stream DiT of 5.1 billion parameters that reads
   the prompt with Qwen3.5-9B, a hybrid language model (three layers in four of linear attention,
   Gated DeltaNet, new in the engine), and decodes with FLUX.2's VAE.
+- **MOSS-Image is a beta**, and the app says so (a “Beta” badge on its card and in Models): its 8-step
+  recipe is the community's LoRA, not its publisher's. It leaves beta when OpenMOSS releases its own
+  fast version.
 - **Its recipe is the community's**: its publisher released no fast version, so Siliconed runs
   MOSS-Image-SFT under [lodestones' DMD LoRA](https://huggingface.co/lodestones/MOSS-Image-SFT-8-steps-dmd)
   at strength 1: 8 evaluations, no CFG. The LoRA is kept beside the weights in fp32, never merged:
@@ -18,10 +21,11 @@ English · [Français](RELEASE-NOTES.fr.md)
 - **Your LoRAs** stack on top of the 8-step one: ComfyUI's and ai-toolkit's layout (the attention's
   fused `qkv`, split exactly), kohya's and diffusers'. LoRAs trained on MOSS-Image Base apply as the
   community uses them. Each imported module's ΔW equals PyTorch's from the published file.
-- **Times**: on an M1 Pro with 16 GB, seed 42, 8 evaluations, queued in the app: 1024² in ⟨TBD⟩ s
-  in Compact, ⟨TBD⟩ s in Standard.
+- **Times**: on an M1 Pro with 16 GB, seed 42, 8 evaluations, queued in the app: 1024² in 107.7 s
+  in Compact, 107.3 s in Standard; 1024×1536 in 174.2 s in both.
 - **Faster Rendering takes one half-size evaluation**, not three: from the second, MOSS-Image
-  smooths skin and softens fine detail where the other models keep it. A tenth less time at 1024².
+  smooths skin and softens fine detail where the other models keep it. 8 % less time at 1024²
+  (116.9 s with every evaluation at full size).
 - **The preview shows during the render**, as with the other models: a projection of the FLUX.2
   latent's 128 channels to colour, fitted on twelve renders.
 - **Checked against the reference**, stage by stage: the tokenizer and the schedule to the bit, the
@@ -35,7 +39,7 @@ English · [Français](RELEASE-NOTES.fr.md)
   the other models, with the Neural Engine on by default. No Light yet: a 4-bit DiT is published,
   not yet checked.
 - **Within the budget**: its memory need is computed from the model's shapes before the first
-  computation. ⟨TBD: peaks⟩
+  computation. The app's peak: 2.4 GiB at 1024², 2.8 GiB at 1024×1536, in both versions.
 - **License**: Apache 2.0, the LoRA included. Commercial use allowed.
 
 ## 0.15

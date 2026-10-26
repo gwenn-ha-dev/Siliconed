@@ -250,6 +250,7 @@ struct ModelManagement: View {
                 HStack(spacing: 6) {
                     Text(card.name).fontWeight(.medium)
                         .help(Welcome.blurb(p.family))
+                    if p.family.isBeta { BetaBadge() }
                     Text("\(card.defaultSteps) steps").font(.caption).foregroundStyle(.secondary)
                     // The version on disk, said where there is a choice.
                     if p.family.variants.count > 1, p.dit > 0, let v = p.variant {
@@ -492,5 +493,16 @@ struct VersionChoice: View {
         default:
             String(localized: "The image model and the text encoder in the publisher's precision (bf16).")
         }
+    }
+}
+
+/// « Beta », same outlined capsule as the version badge, in the orange of « non-commercial » (a caveat, not an error).
+/// Shown where a model with a community recipe is chosen (`Family.isBeta`).
+struct BetaBadge: View {
+    var body: some View {
+        Text("Beta").font(.caption).foregroundStyle(.orange)
+            .padding(.horizontal, 5).padding(.vertical, 1)
+            .overlay(Capsule().strokeBorder(Color.orange.opacity(0.6)))
+            .help("Beta: the 8-step recipe is the community's distillation, not the publisher's. It leaves beta when the publisher releases its own fast version.")
     }
 }

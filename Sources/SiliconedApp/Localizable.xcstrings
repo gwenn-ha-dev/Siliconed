@@ -4881,6 +4881,62 @@
         }
       }
     },
+    "Beta" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Beta"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Beta"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bêta"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Beta"
+          }
+        }
+      }
+    },
+    "Beta: the 8-step recipe is the community's distillation, not the publisher's. It leaves beta when the publisher releases its own fast version." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Beta: Das 8-Schritte-Rezept ist die Destillation der Community, nicht die des Herausgebers. Das Modell verlässt die Beta, sobald der Herausgeber eine eigene schnelle Version veröffentlicht."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Beta: la receta de 8 pasos es la destilación de la comunidad, no la del editor. El modelo deja de ser beta cuando el editor publique su propia versión rápida."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bêta : la recette en 8 pas est la distillation de la communauté, pas celle de l’éditeur. Le modèle sort de bêta quand l’éditeur publie sa propre version rapide."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Beta: la ricetta a 8 passi è la distillazione della comunità, non quella dell’editore. Il modello esce dalla beta quando l’editore pubblica una propria versione rapida."
+          }
+        }
+      }
+    },
     "Build the app with tools/app.sh." : {
       "localizations" : {
         "de" : {

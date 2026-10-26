@@ -517,7 +517,10 @@ struct Welcome: View {
                 Text(verbatim: model.licenseName).font(.caption).foregroundStyle(.secondary)
                     .lineLimit(1).truncationMode(.tail)
             }
-            Text(verbatim: model.name).font(.title3.weight(.semibold))
+            HStack(spacing: 6) {
+                Text(verbatim: model.name).font(.title3.weight(.semibold))
+                if family.isBeta { BetaBadge() }
+            }
             Text(Self.blurb(family))
                 .font(.callout).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)

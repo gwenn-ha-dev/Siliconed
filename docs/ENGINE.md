@@ -41,22 +41,22 @@ Times: renders queued in the app with `silicontrol`, each in a newly launched ap
 
 ## Numbers
 
-Reference machine: MacBook Pro M1 Pro (8 cores, 14 GPU cores), 16 GB. App 0.15, 25/10/2026, seed 42, 8 steps, Faster Rendering on (the default), the prompt “Photo of a young Irish woman with wavy auburn hair and freckles, in a shorty wetsuit, holding her surfboard on a wild beach in the west of Ireland, Atlantic waves behind her, 35 mm photograph.”
+Reference machine: MacBook Pro M1 Pro (8 cores, 14 GPU cores), 16 GB. App 0.15, 25/10/2026 (MOSS-Image: app 0.16, 26/10/2026), seed 42, 8 steps, Faster Rendering on (the default), the prompt “Photo of a young Irish woman with wavy auburn hair and freckles, in a shorty wetsuit, holding her surfboard on a wild beach in the west of Ireland, Atlantic waves behind her, 35 mm photograph.”
 
 | | Krea 2 Turbo | Z-Image Turbo | Qwen-Image-2.1 Turbo | Anima Turbo | MOSS-Image |
 |---|---|---|---|---|---|
-| 1024², Compact (8 bits, the default), Neural Engine on | **135.8 s** | **83.1 s** | **100.2 s** | **33.1 s** | **⟨TBD⟩** |
-| 1024², Standard (the publisher's bf16, computed in fp32) | 147.8 s | 82.4 s | 110.4 s | 34.3 s | ⟨TBD⟩ |
+| 1024², Compact (8 bits, the default), Neural Engine on | **135.8 s** | **83.1 s** | **100.2 s** | **33.1 s** | **107.7 s** |
+| 1024², Standard (the publisher's bf16, computed in fp32) | 147.8 s | 82.4 s | 110.4 s | 34.3 s | 107.3 s |
 | 1024², Light (4 to 6 bits), Neural Engine on | 145.0 s | 87.5 s | 103.7 s | 34.7 s | — (no Light) |
-| 1024×1536, Compact / Standard | 207.7 s / 223.1 s | 130.2 s / 133.1 s | 161.1 s / 170.9 s | 53.6 s / 53.7 s | ⟨TBD⟩ |
-| the first image of a new prompt (its text encoding included), 1024², Compact / Standard | 136.7 s / 150.2 s | 84.2 s / 84.9 s | 105.7 s / 118.4 s | 33.8 s / 33.9 s | ⟨TBD⟩ |
-| peak memory of the app, 1024² · 1024×1536, Compact / Standard | 2.1 · 2.7 / 2.1 · 2.6 GiB | 1.9 · 2.8 / 1.9 · 2.8 GiB | 1.5 · 1.7 / 1.5 · 1.7 GiB | 1.3 · 2.0 / 1.3 · 2.0 GiB | ⟨TBD⟩ |
-| read from disk per image, 1024², Compact / Standard | 98 / 195 GB | 0 / 44 GB | 0.2 / 135 GB | 0 / 0 GB | ⟨TBD⟩ |
-| 1024², Standard, every evaluation at full size (0.12) | 221.1 s | 117.7 s | 142.7 s | 44.4 s | ⟨TBD: app 0.16, Faster Rendering off⟩ |
+| 1024×1536, Compact / Standard | 207.7 s / 223.1 s | 130.2 s / 133.1 s | 161.1 s / 170.9 s | 53.6 s / 53.7 s | 174.2 s / 174.2 s |
+| the first image of a new prompt (its text encoding included), 1024², Compact / Standard | 136.7 s / 150.2 s | 84.2 s / 84.9 s | 105.7 s / 118.4 s | 33.8 s / 33.9 s | 109.9 s / 109.7 s |
+| peak memory of the app, 1024² · 1024×1536, Compact / Standard | 2.1 · 2.7 / 2.1 · 2.6 GiB | 1.9 · 2.8 / 1.9 · 2.8 GiB | 1.5 · 1.7 / 1.5 · 1.7 GiB | 1.3 · 2.0 / 1.3 · 2.0 GiB | 2.4 · 2.8 / 2.4 · 2.8 GiB |
+| read from disk per image, 1024², Compact / Standard | 98 / 195 GB | 0 / 44 GB | 0.2 / 135 GB | 0 / 0 GB | 0.1 / 76 GB |
+| 1024², Standard, every evaluation at full size (0.12) | 221.1 s | 117.7 s | 142.7 s | 44.4 s | 116.9 s (0.16) |
 | other, Standard | | | an edit with 1 image 211 s, with 2 images 297 s | 512² 12.1 s |  |
 | deviation of the denoiser's output (`model_out`, worst channel) from the fp32 reference · from the fp64 exact (the reference's own) | 2.6·10⁻⁴ · 3.3·10⁻⁴ (3.1·10⁻⁴), 1024² | 9.8·10⁻⁶ · 1.2·10⁻⁵ (1.3·10⁻⁵), 1024² | 3.1·10⁻⁶ · 2.6·10⁻⁶ (2.5·10⁻⁶), 512² | 1.4·10⁻⁵ · per latent plane 2.9·10⁻⁶ (3.8·10⁻⁶), 1024² | per latent plane 1.2·10⁻⁶ · 1.3·10⁻⁶ (1.4·10⁻⁶), 512² |
 
-**Full precision costs almost nothing.** The Standard computes the publisher's bf16 weights in fp32, the precision the reference is checked in; the Compact reads 8-bit weights published by third parties and computes in fp32 too. On Z-Image and Anima the Standard takes the Compact's time within 4 %. On Krea 2 and Qwen-Image-2.1 it takes 6 to 10 % more: at full precision their weights do not stay in a 16 GB Mac's memory and are read again from disk at each step, 195 GB and 135 GB per image at 1024². That is also why every peak above stays under 3 GiB: weights mapped from disk are not counted in `phys_footprint`, since the system can drop them at any moment. What the Standard does cost is disk space, twice the Compact's, and energy, the Neural Engine being off on it by default ([The Neural Engine](#the-neural-engine)).
+**Full precision costs almost nothing.** The Standard computes the publisher's bf16 weights in fp32, the precision the reference is checked in; the Compact reads 8-bit weights published by third parties and computes in fp32 too. On Z-Image and Anima the Standard takes the Compact's time within 4 %. On Krea 2 and Qwen-Image-2.1 it takes 6 to 10 % more: at full precision their weights do not stay in a 16 GB Mac's memory and are read again from disk at each step, 195 GB and 135 GB per image at 1024². MOSS-Image's Standard reads 76 GB per image and still takes the Compact's time: its steps are long enough for the disk to keep up. That is also why every peak above stays under 3 GiB: weights mapped from disk are not counted in `phys_footprint`, since the system can drop them at any moment. What the Standard does cost is disk space, twice the Compact's, and energy, the Neural Engine being off on it by default ([The Neural Engine](#the-neural-engine)).
 
 Each line is a `silicontrol measure` series in a freshly opened app, the series anyone can repeat ([REMOTE-CONTROL.md](REMOTE-CONTROL.md)): a load render, a witness (the library prompt, “a 30 year old woman posing in a library”), two renders of the prompt above, a witness again. A time is the second render's, from the request to the PNG, the prompt already encoded; the first image of a new prompt adds its text encoding. The two witnesses of each series stayed within 1.4 % of each other, 0 swap-out, and each image came out identical, to the bit, from one render to the next. Peak memory is the app's `phys_footprint`, sampled every 100 ms. Every evaluation at full size: 18/10/2026, app 0.12, 0 swap-out. The other times: Qwen-Image-2.1 on 15/10/2026 with 0.10, Anima Turbo's 512² with the engine alone (14–15/10/2026). The deviations are what `siliconed check <model> dit --size <side>` printed on the same Mac on 24/10/2026, against goldens written by `tools/oracle/`; on yours they differ in the last digits ([VERIFY.md](VERIFY.md), [Verification](#verification)).
 

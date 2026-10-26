@@ -10,6 +10,9 @@
   Krea 2, Z-Image, Qwen-Image-2.1 et Anima. Un DiT mono-flux de 5,1 milliards de paramètres qui lit
   le prompt avec Qwen3.5-9B, un modèle de langage hybride (trois couches sur quatre en attention
   linéaire, Gated DeltaNet, nouvelle dans le moteur), et décode avec le VAE de FLUX.2.
+- **MOSS-Image est en bêta**, et l'app le dit (un badge « Bêta » sur sa carte et dans Modèles) : sa
+  recette en 8 pas est la LoRA de la communauté, pas celle de son éditeur. Il sort de bêta quand
+  OpenMOSS publie sa propre version rapide.
 - **Sa recette est celle de la communauté** : son éditeur n'a pas publié de version rapide, alors
   Siliconed fait tourner MOSS-Image-SFT sous la [LoRA DMD de lodestones](https://huggingface.co/lodestones/MOSS-Image-SFT-8-steps-dmd)
   à force 1 : 8 évaluations, sans CFG. La LoRA est gardée à côté des poids en fp32, jamais fusionnée :
@@ -19,11 +22,11 @@
   `qkv` fusionné de l'attention, séparé exactement), celles de kohya et de diffusers. Les LoRA
   entraînées sur MOSS-Image Base s'appliquent comme la communauté s'en sert. Le ΔW de chaque module
   importé est égal à celui que PyTorch calcule depuis le fichier publié.
-- **Temps** : sur un M1 Pro de 16 Go, graine 42, 8 évaluations, en file dans l'app : 1024² en ⟨TBD⟩ s
-  en Compact, ⟨TBD⟩ s en Standard.
+- **Temps** : sur un M1 Pro de 16 Go, graine 42, 8 évaluations, en file dans l'app : 1024² en 107,7 s
+  en Compact, 107,3 s en Standard ; 1024×1536 en 174,2 s dans les deux.
 - **Le rendu plus rapide n'y prend qu'une évaluation en demi-taille**, pas trois : dès la deuxième,
-  MOSS-Image lisse la peau et adoucit le détail fin là où les autres modèles le gardent. Un dixième de
-  temps en moins à 1024².
+  MOSS-Image lisse la peau et adoucit le détail fin là où les autres modèles le gardent. 8 % de temps
+  en moins à 1024² (116,9 s avec toutes les évaluations en pleine taille).
 - **L'aperçu s'affiche pendant le rendu**, comme pour les autres modèles : une projection des
   128 canaux du latent FLUX.2 vers la couleur, ajustée sur douze rendus.
 - **Vérifié contre la référence**, étage par étage : le tokenizer et le calendrier au bit près, les
@@ -37,7 +40,7 @@
   comme pour les autres modèles, avec le Neural Engine allumé par défaut. Pas encore de Légère : un
   DiT en 4 bits est publié, pas encore vérifié.
 - **Dans le budget** : son besoin en mémoire est calculé à partir des formes du modèle avant le
-  premier calcul. ⟨TBD : pics⟩
+  premier calcul. Pic de l'app : 2,4 Gio à 1024², 2,8 Gio en 1024×1536, dans les deux versions.
 - **Licence** : Apache 2.0, LoRA comprise. Usage commercial permis.
 
 ## 0.15
