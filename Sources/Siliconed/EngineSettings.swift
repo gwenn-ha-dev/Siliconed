@@ -277,7 +277,23 @@ package struct EngineSettings: Sendable {
     // ── reading ─────────────────────────────────────────────────────────────────────────
 
     /// The process's active settings, read once, on first access. The whole engine goes through here.
-    package static let effective: EngineSettings = EngineSettings()
+    package static var effective: EngineSettings {
+        #if DEBUG
+        if readsForbidden { forbiddenReads.add(1, ordering: .relaxed) }
+        #endif
+        return read
+    }
+    private static let read = EngineSettings()
+
+    #if DEBUG
+    /// **A tripwire for what must not read the settings** (debug builds only): inside
+    /// `$readsForbidden.withValue(true)`, each read of `effective` is counted. A plan asked before the
+    /// capacity map froze the process on the defaults once (the map then refused, the AMX off for the
+    /// session); the first read cannot be watched in a test process where others already read, every
+    /// read can.
+    @TaskLocal package static var readsForbidden = false
+    package static let forbiddenReads = Atomic<Int>(0)
+    #endif
 
     /// What an app designated before the first access (`load(from:map:)`): its profile, its map.
     private static let designated = Mutex<(profile: String?, map: Diagnostic.Report?)>((nil, nil))
