@@ -161,6 +161,11 @@ package enum Diagnostic {
             self.swapUsedBytes = swapUsedBytes
         }
 
+        /// **A machine at rest, as far as one reading says**: thermal state nominal, Low Power Mode off. The
+        /// battery is not held against it: it did not throttle the maps taken on it (M5, M5 Pro: witness
+        /// ×1.00). Swap is judged between two readings (`Report.isProvisional`), never from one.
+        package var isNominal: Bool { thermal == "nominal" && !lowPowerMode }
+
         private enum CodingKeys: String, CodingKey { case thermal, lowPowerMode, onBattery, swapUsedBytes }
         /// Explicit `null`s, as everywhere in the report: "unknown" is said, not dropped.
         package func encode(to encoder: any Encoder) throws {
@@ -501,6 +506,15 @@ package enum Diagnostic {
         /// **The report still describes this process's machine and build** — what an app checks before
         /// handing it to `EngineSettings.load(from:map:)`; when it does not, the app offers to measure again.
         package var isCurrent: Bool { schema == Diagnostic.schema && fingerprint == .current }
+
+        /// **Taken on a machine that was not at rest**: warm or in Low Power Mode before or after, or swap
+        /// growing over the measure — another process pressing on memory (a Mac mini M4, 20/10/2026: swap
+        /// 6.74 → 6.83 GB, MPSGraph's attention at ~1 TFLOP/s, half its sibling's). Such a map still
+        /// serves — refusing a render on it would be worse —, and the app measures again at its next
+        /// launch at rest.
+        package var isProvisional: Bool {
+            !before.isNominal || !after.isNominal || after.swapUsedBytes > before.swapUsedBytes
+        }
 
         /// Every measure of the report, in its order.
         package var measures: [Measure] {

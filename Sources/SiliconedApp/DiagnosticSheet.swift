@@ -70,9 +70,15 @@ struct DiagnosticSheet: View {
     /// The sentence of `mapStatus` — the settings window says it too.
     static func mapStatus(_ app: AppState) -> LocalizedStringKey {
         if let used = app.mapInUse {
+            if used == app.storedMap, used.isProvisional {
+                return "This session uses the measure of \(day(used.date)), taken while the Mac was warm, in Low Power Mode or short of memory: it is measured again at its next launch at rest."
+            }
             return used == app.storedMap
                 ? "This session uses the choices of this Mac's measure of \(day(used.date))."
                 : "This session uses the measure of \(day(used.date)); the newer one applies from the next launch."
+        }
+        if app.remeasuringProvisional, let stored = app.storedMap {
+            return "The measure of \(day(stored.date)) was taken while the Mac was not at rest: it is measured again before the next render."
         }
         if let stored = app.storedMap, !stored.isCurrent {
             return "The measure of \(day(stored.date)) was taken with another macOS or another version of Siliconed: this Mac is measured again before the next render."

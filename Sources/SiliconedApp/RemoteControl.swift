@@ -200,6 +200,8 @@ final class RemoteControl {
                                 "faster_rendering": app.fasterRendering]
         // The settings renders run on: a series compared across launches compares maps too.
         o["settings"] = ["read": app.settingsRead, "map": app.mapInUse?.date ?? NSNull(),
+                         "provisional": app.mapInUse?.isProvisional ?? NSNull(),
+                         "remeasuring": app.remeasuringProvisional,
                          "warnings": app.profileWarnings] as [String: Any]
         if let t = app.currentJob {
             var e = json(t)

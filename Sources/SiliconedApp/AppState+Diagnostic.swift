@@ -72,6 +72,7 @@ extension AppState {
             self.diagnosticProcess = nil
             if self.diagnosticStopped {
                 self.diagnostic = .ready
+                self.fallBackOnStoredMap()
             } else if let report, process.terminationStatus == 0 {
                 self.diagnostic = .finished(report)
                 self.keep(report)   // what this Mac uses: from now if nothing read the settings yet, else from the next launch
@@ -79,6 +80,7 @@ extension AppState {
                 let problem = failure ?? Problem(EngineError.internalFailure(
                     component: "diagnostic", detail: "the measuring process ended with status \(process.terminationStatus)"))
                 self.diagnostic = .failed(problem)
+                self.fallBackOnStoredMap()
                 // A job waits for this measure: the failure is said where the render's would be.
                 if !self.settingsRead, !self.file.isEmpty { self.problem = problem }
             }

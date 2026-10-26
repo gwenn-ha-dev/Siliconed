@@ -60,6 +60,30 @@ final class DiagnosticTests: XCTestCase {
                                      Diagnostic.Cut(k: k, n: Diagnostic.cutWidth, m: m, share: k < 8192 ? 0.6234 : 0.6876) } })
     }
 
+    // ── off rest ────────────────────────────────────────────────────────────────────────────
+
+    /// A map is provisional when the machine was warm or in Low Power Mode at either end, or its swap grew
+    /// over the measure; the battery alone, a swap already there and unchanged, or one that shrank, are not.
+    func testProvisionalOffRestOnly() {
+        func conditions(_ thermal: String = "nominal", lowPower: Bool = false, battery: Bool? = nil, swap: Int = 0) -> Diagnostic.Conditions {
+            Diagnostic.Conditions(thermal: thermal, lowPowerMode: lowPower, onBattery: battery, swapUsedBytes: swap)
+        }
+        func provisional(_ before: Diagnostic.Conditions, _ after: Diagnostic.Conditions) -> Bool {
+            var r = sample(); r.before = before; r.after = after
+            return r.isProvisional
+        }
+        XCTAssertFalse(sample().isProvisional)
+        XCTAssertFalse(provisional(conditions(battery: true), conditions(battery: true)))
+        XCTAssertFalse(provisional(conditions(swap: 2_900_000), conditions(swap: 2_900_000)))   // M5 Pro, 20/10
+        XCTAssertFalse(provisional(conditions(swap: 7_000_000_000), conditions(swap: 6_000_000_000)))
+        XCTAssertTrue(provisional(conditions(swap: 6_740_000_000), conditions(swap: 6_830_000_000)))   // Mac mini M4, 20/10
+        XCTAssertTrue(provisional(conditions(), conditions("fair")))
+        XCTAssertTrue(provisional(conditions("serious"), conditions()))
+        XCTAssertTrue(provisional(conditions(lowPower: true), conditions()))
+        XCTAssertTrue(conditions(battery: true).isNominal)
+        XCTAssertFalse(conditions("fair").isNominal)
+    }
+
     // ── the JSON ────────────────────────────────────────────────────────────────────────────
 
     func testJSONIsStableAndReadsBack() throws {

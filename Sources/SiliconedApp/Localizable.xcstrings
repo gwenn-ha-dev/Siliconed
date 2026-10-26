@@ -20125,6 +20125,34 @@
         }
       }
     },
+    "The measure of %@ was taken while the Mac was not at rest: it is measured again before the next render." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Messung vom %@ wurde nicht im Ruhezustand des Mac aufgenommen: Sie wird vor dem nächsten Rendern wiederholt."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La medición del %@ se tomó con el Mac sin estar en reposo: se repite antes del próximo render."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La mesure du %@ a été prise sur un Mac qui n’était pas au repos : elle est refaite avant le prochain rendu."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La misura del %@ è stata presa con il Mac non a riposo: viene ripetuta prima del prossimo rendering."
+          }
+        }
+      }
+    },
     "The measure of %@ was taken with another macOS or another version of Siliconed: this Mac is measured again before the next render." : {
       "localizations" : {
         "de" : {
@@ -22213,6 +22241,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Questa sessione usa le scelte della misura di questo Mac del %@."
+          }
+        }
+      }
+    },
+    "This session uses the measure of %@, taken while the Mac was warm, in Low Power Mode or short of memory: it is measured again at its next launch at rest." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diese Sitzung verwendet die Messung vom %@, aufgenommen bei warmem Mac, im Stromsparmodus oder bei knappem Speicher: Sie wird beim nächsten Start im Ruhezustand wiederholt."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esta sesión usa la medición del %@, tomada con el Mac caliente, en modo de bajo consumo o con poca memoria: se repetirá en su próximo inicio en reposo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette session utilise la mesure du %@, prise sur un Mac chaud, en mode économie d’énergie ou à court de mémoire : elle sera refaite à son prochain lancement au repos."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Questa sessione usa la misura del %@, presa con il Mac caldo, in modalità Risparmio energetico o a corto di memoria: verrà ripetuta al prossimo avvio a riposo."
           }
         }
       }

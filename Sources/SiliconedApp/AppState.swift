@@ -476,9 +476,18 @@ final class AppState {
         // with a current map: the app builds only one `AppState` (see `App.swift`). Without one (none yet,
         // or one of another Mac, macOS or build: an update), the settings stay unread until the measure
         // the first render starts (`next`).
+        // A provisional map (taken warm, in Low Power Mode or under swap) is measured again once the Mac
+        // is at rest — once: a measure again provisional serves until the next one (`retriedMapKey`).
         let stored = Self.readStoredMap()
         storedMap = stored
-        if let stored, stored.isCurrent { readSettings(map: stored) }
+        if let stored, stored.isCurrent {
+            if stored.isProvisional, stored.date != UserDefaults.standard.string(forKey: Self.retriedMapKey),
+               Diagnostic.conditions().isNominal {
+                remeasuringProvisional = true
+            } else {
+                readSettings(map: stored)
+            }
+        }
         watchVolumes()
         warm()
     }
@@ -492,6 +501,9 @@ final class AppState {
     /// Mac, macOS build or app build) —, said in the sidebar, never in the background; the user can
     /// also measure again (« Measure This Mac »), which then applies from the next launch.
     private static let capacityMapKey = "capacityMap"
+    /// The date of a map measured again because the one before was provisional, and provisional itself:
+    /// it is not measured again at each launch.
+    private static let retriedMapKey = "capacityMapRetried"
 
     private static func readStoredMap() -> Diagnostic.Report? {
         UserDefaults.standard.data(forKey: capacityMapKey).flatMap { try? JSONDecoder().decode(Diagnostic.Report.self, from: $0) }
@@ -506,13 +518,28 @@ final class AppState {
     /// **The engine's settings were read** (`EngineSettings.load`), the map with them: renders may run,
     /// and the memory needs be computed — they read the settings (`amx` adds the AMX's operands).
     private(set) var settingsRead = false
+    /// The kept map is current but provisional (`Diagnostic.Report.isProvisional`) and the Mac is at rest
+    /// now: the first render measures again rather than read it.
+    private(set) var remeasuringProvisional = false
 
     /// Keeps `report` as the map of the next launches — and of this one, when nothing read the settings yet.
     func keep(_ report: Diagnostic.Report) {
         guard let data = try? report.json(pretty: false) else { return }
         UserDefaults.standard.set(data, forKey: Self.capacityMapKey)
+        if remeasuringProvisional, report.isProvisional {
+            UserDefaults.standard.set(report.date, forKey: Self.retriedMapKey)
+        }
+        remeasuringProvisional = false
         storedMap = report
         if !settingsRead { readSettings(map: report) }
+    }
+
+    /// **A measure taken again failed or was stopped**: the provisional map kept serves this session
+    /// rather than leave the queue waiting — it is current, only taken off rest.
+    func fallBackOnStoredMap() {
+        guard remeasuringProvisional, !settingsRead, let stored = storedMap, stored.isCurrent else { return }
+        remeasuringProvisional = false
+        readSettings(map: stored)
     }
 
     /// **Reads the engine's settings**, once: the profile of THIS library and `map`.
