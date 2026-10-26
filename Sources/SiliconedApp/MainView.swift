@@ -552,6 +552,7 @@ struct Welcome: View {
         case .qwenImage21: "wand.and.stars"
         case .anima: "paintbrush"
         case .krea2: "camera.aperture"
+        case .mossImage: "text.viewfinder"
         default: "sparkles"
         }
     }
@@ -566,6 +567,8 @@ struct Welcome: View {
         case .anima: String(localized: "Illustration, painting and anime. No photorealism: its publisher's choice.")
         // The largest DiT of the four (12.8 B), and the slowest render.
         case .krea2: String(localized: "Aesthetic images, from photography to painting. The largest model, and the slowest.")
+        // A 9 B language model reads the prompt; the eight steps come from the community's distillation, not the publisher's.
+        case .mossImage: String(localized: "Long, detailed prompts, read by a 9 B language model. Eight steps through the community's distillation.")
         }
     }
 }

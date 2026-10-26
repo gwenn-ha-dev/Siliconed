@@ -129,14 +129,23 @@ package struct ModelCard: Sendable, Identifiable, Hashable {
                          urls: Installer.licenseURLs(.qwenImage21)),
         defaultSteps: 8, space: .qwenImage21, formats: recommendedFormats)
 
+    /// **MOSS-Image under the community's 8-step LoRA** (OpenMOSS-Team's SFT model, lodestones' DMD distillation at
+    /// strength 1; no official turbo exists as of the pinned revisions): single-stream DiT of 5.08 B, Qwen3.5-9B
+    /// encoder (hybrid Gated DeltaNet), FLUX.2 VAE, 8 steps without CFG. Apache 2.0, commercial. Standard only.
+    package static let mossImage = ModelCard(
+        id: "moss-image", name: "MOSS-Image", family: .mossImage, map: nil,
+        license: License(text: "Apache 2.0", commercial: true, requiredFilter: false, urls: Installer.licenseURLs(.mossImage)),
+        defaultSteps: 8, space: .flux2, formats: recommendedFormats)
+
     /// The repository's models, in the order of `Model.identifiers`.
-    package static let allCards: [ModelCard] = [zImage, anima, krea2, qwenImage21]
+    package static let allCards: [ModelCard] = [zImage, anima, krea2, qwenImage21, mossImage]
 
     /// A family's sheet — that of its published model.
     package static func of(_ family: Family) -> ModelCard {
         switch family {
         case .zImage: return zImage; case .anima: return anima; case .krea2: return krea2
         case .qwenImage21: return qwenImage21
+        case .mossImage: return mossImage
         }
     }
 

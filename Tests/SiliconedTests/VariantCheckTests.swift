@@ -58,7 +58,7 @@ struct VariantCheckTests {
     @Test func aVersionMapHasItsOwnNameBesideTheStandards() {
         for family in Family.allCases {
             let names = Set(family.variants.map { family.ditMap($0) })
-            #expect(names.count == 3, "\(family)")
+            #expect(names.count == family.variants.count, "\(family)")
         }
     }
 }

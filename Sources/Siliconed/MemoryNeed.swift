@@ -80,6 +80,7 @@ package struct MemoryNeed: Sendable, Equatable {
         package var qwenMaps: QwenImage21Maps? = nil
         package var animaMaps: AnimaMaps? = nil
         package var krea2Maps: Krea2Maps? = nil
+        package var mossMaps: MossMaps? = nil
 
         package init(card: ModelCard, width: Int, height: Int, references: [(width: Int, height: Int)] = [],
                      promptTokens: Int, loraRanks: [Int] = [], tail: MemoryPlan.Tail = .init(fraction: 0.5, streamed: true)) {
@@ -120,6 +121,10 @@ package struct MemoryNeed: Sendable, Equatable {
             case .zImage:
                 return Tokenizer.chatPrefix.utf8.count + min(text, Siliconed.Request.maximumPromptTokens)
                     + Tokenizer.chatSuffix.utf8.count
+            case .mossImage:
+                // The template's bytes bound its tokens (`Qwen35Prompt.template`); the prompt is admitted up to the bound.
+                return min(Qwen35Prompt.template("").utf8.count + min(text, Siliconed.Request.maximumPromptTokens),
+                           Qwen35Prompt.maxTokens)
             }
         }
 
@@ -204,6 +209,7 @@ package struct MemoryNeed: Sendable, Equatable {
         case .qwenImage21: qwenImage21(request)
         case .anima: anima(request)
         case .krea2: krea2(request)
+        case .mossImage: mossImage(request)
         }
     }
 

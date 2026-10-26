@@ -51,11 +51,12 @@ final class AppTests: XCTestCase {
     func testTheCardMatchesTheDenoiser() {
         let denoisers: [String: any DenoisingModule] = [
             "z-image": ZImageDenoisingModule(map: ""), "anima": AnimaDenoisingModule(map: ""), "krea2": Krea2DenoisingModule(map: ""),
-            "qwen-image-2.1": QwenImage21DenoisingModule(map: "", scheduler: .init())]
+            "qwen-image-2.1": QwenImage21DenoisingModule(map: "", scheduler: .init()),
+            "moss-image": MossImageDenoisingModule(map: "", turbo: "")]
         // Qwen-Image-2.1 joins last when the zero swap holds at its worst case (`ModelCard.qwenImage21`):
         // both states pass, nothing else does.
         let published = ["z-image", "anima", "krea2"]
-        XCTAssertTrue(Model.identifiers == published || Model.identifiers == published + ["qwen-image-2.1"],
+        XCTAssertTrue(Model.identifiers == published + ["moss-image"] || Model.identifiers == published + ["qwen-image-2.1", "moss-image"],
                       "\(Model.identifiers)")
         // Hidden card, hidden family; visible card, offered family — never one without the other.
         XCTAssertEqual(Family.offered.contains(.qwenImage21), ModelCard.allCards.contains(.qwenImage21))

@@ -908,6 +908,7 @@ package struct Model: Sendable {
         case "anima": return try anima(in: b, card: .anima, dit: b.ditMap(.anima))
         case "krea2": return try krea2(in: b, card: .krea2, dit: b.ditMap(.krea2))
         case "qwen-image-2.1": return try qwenImage21(in: b, card: .qwenImage21, dit: b.ditMap(.qwenImage21))
+        case "moss-image": return try mossImage(in: b, card: .mossImage, dit: b.ditMap(.mossImage))
         default:
             guard let card = b.importedCards().first(where: { $0.id == identifier }), let dit = card.map else {
                 throw Failure.unknown(identifier)
@@ -917,6 +918,7 @@ package struct Model: Sendable {
             case .anima: return try anima(in: b, card: card, dit: dit)
             case .krea2: return try krea2(in: b, card: card, dit: dit)
             case .qwenImage21: return try qwenImage21(in: b, card: card, dit: dit)
+            case .mossImage: return try mossImage(in: b, card: card, dit: dit)
             }
         }
     }
@@ -994,5 +996,20 @@ package struct Model: Sendable {
                    denoising: try QwenImage21DenoisingModule.product(map: try map(dit, b), in: b),
                    decoding: QwenImage21DecodingModule(path: vae),
                    encoding: QwenImage21EncodingModule(path: vae)))
+    }
+
+    /// MOSS-Image under its 8-step LoRA. Apache 2.0.
+    package static func mossImage(in b: Library) throws(EngineError) -> Model {
+        try building(ModelCard.mossImage.id) { try mossImage(in: b, card: .mossImage, dit: b.ditMap(.mossImage)) }
+    }
+
+    static func mossImage(in b: Library, card: ModelCard, dit: String) throws -> Model {
+        // The LoRA lives with the components; without it the DiT would render an undistilled image in 8 steps.
+        guard let turbo = Installer(library: b).companionMap(.mossImage) else { throw MissingFile("turbo LoRA", .map) }
+        guard FileManager.default.fileExists(atPath: turbo) else { throw MissingFile(turbo, .map) }
+        return Model(card: card, library: b, chain: try Chain(
+            text: MossImageTextModule(map: try map(b.encoderMap(.mossImage), b), tokenizer: try b.component(.mossImage, "tokenizer")),
+            denoising: MossImageDenoisingModule(map: try map(dit, b), turbo: turbo),
+            decoding: Flux2DecodingModule(path: try b.component(.mossImage, "vae.safetensors"))))
     }
 }

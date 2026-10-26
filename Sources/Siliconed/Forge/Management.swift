@@ -380,6 +380,7 @@ extension Family {
             case .anima: return (1_845_869_136, installedSize(.compact).encoder, installedSize(.standard).components)
             // vantagewithai's Q4_K_M, blocks kept; Krea's two easter-egg tensors left out.
             case .krea2: return (7_436_943_360, installedSize(.compact).encoder, installedSize(.standard).components)
+            case .mossImage: return installedSize(.standard)   // no Light: `Family.variants`
             }
         }
         if variant == .compact {
@@ -393,6 +394,7 @@ extension Family {
             // Comfy-Org's int8 convrot, the DiT's Linears kept 8-bit; the encoder's embedding table
             // in fp32 (a rotated table cannot be read by rows).
             case .krea2: return (14_138_179_584, 5_096_919_040, installedSize(.standard).components)
+            case .mossImage: return installedSize(.standard)   // no Compact: `Family.variants`
             }
         }
         switch self {
@@ -404,6 +406,10 @@ extension Family {
         // The maps measured on 2026-10-03 (the Turbo's DiT has the base's shapes and dtypes, its encoder
         // the base's tensors); the components summed from the Turbo's published files (VAE in bf16).
         case .qwenImage21: return (14_231_355_392, 16_295_034_880, 686_958_986)
+        // The maps as installed: the DiT in bf16 (the published bytes), the language model alone of the Qwen3.5-9B
+        // (the vision tower dropped; the norms and the delta layers' small tensors in fp32), and the components
+        // — tokenizer, fp32 VAE, configs and the DMD LoRA's fp32 map (1.19 GB).
+        case .mossImage: return (10_167_146_496, 15_876_997_120, 1_458_697_496)
         }
     }
 }

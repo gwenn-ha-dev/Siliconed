@@ -110,6 +110,8 @@ package enum ForgeDiT {
                 if n.hasPrefix("transformer_blocks.") { return (1, index(n, 1)) }
                 if n.hasPrefix("norm_out.") || n.hasPrefix("proj_out.") { return (2, 0) }
                 return (0, 0)
+            case .mossImage:
+                return (0, 0)   // forged by `MossImageForge`, in its own order
             }
         }
         let keys: [(Int, Int, String)] = names.map { n in let r = rank(n); return (r.0, r.1, n) }
@@ -131,7 +133,7 @@ package enum ForgeDiT {
         switch family {
         case .zImage:
             return name.contains("t_embedder") || name.contains("cap_embedder") ? .float32 : .bfloat16
-        case .anima, .qwenImage21:
+        case .anima, .qwenImage21, .mossImage:
             return .bfloat16
         case .krea2:
             if name.firstMatch(#"\.attn\.to_(q|k|v|gate|out\.0)\.weight$"#) != nil
@@ -271,6 +273,8 @@ package enum ForgeDiT {
                       .init("zero_centered_norms_folded", .list(qwenZeroCentered.map { .string($0) })),
                       .init("config", config), .init("source", .object(source)),
                       .init("weight_absmax", .real(Double(m?.absMax ?? 0)))]
+            case .mossImage:
+                h += [.init("config", config), .init("source", .object(source))]   // not reached: `MossImageForge` writes its map
             }
             if let name { h.append(.init("nom", .string(name))) }
             h.append(.init("order", .list(order.map { .string($0) })))

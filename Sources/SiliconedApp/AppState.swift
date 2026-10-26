@@ -63,7 +63,7 @@ final class AppState {
     /// **The families in front**: the four the product is, **in the order every list shows them**
     /// (the rack's picker, the Models sheet, the welcome, `silicontrol models`) — not the engine's
     /// `Family.allCases`. The others need Developer Mode, and come after them.
-    static let frontFamilies: [Family] = [.zImage, .qwenImage21, .anima, .krea2]
+    static let frontFamilies: [Family] = [.zImage, .qwenImage21, .anima, .krea2, .mossImage]
     private static let developerModeKey = "developerMode"
     /// **Developer Mode**: the solvers (`offeredSolvers`), ComfyUI's schedule — and a family not in
     /// front, were there one (none since Krea 2 joined them).

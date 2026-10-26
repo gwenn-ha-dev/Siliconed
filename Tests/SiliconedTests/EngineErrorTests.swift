@@ -130,6 +130,7 @@ final class EngineErrorTests: XCTestCase {
         r.qwenMaps = MemoryFixtures.qwenMaps()
         r.animaMaps = MemoryFixtures.animaMaps()
         r.krea2Maps = MemoryFixtures.krea2Maps()
+        r.mossMaps = MossImageFamilyTests.maps()
         return r
     }
 
@@ -216,7 +217,7 @@ final class EngineErrorTests: XCTestCase {
         for f in Family.allCases {
             let card = ModelCard.of(f), urls = card.license.urls
             XCTAssertFalse(urls.isEmpty, "\(f): no license URL")
-            let downloaded = Set((Installer.components(f) + Installer.encoder(f) + Installer.dit(f))
+            let downloaded = Set((Installer.components(f) + Installer.encoder(f) + Installer.dit(f) + Installer.companion(f))
                 .map { "\($0.repository.name)@\($0.repository.revision)" })
             for (i, url) in urls.enumerated() {
                 let s = url.absoluteString

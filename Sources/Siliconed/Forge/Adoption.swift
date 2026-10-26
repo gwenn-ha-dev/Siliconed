@@ -29,7 +29,9 @@ enum Adoption {
                 Installer.encoder(f, v).filter { $0.sha256 != nil && $0.size != nil }.map { Expectation(family: f, variant: v, file: $0) }
             }
             // A family's components are every version's: listed once, under the Standard.
-            + Installer.components(f).filter { $0.sha256 != nil && $0.size != nil }.map { Expectation(family: f, variant: .standard, file: $0) }
+            // (a VAE alone: a tokenizer or a config pinned beside it is not a file a user drops)
+            + Installer.components(f).filter { $0.destination == "vae.safetensors" && $0.sha256 != nil && $0.size != nil }
+                .map { Expectation(family: f, variant: .standard, file: $0) }
         }
     }
 

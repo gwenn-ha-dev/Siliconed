@@ -312,7 +312,7 @@ package enum ForgeLoRA {
             for n in 0..<64 {
                 for (pattern, _) in Recipes.animaBlocks { c.append("blocks.\(n)." + pattern.dropLast()) }
             }
-        case .qwenImage21:
+        case .qwenImage21, .mossImage:
             break
         }
         return c
@@ -373,6 +373,8 @@ package enum ForgeLoRA {
                 return [Target(module: module)]
             }
             return [Target(module: String(try Recipes.anima(module + ".weight").dropLast(7)))]
+        case .mossImage:
+            throw Numerics.Failure(description: "\(module) : LoRAs of MOSS-Image are not imported — the family renders under its own 8-step LoRA")
         }
     }
 

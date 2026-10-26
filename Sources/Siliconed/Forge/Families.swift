@@ -10,6 +10,9 @@ package enum Family: String, CaseIterable, Sendable, Codable {
     /// Qwen-Image-2.1-Turbo (Qwen): single-stream DiT, Qwen3-VL-8B encoder that sees the reference
     /// images, 64-channel VAE; generation and editing by instruction, 8 steps.
     case qwenImage21 = "qwen-image-2.1"
+    /// MOSS-Image-SFT (OpenMOSS-Team) under the community's DMD LoRA (lodestones) — the 8-step recipe:
+    /// single-stream DiT of 5.08 B, Qwen3.5-9B hybrid encoder, FLUX.2 VAE. Standard only.
+    case mossImage = "moss-image"
 
     /// The families offered to the user — `install all`, the app's library sheet. All of them
     /// since Qwen-Image-2.1 renders swap-free at its worst case; a family that
@@ -22,6 +25,7 @@ package enum Family: String, CaseIterable, Sendable, Codable {
         case .anima: return "Anima"
         case .krea2: return "Krea 2"
         case .qwenImage21: return "Qwen-Image-2.1"
+        case .mossImage: return "MOSS-Image"
         }
     }
 
@@ -34,6 +38,7 @@ package enum Family: String, CaseIterable, Sendable, Codable {
         // The official Turbo's checkpoint. Another kind than the base model's (`supersededQwenImage21Kind`),
         // which rendered under a third-party turbo LoRA: a map of it is not taken for this one.
         case .qwenImage21: return "qwen-image-2.1-turbo-dit"
+        case .mossImage: return MossImageDiT.kind
         }
     }
 
@@ -44,6 +49,7 @@ package enum Family: String, CaseIterable, Sendable, Codable {
         case .anima: return "anima-turbo-dit.v0.silicon"
         case .krea2: return "krea2-turbo-dit.v0.silicon"
         case .qwenImage21: return "qwen-image-2.1-turbo-dit.v0.silicon"
+        case .mossImage: return "moss-image-sft-dit.v0.silicon"
         }
     }
 
@@ -55,11 +61,15 @@ package enum Family: String, CaseIterable, Sendable, Codable {
         case .krea2: return "qwen3-vl-4b-encoder.v0.silicon"
         // The whole `Qwen3VLModel`: language model **and** vision tower — the references go through it.
         case .qwenImage21: return "qwen3-vl-8b-encoder.v0.silicon"
+        case .mossImage: return "qwen3.5-9b-encoder.v0.silicon"
         }
     }
 
-    /// **The versions a family installs in**: every family has its Standard, a Compact and a Light.
-    package var variants: [Variant] { [.standard, .compact, .light] }
+    /// **The versions a family installs in**: every family has its Standard, a Compact and a Light — but
+    /// MOSS-Image, whose publisher (and no one else, as of the pinned revisions) offers the Standard alone: the
+    /// community's 8-bit and GGUF copies of the DiT are not a version of *this* recipe (the DMD LoRA is
+    /// applied to bf16 weights, and an 8-bit DiT would round the distillation away).
+    package var variants: [Variant] { self == .mossImage ? [.standard] : [.standard, .compact, .light] }
 
     /// **The version preselected before an installation** (the welcome cards, « Install… »): the
     /// Compact, the one we recommend — as fast as the Standard on the Macs measured, half its disk,
@@ -270,6 +280,7 @@ package enum Recipes {
         if a(#"^transformer_blocks\.\d+\.img_mlp\.(gate_layer|gate_up)\."#) && a(#"^txt_in\.text_norm\."#) { return .qwenImage21 }
         if a(#"^(layers|noise_refiner|context_refiner)\.\d+\.attention\.(qkv|to_q)\."#) && a(#"^cap_embedder\."#) { return .zImage }
         if a(#"^(blocks\.\d+\.attn\.wq|txtfusion\.|transformer_blocks\.\d+\.attn\.to_gate)"#) { return .krea2 }
+        // MOSS-Image is not recognized: a checkpoint of it is not imported (the family's DiT is forged by `MossImageForge`).
         if a(#"^(blocks\.\d+\.self_attn\.q_proj|llm_adapter\.|transformer_blocks\.\d+\.attn1\.to_q)"#) { return .anima }
         return nil
     }
@@ -342,6 +353,13 @@ package enum Recipes {
                 } else {
                     try place(name, asPublished(source, published))
                 }
+            }
+        case .mossImage:
+            // The names as published; `rope.bands` is derived by the code, never a weight (`MossImageForge`).
+            r.naming = "MOSS-Image"
+            for (published, name) in keys {
+                if MossImageForge.notWeights.contains(name) { r.ignored.append(published); continue }
+                try place(name, asPublished(source, published))
             }
         case .anima:
             let origin = keys.contains { $0.name.hasPrefix("blocks.") || $0.name.hasPrefix("x_embedder.") || $0.name.hasPrefix("llm_adapter.") }

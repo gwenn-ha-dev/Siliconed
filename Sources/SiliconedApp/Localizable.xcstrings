@@ -11816,6 +11816,34 @@
         }
       }
     },
+    "Long, detailed prompts, read by a 9 B language model. Eight steps through the community's distillation." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lange, detaillierte Prompts, gelesen von einem Sprachmodell mit 9 Milliarden Parametern. Acht Schritte dank der Destillation der Community."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prompts largos y detallados, leídos por un modelo de lenguaje de 9 mil millones de parámetros. Ocho pasos gracias a la destilación de la comunidad."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Des prompts longs et détaillés, lus par un modèle de langage de 9 milliards de paramètres. Huit pas, grâce à la distillation de la communauté."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prompt lunghi e dettagliati, letti da un modello linguistico da 9 miliardi di parametri. Otto passi grazie alla distillazione della comunità."
+          }
+        }
+      }
+    },
     "Made with ComfyUI's schedule, offered in Developer Mode: the official one will be used." : {
       "localizations" : {
         "de" : {
@@ -19477,6 +19505,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Il modello d’immagine e l’encoder di testo nella precisione dell’editore (bf16)."
+          }
+        }
+      }
+    },
+    "The image model and the text encoder in the publisher's precision (bf16); the 8-step LoRA from lodestones, in fp32. VAE and tokenizer are the publisher's." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bildmodell und Text-Encoder in der Genauigkeit des Herausgebers (bf16); die 8-Schritt-LoRA von lodestones in fp32. VAE und Tokenizer stammen vom Herausgeber."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El modelo de imagen y el codificador de texto en la precisión del editor (bf16); la LoRA de 8 pasos de lodestones, en fp32. El VAE y el tokenizador son los del editor."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le modèle d’image et l’encodeur de texte dans la précision de l’éditeur (bf16) ; la LoRA à 8 pas de lodestones, en fp32. VAE et tokenizer sont ceux de l’éditeur."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il modello d’immagine e l’encoder di testo nella precisione dell’editore (bf16); la LoRA a 8 passi di lodestones, in fp32. VAE e tokenizer sono quelli dell’editore."
           }
         }
       }

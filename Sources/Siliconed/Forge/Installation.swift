@@ -74,6 +74,11 @@ package struct Installer {
     // at the same offsets, plus 48 bytes appended after the data (`L2P_bypass_…`): a copy, not taken.
     static let krea2GGUF = Repository(name: "vantagewithai/Krea-2-Turbo-GGUF", revision: "390847e2835c16bdf82303731e3d35b874760d89")
 
+    // MOSS-Image: OpenMOSS-Team's own repository for every weight (DiT, Qwen3.5-9B encoder, FLUX.2 VAE, tokenizer),
+    // Apache 2.0; and lodestones' DMD LoRA, which is the 8-step recipe (no official turbo as of these revisions).
+    static let mossImage = Repository(name: "OpenMOSS-Team/MOSS-Image-SFT", revision: "f972bd4b4b9e3852133cc5da954d87bc32cd8fb9")
+    static let mossTurbo = Repository(name: "lodestones/MOSS-Image-SFT-8-steps-dmd", revision: "f95df83b5e90ae91ea412434b3f9b7f1c8c6314f")
+
     /// The small files read at render time, and their place under `store/composants/<famille>/`.
     static func components(_ f: Family) -> [File] {
         switch f {
@@ -95,6 +100,15 @@ package struct Installer {
             return [File(repository: qwenImage21Turbo, path: "processor/tokenizer.json", destination: "tokenizer/tokenizer.json"),
                     File(repository: qwenImage, path: "vae/diffusion_pytorch_model.safetensors", destination: "vae.safetensors",
                          sha256: "0c8bc8b758c649abef9ea407b95408389a3b2f610d0d10fcb054fe171d0a8344", size: 253806966)]
+        case .mossImage:
+            // The tokenizer is `Qwen2Tokenizer`: its pre-tokenizer's regex is the file's own (`Tokenizer`
+            // reads it), the chat template is in the code (`Qwen35Prompt`). The VAE is published in fp32.
+            return [File(repository: mossImage, path: "tokenizer/tokenizer.json", destination: "tokenizer/tokenizer.json",
+                         sha256: "06b9509352d2af50381ab2247e083b80d32d5c0aba91c272ca9ff729b6a0e523", size: 19989325),
+                    File(repository: mossImage, path: "vae/diffusion_pytorch_model.safetensors", destination: "vae.safetensors",
+                         sha256: "c3bdf94dc67ec69b30ea9fe1fa8340085679cae64d019f7c7e4a9921f1a7f17a", size: 249521372),
+                    File(repository: mossImage, path: "vae/config.json", destination: "vae.json"),
+                    File(repository: mossImage, path: "transformer/config.json", destination: "transformer.json")]
         case .qwenImage21:
             // `processor/` as published (transformers 5's serialization: `tokenizer.json` holds the
             // vocabulary, `processor_config.json` the image processor's values). The engine reads
@@ -166,6 +180,9 @@ package struct Installer {
                              File(repository: qwenImage, path: "README.md", destination: nil),
                              File(repository: qwenImage21Turbo, path: "README.md", destination: nil)]
         case .qwenImage21: return [File(repository: qwenImage21Turbo, path: "LICENSE", destination: nil)]
+        // Apache 2.0 for the model; the LoRA's repository declares its own in its card (Apache 2.0).
+        case .mossImage: return [File(repository: mossImage, path: "LICENSE", destination: nil),
+                                 File(repository: mossTurbo, path: "README.md", destination: nil)]
         }
     }
 
@@ -216,6 +233,15 @@ package struct Installer {
             // `model.` (the `Qwen3VLForConditionalGeneration` layout).
             return [File(repository: krea2Comfy, path: "text_encoders/qwen3vl_4b_bf16.safetensors", destination: nil,
                          sha256: "36f3ff447ef59201722e8f9ce6020c9819fdcfba6aa2608c4e09b1c0ce114e34", size: 8875719384)]
+        case .mossImage:
+            // The whole `Qwen3_5Model` as published (language model and vision tower in the same four shards);
+            // the forge writes the language model alone (`ForgeQwen35`).
+            return ["config.json", "model.safetensors.index.json"].map { File(repository: mossImage, path: "text_encoder/" + $0, destination: nil) }
+                + [("model-00001-of-00004.safetensors", "abfaa3d3a8612508c85ee8f6da9c734b862f10298b903765c4ad384177c32b0b", 4973910744),
+                   ("model-00002-of-00004.safetensors", "9112637fa6bf4d07bafd6ae268852b18d3d0c1242f4ee901c5579006e5bd4894", 4988364288),
+                   ("model-00003-of-00004.safetensors", "956f1ef51d0cfe610b0d22987c0b7821c36e3ce228abceccef523518bcf079dc", 4954202112),
+                   ("model-00004-of-00004.safetensors", "9e21d20e8adde88c3e0b65d4a0d251f143d98ee9d52db36b4348361091e4e208", 1869001848)]
+                .map { File(repository: mossImage, path: "text_encoder/" + $0.0, destination: nil, sha256: $0.1, size: $0.2) }
         case .qwenImage21:
             // One file, the base's four shards to the bit (750 tensors): the map's tensors are the same.
             return [File(repository: qwenImage21Turbo, path: "text_encoder/config.json", destination: nil),
@@ -276,6 +302,16 @@ package struct Installer {
                          sha256: "78bbf8f4165eda19cea3cb06c78089221932a39e2eed8af9da741f942c47ffb3")]
         case .anima:
             return [File(repository: anima, path: "split_files/diffusion_models/anima-turbo-v1.1.safetensors", destination: nil)]
+        case .mossImage:
+            return (["diffusion_pytorch_model.safetensors.index.json"] + (1...3).map { "diffusion_pytorch_model-0000\($0)-of-00003.safetensors" })
+                .map { name -> File in
+                    let pinned: [String: (String, Int)] = [
+                        "diffusion_pytorch_model-00001-of-00003.safetensors": ("e40d3444940a0b0fd7cd45ba7959a5bd3d5efd7ddf87aae5ce4d87ce8aa03d01", 4991978016),
+                        "diffusion_pytorch_model-00002-of-00003.safetensors": ("d106da790ec2924ffd8af04b4ffa8f8de281a974b58e55649c3ec596dc8ef033", 4983137016),
+                        "diffusion_pytorch_model-00003-of-00003.safetensors": ("11f637ab17c7093344a6110a1e87ffda8e56558dc55183d8e790222cfcdcf52d", 189549184)]
+                    return File(repository: mossImage, path: "transformer/" + name, destination: nil,
+                                sha256: pinned[name]?.0, size: pinned[name]?.1)
+                }
         case .qwenImage21:
             // The Turbo's two shards, pinned: the base's names, shapes, dtypes and sizes, other values.
             let shards = ["6cccd922767f01694461bdcf1f34ea7b771f3442e4d5e338ea9aa55277431cc0",
@@ -286,6 +322,19 @@ package struct Installer {
                          destination: nil, sha256: $0.element)
                 }
         }
+    }
+
+    /// **What a family downloads beside its DiT and forges next to its components**: MOSS-Image's DMD LoRA (the
+    /// 8-step recipe), `lora.safetensors` at strength 1 — fp32 in the map, **never merged into the bf16 weights**.
+    static func companion(_ f: Family) -> [File] {
+        guard f == .mossImage else { return [] }
+        return [File(repository: mossTurbo, path: "lora.safetensors", destination: nil,
+                     sha256: "4abb14e39c1a59018907581e609f43616ec6810126144ec2b1d2e6f8969628fe", size: 1189176800)]
+    }
+
+    /// Where the forged companion LoRA lives: the family's components folder.
+    package func companionMap(_ f: Family) -> String? {
+        f == .mossImage ? componentsFolder(f) + "/" + MossImageForge.turboMapName : nil
     }
 
     /// **The DiT's published config**, which the map's header copies (`ForgeDiT.forge`): the family's
@@ -418,7 +467,10 @@ package struct Installer {
         let encoderMap = library.map(encoderName), ditMap = library.map(ditName)
         let ditPresent = fm.fileExists(atPath: ditMap)
             && (f != .anima || fm.fileExists(atPath: adapterPath(fromMap: ditMap)))
-        let ditFiles = Self.dit(f, v)
+            && (companionMap(f).map { fm.fileExists(atPath: $0) } ?? true)
+        // MOSS-Image: the DiT's map may be there while its LoRA's is not (an interrupted installation).
+        let ditMapPresent = fm.fileExists(atPath: ditMap)
+        let ditFiles = f == .mossImage && ditMapPresent ? [] : Self.dit(f, v)
         /// The DiT's sources downloaded and verified while the encoder was forged.
         var verified: Set<String> = []
         if !fm.fileExists(atPath: encoderMap) {
@@ -434,6 +486,10 @@ package struct Installer {
             let beside = baseDiT && !ditPresent
                 ? startDownloads(ditFiles, alsoWriting: files.reduce(0) { $0 + Library.size(source($1)) }) : nil
             let forged = Result { () throws -> MapWriter.Tally in
+                if f == .mossImage {
+                    return try ForgeQwen35.forge(folder: (source(files[0]) as NSString).deletingLastPathComponent, to: encoderMap,
+                                                 progressHandler: beside == nil ? progressHandler : nil)
+                }
                 if let published = Self.publishedEncoderConfig(f) {
                     // The weights alone, their config in the code (Krea 2: `Krea2Published`).
                     return try ForgeText.forge(source: TensorSource(paths: files.map(source)), published: published, family: f,
@@ -459,7 +515,9 @@ package struct Installer {
             if let beside { verified = try beside.wait() }
         }
 
-        if baseDiT && !ditPresent {
+        if baseDiT && !ditPresent && f == .mossImage {
+            try installMossImage(config: config, ditName: ditName, ditMap: ditMap, ditFiles: ditFiles, verified: verified)
+        } else if baseDiT && !ditPresent {
             let files = ditFiles
             if verified.isEmpty { try checkSpace(files) }
             for x in files where !verified.contains(source(x)) { try download(x) }
@@ -494,6 +552,36 @@ package struct Installer {
         if freed > 0 { journal(String(format: "  the other version removed: %.2f GB freed", Double(freed) / 1e9)) }
         if !keepSources { cleanDownloads() }
         journal("✓ \(f.name) installed")
+    }
+
+    /// **MOSS-Image's DiT and its LoRA**: the DiT's three shards forged to one bf16 map (`MossImageForge.forgeDiT`), then the
+    /// DMD LoRA forged to its own fp32 map in the components folder (`forgeLoRA`) — the two are one recipe, and the LoRA
+    /// is never merged into the DiT's weights (a delta smaller than bf16's step would be lost).
+    func installMossImage(config: OrderedJSON, ditName: String, ditMap: String, ditFiles: [File],
+                          verified: Set<String>) throws {
+        let fm = FileManager.default
+        if !ditFiles.isEmpty {
+            if verified.isEmpty { try checkSpace(ditFiles) }
+            for x in ditFiles where !verified.contains(source(x)) { try download(x) }
+            journal("forging the DiT → \(ditName)")
+            let begin = Date()
+            let folder = (source(ditFiles[0]) as NSString).deletingLastPathComponent
+            let tally = try MossImageForge.forgeDiT(source: TensorSource(folder: folder), config: config, to: ditMap)
+            journal(String(format: "  %.2f GB, %d tensors, %d values rounded", Double(tally.bytes) / 1e9, tally.tensors, tally.inexact))
+            journal(String(format: "  ✓ forged %@ in %.0f s", ditName, Date().timeIntervalSince(begin)))
+            if !keepSources { for x in ditFiles { try? fm.removeItem(atPath: source(x)) } }
+        }
+        guard let turbo = companionMap(.mossImage), !fm.fileExists(atPath: turbo) else { return }
+        let files = Self.companion(.mossImage)
+        try checkSpace(files)
+        for x in files { try download(x) }
+        journal("forging the LoRA → \((turbo as NSString).lastPathComponent)")
+        let begin = Date()
+        let tally = try MossImageForge.forgeLoRA(source: TensorSource(paths: [source(files[0])]), config: MossImageDiT.Config(header: [:]),
+                                                 to: turbo, name: MossImageForge.turboName)
+        journal(String(format: "  %.2f GB, %d tensors", Double(tally.bytes) / 1e9, tally.tensors))
+        journal(String(format: "  ✓ forged %@ in %.0f s", (turbo as NSString).lastPathComponent, Date().timeIntervalSince(begin)))
+        if !keepSources { for x in files { try? fm.removeItem(atPath: source(x)) } }
     }
 
     /// **What an installation will occupy at its peak**, offline: the forged parts of `variant`

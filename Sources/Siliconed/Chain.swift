@@ -42,6 +42,9 @@ package struct TextFormat: Hashable, Sendable, CustomStringConvertible {
     /// its `T` rows (`Conditioning.imageSlots`). `txt_in` and the images' latents belong to the DiT.
     package static let qwenImage21 = TextFormat("qwen3-vl-8b · prompt + images · last layer before norm",
                                                readsImages: true)
+    /// Qwen3.5-9B on the chat template (no system turn, the thinking block open), last hidden state after the final
+    /// norm, every token kept: `[T, 4096]`. The two text blocks and the projection belong to the DiT.
+    package static let mossImage = TextFormat("qwen3.5-9b · chat · last hidden state after norm")
 }
 
 /// **A latent's space**: the VAE that defined it. The same number of channels does not mean the
@@ -60,6 +63,10 @@ package struct LatentSpace: Hashable, Sendable, CustomStringConvertible {
     /// tokens are its transpose `[h·w, 64]` (`QwenImage21VAE.pack` / `unpack`). The VAE itself reads and
     /// writes RGBA (`QwenImage21EncodingModule`, `QwenImage21DecodingModule`).
     package static let qwenImage21 = LatentSpace(name: "VAE Qwen-Image-2.1", channels: 64, factor: 16)
+    /// FLUX.2's VAE (`AutoencoderKLFlux2`) as MOSS-Image's DiT sees it: the 32 channels patched 2×2 into **128**,
+    /// 16 pixels per cell, planar `[128, H/16, W/16]`; the pipeline de-normalizes it with the VAE's batch-norm
+    /// statistics and un-patchifies it before the decoder (`Flux2VAE`). Noise as `torch.randn` draws it.
+    package static let flux2 = LatentSpace(name: "VAE FLUX.2", channels: 128, factor: 16)
 }
 
 /// The encoded text, ready for a denoiser of the same format.
@@ -100,7 +107,7 @@ package struct Latent: Sendable {
     /// `torch.randn((1, 1, 64, h, w))` to the bit (`TorchNoise`), so a seed gives diffusers' image.
     package static func noise(_ space: LatentSpace, height: Int, width: Int, seed: UInt64) -> Latent {
         var values = [Float](repeating: 0, count: space.channels * height * width)
-        if space == .qwenImage21 {
+        if space == .qwenImage21 || space == .flux2 {
             var noise = TorchNoise(seed: seed)
             values.withUnsafeMutableBufferPointer { noise.fill($0.baseAddress!, count: $0.count) }
         } else {

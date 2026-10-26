@@ -484,6 +484,9 @@ struct VersionChoice: View {
             String(localized: "8-bit weights published by Comfy-Org: the image model and the text encoder (int8 convrot). VAE and tokenizer as in the Standard version.")
         case (.light, .krea2):
             String(localized: "The image model in 4 to 5 bits, published by vantagewithai (GGUF Q4_K_M); the Compact's 8-bit text encoder, from Comfy-Org (int8 convrot). VAE and tokenizer as in the Standard version.")
+        // The 8 steps are the community's LoRA, applied beside the weights in fp32 — never merged into the bf16 ones.
+        case (.standard, .mossImage):
+            String(localized: "The image model and the text encoder in the publisher's precision (bf16); the 8-step LoRA from lodestones, in fp32. VAE and tokenizer are the publisher's.")
         default:
             String(localized: "The image model and the text encoder in the publisher's precision (bf16).")
         }

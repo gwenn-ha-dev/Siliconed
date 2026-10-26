@@ -63,7 +63,7 @@ package enum Format {
         switch family {
         case .anima:
             return min(maximumSide, AnimaDiT.Config.publishedRopePositions * 2 * LatentSpace.qwenImage.factor)
-        case .zImage, .krea2, .qwenImage21: return maximumSide
+        case .zImage, .krea2, .qwenImage21, .mossImage: return maximumSide
         }
     }
 
