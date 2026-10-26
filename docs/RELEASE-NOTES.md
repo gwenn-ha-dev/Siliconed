@@ -51,6 +51,8 @@ English · [Français](RELEASE-NOTES.fr.md)
 - **A measure taken off rest is taken again**: measured while the Mac was warm, in Low Power Mode, or
   with its swap growing (another app pressing on memory), the choices still serve, the Chain's chip
   stays orange, and the next launch at rest measures again before its first render — once.
+- **An update that leaves the engine untouched keeps this Mac's measure**: the measure is tied to the
+  engine's sources and compiler, no longer to the app's build; one that moves the engine measures again.
 - **macOS 26 or later**: the only version Siliconed was ever measured and checked on. The app no
   longer installs on macOS 15.
 

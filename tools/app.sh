@@ -88,6 +88,12 @@ fi
 cp $icon "$app/Contents/Resources/Siliconed.icns"
 
 build=$(git rev-list --count HEAD 2>/dev/null || echo 1)
+# **The engine's digest** (`SiliconedEngine`, read by `Diagnostic.Fingerprint`): what this Mac's capacity
+# map measured — the engine's sources, each with its path, `Package.swift` and the compiler. An update that
+# moves only the app, its phrases or its docs keeps the map; one that moves the engine measures again.
+engine=$({ cat Package.swift; xcrun swift --version 2>&1
+  find Sources/Siliconed Sources/AMXLegacy -type f ! -name .DS_Store | LC_ALL=C sort | while read -r f; do print -r -- "== $f"; cat "$f"; done
+} | shasum -a 256 | cut -c1-12)
 cat > "$app/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -100,6 +106,7 @@ cat > "$app/Contents/Info.plist" <<PLIST
   <key>CFBundleIconFile</key><string>Siliconed</string>
   <key>CFBundleShortVersionString</key><string>0.16</string>
   <key>CFBundleVersion</key><string>$build</string>
+  <key>SiliconedEngine</key><string>$engine</string>
   <key>CFBundleDevelopmentRegion</key><string>en</string>
   <key>CFBundleLocalizations</key><array>$localizations</array>
   <key>LSApplicationCategoryType</key><string>public.app-category.graphics-design</string>

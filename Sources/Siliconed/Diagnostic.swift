@@ -604,7 +604,7 @@ package enum Diagnostic {
         }
     }
 
-    /// **Runs the diagnostic**: 23 s and 1.4 GB at the peak on the M1 Pro, no weights. Synchronous and
+    /// **Runs the diagnostic**: ~1 min and 1.4 GB at the peak on the M1 Pro, no weights. Synchronous and
     /// heavy: call it off the main thread, and never from the engine's queue.
     ///
     /// **It passes the doors a render passes**: it waits its turn on the engine's queue (`Engine.file`:
@@ -694,14 +694,31 @@ package enum Diagnostic {
     }
 
     /// The first 12 hex digits of the SHA-256 of `RenderCache.build` (the executable's path, size, date).
+    /// **The engine that measured**: in an app, its Info.plist's `SiliconedEngine` — the digest `tools/app.sh`
+    /// takes of the engine's sources (`Sources/Siliconed`, `Sources/AMXLegacy`, `Package.swift`) and of the
+    /// compiler, so that an update moving only the app, its phrases or its docs keeps the map; elsewhere
+    /// (the command line, a test), the executable's own stamp: every build measures again.
     private static func buildStamp() -> String {
-        SHA256.hash(data: Data(RenderCache.build.utf8)).prefix(6).map { String(format: "%02x", $0) }.joined()
+        for bundle in enclosingBundles() {
+            if let engine = bundle.infoDictionary?["SiliconedEngine"] as? String { return "engine " + engine }
+        }
+        return SHA256.hash(data: Data(RenderCache.build.utf8)).prefix(6).map { String(format: "%02x", $0) }.joined()
     }
 
-    /// **What a map is valid for**: the hardware model, the chip, macOS with its build, and the binary
-    /// that measured it (its version and its build stamp). Any of them changing — a new Mac restored from
-    /// a backup, a macOS update that moves MPS, an app update that moves a kernel — makes the map stale:
-    /// the stale one is not applied, and the app offers to measure again (~23 s).
+    /// This executable's bundle, then the `.app` it sits in (a helper's `Contents/Helpers`).
+    private static func enclosingBundles() -> [Bundle] {
+        var bundles = [Bundle.main]
+        if let path = Bundle.main.executableURL?.resolvingSymlinksInPath().path, let range = path.range(of: ".app/Contents/") {
+            if let app = Bundle(path: String(path[..<range.lowerBound]) + ".app") { bundles.append(app) }
+        }
+        return bundles
+    }
+
+    /// **What a map is valid for**: the hardware model, the chip, macOS with its build, and the engine
+    /// that measured it (`build`). Any of them changing — a new Mac restored from a backup, a macOS
+    /// update that moves MPS, an update that moves a kernel — makes the map stale: the stale one is not
+    /// applied, and the app measures again (~1 min). **The app's version is said, not compared**: the
+    /// map measures the engine, and an update of the app alone does not move it.
     package struct Fingerprint: Codable, Sendable, Equatable, CustomStringConvertible {
         package var hardwareModel, chip, macOS, version, build: String
 
@@ -713,6 +730,10 @@ package enum Diagnostic {
         package init(_ machine: Machine) {
             self.init(hardwareModel: machine.hardwareModel, chip: machine.chip, macOS: machine.macOS,
                       version: machine.version, build: machine.build)
+        }
+
+        package static func == (a: Fingerprint, b: Fingerprint) -> Bool {
+            (a.hardwareModel, a.chip, a.macOS, a.build) == (b.hardwareModel, b.chip, b.macOS, b.build)
         }
 
         /// This process's, read without Metal (`sysctl`, the bundle, the executable's stamp).
@@ -814,11 +835,7 @@ package enum Diagnostic {
     /// `.git` lies above the executable (a Mac without the developer tools would otherwise be asked to
     /// install them by a dialog).
     private static func binaryVersion() -> String {
-        var bundles = [Bundle.main]
-        if let path = Bundle.main.executableURL?.resolvingSymlinksInPath().path, let range = path.range(of: ".app/Contents/") {
-            if let app = Bundle(path: String(path[..<range.lowerBound]) + ".app") { bundles.append(app) }
-        }
-        for bundle in bundles {
+        for bundle in enclosingBundles() {
             if let short = bundle.infoDictionary?["CFBundleShortVersionString"] as? String {
                 let build = bundle.infoDictionary?["CFBundleVersion"] as? String
                 return short + (build.map { " (\($0))" } ?? "")

@@ -53,6 +53,8 @@
   avec un swap qui monte (une autre app qui presse la mémoire), les choix servent quand même, la puce
   de la Chaîne reste orange, et le prochain lancement au repos mesure à nouveau avant son premier
   rendu — une fois.
+- **Une mise à jour qui ne touche pas le moteur garde la mesure de ce Mac** : la mesure suit les sources
+  du moteur et son compilateur, plus le build de l'app ; une mise à jour du moteur fait mesurer à nouveau.
 - **macOS 26 ou plus** : la seule version sur laquelle Siliconed a jamais été mesuré et contrôlé.
   L'app ne s'installe plus sur macOS 15.
 

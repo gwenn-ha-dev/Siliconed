@@ -466,7 +466,7 @@ final class CapacityRulesTests: XCTestCase {
     // ── the fingerprint ─────────────────────────────────────────────────────────────────────
 
     /// **A map is this process's only if nothing of the fingerprint moved**: hardware, chip, macOS and its
-    /// build, the binary's version and its stamp.
+    /// build, the engine's stamp — not the app's version: an update of the app alone keeps the map.
     func testAStaleFingerprintIsNotCurrent() {
         let now = Diagnostic.Fingerprint.current
         var machine = Self.machine
@@ -477,7 +477,7 @@ final class CapacityRulesTests: XCTestCase {
         XCTAssertTrue(fresh.isCurrent)
         let changes: [(String, (inout Diagnostic.Machine) -> Void)] = [
             ("hardware", { $0.hardwareModel += "x" }), ("chip", { $0.chip = "Apple M5" }),
-            ("macOS build", { $0.macOS += "a" }), ("version", { $0.version += ".1" }), ("build", { $0.build = "000000000000" }),
+            ("macOS build", { $0.macOS += "a" }), ("engine", { $0.build = "000000000000" }),
         ]
         for (what, change) in changes {
             var other = machine
@@ -488,6 +488,9 @@ final class CapacityRulesTests: XCTestCase {
         var sameChip = machine
         sameChip.memoryBytes *= 2
         XCTAssertTrue(report(m1Pro, machine: sameChip).isCurrent)
+        var appOnly = machine
+        appOnly.version += ".1"
+        XCTAssertTrue(report(m1Pro, machine: appOnly).isCurrent)
         var otherSchema = fresh
         otherSchema.schema = Diagnostic.schema + 1
         XCTAssertFalse(otherSchema.isCurrent)
