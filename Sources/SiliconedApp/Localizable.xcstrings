@@ -3055,6 +3055,34 @@
         }
       }
     },
+    "8-bit weights published by Comfy-Org: the image model and the text encoder (int8 convrot); the 8-step LoRA from lodestones, in fp32. VAE and tokenizer are the publisher's." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "8-Bit-Gewichte, von Comfy-Org veröffentlicht: Bildmodell und Text-Encoder (int8 convrot); die 8-Schritt-LoRA von lodestones in fp32. VAE und Tokenizer stammen vom Herausgeber."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pesos de 8 bits publicados por Comfy-Org: el modelo de imagen y el codificador de texto (int8 convrot); la LoRA de 8 pasos de lodestones, en fp32. El VAE y el tokenizador son los del editor."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Poids 8 bits publiés par Comfy-Org : le modèle d’image et l’encodeur de texte (int8 convrot) ; la LoRA à 8 pas de lodestones, en fp32. VAE et tokenizer sont ceux de l’éditeur."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pesi a 8 bit pubblicati da Comfy-Org: il modello d’immagine e l’encoder di testo (int8 convrot); la LoRA a 8 passi di lodestones, in fp32. VAE e tokenizer sono quelli dell’editore."
+          }
+        }
+      }
+    },
     "8-bit weights published by third parties: the image model from Comfy-Org (int8 convrot), the text encoder from unsloth (int8 convrot). Processor and VAE are the publisher's." : {
       "localizations" : {
         "de" : {

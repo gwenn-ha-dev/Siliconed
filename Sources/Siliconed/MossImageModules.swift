@@ -64,12 +64,26 @@ package struct MossImageDenoisingModule: DenoisingModule {
     /// Shift 5 on the 1000-step grid, rounded to it: at most `steps` σ, followed by the final 0.
     package func sigmas(steps: Int) -> [Float] { MossImageSchedule.sigmas(steps: steps) }
 
-    /// Every evaluation at full size: the recipe as published.
+    /// **By default every evaluation at full size**: the recipe as published.
+    ///
+    /// **The half-size start** (`Spectral.halfSizeStart`, the app's Faster Rendering; `euler`, as Krea 2): the first
+    /// `halfSizeSteps` evaluations on the half grid. Only at the recipe's eight, from the first step, on a grid that
+    /// halves above the 512-px floor (16-px cells: 1024², 1024×1536 and its transpose), never under a request's LoRA —
+    /// the turbo one is the recipe, not a request's. `SILICONED_SPECTRAL` forces `k` (a measurement), within the same rules.
     package func plan(height: Int, width: Int, steps: Int, start: Int, withLoRA: Bool) -> DenoisingPlan {
         let σ = sigmas(steps: steps)
-        return DenoisingPlan(startStep: start, startSigma: σ[start], evaluations: σ.count - 1 - start,
-                             reduced: 0, reducedHeight: height, reducedWidth: width)
+        let halvable = Spectral.divisible(height: height, width: width, by: 2, floor: Spectral.floor(factor: space.factor))
+        let rule = Spectral.halfSizeStart && steps == defaultSteps ? Self.halfSizeSteps : 0
+        let evaluations = σ.count - 1 - start
+        let k = start > 0 || !halvable || withLoRA ? 0 : min(max(0, Spectral.forced ?? rule), evaluations - 1)
+        return DenoisingPlan(startStep: start, startSigma: σ[start], evaluations: evaluations,
+                             reduced: k, reducedHeight: k > 0 ? height / 2 : height, reducedWidth: k > 0 ? width / 2 : width)
     }
+
+    /// Its half-size evaluations: **1** (σ 1 → 0.968), judged by eye on the library and surfer prompts at 1024² — the
+    /// fewest of the five: MOSS takes the half grid worse than the others. At 2 the skin smooths and the book spines
+    /// soften, at 3 the skin turns waxy and hands go soft, at 5 the faces blotch. One saves 6 to 11 % at 1024².
+    package static let halfSizeSteps = 1
 
     /// The turbo LoRA at strength 1, then the request's.
     package func stack(_ user: LoRA?) throws -> LoRA {
@@ -86,20 +100,42 @@ package struct MossImageDenoisingModule: DenoisingModule {
         // What the DiT is told: `σ · 1000` in fp32 (the scheduler's timesteps); no bell, the σ themselves.
         let told = context.told(σ, start: start)
         let timesteps = told[start..<(σ.count - 1)].map { $0 * Float(MossImageSchedule.trainTimesteps) }
-        let dit = try MossImageDiT(artifact: artifact, gridHeight: latent.height, gridWidth: latent.width, maxText: tokens,
-                                   freezeCut: context.reproducible, neuralEngine: context.neuralEngine, lora: try stack(lora))
-        dit.cancellation = context.cancellation
-        try context.check()
-        // The modulation depends on σ alone: the following images of a batch reuse the first's table.
+        let stack = try stack(lora)
+        let planned = plan(height: latent.height, width: latent.width, steps: steps, start: start,
+                           withLoRA: lora != nil || context.detail != .normal, schedule: context.schedule)
+        // The modulation depends on σ alone: both grids, and the following images of a batch, read the first's table.
         let key = "moss-image.modulation " + map
-        if let table = context.reserve[key] as? MossImageDiT.ModulationTable { dit.modulations = table }
-        try dit.tabulateModulation(timesteps: Array(timesteps))
-        context.reserve[key] = dit.modulations
-        try euler(&latent, sigmas: σ, start: start, context: context) { x, sigma in
+        // **Two DiTs, one at a time** (Krea 2's rule): the half grid's — its own RoPE grid, arena and sequence
+        // `S/4 + T` — given back before the full one maps its arena; the full one is what the need charges. The
+        // full one takes over the small one's expanded LoRA, the one thing that outlives it.
+        func build(height: Int, width: Int, expanded: CacheLoRA? = nil) throws -> MossImageDiT {
+            let dit = try MossImageDiT(artifact: artifact, gridHeight: height, gridWidth: width, maxText: tokens,
+                                       freezeCut: context.reproducible, neuralEngine: context.neuralEngine, lora: stack,
+                                       expanded: expanded)
+            dit.cancellation = context.cancellation
+            try context.check()
+            if let table = context.reserve[key] as? MossImageDiT.ModulationTable { dit.modulations = table }
+            try dit.tabulateModulation(timesteps: Array(timesteps))
+            context.reserve[key] = dit.modulations
+            return dit
+        }
+        var small = planned.reduced > 0
+            ? try build(height: planned.reducedHeight, width: planned.reducedWidth) : nil
+        var full = small == nil ? try build(height: latent.height, width: latent.width) : nil
+        let (height, width) = (latent.height, latent.width)
+        func speed(_ dit: MossImageDiT, _ x: UnsafePointer<Float>, _ sigma: Float) throws -> [Float] {
             try text.values.withUnsafeBufferPointer {
                 try dit.forward(latent: x, text: $0.baseAddress!, textRows: tokens, timestep: sigma * Float(MossImageSchedule.trainTimesteps))
             }
         }
+        let half = small.map { _ in
+            HalfSizeStart(steps: planned.reduced, speed: { x, sigma in try speed(small!, x, sigma) }, handOver: {
+                let expanded = small?.expandedLoRA
+                small = nil
+                full = try build(height: height, width: width, expanded: expanded)
+            })
+        }
+        try euler(&latent, sigmas: σ, start: start, context: context, half: half) { x, sigma in try speed(full!, x, sigma) }
         context.footprints.denoising = Arena.processFootprint()
     }
 }

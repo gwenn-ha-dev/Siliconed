@@ -19,7 +19,7 @@ final class CompactTests: XCTestCase {
     }
 
     func testEveryFamilyHasACompactAndALight() {
-        // MOSS-Image has its Standard alone (`MossImageFamilyTests`): no publisher offers another version of this recipe.
+        // MOSS-Image has a Standard and a Compact (`MossImageFamilyTests`): no Light.
         for f in Family.allCases where f != .mossImage {
             XCTAssertEqual(f.variants, [.standard, .compact, .light], f.name)
             XCTAssertEqual(Set(Variant.allCases.map(f.ditMap)).count, 3, f.name)

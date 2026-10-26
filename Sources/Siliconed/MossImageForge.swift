@@ -81,6 +81,53 @@ package enum MossImageForge {
         })
     }
 
+    /// **Forges the Compact's DiT map** from Comfy-Org's single int8 convrot file: the 168 block `Linear`s kept 8-bit
+    /// (bytes, per-row scales and the rotation said in the entry, `ForgeDiT.tensor`), `proj.qkv` split back into
+    /// `q`, `k`, `v` (`Recipes.normalize`), every other tensor the publisher's bf16 bits — Comfy-Org's 210 bf16
+    /// tensors are the Standard map's to the bit (measured). The same names, shapes and order as the Standard's map.
+    @discardableResult
+    package static func forgeQuantizedDiT(source: TensorSource, config: OrderedJSON, to path: String,
+                                          description: OrderedJSON) throws -> ForgeDiT.Report {
+        let n = try Recipes.normalize(source, family: .mossImage)
+        let layers = config["num_layers"]?.integer ?? 42
+        let names = order(Array(n.dit.keys))
+        guard names.count == expectedCount(layers: layers) else {
+            throw Numerics.Failure(description: "\(names.count) DiT tensors, \(expectedCount(layers: layers)) expected for MOSS-Image")
+        }
+        var tensors: [MapWriter.Tensor] = []
+        var dtypes: [String: Int] = [:]
+        var kept8bit = 0, dequantized: [String] = [], widened: [String] = []
+        for name in names {
+            let p = n.dit[name]!
+            dtypes[p.dtypeSource, default: 0] += 1
+            let (t, outcome) = try ForgeDiT.tensor(name, p, ForgeDiT.rule(name, shape: p.shape, family: .mossImage))
+            switch outcome {
+            case .kept8bit: kept8bit += 1
+            case .dequantized(let why): dequantized.append(name + why)
+            case .widened: widened.append(name)
+            case .asNamed, .kept16bit, .keptPacked: break
+            }
+            tensors.append(t)
+        }
+        let parameters = tensors.reduce(0) { $0 + $1.shape.reduce(1, *) }
+        let tally = try MapWriter.write(to: path, tensors: tensors, header: { m in
+            [
+                .init("format", 1), .init("kind", .string(MossImageDiT.kind)), .init("page", .integer(MapWriter.page)),
+                .init("map_dtype", .string("mixed")), .init("linear_weights_transposed", true),
+                .init("rope_layout", "half-split"),
+                .init("config", config.withoutPrivateKeys),
+                .init("source", .object((description.pairs ?? []) + [.init("tensor_count", .integer(names.count)),
+                                                                      .init("parameters", .integer(parameters))])),
+                .init("weight_absmax", .real(Double(m?.absMax ?? 0))),
+                .init("order", .list(names.map { .string($0) })),
+            ]
+        })
+        return ForgeDiT.Report(tally: tally, naming: n.naming, ignored: n.ignored.count, dtypesSource: dtypes,
+                               quantizedFormats: source.quantizedFormats, kept8bit: kept8bit, keptPacked: 0,
+                               dequantized: dequantized, widened: widened, kept16bit: 0, adapterDequantized: 0,
+                               notes: source.notes, adapter: nil)
+    }
+
     /// The model identifier a LoRA map is checked against (`LoRA.checkTarget`).
     package static let model = "moss-image"
 

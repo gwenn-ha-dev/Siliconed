@@ -403,14 +403,26 @@ extension Widen {
             }
             for c in 0..<n { d[c] *= norm }
         }
-        let tile = rotationTileWidth, tiles = (width + tile - 1) / tile, groups = k / group
+        let tile = rotationTileWidth, tiles = (width + tile - 1) / tile, groups = k / group, jobs = groups * tiles
         nonisolated(unsafe) let (src, dst) = (values.assumingMemoryBound(to: Int8.self) + slice.lowerBound, destination)
+        // **One tile of integers per worker, mapped once and given back on return** — not one per job on the heap:
+        // freed 2 MB blocks stay in the allocator's magazines, in the footprint (+16 MB, a second set of tiles,
+        // measured on MOSS-Image's 8-bit encoder). Worker `i` takes jobs `i, i + W, …`: the same tiles, the same values.
+        let workers = min(max(1, widenWorkers), jobs)
+        let slot = Arena.capacity(for: group * min(tile, width) * MemoryLayout<Int16>.size)
+        guard let region = mmap(nil, workers * slot, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0),
+              region != MAP_FAILED else { preconditionFailure("dequantizeRotated: \(workers * slot) bytes of tiles refused") }
+        defer { munmap(region, workers * slot) }
+        nonisolated(unsafe) let scratch = region
         factors.withUnsafeBufferPointer { f in
             nonisolated(unsafe) let factor = f.baseAddress! + slice.lowerBound
-            DispatchQueue.concurrentPerform(iterations: groups * tiles) { job in
-                let g = job / tiles, c0 = (job % tiles) * tile, w = min(tile, width - c0)
-                rotateTile(src + g * group * n + c0, dst + g * group * width + c0, factor + c0,
-                           rows: group, width: w, stride: n, outStride: width)
+            DispatchQueue.concurrentPerform(iterations: workers) { worker in
+                let t = (scratch + worker * slot).assumingMemoryBound(to: SIMD8<Int16>.self)
+                for job in stride(from: worker, to: jobs, by: workers) {
+                    let g = job / tiles, c0 = (job % tiles) * tile, w = min(tile, width - c0)
+                    rotateTile(src + g * group * n + c0, dst + g * group * width + c0, factor + c0,
+                               rows: group, width: w, stride: n, outStride: width, tile: t)
+                }
             }
         }
     }
@@ -449,10 +461,9 @@ extension Widen {
     package static var widenWorkers: Int { ProcessInfo.processInfo.activeProcessorCount }
 
     /// **What `dequantizeRotated` allocates while it runs, outside every arena**: its `factors`
-    /// (`n` floats), and in each job alive at once its tile's integers — `G × w` `Int16`, w ≤ 4096
-    /// (a 4096-wide tile is 2 MB: past a worker's stack, so on the heap). At most `workers` jobs run at
-    /// once, and never more than there are. Each allocation counted at the page, as `malloc` maps a
-    /// large one. A width not a multiple of 8 takes the scalar path, `G` `Int32` per job.
+    /// (`n` floats), and one tile of integers per worker — `G × w` `Int16`, w ≤ 4096 (2 MB at 4096), mapped
+    /// together and unmapped on return —, `workers` of them, never more than there are jobs. Each counted at
+    /// the page. A width not a multiple of 8 takes the scalar path, `G` `Int32` per job.
     package static func rotationScratchBytes(rows k: Int, columns n: Int, group: Int, workers: Int = widenWorkers) -> Int {
         guard group > 0, k >= group, n > 0 else { return 0 }
         let tiles = (n + rotationTileWidth - 1) / rotationTileWidth, jobs = (k / group) * tiles
@@ -479,14 +490,15 @@ extension Widen {
 
     /// One tile: `rows` (= G) × `width` (≤ 4096) values at `source` (row stride `stride`), rotated
     /// along the rows, times `factor[c]`, written at `destination` (row stride `outStride`).
+    /// `t`: the worker's tile of integers, `g × w` `Int16` at least.
     private static func rotateTile(_ source: UnsafePointer<Int8>, _ destination: UnsafeMutablePointer<Float>,
-                                   _ factor: UnsafePointer<Float>, rows g: Int, width w: Int, stride: Int, outStride: Int) {
+                                   _ factor: UnsafePointer<Float>, rows g: Int, width w: Int, stride: Int, outStride: Int,
+                                   tile t: UnsafeMutablePointer<SIMD8<Int16>>) {
         guard w % 8 == 0 else {
             return rotateTileScalar(source, destination, factor, rows: g, width: w, stride: stride, outStride: outStride)
         }
         let vectors = w / 8
-        withUnsafeTemporaryAllocation(of: SIMD8<Int16>.self, capacity: g * vectors) { tile in
-            let t = tile.baseAddress!
+        do {
             for r in 0..<g {
                 let row = UnsafeRawPointer(source + r * stride)
                 for v in 0..<vectors {

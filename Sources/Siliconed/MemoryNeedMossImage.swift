@@ -3,7 +3,7 @@ import Foundation
 /// **MOSS-Image's DiT need** — the denoising phase, nothing but the constructors' shape functions. The
 /// encoder's and the VAE's phases are their own files'; the family's formula composes the three.
 ///
-///     denoising   MossImageDiT arena(S + T, r) + the stream's buffers + CacheLoRA(r)
+///     denoising   MossImageDiT arena(S + T, r) + the stream's buffers + CacheLoRA(r) + a rotated weight's widening scratch
 ///                 + the SDPA (queries' copy; past `Attention.maxMatrix` the slices' concatenation)
 ///                 + the velocities the sampler holds · the GEMM's tiers and conductor workspace
 ///                 — or, before the first evaluation, the modulation tabulated for every timestep
@@ -118,6 +118,8 @@ extension MemoryNeed {
                 ? LoRA.downBytes(k: modules.map(\.k).max() ?? 0, rank: request.loraRanks.max() ?? 0) : 0),
             // The velocity `forward` returns (`[128, h, w]`) and the sampler's own (`velocities`, history).
             Term("sampler", (1 + velocities) * latent + request.solver.historyBytes(count: latent / f)),
+            // Widening the largest rotated block weight (the Compact's int8 convrot): beside the arena; 0 in bf16.
+            Term("DiT rotation scratch", Widen.rotationScratchBytes(header: header, prefixes: (0..<config.layers).map(MossImageDiT.layerPrefix))),
         ]
         let split = MossImageDiT.headSplit(sequence: n)
         terms += attention("DiT", heads: config.heads, rows: n, keys: n, headDim: config.headDim, causal: false,

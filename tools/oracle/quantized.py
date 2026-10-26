@@ -8,7 +8,7 @@ library**, never by ours:
 * GGUF (unsloth's Z-Image and Qwen-Image-2.1, vanes430's Anima, vantagewithai's Krea 2): `gguf-py`, llama.cpp's
   own reader, `gguf.quants.dequantize` on the stored blocks. diffusers' GGUF loader, asked for float32,
   gives the same bits on every tensor (`quant_fixtures.py` counts the differing bits and stops at one).
-* ComfyUI's int8 convrot (Comfy-Org's Qwen-Image-2.1 and Krea 2): `dequantize_int8_convrot_weight` of
+* ComfyUI's int8 convrot (Comfy-Org's Qwen-Image-2.1, Krea 2 and MOSS-Image): `dequantize_int8_convrot_weight` of
   comfy_kitchen at the frozen version `quant_fixtures.py` downloads and hashes (`(q * scale)` rotated back
   by the Hadamard blocks, in float32).
 
@@ -65,6 +65,11 @@ SOURCES = {
                       file="krea2_turbo-Q4_K_M.gguf", format="gguf",
                       sha256="bc12f539de7a7a6ddf9bac17ec6e5bfecd42c3517190f491131d8464a1034b40"),
     },
+    "moss-image": {
+        "compact": dict(repo="Comfy-Org/MOSS-Image", revision="530a4c94f92c35ef6818b1b035a983fe9dcf5f54",
+                        file="diffusion_models/moss_image_sft_int8_convrot.safetensors", format="convrot",
+                        sha256="b4d1475bc7eeffd7b809e82ea13a1fba1fb85c4e18365af3813722faa5c0fe4f"),
+    },
 }
 VARIANTS = ("compact", "light")
 
@@ -103,6 +108,16 @@ def to_map_names(family: str, tensors: dict) -> dict:
     if family == "anima":
         import anima
         return {anima.diffusers_name(k.removeprefix("model.diffusion_model.")): v for k, v in tensors.items()}
+    if family == "moss-image":
+        # The reference's own names; Comfy-Org fuses each block's `proj.qkv` = [q; k; v] on the output axis.
+        out = {}
+        for k, v in tensors.items():
+            if k.startswith("layers.") and k.endswith(".proj.qkv.weight"):
+                for part, x in zip(torch.chunk(v, 3, dim=0), "qkv"):
+                    out[k.replace(".proj.qkv.", f".proj.{x}.")] = part
+            else:
+                out[k] = v
+        return out
     return qf.to_map_names(family, tensors)
 
 

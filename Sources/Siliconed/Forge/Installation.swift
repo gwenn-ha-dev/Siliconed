@@ -78,6 +78,8 @@ package struct Installer {
     // Apache 2.0; and lodestones' DMD LoRA, which is the 8-step recipe (no official turbo as of these revisions).
     static let mossImage = Repository(name: "OpenMOSS-Team/MOSS-Image-SFT", revision: "f972bd4b4b9e3852133cc5da954d87bc32cd8fb9")
     static let mossTurbo = Repository(name: "lodestones/MOSS-Image-SFT-8-steps-dmd", revision: "f95df83b5e90ae91ea412434b3f9b7f1c8c6314f")
+    // Its Compact: Comfy-Org's int8 convrot of the SFT's DiT and of its encoder (the repository holds the Base's too).
+    static let mossComfy = Repository(name: "Comfy-Org/MOSS-Image", revision: "530a4c94f92c35ef6818b1b035a983fe9dcf5f54")
 
     /// The small files read at render time, and their place under `store/composants/<famille>/`.
     static func components(_ f: Family) -> [File] {
@@ -147,6 +149,8 @@ package struct Installer {
     ///   come after the Standard's: the license is the publisher's, the cards say whose bytes.
     /// - **A Light** links the card of its DiT's repository (unsloth's GGUF: Apache 2.0 for Z-Image,
     ///   Qwen Research for Qwen-Image-2.1), then the card of its encoder's, the Compact's.
+    /// - **MOSS-Image's Compact** adds Comfy-Org's card (`license: apache-2.0`, `base_model` the publisher's
+    ///   two repositories): its DiT and its encoder are Comfy-Org's int8 convrot of the publisher's weights.
     /// - **Krea 2's Compact** adds nothing: its DiT and its encoder are Comfy-Org's, whose card is the
     ///   Standard's. **Its Light** adds vantagewithai's card (`license: other`, Krea's license link,
     ///   `base_model: krea/Krea-2-Turbo`).
@@ -169,6 +173,8 @@ package struct Installer {
             return licenseFiles(f) + [File(repository: animaGGUF, path: "README.md", destination: nil)]
         case (.krea2, .light):
             return licenseFiles(f) + [File(repository: krea2GGUF, path: "README.md", destination: nil)]
+        case (.mossImage, .compact):
+            return licenseFiles(f) + [File(repository: mossComfy, path: "README.md", destination: nil)]
         default: break
         }
         switch f {
@@ -214,6 +220,13 @@ package struct Installer {
             return [File(repository: qwenImage21Turbo, path: "text_encoder/config.json", destination: nil),
                     File(repository: qwenImage21Unsloth, path: "Qwen-Image-2.1-text_encoder-INT8-ConvRot.safetensors",
                          destination: nil, sha256: "0cb5ed0653e2ec8065f25a6cfb2ab6a89b6c8f143a500acea19f0e36214814b7", size: 9349769248)]
+        case (.mossImage, .compact):
+            // The publisher's `config.json`, Comfy-Org's int8 convrot (`int8_tensorwise`, group 256 on the language
+            // model): its 216 linears and the embedding table, per-row scales; the vision tower, the multi-token head
+            // and `lm_head` are not written.
+            return [File(repository: mossImage, path: "text_encoder/config.json", destination: nil),
+                    File(repository: mossComfy, path: "text_encoders/qwen3.5_9b_int8_convrot.safetensors", destination: nil,
+                         sha256: "32e3787472f708fa5f83624acbf5ef23f7fc89c439e05065ea57cfe5a97f025a", size: 9748121532)]
         default: break
         }
         switch f {
@@ -289,6 +302,11 @@ package struct Installer {
             // Its 31 `comfy_attention.config` (ComfyUI's attention preference) are ignored by the forge.
             return [File(repository: qwenImage21Comfy, path: "diffusion_models/qwen_image_2.1_turbo_int8_convrot.safetensors",
                          destination: nil, sha256: "8144a0182964aa8403ad6dbc011db837304167d235161b9aabaa8532e967314c")]
+        case (.mossImage, .compact):
+            // int8 convrot ×168 (the 42 blocks' fused qkv, o, ffn_up_gate, ffn_down), the rest bf16 — the Standard's
+            // bits — and its 42 `comfy_attention.config`, ignored by the forge.
+            return [File(repository: mossComfy, path: "diffusion_models/moss_image_sft_int8_convrot.safetensors", destination: nil,
+                         sha256: "b4d1475bc7eeffd7b809e82ea13a1fba1fb85c4e18365af3813722faa5c0fe4f", size: 5413698958)]
         default: break
         }
         switch f {
@@ -486,8 +504,15 @@ package struct Installer {
             let beside = baseDiT && !ditPresent
                 ? startDownloads(ditFiles, alsoWriting: files.reduce(0) { $0 + Library.size(source($1)) }) : nil
             let forged = Result { () throws -> MapWriter.Tally in
-                if f == .mossImage {
+                if f == .mossImage && v == .standard {
                     return try ForgeQwen35.forge(folder: (source(files[0]) as NSString).deletingLastPathComponent, to: encoderMap,
+                                                 progressHandler: beside == nil ? progressHandler : nil)
+                }
+                if f == .mossImage {
+                    // The publisher's config, Comfy-Org's 8-bit weights.
+                    let weights = files[1]
+                    return try ForgeQwen35.forge(source: TensorSource(paths: [source(weights)]), published: OrderedJSON.read(source(files[0])),
+                                                 to: encoderMap, directory: weights.repository.name + "@" + weights.repository.revision,
                                                  progressHandler: beside == nil ? progressHandler : nil)
                 }
                 if let published = Self.publishedEncoderConfig(f) {
@@ -516,7 +541,7 @@ package struct Installer {
         }
 
         if baseDiT && !ditPresent && f == .mossImage {
-            try installMossImage(config: config, ditName: ditName, ditMap: ditMap, ditFiles: ditFiles, verified: verified)
+            try installMossImage(variant: v, config: config, ditName: ditName, ditMap: ditMap, ditFiles: ditFiles, verified: verified)
         } else if baseDiT && !ditPresent {
             let files = ditFiles
             if verified.isEmpty { try checkSpace(files) }
@@ -557,7 +582,8 @@ package struct Installer {
     /// **MOSS-Image's DiT and its LoRA**: the DiT's three shards forged to one bf16 map (`MossImageForge.forgeDiT`), then the
     /// DMD LoRA forged to its own fp32 map in the components folder (`forgeLoRA`) — the two are one recipe, and the LoRA
     /// is never merged into the DiT's weights (a delta smaller than bf16's step would be lost).
-    func installMossImage(config: OrderedJSON, ditName: String, ditMap: String, ditFiles: [File],
+    /// The Compact's DiT is Comfy-Org's single int8 file (`MossImageForge.forgeQuantizedDiT`); its LoRA is the Standard's.
+    func installMossImage(variant v: Variant, config: OrderedJSON, ditName: String, ditMap: String, ditFiles: [File],
                           verified: Set<String>) throws {
         let fm = FileManager.default
         if !ditFiles.isEmpty {
@@ -565,9 +591,19 @@ package struct Installer {
             for x in ditFiles where !verified.contains(source(x)) { try download(x) }
             journal("forging the DiT → \(ditName)")
             let begin = Date()
-            let folder = (source(ditFiles[0]) as NSString).deletingLastPathComponent
-            let tally = try MossImageForge.forgeDiT(source: TensorSource(folder: folder), config: config, to: ditMap)
-            journal(String(format: "  %.2f GB, %d tensors, %d values rounded", Double(tally.bytes) / 1e9, tally.tensors, tally.inexact))
+            if v == .standard {
+                let folder = (source(ditFiles[0]) as NSString).deletingLastPathComponent
+                let tally = try MossImageForge.forgeDiT(source: TensorSource(folder: folder), config: config, to: ditMap)
+                journal(String(format: "  %.2f GB, %d tensors, %d values rounded", Double(tally.bytes) / 1e9, tally.tensors, tally.inexact))
+            } else {
+                let file = ditFiles[0]
+                let r = try MossImageForge.forgeQuantizedDiT(
+                    source: TensorSource(paths: [source(file)]), config: config, to: ditMap,
+                    description: .object([.init("file", .string((file.path as NSString).lastPathComponent)),
+                                          .init("repository", .string(file.repository.name)),
+                                          .init("revision", .string(file.repository.revision))]))
+                r.rows.forEach { journal("  " + $0) }
+            }
             journal(String(format: "  ✓ forged %@ in %.0f s", ditName, Date().timeIntervalSince(begin)))
             if !keepSources { for x in ditFiles { try? fm.removeItem(atPath: source(x)) } }
         }

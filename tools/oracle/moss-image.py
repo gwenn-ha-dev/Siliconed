@@ -12,6 +12,11 @@ The recipe is the community turbo: MOSS-Image-SFT + the LoRA `lodestones/MOSS-Im
     moss-image.py vae-witness                  the decoder in float64                        -> witness-moss-vae-f64-512
     moss-image.py dit [--lora]                 one DiT evaluation at step 0 (taps)           -> goldens-moss-dit[-lora]-512
     moss-image.py witness [--lora]             the same evaluation in float64                -> witness-moss-dit[-lora]-f64-512
+    moss-image.py dit|witness --variant compact   the same, on the Compact's published DiT (Comfy-Org's int8 convrot,
+                                               dequantized by comfy_kitchen: `quantized.py`) -> goldens-moss-dit-compact-512,
+                                               witness-moss-dit-compact-f64-512
+    moss-image.py dit-bf16 [--variant compact] the dit evaluation in bfloat16, on its golden's inputs (taps)
+                                               -> witness-bf16-moss-dit[-compact]-512 (the bar of --neural-engine)
     moss-image.py bf16                         LoRA merged into bf16 weights vs kept apart   -> witness-moss-bf16-512
     moss-image.py trajectory                   the 8 steps with the LoRA                     -> goldens-moss-trajectory-512
     moss-image.py vae-final                    the final latent decoded, the image's md5     -> goldens-moss-vae-final-512
@@ -62,6 +67,7 @@ from safetensors.torch import save_file
 
 sys.dont_write_bytecode = True      # the repository carries no caches
 import common  # noqa: E402
+import quantized  # noqa: E402
 from common import Checkpoint, Streamed
 
 REPOSITORY = "OpenMOSS-Team/MOSS-Image-SFT"
@@ -86,9 +92,17 @@ OUT: Path
 _SNAP: Path | None = None
 _LORA: Path | None = None
 _REF = None
+VARIANT: str | None = None      # --variant: the Compact's published DiT, for `dit` and `witness`
 
 
 def snap() -> Path:
+    if VARIANT:
+        # The weights come from the variant's file: the repository gives the reference's code and the DiT's config.
+        return common.snapshot(REPOSITORY, [], files=["pipeline_moss_image.py", "transformer/config.json"])
+    return full_snap()
+
+
+def full_snap() -> Path:
     global _SNAP
     if _SNAP is None:
         _SNAP = common.snapshot(REPOSITORY, ["text_encoder", "tokenizer", "transformer", "scheduler", "vae"],
@@ -392,7 +406,7 @@ class LoraCheckpoint:
 
 
 def dit_checkpoint(lora: bool):
-    base = Checkpoint(snap() / "transformer", DIT_INDEX)
+    base = quantized.Variant("moss-image", VARIANT) if VARIANT else Checkpoint(snap() / "transformer", DIT_INDEX)
     return LoraCheckpoint(base, lora_path()) if lora else base
 
 
@@ -464,9 +478,10 @@ def stage_dit(size: str, lora: bool):
     taps = probe_dit(model)
     out = model(latent, timestep, embeds).sample
     payload = {"latent_in": latent[0], "timestep": timestep, "text_in": embeds[0], "model_out": out[0], **taps}
-    stem = f"goldens-moss-dit-lora-{name}" if lora else f"goldens-moss-dit-{name}"
+    stem = quantized.stem(f"goldens-moss-dit-lora-{name}" if lora else f"goldens-moss-dit-{name}", VARIANT)
     write(stem, payload, {"sigma": float(scheduler.sigmas[0]), "lora": lora and "lora.safetensors, strength 1",
-                          "lora_revision": common.REVISIONS[LORA_REPOSITORY] if lora else None})
+                          "lora_revision": common.REVISIONS[LORA_REPOSITORY] if lora else None,
+                          **({"weights": model.published.describe()} if VARIANT else {})})
 
 
 def patch_dit64():
@@ -495,8 +510,8 @@ def rope64(height, width, text_length, base=10000.0, bands=16):
 def stage_witness(size: str, lora: bool):
     """One whole evaluation in float64 on the fp32 golden's inputs (latent, timestep, the encoder's fp32 output)."""
     _, _, name = common.parse_size(size)
-    stem = f"goldens-moss-dit-lora-{name}" if lora else f"goldens-moss-dit-{name}"
-    golden = read(stem, f"moss-image.py dit{' --lora' if lora else ''}")
+    stem = quantized.stem(f"goldens-moss-dit-lora-{name}" if lora else f"goldens-moss-dit-{name}", VARIANT)
+    golden = read(stem, f"moss-image.py dit{' --lora' if lora else ''}{' --variant ' + VARIANT if VARIANT else ''}")
     patch_dit64()
     f64 = torch.float64
     ref = reference()
@@ -543,7 +558,7 @@ def stage_witness(size: str, lora: bool):
     report = {k: relative(golden[k], payload[k], 0 if golden[k].ndim == 3 else -1) for k in payload if k in golden}
     for k in ("model_out", "block0_out", "block41_out", "text_block1_out", "shared_modulation"):
         print(f"  {k}: fp32 against fp64, {report[k]}")
-    path = OUT / f"witness-moss-dit{'-lora' if lora else ''}-f64-{name}.safetensors"
+    path = OUT / f"witness-moss-dit{'-lora' if lora else ''}{'-' + VARIANT if VARIANT else ''}-f64-{name}.safetensors"
     save_file({k: v.contiguous() for k, v in payload.items()}, str(path))
     path.with_suffix(".json").write_text(json.dumps({"inputs": [stem], "oracle_fp32_vs_witness": report}, indent=1))
     print(f"-> {path}")
@@ -598,6 +613,26 @@ def stage_bf16(size: str):
     save_file({k: v.contiguous() for k, v in payload.items()}, str(path))
     path.with_suffix(".json").write_text(json.dumps({"inputs": [f"goldens-moss-dit-lora-{name}"], "report": report}, indent=1))
     print(f"-> {path}")
+
+
+def stage_dit_bf16(size: str):
+    """`dit` with the reference in bfloat16, as the pipeline runs it under `torch_dtype=torch.bfloat16`: the weights
+    in bf16 (the Compact's dequantized, then rounded), the module casting its fp32 inputs itself (`forward` casts the
+    latent, the text and the time vector to its weights' dtype). The inputs are the dit golden's, so only the
+    arithmetic differs; the taps are widened to float32 (exact) under the golden's keys. It is the bar of the engine's
+    half-precision paths (`--neural-engine`, `--bf16-activations`): `witness-bf16-…`, the name `siliconed check` looks for.
+    No LoRA: `bf16` is the stage that weighs it."""
+    _, _, name = common.parse_size(size)
+    stem = quantized.stem(f"goldens-moss-dit-{name}", VARIANT)
+    golden = read(stem, f"moss-image.py dit{' --variant ' + VARIANT if VARIANT else ''}")
+    model = load_dit(torch.bfloat16)
+    taps = probe_dit(model)
+    out = model(golden["latent_in"][None], golden["timestep"], golden["text_in"][None]).sample
+    payload = {"model_out": out[0].float(), **{k: v.float() for k, v in taps.items()}}
+    for k in ("model_out", "block0_out", "block41_out"):
+        print(f"  {k}: bf16 against fp32, {relative(golden[k], payload[k], 0 if golden[k].ndim == 3 else -1)}")
+    write(stem.replace("goldens-", "witness-bf16-"), payload,
+          {"dtype": "bfloat16", "inputs": stem, **({"weights": model.published.describe()} if VARIANT else {})})
 
 
 # ------------------------------------------------------------------ the trajectory
@@ -717,7 +752,7 @@ def stage_vae_final(size: str):
 def everything(goldens: Path):
     stages = [["schedule"], ["tokenizer"], ["text"], ["vae", "--size", "512"], ["dit", "--size", "512"],
               ["dit", "--size", "512", "--lora"], ["text-witness"], ["vae-witness", "--size", "512"],
-              ["witness", "--size", "512", "--lora"], ["witness", "--size", "512"], ["bf16", "--size", "512"],
+              ["witness", "--size", "512", "--lora"], ["witness", "--size", "512"], ["dit-bf16", "--size", "512"], ["bf16", "--size", "512"],
               ["trajectory", "--size", "512"], ["vae-final", "--size", "512"]]
     common.run_stages(__file__, goldens, stages)
 
@@ -727,11 +762,17 @@ def main() -> None:
     common.unbuffered()
     p = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     p.add_argument("stage", choices=["schedule", "tokenizer", "text", "text-witness", "vae", "vae-witness", "dit", "witness",
-                                     "bf16", "trajectory", "vae-final", "all"])
+                                     "dit-bf16", "bf16", "trajectory", "vae-final", "all"])
     p.add_argument("--size", default="512", help="512 (the only size)")
     p.add_argument("--lora", action="store_true", help="dit, witness: the 8-step LoRA merged at strength 1")
+    p.add_argument("--variant", choices=list(quantized.SOURCES["moss-image"]),
+                   help="dit, witness, dit-bf16: the Compact's published DiT (Comfy-Org's int8 convrot) instead of the publisher's")
     p.add_argument("--goldens", help="output folder (default: $SILICONED_GOLDENS, else ./goldens)")
     args = p.parse_args()
+    global VARIANT
+    if args.variant and (args.stage not in ("dit", "witness", "dit-bf16") or args.lora):
+        p.error("--variant goes with dit, witness or dit-bf16, without --lora (the Compact takes the Standard's LoRA)")
+    VARIANT = args.variant
     OUT = common.goldens_directory(args.goldens) / "moss"
     OUT.mkdir(parents=True, exist_ok=True)
     if args.stage == "all":
@@ -743,7 +784,7 @@ def main() -> None:
     else:
         {"schedule": stage_schedule, "tokenizer": stage_tokenizer, "text": stage_text, "text-witness": stage_text_witness,
          "vae": lambda: stage_vae(args.size), "vae-witness": lambda: stage_vae_witness(args.size),
-         "bf16": lambda: stage_bf16(args.size), "trajectory": lambda: stage_trajectory(args.size),
+         "bf16": lambda: stage_bf16(args.size), "dit-bf16": lambda: stage_dit_bf16(args.size), "trajectory": lambda: stage_trajectory(args.size),
          "vae-final": lambda: stage_vae_final(args.size)}[args.stage]()
 
 

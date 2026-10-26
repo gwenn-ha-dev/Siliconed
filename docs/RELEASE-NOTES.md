@@ -2,6 +2,42 @@ English · [Français](RELEASE-NOTES.fr.md)
 
 # Siliconed — release notes
 
+## 0.16
+
+### A fifth model: MOSS-Image
+
+- **[MOSS-Image](https://huggingface.co/OpenMOSS-Team/MOSS-Image-SFT)**, by the OpenMOSS team, joins
+  Krea 2, Z-Image, Qwen-Image-2.1 and Anima. A single-stream DiT of 5.1 billion parameters that reads
+  the prompt with Qwen3.5-9B, a hybrid language model (three layers in four of linear attention,
+  Gated DeltaNet, new in the engine), and decodes with FLUX.2's VAE.
+- **Its recipe is the community's**: its publisher released no fast version, so Siliconed runs
+  MOSS-Image-SFT under [lodestones' DMD LoRA](https://huggingface.co/lodestones/MOSS-Image-SFT-8-steps-dmd)
+  at strength 1: 8 evaluations, no CFG. The LoRA is kept beside the weights in fp32, never merged:
+  merged into the bf16 weights, its deltas would be lost to rounding. Text-to-image; no Detail, no
+  edit.
+- **Your LoRAs** stack on top of the 8-step one: ComfyUI's and ai-toolkit's layout (the attention's
+  fused `qkv`, split exactly), kohya's and diffusers'. LoRAs trained on MOSS-Image Base apply as the
+  community uses them. Each imported module's ΔW equals PyTorch's from the published file.
+- **Times**: on an M1 Pro with 16 GB, seed 42, 8 evaluations, queued in the app: 1024² in ⟨TBD⟩ s
+  in Compact, ⟨TBD⟩ s in Standard.
+- **Faster Rendering takes one half-size evaluation**, not three: from the second, MOSS-Image
+  smooths skin and softens fine detail where the other models keep it. A tenth less time at 1024².
+- **The preview shows during the render**, as with the other models: a projection of the FLUX.2
+  latent's 128 channels to colour, fitted on twelve renders.
+- **Checked against the reference**, stage by stage: the tokenizer and the schedule to the bit, the
+  text encoder's 32 layers, the denoiser with and without the LoRA, the 8-step trajectory and the
+  decoder, each at the fp64 witness where the reference carries its own error. At 512², the
+  denoiser's output is 1.3·10⁻⁶ from the exact result, the reference's own 1.4·10⁻⁶. Under the
+  Neural Engine, both versions' denoiser stays within bf16's own error plus 25 %, as for the other
+  models.
+- **Standard or Compact**: 27.5 GB (the publisher's bf16, the LoRA in fp32) or 17.9 GB (the DiT and
+  the text encoder in int8 convrot, as Comfy-Org publishes them); the Compact is preselected, as for
+  the other models, with the Neural Engine on by default. No Light yet: a 4-bit DiT is published,
+  not yet checked.
+- **Within the budget**: its memory need is computed from the model's shapes before the first
+  computation. ⟨TBD: peaks⟩
+- **License**: Apache 2.0, the LoRA included. Commercial use allowed.
+
 ## 0.15
 
 ### Compact by default

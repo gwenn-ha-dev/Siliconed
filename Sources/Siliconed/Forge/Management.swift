@@ -368,7 +368,7 @@ extension Family {
     /// unsloth's GGUF, its encoder from Disty0's; Qwen-Image-2.1's DiT from Comfy-Org's int8 convrot,
     /// its encoder from unsloth's; Anima's DiT from vanes430's GGUF Q8_0 (Q4_K_M for the Light), with
     /// the Standard's encoder; Krea 2's DiT and encoder from Comfy-Org's int8 convrot, its Light's DiT
-    /// from vantagewithai's GGUF Q4_K_M. An installation needs more while forging: the sources, about as
+    /// from vantagewithai's GGUF Q4_K_M; MOSS-Image's DiT and encoder from Comfy-Org's int8 convrot. An installation needs more while forging: the sources, about as
     /// large as the map, then thrown away (`spaceNeeded`).
     package func installedSize(_ variant: Variant) -> (dit: Int, encoder: Int, components: Int) {
         if variant == .light {
@@ -394,7 +394,8 @@ extension Family {
             // Comfy-Org's int8 convrot, the DiT's Linears kept 8-bit; the encoder's embedding table
             // in fp32 (a rotated table cannot be read by rows).
             case .krea2: return (14_138_179_584, 5_096_919_040, installedSize(.standard).components)
-            case .mossImage: return installedSize(.standard)   // no Compact: `Family.variants`
+            // Comfy-Org's int8 convrot, the same way: the encoder's table in fp32 (4.07 GB of its 11).
+            case .mossImage: return (5_417_031_680, 11_004_936_192, installedSize(.standard).components)
             }
         }
         switch self {

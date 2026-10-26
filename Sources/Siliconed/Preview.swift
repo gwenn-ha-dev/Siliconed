@@ -6,7 +6,7 @@ extension Engine {
     ///
     /// The principle of ComfyUI and Draw Things: a linear projection of the latent's channels to
     /// RGB, one pixel per latent cell — 64×64 at 512², 128×128 at 1024² (half that for
-    /// Qwen-Image-2.1, whose cell is 16×16 pixels) — enlarged on display. Two
+    /// Qwen-Image-2.1 and MOSS-Image, whose cell is 16×16 pixels) — enlarged on display. Two
     /// choices make it useful from the first steps:
     ///
     /// 1. **We show x̂₀, not x_t** — the prediction of the final image, not the noised state. In
@@ -16,7 +16,7 @@ extension Engine {
     ///    preview is exactly the final latent. The sign convention is verified for each model:
     ///    Anima and Krea 2 return `v` as is (`euler`: `x += Δσ·v`), Z-Image returns `−v` and the
     ///    sampler negates it (`Sampler`: `x += Δσ·negated`), so `negated` IS `dx/dσ`;
-    ///    Qwen-Image-2.1 returns `v` as is (`QwenImage21Sampler`: `x += dt·v`).
+    ///    Qwen-Image-2.1 returns `v` as is (`QwenImage21Sampler`: `x += dt·v`), MOSS-Image too (`euler`).
     ///    Check: the last step's preview against the decoded image (a developer check).
     /// 2. **The coefficients are fitted on our golden tensors**, by least squares, and not copied
     ///    (see `PreviewProjection`).
@@ -41,7 +41,7 @@ extension Engine {
     }
 }
 
-/// **The C → RGB projection of a latent space** (16 channels, 64 for Qwen-Image-2.1):
+/// **The C → RGB projection of a latent space** (16 channels, 64 for Qwen-Image-2.1, 128 for FLUX.2):
 /// `rgb = Wᵀ·z + b`, in `[-1, 1]`, then the post-processing of `ImageRGB.rgba8` (`x/2 + 0.5`,
 /// clamped, ×255, rounded).
 ///
@@ -66,6 +66,15 @@ extension Engine {
 /// latent *before* its per-channel denormalization, RGB of the RGBA decode. One pair held out: 26.2
 /// to 29.1 dB — optimistic, the pairs go by twos; both generations held out together, judged on them: **23.9 dB**. ComfyUI publishes nothing for
 /// this space.
+///
+/// **FLUX.2** (MOSS-Image): 128 channels — 32 VAE channels × the 2×2 patch —, the latent the DiT sees (before the
+/// batch-norm denormalization), one pixel per 16-px cell against the image's 16×16 block mean. No golden covers enough
+/// images: twelve 512² renders of the installed chain, twelve prompts (portrait, animal, food, night street, sea, anime,
+/// black and white, jungle, desert, interior, watercolour, pastel), seed 100 + i, final latent and decoded image (a
+/// private maintainer command). One image held out, judged on it: **16.7 to 20.4 dB, 18.7 on average** — below the other
+/// spaces: the cell's sub-pixel detail leaks into it as coloured speckle, which no ridge reduces (18.7 at every λ up to
+/// 0.03) and a projection shared by the four sub-positions (32 → 3, a twice finer grid) does worse, 17.2 dB brought to
+/// the cell. ComfyUI's factors were not compared.
 package struct PreviewProjection: Sendable, Equatable {
     /// `[channel][r, g, b]`, C × 3, one row per channel.
     package let weights: [Float]
@@ -107,6 +116,7 @@ extension LatentSpace {
         case .flux: return .flux
         case .qwenImage: return .qwenImage
         case .qwenImage21: return .qwenImage21
+        case .flux2: return .flux2
         default: return nil
         }
     }
@@ -217,5 +227,135 @@ extension PreviewProjection {
          0.009711,  0.005954, -0.001892,
          0.021673,  0.019519,  0.025297
     ], bias: [-0.102026, -0.131619, -0.214295])
+    static let flux2 = PreviewProjection(weights: [
+         0.012039,  0.013185,  0.014823,
+         0.017394,  0.014037,  0.016079,
+         0.008738,  0.000431,  0.008769,
+         0.007372,  0.004446,  0.003329,
+        -0.003358, -0.007712,  0.008917,
+         0.002088,  0.004858,  0.029830,
+         0.000982, -0.009559,  0.012879,
+        -0.004556,  0.001899,  0.027746,
+        -0.009673, -0.012460, -0.001937,
+        -0.003314, -0.006019,  0.005192,
+         0.005934,  0.013373,  0.022729,
+        -0.005121, -0.003057,  0.004082,
+         0.013265,  0.074445,  0.147122,
+         0.061592,  0.098769,  0.151296,
+         0.053368,  0.101887,  0.147520,
+         0.083995,  0.115801,  0.155697,
+        -0.010617, -0.019319, -0.002424,
+        -0.008136, -0.021525, -0.008612,
+         0.012295,  0.008160,  0.010783,
+         0.002107, -0.007256, -0.009787,
+        -0.001099, -0.011038, -0.015787,
+         0.003807,  0.000489,  0.005380,
+         0.002687,  0.000291, -0.009021,
+        -0.010447, -0.010141, -0.008765,
+        -0.003017,  0.027537, -0.013812,
+        -0.013704,  0.021581, -0.006332,
+        -0.001161,  0.023492, -0.009308,
+        -0.007006,  0.022712, -0.006493,
+         0.003288,  0.009078,  0.015733,
+         0.015861,  0.020151,  0.027680,
+        -0.005094,  0.006583,  0.009811,
+         0.008753,  0.014363,  0.013580,
+        -0.118662, -0.091427, -0.056186,
+        -0.109705, -0.075971, -0.021419,
+        -0.105436, -0.074151, -0.019008,
+        -0.073283, -0.020160,  0.046945,
+         0.011946,  0.008353,  0.023407,
+         0.002681, -0.006674,  0.002445,
+        -0.002718, -0.010409, -0.002675,
+         0.009655,  0.005607,  0.007477,
+        -0.003563,  0.006630,  0.010357,
+         0.000715,  0.003442,  0.024233,
+        -0.003479,  0.006899,  0.012019,
+        -0.001652,  0.002501,  0.006398,
+        -0.003802, -0.009745, -0.027312,
+         0.000522, -0.005941, -0.022291,
+        -0.000761,  0.003582, -0.014108,
+         0.004263,  0.002201, -0.018266,
+         0.006126,  0.016088,  0.003986,
+        -0.002876,  0.007290,  0.014442,
+         0.006014,  0.006183,  0.000606,
+         0.000223,  0.006611,  0.013410,
+        -0.000177, -0.008404, -0.016749,
+        -0.010178, -0.004104, -0.003785,
+        -0.010873, -0.009270, -0.002606,
+         0.001511, -0.001036, -0.003428,
+        -0.020672, -0.017721, -0.025952,
+        -0.008500, -0.014159, -0.002957,
+         0.005189, -0.003396, -0.007665,
+        -0.001559, -0.008642, -0.014890,
+        -0.040115,  0.002848,  0.010488,
+        -0.026464,  0.015025,  0.019404,
+        -0.035352, -0.000215,  0.009546,
+        -0.037458,  0.005339,  0.014309,
+        -0.007867, -0.009234, -0.010695,
+         0.007777,  0.000666, -0.007164,
+         0.007884, -0.001978, -0.001229,
+         0.018298,  0.030277,  0.036353,
+        -0.006289, -0.014828, -0.003231,
+         0.005493, -0.001595, -0.004100,
+         0.000796,  0.002294,  0.000727,
+         0.003865,  0.003418,  0.006972,
+         0.002037,  0.004675,  0.018571,
+        -0.000297, -0.002888, -0.002523,
+         0.006159,  0.007264, -0.003530,
+         0.000568,  0.016492,  0.006758,
+         0.038578, -0.020335, -0.010923,
+         0.028503, -0.025675, -0.004049,
+         0.047943, -0.011020,  0.012667,
+         0.040783, -0.013333,  0.008124,
+         0.006236,  0.006929,  0.001601,
+        -0.006720, -0.002693, -0.005612,
+        -0.008758, -0.006993,  0.001386,
+        -0.001700,  0.003717,  0.001454,
+         0.005342,  0.004350,  0.011380,
+        -0.001932, -0.004241,  0.004630,
+        -0.000228, -0.002034, -0.005768,
+        -0.005293, -0.007131, -0.007435,
+        -0.003095,  0.004966, -0.010250,
+        -0.003951,  0.003458, -0.005340,
+        -0.002791,  0.004469,  0.000329,
+        -0.011602,  0.000453, -0.004343,
+         0.007230,  0.005053, -0.002592,
+         0.016581,  0.007996,  0.019318,
+        -0.003924, -0.009849, -0.004786,
+        -0.008543, -0.012639, -0.002837,
+        -0.015494, -0.000199, -0.002232,
+        -0.002286, -0.004745, -0.016252,
+        -0.021645, -0.000860, -0.004665,
+         0.009269, -0.004007, -0.020298,
+        -0.003549,  0.009504,  0.010507,
+        -0.005931,  0.006491,  0.009099,
+         0.011633,  0.029467,  0.031771,
+         0.002734,  0.013202,  0.018982,
+         0.003741, -0.004809,  0.001664,
+         0.004810, -0.012003, -0.005377,
+         0.006731, -0.005821,  0.009706,
+         0.007721, -0.008420, -0.004096,
+         0.009793,  0.011186,  0.018376,
+         0.013965,  0.016478,  0.035518,
+         0.018572,  0.010814,  0.022926,
+         0.010717,  0.023656,  0.031846,
+        -0.007693, -0.002568,  0.000978,
+        -0.021172, -0.007422, -0.006695,
+        -0.010291, -0.007543, -0.013182,
+        -0.010662, -0.009879, -0.016291,
+        -0.006437, -0.001836,  0.001977,
+        -0.016990, -0.004370, -0.000899,
+        -0.024690, -0.004641,  0.002021,
+        -0.019858, -0.014403, -0.006667,
+        -0.001123,  0.001152, -0.005337,
+         0.002064,  0.006639, -0.007181,
+         0.008010,  0.009261, -0.000765,
+         0.007769,  0.000299, -0.000651,
+         0.013287,  0.004057, -0.001464,
+        -0.005048, -0.011306, -0.014555,
+         0.006663,  0.005667, -0.007448,
+         0.010945,  0.005011, -0.004665
+    ], bias: [-0.066671, -0.087091, -0.170948])
     // END COEFFICIENTS
 }

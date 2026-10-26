@@ -2,6 +2,44 @@
 
 # Siliconed — notes de version
 
+## 0.16
+
+### Un cinquième modèle : MOSS-Image
+
+- **[MOSS-Image](https://huggingface.co/OpenMOSS-Team/MOSS-Image-SFT)**, de l'équipe OpenMOSS, rejoint
+  Krea 2, Z-Image, Qwen-Image-2.1 et Anima. Un DiT mono-flux de 5,1 milliards de paramètres qui lit
+  le prompt avec Qwen3.5-9B, un modèle de langage hybride (trois couches sur quatre en attention
+  linéaire, Gated DeltaNet, nouvelle dans le moteur), et décode avec le VAE de FLUX.2.
+- **Sa recette est celle de la communauté** : son éditeur n'a pas publié de version rapide, alors
+  Siliconed fait tourner MOSS-Image-SFT sous la [LoRA DMD de lodestones](https://huggingface.co/lodestones/MOSS-Image-SFT-8-steps-dmd)
+  à force 1 : 8 évaluations, sans CFG. La LoRA est gardée à côté des poids en fp32, jamais fusionnée :
+  fusionnée dans les poids bf16, ses deltas se perdraient dans l'arrondi. Texte vers image ; ni
+  Détail, ni édition.
+- **Vos LoRA** s'empilent par-dessus celle des 8 pas : la disposition de ComfyUI et d'ai-toolkit (le
+  `qkv` fusionné de l'attention, séparé exactement), celles de kohya et de diffusers. Les LoRA
+  entraînées sur MOSS-Image Base s'appliquent comme la communauté s'en sert. Le ΔW de chaque module
+  importé est égal à celui que PyTorch calcule depuis le fichier publié.
+- **Temps** : sur un M1 Pro de 16 Go, graine 42, 8 évaluations, en file dans l'app : 1024² en ⟨TBD⟩ s
+  en Compact, ⟨TBD⟩ s en Standard.
+- **Le rendu plus rapide n'y prend qu'une évaluation en demi-taille**, pas trois : dès la deuxième,
+  MOSS-Image lisse la peau et adoucit le détail fin là où les autres modèles le gardent. Un dixième de
+  temps en moins à 1024².
+- **L'aperçu s'affiche pendant le rendu**, comme pour les autres modèles : une projection des
+  128 canaux du latent FLUX.2 vers la couleur, ajustée sur douze rendus.
+- **Vérifié contre la référence**, étage par étage : le tokenizer et le calendrier au bit près, les
+  32 couches de l'encodeur de texte, le débruiteur avec et sans la LoRA, la trajectoire de 8 pas et
+  le décodeur, chacun au témoin fp64 là où la référence porte sa propre erreur. En 512², la sortie du
+  débruiteur est à 1,3·10⁻⁶ du résultat exact, celle de la référence à 1,4·10⁻⁶. Sous le Neural
+  Engine, le débruiteur des deux versions reste dans l'erreur propre au bf16 plus 25 %, comme pour
+  les autres modèles.
+- **Standard ou Compact** : 27,5 Go (les bf16 de l'éditeur, la LoRA en fp32) ou 17,9 Go (le DiT et
+  l'encodeur de texte en int8 convrot, tels que Comfy-Org les publie) ; la Compact est présélectionnée,
+  comme pour les autres modèles, avec le Neural Engine allumé par défaut. Pas encore de Légère : un
+  DiT en 4 bits est publié, pas encore vérifié.
+- **Dans le budget** : son besoin en mémoire est calculé à partir des formes du modèle avant le
+  premier calcul. ⟨TBD : pics⟩
+- **Licence** : Apache 2.0, LoRA comprise. Usage commercial permis.
+
 ## 0.15
 
 ### La Compact par défaut

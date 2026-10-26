@@ -119,9 +119,11 @@ package final class MossImageDiT {
     /// - Parameters:
     ///   - gridHeight, gridWidth: the latent's cells (`image / 16`); one token each.
     ///   - maxText: the most text rows an evaluation passes.
+    ///   - expanded: the stack's expanded weights from a DiT given back, taken over rather than filled again (the
+    ///     half-size start's, handed to the full one: the turbo LoRA's 1.19 GB of fp32 read once).
     package init(artifact: Artifact, gridHeight: Int, gridWidth: Int, maxText: Int = 512,
                  freezeCut: Bool = EngineSettings.effective.frozenCut, neuralEngine: Bool = EngineSettings.effective.gemmANE,
-                 lora: LoRA? = nil) throws {
+                 lora: LoRA? = nil, expanded: CacheLoRA? = nil) throws {
         guard artifact.header["kind"] as? String == MossImageDiT.kind else {
             throw Artifact.Failure.badHeader("map \(artifact.header["kind"] ?? "?"): \(MossImageDiT.kind) expected")
         }
@@ -163,7 +165,8 @@ package final class MossImageDiT {
                     + "(\(unapplied.count) in all) — refused rather than let it be ignored")
             }
             let served = Set(MossImageDiT.loraTargets(config: config).map(\.name))
-            cacheLoRA = try CacheLoRA(lora: lora, retain: served.contains)
+            if let expanded, expanded.lora === lora { cacheLoRA = expanded }
+            else { cacheLoRA = try CacheLoRA(lora: lora, retain: served.contains) }
         } else {
             cacheLoRA = nil
         }
@@ -176,6 +179,7 @@ package final class MossImageDiT {
 
     package var arenaCapacity: Int { arena.capacity }
     package var loraCacheCapacity: Int { cacheLoRA?.capacity ?? 0 }
+    package var expandedLoRA: CacheLoRA? { cacheLoRA }
 
     // MARK: - what the pass reads, in the order it reads it
 

@@ -7,6 +7,7 @@ import Foundation
 ///               · latent [128, H/16, W/16]
 ///
 ///     text        Qwen35Encoder arena(T) + its staging units × the largest tensor of the stream
+///                 + the largest rotated weight's widening scratch (the Compact's int8 convrot)
 ///                 + the full layers' causal SDPA (mask T·T ⊕ queries' copy) · its GEMM
 ///     denoising   MossImageDiT arena(S + T, r) + the stream's units + CacheLoRA(r) … (`mossImageDenoising`)
 ///     decoding    the FLUX.2 decoder's two heaps and the image it returns (`Flux2VAE.plan`)
@@ -38,6 +39,9 @@ extension MemoryNeed {
         package let encoderUnit: Int
         /// The LoRA map's rank (its `rang`), the one every render opens.
         package let turboRank: Int
+        /// What widening the encoder's largest rotated (int8 convrot) weight allocates beside its arena
+        /// (`Widen.rotationScratchBytes`): the Compact's; 0 for the Standard's bf16.
+        package let encoderRotationScratch: Int
 
         package init?(dit: [String: Any], ditSize: Int = .max, encoder: [String: Any], encoderSize: Int = .max, turboRank: Int) {
             guard let encoderConfig = try? Qwen35Encoder.Config(header: encoder), turboRank > 0 else { return nil }
@@ -49,9 +53,10 @@ extension MemoryNeed {
             guard unit > 0 else { return nil }
             ditHeader = dit; self.ditSize = ditSize; self.dit = config; self.encoderConfig = encoderConfig
             encoderUnit = unit; self.turboRank = turboRank
+            encoderRotationScratch = Widen.rotationScratchBytes(header: encoder, prefixes: (0..<encoderConfig.layers).map { "layers.\($0)." })
         }
 
-        /// The maps this card renders with: the library's installed Standard — DiT, encoder, the DMD LoRA.
+        /// The maps this card renders with: the library's installed version — DiT, encoder, the DMD LoRA.
         package init?(card: ModelCard, library: Library = .processWide) {
             let ditPath = card.map ?? library.map(library.ditMap(.mossImage))
             let encoderPath = library.map(library.encoderMap(.mossImage))
@@ -97,6 +102,7 @@ extension MemoryNeed {
         let text = Phase(kind: .text, terms: [
             Term("encoder arena", Qwen35Encoder.arenaBytes(config: encoder, sequence: sequence)),
             Term("encoder staging", TextEncoder.stagingSlots(granted: request.encoderSlots) * maps.encoderUnit),
+            Term("encoder rotation scratch", maps.encoderRotationScratch),
         ] + attention("encoder", heads: encoder.heads, rows: sequence, keys: sequence, headDim: encoder.headDim,
                       causal: true, split: false, threads: request.threads)
           + gemm("encoder", bounded: [(sequence, h, channels), (sequence, h, valueWidth), (sequence, valueWidth, h),

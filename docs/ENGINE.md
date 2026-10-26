@@ -43,18 +43,18 @@ Times: renders queued in the app with `silicontrol`, each in a newly launched ap
 
 Reference machine: MacBook Pro M1 Pro (8 cores, 14 GPU cores), 16 GB. App 0.15, 25/10/2026, seed 42, 8 steps, Faster Rendering on (the default), the prompt “Photo of a young Irish woman with wavy auburn hair and freckles, in a shorty wetsuit, holding her surfboard on a wild beach in the west of Ireland, Atlantic waves behind her, 35 mm photograph.”
 
-| | Krea 2 Turbo | Z-Image Turbo | Qwen-Image-2.1 Turbo | Anima Turbo |
-|---|---|---|---|---|
-| 1024², Compact (8 bits, the default), Neural Engine on | **135.8 s** | **83.1 s** | **100.2 s** | **33.1 s** |
-| 1024², Standard (the publisher's bf16, computed in fp32) | 147.8 s | 82.4 s | 110.4 s | 34.3 s |
-| 1024², Light (4 to 6 bits), Neural Engine on | 145.0 s | 87.5 s | 103.7 s | 34.7 s |
-| 1024×1536, Compact / Standard | 207.7 s / 223.1 s | 130.2 s / 133.1 s | 161.1 s / 170.9 s | 53.6 s / 53.7 s |
-| the first image of a new prompt (its text encoding included), 1024², Compact / Standard | 136.7 s / 150.2 s | 84.2 s / 84.9 s | 105.7 s / 118.4 s | 33.8 s / 33.9 s |
-| peak memory of the app, 1024² · 1024×1536, Compact / Standard | 2.1 · 2.7 / 2.1 · 2.6 GiB | 1.9 · 2.8 / 1.9 · 2.8 GiB | 1.5 · 1.7 / 1.5 · 1.7 GiB | 1.3 · 2.0 / 1.3 · 2.0 GiB |
-| read from disk per image, 1024², Compact / Standard | 98 / 195 GB | 0 / 44 GB | 0.2 / 135 GB | 0 / 0 GB |
-| 1024², Standard, every evaluation at full size (0.12) | 221.1 s | 117.7 s | 142.7 s | 44.4 s |
-| other, Standard | | | an edit with 1 image 211 s, with 2 images 297 s | 512² 12.1 s |
-| deviation of the denoiser's output (`model_out`, worst channel) from the fp32 reference · from the fp64 exact (the reference's own) | 2.6·10⁻⁴ · 3.3·10⁻⁴ (3.1·10⁻⁴), 1024² | 9.8·10⁻⁶ · 1.2·10⁻⁵ (1.3·10⁻⁵), 1024² | 3.1·10⁻⁶ · 2.6·10⁻⁶ (2.5·10⁻⁶), 512² | 1.4·10⁻⁵ · per latent plane 2.9·10⁻⁶ (3.8·10⁻⁶), 1024² |
+| | Krea 2 Turbo | Z-Image Turbo | Qwen-Image-2.1 Turbo | Anima Turbo | MOSS-Image |
+|---|---|---|---|---|---|
+| 1024², Compact (8 bits, the default), Neural Engine on | **135.8 s** | **83.1 s** | **100.2 s** | **33.1 s** | **⟨TBD⟩** |
+| 1024², Standard (the publisher's bf16, computed in fp32) | 147.8 s | 82.4 s | 110.4 s | 34.3 s | ⟨TBD⟩ |
+| 1024², Light (4 to 6 bits), Neural Engine on | 145.0 s | 87.5 s | 103.7 s | 34.7 s | — (no Light) |
+| 1024×1536, Compact / Standard | 207.7 s / 223.1 s | 130.2 s / 133.1 s | 161.1 s / 170.9 s | 53.6 s / 53.7 s | ⟨TBD⟩ |
+| the first image of a new prompt (its text encoding included), 1024², Compact / Standard | 136.7 s / 150.2 s | 84.2 s / 84.9 s | 105.7 s / 118.4 s | 33.8 s / 33.9 s | ⟨TBD⟩ |
+| peak memory of the app, 1024² · 1024×1536, Compact / Standard | 2.1 · 2.7 / 2.1 · 2.6 GiB | 1.9 · 2.8 / 1.9 · 2.8 GiB | 1.5 · 1.7 / 1.5 · 1.7 GiB | 1.3 · 2.0 / 1.3 · 2.0 GiB | ⟨TBD⟩ |
+| read from disk per image, 1024², Compact / Standard | 98 / 195 GB | 0 / 44 GB | 0.2 / 135 GB | 0 / 0 GB | ⟨TBD⟩ |
+| 1024², Standard, every evaluation at full size (0.12) | 221.1 s | 117.7 s | 142.7 s | 44.4 s | ⟨TBD: app 0.16, Faster Rendering off⟩ |
+| other, Standard | | | an edit with 1 image 211 s, with 2 images 297 s | 512² 12.1 s |  |
+| deviation of the denoiser's output (`model_out`, worst channel) from the fp32 reference · from the fp64 exact (the reference's own) | 2.6·10⁻⁴ · 3.3·10⁻⁴ (3.1·10⁻⁴), 1024² | 9.8·10⁻⁶ · 1.2·10⁻⁵ (1.3·10⁻⁵), 1024² | 3.1·10⁻⁶ · 2.6·10⁻⁶ (2.5·10⁻⁶), 512² | 1.4·10⁻⁵ · per latent plane 2.9·10⁻⁶ (3.8·10⁻⁶), 1024² | per latent plane 1.2·10⁻⁶ · 1.3·10⁻⁶ (1.4·10⁻⁶), 512² |
 
 **Full precision costs almost nothing.** The Standard computes the publisher's bf16 weights in fp32, the precision the reference is checked in; the Compact reads 8-bit weights published by third parties and computes in fp32 too. On Z-Image and Anima the Standard takes the Compact's time within 4 %. On Krea 2 and Qwen-Image-2.1 it takes 6 to 10 % more: at full precision their weights do not stay in a 16 GB Mac's memory and are read again from disk at each step, 195 GB and 135 GB per image at 1024². That is also why every peak above stays under 3 GiB: weights mapped from disk are not counted in `phys_footprint`, since the system can drop them at any moment. What the Standard does cost is disk space, twice the Compact's, and energy, the Neural Engine being off on it by default ([The Neural Engine](#the-neural-engine)).
 
@@ -62,7 +62,7 @@ Each line is a `silicontrol measure` series in a freshly opened app, the series 
 
 ### Faster Rendering
 
-On by default, at the head of Settings, for all four models. From 1024 px on each side (1024², 1024×1536, 1536×1024…), the first evaluations run on the half-size grid — 3 of 8 for Z-Image, Qwen-Image-2.1 and Anima, 4 for Krea 2, whose schedule keeps its first noise levels higher — and the rest at full size. Still 8 evaluations; one at half size costs about a quarter of a full one. No usual portrait or landscape format qualifies: the half of 832×1216 would fall under 512 px on one side.
+On by default, at the head of Settings, for all five models. From 1024 px on each side (1024², 1024×1536, 1536×1024…), the first evaluations run on the half-size grid — 3 of 8 for Z-Image, Qwen-Image-2.1 and Anima, 4 for Krea 2, whose schedule keeps its first noise levels higher, 1 for MOSS-Image, which starts losing fine detail from the second — and the rest at full size. Still 8 evaluations; one at half size costs about a quarter of a full one. No usual portrait or landscape format qualifies: the half of 832×1216 would fall under 512 px on one side.
 
 The small grid is fed the averaged state plus the low band of the starting noise, so it holds a clean, correctly noised picture; the velocity brought back to full size is the one that leads the full state to the enlarged clean estimate, so it also takes away the fine noise a half grid cannot see, at the pace a full step would. The half-size steps dropped in 0.8.2 had neither: their enlarged velocity left that fine noise in place (sand on skin and walls), and their small grid was a plain decimation, whose aliasing the model read as texture (cracks). Each model's number of half-size evaluations was judged by eye on two prompts, a portrait and the library: no sand, no cracks, freckles, hair and book spines intact; one step more, and fine detail starts to go.
 

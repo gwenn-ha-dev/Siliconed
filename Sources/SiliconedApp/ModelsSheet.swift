@@ -487,6 +487,8 @@ struct VersionChoice: View {
         // The 8 steps are the community's LoRA, applied beside the weights in fp32 — never merged into the bf16 ones.
         case (.standard, .mossImage):
             String(localized: "The image model and the text encoder in the publisher's precision (bf16); the 8-step LoRA from lodestones, in fp32. VAE and tokenizer are the publisher's.")
+        case (.compact, .mossImage):
+            String(localized: "8-bit weights published by Comfy-Org: the image model and the text encoder (int8 convrot); the 8-step LoRA from lodestones, in fp32. VAE and tokenizer are the publisher's.")
         default:
             String(localized: "The image model and the text encoder in the publisher's precision (bf16).")
         }

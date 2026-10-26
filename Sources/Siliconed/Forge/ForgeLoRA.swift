@@ -16,7 +16,8 @@ import Foundation
 ///   · **original names** (`blocks.3.attn.wq`, `layers.0.attention.qkv`,
 ///     `blocks.3.self_attn.q_proj`) or diffusers (`transformer_blocks.3.attn.to_q`) — the rules of
 ///     `Recipes`, those of the DiTs;
-///   · **fused qkv** (original Z-Image): shared `down`, `up` split in three by rows;
+///   · **fused qkv** (original Z-Image, MOSS-Image as ComfyUI and ai-toolkit name it): shared `down`, `up` split
+///     in three by rows;
 ///   · **Qwen-Image-2.1 from ai-toolkit**: its vendored transformer keeps ComfyUI's fused
 ///     `img_mlp.gate_up` (`gate, up = gate_up(x).chunk(2)`, `out(silu(gate) * up)`), where the
 ///     map has diffusers' `gate_layer` (the SiLU side) and `proj`. `up` is cut by rows,
@@ -312,7 +313,9 @@ package enum ForgeLoRA {
             for n in 0..<64 {
                 for (pattern, _) in Recipes.animaBlocks { c.append("blocks.\(n)." + pattern.dropLast()) }
             }
-        case .qwenImage21, .mossImage:
+        case .mossImage:
+            for m in c where m.hasSuffix(".proj.q") { c.append(String(m.dropLast(2)) + ".qkv") }
+        case .qwenImage21:
             break
         }
         return c
@@ -374,7 +377,18 @@ package enum ForgeLoRA {
             }
             return [Target(module: String(try Recipes.anima(module + ".weight").dropLast(7)))]
         case .mossImage:
-            throw Numerics.Failure(description: "\(module) : LoRAs of MOSS-Image are not imported — the family renders under its own 8-step LoRA")
+            // ComfyUI's checkpoint fuses the attention's input (`proj.qkv`, `[q; k; v]` by rows), and ai-toolkit trains on
+            // it: `down` shared, `up` cut in three — exact. The published repository's names (`proj.q`…) pass as they are.
+            if module.hasSuffix(".proj.qkv") {
+                let root = String(module.dropLast(4))
+                return [0, 1, 2].map { Target(module: root + [".q", ".k", ".v"][$0], part: ($0, 3)) }
+            }
+            // The text blocks, the embedders, the head: Linears the engine computes without a LoRA's hook.
+            guard MossImageDiT.appliesLoRA(module) else {
+                throw Numerics.Failure(description: "\(module) : a MOSS-Image module the engine does not adapt with a LoRA — "
+                                      + "refused rather than ignored")
+            }
+            return [Target(module: module)]
         }
     }
 
@@ -451,6 +465,7 @@ package enum ForgeLoRA {
         func familyOfNames(_ modules: [String]) -> Family? {
             func a(_ pattern: String) -> Bool { modules.contains { $0.firstMatch(pattern) != nil } }
             if a(#"^transformer_blocks\.\d+\.img_mlp\.(gate_layer|proj|gate_up|out)$"#) { return .qwenImage21 }
+            if a(#"^layers\.\d+\.proj\.(qkv|q|k|v|o|ffn_up_gate|ffn_down)$"#) { return .mossImage }
             if a(#"^(layers|noise_refiner|context_refiner)\.\d+\.(attention|feed_forward|adaLN_modulation)"#) { return .zImage }
             if a(#"^(blocks\.\d+\.(attn\.(wq|wk|wv|wo|gate)|mlp\.(gate|up|down))|txtfusion\.|text_fusion\.|transformer_blocks\.\d+\.(attn\.to_gate|ff\.(gate|up|down)))"#) { return .krea2 }
             if a(#"^(blocks\.\d+\.(self_attn|cross_attn|mlp\.layer|adaln_modulation)|llm_adapter\.|transformer_blocks\.\d+\.(attn1|attn2|ff\.net|norm[123]))"#) { return .anima }

@@ -92,10 +92,11 @@ The same two commands, for each model: `tools/oracle/<script> all`, then `silico
 | Qwen-Image-2.1 | `qwen-image-2.1.py` | 30 GB | 27 min | the fp64 decoder witness: 43 s, 15.5 GB | 10 min |
 | Anima | `anima.py` | 5 GB | 7 min | the 1024² decoder: 1 min, 20.8 GB | 3 min |
 | Krea 2 | `krea2.py` | 33 GB | 1 h 45 min | the eight fp64 step witnesses at 1024²: 44 min, 11 GB | 16 min |
+| MOSS-Image | `moss-image.py` | 28 GB | 11 min | the 8-step trajectory: 3.6 min, 10.6 GB | 3 min |
 
 On a MacBook Pro M1 Pro, 16 GB, wall time. The download comes on top of the app's own weights. The oracle streams the denoiser block by block in float32 (Krea 2's is 48 GB at that precision), so a 16 GB Mac runs every script; a stage whose peak passes the machine's memory (the 1024² decoders) runs in swap and takes longer.
 
-The verdict lines of the other three models on our MacBook Pro M1 Pro, with the `map` line each stage prints (Anima's are in the section above; the measures are left out):
+The verdict lines of the other four models on our MacBook Pro M1 Pro, with the `map` line each stage prints (Anima's are in the section above; the measures are left out):
 
 <details>
 <summary>Z-Image</summary>
@@ -185,6 +186,29 @@ map ~/Library/Application Support/Siliconed/store/krea2-turbo-dit.v0.silicon · 
 
 Two Krea 2 measures pass with little to spare on our Mac: the velocity `v_2` of the 512² trajectory (5.08e-4 for an allowance of 5.14e-4) and `block0_attn_out` of the 1024² denoiser (3.57e-3 for 3.59e-3, 0.6 % to spare). The allowance is computed from your reference's own error, so it moves with your CPU's rounding, and these two may fail by a hair on another Mac. The rule is not loosened for them. If they fail on yours, an issue with the output of `siliconed check` helps us find which layer carries the gap.
 
+<details>
+<summary>MOSS-Image</summary>
+
+```
+✓ moss-image tokenizer · 11 measures
+map ~/Library/Application Support/Siliconed/store/qwen3.5-9b-encoder.v0.silicon · 15.9 GB · bfloat16 ×249, float32 ×177 (standard weights)
+✓ moss-image text-delta · 8 measures · nearest its threshold: layer 0 out 3.61e-06 of 5.00e-04
+map ~/Library/Application Support/Siliconed/store/qwen3.5-9b-encoder.v0.silicon · 15.9 GB · bfloat16 ×249, float32 ×177 (standard weights)
+✓ moss-image text-full · 15 measures · nearest its threshold: layer3 gated attention 2.39e-05 of 5.00e-04
+map ~/Library/Application Support/Siliconed/store/qwen3.5-9b-encoder.v0.silicon · 15.9 GB · bfloat16 ×249, float32 ×177 (standard weights)
+✓ moss-image text · 44 measures · nearest its threshold: layer3 gated attention 2.39e-05 of 5.00e-04
+✓ moss-image schedule · 25 measures
+map ~/Library/Application Support/Siliconed/store/moss-image-sft-dit.v0.silicon · 10.2 GB · bfloat16 (standard weights)
+✓ moss-image dit 512 · 23 measures · nearest its threshold: model_out per plane 1.35e-06 of 1.75e-06
+map ~/Library/Application Support/Siliconed/store/moss-image-sft-dit.v0.silicon · 10.2 GB · bfloat16 (standard weights)
+✓ moss-image dit-lora 512 · 22 measures · nearest its threshold: model_out per plane 2.72e-06 of 4.17e-06
+map ~/Library/Application Support/Siliconed/store/moss-image-sft-dit.v0.silicon · 10.2 GB · bfloat16 (standard weights)
+✓ moss-image trajectory 512 · 11 measures · nearest its threshold: v_6 per plane 2.97e-05 of 5.00e-04
+✓ moss-image vae 512 · 4 measures · nearest its threshold: image RGB (encoded test image) 2.34e-07 of 7.28e-07
+```
+
+</details>
+
 ## Are your goldens ours?
 
 We do not publish the goldens (several gigabytes, and weights whose licences forbid it). We publish their fingerprints: shape, type and statistics of every tensor.
@@ -240,7 +264,7 @@ Qwen-Image-2.1's editing, with one and two reference pictures, is part of its `a
 
 *The dequantization*, value by value: `swift test` reads small pieces of each published file (`Tests/SiliconedTests/Fixtures/quant`, rows cut by HTTP `Range` at the pinned revision, bytes identical to the published ones) and compares the engine's widening with the publisher's own library at the bit: `gguf-py` (llama.cpp's reader, which diffusers' GGUF loader agrees with on every value), ComfyUI's `comfy_kitchen` for the convrot, torchao and SDNQ for the 8-bit float and int8 files. `tools/oracle/quant_fixtures.py` rewrites those fixtures from the published files (`python tools/oracle/quant_fixtures.py [slug ...]`; the manifests hold the sha256 of what it wrote, and a rerun must leave them unchanged).
 
-*The denoiser*, whole: the reference DiT of diffusers, in float32 on the CPU, with the weights the third party published, dequantized by that library (`tools/oracle/quantized.py`), on the Standard's own inputs (same latent, same text states, same sigma). The oracle scripts take `--variant compact|light` for `dit` and `bf16`, and, for Z-Image and Krea 2, for `witness` (Krea 2 also for `witness-step --step 0` and `draw`); the variants of Anima and Qwen-Image-2.1 (generation only, no `--edit`) have no fp64 witness and are judged by the plain rule against the reference. The check takes `--variant` for `dit`, at 512, and reads the map of that version beside the Standard's (`--map` names another). A map of the other version is refused, said: a Light judged against a Compact's golden would be other weights.
+*The denoiser*, whole: the reference DiT of diffusers, in float32 on the CPU, with the weights the third party published, dequantized by that library (`tools/oracle/quantized.py`), on the Standard's own inputs (same latent, same text states, same sigma). The oracle scripts take `--variant compact|light` for `dit` and `bf16`, and, for Z-Image and Krea 2, for `witness` (Krea 2 also for `witness-step --step 0` and `draw`); MOSS-Image has a Compact only, and its script takes `--variant compact` for `dit`, `witness` and `dit-bf16`; the variants of Anima and Qwen-Image-2.1 (generation only, no `--edit`) have no fp64 witness and are judged by the plain rule against the reference. The check takes `--variant` for `dit`, at 512, and reads the map of that version beside the Standard's (`--map` names another). A map of the other version is refused, said: a Light judged against a Compact's golden would be other weights.
 
 ```sh
 oracle-env/bin/python tools/oracle/z-image.py dit --size 512 --variant compact     # downloads the 7 GB GGUF once
@@ -254,7 +278,7 @@ The variants' oracle also needs the publishers' libraries: `oracle-env/bin/pip i
 
 The Compact and the Light run on the Neural Engine by default (fp16 products), so `--neural-engine` is the bar that matters for them, judged like the Standard's: against the reference in bf16 on the same dequantized weights, the engine allowed bf16's own error plus 25 %. Those goldens need the Standard's `dit` golden at 512 first (they read its inputs); they are not part of `all` or of `siliconed check <model>`.
 
-On our MacBook Pro M1 Pro, `dit --size 512` of each of the eight variants, in fp32 then with `--neural-engine`, passes: 16 runs out of 16. Below, the gap of `model_out` to the reference (for Qwen-Image-2.1, `model_out (full)`) in each run, and the bar the Neural Engine run is judged against.
+On our MacBook Pro M1 Pro, `dit --size 512` of each of the nine variants, in fp32 then with `--neural-engine`, passes: 18 runs out of 18. Below, the gap of `model_out` to the reference (for Qwen-Image-2.1, `model_out (full)`; for MOSS-Image, `model_out per plane`) in each run, and the bar the Neural Engine run is judged against.
 
 | Variant | `model_out` in fp32, against the reference | Under the Neural Engine, against the reference | Its bar (bf16's own error + 25 %) |
 |---|---|---|---|
@@ -266,11 +290,12 @@ On our MacBook Pro M1 Pro, `dit --size 512` of each of the eight variants, in fp
 | Anima, Light | 7.918e-06 | 6.422e-03 | 4.81e-02 |
 | Krea 2, Compact | 7.070e-05 | 4.861e-03 | 4.24e-02 |
 | Krea 2, Light | 4.383e-05 | 4.741e-03 | 4.91e-02 |
+| MOSS-Image, Compact | 1.296e-06 | 4.171e-03 | 2.89e-02 |
 
-The fp32 column is the plain gap to the reference; Z-Image and Krea 2 are judged on it at the fp64 witness, as their Standards are. The complete lines:
+The fp32 column is the plain gap to the reference; Z-Image, Krea 2 and MOSS-Image are judged on it at the fp64 witness, as their Standards are. The complete lines:
 
 <details>
-<summary>Compact and Light, the 16 runs</summary>
+<summary>Compact and Light, the 18 runs</summary>
 
 ```
 $ siliconed check z-image dit --size 512 --variant compact
@@ -325,11 +350,19 @@ $ siliconed check krea2 dit --size 512 --variant light --neural-engine
 map ~/Library/Application Support/Siliconed/store/krea2-turbo-dit.light.v0.silicon · 7.4 GB · q4_k ×201, float32 ×168, q5_k ×61 (packed weights)
 model_out per plane         1.667e-03   1.56e-03        0   1.667e-03    2.03e-02  ✓  oracle at fp64 1.62e-02
 ✓ krea2 dit light 512 · 12 measures · nearest its threshold: img_in_out 1.09e-03 of 4.54e-03
+$ siliconed check moss-image dit --variant compact
+map ~/Library/Application Support/Siliconed/store/moss-image-sft-dit.compact.v0.silicon · 5.4 GB · int8 ×252, bfloat16 ×210 (8-bit weights)
+model_out per plane         1.296e-06   1.02e-06       82   1.470e-06    1.91e-06  ✓  oracle at fp64 1.53e-06
+✓ moss-image dit compact 512 · 22 measures · nearest its threshold: model_out per plane 1.47e-06 of 1.91e-06
+$ siliconed check moss-image dit --variant compact --neural-engine
+map ~/Library/Application Support/Siliconed/store/moss-image-sft-dit.compact.v0.silicon · 5.4 GB · int8 ×252, bfloat16 ×210 (8-bit weights)
+model_out per plane         4.171e-03   3.51e-03      120   4.171e-03    2.89e-02  ✓  oracle at fp64 2.31e-02
+✓ moss-image dit compact 512 · 23 measures · nearest its threshold: video_embed 1.43e-03 of 3.20e-03
 ```
 
 </details>
 
-Krea 2's variants are judged by clouds like its Standard, and **the Light's `model_out per plane` needs them.** Judged in a single draw, that line is 1.345e-4 for an allowance of 1.33e-4: it fails, by about 1 %, and it is the only measure of the eight variants that does. It passes once the clouds are applied to it. The rule already applied them to `model_out`; in 0.15 it was extended to `model_out per plane`, and with the reference's one-ulp draws the engine's median is 1.282e-4 for 1.36e-4 (the line above says: `clouds: engine median of 5 draws, oracle worst of 4`). So that one line is green because of the draws, not without them, and you can see it in the output of `krea2 dit --variant light`. The draws of a variant are `krea2.py draw --size 512 --step 0 --jitter 1 2 3 --variant compact|light` (step 0 only: the later latents belong to the Standard's trajectory).
+Krea 2's variants are judged by clouds like its Standard, and **the Light's `model_out per plane` needs them.** Judged in a single draw, that line is 1.345e-4 for an allowance of 1.33e-4: it fails, by about 1 %, and it is the only measure of the nine variants that does. It passes once the clouds are applied to it. The rule already applied them to `model_out`; in 0.15 it was extended to `model_out per plane`, and with the reference's one-ulp draws the engine's median is 1.282e-4 for 1.36e-4 (the line above says: `clouds: engine median of 5 draws, oracle worst of 4`). So that one line is green because of the draws, not without them, and you can see it in the output of `krea2 dit --variant light`. The draws of a variant are `krea2.py draw --size 512 --step 0 --jitter 1 2 3 --variant compact|light` (step 0 only: the later latents belong to the Standard's trajectory).
 
 LoRAs are not covered here: they are files you choose, not part of what Siliconed ships.
 
@@ -380,7 +413,7 @@ The output of `siliconed check list --markdown`. `{size}` is 512, 1024 or a rect
 | `moss-image text-full` | layers 0 to 3: three Gated DeltaNet layers and the first full-attention layer (gated queries, partial RoPE, output gate), part by part | the rule, floor 5e-4 | `tools/oracle/moss-image.py text` | text encoder (layers 0–3) |
 | `moss-image text` | the prompt through Qwen3.5-9B: all 32 layers' outputs and the final state, the DiT's `prompt_embeds` | the rule, floor 5e-4; the layers 0, 3, 15, 31 and the final state at the fp64 witness | `tools/oracle/moss-image.py text; text-witness` | text encoder |
 | `moss-image schedule` | the sigmas of MOSSImageScheduler (shift 5 on the fp32 grid, snapped to the 1000-step training grid) and the timesteps the DiT receives, for 1 to 10, 20 and 50 steps | bit for bit | `tools/oracle/moss-image.py schedule` | — |
-| `moss-image dit` | one evaluation of the DiT at σ = 1, boundary by boundary — time, modulations, RoPE, text path, block 0 inside out, blocks 1, 13, 27, 41, the head —, judged at the fp64 witness | the rule, floor 5e-4, at the fp64 witness where it exists; model_out per latent plane at the witness | `tools/oracle/moss-image.py dit; witness` | DiT |
+| `moss-image dit` | one evaluation of the DiT at σ = 1, boundary by boundary — time, modulations, RoPE, text path, block 0 inside out, blocks 1, 13, 27, 41, the head —, judged at the fp64 witness | the rule, floor 5e-4, at the fp64 witness where it exists; model_out per latent plane at the witness; with --neural-engine or --bf16-activations, against bf16's own error + 25 % | `tools/oracle/moss-image.py dit; witness; with --neural-engine or --bf16-activations, dit-bf16; with --variant compact, dit, witness and dit-bf16 with --variant (the Compact's or the Light's published weights, dequantized by their publisher's library)` | DiT |
 | `moss-image dit-lora` | the same evaluation with the DMD 8-step LoRA at strength 1 (kohya `lora.safetensors`, rank 128, fp32), the golden having it merged in fp32 | the rule, floor 5e-4, at the fp64 witness where it exists; model_out per latent plane at the witness | `tools/oracle/moss-image.py dit --lora; witness --lora` | DiT, LoRA |
 | `moss-image trajectory` | the 8 steps of the recipe: the seed's noise bit for bit, the σ, each step's velocity from the oracle's latent at that step (the DMD LoRA at strength 1), then the product's denoiser run free from the noise on the oracle's text — its latents shown against the oracle's, and against the free loop the stage runs itself | noise and σ bit for bit; each guided velocity per latent plane, floor 5e-4; the product's free run against the stage's own loop, 1e-5 (the same arithmetic); the free latents against the oracle's are shown, not judged (eight steps amplify the evaluation's rounding) | `tools/oracle/moss-image.py trajectory` | DiT, LoRA |
 | `moss-image vae` | FLUX.2's decoder: the pipeline's de-normalization and 2×2 de-patchification, then the image, plane by plane — on an encoded test image's latent and on the final latent of the reference pipeline | the de-patchified latent per channel, floor 5e-4; the image per plane, floor 5e-4, at the fp64 witness (no floor there) | `tools/oracle/moss-image.py vae --size {size}; vae-witness --size {size}; vae-final --size {size}` | VAE |

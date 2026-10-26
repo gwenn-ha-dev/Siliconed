@@ -54,10 +54,10 @@ package enum MossImageStages {
     static let dit = Stage(
         model: model, name: "dit",
         proves: "one evaluation of the DiT at σ = 1, boundary by boundary — time, modulations, RoPE, text path, block 0 inside out, blocks 1, 13, 27, 41, the head —, judged at the fp64 witness",
-        options: ["--map"],
-        oracle: "tools/oracle/moss-image.py dit; witness",
+        options: ["--map", "--neural-engine", "--bf16-activations", "--variant"],
+        oracle: "tools/oracle/moss-image.py dit; witness; with --neural-engine or --bf16-activations, dit-bf16; with --variant compact, dit, witness and dit-bf16 with --variant \(Wording.publishers)",
         weights: ["DiT"],
-        rule: "the rule, floor 5e-4, at the fp64 witness where it exists; model_out per latent plane at the witness"
+        rule: "the rule, floor 5e-4, at the fp64 witness where it exists; model_out per latent plane at the witness; \(Wording.halfPrecision)"
     ) { invocation in try evaluate(invocation, lora: false) }
 
     static let ditLoRA = Stage(
@@ -157,9 +157,12 @@ package enum MossImageStages {
     }
 
     static func evaluate(_ invocation: Invocation, lora useLoRA: Bool) throws -> Report {
-        let title = "\(model) \(useLoRA ? "dit-lora" : "dit") \(invocation.size)"
+        // The Compact's golden is the reference on Comfy-Org's int8 convrot dequantized; `dit-lora` judges the Standard's.
+        let version = useLoRA ? nil : try invocation.quantizedVariant()
+        let title = "\(model) \(useLoRA ? "dit-lora" : "dit")\(version.map { " " + $0.rawValue } ?? "") \(invocation.size)"
         let report = Report(title: title)
-        let stem = useLoRA ? "moss/goldens-moss-dit-lora-\(invocation.size)" : "moss/goldens-moss-dit-\(invocation.size)"
+        let stem = useLoRA ? "moss/goldens-moss-dit-lora-\(invocation.size)"
+            : variantStem("moss/goldens-moss-dit-\(invocation.size)", version)
         let goldens = try invocation.goldens.open(stem + ".safetensors")
         guard let latentEntry = goldens.entries["latent_in"], let latent = goldens.float32("latent_in"),
               let text = goldens.float32("text_in"), let textEntry = goldens.entries["text_in"],
@@ -167,7 +170,7 @@ package enum MossImageStages {
             throw Skip("\(goldens.path): the evaluation's inputs (latent_in, text_in, timestep) are missing")
         }
         let (height, width, t) = (latentEntry.shape[1], latentEntry.shape[2], textEntry.shape[0])
-        let artifact = try Artifact(path: try invocation.ditMap(ditMap))
+        let artifact = try Artifact(path: try invocation.ditMap(ditMap, family: .mossImage, version: version))
         var stack: LoRA?
         if useLoRA {
             let path = invocation.extras["--lora"] ?? Installer(library: .processWide).companionMap(.mossImage) ?? ""
@@ -181,6 +184,9 @@ package enum MossImageStages {
         let witnessStem = stem.replacingOccurrences(of: "goldens-moss-dit", with: "witness-moss-dit")
             .replacingOccurrences(of: "512", with: "f64-512")
         let witness = invocation.goldens.optional(witnessStem + ".safetensors")
+        // `dit-lora` lists no half-precision option: `half` is nil there.
+        let half = useLoRA ? nil : try invocation.halfReference(
+            stem + ".safetensors", script: "tools/oracle/moss-image.py dit-bf16\(version.map { " --variant " + $0.rawValue } ?? "")")
         let dit = try MossImageDiT(artifact: artifact, gridHeight: height, gridWidth: width, maxText: t, lora: stack)
         dit.recordBoundaries = true
         dit.recordedBlocks = [0, 1, 13, 27, 41]
@@ -191,21 +197,28 @@ package enum MossImageStages {
         for (name, columns) in boundaries(dim: dit.config.dim, headDim: dit.config.headDim, ffn: dit.config.hidden) {
             guard let oracle = goldens.float32(name) else { continue }
             guard let engine = recorded[name] else { report.add(Judge.missing(name)); continue }
-            report.add(Judge.boundary(name, engine: engine, oracle: oracle, witness: witness?.float32(name), columns: columns))
+            report.add(Judge.boundary(name, engine: engine, oracle: oracle, witness: witness?.float32(name),
+                                      half: half?.values(name), columns: columns))
         }
         if let expected = goldens.float32("model_out") {
             report.add(Judge.planes("model_out per plane", engine: out, oracle: expected,
-                                    witness: witness?.float32("model_out"), planes: dit.config.channels))
+                                    witness: witness?.float32("model_out"), reference: half?.values("model_out"),
+                                    planes: dit.config.channels))
         }
         // The official recipe's negative branch: block 22 not computed (zero-based), the same inputs — judged
-        // when the oracle has written it (`goldens-moss-dit-skip22-512`, no LoRA).
-        if !useLoRA, let skipped = invocation.goldens.optional("moss/goldens-moss-dit-skip22-\(invocation.size).safetensors"),
+        // when the oracle has written it (`goldens-moss-dit-skip22-512`, no LoRA), on the fp32 path only: the
+        // oracle has no bf16 run of it to set a half-precision bar (the turbo recipe, CFG 1, never runs it).
+        if half != nil {
+            print("model_out, block 22 skipped: judged on the fp32 path only (no bf16 reference of that branch)")
+        } else if !useLoRA, version == nil, let skipped = invocation.goldens.optional("moss/goldens-moss-dit-skip22-\(invocation.size).safetensors"),
            let expected = skipped.float32("model_out") {
             dit.recordBoundaries = false
             let skippedOut = try dit.forward(latent: latent.baseAddress!, text: text.baseAddress!, textRows: t,
                                              timestep: timestep[0], skipping: [22])
             report.add(Judge.planes("model_out, block 22 skipped", engine: skippedOut, oracle: expected, planes: dit.config.channels))
         }
+        if invocation.neuralEngine { try NeuralEngineRun.account(report) }
+        if invocation.bf16Activations { try BF16ActivationRun.account(report) }
         return report
     }
 }

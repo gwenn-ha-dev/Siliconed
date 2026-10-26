@@ -42,10 +42,13 @@ final class MossImageFamilyTests: XCTestCase {
                        ["tokenizer/tokenizer.json", "transformer.json", "vae.json", "vae.safetensors"])
     }
 
-    func testTheStandardIsTheOnlyVersion() {
-        XCTAssertEqual(Family.mossImage.variants, [.standard])
-        XCTAssertEqual(Family.mossImage.preselectedVariant(), .standard)
-        XCTAssertEqual(Family.mossImage.preselectedVariant(physicalMemory: 8 << 30), .standard)
+    /// A Standard and a Compact, the Compact preselected — on 8 GB too: there is no Light.
+    func testTheCompactIsPreselected() {
+        XCTAssertEqual(Family.mossImage.variants, [.standard, .compact])
+        XCTAssertEqual(Family.mossImage.preselectedVariant(), .compact)
+        XCTAssertEqual(Family.mossImage.preselectedVariant(physicalMemory: 8 << 30), .compact)
+        XCTAssertNotEqual(Family.mossImage.ditMap(.compact), Family.mossImage.ditMap)
+        XCTAssertNotEqual(Family.mossImage.encoderMap(.compact), Family.mossImage.encoderMap)
         XCTAssertTrue(Family.offered.contains(.mossImage))
         XCTAssertEqual(Family(ditKind: Family.mossImage.ditKind), .mossImage)
     }
@@ -61,6 +64,29 @@ final class MossImageFamilyTests: XCTestCase {
         let library = Library(root: URL(fileURLWithPath: "/nowhere"))
         XCTAssertEqual(Installer(library: library).companionMap(.mossImage), "/nowhere/store/composants/moss-image/turbo.lora.silicon")
         XCTAssertNil(Installer(library: library).companionMap(.zImage))
+    }
+
+    /// **The Compact is Comfy-Org's two int8 convrot files**, pinned; the encoder's config, the components and
+    /// the DMD LoRA are the Standard's. Its license adds Comfy-Org's card.
+    func testTheCompactIsComfyOrgsInt8() {
+        XCTAssertEqual(Installer.mossComfy.name, "Comfy-Org/MOSS-Image")
+        XCTAssertEqual(Installer.mossComfy.revision, "530a4c94f92c35ef6818b1b035a983fe9dcf5f54")
+        let dit = Installer.dit(.mossImage, .compact), encoder = Installer.encoder(.mossImage, .compact)
+        XCTAssertEqual(dit.map(\.path), ["diffusion_models/moss_image_sft_int8_convrot.safetensors"])
+        XCTAssertEqual(dit.first?.size, 5_413_698_958)
+        XCTAssertEqual(dit.first?.sha256, "b4d1475bc7eeffd7b809e82ea13a1fba1fb85c4e18365af3813722faa5c0fe4f")
+        XCTAssertEqual(encoder.map(\.path), ["text_encoder/config.json", "text_encoders/qwen3.5_9b_int8_convrot.safetensors"])
+        XCTAssertEqual(encoder.first?.repository.name, Installer.mossImage.name)
+        XCTAssertEqual(encoder.last?.size, 9_748_121_532)
+        XCTAssertEqual(encoder.last?.sha256, "32e3787472f708fa5f83624acbf5ef23f7fc89c439e05065ea57cfe5a97f025a")
+        for file in dit + encoder.dropFirst() { XCTAssertEqual(file.repository.name, Installer.mossComfy.name, file.path) }
+        XCTAssertEqual(Installer.licenseFiles(.mossImage, .compact).count, Installer.licenseFiles(.mossImage).count + 1)
+        XCTAssertEqual(Installer.licenseFiles(.mossImage, .compact).last?.repository.name, Installer.mossComfy.name)
+        // Measured as installed: the DiT's Linears kept 8-bit, the encoder's table in fp32.
+        let size = Family.mossImage.installedSize(.compact)
+        XCTAssertEqual(size.dit, 5_417_031_680)
+        XCTAssertEqual(size.encoder, 11_004_936_192)
+        XCTAssertEqual(size.components, Family.mossImage.installedSize(.standard).components)
     }
 
     func testTheLicensesAreTheModelsAndTheLoRAs() {
@@ -112,6 +138,27 @@ final class MossImageFamilyTests: XCTestCase {
         XCTAssertEqual(plan.reduced, 0)
         // A dense schedule has fewer evaluations than steps (the σ are snapped to the training grid, then deduplicated).
         XCTAssertEqual(dit.plan(height: 64, width: 64, steps: 250, start: 0, withLoRA: false).evaluations, 246)
+    }
+
+    /// **The half-size start** (Faster Rendering): `halfSizeSteps` where the half grid stays at 512 px (16-px cells:
+    /// 1024², 1024×1536), never under the floor, a request's LoRA, another schedule, a start past 0 or off the eight.
+    func testTheHalfSizeStartFollowsTheOthersRules() throws {
+        try XCTSkipIf(Spectral.forced != nil, "SILICONED_SPECTRAL forces k")
+        defer { Spectral.halfSizeStart = false }
+        let dit = MossImageDenoisingModule(map: "", turbo: "")
+        Spectral.halfSizeStart = true
+        let half = dit.plan(height: 64, width: 64, steps: 8, start: 0, withLoRA: false)
+        XCTAssertEqual(half.reduced, MossImageDenoisingModule.halfSizeSteps)
+        XCTAssertEqual([half.reducedHeight, half.reducedWidth], [32, 32])
+        XCTAssertEqual(half.evaluations, 8)
+        XCTAssertEqual(dit.plan(height: 96, width: 64, steps: 8, start: 0, withLoRA: false).reduced,
+                       MossImageDenoisingModule.halfSizeSteps)
+        XCTAssertEqual(dit.plan(height: 64, width: 64, steps: 8, start: 0, withLoRA: true).reduced, 0)
+        XCTAssertEqual(dit.plan(height: 64, width: 64, steps: 8, start: 1, withLoRA: false).reduced, 0)
+        XCTAssertEqual(dit.plan(height: 64, width: 64, steps: 12, start: 0, withLoRA: false).reduced, 0)
+        // 512² and 832×1216: a half side under 512 px.
+        XCTAssertEqual(dit.plan(height: 32, width: 32, steps: 8, start: 0, withLoRA: false).reduced, 0)
+        XCTAssertEqual(dit.plan(height: 76, width: 52, steps: 8, start: 0, withLoRA: false).reduced, 0)
     }
 
     /// 512² and up, on a multiple of 16 — the DiT's cell.
@@ -252,10 +299,69 @@ final class MossImageFamilyTests: XCTestCase {
         let empty = Library(root: URL(fileURLWithPath: "/nulle-part-\(UUID())"))
         XCTAssertNil(ModelCard.mossImage.memoryNeed(request: empty))
     }
+
+    /// **A MOSS-Image LoRA as ai-toolkit and ComfyUI publish it** (`diffusion_model.layers.N.proj.qkv`, `lora_A`/`lora_B`,
+    /// no alpha), on a miniature (d = 2, r = 2): recognized by its names, `qkv` split by rows into `q`, `k`, `v` with `down`
+    /// shared, `o` as it is — and a module the engine does not adapt refused. Small integers: bf16 keeps them exactly.
+    func testAToolkitLoRAIsImportedWithItsFusedQKVSplit() throws {
+        XCTAssertEqual(try ForgeLoRA.targets("layers.3.proj.qkv", family: .mossImage).map(\.module),
+                       ["layers.3.proj.q", "layers.3.proj.k", "layers.3.proj.v"])
+        XCTAssertEqual(try ForgeLoRA.targets("layers.3.proj.ffn_up_gate", family: .mossImage).map(\.module), ["layers.3.proj.ffn_up_gate"])
+        XCTAssertThrowsError(try ForgeLoRA.targets("text_embedder.blocks.0.qkv", family: .mossImage))
+        XCTAssertThrowsError(try ForgeLoRA.targets("video_embedder", family: .mossImage))
+
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("moss-lora-\(UUID().uuidString)").path
+        try FileManager.default.createDirectory(atPath: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(atPath: folder) }
+        let a: [Float] = [1, 2, 3, 4]                                         // A [r = 2, k = 2]
+        let b: [Float] = (1...12).map(Float.init)                             // B [3d = 6, r = 2]
+        let tensors: [(String, [Int], [Float])] = [
+            ("diffusion_model.layers.0.proj.qkv.lora_A.weight", [2, 2], a),
+            ("diffusion_model.layers.0.proj.qkv.lora_B.weight", [6, 2], b),
+            ("diffusion_model.layers.0.proj.o.lora_A.weight", [2, 2], a),
+            ("diffusion_model.layers.0.proj.o.lora_B.weight", [2, 2], [1, 0, 0, 1]),
+        ]
+        var table: [OrderedJSON.Pair] = [.init("__metadata__", .object([.init("ss_network_alpha", .string("32"))]))]
+        var data = Data(), at = 0
+        for (name, shape, values) in tensors {
+            let bytes = values.withUnsafeBufferPointer { Data(buffer: $0) }
+            table.append(.init(name, .object([.init("dtype", .string("F32")), .init("shape", .list(shape.map { .integer($0) })),
+                                              .init("data_offsets", .list([.integer(at), .integer(at + bytes.count)]))])))
+            data.append(bytes); at += bytes.count
+        }
+        var json = Array(OrderedJSON.object(table).jsonText.utf8)
+        while json.count % 8 != 0 { json.append(0x20) }
+        var n = UInt64(json.count).littleEndian
+        var file = withUnsafeBytes(of: &n) { Data($0) }
+        file.append(contentsOf: json); file.append(data)
+        let source = folder + "/mini.safetensors", map = folder + "/mini.lora.silicon"
+        try file.write(to: URL(fileURLWithPath: source))
+        let ref: [String: [Int]] = ["layers.0.proj.q.weight": [2, 2], "layers.0.proj.k.weight": [2, 2],
+                                    "layers.0.proj.v.weight": [2, 2], "layers.0.proj.o.weight": [2, 2]]
+        let report = try ForgeLoRA.forge(file: source, to: map, reference: { $0 == .mossImage ? ref : nil })
+        XCTAssertEqual(report.family, .mossImage, "recognized by its names")
+        XCTAssertEqual(report.modules, 4)
+
+        let m = try Artifact(path: map)
+        func values(_ name: String) throws -> [Float] {
+            let t = try XCTUnwrap(m.tensors[name], name)
+            var out = [Float](repeating: 0, count: t.count)
+            try out.withUnsafeMutableBufferPointer { try Numerics.toFloat32(m.pointer(name)!, dtype: "BF16", count: t.count, to: $0.baseAddress!) }
+            return out
+        }
+        // `.down` is Aᵀ [k, r], shared; `.up` is Bᵀ [r, n] of each third of B's rows — the metadata's alpha ignored (scale 1).
+        for x in ["q", "k", "v", "o"] { XCTAssertEqual(try values("layers.0.proj.\(x).down"), [1, 3, 2, 4], x) }
+        XCTAssertEqual(try values("layers.0.proj.q.up"), [1, 3, 2, 4])
+        XCTAssertEqual(try values("layers.0.proj.k.up"), [5, 7, 6, 8])
+        XCTAssertEqual(try values("layers.0.proj.v.up"), [9, 11, 10, 12])
+        XCTAssertEqual(try values("layers.0.proj.o.up"), [1, 0, 0, 1])
+    }
+
 }
 
 private extension ModelCard {
     func memoryNeed(request library: Library) -> Int? {
         memoryNeed(memoryRequest(width: 1024, height: 1024, library: library))
     }
+
 }

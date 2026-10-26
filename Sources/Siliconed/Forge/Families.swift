@@ -11,7 +11,7 @@ package enum Family: String, CaseIterable, Sendable, Codable {
     /// images, 64-channel VAE; generation and editing by instruction, 8 steps.
     case qwenImage21 = "qwen-image-2.1"
     /// MOSS-Image-SFT (OpenMOSS-Team) under the community's DMD LoRA (lodestones) — the 8-step recipe:
-    /// single-stream DiT of 5.08 B, Qwen3.5-9B hybrid encoder, FLUX.2 VAE. Standard only.
+    /// single-stream DiT of 5.08 B, Qwen3.5-9B hybrid encoder, FLUX.2 VAE. A Standard and a Compact, no Light.
     case mossImage = "moss-image"
 
     /// The families offered to the user — `install all`, the app's library sheet. All of them
@@ -66,10 +66,10 @@ package enum Family: String, CaseIterable, Sendable, Codable {
     }
 
     /// **The versions a family installs in**: every family has its Standard, a Compact and a Light — but
-    /// MOSS-Image, whose publisher (and no one else, as of the pinned revisions) offers the Standard alone: the
-    /// community's 8-bit and GGUF copies of the DiT are not a version of *this* recipe (the DMD LoRA is
-    /// applied to bf16 weights, and an 8-bit DiT would round the distillation away).
-    package var variants: [Variant] { self == .mossImage ? [.standard] : [.standard, .compact, .light] }
+    /// MOSS-Image, which has no Light: its Compact is Comfy-Org's int8 convrot (DiT and encoder), the DMD LoRA
+    /// applied beside its products in fp32 as on the Standard's (never merged: the 8-bit weights hold no
+    /// distillation to round away).
+    package var variants: [Variant] { self == .mossImage ? [.standard, .compact] : [.standard, .compact, .light] }
 
     /// **The version preselected before an installation** (the welcome cards, « Install… »): the
     /// Compact, the one we recommend — as fast as the Standard on the Macs measured, half its disk,
@@ -93,6 +93,7 @@ package enum Family: String, CaseIterable, Sendable, Codable {
         case (.anima, .light): return "anima-turbo-dit.light.v0.silicon"
         case (.krea2, .compact): return "krea2-turbo-dit.compact.v0.silicon"
         case (.krea2, .light): return "krea2-turbo-dit.light.v0.silicon"
+        case (.mossImage, .compact): return "moss-image-sft-dit.compact.v0.silicon"
         default: return ditMap
         }
     }
@@ -110,6 +111,7 @@ package enum Family: String, CaseIterable, Sendable, Codable {
         case (.zImage, .compact), (.zImage, .light): return "qwen3-4b-encoder.compact.v0.silicon"
         case (.qwenImage21, .compact), (.qwenImage21, .light): return "qwen3-vl-8b-encoder.compact.v0.silicon"
         case (.krea2, .compact), (.krea2, .light): return "qwen3-vl-4b-encoder.compact.v0.silicon"
+        case (.mossImage, .compact): return "qwen3.5-9b-encoder.compact.v0.silicon"
         default: return encoderMap
         }
     }
@@ -356,10 +358,21 @@ package enum Recipes {
             }
         case .mossImage:
             // The names as published; `rope.bands` is derived by the code, never a weight (`MossImageForge`).
-            r.naming = "MOSS-Image"
+            // Comfy-Org's files fuse each block's attention input, `proj.qkv` = `[q; k; v]` on the output axis
+            // (each third against the publisher's own projection: correlation 1.0000, < 0.14 with the
+            // others — measured on blocks 0, 21 and 41): split back, an 8-bit one's rows with their scales.
+            let fused = keys.contains { $0.name.hasSuffix(".proj.qkv.weight") }
+            r.naming = fused ? "MOSS-Image, attention qkv fused (ComfyUI)" : "MOSS-Image"
             for (published, name) in keys {
                 if MossImageForge.notWeights.contains(name) { r.ignored.append(published); continue }
-                try place(name, asPublished(source, published))
+                if name.hasPrefix("layers."), name.hasSuffix(".proj.qkv.weight") {
+                    let root = String(name.dropLast("qkv.weight".count))
+                    for (k, x) in ["q", "k", "v"].enumerated() {
+                        try place(root + x + ".weight", try rows(source, published, part: k, outOf: 3))
+                    }
+                } else {
+                    try place(name, asPublished(source, published))
+                }
             }
         case .anima:
             let origin = keys.contains { $0.name.hasPrefix("blocks.") || $0.name.hasPrefix("x_embedder.") || $0.name.hasPrefix("llm_adapter.") }
