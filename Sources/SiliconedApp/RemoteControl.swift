@@ -198,6 +198,9 @@ final class RemoteControl {
         var o: [String: Any] = ["ok": true, "library": app.library.root.path,
                                 "history_images": app.history.count,
                                 "faster_rendering": app.fasterRendering]
+        // The settings renders run on: a series compared across launches compares maps too.
+        o["settings"] = ["read": app.settingsRead, "map": app.mapInUse?.date ?? NSNull(),
+                         "warnings": app.profileWarnings] as [String: Any]
         if let t = app.currentJob {
             var e = json(t)
             e["stage"] = app.stage.map(Self.stageName) ?? NSNull()

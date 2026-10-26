@@ -421,11 +421,14 @@ package enum Spectral {
     /// eye on its own schedule; its plan says where it applies.
     nonisolated(unsafe) package static var halfSizeStart = false
 
-    /// `SILICONED_SPECTRAL`, via `EngineSettings` — read at render time, never at construction; `nil`
-    /// when nothing forces it. It forces the half-size start's `k` over its rule, within the floor: a
-    /// measurement, never the product.
+    /// `SILICONED_SPECTRAL` — read at render time, never at construction; `nil` when nothing forces it.
+    /// It forces the half-size start's `k` over its rule, within the floor: a measurement, never the product.
+    /// **Read from the environment, not through `EngineSettings.effective`**: only the environment may set
+    /// it (a profile may not), and the app asks for plans before the capacity map is measured — through
+    /// `effective`, that first plan froze the process on the defaults and the map was then refused, the
+    /// AMX off for the whole session (+20 % per MOSS step).
     package static var forced: Int? {
-        EngineSettings.effective.provenance["spectral"] != nil ? EngineSettings.effective.spectral : nil
+        ProcessInfo.processInfo.environment["SILICONED_SPECTRAL"].flatMap { Int($0) }
     }
 
     /// **The 512-px floor in the cells of a latent of `factor` px per cell**: 64 for the 8-px VAEs,

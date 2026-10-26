@@ -494,9 +494,13 @@ package enum RemoteControlHelp {
                                     "license": "Qwen Research (non-commercial)", "license_urls": […], "model": …}, …],
            "installing": {"title": "Installing Z-Image Turbo", "last": "forging the DiT → …"} | null,
            "queue_remaining_s": 66.5, "remaining_complete": true,
-           "history_images": 12, "library": "/Users/…/Siliconed", "faster_rendering": true}
+           "history_images": 12, "library": "/Users/…/Siliconed", "faster_rendering": true,
+           "settings": {"read": true, "map": "2026-10-26T14:43:50Z", "warnings": []}}
 
         faster_rendering   : the Settings switch (help set).
+        settings           : the engine settings renders run on — read: false until this Mac's map is; map: the
+                             capacity map's date (null: the defaults); warnings: why a map or profile was refused.
+                             Two series compared across launches compare their maps too.
         stage              : text, image (encoding a reference), denoising, decoding.
         steps_total        : the model's evaluations, not the requested steps (a sketch: those it stops after).
         remaining_s        : null until the app has a measurement for this render.
@@ -1238,9 +1242,13 @@ package enum RemoteControlHelp {
                                     "license": "Qwen Research (non-commercial)", "license_urls": […], "model": …}, …],
            "installing": {"title": "Installing Z-Image Turbo", "last": "forging the DiT → …"} | null,
            "queue_remaining_s": 66.5, "remaining_complete": true,
-           "history_images": 12, "library": "/Users/…/Siliconed", "faster_rendering": true}
+           "history_images": 12, "library": "/Users/…/Siliconed", "faster_rendering": true,
+           "settings": {"read": true, "map": "2026-10-26T14:43:50Z", "warnings": []}}
 
         faster_rendering   : l'interrupteur des Réglages (help set).
+        settings           : les réglages du moteur des rendus — read : false tant que la carte de ce Mac ne l'est
+                             pas ; map : la date de la carte (null : les défauts) ; warnings : pourquoi une carte ou
+                             un profil a été refusé. Deux séries de deux lancements comparent aussi leurs cartes.
         stage              : text, image (encodage d'une référence), denoising, decoding.
         steps_total        : les évaluations du modèle, pas les pas demandés (une esquisse : celles après lesquelles elle s'arrête).
         remaining_s        : null tant que l'app n'a pas de mesure pour ce rendu.
