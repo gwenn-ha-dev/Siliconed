@@ -4,7 +4,9 @@ import PackageDescription
 
 let package = Package(
     name: "Siliconed",
-    platforms: [.macOS(.v15)],   // MPSGraph.scaledDotProductAttention : macOS 15+
+    // macOS 26: the only one the engine was ever measured and checked on (every map received ran 26.7 or 27);
+    // MPSGraph's SDPA needs 15, Metal 4's matmul2d and the super-resolution 26.
+    platforms: [.macOS("26.0")],
     products: [
         .executable(name: "SiliconedApp", targets: ["SiliconedApp"]),
         .executable(name: "silicontrol", targets: ["Silicontrol"]),

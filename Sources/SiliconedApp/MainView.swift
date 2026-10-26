@@ -72,13 +72,9 @@ extension View {
 }
 
 extension View {
-    /// macOS 26's glass where it exists, a material elsewhere (macOS 15).
-    @ViewBuilder func glass<S: Shape>(_ shape: S) -> some View {
-        if #available(macOS 26, *) {
-            glassEffect(.regular, in: shape)
-        } else {
-            background(.regularMaterial, in: shape)
-        }
+    /// macOS 26's glass.
+    func glass<S: Shape>(_ shape: S) -> some View {
+        glassEffect(.regular, in: shape)
     }
 }
 

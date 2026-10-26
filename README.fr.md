@@ -7,7 +7,7 @@
 Siliconed est une app macOS libre et gratuite pour la **génération d'images à partir de texte et l'édition d'images par IA, en local**, sur les Mac Apple silicon (M1 et suivants). Elle fait tourner des modèles de diffusion récents — [Krea 2 Turbo](https://huggingface.co/krea/Krea-2-Turbo), [Z-Image Turbo](https://huggingface.co/Tongyi-MAI/Z-Image-Turbo), [Qwen-Image-2.1 Turbo](https://huggingface.co/Qwen/Qwen-Image-2.1-Turbo), [Anima Turbo](https://huggingface.co/circlestone-labs/Anima) et [MOSS-Image](https://huggingface.co/OpenMOSS-Team/MOSS-Image-SFT) (bêta : sa recette en 8 pas est celle de la communauté) — en natif, en Swift et Metal : ni Python, ni serveur, ni cloud, rien ne quitte votre Mac. Elle marche hors ligne une fois le modèle installé.
 
 ![Licence : Apache 2.0](https://img.shields.io/badge/licence-Apache%202.0-blue)
-![macOS 15+](https://img.shields.io/badge/macOS-15%2B-black)
+![macOS 26+](https://img.shields.io/badge/macOS-26%2B-black)
 ![Apple silicon](https://img.shields.io/badge/Apple%20silicon-M1%20et%20suivants-black)
 [![tests unitaires](https://img.shields.io/github/actions/workflow/status/gwenn-ha-dev/Siliconed/test.yml?branch=main&label=tests%20unitaires)](https://github.com/gwenn-ha-dev/Siliconed/actions/workflows/test.yml)
 [![noyaux vérifiés, étapes CPU](https://img.shields.io/github/actions/workflow/status/gwenn-ha-dev/Siliconed/kernels.yml?branch=main&label=noyaux%20v%C3%A9rifi%C3%A9s%2C%20%C3%A9tapes%20CPU)](https://github.com/gwenn-ha-dev/Siliconed/actions/workflows/kernels.yml)
@@ -18,7 +18,7 @@ Siliconed est une app macOS libre et gratuite pour la **génération d'images à
 
 ## Télécharger
 
-L'app est distribuée en `.dmg` sur la page [Releases](https://github.com/gwenn-ha-dev/Siliconed/releases). Prérequis : macOS 15 ou plus, Apple silicon. Les modèles s'installent depuis l'app ; vous choisissez lesquels. Pour la construire vous-même : [Construire depuis les sources](docs/ENGINE.fr.md#construire-depuis-les-sources).
+L'app est distribuée en `.dmg` sur la page [Releases](https://github.com/gwenn-ha-dev/Siliconed/releases). Prérequis : macOS 26 ou plus, Apple silicon. Les modèles s'installent depuis l'app ; vous choisissez lesquels. Pour la construire vous-même : [Construire depuis les sources](docs/ENGINE.fr.md#construire-depuis-les-sources).
 
 ## Ce que fait l'app
 

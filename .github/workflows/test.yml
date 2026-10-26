@@ -11,7 +11,7 @@ on:
 
 jobs:
   swift-test:
-    # Xcode 26 or later: the app uses macOS 26 APIs behind `#available`, which an older SDK does not declare.
+    # Xcode 26 or later: macOS 26 is the deployment target, which an older SDK does not know.
     runs-on: macos-26
     timeout-minutes: 30
     steps:

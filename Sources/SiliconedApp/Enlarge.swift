@@ -37,15 +37,14 @@ enum SuperResolution {
 
     enum State: Equatable { case unavailable, downloadRequired, downloading, ready }
 
-    /// Whether this Mac has it at all: macOS 26, and a ×4 its hardware offers.
+    /// Whether this Mac has it at all: a ×4 its hardware offers.
     static var available: Bool {
-        guard #available(macOS 26.0, *) else { return false }
-        return VTSuperResolutionScalerConfiguration.isSupported
+        VTSuperResolutionScalerConfiguration.isSupported
             && VTSuperResolutionScalerConfiguration.supportedScaleFactors.contains(factor)
     }
 
     static func state(width: Int, height: Int) -> State {
-        guard available, #available(macOS 26.0, *), let c = configuration(width: width, height: height) else { return .unavailable }
+        guard available, let c = configuration(width: width, height: height) else { return .unavailable }
         switch c.configurationModelStatus {
         case .ready: return .ready
         case .downloading: return .downloading
@@ -55,7 +54,7 @@ enum SuperResolution {
 
     /// Downloads Apple's model; `progress` receives 0…1 while it comes.
     static func download(width: Int, height: Int, progress: @escaping @MainActor (Double) -> Void) async throws {
-        guard #available(macOS 26.0, *), let c = configuration(width: width, height: height) else { throw Failure.unavailable }
+        guard let c = configuration(width: width, height: height) else { throw Failure.unavailable }
         let watch = Task { @MainActor in
             while !Task.isCancelled {
                 progress(Double(c.configurationModelPercentageAvailable))
@@ -69,7 +68,6 @@ enum SuperResolution {
     /// `png` enlarged ×4, as an sRGB `CGImage` — off the main thread.
     static func enlarge(_ png: Data) async throws -> Decoded {
         try await Task.detached(priority: .userInitiated) {
-            guard #available(macOS 26.0, *) else { throw Failure.unavailable }
             guard let source = CGImageSourceCreateWithData(png as CFData, nil),
                   let image = CGImageSourceCreateImageAtIndex(source, 0, nil) else { throw Failure.unreadable }
             return Decoded(try run(image))
@@ -78,7 +76,6 @@ enum SuperResolution {
 
     enum Failure: Error { case unavailable, unreadable, buffer, failed(String) }
 
-    @available(macOS 26.0, *)
     private static func configuration(width: Int, height: Int) -> VTSuperResolutionScalerConfiguration? {
         VTSuperResolutionScalerConfiguration(frameWidth: width, frameHeight: height, scaleFactor: factor,
                                              inputType: .image, usePrecomputedFlow: false,
@@ -86,7 +83,6 @@ enum SuperResolution {
                                              revision: VTSuperResolutionScalerConfiguration.defaultRevision)
     }
 
-    @available(macOS 26.0, *)
     private static func run(_ image: CGImage) throws -> CGImage {
         let w = image.width, h = image.height
         guard let configuration = configuration(width: w, height: h) else { throw Failure.unavailable }
@@ -157,7 +153,7 @@ enum EnlargeFailure: Error {
 extension AppState {
     /// Why « Enlarge » cannot take this image now, in a sentence — `nil` when it can.
     func enlargeRefusal(_ entry: Entry) -> String? {
-        if !SuperResolution.available { return String(localized: "Enlarging needs macOS 26 or later") }
+        if !SuperResolution.available { return String(localized: "This Mac does not offer macOS's super-resolution") }
         if entry.grid != nil || entry.sketch != nil { return String(localized: "A grid is not enlarged") }
         if entry.enlarged != nil { return String(localized: "This image is already enlarged") }
         // A render past 1920 px (the sizes B now allows) is no enlargement: it is beyond macOS's input.
@@ -212,7 +208,7 @@ extension AppState {
         // A render asked meanwhile waited in the queue (`next`): it starts now.
         defer { enlarging = nil; enlargeDownload = nil; next() }
         switch SuperResolution.state(width: entry.width, height: entry.height) {
-        case .unavailable: throw EnlargeFailure.refused(String(localized: "Enlarging needs macOS 26 or later"))
+        case .unavailable: throw EnlargeFailure.refused(String(localized: "This Mac does not offer macOS's super-resolution"))
         case .ready: break
         case .downloadRequired, .downloading:
             guard download else { throw EnlargeFailure.downloadRequired }

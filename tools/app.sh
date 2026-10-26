@@ -103,7 +103,7 @@ cat > "$app/Contents/Info.plist" <<PLIST
   <key>CFBundleDevelopmentRegion</key><string>en</string>
   <key>CFBundleLocalizations</key><array>$localizations</array>
   <key>LSApplicationCategoryType</key><string>public.app-category.graphics-design</string>
-  <key>LSMinimumSystemVersion</key><string>15.0</string>
+  <key>LSMinimumSystemVersion</key><string>26.0</string>
   <key>NSHighResolutionCapable</key><true/>
   <key>NSHumanReadableCopyright</key><string>Siliconed</string>
   <key>CFBundleURLTypes</key><array><dict>

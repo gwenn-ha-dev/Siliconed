@@ -43,6 +43,19 @@
   premier calcul. Pic de l'app : 2,4 Gio à 1024², 2,8 Gio en 1024×1536, dans les deux versions.
 - **Licence** : Apache 2.0, LoRA comprise. Usage commercial permis.
 
+### Sur chaque Mac
+
+- **Le premier lancement après une mise à jour ne va plus moins vite** : quand le premier geste était
+  une exploration, une grille ou `silicontrol add`, la session ignorait la mesure de ce Mac et tournait
+  sur les défauts — l'AMX éteint, environ 20 % par pas sur un M1 Pro. `silicontrol status` dit
+  désormais la mesure qu'emploie la session.
+- **Une mesure prise hors repos se refait** : mesurés sur un Mac chaud, en mode économie d'énergie ou
+  avec un swap qui monte (une autre app qui presse la mémoire), les choix servent quand même, la puce
+  de la Chaîne reste orange, et le prochain lancement au repos mesure à nouveau avant son premier
+  rendu — une fois.
+- **macOS 26 ou plus** : la seule version sur laquelle Siliconed a jamais été mesuré et contrôlé.
+  L'app ne s'installe plus sur macOS 15.
+
 ## 0.15
 
 ### La Compact par défaut

@@ -42,6 +42,18 @@ English · [Français](RELEASE-NOTES.fr.md)
   computation. The app's peak: 2.4 GiB at 1024², 2.8 GiB at 1024×1536, in both versions.
 - **License**: Apache 2.0, the LoRA included. Commercial use allowed.
 
+### Every Mac
+
+- **The first launch after an update no longer runs slower**: when the first gesture was an
+  exploration, a grid or `silicontrol add`, the session ignored this Mac's measure and ran on the
+  defaults — the AMX off, about 20 % per step on an M1 Pro. `silicontrol status` now says which
+  measure the session uses.
+- **A measure taken off rest is taken again**: measured while the Mac was warm, in Low Power Mode, or
+  with its swap growing (another app pressing on memory), the choices still serve, the Chain's chip
+  stays orange, and the next launch at rest measures again before its first render — once.
+- **macOS 26 or later**: the only version Siliconed was ever measured and checked on. The app no
+  longer installs on macOS 15.
+
 ## 0.15
 
 ### Compact by default

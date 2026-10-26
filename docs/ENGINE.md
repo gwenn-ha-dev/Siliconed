@@ -121,7 +121,7 @@ Each stage (text encoder, denoiser, VAE) is compared with the reference implemen
 
 ## Build from source
 
-macOS 15 or later, Apple silicon, Xcode 26 or later (the app uses macOS 26 APIs where the system has them).
+macOS 26 or later, Apple silicon, Xcode 26 or later.
 
 ```
 swift build                 the app and silicontrol

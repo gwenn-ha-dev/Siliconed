@@ -7,7 +7,7 @@ English · [Français](README.fr.md)
 Siliconed is a free, open-source macOS app for **local text-to-image generation and AI image editing** on Apple silicon Macs (M1 and later). It runs recent diffusion models — [Krea 2 Turbo](https://huggingface.co/krea/Krea-2-Turbo), [Z-Image Turbo](https://huggingface.co/Tongyi-MAI/Z-Image-Turbo), [Qwen-Image-2.1 Turbo](https://huggingface.co/Qwen/Qwen-Image-2.1-Turbo), [Anima Turbo](https://huggingface.co/circlestone-labs/Anima) and [MOSS-Image](https://huggingface.co/OpenMOSS-Team/MOSS-Image-SFT) (beta: its 8-step recipe is the community's) — natively in Swift and Metal: no Python, no server, no cloud, nothing leaves your Mac. It works offline once a model is installed.
 
 ![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue)
-![macOS 15+](https://img.shields.io/badge/macOS-15%2B-black)
+![macOS 26+](https://img.shields.io/badge/macOS-26%2B-black)
 ![Apple silicon](https://img.shields.io/badge/Apple%20silicon-M1%20and%20later-black)
 [![unit tests](https://img.shields.io/github/actions/workflow/status/gwenn-ha-dev/Siliconed/test.yml?branch=main&label=unit%20tests)](https://github.com/gwenn-ha-dev/Siliconed/actions/workflows/test.yml)
 [![kernels checked, CPU stages](https://img.shields.io/github/actions/workflow/status/gwenn-ha-dev/Siliconed/kernels.yml?branch=main&label=kernels%20checked%2C%20CPU%20stages)](https://github.com/gwenn-ha-dev/Siliconed/actions/workflows/kernels.yml)
@@ -18,7 +18,7 @@ Siliconed is a free, open-source macOS app for **local text-to-image generation 
 
 ## Download
 
-The app ships as a `.dmg` on the [Releases](https://github.com/gwenn-ha-dev/Siliconed/releases) page. Requirements: macOS 15 or later, Apple silicon. Models install from inside the app; you choose which ones. To build it yourself: [Build from source](docs/ENGINE.md#build-from-source).
+The app ships as a `.dmg` on the [Releases](https://github.com/gwenn-ha-dev/Siliconed/releases) page. Requirements: macOS 26 or later, Apple silicon. Models install from inside the app; you choose which ones. To build it yourself: [Build from source](docs/ENGINE.md#build-from-source).
 
 ## What it does
 

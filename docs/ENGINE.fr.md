@@ -121,7 +121,7 @@ Chaque étage (encodeur de texte, débruitage, VAE) est comparé à l'implément
 
 ## Construire depuis les sources
 
-macOS 15 ou plus, Apple silicon, Xcode 26 ou plus (l'app emploie les API de macOS 26 là où le système les a).
+macOS 26 ou plus, Apple silicon, Xcode 26 ou plus.
 
 ```
 swift build                 l'app et silicontrol

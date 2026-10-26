@@ -721,7 +721,7 @@ extension Diagnostic {
     /// header, 64 × 32 tiles over four simdgroups, its destination a cooperative tensor written once
     /// (`run` accumulates into a device tensor). On an M5 it runs on the GPU's neural accelerators;
     /// before, on the shader cores. Not tuned: it answers "is there a matrix engine", not "how fast can
-    /// the best kernel go". `nil` before macOS 26, or on a device without Metal 4.
+    /// the best kernel go". `nil` on a device without Metal 4.
     private final class TensorProducts {
         private let queue: MTLCommandQueue
         private let pipelines: [String: MTLComputePipelineState]
@@ -762,7 +762,7 @@ extension Diagnostic {
         """
 
         init?(_ bench: Bench) {
-            guard #available(macOS 26.0, *), bench.device.supportsFamily(.metal4) else { return nil }
+            guard bench.device.supportsFamily(.metal4) else { return nil }
             let options = MTLCompileOptions()
             options.languageVersion = .version4_0
             guard let library = try? bench.device.makeLibrary(source: TensorProducts.source, options: options) else { return nil }

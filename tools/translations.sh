@@ -44,7 +44,7 @@ package_name=${package_name//[^a-z0-9_]/_}
 
 folder=.build/translations
 rm -rf $folder && mkdir -p $folder
-xcrun swiftc -c -wmo -Onone -parse-as-library -swift-version 6 -target arm64-apple-macosx15.0 \
+xcrun swiftc -c -wmo -Onone -parse-as-library -swift-version 6 -target arm64-apple-macosx26.0 \
   -I $module -I Sources/AMXLegacy/include -module-name SiliconedApp -package-name $package_name -o $folder/app.o \
   -emit-localized-strings -emit-localized-strings-path $folder Sources/SiliconedApp/*.swift
 data=()

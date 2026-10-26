@@ -8657,34 +8657,6 @@
         }
       }
     },
-    "Enlarging needs macOS 26 or later" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Vergrößern erfordert macOS 26 oder neuer"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ampliar requiere macOS 26 o posterior"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Agrandir demande macOS 26 ou plus récent"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "L’ingrandimento richiede macOS 26 o successivo"
-          }
-        }
-      }
-    },
     "Enlarging waits for the queue to finish" : {
       "localizations" : {
         "de" : {
@@ -21399,6 +21371,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Questo Mac"
+          }
+        }
+      }
+    },
+    "This Mac does not offer macOS's super-resolution" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dieser Mac bietet die Superauflösung von macOS nicht an"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Este Mac no ofrece la superresolución de macOS"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce Mac n’offre pas la super-résolution de macOS"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Questo Mac non offre la super-risoluzione di macOS"
           }
         }
       }

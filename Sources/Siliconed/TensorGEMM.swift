@@ -190,10 +190,10 @@ package final class TensorGEMM {
     }
     """
 
-    /// `nil` before macOS 26, on a device without Metal 4, or when this macOS's compiler refuses the
+    /// `nil` on a device without Metal 4, or when this macOS's compiler refuses the
     /// kernel: the caller keeps the default path.
     package init?(device: MTLDevice, queue: MTLCommandQueue, roundingActivations: Bool = false) {
-        guard #available(macOS 26.0, *), device.supportsFamily(.metal4) else { return nil }
+        guard device.supportsFamily(.metal4) else { return nil }
         let options = MTLCompileOptions()
         options.languageVersion = .version4_0
         options.mathMode = .safe
