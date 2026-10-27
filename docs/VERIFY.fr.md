@@ -12,15 +12,15 @@ Les chiffres d'ici, et les contrôles, sont ceux du rendu à pleine taille, Rend
 
 ## Mise en place
 
-Il faut l'app (0.15 ou suivante), Python 3.12, et ce dépôt à la version de l'app (Siliconed → À propos de Siliconed l’affiche). `siliconed` est livré dans l'app : c'est le moteur même avec lequel l'app rend, et il tourne sans Xcode.
+Il faut l'app (0.16 ou suivante), Python 3.12, et ce dépôt à la version de l'app (Siliconed → À propos de Siliconed l'affiche). `siliconed` est livré dans l'app : c'est le moteur même avec lequel l'app rend, et il tourne sans Xcode.
 
 ```sh
 alias siliconed=/Applications/Siliconed.app/Contents/Helpers/siliconed
-git clone --branch v0.15 https://github.com/gwenn-ha-dev/Siliconed && cd Siliconed
+git clone --branch v0.16 https://github.com/gwenn-ha-dev/Siliconed && cd Siliconed
 python3.12 -m venv oracle-env && oracle-env/bin/pip install -r tools/oracle/requirements.txt
 ```
 
-La première exécution d'un script d'oracle télécharge les poids de référence depuis le Hugging Face Hub, à des révisions épinglées (les tailles sont en [section 3](#3--tous-les-modèles)) ; `HF_HOME` ou `HF_HUB_CACHE` décide où ils vont. La référence de Krea 2, `krea/Krea-2-Turbo`, est à accès restreint : acceptez sa licence sur le Hub, puis `oracle-env/bin/hf auth login`, avant `krea2.py` ; faites de même pour tout autre dépôt qui le demande. Le code convrot int8 dont deux versions Compactes ont besoin est récupéré une fois, à un commit épinglé, et son sha256 est vérifié.
+La première exécution d'un script d'oracle télécharge les poids de référence depuis le Hugging Face Hub, à des révisions épinglées (les tailles sont en [section 3](#3--tous-les-modèles)) ; `HF_HOME` ou `HF_HUB_CACHE` décide où ils vont. La référence de Krea 2, `krea/Krea-2-Turbo`, est à accès restreint : acceptez sa licence sur le Hub, puis `oracle-env/bin/hf auth login`, avant `krea2.py` ; faites de même pour tout autre dépôt qui le demande. Le code convrot int8 dont deux versions Compact ont besoin est récupéré une fois, à un commit épinglé, et son sha256 est vérifié.
 
 Pour vérifier plutôt votre propre compilation : `swift build -c release --product siliconed` (Xcode 26), puis `.build/release/siliconed` à la place de l'alias.
 
@@ -232,7 +232,7 @@ La ligne de chaque étape dans `check list` donne sa règle. Une identité (toke
 
 Chaque décodeur, celui de Z-Image compris, se juge par plan de l'image contre un témoin float64 du décodeur de la référence (`vae-witness`).
 
-Le débruiteur de Krea 2 a quelques frontières si mal conditionnées qu'un changement d'une unité sur le dernier chiffre de l'entrée déplace la sortie de plus que la règle ne permet, référence comprise. Là, une mesure qui échoue au témoin est jugée par *nuages* : la référence et le moteur tournent tous deux sur des entrées décalées d'un ulp, et l'écart médian du moteur doit rester sous 1,25 fois le pire de la référence. Ce sont les étapes dont la règle dit « clouds when the oracle has draws ».
+Le débruiteur de Krea 2 a quelques frontières si mal conditionnées qu'un changement d'une unité sur le dernier chiffre de l'entrée déplace la sortie de plus que la règle ne permet, référence comprise. Là, une mesure qui échoue au témoin est jugée par *nuages* : la référence et le moteur tournent tous deux sur des entrées décalées d'un ulp, et l'écart médian du moteur doit rester sous 1,25 fois le pire de la référence. Ce sont les étapes dont la règle dit « clouds when the oracle has draws ».
 
 ## Au-delà de `all`
 
@@ -245,14 +245,14 @@ oracle-env/bin/python tools/oracle/z-image.py text --long
 siliconed check z-image text --long
 ```
 
-**Le Neural Engine.** L'app peut partager les produits matriciels du débruiteur avec le Neural Engine du Mac, qui calcule en fp16 ([ENGINE](ENGINE.fr.md#le-neural-engine)). `--neural-engine` vérifie ce chemin : chaque produit élargi du DiT d'au moins 512 lignes donne la moitié de ses lignes à l'ANE, le même partage sur tous les Mac et plus qu'aucune carte n'en donne (un rendu laisse au GPU les produits de moins de 1 024 lignes), et l'étape est jugée contre la référence calculée en bf16 sur les mêmes entrées, le moteur ayant droit à l'écart propre au bf16 plus 25 %. Le verdict dit combien de produits l'ANE a calculés ; sur un Mac où il n'en calcule aucun, l'étape est sautée. Les étapes `dit` des quatre modèles l'acceptent.
+**Le Neural Engine.** L'app peut partager les produits matriciels du débruiteur avec le Neural Engine du Mac, qui calcule en fp16 ([ENGINE](ENGINE.fr.md#le-neural-engine)). `--neural-engine` vérifie ce chemin : chaque produit élargi du DiT d'au moins 512 lignes donne la moitié de ses lignes à l'ANE, le même partage sur tous les Mac et plus qu'aucune carte n'en donne (un rendu laisse au GPU les produits de moins de 1 024 lignes), et l'étape est jugée contre la référence calculée en bf16 sur les mêmes entrées, le moteur ayant droit à l'écart propre au bf16 plus 25 %. Le verdict dit combien de produits l'ANE a calculés ; sur un Mac où il n'en calcule aucun, l'étape est sautée. Les étapes `dit` des cinq modèles l'acceptent.
 
 ```sh
 oracle-env/bin/python tools/oracle/z-image.py bf16 --size 1024
 siliconed check z-image dit --size 1024 --neural-engine
 ```
 
-**Activations arrondies en bf16.** Là où la carte de ce Mac l'allume, les produits du DiT prennent leur activation arrondie en bf16 juste avant le produit (les poids tels que publiés, les sommes et la sortie en fp32). `--bf16-activations` vérifie ce chemin sur n'importe quel Mac, pour chaque produit de 256 lignes ou plus, et juge l'étape comme celle du Neural Engine : contre la référence calculée en bf16, l'écart permis étant celui du bf16 plus 25 %. Le verdict dit combien de produits ont arrondi leur opérande. Les étapes `dit` des quatre modèles l'acceptent.
+**Activations arrondies en bf16.** Là où la carte de ce Mac l'allume, les produits du DiT prennent leur activation arrondie en bf16 juste avant le produit (les poids tels que publiés, les sommes et la sortie en fp32). `--bf16-activations` vérifie ce chemin sur n'importe quel Mac, pour chaque produit de 256 lignes ou plus, et juge l'étape comme celle du Neural Engine : contre la référence calculée en bf16, l'écart permis étant celui du bf16 plus 25 %. Le verdict dit combien de produits ont arrondi leur opérande. Les étapes `dit` des cinq modèles l'acceptent.
 
 ```sh
 siliconed check z-image dit --size 512 --bf16-activations
@@ -260,11 +260,11 @@ siliconed check z-image dit --size 512 --bf16-activations
 
 L'édition de Qwen-Image-2.1, avec une et deux images de référence, fait partie de son `all` et de `siliconed check qwen-image-2.1` ; une étape seule, c'est `siliconed check qwen-image-2.1 dit --edit 2`. Sa barre sous le Neural Engine s'écrit par `qwen-image-2.1.py bf16 --edit N`.
 
-**La Compacte et la Légère.** Leurs DiT sont des fichiers de tiers (GGUF Q8_0 et int8 convrot de Comfy-Org pour la Compacte, GGUF Q4_K_M pour la Légère ; l'app épingle chacun par dépôt, révision et sha256). Deux choses se vérifient, de l'extérieur.
+**La Compact et la Légère.** Leurs DiT sont des fichiers de tiers (GGUF Q8_0 et int8 convrot de Comfy-Org pour la Compact, GGUF Q4_K_M pour la Légère ; l'app épingle chacun par dépôt, révision et sha256). Deux choses se vérifient, de l'extérieur.
 
-*Le déquantage*, valeur par valeur : `swift test` lit de petits morceaux de chaque fichier publié (`Tests/SiliconedTests/Fixtures/quant`, lignes coupées par HTTP `Range` à la révision épinglée, octets identiques aux publiés) et compare l'élargissement du moteur à la bibliothèque de l'éditeur, au bit : `gguf-py` (le lecteur de llama.cpp, avec qui le chargeur GGUF de diffusers s'accorde sur chaque valeur), `comfy_kitchen` de ComfyUI pour le convrot, torchao et SDNQ pour les fichiers float8 et int8. `tools/oracle/quant_fixtures.py` réécrit ces fixtures depuis les fichiers publiés (`python tools/oracle/quant_fixtures.py [slug ...]` ; les manifestes portent le sha256 de ce qu'il a écrit, et une relance doit les laisser inchangés).
+*Le déquantage*, valeur par valeur : `swift test` lit de petits morceaux de chaque fichier publié (`Tests/SiliconedTests/Fixtures/quant`, lignes coupées par HTTP `Range` à la révision épinglée, octets identiques aux publiés) et compare l'élargissement du moteur à la bibliothèque de l'éditeur, au bit : `gguf-py` (le lecteur de llama.cpp, avec qui le chargeur GGUF de diffusers s'accorde sur chaque valeur), `comfy_kitchen` de ComfyUI pour le convrot, torchao et SDNQ pour les fichiers float8 et int8. `tools/oracle/quant_fixtures.py` réécrit ces fixtures depuis les fichiers publiés (`python tools/oracle/quant_fixtures.py [slug ...]` ; les manifestes portent le sha256 de ce qu'il a écrit, et une relance doit les laisser inchangés).
 
-*Le débruiteur*, en entier : le DiT de référence de diffusers, en float32 sur le CPU, avec les poids que le tiers a publiés, déquantés par cette bibliothèque (`tools/oracle/quantized.py`), sur les entrées mêmes de la Standard (même latent, mêmes états du texte, même sigma). Les scripts de l'oracle prennent `--variant compact|light` pour `dit` et `bf16`, et, pour Z-Image et Krea 2, pour `witness` (Krea 2 aussi pour `witness-step --step 0` et `draw`) ; MOSS-Image n'a qu'une Compacte, et son script prend `--variant compact` pour `dit`, `witness` et `dit-bf16` ; les variantes d'Anima et de Qwen-Image-2.1 (génération seule, sans `--edit`) n'ont pas de témoin fp64 et se jugent par la règle simple contre la référence. Le contrôle prend `--variant` pour `dit`, à 512, et lit la carte de cette version à côté de celle de la Standard (`--map` en désigne une autre). Une carte de l'autre version est refusée, avec la raison : une Légère jugée contre le golden d'une Compacte, ce seraient d'autres poids.
+*Le débruiteur*, en entier : le DiT de référence de diffusers, en float32 sur le CPU, avec les poids que le tiers a publiés, déquantés par cette bibliothèque (`tools/oracle/quantized.py`), sur les entrées mêmes de la Standard (même latent, mêmes états du texte, même sigma). Les scripts de l'oracle prennent `--variant compact|light` pour `dit` et `bf16`, et, pour Z-Image et Krea 2, pour `witness` (Krea 2 aussi pour `witness-step --step 0` et `draw`) ; MOSS-Image n'a qu'une Compact, et son script prend `--variant compact` pour `dit`, `witness` et `dit-bf16` ; les variantes d'Anima et de Qwen-Image-2.1 (génération seule, sans `--edit`) n'ont pas de témoin fp64 et se jugent par la règle simple contre la référence. Le contrôle prend `--variant` pour `dit`, à 512, et lit la carte de cette version à côté de celle de la Standard (`--map` en désigne une autre). Une carte de l'autre version est refusée, avec la raison : une Légère jugée contre le golden d'une Compacte, ce seraient d'autres poids.
 
 ```sh
 oracle-env/bin/python tools/oracle/z-image.py dit --size 512 --variant compact     # télécharge le GGUF de 7 Go une fois
@@ -276,26 +276,26 @@ siliconed check z-image dit --size 512 --variant compact --neural-engine
 
 L'oracle des variantes demande aussi les bibliothèques des éditeurs : `oracle-env/bin/pip install -r tools/oracle/requirements-quant.txt` d'abord (il ajoute `gguf`, et `sdnq` et `torchao` pour `quant_fixtures.py`, aux dépendances de base).
 
-La Compacte et la Légère calculent par défaut sur le Neural Engine (produits en fp16) : `--neural-engine` est donc la barre qui compte pour elles, jugée comme celle de la Standard : contre la référence en bf16 sur les mêmes poids déquantés, le moteur ayant droit à l'erreur propre du bf16 plus 25 %. Ces goldens demandent d'abord le golden `dit` de la Standard à 512 (ils en lisent les entrées) ; ils ne font partie ni de `all` ni de `siliconed check <modèle>`.
+La Compact et la Légère calculent par défaut sur le Neural Engine (produits en fp16) : `--neural-engine` est donc la barre qui compte pour elles, jugée comme celle de la Standard : contre la référence en bf16 sur les mêmes poids déquantés, le moteur ayant droit à l'erreur propre du bf16 plus 25 %. Ces goldens demandent d'abord le golden `dit` de la Standard à 512 (ils en lisent les entrées) ; ils ne font partie ni de `all` ni de `siliconed check <modèle>`.
 
 Sur notre MacBook Pro M1 Pro, `dit --size 512` de chacune des neuf variantes, en fp32 puis avec `--neural-engine`, passe : 18 exécutions sur 18. Ci-dessous, l'écart de `model_out` à la référence (pour Qwen-Image-2.1, `model_out (full)` ; pour MOSS-Image, `model_out per plane`) dans chaque exécution, et la barre contre laquelle l'exécution sous le Neural Engine est jugée.
 
 | Variante | `model_out` en fp32, contre la référence | Sous le Neural Engine, contre la référence | Sa barre (l'écart propre au bf16 + 25 %) |
 |---|---|---|---|
-| Z-Image, Compacte | 7,833e-06 | 9,906e-03 | 5,89e-02 |
+| Z-Image, Compact | 7,833e-06 | 9,906e-03 | 5,89e-02 |
 | Z-Image, Légère | 7,096e-06 | 1,009e-02 | 8,75e-02 |
-| Qwen-Image-2,1, Compacte | 4,301e-06 | 4,562e-03 | 1,59e-02 |
+| Qwen-Image-2,1, Compact | 4,301e-06 | 4,562e-03 | 1,59e-02 |
 | Qwen-Image-2,1, Légère | 4,896e-06 | 4,103e-03 | 1,47e-02 |
-| Anima, Compacte | 6,233e-06 | 6,133e-03 | 8,57e-02 |
+| Anima, Compact | 6,233e-06 | 6,133e-03 | 8,57e-02 |
 | Anima, Légère | 7,918e-06 | 6,422e-03 | 4,81e-02 |
-| Krea 2, Compacte | 7,070e-05 | 4,861e-03 | 4,24e-02 |
+| Krea 2, Compact | 7,070e-05 | 4,861e-03 | 4,24e-02 |
 | Krea 2, Légère | 4,383e-05 | 4,741e-03 | 4,91e-02 |
-| MOSS-Image, Compacte | 1,296e-06 | 4,171e-03 | 2,89e-02 |
+| MOSS-Image, Compact | 1,296e-06 | 4,171e-03 | 2,89e-02 |
 
 La colonne fp32 est l'écart simple à la référence ; Z-Image, Krea 2 et MOSS-Image y sont jugés au témoin fp64, comme leurs Standards. Les lignes complètes :
 
 <details>
-<summary>Compacte et Légère, les 18 exécutions</summary>
+<summary>Compact et Légère, les 18 exécutions</summary>
 
 ```
 $ siliconed check z-image dit --size 512 --variant compact

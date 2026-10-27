@@ -15,7 +15,7 @@ The engine behind it, with the measurements: [The Siliconed engine](ENGINE.md).
 - **Five models.** Krea 2 Turbo, Z-Image Turbo, Qwen-Image-2.1 Turbo, Anima Turbo and MOSS-Image, each under its own license ([Models](#models)). All five read the prompt with a language model.
 - **The chain, visible.** The rack shows the pipeline top to bottom (prompt, encoders, denoiser, decoder), with typed wires and the active stage lit; each stage holds its own settings.
 - **More detail** with Z-Image and Qwen-Image-2.1: “Detail: Normal · More · Most” adds fine texture, at no extra time.
-- **Faster Rendering** (Settings, on by default): from 1024 px on each side, the first evaluations on a half-size grid, the rest at full size: a quarter to a third less time (a tenth for MOSS-Image), still 8 evaluations, a slightly different image ([how](ENGINE.md#faster-rendering)).
+- **Faster Rendering** (Settings, on by default): from 1024 px on each side, the first evaluations on a half-size grid, the rest at full size: a quarter to a third less time (under a tenth for MOSS-Image), still 8 evaluations, a slightly different image ([how](ENGINE.md#faster-rendering)).
 - **Variations**: new takes on an image, subtle or strong, with the same settings.
 - **Enlarge ×4** with macOS's own super-resolution (macOS 26): no prompt, nothing added, edges and texture sharpened; 1024² becomes 4096² in a second or two.
 - **LoRAs** on all five models.

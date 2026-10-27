@@ -67,7 +67,7 @@ Le `variation` de chaque image donne ses graines de variation dans l'ordre ; l
 `silicontrol help vary`.
 
 **L'agrandissement aussi est celui du menu.** `silicontrol enlarge i7 [--download]` et « Agrandir ×4 »
-appellent tous deux `AppState.enlarged` : la super-résolution de macOS (VideoToolbox, macOS 26),
+appellent tous deux `AppState.enlarged` : la super-résolution de macOS (VideoToolbox, macOS 26),
 sans prompt, hors de la file — refusé pendant un rendu —, avec la nouvelle image en réponse une
 fois dans l'historique. Le modèle d'Apple n'est téléchargé par macOS qu'avec `--download` (sinon
 `download_required`) ; le reste est dans `silicontrol help enlarge`.

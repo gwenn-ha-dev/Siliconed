@@ -12,15 +12,15 @@ The figures here, and the checks, are those of the render at full size, Faster R
 
 ## Setting up
 
-You need the app (0.15 or later), Python 3.12, and this repository at the app's version (Siliconed → About Siliconed shows it). `siliconed` ships inside the app: it is the very engine the app renders with, and it runs without Xcode.
+You need the app (0.16 or later), Python 3.12, and this repository at the app's version (Siliconed → About Siliconed shows it). `siliconed` ships inside the app: it is the very engine the app renders with, and it runs without Xcode.
 
 ```sh
 alias siliconed=/Applications/Siliconed.app/Contents/Helpers/siliconed
-git clone --branch v0.15 https://github.com/gwenn-ha-dev/Siliconed && cd Siliconed
+git clone --branch v0.16 https://github.com/gwenn-ha-dev/Siliconed && cd Siliconed
 python3.12 -m venv oracle-env && oracle-env/bin/pip install -r tools/oracle/requirements.txt
 ```
 
-The first run of an oracle script downloads the reference weights from the Hugging Face Hub, at pinned revisions (sizes in [section 3](#3--every-model)); `HF_HOME` or `HF_HUB_CACHE` decides where they go. Krea 2's reference, `krea/Krea-2-Turbo`, is gated: accept its licence on the Hub, then `oracle-env/bin/hf auth login`, before `krea2.py`; do the same for any other repository that asks for it. The int8 convrot code that two of the Compact versions need is fetched, once, at a pinned commit and checked against its sha256.
+The first run of an oracle script downloads the reference weights from the Hugging Face Hub, at pinned revisions (sizes in [section 3](#3--every-model)); `HF_HOME` or `HF_HUB_CACHE` decides where they go. Krea 2's reference, `krea/Krea-2-Turbo`, is gated: accept its license on the Hub, then `oracle-env/bin/hf auth login`, before `krea2.py`; do the same for any other repository that asks for it. The int8 convrot code that two of the Compact versions need is fetched, once, at a pinned commit and checked against its sha256.
 
 To check your own build instead: `swift build -c release --product siliconed` (Xcode 26), then `.build/release/siliconed` in place of the alias.
 
@@ -211,7 +211,7 @@ map ~/Library/Application Support/Siliconed/store/moss-image-sft-dit.v0.silicon 
 
 ## Are your goldens ours?
 
-We do not publish the goldens (several gigabytes, and weights whose licences forbid it). We publish their fingerprints: shape, type and statistics of every tensor.
+We do not publish the goldens (several gigabytes, and weights whose licenses forbid it). We publish their fingerprints: shape, type and statistics of every tensor.
 
 ```sh
 oracle-env/bin/python tools/oracle/fingerprints.py compare
@@ -245,14 +245,14 @@ oracle-env/bin/python tools/oracle/z-image.py text --long
 siliconed check z-image text --long
 ```
 
-**The Neural Engine.** The app can share the denoiser's matrix products with the Mac's Neural Engine, which computes in fp16 ([ENGINE](ENGINE.md#the-neural-engine)). `--neural-engine` checks that path: every widened product of the DiT with 512 rows or more gives half its rows to the ANE, the same split on every Mac and more than any map gives (a render leaves products under 1,024 rows to the GPU), and the stage is judged against the reference run in bf16 on the same inputs, the engine allowed bf16's own error plus 25 %. The verdict says how many products the ANE computed; on a Mac where it computes none, the stage is skipped. The `dit` stages of the four models take it.
+**The Neural Engine.** The app can share the denoiser's matrix products with the Mac's Neural Engine, which computes in fp16 ([ENGINE](ENGINE.md#the-neural-engine)). `--neural-engine` checks that path: every widened product of the DiT with 512 rows or more gives half its rows to the ANE, the same split on every Mac and more than any map gives (a render leaves products under 1,024 rows to the GPU), and the stage is judged against the reference run in bf16 on the same inputs, the engine allowed bf16's own error plus 25 %. The verdict says how many products the ANE computed; on a Mac where it computes none, the stage is skipped. The `dit` stages of the five models take it.
 
 ```sh
 oracle-env/bin/python tools/oracle/z-image.py bf16 --size 1024
 siliconed check z-image dit --size 1024 --neural-engine
 ```
 
-**Activations rounded to bf16.** Where this Mac's map turns it on, the DiT's products take their activation rounded to bf16 just before the product (the weights as published, the sums and the output in fp32). `--bf16-activations` checks that path on any Mac, for every product of 256 rows or more, and judges the stage like the Neural Engine's: against the reference run in bf16, the engine allowed bf16's own error plus 25 %. The verdict says how many products rounded their operand. The `dit` stages of the four models take it.
+**Activations rounded to bf16.** Where this Mac's map turns it on, the DiT's products take their activation rounded to bf16 just before the product (the weights as published, the sums and the output in fp32). `--bf16-activations` checks that path on any Mac, for every product of 256 rows or more, and judges the stage like the Neural Engine's: against the reference run in bf16, the engine allowed bf16's own error plus 25 %. The verdict says how many products rounded their operand. The `dit` stages of the five models take it.
 
 ```sh
 siliconed check z-image dit --size 512 --bf16-activations
