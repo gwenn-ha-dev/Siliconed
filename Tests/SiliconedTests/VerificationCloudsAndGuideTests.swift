@@ -27,6 +27,18 @@ final class VerificationCloudsAndGuideTests: XCTestCase {
         }
     }
 
+    /// The guide clones the tag of the version being released (`tools/app.sh`): it drifted one version once.
+    func testTheGuideClonesTheAppsVersion() throws {
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let app = try String(contentsOf: root.appendingPathComponent("tools/app.sh"), encoding: .utf8)
+        let key = "<key>CFBundleShortVersionString</key><string>"
+        let version = try XCTUnwrap(app.components(separatedBy: key).dropFirst().first?.components(separatedBy: "<").first)
+        for file in ["VERIFY.md", "VERIFY.fr.md"] {
+            let text = try String(contentsOf: root.appendingPathComponent("docs/\(file)"), encoding: .utf8)
+            XCTAssertTrue(text.contains("git clone --branch v\(version) "), "\(file): clone the tag v\(version), the app's version")
+        }
+    }
+
     // MARK: - Clouds
 
     /// The truth [3, 4] has norm 5, as one channel (`columns: 1`). A draw moved by [3x, 4x] is x away from it.

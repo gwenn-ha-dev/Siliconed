@@ -19,10 +19,6 @@ extension AppState {
     var maxReferences: Int { chain?.denoising.maxReferences ?? 0 }
     var editingPossible: Bool { maxReferences > 0 }
     var editors: [ModelCard] { visibleReady.filter { editingModels.contains($0.id) } }
-    func readEditors() {
-        editingModels = readySet.filter { (model($0)?.chain.denoising.maxReferences ?? 0) > 0 }
-    }
-
     func model(_ id: String) -> Model? {
         if let known = modelsRead[id] { return known }
         let m = try? Model.named(id, in: library)
@@ -327,13 +323,6 @@ extension AppState {
     /// The sizes the picker offers: the model's for this orientation, and the one typed by hand.
     var pickerFormats: [RecommendedFormat] {
         orientationFormats.contains(format) ? orientationFormats : orientationFormats + [format]
-    }
-
-    /// Re-reads from disk what depends on the chosen model: its chain, its LoRAs, what it is missing.
-    func readModelCatalog() {
-        chain = model(identifier)?.chain
-        compatibleLoras = library.loras(for: identifier)
-        missing = readySet.contains(identifier) ? nil : card?.missing(in: library)
     }
 
     /// The orientation's first size this Mac renders (`macNeeded`), its first at all when none does —

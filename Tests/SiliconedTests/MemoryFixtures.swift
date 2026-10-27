@@ -8,6 +8,43 @@ import XCTest
 /// vocabulary entries in 3 989 982 bytes, 151 387 merges in 7 426 578: 28 213 248 bytes mapped). No
 /// byte of weights, no file: the same figures on every Mac, the CI's included.
 enum MemoryFixtures {
+    // MARK: - The maps, built once per argument
+
+    /// A family's maps cost tens of milliseconds to lay out, and the tests ask for the same ones hundreds of
+    /// times: each is built once per set of arguments. Values, so a test that edits its copy edits nothing else.
+    nonisolated(unsafe) private static var built: [String: Any] = [:]
+    private static let lock = NSLock()
+
+    private static func once<T>(_ key: String, _ make: () -> T) -> T {
+        lock.lock(); defer { lock.unlock() }
+        if let known = built[key] as? T { return known }
+        let made = make()
+        built[key] = made
+        return made
+    }
+
+    static func zImageMaps(bytesPerValue: Int = 2, rotated: Bool = false) -> MemoryNeed.ZImageMaps {
+        once("z-image \(bytesPerValue) \(rotated)") { buildZImageMaps(bytesPerValue: bytesPerValue, rotated: rotated) }
+    }
+
+    static func animaMaps(ditBytesPerValue: Int = 2, encoderBytesPerValue: Int = 2, rotated: Bool = false) -> MemoryNeed.AnimaMaps {
+        once("anima \(ditBytesPerValue) \(encoderBytesPerValue) \(rotated)") {
+            buildAnimaMaps(ditBytesPerValue: ditBytesPerValue, encoderBytesPerValue: encoderBytesPerValue, rotated: rotated)
+        }
+    }
+
+    static func krea2Maps(ditBytesPerValue: Int = 2, encoderBytesPerValue: Int = 2, rotated: Bool = false) -> MemoryNeed.Krea2Maps {
+        once("krea2 \(ditBytesPerValue) \(encoderBytesPerValue) \(rotated)") {
+            buildKrea2Maps(ditBytesPerValue: ditBytesPerValue, encoderBytesPerValue: encoderBytesPerValue, rotated: rotated)
+        }
+    }
+
+    static func qwenMaps(bytesPerValue: Int = 2) -> QwenImage21Maps {
+        once("qwen-image-2.1 \(bytesPerValue)") { buildQwenMaps(bytesPerValue: bytesPerValue) }
+    }
+
+    // MARK: - Laying them out
+
     /// A layer table: `layers` blocks of `tensors` under `prefix(i)`, each tensor on its own pages.
     static func table(layers: Int, prefix: (Int) -> String, tensors: [(String, [Int])], bytesPerValue: Int,
                       page: Int = 16384) -> [String: Any] {
@@ -34,7 +71,7 @@ enum MemoryFixtures {
     /// **Z-Image's maps**: the DiT's 30 layers and the encoder's 35 with the published shapes and
     /// order, the published configs — `bytesPerValue` 2 (bf16) or 1 (an 8-bit map, plus a float scale
     /// per output column).
-    static func zImageMaps(bytesPerValue: Int = 2, rotated: Bool = false) -> MemoryNeed.ZImageMaps {
+    private static func buildZImageMaps(bytesPerValue: Int, rotated: Bool) -> MemoryNeed.ZImageMaps {
         let (d, h) = (3840, 10240)
         let layer: [(String, [Int])] = [
             ("adaLN_modulation.0.bias", [4 * d]), ("adaLN_modulation.0.weight", [256, 4 * d]),
@@ -75,7 +112,7 @@ enum MemoryFixtures {
     /// type — 2 (Standard, bf16), 1 (Compact, Q8_0), 0 for a 4-bit table (Light, Q4_K_M: half a byte a
     /// value, laid out as a quarter of bf16's) — and the formula must not read it; `encoderBytesPerValue`
     /// the encoder's, which it reads (its staging buffers).
-    static func animaMaps(ditBytesPerValue: Int = 2, encoderBytesPerValue: Int = 2, rotated: Bool = false) -> MemoryNeed.AnimaMaps {
+    private static func buildAnimaMaps(ditBytesPerValue: Int, encoderBytesPerValue: Int, rotated: Bool) -> MemoryNeed.AnimaMaps {
         let (d, h, a) = (2048, 8192, 256)
         let block: [(String, [Int])] = [
             ("attn1.norm_k.weight", [128]), ("attn1.norm_q.weight", [128]), ("attn1.to_k.weight", [d, d]),
@@ -129,7 +166,7 @@ enum MemoryFixtures {
     /// (Standard, bf16), 1 (Compact, int8 and a float scale per output column), 0 for a 4-bit table
     /// (Light, Q4_K_M: a quarter of bf16's bytes) —, `encoderBytesPerValue` the encoder's.
     /// `rotated`: the 8-bit linears published rotated (Comfy-Org's int8 convrot, group 256).
-    static func krea2Maps(ditBytesPerValue: Int = 2, encoderBytesPerValue: Int = 2, rotated: Bool = false) -> MemoryNeed.Krea2Maps {
+    private static func buildKrea2Maps(ditBytesPerValue: Int, encoderBytesPerValue: Int, rotated: Bool) -> MemoryNeed.Krea2Maps {
         let (d, h, kv, page) = (6144, 16_384, 1536, 16384)
         let linears: [(String, [Int])] = [
             ("attn.to_q.weight", [d, d]), ("attn.to_k.weight", [d, kv]), ("attn.to_v.weight", [d, kv]),
@@ -206,7 +243,7 @@ enum MemoryFixtures {
         + ByteTableFigures.mapped(entries: 151_387, keyBytes: 7_426_578)
 
     /// `bytesPerValue` 2: the Standard (bf16); 1: an 8-bit map (a float scale per output column).
-    static func qwenMaps(bytesPerValue: Int = 2) -> QwenImage21Maps {
+    private static func buildQwenMaps(bytesPerValue: Int) -> QwenImage21Maps {
         let (d, h) = (4096, 12_288)
         let block: [(String, [Int])] = [
             ("attn.norm_k.weight", [128]), ("attn.norm_q.weight", [128]),

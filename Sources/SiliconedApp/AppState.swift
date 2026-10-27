@@ -264,11 +264,18 @@ final class AppState {
 
     // ── The chosen model's catalog: read from disk when it changes, not at each drawing ──
     /// The chosen model's chain — what the boxes draw. `nil` if it is not installed.
-    var chain: Chain?
+    private(set) var chain: Chain?
     /// The LoRAs forged for the chosen model.
-    var compatibleLoras: [LoRACard] = []
+    private(set) var compatibleLoras: [LoRACard] = []
     /// What the chosen model is missing (the library's message), or `nil` if it is ready.
-    var missing: String?
+    private(set) var missing: String?
+
+    /// Re-reads from disk what depends on the chosen model: its chain, its LoRAs, what it is missing.
+    func readModelCatalog() {
+        chain = model(identifier)?.chain
+        compatibleLoras = library.loras(for: identifier)
+        missing = readySet.contains(identifier) ? nil : card?.missing(in: library)
+    }
 
     // ── What the render shows ──
     /// The running render, then those waiting — in the order they were requested.
@@ -557,7 +564,10 @@ final class AppState {
     // MARK: Catalog
 
     /// The installed models that edit, read once per catalog: where « Edit with… » sends an image.
-    var editingModels: Set<String> = []
+    private(set) var editingModels: Set<String> = []
+    func readEditors() {
+        editingModels = readySet.filter { (model($0)?.chain.denoising.maxReferences ?? 0) > 0 }
+    }
 
     /// **The models, read once per catalog**: `Model.named` reads the map headers on disk, and the
     /// exploration's footer asks for each cell's model at every drawing. Emptied by `refreshCatalog`.

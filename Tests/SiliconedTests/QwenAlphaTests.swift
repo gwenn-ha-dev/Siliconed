@@ -78,8 +78,8 @@ final class QwenAlphaTests: XCTestCase {
         for p in 0..<(40 * 30) { opaque[4 * p] = UInt8(p % 256); opaque[4 * p + 1] = UInt8((p / 3) % 256); opaque[4 * p + 3] = 255 }
         let decoded = try ImageRGB(cgImage: image(opaque, width: 40, height: 30))
         XCTAssertNil(decoded.rgba)
-        let prepared = QwenImage21Pipeline.preparedReference(decoded, resolution: 512)
-        XCTAssertEqual(prepared, QwenImage21Pipeline.image(QwenImage21Pipeline.reference(decoded, resolution: 512)))
+        let prepared = QwenImage21Pipeline.preparedReference(decoded, resolution: 128)
+        XCTAssertEqual(prepared, QwenImage21Pipeline.image(QwenImage21Pipeline.reference(decoded, resolution: 128)))
         XCTAssertEqual(QwenImage21EncodingModule.rgba(prepared).suffix(prepared.width * prepared.height),
                        ArraySlice([Float](repeating: 1, count: prepared.width * prepared.height)))
     }
