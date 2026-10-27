@@ -37,7 +37,7 @@
   les autres modèles.
 - **Standard ou Compact** : 27,5 Go (les bf16 de l'éditeur, la LoRA en fp32) ou 17,9 Go (le DiT et
   l'encodeur de texte en int8 convrot, tels que Comfy-Org les publie) ; la Compact est présélectionnée,
-  comme pour les autres modèles, avec le Neural Engine allumé par défaut. Pas encore de Légère : un
+  comme pour les autres modèles (sur 8 Go aussi, faute de Légère), avec le Neural Engine allumé par défaut. Pas encore de Légère : un
   DiT en 4 bits est publié, pas encore vérifié.
 - **Dans le budget** : son besoin en mémoire est calculé à partir des formes du modèle avant le
   premier calcul. Pic de l'app : 2,4 Gio à 1024², 2,8 Gio en 1024×1536, dans les deux versions.

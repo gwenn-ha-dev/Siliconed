@@ -111,4 +111,4 @@ silicontrol add --wait --out out "a woman posing in a library"
 silicontrol status
 ```
 
-Elle bascule aussi l'interrupteur du rendu plus rapide (`silicontrol set faster-rendering on|off`) et refait chez vous une série chronométrée de rendus (`silicontrol measure`). La sortie est en lignes JSON ; la dernière porte `"ok"`. Le dedans : [REMOTE-CONTROL.fr.md](REMOTE-CONTROL.fr.md).
+Elle bascule aussi l'interrupteur du rendu plus rapide (`silicontrol set faster-rendering on|off`) et refait chez vous une série chronométrée de rendus (`silicontrol measure`) ; elle fait aussi des grilles, des variations, des agrandissements, suit un rendu pas à pas, et plus : `silicontrol help all` donne toutes les commandes. La sortie est en lignes JSON ; la dernière porte `"ok"`. Le dedans : [REMOTE-CONTROL.fr.md](REMOTE-CONTROL.fr.md).

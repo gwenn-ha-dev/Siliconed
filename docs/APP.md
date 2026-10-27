@@ -111,4 +111,4 @@ silicontrol add --wait --out out "a woman posing in a library"
 silicontrol status
 ```
 
-It also flips the Faster Rendering switch (`silicontrol set faster-rendering on|off`) and repeats a timed series of renders on your Mac (`silicontrol measure`). Output is JSON lines; the last one carries `"ok"`. How it works inside: [REMOTE-CONTROL.md](REMOTE-CONTROL.md).
+It also flips the Faster Rendering switch (`silicontrol set faster-rendering on|off`) and repeats a timed series of renders on your Mac (`silicontrol measure`); it grids, varies, enlarges, follows a render step by step, and more: `silicontrol help all` lists every command. Output is JSON lines; the last one carries `"ok"`. How it works inside: [REMOTE-CONTROL.md](REMOTE-CONTROL.md).

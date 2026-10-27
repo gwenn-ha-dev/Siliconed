@@ -36,7 +36,7 @@ English · [Français](RELEASE-NOTES.fr.md)
   models.
 - **Standard or Compact**: 27.5 GB (the publisher's bf16, the LoRA in fp32) or 17.9 GB (the DiT and
   the text encoder in int8 convrot, as Comfy-Org publishes them); the Compact is preselected, as for
-  the other models, with the Neural Engine on by default. No Light yet: a 4-bit DiT is published,
+  the other models (on 8 GB too, since there is no Light to fall back on), with the Neural Engine on by default. No Light yet: a 4-bit DiT is published,
   not yet checked.
 - **Within the budget**: its memory need is computed from the model's shapes before the first
   computation. The app's peak: 2.4 GiB at 1024², 2.8 GiB at 1024×1536, in both versions.
