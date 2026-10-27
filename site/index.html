@@ -201,9 +201,9 @@
       <path d="M 40 830 L 560 830 A 310 310 0 0 0 560 210 A 310 310 0 0 0 250 520"/>
     </g>
   </svg>
-  <p class="eyebrow h-fade">v0.15 · free · open source · Apple silicon</p>
+  <p class="eyebrow h-fade">v0.16 · free · open source · Apple silicon</p>
   <h1 class="h-fade d1"><span class="grad">Your Mac, mapped.</span><span class="sub">Every kernel chosen for <em>this</em> chip.</span></h1>
-  <p class="lead h-fade d2">Siliconed measures your Mac, then runs four image models on the kernels that won there:
+  <p class="lead h-fade d2">Siliconed measures your Mac, then runs five image models on the kernels that won there:
     GPU, CPU matrix unit, Neural Engine. Full fp32, checked against the reference, inside a fixed memory
     budget. No Python. No server. No cloud.</p>
   <div class="cta h-fade d3">
@@ -223,7 +223,7 @@
 <section class="wrap" id="krea2">
   <div class="split">
     <div class="text reveal">
-      <p class="kicker">Four models · the largest first</p>
+      <p class="kicker">Five models · the largest first</p>
       <h2><span class="grad">Krea 2 Turbo.</span><br>The big one.</h2>
       <p class="punch">12.9 billion parameters. The largest model Siliconed runs.</p>
       <p>Aesthetic images, from photography to painting. The whole 8-step recipe in fp32 on the publisher's bf16
@@ -248,15 +248,36 @@
   </figure>
 
   <div class="reveal" style="margin-top:clamp(56px, 8vw, 96px)">
-    <h2>Four models.<br><span class="grad">Zero cloud.</span></h2>
+    <h2>Five models.<br><span class="grad">Zero cloud.</span></h2>
     <div class="tablewrap"><table>
       <tr><th>Model</th><th>What it does</th><th>License</th></tr>
       <tr><td><a href="https://huggingface.co/krea/Krea-2-Turbo">Krea 2 Turbo</a></td><td>text-to-image (aesthetic images, from photography to painting), LoRA</td><td>Krea 2 Community (commercial under $1M annual revenue, content filter required when deployed)</td></tr>
       <tr><td><a href="https://huggingface.co/Tongyi-MAI/Z-Image-Turbo">Z-Image Turbo</a></td><td>text-to-image, LoRA</td><td>Apache 2.0</td></tr>
       <tr><td><a href="https://huggingface.co/Qwen/Qwen-Image-2.1-Turbo">Qwen-Image-2.1 Turbo</a></td><td>text-to-image, editing by instruction with 1 to 3 images, LoRA</td><td>Qwen Research (non-commercial)</td></tr>
       <tr><td><a href="https://huggingface.co/circlestone-labs/Anima">Anima Turbo</a></td><td>text-to-image (illustration, painting, anime), LoRA</td><td>CircleStone Labs Non-Commercial (the images may be used commercially)</td></tr>
+      <tr><td><a href="https://huggingface.co/OpenMOSS-Team/MOSS-Image-SFT">MOSS-Image</a></td><td>text-to-image, LoRA; beta, under the community's 8-step LoRA</td><td>Apache 2.0</td></tr>
     </table></div>
-    <p class="times">1024², 8 steps, seed 42, on an M1 Pro with 16 GB, app 0.15, Faster Rendering on (the default). Compact, the default: Krea 2 Turbo 135.8 s, Z-Image Turbo 83.1 s, Qwen-Image-2.1 Turbo 100.2 s, Anima Turbo 33.1 s. Standard, the publisher's bf16 in fp32: 147.8 s, 82.4 s, 110.4 s, 34.3 s. Light: 145.0 s, 87.5 s, 103.7 s, 34.7 s. Every step at full size (Standard, 0.12): 221.1 s, 117.7 s, 142.7 s, 44.4 s. An edit with one reference: 211 s (0.10).</p>
+    <p class="times">1024², 8 steps, seed 42, on an M1 Pro with 16 GB, app 0.15, Faster Rendering on (the default). Compact, the default: Krea 2 Turbo 135.8 s, Z-Image Turbo 83.1 s, Qwen-Image-2.1 Turbo 100.2 s, Anima Turbo 33.1 s; MOSS-Image 107.7 s (app 0.16). Standard, the publisher's bf16 in fp32: 147.8 s, 82.4 s, 110.4 s, 34.3 s; 107.3 s. Light: 145.0 s, 87.5 s, 103.7 s, 34.7 s; none for MOSS-Image. Every step at full size (Standard, 0.12): 221.1 s, 117.7 s, 142.7 s, 44.4 s. An edit with one reference: 211 s (0.10).</p>
+  </div>
+  <div class="split rev" id="moss" style="margin-top:clamp(64px, 9vw, 112px)">
+    <div class="text reveal">
+      <p class="kicker">New in 0.16 · beta</p>
+      <h2><span class="grad">MOSS-Image.</span><br>Fast, thanks to its community.</h2>
+      <p class="punch">5.1 billion parameters, read by a 9-billion-parameter language model.</p>
+      <p>OpenMOSS released no fast version; lodestones did: an 8-step DMD LoRA, kept beside the weights
+        in fp32 so its small deltas survive. Both checked against the reference, the LoRA included. Your
+        LoRAs on top, ComfyUI's and ai-toolkit's too. Beta until OpenMOSS ships its own fast version.
+        Apache 2.0.</p>
+      <ul class="stats">
+        <li><b>107.7 s</b>1024² on an M1 Pro, Compact</li>
+        <li><b>107.3 s</b>the same, in full precision</li>
+        <li><b>2.4 GiB</b>peak memory of the app at 1024²</li>
+      </ul>
+    </div>
+    <figure class="shot reveal">
+      <img src="images/moss.jpg" width="1600" height="1064" alt="The Siliconed window with MOSS-Image in the rack: a 1248×832 photo of a young Irish woman with long wavy auburn hair and freckles, in a cream Aran sweater and jeans, riding an old green bicycle down a country lane between dry-stone walls, laughing over her shoulder, wildflowers in the basket, a whitewashed cottage and late-afternoon sun breaking through the clouds" loading="lazy">
+      <figcaption>MOSS-Image, Compact, 1248×832, 8 steps, seed 5001, 127 s on an M1 Pro: &ldquo;Candid travel photograph of a young Irish woman with long wavy auburn red hair, pale freckled skin and green eyes, in a cream Aran knit sweater and jeans, riding an old green bicycle down a narrow country lane in the west of Ireland, laughing over her shoulder, wildflowers in the front basket. Dry-stone walls, emerald fields, a whitewashed cottage, low dramatic clouds breaking with a shaft of late-afternoon sunlight. Shot on 35mm film, slight motion blur on the wheels, warm grain, natural colors.&rdquo;</figcaption>
+    </figure>
   </div>
 </section>
 
@@ -403,7 +424,7 @@
         revision and checked by sha256, and downloads resume where they stopped. The next file downloads
         while the previous one is prepared: Qwen-Image-2.1 installs in about 6½ minutes on a fast connection.</p>
     </div>
-    <figure class="shot reveal"><img src="images/models.jpg" width="1600" height="1064" alt="The Models window: the four publishers' models installed in Standard, each with its license and size on disk, and the inCase LoRA for Anima" loading="lazy"></figure>
+    <figure class="shot reveal"><img src="images/models.jpg" width="1600" height="1065" alt="The Models window: the five publishers' models installed in Compact, MOSS-Image marked beta, each with its license and size on disk, and the LoRAs below" loading="lazy"></figure>
   </div>
 </section>
 
