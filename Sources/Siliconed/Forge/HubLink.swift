@@ -129,12 +129,15 @@ package struct HubRepository: Sendable {
     /// **The repositories a family is installed from, or is the base of**: the button shows on these
     /// pages, on their adapters' and their quantizations'. Z-Image's and Qwen-Image-2.1's base models
     /// are trained on, and their LoRAs are applied to the Turbo; Krea 2's Turbo is gated, and the
-    /// installation takes nothing from it (`Installer`), but it is what LoRAs name.
+    /// installation takes nothing from it (`Installer`), but it is what LoRAs name. MOSS-Image installs
+    /// from its SFT; LoRAs trained on its Base apply to it too, as the community uses them.
     package static let bases: [(id: String, family: Family, installed: Bool)] = [
         (Installer.zImage.name, .zImage, true), ("Tongyi-MAI/Z-Image", .zImage, false),
         (Installer.anima.name, .anima, true),
         (Installer.qwenImage21Turbo.name, .qwenImage21, true), ("Qwen/Qwen-Image-2.1", .qwenImage21, false),
         ("krea/Krea-2-Turbo", .krea2, true), (Installer.krea2Comfy.name, .krea2, false),
+        (Installer.mossImage.name, .mossImage, true), ("OpenMOSS-Team/MOSS-Image-Base", .mossImage, false),
+        (Installer.mossComfy.name, .mossImage, false),
     ]
 
     /// The family whose installation this repository is: its page's button installs the family.

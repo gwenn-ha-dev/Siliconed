@@ -58,6 +58,10 @@ final class HubLinkTests: XCTestCase {
         XCTAssertFalse(base.gated)
         XCTAssertNil(try HubRepository(json: Data(#"{"id": "krea/Krea-2", "sha": "f332072aa78be7aecdf3ee76d5c247082da564a6"}"#.utf8)).installs,
                      "a family's other repository is no installation")
+        XCTAssertEqual(try HubRepository(json: Data(#"{"id": "OpenMOSS-Team/MOSS-Image-SFT", "sha": "f972bd4b4b9e3852133cc5da954d87bc32cd8fb9"}"#.utf8)).installs,
+                       .mossImage)
+        XCTAssertEqual(try HubRepository(json: Data(#"{"id": "someone/moss-lora", "sha": "f972bd4b4b9e3852133cc5da954d87bc32cd8fb9", "tags": ["base_model:adapter:OpenMOSS-Team/MOSS-Image-Base"]}"#.utf8)).declaredFamily,
+                       .mossImage, "a LoRA trained on MOSS-Image Base applies to the SFT")
         for bad in [#"{"id": "a/b", "sha": "main"}"#, #"{"id": "../b", "sha": "f332072aa78be7aecdf3ee76d5c247082da564a6"}"#, "[]", "<html>"] {
             XCTAssertThrowsError(try HubRepository(json: Data(bad.utf8)), bad)
         }
