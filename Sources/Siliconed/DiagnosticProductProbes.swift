@@ -26,6 +26,7 @@ extension Diagnostic {
         var products: [Product] = []
         for s in shapes {
             try bench.check()
+            bench.gauge.mark("products", "\(s.model) \(s.product) \(s.m)")
             let rows = sampleRows(s.m, count: sampledRows)
             let exact = exactRows(rows, a: o.a.floats(), b: o.b.floats(), k: s.k, n: s.n)
             let c = o.c.floats()
@@ -36,10 +37,12 @@ extension Diagnostic {
                 return (judge(gather(c, rows: rows, n: s.n), truth ?? exact, columns: rows.count, rate: flops / t / 1e12,
                               threshold: fp32Threshold), t)
             }
+            bench.gauge.mark("products", "\(s.model) \(s.product) \(s.m) gpu")
             let (gpu, tGPU) = measure {
                 _ = alone.linear(a: aloneBuffers.0, b: aloneBuffers.1, c: aloneBuffers.2, m: s.m, k: s.k, n: s.n,
                                  weightIsTransposed: true)
             }
+            bench.gauge.mark("products", "\(s.model) \(s.product) \(s.m) amx")
             var refused = false
             let (amxMeasure, tAMX) = measure {
                 let status = Conductor.multiply(a: o.a.base, b: o.b.base, c: o.c.base, rows: s.m, k: s.k, n: s.n,
@@ -49,6 +52,7 @@ extension Diagnostic {
             let amx = refused ? nil : amxMeasure
             // The GPU's share of the rows that equalizes the two engines' times: `T*` of the servo.
             let share = amx.map { _ in tAMX / (tGPU + tAMX) }
+            bench.gauge.mark("products", "\(s.model) \(s.product) \(s.m) coexecution")
             var coexecution: Measure?, gpuRows: Int?
             if let share, let conductor = both.conductor {
                 try bench.check()
@@ -61,6 +65,7 @@ extension Diagnostic {
             }
             // ── gemm_ane: the GPU on the first rows, the Neural Engine on the last ── At the share that ends both
             // together (`aneBalance`), judged against bf16's error (invariant 3), not the fp32 threshold.
+            bench.gauge.mark("products", "\(s.model) \(s.product) \(s.m) ane")
             var ane: Measure?, aneShare: Double?
             if let engine = neural.neuralEngine, engine.rows(s.m, k: s.k, n: s.n) > 0 {
                 try bench.check()
@@ -88,6 +93,7 @@ extension Diagnostic {
                     }
                 }
             }
+            bench.gauge.mark("products", "\(s.model) \(s.product) \(s.m) tensor")
             var tensor: Measure?
             if alone.tensor != nil {
                 try bench.check()
@@ -100,6 +106,7 @@ extension Diagnostic {
             // head of `b`, the rounded rows in its tail, as a model's reserve holds them (`WeightProducts.roundingPlan`);
             // judged against the exact product of the rounded activation: it checks the accumulation and the
             // kernel, not what the rounding costs (the check's, against diffusers in bf16). `b` restored from `bf16`.
+            bench.gauge.mark("products", "\(s.model) \(s.product) \(s.m) bf16act")
             var bf16Act: Measure?
             if alone.bf16Activations, let plan = WeightProducts.roundingPlan(k: s.k, n: s.n, capacity: s.k * s.n) {
                 try bench.check()
@@ -156,12 +163,14 @@ extension Diagnostic {
                 return (alone, beside, columns)
             }
             let q = o.q.base.assumingMemoryBound(to: Int8.self)
+            bench.gauge.mark("products", "\(s.model) \(s.product) \(s.m) int8")
             var int8: Measure?, int8Coexecution: Measure?, int8GPUColumns: Int?
             if both.tensorInt8, s.k % int8Group == 0, (s.k * s.n) % 2 == 0 {
                 try bench.check()
                 let truth = exactRows(rows, a: o.a.floats(), q: q, scale: Double(int8Scale), group: int8Group, k: s.k, n: s.n)
                 (int8, int8Coexecution, int8GPUColumns) = try eightBit(group: int8Group, block: nil, truth: truth)
             }
+            bench.gauge.mark("products", "\(s.model) \(s.product) \(s.m) q8")
             var q8: Measure?, q8Coexecution: Measure?, q8GPUColumns: Int?
             if both.tensorQ8, s.k % q8Block == 0, (s.k * s.n) % 2 == 0 {
                 try bench.check()
@@ -217,50 +226,73 @@ extension Diagnostic {
     /// at 319 ms beside a GPU done in 240, the pair slower than the GPU alone, 23/10/2026). Not judged: the
     /// products judge the ANE's arithmetic, which no share changes. Empty when no ANE program runs on this Mac.
     static func measureANECuts(_ o: Operands, _ bench: Bench, cuts amxCuts: [Cut], products: [Product],
-                               threeSeconds: inout Double) throws -> [Cut] {
-        let neural = try GEMM(freezeCut: true, coexecution: false, tensorWeights: false, neuralEngine: true, neuralEngineShare: 0.5)
-        guard let engine = neural.neuralEngine else { return [] }
-        engine.shares = .none
-        let a = try neural.wrap(o.a.base, bytes: o.a.capacity, name: "diagnostic.a")
-        let b = try neural.wrap(o.b.base, bytes: o.b.capacity, name: "diagnostic.b")
-        let c = try neural.wrap(o.c.base, bytes: o.c.capacity, name: "diagnostic.c")
-        // The AMX's route as a render takes it: its conductor frozen at its grid's share for the shape.
-        let amx = amxCuts.isEmpty ? nil : try GEMM(freezeCut: true, coexecution: true, tensorWeights: false, neuralEngine: false)
-        if let conductor = amx?.conductor {
-            conductor.shares = Conductor.Shares(amxCuts.map { .init(k: $0.k, n: $0.n, m: $0.m, ratio: (1 - $0.share) / $0.share) })
+                               batches: [[GridPoint]], threeSeconds: inout Double) throws -> [Cut] {
+        /// **The ANE's side of the map, one batch of the grid** (`Plan.aneAllotment`): the pair's engine and the
+        /// three's, each keeping the surfaces of every program shape it ran until it is released. Released
+        /// before the next batch builds its own, so that two never live together.
+        struct Side {
+            let neural: GEMM, engine: NeuralEngine
+            let a, b, c: MTLBuffer
+            let amx: GEMM?, amxOperands: (MTLBuffer, MTLBuffer, MTLBuffer)?
+            let three: GEMM?, threeOperands: (MTLBuffer, MTLBuffer, MTLBuffer)?
         }
-        let operands = try amx.map { g in (try g.wrap(o.a.base, bytes: o.a.capacity, name: "diagnostic.a"),
-                                           try g.wrap(o.b.base, bytes: o.b.capacity, name: "diagnostic.b"),
-                                           try g.wrap(o.c.base, bytes: o.c.capacity, name: "diagnostic.c")) }
-        // The three at once: the ANE on its rows, the GPU beside the AMX on the rest (`ane_amx`), at the share
-        // both pairs give — one wall per point, no sweep (on the M1 Pro, 26/10/2026, the derived split lands on a sweep's best).
-        let three = amx == nil ? nil : try GEMM(freezeCut: true, coexecution: true, tensorWeights: false, neuralEngine: true,
-                                                 neuralEngineShare: 0.5)
-        if let conductor = three?.conductor, let grid = amx?.conductor?.shares { conductor.shares = grid }
-        let threeOperands = try three.map { g in (try g.wrap(o.a.base, bytes: o.a.capacity, name: "diagnostic.a"),
-                                                  try g.wrap(o.b.base, bytes: o.b.capacity, name: "diagnostic.b"),
-                                                  try g.wrap(o.c.base, bytes: o.c.capacity, name: "diagnostic.c")) }
+        // The AMX's route as a render takes it: its conductor frozen at its grid's share for the shape.
+        let grid = amxCuts.isEmpty ? nil : Conductor.Shares(amxCuts.map { .init(k: $0.k, n: $0.n, m: $0.m, ratio: (1 - $0.share) / $0.share) })
+        func operands(of g: GEMM) throws -> (MTLBuffer, MTLBuffer, MTLBuffer) {
+            (try g.wrap(o.a.base, bytes: o.a.capacity, name: "diagnostic.a"),
+             try g.wrap(o.b.base, bytes: o.b.capacity, name: "diagnostic.b"),
+             try g.wrap(o.c.base, bytes: o.c.capacity, name: "diagnostic.c"))
+        }
+        func build() throws -> Side? {
+            let neural = try GEMM(freezeCut: true, coexecution: false, tensorWeights: false, neuralEngine: true, neuralEngineShare: 0.5)
+            guard let engine = neural.neuralEngine else { return nil }
+            engine.shares = .none
+            let (a, b, c) = try operands(of: neural)
+            let amx = grid == nil ? nil : try GEMM(freezeCut: true, coexecution: true, tensorWeights: false, neuralEngine: false)
+            if let conductor = amx?.conductor, let grid { conductor.shares = grid }
+            // The three at once: the ANE on its rows, the GPU beside the AMX on the rest (`ane_amx`), at the share
+            // both pairs give — one wall per point, no sweep (on the M1 Pro, 26/10/2026, the derived split lands on a sweep's best).
+            let three = grid == nil ? nil : try GEMM(freezeCut: true, coexecution: true, tensorWeights: false, neuralEngine: true,
+                                                      neuralEngineShare: 0.5)
+            if let conductor = three?.conductor, let grid { conductor.shares = grid }
+            return Side(neural: neural, engine: engine, a: a, b: b, c: c, amx: amx, amxOperands: try amx.map(operands),
+                        three: three, threeOperands: try three.map(operands))
+        }
+        var side = try build()
+        guard side != nil else { return [] }
+        var batch = 0, inBatch = 0
         /// `best`: the faster pair's wall (ms) — the three are given up past it.
         func threeWall(k: Int, n: Int, m: Int, share: Double, best: Double) -> Double? {
-            guard let g = three, let side = g.neuralEngine, let (a, b, c) = threeOperands,
-                  let amxShare = amx?.conductor?.shares.share(k: k, n: n, m: m) else { return nil }
-            side.gpuShare = threeWayShare(ane: share, amx: amxShare)
-            side.shares = .none
-            side.besideAMX = Conductor.Shares([.init(k: k, n: n, m: m, ratio: 1)])
-            let before = side.fallbacks, began = Date()
+            guard let side, let g = side.three, let sideEngine = g.neuralEngine, let (a, b, c) = side.threeOperands,
+                  let amxShare = grid?.share(k: k, n: n, m: m) else { return nil }
+            sideEngine.gpuShare = threeWayShare(ane: share, amx: amxShare)
+            sideEngine.shares = .none
+            sideEngine.besideAMX = Conductor.Shares([.init(k: k, n: n, m: m, ratio: 1)])
+            let before = sideEngine.fallbacks, began = Date()
             defer { threeSeconds += Date().timeIntervalSince(began) }
             let t = seconds(giveUpAbove: best * 1e-3) { _ = g.linear(a: a, b: b, c: c, m: m, k: k, n: n, weightIsTransposed: true) }
-            return side.fallbacks == before ? t * 1e3 : nil
+            return sideEngine.fallbacks == before ? t * 1e3 : nil
         }
         var cuts: [Cut] = []
         for shape in aneShapes {
             for m in heights {
                 try bench.check()
+                bench.gauge.mark("aneCuts", "\(shape.k)x\(shape.n) \(m)")
+                // The next batch: the engines of this one are released (and their surfaces with them) before it builds its own.
+                if inBatch == batches[batch].count {
+                    side = nil
+                    batch += 1; inBatch = 0
+                    side = try build()
+                    guard side != nil else { return [] }
+                }
+                inBatch += 1
+                guard let current = side else { return [] }
+                let (neural, engine, a, b, c) = (current.neural, current.engine, current.a, current.b, current.c)
                 // A product the map measured already (Z-Image's and Qwen-Image-2.1's MLP): its share and its rates.
                 if let p = products.first(where: { $0.k == shape.k && $0.n == shape.n && $0.m == m }),
                    let share = p.aneGPUShare, let ane = p.ane?.rate, ane > 0, p.gpu.rate > 0 {
                     let flops = 2 * Double(m * shape.k * shape.n) * 1e-9   // TFLOP/s → milliseconds
-                    let beside = amx != nil ? p.coexecution.map { flops / $0.rate } : nil
+                    let beside = current.amx != nil ? p.coexecution.map { flops / $0.rate } : nil
                     cuts.append(Cut(k: shape.k, n: shape.n, m: m, share: share, ane: flops / ane, gpu: flops / p.gpu.rate,
                                     amx: beside, three: beside.flatMap { threeWall(k: shape.k, n: shape.n, m: m, share: share,
                                                                                    best: min($0, flops / ane)) }))
@@ -271,7 +303,7 @@ extension Diagnostic {
                 engine.gpuShare = share
                 let paired = seconds(run)
                 // Past the ANE's tolerance the AMX's pair cannot take the shape: its exact wall no longer matters.
-                let beside = amx.flatMap { g in operands.map { (a, b, c) in
+                let beside = current.amx.flatMap { g in current.amxOperands.map { (a, b, c) in
                     seconds(giveUpAbove: paired / aneTolerance) {
                         _ = g.linear(a: a, b: b, c: c, m: m, k: shape.k, n: shape.n, weightIsTransposed: true) } } }
                 cuts.append(Cut(k: shape.k, n: shape.n, m: m, share: share, ane: paired * 1e3, gpu: alone * 1e3,
@@ -301,6 +333,7 @@ extension Diagnostic {
         for shape in cutShapes {
             for m in heights {
                 try bench.check()
+                bench.gauge.mark("cuts", "\(shape.k)x\(shape.n) \(m)")
                 let key = "\(shape.k)×\(shape.n)"
                 var share = start
                 /// One product at `share`, and the share that would have balanced it.

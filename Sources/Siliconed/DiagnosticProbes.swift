@@ -12,8 +12,9 @@ extension Diagnostic {
         let device: MTLDevice
         let queue: MTLCommandQueue
         let cancellation: Cancellation?
-        init(device: MTLDevice, queue: MTLCommandQueue, cancellation: Cancellation?) {
-            self.device = device; self.queue = queue; self.cancellation = cancellation
+        let gauge: Gauge
+        init(device: MTLDevice, queue: MTLCommandQueue, cancellation: Cancellation?, gauge: Gauge = Gauge()) {
+            self.device = device; self.queue = queue; self.cancellation = cancellation; self.gauge = gauge
         }
         func check() throws { if cancellation?.isCancelled == true { throw EngineError.cancelled } }
         /// `pages` seen by the GPU, without a copy.
@@ -245,22 +246,38 @@ extension Diagnostic {
     /// fp16 scales per `q8Block` rows and column.
     final class Operands {
         let a, b, c, bf16, q, q8Scales: Pages
-        init() {
+        /// **The bytes each operand maps**, from the shapes alone (`Diagnostic.need` charges these):
+        /// `a` and `b` at the largest of the shapes (`m · k`, `k · n`), `c` likewise, `bf16` half of `b`,
+        /// `q` the int8 weight of the products' largest, `q8Scales` one fp32 per block of rows and column.
+        struct Sizes: Equatable {
+            var aFloats, bFloats, cFloats, qValues, scaleCount: Int
+            var bytes: Int {
+                [aFloats * 4, bFloats * 4, bFloats * 2, cFloats * 4, qValues, scaleCount * 4]
+                    .map { Arena.capacity(for: max(1, $0)) }.reduce(0, +)
+            }
+        }
+        static var sizes: Sizes {
             let m = Diagnostic.heights.max()!
             let shapes = Diagnostic.shapes.map { (m: $0.m, k: $0.k, n: $0.n) }
                 + (Diagnostic.cutShapes + Diagnostic.aneShapes).map { (m: m, k: $0.k, n: $0.n) }
-            let (aFloats, bFloats) = (shapes.map { $0.m * $0.k }.max()!, shapes.map { $0.k * $0.n }.max()!)
+            return Sizes(aFloats: shapes.map { $0.m * $0.k }.max()!, bFloats: shapes.map { $0.k * $0.n }.max()!,
+                         cFloats: shapes.map { $0.m * $0.n }.max()!, qValues: Diagnostic.shapes.map { $0.k * $0.n }.max()!,
+                         scaleCount: Diagnostic.shapes.map { ($0.k + q8Block - 1) / q8Block * $0.n }.max()!)
+        }
+        init() {
+            let size = Operands.sizes
+            let (aFloats, bFloats) = (size.aFloats, size.bFloats)
             a = Pages(bytes: aFloats * 4); b = Pages(bytes: bFloats * 4); bf16 = Pages(bytes: bFloats * 2)
-            c = Pages(bytes: shapes.map { $0.m * $0.n }.max()! * 4)
+            c = Pages(bytes: size.cFloats * 4)
             Diagnostic.fill(a.floats(), count: aFloats, scale: 1, seed: 1)
             Diagnostic.fill(b.floats(), count: bFloats, scale: 1, seed: 2)
             Widen.float32ToBfloat16(source: b.base, destination: bf16.base, count: bFloats)
             Widen.bfloat16ToFloat32(source: bf16.base, destination: b.base, count: bFloats)
-            let qValues = Diagnostic.shapes.map { $0.k * $0.n }.max()!
+            let qValues = size.qValues
             q = Pages(bytes: qValues)
             let (bp, qp) = (b.floats(), q.base.assumingMemoryBound(to: Int8.self))
             for i in 0..<qValues { qp[i] = Int8((bp[i] * 127).rounded()) }
-            let scaleCount = Diagnostic.shapes.map { ($0.k + q8Block - 1) / q8Block * $0.n }.max()!
+            let scaleCount = size.scaleCount
             q8Scales = Pages(bytes: scaleCount * 4)
             let sp = q8Scales.floats()
             for i in 0..<scaleCount { sp[i] = q8Scale(i) }
