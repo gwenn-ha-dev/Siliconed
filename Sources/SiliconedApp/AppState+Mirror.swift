@@ -51,6 +51,8 @@ final class MirrorLink {
     var entries: [Int: Entry] = [:]
     /// An entry waits for its PNG, the blob that follows it.
     var pending: [UInt32: RemoteEntry] = [:]
+    /// Ends told before their images' PNGs came (messages never wait for blobs): held until they all have.
+    var endings: [RemoteEnded] = []
     var previewBlob: UInt32?
     private let blobSender: (Data, UInt32) -> Void
     private var nextBlob: UInt32 = 1
@@ -301,16 +303,8 @@ extension AppState {
             if let waiter = link.waiters.removeValue(forKey: request) { waiter(a); return }
             if case .refused(let text) = a { problem = Problem(text); flash(text) }
         case .ended(let e):
-            // Known from the queue, or from the answer to its `render` (a job that ended between two snapshots).
-            guard let job = link.jobs[e.ordinal] else { return }
-            let issue: Issue = switch e.issue {
-            case .finished: .finished
-            case .stopped: .stopped
-            case .removed: .removed
-            case .failed(let text): .failed(Problem(text))
-            }
-            if case .failed(let p) = issue { problem = p }
-            complete(job, issue, images: e.images, warnings: e.warnings)
+            link.endings.append(e)
+            endHeld()
         case .quoted(let a):
             link.asked.remove(a.quote)
             mirrorQuotes[a.quote] = a
@@ -319,6 +313,25 @@ extension AppState {
             flash(text)
         default:
             break
+        }
+    }
+
+    /// The held ends whose images all came: told, after them, as here (`silicontrol wait` emits each image first).
+    private func endHeld() {
+        guard let link = mirror else { return }
+        link.endings.removeAll { e in
+            guard e.images.allSatisfy({ link.entries[$0] != nil }) else { return false }
+            // Known from the queue, or from the answer to its `render` (a job that ended between two snapshots).
+            guard let job = link.jobs[e.ordinal] else { return true }
+            let issue: Issue = switch e.issue {
+            case .finished: .finished
+            case .stopped: .stopped
+            case .removed: .removed
+            case .failed(let text): .failed(Problem(text))
+            }
+            if case .failed(let p) = issue { problem = p }
+            complete(job, issue, images: e.images, warnings: e.warnings)
+            return true
         }
     }
 
@@ -355,6 +368,7 @@ extension AppState {
             selection = entry.id
             marked = []; anchor = entry.id
         }
+        endHeld()
     }
 
     private static func entry(_ e: RemoteEntry, png: Data, image: CGImage) -> Entry {
