@@ -228,4 +228,47 @@ final class RemoteTests: XCTestCase {
                        .protocolVersion(mine: Hello.protocolVersion, theirs: 2))
         XCTAssertEqual(try JSONDecoder().decode(Hello.self, from: JSONEncoder().encode(mini)), mini)
     }
+
+    // MARK: - Statistics and licenses
+
+    func testStatisticsAndLicensesTravelAsJSON() throws {
+        let job = RemoteJob(ordinal: 3, model: "z-image", modelName: "Z-Image Turbo", prompt: "p", width: 1024, height: 1024,
+                            steps: 8, defaultSteps: 8, loras: [], seeds: [42], detail: .normal, solver: .euler,
+                            schedule: .official, previews: true, neuralEngine: nil)
+        var t = Engine.Timings(); t.total = 12.5
+        var st = RemoteStatistics()
+        st.measures = RemoteMeasures(job: job, elapsed: 4.5, evaluations: 8, reduced: 2, tokens: 12, tokenizer: 0.01,
+                                     encoder: 0.4, encoding: nil, textCached: false, stepSeconds: [[1.5, 1.4]], decodings: [0.9],
+                                     timings: t, footprints: Engine.Footprints())
+        st.speeds = ["z-image|1024×1024": RemoteSpeed(full: 1.4, reducedAverage: 0.7, text: nil, image: 0, decoding: 0.9)]
+        st.estimates = [4: 31.5]
+        st.images = 3; st.seconds = 40.25
+        let digest = Data(repeating: 7, count: 32)
+        let messages: [SessionMessage] = [
+            .statistics(st), .statistics(RemoteStatistics()),
+            .licensing(RemoteLicense(model: "krea2", variant: "compact", digest: digest)), .licensing(nil),
+            .answerLicense(RemoteLicenseAnswer(model: "krea2", accepted: true, digest: digest)),
+            .answerLicense(RemoteLicenseAnswer(model: "krea2", accepted: false, digest: nil)),
+        ]
+        for m in messages {
+            XCTAssertEqual(try JSONDecoder().decode(SessionMessage.self, from: JSONEncoder().encode(m)), m)
+        }
+        // The running render's age alone is no change; anything else is.
+        var later = st
+        later.measures?.elapsed = 9
+        XCTAssertNotEqual(later, st)
+        XCTAssertEqual(later.withoutClock, st.withoutClock)
+        later.images = 4
+        XCTAssertNotEqual(later.withoutClock, st.withoutClock)
+    }
+
+    /// The digest an acceptance carries changes with any word the sheet states, and with nothing else.
+    func testALicenseDigestFollowsTheTextShown() {
+        let z = ModelCard.zImage, k = ModelCard.krea2
+        XCTAssertEqual(LicenseDigest.of(z, variant: .standard), LicenseDigest.of(z, variant: .standard))
+        XCTAssertEqual(LicenseDigest.of(z, variant: .standard).count, 32)
+        XCTAssertNotEqual(LicenseDigest.of(z, variant: .standard), LicenseDigest.of(k, variant: .standard))
+        XCTAssertNotEqual(LicenseDigest.of(k, variant: .standard), LicenseDigest.of(k, variant: .compact),
+                          "a Compact's links are third parties'")
+    }
 }

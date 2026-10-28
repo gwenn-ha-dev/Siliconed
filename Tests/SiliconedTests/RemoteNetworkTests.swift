@@ -277,6 +277,46 @@ final class RemoteNetworkTests: XCTestCase {
         }
     }
 
+    /// Named subjects, grids asked from `silicontrol` and an enlargement's source cross the mirror too —
+    /// and a message from a build without them still reads.
+    func testSubjectsGridAnswersAndEnlargementSourcesTravelAsJSON() throws {
+        var job = RemoteJob(ordinal: 3, model: "qwen-image-2.1", modelName: "Qwen-Image 2.1", prompt: "@ana in a library",
+                            width: 1024, height: 1024, steps: 8, defaultSteps: 8, loras: [], seeds: [42], detail: .normal,
+                            solver: .euler, schedule: .official, previews: true, neuralEngine: nil)
+        job.references = [RemoteReference(origin: .file(blob: 3), name: "a.heic", width: 3024, height: 4032),
+                          RemoteReference(origin: .image(blob: 4), name: "@ana", width: 640, height: 480)]
+        job.modelPrompt = "A woman, as in image 2, in a library"
+        job.subjectImages = 1
+        let grid = try RenderGrid(.init(prompt: "a cat", seed: 42, steps: 8, loraStrengths: [], images: 0), x: .seeds([1, 2]))
+        var t = Engine.Timings(); t.total = 83.1
+        let messages: [SessionMessage] = [
+            .render(job),
+            .grid(RemoteGridRequest(spec: RemoteGridSpec(grid), job: job, sketch: false, stopAfter: 0, request: 5)),
+            .answer(request: 5, .gridQueued(grid: 2, cells: [job, job], estimate: 90.5)),
+            .answer(request: 6, .gridQueued(grid: 3, cells: [], estimate: nil)),
+            .entry(RemoteEntry(ordinal: 9, job: job, width: 4096, height: 4096, seed: 42, timings: t, footprints: Engine.Footprints(),
+                               evaluations: 0, metadata: [:], neuralEngine: false, png: 11, enlarged: 4, enlargedFrom: 7)),
+        ]
+        for m in messages {
+            XCTAssertEqual(try JSONDecoder().decode(SessionMessage.self, from: JSONEncoder().encode(m)), m)
+        }
+        // A job and an entry from before these fields: absent, not an error.
+        var object = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(job)) as? [String: Any])
+        object["modelPrompt"] = nil; object["subjectImages"] = nil
+        let old = try JSONDecoder().decode(RemoteJob.self, from: JSONSerialization.data(withJSONObject: object))
+        XCTAssertNil(old.modelPrompt)
+        XCTAssertNil(old.subjectImages)
+        guard case .entry(var entry) = messages[4] else { return XCTFail() }
+        entry.enlargedFrom = nil
+        var fields = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(entry)) as? [String: Any])
+        fields["enlargedFrom"] = nil
+        XCTAssertNil(try JSONDecoder().decode(RemoteEntry.self, from: JSONSerialization.data(withJSONObject: fields)).enlargedFrom)
+        var request = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(
+            RemoteGridRequest(spec: RemoteGridSpec(grid), job: job, sketch: true, stopAfter: 0))) as? [String: Any])
+        request["request"] = nil
+        XCTAssertNil(try JSONDecoder().decode(RemoteGridRequest.self, from: JSONSerialization.data(withJSONObject: request)).request)
+    }
+
     // MARK: - What is filed
 
     func testPairingsKeepTheirKeysAndReplaceAMacPairedAgain() throws {

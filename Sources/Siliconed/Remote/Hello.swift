@@ -63,7 +63,7 @@ package enum SessionMessage: Codable, Equatable, Sendable {
     /// The preview is the blob `id` (a PNG); `nil`: no preview now.
     case preview(UInt32?)
     /// A `render` the mini did not queue, in its words.
-    case refused(String)
+    case refused(RemoteRefusal)
     case quoted(RemoteQuoteAnswer)
     case answer(request: Int, RemoteAnswer)
     case ended(RemoteEnded)
@@ -72,6 +72,12 @@ package enum SessionMessage: Codable, Equatable, Sendable {
     case explored(RemoteExploration?)
     /// One cell's image of the exploration `grid`; its PNG is the blob `entry.png`, which follows.
     case cellImage(grid: Int, cell: Int, RemoteEntry)
+    /// What the Statistics window reads for this client (`Statistics.swift`).
+    case statistics(RemoteStatistics)
+    /// The license this client's waiting job needs, to be accepted on its screen; `nil`: none waits.
+    case licensing(RemoteLicense?)
+    /// First after `catalog` at each join (see `RemoteSync`).
+    case synced(RemoteSync)
 
     // Neo → mini
     case render(RemoteJob)
@@ -85,6 +91,9 @@ package enum SessionMessage: Codable, Equatable, Sendable {
     case stopAll
     case clearQueue
     case deleteImages([Int])
+    case answerLicense(RemoteLicenseAnswer)
+    /// « Undo » of a deletion: the images (by `i` ordinal) back in the history, in their place.
+    case restoreImages([Int])
 
     package static func proof(_ key: PairedKey, challenge: Data) -> Data {
         Pairing.proof(key.key, side: "session", transcript: challenge)

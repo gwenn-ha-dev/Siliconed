@@ -15,18 +15,26 @@ import Foundation
 ///                  quoted      the answer to a `quote`; `answer` the one to a `render`
 ///                  ended       one of the Neo's jobs ended, after its images (what `silicontrol wait` reads)
 ///                  explored    the exploration under way, without its images; `cellImage` + PNG one cell's
+///                  synced      at each join: the images and jobs the mini still knows of the Neo's, so that
+///                              what was removed during a cut is removed here too
+///                  statistics  what the Statistics window reads, for the Neo's renders only (`Statistics.swift`)
+///                  licensing   the license a waiting job of the Neo's needs, accepted on the Neo's screen
 ///     Neo → mini   render      one job from the Neo's form; the mini checks it again (B, steps) before
 ///                              queueing it — the Neo's judgment is never the last word; an edit's images
 ///                              go first as blobs, or by their history ordinal
 ///                  quote       what an edit's format and a need with images are: the denoiser's rule
 ///                              and the memory need come from maps only the mini holds
 ///                  grid        an exploration (or a grid) from the Neo's form: its cells made on the mini,
-///                              which alone knows where a model's sketch stops; `addSheet` draws its sheet
+///                              which alone knows where a model's sketch stops; `addSheet` draws its sheet;
+///                              asked with a request number (`silicontrol grid`), it is answered by `gridQueued`
 ///                  enlarge, crop  an image of the mini's history, made there; `enlargeNeedsDownload`
 ///                              asks the Neo's consent to Apple's model
 ///                  cancel, removeJob, stopAll, clearQueue, deleteImages
+///                  restoreImages  the images just deleted, asked back from the mini's session trash
+///                  answerLicense  the click on that sheet, with the digest of the text shown (`Licensing.swift`)
 ///
-/// **No `Date` crosses**: the two clocks differ. What remains of a render is a duration.
+/// **No `Date` crosses**: the two clocks differ. What remains of a render is a duration. **No sentence
+/// crosses** where a code can: a refusal is `RemoteRefusal` (`Refusal.swift`), said in the reader's language.
 
 package struct RemoteLoRA: Codable, Equatable, Sendable {
     package var path: String
@@ -110,12 +118,18 @@ package struct RemoteJob: Codable, Equatable, Sendable {
     package var references: [RemoteReference]
     /// « Variations »: applied in order over the seed's noise.
     package var variations: [Variation]
+    /// **Named subjects**, which stay on the Neo (incognito): `prompt` is the one typed, `modelPrompt` the
+    /// rewrite the model reads, and the last `subjectImages` of `references` are the subjects' framed
+    /// pictures, sent as `.image` blobs after the edit's own. `nil`: the job cites nobody.
+    package var modelPrompt: String?
+    package var subjectImages: Int?
 
     package init(ordinal: Int, model: String, modelName: String, prompt: String, width: Int, height: Int, steps: Int,
                  defaultSteps: Int?, loras: [RemoteLoRA], seeds: [UInt64], detail: Detail, solver: Solver,
                  schedule: SigmaSchedule, previews: Bool, neuralEngine: Bool?, references: [RemoteReference] = [],
-                 variations: [Variation] = []) {
+                 variations: [Variation] = [], modelPrompt: String? = nil, subjectImages: Int? = nil) {
         self.references = references; self.variations = variations
+        self.modelPrompt = modelPrompt; self.subjectImages = subjectImages
         self.ordinal = ordinal; self.model = model; self.modelName = modelName; self.prompt = prompt
         self.width = width; self.height = height; self.steps = steps; self.defaultSteps = defaultSteps
         self.loras = loras; self.seeds = seeds; self.detail = detail; self.solver = solver
@@ -138,8 +152,8 @@ package struct RemoteQueue: Codable, Equatable, Sendable {
     package var stageSeconds: [String: Double] = [:]
     /// Seconds left in the render running, as the mini estimated them when it sent this.
     package var remaining: Double?
-    /// The last refusal or failure, in the mini's words.
-    package var problem: String?
+    /// The last refusal or failure.
+    package var problem: RemoteRefusal?
     /// The history image being enlarged (`i` ordinal).
     package var enlarging: Int?
     /// **What others asked of the mini**, never shown: its own renders and other Macs', as a count, and
@@ -165,11 +179,14 @@ package struct RemoteEntry: Codable, Equatable, Sendable {
     package var enlarged: Int?
     package var cropped: Crop.Box?
     package var sheet: RemoteSheet?
+    /// An enlargement's source, by its history ordinal (`nil`: it left the history): the borrowing Mac lays
+    /// it under the enlarged image, as the curtain does here — it has no original of its own.
+    package var enlargedFrom: Int?
 
     package init(ordinal: Int, job: RemoteJob, width: Int, height: Int, seed: UInt64, timings: Engine.Timings,
                  footprints: Engine.Footprints, evaluations: Int, metadata: [String: String], neuralEngine: Bool, png: UInt32,
-                 enlarged: Int? = nil, cropped: Crop.Box? = nil, sheet: RemoteSheet? = nil) {
-        self.enlarged = enlarged; self.cropped = cropped; self.sheet = sheet
+                 enlarged: Int? = nil, cropped: Crop.Box? = nil, sheet: RemoteSheet? = nil, enlargedFrom: Int? = nil) {
+        self.enlarged = enlarged; self.cropped = cropped; self.sheet = sheet; self.enlargedFrom = enlargedFrom
         self.ordinal = ordinal; self.job = job; self.width = width; self.height = height; self.seed = seed
         self.timings = timings; self.footprints = footprints; self.evaluations = evaluations
         self.metadata = metadata; self.neuralEngine = neuralEngine; self.png = png
@@ -241,15 +258,18 @@ package struct RemoteGridRequest: Codable, Equatable, Sendable {
     package var sketch: Bool
     /// The evaluations a sketch stops after; 0: where the model's sketch stops by itself.
     package var stopAfter: Int
-    package init(spec: RemoteGridSpec, job: RemoteJob, sketch: Bool, stopAfter: Int) {
-        self.spec = spec; self.job = job; self.sketch = sketch; self.stopAfter = stopAfter
+    /// The Neo's request number when it waits for the mini's word (`silicontrol grid`): answered by
+    /// `RemoteAnswer.gridQueued`. `nil`: the window, which reads the exploration published.
+    package var request: Int?
+    package init(spec: RemoteGridSpec, job: RemoteJob, sketch: Bool, stopAfter: Int, request: Int? = nil) {
+        self.spec = spec; self.job = job; self.sketch = sketch; self.stopAfter = stopAfter; self.request = request
     }
 }
 
 /// How a cell's job ended, as the panel says it.
 package enum RemoteIssue: Codable, Equatable, Sendable {
     case finished, stopped, removed
-    case failed(String)
+    case failed(RemoteRefusal)
 }
 
 /// **The exploration on the mini**, published whole at each change — but its images, which go once
@@ -279,7 +299,9 @@ package struct RemoteSheet: Codable, Equatable, Sendable {
 package enum RemoteAnswer: Codable, Equatable, Sendable {
     /// Queued as this job, with what the mini estimates it takes (`nil`: never measured).
     case queued(ordinal: Int, estimate: Double?, width: Int, height: Int)
-    case refused(String)
+    case refused(RemoteRefusal)
+    /// A grid queued as this grid, its cell jobs in the grid's order, whole (`RemoteGridRequest.request`).
+    case gridQueued(grid: Int, cells: [RemoteJob], estimate: Double?)
 }
 
 /// **A job of the Neo's that ended** on the mini — sent after its images, so that whoever follows it

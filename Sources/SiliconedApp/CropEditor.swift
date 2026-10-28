@@ -40,19 +40,20 @@ extension AppState {
     // MARK: Asking
 
     /// Why « Crop » cannot take this image, in a sentence — `nil` when it can.
-    func cropRefusal(_ entry: Entry) -> String? {
-        if entry.grid != nil { return String(localized: "A grid is not cropped") }
-        if entry.sketch != nil { return String(localized: "A sketch is not cropped") }
-        return cropRefusal(width: entry.width, height: entry.height)
+    func cropRefusal(_ entry: Entry) -> String? { cropRefusalCode(entry)?.sentence }
+
+    func cropRefusal(width: Int, height: Int) -> String? { cropRefusalCode(width: width, height: height)?.sentence }
+
+    /// The same, as a code: what a lending Mac sends (`MirrorServer`), said in the borrower's language.
+    func cropRefusalCode(_ entry: Entry) -> AppRefusal? {
+        if entry.grid != nil { return .gridNotCropped }
+        if entry.sketch != nil { return .sketchNotCropped }
+        return cropRefusalCode(width: entry.width, height: entry.height)
     }
 
-    func cropRefusal(width: Int, height: Int) -> String? {
-        let frame = Crop.Frame(width: width, height: height)
-        guard !frame.canCrop else { return nil }
-        let side = String(Format.minimumSide)
-        return min(width, height) < Format.minimumSide
-            ? String(localized: "Cropping needs \(side) px or more on each side")
-            : String(localized: "This image is already at the smallest size, \(side) px")
+    func cropRefusalCode(width: Int, height: Int) -> AppRefusal? {
+        guard !Crop.Frame(width: width, height: height).canCrop else { return nil }
+        return min(width, height) < Format.minimumSide ? .cropNeeds(side: Format.minimumSide) : .cropSmallest(side: Format.minimumSide)
     }
 
     /// **C**: the image shown, or the toast that says why not.
@@ -126,7 +127,7 @@ extension AppState {
         case .entry(let id):
             guard let entry = history.first(where: { $0.id == id }) else { return }
             // In a mirror, the other Mac cuts its own pixels: the same box, the same image, in its history.
-            if let mirror { mirror.send(.crop(entry.ordinal, s.box)); return }
+            if let mirror { mirror.cropsAsked += 1; mirror.send(.crop(entry.ordinal, s.box)); return }
             Task { await cropped(entry, image: s.image, box: s.box) }
         case .reference(let id):
             cropReference(id, image: s.image, box: s.box)

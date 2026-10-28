@@ -19,6 +19,8 @@ struct Problem: Equatable, Sendable {
     var title: String
     var suggestion: String?
     var detail: String?
+    /// The error itself, when there was one: what crosses to a borrowing Mac, which says it in its language.
+    var engine: EngineError?
 
     /// The sentence and its suggestion, one per line — what the remote control returns as "message".
     var text: String { [title, suggestion].compactMap { $0 }.joined(separator: "\n") }
@@ -33,6 +35,7 @@ struct Problem: Equatable, Sendable {
     init(_ error: any Error) { self.init(EngineError(error)) }
 
     init(_ e: EngineError) {
+        engine = e
         code = e.code
         title = Self.sentence(e)
         suggestion = Self.suggestion(e)

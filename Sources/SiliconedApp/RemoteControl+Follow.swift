@@ -56,7 +56,7 @@ extension RemoteControl {
     }
 
     /// One `"type": "image"` line (or `"sheet"`), the PNG written into `folder` if given.
-    private func emitImage(_ e: Entry, folder: String?, type: String = "image", _ c: Connection) {
+    func emitImage(_ e: Entry, folder: String?, type: String = "image", _ c: Connection) {
         var path: String?
         var o: [String: Any] = [:]
         if let folder {
@@ -84,7 +84,8 @@ extension RemoteControl {
             }
             // `g2`: a grid, followed to its sheet.
             if a.first == "g", let n = Int(a.dropFirst()) {
-                guard app.gridRuns[n] != nil || app.drawingSheets[n] != nil || app.endedGrids[n] != nil else {
+                guard app.gridRuns[n] != nil || app.drawingSheets[n] != nil || app.endedGrids[n] != nil
+                        || app.mirror?.grids[n] != nil else {
                     throw Refusal("unknown_job", String(localized: "no grid \(a) in this session"), help: "silicontrol status")
                 }
                 grids.append(n)
@@ -107,7 +108,7 @@ extension RemoteControl {
                 throw Refusal("usage", String(localized: "wait follows one grid alone: wait g2 [--out D]"))
             }
             if let folder { try createFolder(folder) }
-            followGrid(grids[0], folder: folder, c)
+            if let mirror = app.mirror { followMirroredGrid(mirror, grids[0], folder: folder, c) } else { followGrid(grids[0], folder: folder, c) }
             return
         }
         if ordinals.isEmpty {

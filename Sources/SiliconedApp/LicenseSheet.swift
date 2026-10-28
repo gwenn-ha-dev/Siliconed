@@ -132,11 +132,12 @@ struct LicenseSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("\(card.name): accept its license to render").font(.title3.weight(.semibold))
-            Text("This model is installed, but its license hasn't been accepted in this library yet. The engine renders nothing before.")
+            Text(app.mirror.map { String(localized: "This model is installed on “\($0.macName)”, but its license hasn't been accepted there yet. It renders nothing before.") }
+                    ?? String(localized: "This model is installed, but its license hasn't been accepted in this library yet. The engine renders nothing before."))
                 .font(.callout).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             // The links and words of the version on disk: a Compact's third parties too.
-            LicenseTerms(card: card, variant: app.library.variant(of: card.family))
+            LicenseTerms(card: card, variant: app.licenseVariant(of: card))
                 .padding(12)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(RoundedRectangle(cornerRadius: 8).fill(Color(nsColor: .controlBackgroundColor)))

@@ -89,7 +89,8 @@ final class RemoteControl {
             case "diagnose": try diagnose(arguments, c)
             case "add":
                 if let mirror = app.mirror { try addOnMirror(mirror, arguments, cwd: cwd, c) } else { try add(arguments, cwd: cwd, c) }
-            case "grid": try add(arguments, cwd: cwd, c, grid: true)
+            case "grid":
+                if let mirror = app.mirror { try addOnMirror(mirror, arguments, cwd: cwd, c, grid: true) } else { try add(arguments, cwd: cwd, c, grid: true) }
             case "wait": try wait(arguments, cwd: cwd, c)
             case "follow": follow(c)
             case "cancel": finish(c, try cancel(arguments))
@@ -97,8 +98,10 @@ final class RemoteControl {
             case "set": finish(c, try set(arguments))
             case "history": finish(c, try history(arguments))
             case "save": finish(c, try save(arguments, cwd: cwd))
-            case "vary": finish(c, try vary(arguments))
-            case "enlarge": try enlarge(arguments, c)
+            case "vary":
+                if let mirror = app.mirror { try varyOnMirror(mirror, arguments, c) } else { finish(c, try vary(arguments)) }
+            case "enlarge":
+                if let mirror = app.mirror { try enlargeOnMirror(mirror, arguments, c) } else { try enlarge(arguments, c) }
             case "subjects": finish(c, try subjects(arguments, cwd: cwd))
             default:
                 throw Refusal("usage", String(localized: "unknown command: \"\(command)\""),

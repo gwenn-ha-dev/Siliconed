@@ -332,7 +332,10 @@ final class AppState {
     /// Any image the model read can be the original — an edit's or a named subject's, framed as it was
     /// sent: « @ana as a western comic » keeps the picture's framing as an edit does.
     /// An enlargement's original is the image it was made from, stretched to its size.
-    func canCompareOriginal(_ e: Entry) -> Bool { e.grid == nil && (!e.references.isEmpty || e.enlargedFrom != nil) }
+    /// In a mirror, an edit's images stayed on the other Mac (`.remote`): no original to lay under it.
+    func canCompareOriginal(_ e: Entry) -> Bool {
+        e.grid == nil && (e.references.contains { if case .remote = $0.source { false } else { true } } || e.enlargedFrom != nil)
+    }
     /// The thumbnails' height in the strip (the slider at its end); in memory, like the rest.
     var thumbnailSide: Double = 64
     /// Where a ⇧-run starts: the last image clicked without ⇧.
@@ -478,12 +481,16 @@ final class AppState {
     var othersSeconds: Double?
     /// What the other Mac answered to the form's questions (`quoted`).
     var mirrorQuotes: [RemoteQuote: RemoteQuoteAnswer] = [:]
+    /// What the other Mac estimates each waiting job of this Mac's takes, by ordinal (`RemoteStatistics`):
+    /// the speeds learned there are not a plan's to compute here.
+    var mirrorEstimates: [Int: Double] = [:]
 
     /// **The state of another Mac**, shown here (`AppState+Mirror.swift`): nothing read from this Mac's
-    /// library but the named subjects, which stay with the user; no capacity map, no copy, no warm-up.
-    init(mirroring link: MirrorLink, library: Library) {
+    /// library but the named subjects, which stay with the user (this Mac's own library, shared: `silicontrol
+    /// subjects` and the chips act on the same ones in either view); no capacity map, no copy, no warm-up.
+    init(mirroring link: MirrorLink, library: Library, subjects: SubjectLibrary) {
         self.library = library
-        subjects = SubjectLibrary(library: library)
+        self.subjects = subjects
         mirror = link
         cards = ModelCard.allCards
         identifier = defaultIdentifier

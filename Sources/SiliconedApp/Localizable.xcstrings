@@ -203,40 +203,6 @@
         }
       }
     },
-    "%@ does not work on another Mac yet: the window computes on “%@”" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ funktioniert noch nicht auf einem anderen Mac: Das Fenster rechnet auf „%@“"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "%1$@ does not work on another Mac yet: the window computes on “%2$@”"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ aún no funciona en otro Mac: la ventana calcula en «%@»"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ ne marche pas encore sur un autre Mac : la fenêtre calcule sur « %@ »"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ non funziona ancora su un altro Mac: la finestra calcola su «%@»"
-          }
-        }
-      }
-    },
     "%@ doesn't offer Detail" : {
       "localizations" : {
         "de" : {
@@ -3791,6 +3757,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Una generazione richiede da 1 a 8 immagini."
+          }
+        }
+      }
+    },
+    "A render that cites named subjects needs their prompt and images." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ein Rendering, das benannte Motive zitiert, braucht deren Prompt und Bilder."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un render que cita sujetos con nombre necesita su prompt y sus imágenes."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un rendu qui cite des sujets nommés a besoin de leur prompt et de leurs images."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un rendering che cita soggetti con nome richiede il loro prompt e le loro immagini."
           }
         }
       }
@@ -19038,6 +19032,34 @@
         }
       }
     },
+    "Statistics on “%@”" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Statistik auf „%@“"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Estadísticas en «%@»"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Statistiques sur « %@ »"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Statistiche su «%@»"
+          }
+        }
+      }
+    },
     "Step counts, separated by commas" : {
       "localizations" : {
         "de" : {
@@ -21185,6 +21207,34 @@
         }
       }
     },
+    "The license shown is not this Mac's text for %@: nothing was accepted." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die gezeigte Lizenz ist nicht der Text dieses Macs für %@: Nichts wurde akzeptiert."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La licencia mostrada no es el texto de este Mac para %@: no se aceptó nada."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La licence montrée n’est pas le texte de ce Mac pour %@ : rien n’a été accepté."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La licenza mostrata non è il testo di questo Mac per %@: non è stato accettato nulla."
+          }
+        }
+      }
+    },
     "The look: medium, palette, lighting — not the content." : {
       "localizations" : {
         "de" : {
@@ -22569,6 +22619,34 @@
         }
       }
     },
+    "These images can't be restored." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diese Bilder können nicht wiederhergestellt werden."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Estas imágenes no se pueden restaurar."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ces images ne peuvent pas être restaurées."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Queste immagini non possono essere ripristinate."
+          }
+        }
+      }
+    },
     "These modules don't connect: %@ comes out where %@ is expected." : {
       "localizations" : {
         "de" : {
@@ -23119,6 +23197,34 @@
         }
       }
     },
+    "This image could not be varied" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dieses Bild konnte nicht variiert werden"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se pudo variar esta imagen"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette image n’a pas pu être variée"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Non è stato possibile variare questa immagine"
+          }
+        }
+      }
+    },
     "This image is already at the smallest size, %@ px" : {
       "localizations" : {
         "de" : {
@@ -23351,6 +23457,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Questo modello non ha una pianificazione per %1$@ passi: %2$@."
+          }
+        }
+      }
+    },
+    "This model is installed on “%@”, but its license hasn't been accepted there yet. It renders nothing before." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dieses Modell ist auf „%@“ installiert, aber seine Lizenz wurde dort noch nicht akzeptiert. Vorher rendert es nichts."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Este modelo está instalado en «%@», pero su licencia aún no se ha aceptado allí. No renderiza nada antes."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce modèle est installé sur « %@ », mais sa licence n’y a pas encore été acceptée. Il ne rend rien avant."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Questo modello è installato su «%@», ma la sua licenza non vi è ancora stata accettata. Prima non genera nulla."
           }
         }
       }
@@ -29457,6 +29591,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "«%@» non è una dimensione: scrivila come larghezza × altezza, ad esempio 832x1216."
+          }
+        }
+      }
+    },
+    "“%@” no longer knows this render." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "„%@“ kennt dieses Rendering nicht mehr."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "«%@» ya no conoce este render."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "« %@ » ne connaît plus ce rendu."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "«%@» non conosce più questo rendering."
           }
         }
       }

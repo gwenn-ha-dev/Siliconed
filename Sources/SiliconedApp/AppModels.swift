@@ -412,6 +412,23 @@ struct Measures {
     /// The timers and footprints of the last finished image.
     private(set) var timings: Engine.Timings?
     private(set) var footprints: Engine.Footprints?
+    /// A mirror has no `plan`: the other Mac's evaluations and half-size steps (`RemoteMeasures`).
+    private(set) var remotePlan: (evaluations: Int, reduced: Int)?
+
+    init() {}
+
+    /// What the other Mac measured for this Mac's render, dated here: `begin` is `elapsed` ago.
+    init(remote r: RemoteMeasures, job: Job, now: Date = Date()) {
+        self.job = job
+        begin = now.addingTimeInterval(-r.elapsed)
+        if let e = r.evaluations { remotePlan = (e, r.reduced ?? 0) }
+        tokens = r.tokens; tokenizer = r.tokenizer; encoder = r.encoder; encoding = r.encoding
+        textCached = r.textCached; stepSeconds = r.stepSeconds; decodings = r.decodings
+        timings = r.timings; footprints = r.footprints
+    }
+
+    /// The evaluations planned per image, here or on the Mac that renders.
+    var planned: Int { plan?.denoising.evaluations ?? remotePlan?.evaluations ?? 0 }
 
     mutating func beginJob(_ t: Job) {
         self = Measures()
@@ -441,7 +458,7 @@ struct Measures {
     }
 
     /// The half-size steps of the spectral schedule: the first ones of each image.
-    var reduced: Int { plan?.denoising.reduced ?? 0 }
+    var reduced: Int { plan?.denoising.reduced ?? remotePlan?.reduced ?? 0 }
 
     /// What this render learns about speed; `nil` without a full step.
     var speed: Speed? {

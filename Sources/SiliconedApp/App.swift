@@ -333,7 +333,7 @@ final class MainWindow: NSObject, NSWindowDelegate {
         if let mac {
             let link = MirrorLink(macName: mac.name, send: { [weak self] m in self?.otherMacs.send(m, to: mac.id) },
                                   sendBlob: { [weak self] d, id in self?.otherMacs.send(blob: d, id: id, to: mac.id) })
-            let m = AppState(mirroring: link, library: local.library)
+            let m = AppState(mirroring: link, library: local.library, subjects: local.subjects)
             m.prompt = from.prompt; m.identifier = from.identifier; m.steps = from.steps
             m.orientation = from.orientation; m.format = from.format; m.batch = from.batch
             m.fixedSeed = from.fixedSeed; m.seed = from.seed; m.detail = from.detail; m.previews = from.previews
@@ -437,7 +437,7 @@ final class MainWindow: NSObject, NSWindowDelegate {
             let p = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 360, height: 620),
                             styleMask: [.titled, .closable, .resizable, .utilityWindow, .nonactivatingPanel],
                             backing: .buffered, defer: false)
-            p.title = String(localized: "Statistics")
+            p.title = app.mirror.map { String(localized: "Statistics on “\($0.macName)”") } ?? String(localized: "Statistics")
             p.isFloatingPanel = true
             p.hidesOnDeactivate = false
             p.isRestorable = false

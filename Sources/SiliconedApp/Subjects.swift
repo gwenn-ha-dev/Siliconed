@@ -311,14 +311,15 @@ extension AppState {
     var subjectsActive: Bool { subjectsAvailable && referenceMode == .subjects }
 
     /// **One expanded prompt, rewritten** — `nil` when the feature is off or the prompt cites nobody.
-    /// For the rack's model and edit images by default; the remote control passes its request's.
-    func rewrite(_ expanded: String, model: Model? = nil,
+    /// For the rack's model and edit images by default; the remote control passes its request's — a
+    /// `model` it holds, or in a mirror (no model chain here) the `capacity` the other Mac published.
+    func rewrite(_ expanded: String, model: Model? = nil, capacity given: Int? = nil,
                  editImages: Int? = nil) -> Result<NamedSubjects.Rewritten, NamedSubjects.Failure>? {
         // The rack reads `@names` in its Subjects mode only; the remote control, which brings its own
         // images, whenever the switch is on — and, like the rack, only for a model that reads images:
         // elsewhere `@` is the model's own (Anima's card writes an artist `@incase`).
-        guard model == nil ? subjectsActive : subjects.enabled, !NamedSubjects.mentions(in: expanded).isEmpty else { return nil }
-        let capacity = model.map { $0.chain.text.output.readsImages ? $0.chain.denoising.maxReferences : 0 }
+        guard model == nil && given == nil ? subjectsActive : subjects.enabled, !NamedSubjects.mentions(in: expanded).isEmpty else { return nil }
+        let capacity = given ?? model.map { $0.chain.text.output.readsImages ? $0.chain.denoising.maxReferences : 0 }
             ?? (promptNamesImages ? maxReferences : 0)
         guard capacity > 0 else { return nil }
         let first = (editImages ?? references.count) + 1
@@ -351,9 +352,11 @@ extension AppState {
 
     /// **The job's prompt and references for one expanded prompt**: rewritten when it cites subjects,
     /// the subjects' framed pictures after the edit's images.
+    /// In a mirror the job goes with the rewrite and the pictures (`RemoteJob.modelPrompt`): the subjects stay here.
     func namedJob(_ expanded: String, settings: inout RenderSettings, references edit: [ReferenceImage],
-                  model: Model? = nil) -> [ReferenceImage] {
-        guard case .success(let r)? = rewrite(expanded, model: model, editImages: edit.count), !r.placed.isEmpty else { return edit }
+                  model: Model? = nil, capacity: Int? = nil) -> [ReferenceImage] {
+        guard case .success(let r)? = rewrite(expanded, model: model, capacity: capacity, editImages: edit.count),
+              !r.placed.isEmpty else { return edit }
         let placed = subjects.references(r)
         settings.modelPrompt = r.prompt
         settings.subjectImages = placed.count

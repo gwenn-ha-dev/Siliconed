@@ -25,10 +25,19 @@
 // - **« Variations »** of an image: its own variations travel with the job, and an edit's images are
 //   named by the image (`ofImage`) — they never came here.
 // - **Enlarging and cropping** happen there, on its own pixels (`enlarge`, `crop` by ordinal); the
-//   consent to download Apple's model is asked here. An enlargement's curtain has no original here yet.
+//   consent to download Apple's model is asked here. An enlargement's curtain lays under it its source
+//   when that is in the history (`RemoteEntry.enlargedFrom`); else there is no curtain.
+// - **Named subjects stay here** (incognito): a render that cites them sends the model's prompt and the
+//   subjects' framed pictures after the edit's images (`RemoteJob.modelPrompt`, `subjectImages`), and
+//   nothing else of them.
 // - **The exploration** is asked whole (`grid`) and made there; the panel shows the one it publishes,
 //   its cells' images arriving one by one (`cellImage`). « Finish This Image » is an ordinary render.
-// - Not yet: named subjects, the statistics, the license sheet, ⌘Z after a removal.
+// - **The statistics and the license sheet** are the other Mac's, for this Mac's renders (`MirrorStats.swift`).
+// - **⌘Z after a removal**: the other Mac keeps the images removed in a trash of its session, per Mac;
+//   « Undo » asks them back by ordinal (`restoreImages`) and « Redo » removes them again.
+// - **After a cut** the other Mac says at each join what it still holds of ours (`synced`): what is not in
+//   it is removed here, and a job it no longer knows ends as failed — nothing waits for ever.
+// - **Its refusals are codes** (`RemoteRefusal`), said here in this Mac's language.
 
 import AppKit
 import Foundation
@@ -43,7 +52,7 @@ final class MirrorLink {
     /// Jobs and images already built here, by ordinal: their `UUID` stays. A job stays once gone from the
     /// queue: its end (`ended`) comes after.
     var jobs: [Int: Job] = [:]
-    private var nextRequest = 1
+    private(set) var nextRequest = 1
     /// Who waits for the mini's word on a render (`silicontrol add`), by request number.
     var waiters: [Int: (RemoteAnswer) -> Void] = [:]
     /// The job each request asked for, until the mini numbers it.
@@ -63,6 +72,21 @@ final class MirrorLink {
     var pendingCells: [UInt32: (grid: Int, cell: Int, entry: RemoteEntry)] = [:]
     /// The edit's images the last exploration was asked with: what « Use These Settings » puts back.
     var exploreReferences: [ReferenceImage] = []
+    /// The installed version of the family whose license is asked: its links, on the other Mac.
+    var licenseVariant: Variant?
+    /// **What was in flight when the link was cut**: the jobs not ended, the renders not answered. The next
+    /// `synced` settles them — those it does not know will never end (`settle`).
+    var cut: (jobs: Set<Int>, requests: Set<Int>)?
+    /// Crops asked and not yet seen back: the one that comes registers its « Undo » (`cropped`).
+    var cropsAsked = 0
+    /// **Who waits for an enlargement** (`silicontrol enlarge`), first come first served: the other Mac
+    /// enlarges one image at a time. Without one, the word of the other Mac goes to the window (the
+    /// consent alert, the flash).
+    var enlargeWaiters: [(Enlarged) -> Void] = []
+    enum Enlarged { case done(Entry), downloadRequired, refused(String) }
+    /// The grids the other Mac made for `silicontrol grid`: their cell jobs in order, and whether they are sketches.
+    var grids: [Int: (jobs: [Int], sketch: Bool)] = [:]
+    private var sketches: [Int: Bool] = [:]
 
     init(macName: String, send: @escaping (SessionMessage) -> Void, sendBlob: @escaping (Data, UInt32) -> Void) {
         self.macName = macName; self.sender = send; self.blobSender = sendBlob
@@ -89,13 +113,35 @@ final class MirrorLink {
     }
 
     /// An exploration: the cells are made there (`enqueueGrid`), where a sketch's stop is known.
+    /// `answered` (`silicontrol grid`): the other Mac's word on the grid, its cell jobs numbered; `sketch:
+    /// false` is a grid whose cells join the history, and its sheet.
     func explore(_ grid: RenderGrid, settings: RenderSettings, references: [ReferenceImage], stopAfter: Int,
-                 neuralEngine: Bool?) throws(EngineError) {
-        var job = MirrorProjection.remote(settings, ordinal: 0, seeds: [], previews: true, defaultSteps: nil,
+                 neuralEngine: Bool?, sketch: Bool = true, previews: Bool = true,
+                 answered: ((RemoteAnswer) -> Void)? = nil) throws(EngineError) {
+        var job = MirrorProjection.remote(settings, ordinal: 0, seeds: [], previews: previews, defaultSteps: nil,
                                           neuralEngine: neuralEngine)
         job.references = try remote(references)
-        exploreReferences = references
-        sender(.grid(RemoteGridRequest(spec: RemoteGridSpec(grid), job: job, sketch: true, stopAfter: stopAfter)))
+        if sketch { exploreReferences = references }
+        var request: Int?
+        if let answered {
+            request = nextRequest
+            nextRequest += 1
+            waiters[request!] = answered
+            sketches[request!] = sketch
+        }
+        sender(.grid(RemoteGridRequest(spec: RemoteGridSpec(grid), job: job, sketch: sketch, stopAfter: stopAfter,
+                                       request: request)))
+    }
+
+    /// A grid answered: its cells are known, to follow.
+    func made(_ grid: Int, cells: [Int], request: Int) {
+        grids[grid] = (cells, sketches.removeValue(forKey: request) ?? true)
+    }
+
+    /// The word of the other Mac on every request numbered from `first` (those a gesture of the window,
+    /// `vary`, has just sent): `answered` gets the request's rank among them.
+    func awaiting(from first: Int, _ answered: @escaping (Int, RemoteAnswer) -> Void) {
+        for r in first..<nextRequest { waiters[r] = { answered(r - first, $0) } }
     }
 
     private func remote(_ references: [ReferenceImage]) throws(EngineError) -> [RemoteReference] {
@@ -135,7 +181,7 @@ enum MirrorProjection {
                   width: s.format.width, height: s.format.height, steps: s.steps, defaultSteps: defaultSteps,
                   loras: s.loras.map { RemoteLoRA(path: $0.path, strength: $0.strength) }, seeds: seeds,
                   detail: s.detail, solver: s.solver, schedule: s.schedule, previews: previews, neuralEngine: neuralEngine,
-                  variations: s.variations)
+                  variations: s.variations, modelPrompt: s.modelPrompt, subjectImages: s.subjectImages > 0 ? s.subjectImages : nil)
     }
 
     static func settings(_ r: RemoteJob) -> RenderSettings {
@@ -145,6 +191,8 @@ enum MirrorProjection {
                                detail: r.detail, solver: r.solver, schedule: r.schedule)
         s.neuralEngine = r.neuralEngine ?? false
         s.variations = r.variations
+        s.modelPrompt = r.modelPrompt
+        s.subjectImages = r.subjectImages ?? 0
         s.references = r.references.count
         return s
     }
@@ -280,7 +328,7 @@ extension AppState {
                 case .finished: .finished
                 case .stopped: .stopped
                 case .removed: .removed
-                case .failed(let text): .failed(Problem(text))
+                case .failed(let r): .failed(Problem(r))
                 }
             }
             link.cells = link.cells.filter { $0.key == x.ordinal }
@@ -289,6 +337,7 @@ extension AppState {
             link.pendingCells[e.png] = (grid, cell, e)
         case .enlargeNeedsDownload(let o):
             // The consent is asked where the user is; the other Mac downloads Apple's model.
+            if !link.enlargeWaiters.isEmpty { link.enlargeWaiters.removeFirst()(.downloadRequired); return }
             if link.entries[o] != nil, Self.consentsToDownload() { link.send(.enlarge(o, download: true)) }
         case .answer(let request, let a):
             if case let .queued(o, _, w, h) = a, let j = link.requested[request], link.jobs[o] == nil {
@@ -299,27 +348,43 @@ extension AppState {
                 known.neuralEngine = j.neuralEngine
                 link.jobs[o] = known
             }
+            // A grid's cells are known by their answer, as a render is: they may end before a snapshot shows them.
+            if case let .gridQueued(grid, cells, _) = a {
+                link.made(grid, cells: cells.map(\.ordinal), request: request)
+                for r in cells where link.jobs[r.ordinal] == nil { link.jobs[r.ordinal] = MirrorProjection.job(r, ordinal: r.ordinal) }
+            }
             link.requested[request] = nil
             if let waiter = link.waiters.removeValue(forKey: request) { waiter(a); return }
-            if case .refused(let text) = a { problem = Problem(text); flash(text) }
+            if case .refused(let r) = a { let p = Problem(r); problem = p; flash(p.text) }
         case .ended(let e):
             link.endings.append(e)
             endHeld()
         case .quoted(let a):
             link.asked.remove(a.quote)
             mirrorQuotes[a.quote] = a
-        case .refused(let text):
-            problem = Problem(text)
-            flash(text)
+        case .statistics(let s):
+            receiveStatistics(s)
+        case .licensing(let l):
+            receiveLicensing(l)
+        case .refused(let r):
+            let p = Problem(r)
+            // An enlargement asked by `silicontrol` is answered there; its refusal is not the window's.
+            if !link.enlargeWaiters.isEmpty { link.enlargeWaiters.removeFirst()(.refused(p.text)); return }
+            problem = p
+            flash(p.text)
+        case .synced(let s):
+            settle(s)
         default:
             break
         }
     }
 
     /// The held ends whose images all came: told, after them, as here (`silicontrol wait` emits each image first).
-    private func endHeld() {
+    func endHeld() {
         guard let link = mirror else { return }
         link.endings.removeAll { e in
+            // Told again at a join (`synced`): one already ended here is not ended twice.
+            if completed[e.ordinal] != nil { return true }
             guard e.images.allSatisfy({ link.entries[$0] != nil }) else { return false }
             // Known from the queue, or from the answer to its `render` (a job that ended between two snapshots).
             guard let job = link.jobs[e.ordinal] else { return true }
@@ -327,7 +392,7 @@ extension AppState {
             case .finished: .finished
             case .stopped: .stopped
             case .removed: .removed
-            case .failed(let text): .failed(Problem(text))
+            case .failed(let r): .failed(Problem(r))
             }
             if case .failed(let p) = issue { problem = p }
             complete(job, issue, images: e.images, warnings: e.warnings)
@@ -347,6 +412,8 @@ extension AppState {
             entry.sketch = e.evaluations
             link.cells[grid, default: [:]][cell] = entry
             if explored?.ordinal == grid { explored?.entries[cell] = entry }
+            // As here, a sketch's image is told to whoever follows its job (`silicontrol grid --wait`).
+            if let run = explored, run.ordinal == grid, run.cellJobs.indices.contains(cell) { signal(.image(run.cellJobs[cell], entry)) }
             return
         }
         guard let e = link.pending.removeValue(forKey: id), link.entries[e.ordinal] == nil,
@@ -357,7 +424,15 @@ extension AppState {
             ReferenceImage(source: .remote($0.origin), vignette: NSImage(systemSymbolName: "photo", accessibilityDescription: nil) ?? NSImage(),
                            name: $0.name, width: $0.width, height: $0.height)
         }
+        // An enlargement's source, when it is still in the history: the curtain lays it under the enlarged
+        // image. None otherwise — no curtain, as for an edit whose images stayed on the other Mac.
+        entry.enlargedFrom = e.enlargedFrom.flatMap { link.entries[$0]?.png }
         link.entries[e.ordinal] = entry
+        if e.cropped != nil, link.cropsAsked > 0, e.ordinal > lastImage {
+            link.cropsAsked -= 1
+            registerRemoteUndo(of: e.ordinal, name: String(localized: "Crop"))
+        }
+        if entry.enlarged != nil, !link.enlargeWaiters.isEmpty { link.enlargeWaiters.removeFirst()(.done(entry)) }
         if let job = link.jobs[e.job.ordinal] { signal(.image(job, entry)) }
         // The history is newest first; entries arrive in their order, the first connection's oldest first.
         let at = history.firstIndex { $0.ordinal < e.ordinal } ?? history.count
@@ -397,8 +472,75 @@ extension AppState {
             // Asked before a cut: asked again.
             mirror?.asked = []
         case .connecting, .off: break
-        case .waiting: problem = { var p = Problem(String(localized: "Lost “\(name)”: trying again…")); p.code = "remote"; return p }()
+        case .waiting: noteCut(); problem = { var p = Problem(String(localized: "Lost “\(name)”: trying again…")); p.code = "remote"; return p }()
         case .refused: problem = { var p = Problem(OtherMacsSection.state(s, found: true)); p.code = "remote"; return p }()
         }
+    }
+}
+
+// MARK: - Removal undone, and the join's sync
+
+extension AppState {
+    /// A removal in a mirror, asked of the other Mac, which keeps the images in its session trash; « Undo »
+    /// asks them back and « Redo » removes them again. After the switch back to this Mac the undo is vain.
+    func removeRemotely(_ ordinals: [Int]) {
+        guard let mirror, !ordinals.isEmpty else { return }
+        mirror.send(.deleteImages(ordinals))
+        undoManager?.registerUndo(withTarget: self) { $0.restoreRemotely(ordinals) }
+        undoManager?.setActionName(ordinals.count == 1 ? String(localized: "Remove Image")
+                                                       : String(localized: "Remove \(ordinals.count) Images"))
+    }
+
+    private func restoreRemotely(_ ordinals: [Int]) {
+        guard let mirror else { return }
+        mirror.send(.restoreImages(ordinals))
+        undoManager?.registerUndo(withTarget: self) { $0.removeRemotely(ordinals) }
+        undoManager?.setActionName(ordinals.count == 1 ? String(localized: "Remove Image")
+                                                       : String(localized: "Remove \(ordinals.count) Images"))
+    }
+
+    /// An image the other Mac made from a crop asked here: undone by removing it, like any removal.
+    private func registerRemoteUndo(of ordinal: Int, name: String) {
+        undoManager?.registerUndo(withTarget: self) { $0.removeRemotely([ordinal]) }
+        undoManager?.setActionName(name)
+    }
+
+    /// The link was cut: what is in flight is noted, for `settle`.
+    func noteCut() {
+        guard let link = mirror, link.cut == nil else { return }
+        let held = Set(link.endings.map(\.ordinal))
+        link.cut = (Set(link.jobs.keys.filter { completed[$0] == nil && !held.contains($0) }),
+                    Set(link.waiters.keys).union(link.requested.keys))
+    }
+
+    /// **The other Mac's word on what it still holds of ours**, at each join: the history and the jobs are
+    /// exactly those. An image or an end it does not list is dropped; a render or a job from before the
+    /// cut that it does not know is over — said, so that no `wait` hangs.
+    fileprivate func settle(_ s: RemoteSync) {
+        guard let link = mirror else { return }
+        let keep = Set(s.entries)
+        let stale = Set(history.map(\.ordinal)).union(link.entries.keys).subtracting(keep).sorted()
+        if !stale.isEmpty {
+            receive(.removed(stale))
+            for o in stale { link.entries[o] = nil }
+        }
+        // Ends waiting for an image that is gone would wait for ever.
+        link.endings = link.endings.map { var e = $0; e.images = e.images.filter(keep.contains); return e }
+        let known = Set(s.jobs)
+        if let cut = link.cut {
+            let lost = Problem(String(localized: "“\(link.macName)” no longer knows this render."))
+            let held = Set(link.endings.map(\.ordinal))
+            for o in cut.jobs.sorted() where !known.contains(o) && completed[o] == nil && !held.contains(o) {
+                guard let job = link.jobs[o] else { continue }
+                problem = lost
+                complete(job, .failed(lost))
+            }
+            for r in cut.requests.sorted() {
+                link.requested[r] = nil
+                link.waiters.removeValue(forKey: r)?(.refused(.text(lost.text)))
+            }
+        }
+        link.cut = nil
+        endHeld()
     }
 }

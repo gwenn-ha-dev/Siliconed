@@ -322,6 +322,22 @@ extension RemoteControl {
     /// jobs (the rack's « Images » by default) with its settings and seed, each turned by a variation
     /// seed drawn at random.
     func vary(_ arguments: [String]) throws -> [String: Any] {
+        let (e, amount, count) = try varyRequest(arguments)
+        if let reason = app.libraryBlocker { throw Refusal("library_absent", reason, help: String(localized: "connect the disk, then retry")) }
+        if let reason = app.installBlocker { throw Refusal("busy", reason, help: String(localized: "retry once the installation is done (silicontrol models)")) }
+        guard app.canVary(e) else {
+            throw Refusal("model", String(localized: "\(e.name) has no variations: a grid's sheet, or its model is not ready"),
+                          help: "silicontrol models")
+        }
+        guard app.file.count + count <= AppState.maxQueueLength else {
+            throw Refusal("queue_full", String(localized: "the queue is full (\(AppState.maxQueueLength) jobs)"),
+                          help: "silicontrol wait, then retry")
+        }
+        return ["ok": true, "jobs": app.vary(e, amount, count: count).map { json($0) }]
+    }
+
+    /// What `vary` is asked: the image, the amount, how many — read the same on this Mac and on a mirror.
+    func varyRequest(_ arguments: [String]) throws -> (entry: Entry, amount: Variation.Amount, count: Int) {
         var count = app.batch
         var rest = arguments
         if rest.count == 4, rest[2] == "--batch" {
@@ -338,17 +354,7 @@ extension RemoteControl {
         guard let e = image(arguments[0]) else {
             throw Refusal("unknown_image", String(localized: "no image \"\(arguments[0])\" in the history"), help: "silicontrol history")
         }
-        if let reason = app.libraryBlocker { throw Refusal("library_absent", reason, help: String(localized: "connect the disk, then retry")) }
-        if let reason = app.installBlocker { throw Refusal("busy", reason, help: String(localized: "retry once the installation is done (silicontrol models)")) }
-        guard app.canVary(e) else {
-            throw Refusal("model", String(localized: "\(e.name) has no variations: a grid's sheet, or its model is not ready"),
-                          help: "silicontrol models")
-        }
-        guard app.file.count + count <= AppState.maxQueueLength else {
-            throw Refusal("queue_full", String(localized: "the queue is full (\(AppState.maxQueueLength) jobs)"),
-                          help: "silicontrol wait, then retry")
-        }
-        return ["ok": true, "jobs": app.vary(e, amount, count: count).map { json($0) }]
+        return (e, amount, count)
     }
 
     /// `enlarge i7 [--download]`: « Enlarge ×4 », answered once the enlarged image is in the history.

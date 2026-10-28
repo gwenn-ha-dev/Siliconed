@@ -16,7 +16,7 @@ import Foundation
 // `internalFailure` — a breakdown, never a silent "operation couldn't be completed".
 
 /// **Everything the engine refuses or fails on, by name.**
-package enum EngineError: Error, Equatable, Sendable, LocalizedError, CustomStringConvertible {
+package enum EngineError: Error, Equatable, Sendable, Codable, LocalizedError, CustomStringConvertible {
 
     // ── the library: models, files, installation ──────────────────────────────────────────
 
@@ -144,7 +144,7 @@ package enum EngineError: Error, Equatable, Sendable, LocalizedError, CustomStri
     case internalFailure(component: String, detail: String)
 
     /// Why a format is refused — `code` refines into `format_refused.<rawValue>`.
-    package enum FormatRefusal: String, Sendable, Equatable, CaseIterable {
+    package enum FormatRefusal: String, Sendable, Equatable, Codable, CaseIterable {
         /// A side that is not a multiple of the model's `Format.multiple(for:)` (16: VAE ×8, patch ×2;
         /// Qwen-Image-2.1 32: VAE ×16, patch ×2).
         case notMultiple = "not_multiple"
@@ -156,7 +156,7 @@ package enum EngineError: Error, Equatable, Sendable, LocalizedError, CustomStri
     }
 
     /// Why a prompt's alternatives do not parse — `code` refines into `prompt_syntax.<rawValue>`.
-    package enum PromptRefusal: String, Sendable, Equatable, CaseIterable {
+    package enum PromptRefusal: String, Sendable, Equatable, Codable, CaseIterable {
         /// A `{` that no `}` closes.
         case unclosedGroup = "unclosed_group"
         /// A `}` that closes no group.
@@ -166,7 +166,7 @@ package enum EngineError: Error, Equatable, Sendable, LocalizedError, CustomStri
     }
 
     /// Why an XY grid is refused — `code` refines into `grid_refused.<rawValue>`.
-    package enum GridRefusal: String, Sendable, Equatable, CaseIterable {
+    package enum GridRefusal: String, Sendable, Equatable, Codable, CaseIterable {
         /// An axis without a value.
         case emptyAxis = "empty_axis"
         /// X and Y vary the same setting (the seed twice, the same group, the same LoRA).
@@ -187,7 +187,7 @@ package enum EngineError: Error, Equatable, Sendable, LocalizedError, CustomStri
     }
 
     /// Why a library cannot go somewhere, or be opened — `code` refines into `library_refused.<rawValue>`.
-    package enum LibraryRefusal: String, Sendable, Equatable, CaseIterable {
+    package enum LibraryRefusal: String, Sendable, Equatable, Codable, CaseIterable {
         /// An MS-DOS (FAT32) disk: no file over 4 GB, and a model's map is tens of GB. exFAT is fine.
         case fileSizeLimit = "file_size_limit"
         /// A disk, or a folder, that cannot be written to.
@@ -205,7 +205,7 @@ package enum EngineError: Error, Equatable, Sendable, LocalizedError, CustomStri
     }
 
     /// Why a LoRA is refused — `code` refines into `unsupported_lora.<rawValue>`.
-    package enum LoRARefusal: String, Sendable, Equatable, CaseIterable {
+    package enum LoRARefusal: String, Sendable, Equatable, Codable, CaseIterable {
         /// The map is a model, not an adapter.
         case notALoRA = "not_a_lora"
         /// The map does not say which model it was forged for: forge it again.

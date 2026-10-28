@@ -84,7 +84,7 @@ struct Statistics: View {
     @ViewBuilder private var dit: some View {
         let image = min(app.batchImage, max(0, m.stepSeconds.count - 1))
         let durations = m.stepSeconds.indices.contains(image) ? m.stepSeconds[image] : []
-        let plannedCount = m.plan?.denoising.evaluations ?? 0
+        let plannedCount = m.planned
         StatLine("DiT", plannedCount > 0 ? String(localized: "\(durations.count)/\(plannedCount) steps") : "—",
               detail: m.speed.map { String(localized: "average \(Figures.seconds($0.full)) per full step") })
         if plannedCount > 0 {

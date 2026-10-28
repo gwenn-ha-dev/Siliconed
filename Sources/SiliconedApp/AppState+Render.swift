@@ -283,6 +283,7 @@ extension AppState {
     /// **The user accepted the license**: the library records it (the engine reads it at every render),
     /// and the jobs that waited for it go back to the head of the queue, in their order.
     func acceptLicense(_ card: ModelCard) {
+        if let mirror { answerLicense(card, accepted: true, via: mirror); return }
         do { try library.acceptLicense(card) } catch {
             problem = Problem(error)
             return
@@ -297,6 +298,7 @@ extension AppState {
 
     /// **Declined**: the jobs that waited end with the engine's refusal, as they would have.
     func declineLicense(_ card: ModelCard) {
+        if let mirror { answerLicense(card, accepted: false, via: mirror); return }
         licenseRequest = nil
         let refused = awaitingLicense.filter { $0.settings.identifier == card.id }
         awaitingLicense.removeAll { $0.settings.identifier == card.id }
@@ -490,6 +492,7 @@ extension AppState {
 
     /// The planned duration of a waiting job, or `nil` if it was never measured.
     func estimation(_ t: Job) -> Double? {
+        if mirror != nil { return mirrorEstimates[t.ordinal] }
         guard let v = speeds[t.speedKey], let plan = t.plan else { return nil }
         return v.duration(plan, images: t.seeds.count)
     }
