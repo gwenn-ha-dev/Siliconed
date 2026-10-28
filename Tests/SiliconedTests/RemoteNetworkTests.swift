@@ -211,6 +211,54 @@ final class RemoteNetworkTests: XCTestCase {
         XCTAssertEqual(neo.next(10) { e -> RemoteLink.Refusal? in if case .refused(let r) = e { r } else { nil } }, .forgotten)
     }
 
+    // MARK: - The mirror's messages
+
+    /// Once joined, a request goes up and an image comes down — its message, then its PNG as a blob.
+    func testAJoinedSessionCarriesMessagesAndBlobsBothWays() throws {
+        let (h, hostEvents) = host()
+        let key = randomKey(), port = Port()
+        try lending(h, hostEvents, [key], into: port)
+        let l = RemoteLink(key: key, hello: hello("Neo")) { port.value.map(Self.loopback) }
+        let received = Events<SessionMessage>(), blobs = Events<Data>()
+        l.listen(messages: { received.add($0) }, blobs: { _, d in blobs.add(d) })
+        let states = Events<RemoteLink.State>()
+        l.connect { states.add($0) }
+        addTeardownBlock { l.disconnect() }
+        XCTAssertNotNil(states.next { if case .connected(let x) = $0 { x } else { nil } })
+        let identity = try XCTUnwrap(hostEvents.next { if case .connected(let i, _) = $0 { i } else { nil } })
+
+        l.send(.cancel)
+        XCTAssertNotNil(hostEvents.next { e -> Bool? in if case .message(identity, .cancel) = e { true } else { nil } })
+        let png = Data((0..<200_000).map { UInt8($0 & 0xff) })
+        h.send(.preview(7), to: identity)
+        h.send(blob: png, id: 7, to: identity)
+        XCTAssertEqual(received.next { e -> UInt32? in if case .preview(let id?) = e { id } else { nil } }, UInt32(7))
+        XCTAssertEqual(blobs.next { d -> Data? in d }, png)
+    }
+
+    func testTheMirrorsMessagesTravelAsJSON() throws {
+        let job = RemoteJob(ordinal: 3, model: "z-image", modelName: "Z-Image Turbo", prompt: "woman posing in a library",
+                            width: 1024, height: 1024, steps: 8, defaultSteps: 8,
+                            loras: [RemoteLoRA(path: "/l/a.silicon", strength: 0.8)], seeds: [42, 43], detail: .normal,
+                            solver: .euler, schedule: .official, previews: true, neuralEngine: nil)
+        var q = RemoteQueue()
+        q.current = job; q.fraction = 0.5; q.stage = "denoising"; q.remaining = 41.5
+        var t = Engine.Timings(); t.total = 83.1
+        let messages: [SessionMessage] = [
+            .render(job), .queue(q), .cancel, .removeJob(4), .deleteImages([1, 2]), .refused("No."), .preview(nil),
+            .entry(RemoteEntry(ordinal: 7, job: job, width: 1024, height: 1024, seed: 42, timings: t,
+                               footprints: Engine.Footprints(), evaluations: 8, metadata: ["parameters": "x"],
+                               neuralEngine: false, png: 9)),
+            .catalog(MirrorCatalog(ready: ["z-image"], traits: ["z-image": RemoteTraits(
+                maxReferences: 0, readsImages: false, acceptsDetail: true, comfyUI: false, steps: Array(1...50),
+                text: "Qwen3", encoding: nil, decoding: "Flux VAE")], loras: [:], loraNames: [:],
+                ceiling: 10 << 30, settingsRead: true, neuralEngineOffered: true, fasterRendering: true)),
+        ]
+        for m in messages {
+            XCTAssertEqual(try JSONDecoder().decode(SessionMessage.self, from: JSONEncoder().encode(m)), m)
+        }
+    }
+
     // MARK: - What is filed
 
     func testPairingsKeepTheirKeysAndReplaceAMacPairedAgain() throws {

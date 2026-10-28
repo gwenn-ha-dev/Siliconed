@@ -24,6 +24,9 @@ package final class RemoteHost: @unchecked Sendable {
         case disconnected(identity: Data)
         /// A Mac that holds a key was turned away: another build (`mismatch`), or no longer paired.
         case turnedAway(name: String, Hello.Mismatch?)
+        /// What a joined Mac sends (`Mirror.swift`).
+        case message(identity: Data, SessionMessage)
+        case blob(identity: Data, id: UInt32, data: Data)
     }
 
     package enum PairingWindow: Equatable, Sendable {
@@ -142,7 +145,11 @@ package final class RemoteHost: @unchecked Sendable {
                 channel.send(SessionMessage.challenge(challenge))
             case .message(let json):
                 guard var s = sessions[id] else { return }
-                guard s.identity == nil else { return } // lot 3: the render's messages
+                if let identity = s.identity {
+                    guard let m = try? JSONDecoder().decode(SessionMessage.self, from: json) else { channel.close(); return }
+                    handler?(.message(identity: identity, m))
+                    return
+                }
                 guard case .join(let theirs, let identity, let proof)? = try? JSONDecoder().decode(SessionMessage.self, from: json),
                       let key = keys.first(where: { $0.identity == identity }),
                       SessionMessage.checks(proof, key, challenge: s.challenge) else {
@@ -159,11 +166,30 @@ package final class RemoteHost: @unchecked Sendable {
                 sessions[id] = s
                 channel.send(SessionMessage.welcome(hello))
                 handler?(.connected(identity: identity, hello: theirs))
-            case .blob:
-                channel.close()
+            case .blob(let blob, let data):
+                guard let identity = sessions[id]?.identity else { channel.close(); return }
+                handler?(.blob(identity: identity, id: blob, data: data))
             case .closed:
                 if let identity = sessions[id]?.identity { handler?(.disconnected(identity: identity)) }
                 sessions[id] = nil
+            }
+        }
+    }
+
+    /// To every joined Mac, or to one.
+    package func send(_ m: SessionMessage, to identity: Data? = nil) {
+        guard let json = try? JSONEncoder().encode(m) else { return }
+        queue.async { [self] in
+            for s in sessions.values where s.identity != nil && (identity == nil || s.identity == identity) {
+                s.channel.send(message: json)
+            }
+        }
+    }
+
+    package func send(blob: Data, id: UInt32, to identity: Data? = nil) {
+        queue.async { [self] in
+            for s in sessions.values where s.identity != nil && (identity == nil || s.identity == identity) {
+                s.channel.send(blob: blob, id: id)
             }
         }
     }

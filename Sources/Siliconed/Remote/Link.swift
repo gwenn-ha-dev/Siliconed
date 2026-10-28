@@ -35,6 +35,8 @@ package final class RemoteLink: @unchecked Sendable {
     private var failures = 0
     private var retry: DispatchWorkItem?
     private var joined = false
+    private var messages: (@Sendable (SessionMessage) -> Void)?
+    private var blobs: (@Sendable (UInt32, Data) -> Void)?
 
     /// `endpoint` is asked at each attempt: the Mac's Bonjour service as last seen, `nil` if not seen.
     package init(key: PairedKey, hello: Hello, endpoint: @escaping @Sendable () -> NWEndpoint?) {
@@ -48,6 +50,20 @@ package final class RemoteLink: @unchecked Sendable {
             failures = 0
             attempt()
         }
+    }
+
+    /// What the other Mac sends once joined, on the link's queue. Set before `connect`.
+    package func listen(messages: @escaping @Sendable (SessionMessage) -> Void, blobs: @escaping @Sendable (UInt32, Data) -> Void) {
+        queue.async { [self] in self.messages = messages; self.blobs = blobs }
+    }
+
+    /// Dropped when not joined: a request made while the link is down is not kept for later.
+    package func send(_ m: SessionMessage) {
+        queue.async { [self] in if joined { channel?.send(m) } }
+    }
+
+    package func send(blob: Data, id: UInt32) {
+        queue.async { [self] in if joined { channel?.send(blob: blob, id: id) } }
     }
 
     package func disconnect() {
@@ -79,8 +95,10 @@ package final class RemoteLink: @unchecked Sendable {
         c.start { [weak self] event in
             guard let self, c === channel else { return }
             switch event {
-            case .ready, .blob:
+            case .ready:
                 break
+            case .blob(let id, let data):
+                if joined { blobs?(id, data) }
             case .message(let json):
                 guard let m = try? JSONDecoder().decode(SessionMessage.self, from: json) else { c.close(); return }
                 switch m {
@@ -95,7 +113,7 @@ package final class RemoteLink: @unchecked Sendable {
                 case .mismatch(let mm):
                     refuse(.mismatch(mm))
                 default:
-                    break // lot 3: the render's messages
+                    if joined { messages?(m) }
                 }
             case .closed(let how):
                 channel = nil

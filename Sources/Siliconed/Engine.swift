@@ -37,7 +37,7 @@ package final class Engine: Sendable {
     /// What each phase cost. `text`, `encoding`, `denoising` and `decoding` partition
     /// `total`; `tokenizer` and `encoder` are indented within `text` — the lesson learned on
     /// decompositions that partition nothing. `encoding`: the img2img image, 0 without one.
-    package struct Timings: Sendable {
+    package struct Timings: Sendable, Codable, Equatable {
         package var tokenizer = 0.0, encoder = 0.0, text = 0.0
         package var encoding = 0.0, denoising = 0.0, decoding = 0.0, total = 0.0
         package init() {}
@@ -46,7 +46,7 @@ package final class Engine: Sendable {
     /// The footprints at the checkpoints. What is measured here cannot be deduced from any total:
     /// a measurement found 520 MB of residue after the text phase because someone sampled between the two,
     /// not because a calculation predicted it.
-    package struct Footprints: Sendable {
+    package struct Footprints: Sendable, Codable, Equatable {
         package var start = 0, tokenizer = 0, encoder = 0, text = 0
         /// The image encoder's peak, taken before it returns its memory; 0 without an image.
         package var encoding = 0

@@ -3671,6 +3671,34 @@
         }
       }
     },
+    "A render takes 1 to 8 images." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ein Rendering umfasst 1 bis 8 Bilder."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Una generación lleva de 1 a 8 imágenes."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un rendu prend de 1 à 8 images."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Una generazione richiede da 1 a 8 immagini."
+          }
+        }
+      }
+    },
     "A sketch is not cropped" : {
       "localizations" : {
         "de" : {
@@ -6533,6 +6561,34 @@
         }
       }
     },
+    "Compute On" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rechnen auf"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Calcular en"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Calculer sur"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Calcola su"
+          }
+        }
+      }
+    },
     "Compute on Another Mac" : {
       "localizations" : {
         "de" : {
@@ -6613,6 +6669,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Calcolo errato: oltre la sua soglia dal risultato esatto"
+          }
+        }
+      }
+    },
+    "Computing on “%@”" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rechnet auf „%@“"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Calculando en «%@»"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Calcul sur « %@ »"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Calcolo su «%@»"
           }
         }
       }
@@ -12236,6 +12320,34 @@
         }
       }
     },
+    "Lost “%@”: trying again…" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "„%@“ verloren: neuer Versuch…"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "«%@» perdido: reintentando…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "« %@ » perdu : nouvel essai…"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "«%@» perso: nuovo tentativo…"
+          }
+        }
+      }
+    },
     "Made with ComfyUI's schedule, offered in Developer Mode: the official one will be used." : {
       "localizations" : {
         "de" : {
@@ -14267,6 +14379,34 @@
         }
       }
     },
+    "Not installed on %@" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nicht installiert auf %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No instalado en %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pas installé sur %@"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Non installato su %@"
+          }
+        }
+      }
+    },
     "Not installed." : {
       "localizations" : {
         "de" : {
@@ -14291,6 +14431,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Non installato."
+          }
+        }
+      }
+    },
+    "Not on “%@” yet" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Noch nicht auf „%@“"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aún no en «%@»"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pas encore sur « %@ »"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Non ancora su «%@»"
           }
         }
       }
@@ -14964,6 +15132,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Altri Mac"
+          }
+        }
+      }
+    },
+    "Other Macs…" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Andere Macs…"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Otros Mac…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Autres Mac…"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Altri Mac…"
           }
         }
       }
@@ -22127,6 +22323,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Questi moduli non si collegano: %@ esce dove è atteso %@."
+          }
+        }
+      }
+    },
+    "This LoRA isn't installed on this Mac: %@" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diese LoRA ist auf diesem Mac nicht installiert: %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Este LoRA no está instalado en este Mac: %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce LoRA n’est pas installé sur ce Mac : %@"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Questo LoRA non è installato su questo Mac: %@"
           }
         }
       }

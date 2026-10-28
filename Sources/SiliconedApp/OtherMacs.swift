@@ -29,10 +29,12 @@ final class OtherMacs {
     private(set) var pairings: Pairings?
     private(set) var unreadable = false
 
-    /// « Lend This Mac », kept across launches.
-    var lending: Bool = UserDefaults.standard.bool(forKey: "lendThisMac") {
+    /// « Lend This Mac », kept across launches — one per `SILICONED_ROOT`, as the Keychain item: two
+    /// instances on one Mac share their preferences.
+    private static let lendingKey = "lendThisMac" + (ProcessInfo.processInfo.environment["SILICONED_ROOT"].map { " " + $0 } ?? "")
+    var lending: Bool = UserDefaults.standard.bool(forKey: OtherMacs.lendingKey) {
         didSet {
-            UserDefaults.standard.set(lending, forKey: "lendThisMac")
+            UserDefaults.standard.set(lending, forKey: Self.lendingKey)
             applyLending()
         }
     }
@@ -79,8 +81,14 @@ final class OtherMacs {
     private var attemptObject: RemotePairingAttempt?
     private let book = Endpoints()
     private var awake: NSObjectProtocol?
+    /// This Mac's own state, the one lent.
+    private let local: AppState
+    private var server: MirrorServer?
+    /// The mirror shown, and the Mac it shows (`MainWindow.compute(on:)`).
+    private(set) var mirrored: (id: String, app: AppState)?
 
-    init() {
+    init(local: AppState) {
+        self.local = local
         // Not `Host.current()`, which may wait on the DNS.
         var n = SCDynamicStoreCopyComputerName(nil, nil).map { $0 as String } ?? "Mac"
         if let root = ProcessInfo.processInfo.environment["SILICONED_ROOT"], !root.isEmpty {
@@ -104,15 +112,22 @@ final class OtherMacs {
     @discardableResult
     func load() -> Pairings? {
         if let pairings { return pairings }
-        guard !unreadable else { return nil }
+        // Unreadable (the user not yet answered the Keychain's question, or said no): asked again at the
+        // next need, never taken as « nothing paired » — a pairing written over it would erase the others.
         guard let p = Pairings.load() else { unreadable = true; return nil }
+        unreadable = false
         pairings = p
         if !p.borrowed.isEmpty { browseSessions() }
+        // Lending was on but the Keychain was not readable at launch: it starts now.
+        if lending, host == nil { applyLending() }
         return p
     }
 
     private func save(_ change: (inout Pairings) -> Void) {
-        guard var p = load() else { return }
+        guard var p = load() else {
+            lendingProblem = String(localized: "The Keychain did not keep the pairing.")
+            return
+        }
         change(&p)
         pairings = p
         if !p.save() { lendingProblem = String(localized: "The Keychain did not keep the pairing.") }
@@ -128,6 +143,7 @@ final class OtherMacs {
         guard lending else {
             host?.stop()
             host = nil
+            server = nil
             connected = [:]
             window = nil
             lendingProblem = nil
@@ -143,6 +159,7 @@ final class OtherMacs {
         let h = RemoteHost(hello: hello, service: (name, txt))
         h.start { [weak self] e in DispatchQueue.main.async { MainActor.assumeIsolated { self?.handle(e) } } }
         host = h
+        server = MirrorServer(app: local, host: h)
         return h
     }
 
@@ -160,9 +177,13 @@ final class OtherMacs {
             }
         case .connected(let identity, let theirs):
             connected[identity] = theirs
+            server?.joined(identity)
         case .disconnected(let identity):
             connected[identity] = nil
-        case .turnedAway:
+            server?.left(identity)
+        case .message(let identity, let m):
+            server?.handle(m, from: identity)
+        case .turnedAway, .blob:
             break
         }
         hold()
@@ -270,6 +291,19 @@ final class OtherMacs {
         }
     }
 
+    /// Shows the other Mac in `mirror` once joined; `nil` stops showing it (the session stays if wanted).
+    func show(_ b: Pairings.Borrowed?, in mirror: AppState?) {
+        if let b, let mirror {
+            mirrored = (b.id, mirror)
+            if linkObjects[b.id] == nil { connect(b) } else { linkObjects[b.id]?.retryNow() }
+        } else {
+            if let id = mirrored?.id { disconnect(id) }
+            mirrored = nil
+        }
+    }
+
+    func send(_ m: SessionMessage, to id: String) { linkObjects[id]?.send(m) }
+
     func connect(_ b: Pairings.Borrowed) {
         guard let p = pairings, linkObjects[b.id] == nil else { return }
         browseSessions()
@@ -277,12 +311,20 @@ final class OtherMacs {
         let l = RemoteLink(key: p.key(of: b), hello: hello) { book.endpoint(id) }
         linkObjects[id] = l
         links[id] = .connecting
+        l.listen(messages: { [weak self] m in
+            DispatchQueue.main.async { MainActor.assumeIsolated { if let s = self, s.mirrored?.id == id { s.mirrored?.app.receive(m) } } }
+        }, blobs: { [weak self] blob, data in
+            DispatchQueue.main.async {
+                MainActor.assumeIsolated { if let s = self, s.mirrored?.id == id { s.mirrored?.app.receive(blob: blob, data) } }
+            }
+        })
         l.connect { [weak self] s in
             DispatchQueue.main.async {
                 MainActor.assumeIsolated {
                     guard let self, self.linkObjects[id] === l else { return }
                     self.links[id] = s
                     if case .refused = s { self.linkObjects[id] = nil }
+                    if self.mirrored?.id == id { self.mirrored?.app.linkChanged(s, name: b.name) }
                 }
             }
         }

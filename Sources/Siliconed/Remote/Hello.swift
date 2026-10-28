@@ -46,13 +46,32 @@ package struct Hello: Codable, Equatable, Sendable {
 /// back all of them, not the one the handshake used (`sec_protocol_metadata_access_pre_shared_keys`,
 /// measured 28/10): it cannot tell which Mac came in. The client proves it here, with the key filed under
 /// the identity it names — so one paired Mac cannot pass for another, and forgetting a Mac on the server
-/// shuts out that Mac alone. The render's messages join this list (lot 3).
+/// shuts out that Mac alone. After `welcome`, the mirror's messages.
 package enum SessionMessage: Codable, Equatable, Sendable {
     case challenge(Data)
     case join(hello: Hello, identity: Data, proof: Data)
     case welcome(Hello)
     /// The two builds differ: said, then the server closes; the client does not retry.
     case mismatch(Hello.Mismatch)
+
+    // The mirror (`Mirror.swift`): mini → Neo
+    case catalog(MirrorCatalog)
+    case queue(RemoteQueue)
+    /// Its PNG is the blob `entry.png`, which follows.
+    case entry(RemoteEntry)
+    case removed([Int])
+    /// The preview is the blob `id` (a PNG); `nil`: no preview now.
+    case preview(UInt32?)
+    /// A `render` the mini did not queue, in its words.
+    case refused(String)
+
+    // Neo → mini
+    case render(RemoteJob)
+    case cancel
+    case removeJob(Int)
+    case stopAll
+    case clearQueue
+    case deleteImages([Int])
 
     package static func proof(_ key: PairedKey, challenge: Data) -> Data {
         Pairing.proof(key.key, side: "session", transcript: challenge)

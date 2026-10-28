@@ -41,6 +41,7 @@ extension AppState {
 
     /// Why « Crop » cannot take this image, in a sentence — `nil` when it can.
     func cropRefusal(_ entry: Entry) -> String? {
+        if let mirror { return String(localized: "Not on “\(mirror.macName)” yet") }
         if entry.grid != nil { return String(localized: "A grid is not cropped") }
         if entry.sketch != nil { return String(localized: "A sketch is not cropped") }
         return cropRefusal(width: entry.width, height: entry.height)

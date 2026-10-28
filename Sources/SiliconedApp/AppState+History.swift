@@ -145,6 +145,8 @@ extension AppState {
     /// **Removes images from the history** — undone by ⌘Z, each back at its place. The image shown
     /// passes to the nearest one left.
     func delete(_ entries: [Entry]) {
+        // In a mirror the other Mac's history is the one: it removes, and says so (`removed`). No ⌘Z yet.
+        if let mirror { mirror.send(.deleteImages(entries.map(\.ordinal))); return }
         let ids = Set(entries.map(\.id))
         let removed = history.enumerated().filter { ids.contains($0.element.id) }
         guard !removed.isEmpty else { return }

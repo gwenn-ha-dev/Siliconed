@@ -16,10 +16,13 @@ extension AppState {
     func loraCard(_ path: String) -> LoRACard? { compatibleLoras.first { $0.path == path } }
     var canAddLoRA: Bool { loras.count < Self.maxLoRA && !compatibleLoras.isEmpty }
     /// How many references the chosen model reads (0: it does no editing).
-    var maxReferences: Int { chain?.denoising.maxReferences ?? 0 }
+    /// In a mirror, none yet: an edit's format is the denoiser's rule, which the borrowing Mac does not hold.
+    var maxReferences: Int { mirror != nil ? 0 : chain?.denoising.maxReferences ?? 0 }
     var editingPossible: Bool { maxReferences > 0 }
     var editors: [ModelCard] { visibleReady.filter { editingModels.contains($0.id) } }
     func model(_ id: String) -> Model? {
+        // A mirror reads nothing from this Mac's disk: its models are the other Mac's.
+        guard mirror == nil else { return nil }
         if let known = modelsRead[id] { return known }
         let m = try? Model.named(id, in: library)
         modelsRead[id] = .some(m)
@@ -28,7 +31,7 @@ extension AppState {
     var canAddReference: Bool { references.count < maxReferences }
     /// The model's encoder sees the images (`TextFormat.readsImages`), so the prompt can name them
     /// (`<image1>`, `<image2>`… in Qwen-Image-2.1's template).
-    var promptNamesImages: Bool { chain?.text.output.readsImages ?? false }
+    var promptNamesImages: Bool { mirror != nil ? traits?.readsImages ?? false : chain?.text.output.readsImages ?? false }
 
     /// **The format the render will have**: when editing, the one the denoiser derives from image 1
     /// (`DenoisingModule.editFormat`, the rule the developer's command line applies too), the chosen one
@@ -57,7 +60,7 @@ extension AppState {
     var memoryNeed: Int? {
         guard settingsRead else { return nil }
         let f = outputFormat
-        return card.flatMap { $0.memoryNeed(width: f.width, height: f.height, references: references.count + subjectImageCount) }
+        return need(f, images: references.count + subjectImageCount)
     }
 
     /// Why "Generate" is grayed out, or `nil`: the app does not try what the request would refuse.
@@ -81,11 +84,33 @@ extension AppState {
             let room = Self.maxQueueLength - file.count
             return String(localized: "These alternatives make \(String(n)) renders: the queue has room for \(String(room)).")
         }
+        if mirror != nil, let t = traits, !t.steps.contains(steps) {
+            let accepted = t.steps.map(String.init).formatted(.list(type: .or))
+            return String(localized: "This model has no schedule for \(String(steps)) steps: \(accepted).")
+        }
         if let denoising = chain?.denoising, (try? denoising.check(steps: steps, startImage: false)) == nil {
             let accepted = acceptedSteps.map(String.init).formatted(.list(type: .or))
             return String(localized: "This model has no schedule for \(String(steps)) steps: \(accepted).")
         }
         return nil
+    }
+
+    /// **The need of the chosen model at `f`**, with `images` references: the engine's, from the maps'
+    /// headers — or, in a mirror, the one the other Mac published (`MirrorCatalog.needs`: its formats,
+    /// without references). A format it did not publish has no need here: the other Mac judges it.
+    func need(_ f: RecommendedFormat, images: Int) -> Int? {
+        if mirror != nil { return images == 0 ? mirrorCatalog?.needs[identifier]?[MirrorCatalog.key(f.width, f.height)] : nil }
+        return card?.memoryNeed(width: f.width, height: f.height, references: images)
+    }
+
+    /// The engine's check against B (`ModelCard.checkMemory`); in a mirror, the published need against
+    /// the other Mac's B.
+    func checkNeed(_ f: RecommendedFormat, images: Int) throws(EngineError) {
+        guard mirror != nil else {
+            try card?.checkMemory(width: f.width, height: f.height, references: images, ceiling: memoryCeiling)
+            return
+        }
+        if let n = need(f, images: images), n > memoryCeiling { throw .insufficientMemory(needed: n, budget: memoryCeiling) }
     }
 
     /// Rule 7: a render that cannot fit is refused before it starts — by the engine's own check
@@ -96,7 +121,7 @@ extension AppState {
     /// one does. The engine's own check (`ModelCard.checkMemory`), against B.
     func macNeeded(_ format: RecommendedFormat, images: Int) -> Int? {
         guard settingsRead, let card else { return nil }
-        do { try card.checkMemory(width: format.width, height: format.height, references: images, ceiling: memoryCeiling) }
+        do { try checkNeed(format, images: images) }
         catch {
             guard case let .insufficientMemory(needed, _) = error else { return nil }
             return MemoryBudget.macNeeded(for: needed)
@@ -123,12 +148,12 @@ extension AppState {
         guard settingsRead, let card else { return nil }
         let f = outputFormat
         let images = references.count + subjectImageCount
-        do { try card.checkMemory(width: f.width, height: f.height, references: images, ceiling: memoryCeiling) } catch {
+        do { try checkNeed(f, images: images) } catch {
             // A need that cannot be computed refuses too, with its own sentence (`memoryNeedUnknown`).
             guard case let .insufficientMemory(needed, budget) = error else { return MemoryRefusal(text: Problem(error).text, smaller: nil) }
             let smaller = references.isEmpty
                 ? RecommendedFormat.largestFitting(formats, budget: budget, current: f) {
-                    card.memoryNeed(width: $0.width, height: $0.height, references: images) ?? .max
+                    need($0, images: images) ?? .max
                   }
                 : nil
             return MemoryRefusal(text: Self.needsMac(needed), smaller: smaller)
@@ -143,7 +168,7 @@ extension AppState {
         let f = references.isEmpty ? RecommendedFormat(1024, 1024) : outputFormat
         let images = references.count + adding + 1
         guard let card, macNeeded(f, images: images) != nil else { return nil }
-        return card.memoryNeed(width: f.width, height: f.height, references: images).map(Self.needsMac)
+        return need(f, images: images).map(Self.needsMac)
     }
 
     /// The way forward the footer offers: the size that fits, chosen as the picker would.
@@ -156,6 +181,7 @@ extension AppState {
     /// (`DenoisingModule.check`) rather than known here: all of them for most, 8 alone for
     /// Qwen-Image-2.1-Turbo. Read when "Generate" is greyed out for that reason, never at each drawing.
     var acceptedSteps: [Int] {
+        if mirror != nil { return traits?.steps ?? [] }
         guard let denoising = chain?.denoising else { return [] }
         return (1...50).filter { (try? denoising.check(steps: $0, startImage: false)) != nil }
     }
@@ -311,7 +337,7 @@ extension AppState {
         do { try checkFormat(width: w, height: h) } catch { return Problem(error) }
         // Beyond B, refused here as the picker greys it out: the same check as the engine's.
         if settingsRead {
-            do { try card?.checkMemory(width: w, height: h, references: subjectImageCount, ceiling: memoryCeiling) }
+            do { try checkNeed(RecommendedFormat(w, h), images: subjectImageCount) }
             catch { return Problem(error) }
         }
         let f = RecommendedFormat(w, h)

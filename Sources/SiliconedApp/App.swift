@@ -58,7 +58,7 @@ private struct AppCommands: Commands {
         }
         // The app's settings, in a window of ours (`SettingsWindow.swift`): SwiftUI's would keep its frame.
         CommandGroup(replacing: .appSettings) {
-            Button("Settings…") { SettingsWindow.shared.show(app) }
+            Button("Settings…") { SettingsWindow.shared.show(window.local) }
                 .keyboardShortcut(",")
         }
         CommandGroup(replacing: .help) {
@@ -121,6 +121,20 @@ private struct AppCommands: Commands {
                 .keyboardShortcut(".")
             Button("Clear Queue and Stop") { app.stopAll() }
                 .keyboardShortcut(".", modifiers: [.command, .option])
+            Divider()
+            // **Where it computes** (`OtherMacs.swift`): this Mac, or one paired that lends itself.
+            // Never both at once; the window's subtitle says which.
+            Menu("Compute On") {
+                Toggle("This Mac", isOn: Binding(get: { window.carrier.mirror == nil }, set: { if $0 { window.compute(on: nil) } }))
+                ForEach(window.otherMacs.pairings?.borrowed ?? [], id: \.id) { b in
+                    Toggle(isOn: Binding(get: { window.carrier.showing == b.id }, set: { if $0 { window.compute(on: b) } })) {
+                        Text(verbatim: b.name)
+                    }
+                }
+                if window.otherMacs.pairings == nil {
+                    Button("Other Macs…") { SettingsWindow.shared.show(window.local) }
+                }
+            }
         }
         CommandMenu("Image") {
             Button("Full Screen") { if app.selectedImage != nil { app.fullScreen = true } }
@@ -187,7 +201,7 @@ final class Delegate: NSObject, NSApplicationDelegate {
             MainWindow.shared.remote.stop()
             MainWindow.shared.otherMacs.stop()
             MainWindow.shared.emptyRenderCache()
-            MainWindow.shared.app.removeWorkingCopy()
+            MainWindow.shared.local.removeWorkingCopy()
         }
     }
 
@@ -197,7 +211,7 @@ final class Delegate: NSObject, NSApplicationDelegate {
         MainActor.assumeIsolated {
             for link in urls.compactMap(HubLink.init) {
                 MainWindow.shared.show()
-                MainWindow.shared.app.open(link)
+                MainWindow.shared.local.open(link)
             }
         }
     }
@@ -210,6 +224,14 @@ final class Delegate: NSObject, NSApplicationDelegate {
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
 }
 
+/// Which state the window shows: observed, so that the menus follow the switch.
+@MainActor @Observable
+final class Carrier {
+    var mirror: AppState?
+    /// The other Mac's `id` while its mirror is shown.
+    var showing: String?
+}
+
 /// The window, created on demand and kept as long as it is open. The state (`AppState`) lives
 /// as long as the process: closing then reopening the window finds the history again.
 @MainActor
@@ -219,7 +241,12 @@ final class MainWindow: NSObject, NSWindowDelegate {
     private var window: NSWindow?
     /// The exploration's panel (`Exploration.swift`), kept once opened.
     var explorationPanel: NSPanel?
-    private(set) lazy var app = AppState(library: {
+    /// **The state shown**: this Mac's, or another Mac's mirror (`compute(on:)`) — every window and
+    /// menu reads it here, so that the switch moves them all.
+    var app: AppState { carrier.mirror ?? local }
+    let carrier = Carrier()
+    /// This Mac's own state: the queue, the history and the library; untouched while a mirror is shown.
+    private(set) lazy var local = AppState(library: {
         // `SILICONED_ROOT` names the app's space, as `Library.standard` does: a library moved
         // elsewhere is followed (`Library.placed`), and never made where its disk is absent.
         let space = ProcessInfo.processInfo.environment["SILICONED_ROOT"].flatMap { $0.isEmpty ? nil : $0 }
@@ -228,13 +255,13 @@ final class MainWindow: NSObject, NSWindowDelegate {
         try? FileManager.default.createDirectory(atPath: Library(root: space).map(""), withIntermediateDirectories: true)
         return b
     }())
-    private(set) lazy var remote = RemoteControl(app: app)
+    private(set) lazy var remote = RemoteControl(app: local)
     /// The other Macs of the network (`OtherMacs.swift`).
-    private(set) lazy var otherMacs = OtherMacs()
+    private(set) lazy var otherMacs = OtherMacs(local: local)
 
     /// Empties `<root>/cache/` (incognito, `Delegate`). A failure costs nothing but disk: the next
     /// launch tries again.
-    func emptyRenderCache() { try? app.library.emptyCache() }
+    func emptyRenderCache() { try? local.library.emptyCache() }
 
     func show() {
         if let window {
@@ -242,14 +269,9 @@ final class MainWindow: NSObject, NSWindowDelegate {
             window.makeKeyAndOrderFront(nil)
             return
         }
-        let host = NSHostingController(rootView: MainView(app: app) { [weak self] in
-            self?.toggleStatistics()
-        })
-        host.sizingOptions = []
-        // SwiftUI's toolbar (`.toolbar`) becomes the window's.
-        host.sceneBridgingOptions = [.toolbars]
-        let f = NSWindow(contentViewController: host)
+        let f = NSWindow(contentViewController: makeRoot())
         f.title = String(localized: "Siliconed")
+        f.subtitle = Self.instanceName
         f.styleMask = [.titled, .closable, .miniaturizable, .resizable]
         f.toolbarStyle = .unified
         f.titlebarSeparatorStyle = .automatic
@@ -267,6 +289,49 @@ final class MainWindow: NSObject, NSWindowDelegate {
         f.makeKeyAndOrderFront(nil)
         // First launch (nothing comes preinstalled): the canvas welcomes and offers the three models
         // (`Welcome`, MainView.swift) — no sheet thrown at the user before they have seen the window.
+    }
+
+    /// Two instances on one Mac (`SILICONED_ROOT`, the remote Mac's test): each window says which it is.
+    private static var instanceName: String {
+        ProcessInfo.processInfo.environment["SILICONED_ROOT"].map { _ in shared.otherMacs.name } ?? ""
+    }
+
+    private func makeRoot() -> NSHostingController<MainView> {
+        let host = NSHostingController(rootView: MainView(app: app) { [weak self] in
+            self?.toggleStatistics()
+        })
+        host.sizingOptions = []
+        // SwiftUI's toolbar (`.toolbar`) becomes the window's.
+        host.sceneBridgingOptions = [.toolbars]
+        return host
+    }
+
+    /// **The switch**: the window, its panels and the menus show `mac`'s state, or this Mac's (`nil`).
+    /// The panels close — they were the other state's —; the form follows, filtered by the other
+    /// Mac's catalog when it arrives (`AppState.receive`). A queue running here goes on.
+    func compute(on mac: Pairings.Borrowed?) {
+        guard mac?.id != carrier.showing else { return }
+        let from = app
+        otherMacs.show(nil, in: nil)
+        if let mac {
+            let link = MirrorLink(macName: mac.name) { [weak self] m in self?.otherMacs.send(m, to: mac.id) }
+            let m = AppState(mirroring: link, library: local.library)
+            m.prompt = from.prompt; m.identifier = from.identifier; m.steps = from.steps
+            m.orientation = from.orientation; m.format = from.format; m.batch = from.batch
+            m.fixedSeed = from.fixedSeed; m.seed = from.seed; m.detail = from.detail; m.previews = from.previews
+            carrier.mirror = m
+            carrier.showing = mac.id
+            otherMacs.show(mac, in: m)
+        } else {
+            carrier.mirror = nil
+            carrier.showing = nil
+        }
+        statistics?.close(); statistics = nil
+        explorationPanel?.close(); explorationPanel = nil
+        guard let window else { return }
+        window.contentViewController = makeRoot()
+        window.subtitle = mac.map { String(localized: "Computing on “\($0.name)”") } ?? Self.instanceName
+        app.undoManager = window.undoManager
     }
 
     /// The project's page: each new version and its notes. The app does not update itself: "Check for
@@ -466,8 +531,8 @@ final class MainWindow: NSObject, NSWindowDelegate {
     /// Quitting: nothing to lose, it quits. Otherwise the alert says what would be lost, and offers to
     /// export what was never saved first.
     func mayQuit() -> Bool {
-        let lost = app.unsaved
-        guard !lost.isEmpty || app.busy else { return true }
+        let lost = local.unsaved
+        guard !lost.isEmpty || local.busy else { return true }
         let alert = NSAlert()
         if lost.isEmpty {
             alert.messageText = String(localized: "A render is in progress.")
@@ -479,13 +544,13 @@ final class MainWindow: NSObject, NSWindowDelegate {
         alert.messageText = lost.count == 1 ? String(localized: "One image was never saved.")
                                             : String(localized: "\(lost.count) images were never saved.")
         alert.informativeText = String(localized: "Siliconed keeps nothing on disk: what is not saved disappears when the app quits.")
-            + (app.busy ? "\n\n" + String(localized: "Quitting also stops the render in progress.") : "")
+            + (local.busy ? "\n\n" + String(localized: "Quitting also stops the render in progress.") : "")
         alert.addButton(withTitle: lost.count == 1 ? String(localized: "Save…") : String(localized: "Export…"))
         alert.addButton(withTitle: String(localized: "Cancel"))
         alert.addButton(withTitle: String(localized: "Quit Without Saving"))
         alert.buttons[2].hasDestructiveAction = true
         switch alert.runModal() {
-        case .alertFirstButtonReturn: return app.export(lost)
+        case .alertFirstButtonReturn: return local.export(lost)
         case .alertThirdButtonReturn: return true
         default: return false
         }

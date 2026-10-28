@@ -27,7 +27,7 @@ extension AppState {
     /// A forge, a render, a diagnostic: one waits for the other (the first two read or write GBs, the
     /// diagnostic would time them).
     /// The library's disk must be there: an installation never lands anywhere else.
-    var managementPossible: Bool { forgeInProgress == nil && !busy && !diagnosticRunning && libraryReachable }
+    var managementPossible: Bool { mirror == nil && forgeInProgress == nil && !busy && !diagnosticRunning && libraryReachable }
 
     /// **No render while an installation or an import runs**: one big job at a time on 16 GB — the
     /// forge reads and writes GBs, a render maps as many. Why « Generate », « Explore » and the

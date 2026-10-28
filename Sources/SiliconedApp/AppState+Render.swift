@@ -205,6 +205,7 @@ extension AppState {
     /// Ready-made jobs enter the queue, in order — the path of the button and of the remote control.
     func enqueue(_ jobs: [Job]) {
         guard !jobs.isEmpty else { return }
+        if let mirror { for j in jobs { mirror.render(j) }; return }
         // A measure that failed before the first render is retried by the next click, not by itself.
         if !settingsRead, case .failed = diagnostic { diagnostic = .ready }
         file.append(contentsOf: jobs)
@@ -225,6 +226,7 @@ extension AppState {
     /// An « Enlarge ×4 » under way and a grid's sheet being drawn are waited for too — memory a render
     /// would add to, never counted in its plan —; each calls `next` when it ends (`enlarged`, `addSheet`).
     func next() {
+        guard mirror == nil else { return }
         guard currentJob == nil, !file.isEmpty, !diagnosticRunning, forgeInProgress == nil else {
             if currentJob == nil, let a = activity {
                 ProcessInfo.processInfo.endActivity(a); activity = nil
@@ -484,10 +486,11 @@ extension AppState {
 
     /// Stops the running render; the queue continues. The engine checks for cancellation between the
     /// layers: stopping takes 0.03 to 0.41 s.
-    func cancel() { task?.cancel() }
+    func cancel() { if let mirror { mirror.send(.cancel) } else { task?.cancel() } }
 
     /// Removes a render that is still waiting — in the queue, or for its model's license.
     func remove(_ job: Job) {
+        if let mirror { mirror.send(.removeJob(job.ordinal)); return }
         if awaitingLicense.contains(where: { $0.id == job.id }) {
             awaitingLicense.removeAll { $0.id == job.id }
             if let id = licenseRequest?.card.id, !awaitingLicense.contains(where: { $0.settings.identifier == id }) {
@@ -504,11 +507,13 @@ extension AppState {
 
     /// Empties the queue and stops the running render.
     func stopAll() {
+        if let mirror { mirror.send(.stopAll); return }
         clearQueue()
         task?.cancel()
     }
 
     func clearQueue() {
+        if let mirror { mirror.send(.clearQueue); return }
         let removedNames = file + awaitingLicense
         file.removeAll()
         awaitingLicense.removeAll()

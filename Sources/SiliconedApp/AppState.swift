@@ -208,7 +208,7 @@ final class AppState {
     /// `effectiveDetail`: on a model that offers none (Anima, Krea 2: `DenoisingModule.acceptsDetail`), Normal.
     var detail = Detail.normal
     /// Whether the form's model offers Detail — the rack hides the choice otherwise.
-    var offersDetail: Bool { model(identifier)?.chain.denoising.acceptsDetail ?? true }
+    var offersDetail: Bool { mirror != nil ? traits?.acceptsDetail ?? true : model(identifier)?.chain.denoising.acceptsDetail ?? true }
     var effectiveDetail: Detail { offersDetail ? detail : .normal }
     /// **The solver** (`Solver`), offered in Developer Mode on the models in front
     /// (`offeredSolvers`). What a render takes is `effectiveSolver`: a choice the form's model does
@@ -227,7 +227,7 @@ final class AppState {
     /// takes is `effectiveSchedule`.
     var comfySchedule = false
     var offersComfySchedule: Bool {
-        developerMode && model(identifier)?.chain.denoising.schedules.contains(.comfyUI) == true
+        developerMode && (mirror != nil ? traits?.comfyUI == true : model(identifier)?.chain.denoising.schedules.contains(.comfyUI) == true)
     }
     var effectiveSchedule: SigmaSchedule { offersComfySchedule && comfySchedule ? .comfyUI : .official }
     /// What turns the half-size first steps off besides a LoRA (`DenoisingModule.plan`).
@@ -266,12 +266,13 @@ final class AppState {
     /// The chosen model's chain — what the boxes draw. `nil` if it is not installed.
     private(set) var chain: Chain?
     /// The LoRAs forged for the chosen model.
-    private(set) var compatibleLoras: [LoRACard] = []
+    var compatibleLoras: [LoRACard] = []
     /// What the chosen model is missing (the library's message), or `nil` if it is ready.
-    private(set) var missing: String?
+    var missing: String?
 
     /// Re-reads from disk what depends on the chosen model: its chain, its LoRAs, what it is missing.
     func readModelCatalog() {
+        if mirror != nil { readMirroredCatalog(); return }
         chain = model(identifier)?.chain
         compatibleLoras = library.loras(for: identifier)
         missing = readySet.contains(identifier) ? nil : card?.missing(in: library)
@@ -467,6 +468,22 @@ final class AppState {
     /// the queue holds that many, so that the largest series fits in an empty queue.
     static let maxQueueLength = PromptAlternatives.maxCombinations
 
+    // ── A mirror (`AppState+Mirror.swift`) ──
+    /// Set on the instance that shows another Mac: its actions go there instead of running here.
+    @ObservationIgnored var mirror: MirrorLink?
+    /// What the other Mac published of its models.
+    var mirrorCatalog: MirrorCatalog?
+
+    /// **The state of another Mac**, shown here (`AppState+Mirror.swift`): nothing read from this Mac's
+    /// library but the named subjects, which stay with the user; no capacity map, no copy, no warm-up.
+    init(mirroring link: MirrorLink, library: Library) {
+        self.library = library
+        subjects = SubjectLibrary(library: library)
+        mirror = link
+        cards = ModelCard.allCards
+        identifier = defaultIdentifier
+    }
+
     init(library: Library) {
         self.library = library
         libraryReachable = library.isReachable
@@ -524,7 +541,7 @@ final class AppState {
     private(set) var mapInUse: Diagnostic.Report?
     /// **The engine's settings were read** (`EngineSettings.load`), the map with them: renders may run,
     /// and the memory needs be computed — they read the settings (`amx` adds the AMX's operands).
-    private(set) var settingsRead = false
+    var settingsRead = false
     /// The kept map is current but provisional (`Diagnostic.Report.isProvisional`) and the Mac is at rest
     /// now: the first render measures again rather than read it.
     private(set) var remeasuringProvisional = false
@@ -577,5 +594,6 @@ final class AppState {
     /// `SILICONED_MEMORY_BUDGET_GB`), read once: it depends on the RAM and nothing else, so what this
     /// Mac cannot do is known ahead and greyed out where it is chosen — the size, the images — never
     /// discovered at the click, and never different from one minute to the next.
-    let memoryCeiling = MemoryBudget.machineCeiling()
+    /// B: this Mac's, or the lending Mac's in a mirror (`AppState+Mirror.swift`).
+    var memoryCeiling = MemoryBudget.machineCeiling()
 }
