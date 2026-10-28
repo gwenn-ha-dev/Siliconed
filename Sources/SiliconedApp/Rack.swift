@@ -212,6 +212,7 @@ struct RackView: View {
         .backgroundPreferenceValue(NodeFrames.self) { frames in
             Wires(edges: edges, frames: frames, state: app.state(of:))
         }
+        .overlay { LinkEdge(app: app) }
     }
 
     /// The chosen model edits by reference and has an image encoder: its box is drawn.
@@ -244,7 +245,7 @@ struct RackView: View {
             let measured = app.storedMap.map { $0.isCurrent && !$0.isProvisional } == true
             Button { app.openDiagnostic() } label: {
                 HStack(spacing: 6) {
-                    Text("Chain").font(.headline)
+                    Text("Chain").font(.headline).fixedSize()
                     Image(systemName: "cpu").font(.body).foregroundStyle(measured ? .green : .orange)
                 }
                 .foregroundStyle(measured ? .primary : Color.orange)
@@ -252,12 +253,14 @@ struct RackView: View {
             }
             .buttonStyle(.plain)
             .help(DiagnosticSheet.mapStatus(app))
+            ComputeOnMenu(app: app)
             Spacer()
             // « Explore » is beside « Generate » (`Sidebar`): a gesture that makes images, not a setting.
             Button("Models…") { app.managementOpen = true }
                 .buttonStyle(.link)
                 .font(.callout)
                 .help("Install, import, remove — and what each takes on disk (⇧⌘M)")
+                .fixedSize()
         }
     }
 
@@ -306,6 +309,66 @@ struct RackView: View {
                  explanation: "Turns the DiT's result, the latent, into pixels: the final image") {
             ModuleSlot(name: app.moduleNames.decoding)
             Cost(app.stageCost(.decoding))
+        }
+    }
+}
+
+// MARK: - Where the chain computes
+
+/// **« On: This Mac ▾ »**, beside « Chain »: the whole chain moves to a paired Mac, or back
+/// (`MainWindow.compute(on:)`) — the Render menu's « Compute On », where the hand already is. Shown
+/// only once a Mac is paired to compute on; one Bonjour does not see is grayed, and says so.
+private struct ComputeOnMenu: View {
+    let app: AppState
+
+    var body: some View {
+        let w = MainWindow.shared
+        if let borrowed = w.otherMacs.pairings?.borrowed, !borrowed.isEmpty {
+            let shown = borrowed.first { $0.id == w.carrier.showing }
+            Menu {
+                Toggle("This Mac", isOn: Binding(get: { shown == nil }, set: { if $0 { w.compute(on: nil) } }))
+                Divider()
+                ForEach(borrowed, id: \.id) { b in
+                    let found = w.otherMacs.found[b.id] != nil
+                    Toggle(isOn: Binding(get: { shown?.id == b.id }, set: { if $0 { w.compute(on: b) } })) {
+                        if found || shown?.id == b.id { Text(verbatim: b.name) }
+                        else { Text("\(b.name) — not on the network") }
+                    }
+                    .disabled(!found && shown?.id != b.id)
+                }
+                Divider()
+                Button("Other Macs…") { SettingsWindow.shared.show(w.local) }
+            } label: {
+                // A long name gives way, never « Chain » or « Models… » beside it.
+                Text("On: \(shown?.name ?? String(localized: "This Mac"))").font(.callout)
+                    .lineLimit(1).truncationMode(.middle)
+            }
+            .menuStyle(.borderlessButton)
+            .fixedSize(horizontal: false, vertical: true)
+            .layoutPriority(-1)
+            .help(shown.map { OtherMacsSection.state(w.otherMacs.links[$0.id], found: w.otherMacs.found[$0.id] != nil) }
+                  ?? String(localized: "The chain computes on this Mac"))
+        }
+    }
+}
+
+/// **The rack's edge while another Mac computes**: blue while connected, orange and dashed while the
+/// link is being made or retried, red once refused — a line where the chain is, not a tint over it.
+private struct LinkEdge: View {
+    let app: AppState
+
+    var body: some View {
+        let w = MainWindow.shared
+        if app.mirror != nil, let id = w.carrier.showing {
+            let (color, dashed): (Color, Bool) = switch w.otherMacs.links[id] {
+            case .connected?: (Color(nsColor: .systemBlue), false)
+            case .refused?: (Palette.failure, false)
+            default: (Color(nsColor: .systemOrange), true)
+            }
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .strokeBorder(color, style: StrokeStyle(lineWidth: 2, dash: dashed ? [6, 4] : []))
+                .padding(4)
+                .allowsHitTesting(false)
         }
     }
 }

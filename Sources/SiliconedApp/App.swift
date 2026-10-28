@@ -232,6 +232,20 @@ final class Carrier {
     var showing: String?
 }
 
+/// The window's content: the state the carrier shows, rebuilt from scratch at each switch (`id`), so
+/// that nothing of one state's views — a field being typed, a popover — passes to the other.
+struct Shown: View {
+    let carrier: Carrier
+    let local: AppState
+    let toggleStatistics: () -> Void
+
+    var body: some View {
+        let app = carrier.mirror ?? local
+        MainView(app: app, toggleStatistics: toggleStatistics)
+            .id(ObjectIdentifier(app))
+    }
+}
+
 /// The window, created on demand and kept as long as it is open. The state (`AppState`) lives
 /// as long as the process: closing then reopening the window finds the history again.
 @MainActor
@@ -296,8 +310,11 @@ final class MainWindow: NSObject, NSWindowDelegate {
         ProcessInfo.processInfo.environment["SILICONED_ROOT"].map { _ in shared.otherMacs.name } ?? ""
     }
 
-    private func makeRoot() -> NSHostingController<MainView> {
-        let host = NSHostingController(rootView: MainView(app: app) { [weak self] in
+    /// One host for the window's life: the switch changes the state it shows (`Shown`), never the
+    /// host — a new `contentViewController` rebuilt SwiftUI's toolbar half-bridged (short, its items
+    /// on the left, seen on macOS 27, 28/10/2026).
+    private func makeRoot() -> NSHostingController<Shown> {
+        let host = NSHostingController(rootView: Shown(carrier: carrier, local: local) { [weak self] in
             self?.toggleStatistics()
         })
         host.sizingOptions = []
@@ -329,7 +346,6 @@ final class MainWindow: NSObject, NSWindowDelegate {
         statistics?.close(); statistics = nil
         explorationPanel?.close(); explorationPanel = nil
         guard let window else { return }
-        window.contentViewController = makeRoot()
         window.subtitle = mac.map { String(localized: "Computing on “\($0.name)”") } ?? Self.instanceName
         app.undoManager = window.undoManager
     }

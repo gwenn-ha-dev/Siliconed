@@ -1519,6 +1519,34 @@
         }
       }
     },
+    "%@ — not on the network" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ — nicht im Netzwerk"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ — no está en la red"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ — absent du réseau"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ — non è in rete"
+          }
+        }
+      }
+    },
     "%@: accept its license to render" : {
       "localizations" : {
         "de" : {
@@ -14828,6 +14856,34 @@
         }
       }
     },
+    "On: %@" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Auf: %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En: %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sur : %@"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Su: %@"
+          }
+        }
+      }
+    },
     "One Mac renders for another on the same network." : {
       "localizations" : {
         "de" : {
@@ -19835,6 +19891,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Le celle ancora in attesa escono dalla coda; quella in corso si interrompe"
+          }
+        }
+      }
+    },
+    "The chain computes on this Mac" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Kette rechnet auf diesem Mac"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La cadena calcula en este Mac"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La chaîne calcule sur ce Mac"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La catena calcola su questo Mac"
           }
         }
       }

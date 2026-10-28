@@ -39,6 +39,9 @@ final class OtherMacs {
         }
     }
     private(set) var lendingProblem: String?
+    /// A Mac was paired to compute on: the Keychain is read at launch, so that the rack's « On: » menu
+    /// and Bonjour are there from the start — whoever paired has already answered the Keychain.
+    private static let borrowsKey = "borrowsAMac" + (ProcessInfo.processInfo.environment["SILICONED_ROOT"].map { " " + $0 } ?? "")
     /// The Macs lent to, connected now: identity → what they said.
     private(set) var connected: [Data: Hello] = [:]
     /// The server's pairing window, while its sheet is open.
@@ -97,9 +100,10 @@ final class OtherMacs {
         name = n
     }
 
-    /// At launch: lends at once if it was on.
+    /// At launch: lends at once if it was on; reads the pairings if a Mac was paired to compute on.
     func boot() {
         if lending { applyLending() }
+        if UserDefaults.standard.bool(forKey: Self.borrowsKey) { load() }
     }
 
     func stop() {
@@ -117,6 +121,7 @@ final class OtherMacs {
         guard let p = Pairings.load() else { unreadable = true; return nil }
         unreadable = false
         pairings = p
+        UserDefaults.standard.set(!p.borrowed.isEmpty, forKey: Self.borrowsKey)
         if !p.borrowed.isEmpty { browseSessions() }
         // Lending was on but the Keychain was not readable at launch: it starts now.
         if lending, host == nil { applyLending() }
@@ -130,6 +135,7 @@ final class OtherMacs {
         }
         change(&p)
         pairings = p
+        UserDefaults.standard.set(!p.borrowed.isEmpty, forKey: Self.borrowsKey)
         if !p.save() { lendingProblem = String(localized: "The Keychain did not keep the pairing.") }
     }
 
