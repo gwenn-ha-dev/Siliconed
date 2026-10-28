@@ -2,6 +2,51 @@ English · [Français](RELEASE-NOTES.fr.md)
 
 # Siliconed — release notes
 
+## 0.17
+
+### Render on another Mac
+
+- **Render › Compute On** moves the whole window to another Mac of your network that runs Siliconed: a
+  MacBook in the living room renders on the Mac mini in the next room. The queue, the progress, the
+  preview, the history, the models, the library, the licenses and the capacity map are the other
+  Mac's; the form, your selection, exports and the clipboard stay on yours. One menu brings you back.
+  Never two views at once: an “On:” menu beside Chain says where you compute, and the rack wears a
+  blue edge while connected.
+- **Pairing by a six-digit code** shown on both screens and accepted on the lending Mac; then TLS 1.2
+  with a key per paired Mac (kept in the Keychain), nothing in clear on the network. The lending Mac
+  turns lending on in Settings › Other Macs.
+- **Everything you do here works there**: renders, edits with your references, variations, grids and
+  explorations, enlarging and cropping, named subjects, undo; installing a model or importing a LoRA
+  on the lending Mac (removing one waits for a click on that Mac); measuring it. Each Mac sees only
+  its own jobs and images. `silicontrol` follows Compute On.
+
+### The capacity map, rebuilt
+
+- **The map now chooses a route for each computation of a render**, not one switch for all: each
+  matrix product of each model at each height, each attention, on the GPU alone, beside the AMX,
+  beside the Neural Engine or the three, with the weights widened or read as published. On a Mac
+  where the Neural Engine wins, it is used where it wins.
+- **Any format, any shape**: a computation the map did not measure — a 1024×1536 image, an edit —
+  takes the route of the nearest one it measured, and only a shape far from all of them stays on the
+  GPU alone. Before, everything outside the measured formats ran on the GPU alone.
+- **Measured the way a render runs**: each route is timed against the simplest in alternation, so a
+  Mac that heats up or runs on battery compares like with like; the routes are chosen at the warm
+  regime a render of a few minutes runs at, with one witness per engine. The minute goes first to the
+  computations that weigh most in your installed models' renders. Still no model needed, about a
+  minute.
+- **Green when the measure is complete and right**, not when the Mac was at rest: heat, the battery
+  and Low Power Mode are written beside the map, no longer a reason for it to be orange.
+- **Under the memory budget**: the map's own need is computed before its first product, as a
+  render's; it now stays under B on an 8 GB Mac (it peaked at 4.9 GB before).
+- **Each render checks the map**: what each computation cost against what the map predicted; a gap
+  corrects the map at the next launch, or measures it again.
+
+### Also
+
+- **The app in Japanese and Simplified Chinese.**
+- **Settings in three tabs**: General, Other Macs, Advanced.
+- **One schedule**: the ComfyUI sigma schedule is gone; the official one is the only one.
+
 ## 0.16
 
 ### A fifth model: MOSS-Image

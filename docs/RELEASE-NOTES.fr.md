@@ -2,6 +2,51 @@
 
 # Siliconed — notes de version
 
+## 0.17
+
+### Calculer sur un autre Mac
+
+- **Rendu › Calculer sur** fait passer toute la fenêtre sur un autre Mac du réseau qui a Siliconed :
+  un MacBook au salon calcule sur le Mac mini de la pièce d'à côté. La file, l'avancement, l'aperçu,
+  l'historique, les modèles, la bibliothèque, les licences et la carte des capacités sont ceux de
+  l'autre Mac ; le formulaire, la sélection, les exports et le presse-papiers restent sur le vôtre. Un
+  menu vous ramène. Jamais deux vues à la fois : un menu « Sur : » à côté de Chaîne dit où l'on
+  calcule, et le rack porte un liseré bleu tant que la liaison tient.
+- **Appairage par un code à six chiffres** affiché sur les deux écrans et accepté sur le Mac prêteur ;
+  puis TLS 1.2 avec une clé par Mac appairé (gardée au Trousseau), rien en clair sur le réseau. Le Mac
+  prêteur ouvre le prêt dans Réglages › Autres Mac.
+- **Tout ce que vous faites ici marche là-bas** : rendus, éditions avec vos références, variations,
+  grilles et explorations, agrandissement et recadrage, sujets nommés, annulation ; installer un modèle
+  ou importer une LoRA sur le Mac prêteur (en retirer un attend un clic sur ce Mac) ; le mesurer.
+  Chaque Mac ne voit que ses propres travaux et images. `silicontrol` suit « Calculer sur ».
+
+### La carte des capacités, refaite
+
+- **La carte choisit maintenant une route pour chaque calcul d'un rendu**, et non un interrupteur pour
+  tous : chaque produit matriciel de chaque modèle à chaque hauteur, chaque attention, sur le GPU seul,
+  à côté de l'AMX, à côté du Neural Engine ou des trois, avec les poids élargis ou lus tels que
+  publiés. Sur un Mac où le Neural Engine gagne, il sert là où il gagne.
+- **Tout format, toute forme** : un calcul que la carte n'a pas mesuré (une image en 1024×1536, une
+  édition) prend la route du plus proche qu'elle a mesuré, et seule une forme loin de toutes reste sur
+  le GPU seul. Avant, tout ce qui sortait des formats mesurés tournait sur le GPU seul.
+- **Mesurée comme un rendu tourne** : chaque route est chronométrée contre la plus simple en
+  alternance, si bien qu'un Mac qui chauffe ou tourne sur batterie compare à conditions égales ; les
+  routes sont choisies au régime chaud d'un rendu de quelques minutes, avec un témoin par moteur. La
+  minute va d'abord aux calculs qui pèsent le plus dans les rendus de vos modèles installés. Toujours
+  sans modèle, environ une minute.
+- **Verte quand la mesure est complète et juste**, et non quand le Mac était au repos : la chaleur, la
+  batterie et le mode Économie d'énergie sont écrits à côté de la carte, et ne la rendent plus orange.
+- **Sous le budget mémoire** : le besoin de la carte est calculé avant son premier produit, comme celui
+  d'un rendu ; elle tient maintenant sous B sur un Mac de 8 Go (elle montait à 4,9 Go).
+- **Chaque rendu vérifie la carte** : ce que chaque calcul a coûté contre ce que la carte prédisait ; un
+  écart corrige la carte au lancement suivant, ou la fait refaire.
+
+### Aussi
+
+- **L'app en japonais et en chinois simplifié.**
+- **Les Réglages en trois onglets** : Général, Autres Mac, Avancé.
+- **Un seul calendrier** : celui de ComfyUI disparaît ; l'officiel est le seul.
+
 ## 0.16
 
 ### Un cinquième modèle : MOSS-Image
