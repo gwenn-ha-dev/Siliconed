@@ -312,12 +312,15 @@ final class CapacityClassesTests: XCTestCase {
         XCTAssertEqual(table.products.forced(k: 3840, n: 3840, m: 4128), .ane)
         XCTAssertEqual(table.products.forced(k: 3840, n: 3840, m: 6176), .ane)        // the line goes on: ρ ≈ 0.58
         XCTAssertTrue(table.products.usesANE)
-        // Not asked for: no rule. Another shape, with no anchor: nothing invented.
-        XCTAssertNil(table.products.forced(k: 3840, n: 3840, m: 3000))
+        // Not asked for: no rule of its own; the nearest rule (2 048's, in log) answers at run time.
+        XCTAssertFalse(table.products.classes.contains { $0.minRows == 3000 })
+        XCTAssertEqual(table.products.forced(k: 3840, n: 3840, m: 3000), .ane)
+        // Another shape, with no anchor: no rule of its own, the nearest shape's at run time.
         let other = RouteTable(plan: p, classes: compute, renderClasses: render([product(4096, 4096, 2048)]))
-        XCTAssertNil(other.products.forced(k: 4096, n: 4096, m: 2048))
-        // Without render classes the table is the plan's alone, as before.
-        XCTAssertNil(RouteTable(plan: p, classes: compute).products.forced(k: 3840, n: 3840, m: 2048))
+        XCTAssertFalse(other.products.classes.contains { $0.k == 4096 })
+        XCTAssertEqual(other.products.forced(k: 4096, n: 4096, m: 2048), .gpu, "3840×3840 at 1 024 rows is the nearest rule")
+        // Without render classes the table is the plan's alone, as before: 2 048 rows take 1 024's (nearer in log than 4 096).
+        XCTAssertEqual(RouteTable(plan: p, classes: compute).products.forced(k: 3840, n: 3840, m: 2048), .gpu)
     }
 
     func testTheLineGoesPastTheLastHeightInsteadOfStoppingThere() {
@@ -371,8 +374,7 @@ final class CapacityClassesTests: XCTestCase {
         let mid = RouteTable.ClassKey.attention(sequence: 2048, heads: 30, headDim: 128)
         let table = RouteTable(plan: p, classes: compute, renderClasses: render([mid, .attention(sequence: 2048, heads: 32, headDim: 128)]))
         XCTAssertTrue(table.attention.route(sequence: 2048, heads: 30, headDim: 128).splits)
-        XCTAssertFalse(table.attention.route(sequence: 2048, heads: 32, headDim: 128).splits, "another head count has no anchor")
-        XCTAssertFalse(table.attention.route(sequence: 2048, heads: 32, headDim: 128).flash)
+        XCTAssertFalse(table.attention.rules.contains { $0.heads == 32 }, "another head count has no anchor: no rule of its own")
         XCTAssertTrue(table.attention.route(sequence: 4096, heads: 30, headDim: 128).splits)
         XCTAssertTrue(table.attention.route(sequence: 1024, heads: 30, headDim: 128).flash)
     }
@@ -405,8 +407,9 @@ final class CapacityClassesTests: XCTestCase {
         let table = RouteTable(plan: empty, classes: [], base: base, renderClasses: cs)
         XCTAssertTrue(table.weightPathConflicts(for: cs).isEmpty)
         for m in [1056, 4128] { XCTAssertEqual(table.products.weight(.int8, k: 3840, n: 10240, m: m).path, .native, "the heavy height's form") }
-        // Other shapes of the same kind are untouched.
-        XCTAssertEqual(table.products.weight(.int8, k: 4096, n: 4096, m: 1056).path, .widened)
+        // Other shapes of the same kind keep the general rule that matches them; one no rule matches takes its neighbour's.
+        XCTAssertEqual(table.products.weight(.int8, k: 4096, n: 4096, m: 2048).path, .native)
+        XCTAssertEqual(table.products.weight(.int8, k: 4096, n: 4096, m: 1056).path, .native, "no general rule below 2 048: 3840×10240's")
 
         // Heavy at the small height: the other way round.
         let light = int8Classes(rowsAndCounts: [(1056, 400), (4128, 1)])

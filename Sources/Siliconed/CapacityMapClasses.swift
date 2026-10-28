@@ -8,7 +8,7 @@ import Foundation
 ///     requests (5 families × Standard / Compact / Light × 512² / 1024², Faster Rendering on)
 ///        │        CapacityClasses.classes(for:)          every product k×n at its real height, every attention
 ///        ├─ share        executions · FLOP ÷ Σ over the request          (neutral rates: the FLOP share)
-///        ├─ entry        (weight kind, k, n, height cluster)  |  (S, heads, head dim)
+///        ├─ entry        (weight kind, k×n, height) clustered  |  (S, heads, head dim) clustered
 ///        │                  a weight = the MAX of its shares over the requests that run it — not the sum, not the mean
 ///        ├─ cut          heaviest first, until `coverage` of the total or `maxEntries`; the rest is the tail
 ///        └─ routes       product: gpu · gpu+amx · gpu+ane · gpu+ane+amx   and the weight's own forms
@@ -23,10 +23,12 @@ import Foundation
 ///     that family would render on the simplest route. With the maximum no family is sacrificed: a class that is 5 %
 ///     of Krea 2's render and 0 for the four others weighs 5 %, as it will for the person who renders Krea 2.
 ///     The weights then add up to more than 1; only their ratios mean anything (`CapacityMeasure.plan` normalises).
-///   - **Heights are clustered, not rounded**: Z-Image's `4 096` and `4 128` rows, Krea 2's `4 112`, MOSS-Image's
-///     `4 117` are one measurement of the same product at 4 100 ± 30 rows (gap ≤ `heightGap` between neighbours of the
-///     same k×n), measured once at the heaviest member's height; the others get their route from the table's
-///     interpolation (`RouteTable.interpolatedRoute`), which is what it is for.
+///   - **Neighbouring shapes are clustered, not rounded**: Z-Image's `4 096` and `4 128` rows, Krea 2's `4 112`, MOSS-Image's
+///     `4 117` are one measurement at 4 100 ± 30 rows (within `heightGap` of the heaviest member), and so are Z-Image's
+///     3840×10240 and Qwen's 4096×12288 (within `shapeRatio` on k and on n, the same weight kind), measured once at the
+///     heaviest member; the others get their route from the table's interpolation (`RouteTable.interpolatedRoute`) or,
+///     at run time, from the nearest measured rule (`RouteTable.Nearest`) — which is also what a model the catalogue does
+///     not list gets.
 ///   - **A weight's kind is part of the class** (the same k×n in bf16 on the Standard and in int8 on the Compact are two
 ///     classes: their native routes are not alternatives to each other), and **the id says it**: `product:3072x16384@4117`
 ///     for bf16, `product:3072x16384@4117~int8` for int8. A K-quant (Light) widens on the CPU like any weight: its
@@ -50,6 +52,11 @@ package enum CapacityMap {
     package static let budget = 60.0
     /// Rows within which two heights of the same k×n are one measurement.
     package static let heightGap = 64
+    /// **The ratio within which two shapes are one measurement** (on k and on n; on the heads of an attention): 3 072, 3 840
+    /// and 4 096 are one class, 9 216 to 12 288 another. The engines' ratios move with the shape in log, and smoothly: a
+    /// measurement per family's exact shape spent five families' minute on 133 classes, a third of the weight under the
+    /// cut. A shape the map measured for another stands for it in the table (`RouteTable.Nearest`).
+    package static let shapeRatio = 1.28
     /// The classes the pairs decide: the heaviest, until this share of the total weight …
     package static let coverage = 0.96
     /// … or this many.
@@ -108,9 +115,11 @@ package enum CapacityMap {
     package struct Entry: Sendable, Equatable {
         package var work: Work
         package var weight: Double
-        /// The heights of the catalogue this entry stands for (products), the entry's own first.
+        /// The heights of the catalogue this entry stands for at its own shape (products), the entry's own first.
         package var heights: [Int]
         package var routes: [CapacityMeasure.Route]
+        /// How many shapes and heights of the catalogue the entry measures for (its own included).
+        package var members = 1
 
         package var id: String { Self.id(work) }
         package var compute: CapacityMeasure.ComputeClass { .init(id, weight: weight, routes: routes) }
@@ -219,36 +228,37 @@ package enum CapacityMap {
         }
         func weight(_ key: Key) -> Double { shares.map { $0[key] ?? 0 }.max() ?? 0 }
 
-        var entries: [Entry] = []
-        // Attention: one entry per (S, heads, head dim).
-        let attentionKeys = Set(shares.flatMap { $0.keys }.filter { $0.kind == nil })
-        for key in attentionKeys {
-            entries.append(Entry(work: .attention(sequence: key.sequence, heads: key.heads, headDim: key.headDim),
-                                 weight: weight(key), heights: [key.sequence],
-                                 routes: attentionRoutes(sequence: key.sequence, caps: caps)))
+        // Neighbouring shapes, one measurement: heaviest first, a key joins the first cluster of its kind (an attention's:
+        // heads and head dim) whose representative is within `shapeRatio` on each side and `heightGap` rows in height.
+        var clusters: [[Key]] = []
+        let tolerance = log(shapeRatio)
+        func near(_ a: Key, _ b: Key) -> Bool {
+            guard a.kind == b.kind else { return false }
+            let (ka, na, ma, kb, nb, mb) = a.kind == nil
+                ? (a.heads, a.headDim, a.sequence, b.heads, b.headDim, b.sequence) : (a.k, a.n, a.m, b.k, b.n, b.m)
+            return abs(log(Double(ka) / Double(kb))) <= tolerance && abs(log(Double(na) / Double(nb))) <= tolerance
+                && abs(ma - mb) <= heightGap
         }
-        // Products: chains of heights within `heightGap`, per (kind, k, n).
-        let productKeys = Set(shares.flatMap { $0.keys }.filter { $0.kind != nil })
-        let groups = Dictionary(grouping: productKeys) { [$0.kind!.rawValue, "\($0.k)", "\($0.n)"] }
-        for (_, members) in groups {
-            let sorted = members.sorted { $0.m < $1.m }
-            var cluster: [Key] = []
-            func flush() {
-                guard let first = cluster.first else { return }
-                // The cluster's weight in a request is the sum of its members' shares there; the map keeps the maximum.
-                let w = shares.map { these in cluster.reduce(0.0) { $0 + (these[$1] ?? 0) } }.max() ?? 0
-                let rep = cluster.max { (weight($0), $1.m) < (weight($1), $0.m) }!
-                let routes = productRoutes(kind: first.kind!, m: rep.m, denoising: cluster.contains { denoising.contains($0) },
+        let keys = Set(shares.flatMap { $0.keys }).sorted { (weight($1), $0.k, $0.n, $0.m, $0.sequence, $0.heads) < (weight($0), $1.k, $1.n, $1.m, $1.sequence, $1.heads) }
+        for key in keys {
+            if let i = clusters.firstIndex(where: { near($0[0], key) }) { clusters[i].append(key) } else { clusters.append([key]) }
+        }
+        var entries: [Entry] = []
+        for cluster in clusters {
+            // The cluster's weight in a request is the sum of its members' shares there; the map keeps the maximum.
+            let w = shares.map { these in cluster.reduce(0.0) { $0 + (these[$1] ?? 0) } }.max() ?? 0
+            let rep = cluster[0]
+            if let kind = rep.kind {
+                let routes = productRoutes(kind: kind, m: rep.m, denoising: cluster.contains { denoising.contains($0) },
                                            caps: caps, limits: limits)
-                entries.append(Entry(work: .product(k: first.k, n: first.n, m: rep.m, kind: first.kind!), weight: w,
-                                     heights: [rep.m] + cluster.map(\.m).filter { $0 != rep.m }.sorted(), routes: routes))
-                cluster = []
+                let heights = [rep.m] + Set(cluster.filter { $0.k == rep.k && $0.n == rep.n && $0.m != rep.m }.map(\.m)).sorted()
+                entries.append(Entry(work: .product(k: rep.k, n: rep.n, m: rep.m, kind: kind), weight: w, heights: heights, routes: routes,
+                                     members: cluster.count))
+            } else {
+                entries.append(Entry(work: .attention(sequence: rep.sequence, heads: rep.heads, headDim: rep.headDim), weight: w,
+                                     heights: [rep.sequence], routes: attentionRoutes(sequence: rep.sequence, caps: caps),
+                                     members: cluster.count))
             }
-            for key in sorted {
-                if let last = cluster.last, key.m - last.m > heightGap { flush() }
-                cluster.append(key)
-            }
-            flush()
         }
         entries.sort { ($1.weight, $0.id) < ($0.weight, $1.id) }
         let total = entries.reduce(0) { $0 + $1.weight }
@@ -270,9 +280,9 @@ package enum CapacityMap {
     }
 
     /// **The table a plan makes**: its decisions as class rules over the grids the cuts give (`cuts[i]` for `catalogue.entries[i]`), the
-    /// catalogue completing it to the heights nobody measured, and — last — the simplest route for what no class decided and
-    /// no neighbour could tell (a class the engine has no rule for would otherwise take the AMX's grid's nearest share: a route
-    /// nobody judged).
+    /// catalogue completing it to the heights nobody measured. A product of no class — another format, another model — takes
+    /// the nearest measured class's rule (`RouteTable.Nearest`), never a catch-all: « GPU alone » for every shape the catalogue
+    /// did not list left a 1024×1536 render without the ANE.
     package static func table(plan: CapacityMeasure.Plan, catalogue: Catalogue, cuts: [Cut], limits: Limits = Limits()) -> RouteTable {
         var amxPoints: [Conductor.Shares.Point] = [], anePoints: [Conductor.Shares.Point] = []
         var seenAMX = Set<[Int]>(), seenANE = Set<[Int]>()
@@ -291,9 +301,7 @@ package enum CapacityMap {
         base.products.amx = .init(enabled: false, gpuShare: shares.isEmpty ? 0.631 : shares[shares.count / 2],
                                   grid: .init(Conductor.Shares(amxPoints)))
         base.products.ane = .init(enabled: false, gpuShare: 0.5, minimumRows: limits.aneRows, grid: .init(Conductor.Shares(anePoints)))
-        var table = RouteTable(plan: plan, classes: catalogue.entries.map(\.compute), base: base, renderClasses: catalogue.render)
-        table.products.classes.append(.init(engines: .gpu))
-        return table
+        return RouteTable(plan: plan, classes: catalogue.entries.map(\.compute), base: base, renderClasses: catalogue.render)
     }
 
     // MARK: - Regime

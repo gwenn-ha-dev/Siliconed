@@ -24,17 +24,33 @@ final class CapacityMapTests: XCTestCase {
     // MARK: the catalogue
 
     func testWeightIsTheMaximumOfTheShares() {
-        // Z-Image and Qwen-Image-2.1 apart, then together: a class only one runs weighs what it weighs in that one.
+        // Z-Image and Qwen-Image-2.1 apart, then together: a family is never diluted — the class that measures for one of
+        // its classes weighs at least what that class weighs for it alone.
         let z = CC.Request(family: .zImage), q = CC.Request(family: .qwenImage21)
-        let alone = CapacityMap.catalogue(requests: [z], caps: all, coverage: 2, maxEntries: 1000)
         let together = CapacityMap.catalogue(requests: [z, q], caps: all, coverage: 2, maxEntries: 1000)
-        let zOnly = alone.entries.first { $0.id == "product:3840x10240@4128" }
-        XCTAssertNotNil(zOnly)
-        XCTAssertEqual(together.entries.first { $0.id == "product:3840x10240@4128" }?.weight ?? 0, zOnly!.weight, accuracy: 1e-12,
-                       "a class the other family does not run keeps its share: not diluted")
-        // The Qwen entry is Qwen's alone, whatever the number of requests.
-        let qOnly = CapacityMap.catalogue(requests: [q], caps: all, coverage: 2, maxEntries: 1000)
-        for e in qOnly.entries { XCTAssertEqual(together.entries.first { $0.id == e.id }?.weight ?? 0, e.weight, accuracy: 1e-12, e.id) }
+        func near(_ a: CapacityMap.Work, _ b: CapacityMap.Work) -> Bool {
+            let r = log(CapacityMap.shapeRatio)
+            func close(_ x: Int, _ y: Int) -> Bool { abs(log(Double(x) / Double(y))) <= r }
+            switch (a, b) {
+            case let (.product(k, n, m, kind), .product(k2, n2, m2, kind2)):
+                return kind == kind2 && close(k, k2) && close(n, n2) && abs(m - m2) <= CapacityMap.heightGap
+            case let (.attention(s, h, d), .attention(s2, h2, d2)):
+                return close(h, h2) && close(d, d2) && abs(s - s2) <= CapacityMap.heightGap
+            default: return false
+            }
+        }
+        for family in [z, q] {
+            let alone = CapacityMap.catalogue(requests: [family], caps: all, coverage: 2, maxEntries: 1000)
+            for e in alone.entries where e.weight > 1e-3 {
+                let standing = together.entries.filter { near($0.work, e.work) }
+                XCTAssertFalse(standing.isEmpty, e.id)
+                XCTAssertGreaterThanOrEqual(standing.map(\.weight).max() ?? 0, e.weight * 0.999, "\(e.id): not diluted")
+            }
+        }
+        // Z-Image's and Qwen's neighbouring shapes are one measurement: 3840×10240 at 4 128 rows and 4096×12288 at 4 096.
+        XCTAssertLessThan(together.entries.count,
+                          CapacityMap.catalogue(requests: [z], caps: all, coverage: 2, maxEntries: 1000).entries.count
+                            + CapacityMap.catalogue(requests: [q], caps: all, coverage: 2, maxEntries: 1000).entries.count)
         // The shares of a request sum to 1: the maximum over requests of a class is at most 1.
         XCTAssertTrue(together.entries.allSatisfy { $0.weight <= 1.000001 })
     }
@@ -196,8 +212,9 @@ final class CapacityMapTests: XCTestCase {
         for h in tall.heights.dropFirst() {
             XCTAssertEqual(table.products.route(k: k, n: n, m: h).engines.rawValue, String(chosen.split(separator: "/")[0]), "\(tall.id) @ \(h)")
         }
-        // Everything else is the simplest route.
-        XCTAssertEqual(table.products.route(k: 7, n: 7, m: 4096).aneRows, 0)
+        // Any other shape — another format, another model — takes a measured class's rule: no catch-all.
+        XCTAssertNotNil(table.products.forced(k: 7, n: 7, m: 4096))
+        XCTAssertFalse(table.products.classes.contains { $0.k == nil })
     }
 
     func testAClassThatChoseTheANEKnowsItsRouteWithoutTheANE() {

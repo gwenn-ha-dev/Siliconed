@@ -113,6 +113,7 @@ package struct RouteTable: Codable, Sendable, Equatable {
         func matches(_ kind: WeightKind, k: Int, n: Int, m: Int) -> Bool {
             self.kind == kind && (self.k ?? k) == k && (self.n ?? n) == n && m >= minRows && m <= (maxRows ?? Int.max)
         }
+        var shape: (k: Int, n: Int)? { k.flatMap { k in n.map { (k, $0) } } }
     }
 
     /// The engines one product's rows are shared between.
@@ -144,6 +145,7 @@ package struct RouteTable: Codable, Sendable, Equatable {
         func matches(k: Int, n: Int, m: Int) -> Bool {
             (self.k ?? k) == k && (self.n ?? n) == n && m >= minRows && m <= (maxRows ?? Int.max)
         }
+        var shape: (k: Int, n: Int)? { k.flatMap { k in n.map { (k, $0) } } }
     }
 
     /// GPU + AMX: the engine is brought up (`enabled`), the GPU keeps `gpuShare` of the rows where the grid says
@@ -229,19 +231,32 @@ package struct RouteTable: Codable, Sendable, Equatable {
         /// **How a product of `kind` weights, `k × n` at `m` rows, reads its weight.**
         /// `usable` lets the caller skip a rule its process cannot run (no `TensorGEMM`, no rounding kernels): the
         /// next rule that matches then applies, as a switch that was off never stood in the way of the one below.
+        ///
+        /// A product no rule matches takes the **nearest shaped rule** of its kind (`Nearest`) — a height or a model the map
+        /// never saw reads its weight as its nearest measured neighbour does, not widened by default.
         package func weight(_ kind: WeightKind, k: Int, n: Int, m: Int,
                             usable: (WeightRule) -> Bool = { _ in true }) -> WeightRoute {
-            if let rule = weights.first(where: { $0.matches(kind, k: k, n: n, m: m) && usable($0) }) {
-                return WeightRoute(path: rule.path, roundsActivation: rule.roundsActivation)
-            }
-            return WeightRoute(path: .widened, roundsActivation: false)
+            // Only a product no rule speaks of borrows a neighbour's: a rule that matches but cannot run falls to the next
+            // that matches, as before.
+            let own = weights.filter { $0.matches(kind, k: k, n: n, m: m) }
+            let rule = own.first(where: usable) ?? (own.isEmpty ? Nearest.rule(
+                among: weights.filter { $0.kind == kind && $0.shape != nil && usable($0) }, k: k, n: n, m: m) { ($0.shape!, $0.minRows, $0.maxRows) } : nil)
+            guard let rule else { return WeightRoute(path: .widened, roundsActivation: false) }
+            return WeightRoute(path: rule.path, roundsActivation: rule.roundsActivation)
         }
 
         /// **The engines a class rule forces on a product**, `nil` when none matches (the grids decide). What
         /// `GEMM.linear` asks at every product; the engine instances (a conductor, a `NeuralEngine`) hold the
         /// grids, built from this table and moved by the diagnostic, which measures at shares of its own.
+        ///
+        /// As for the weights, a product no rule matches takes the **nearest shaped rule** (`Nearest`): the map rules every
+        /// class it measured, and a format or a model it did not see takes its measured neighbour's route — a route
+        /// judged, where the grids alone would give one nobody judged. The grids decide only in a table without a class
+        /// rule (the switches').
         package func forced(k: Int, n: Int, m: Int, aneBroughtUp: Bool = true) -> Engines? {
-            guard let rule = classes.first(where: { $0.matches(k: k, n: n, m: m) }) else { return nil }
+            guard let rule = classes.first(where: { $0.matches(k: k, n: n, m: m) })
+                    ?? Nearest.rule(among: classes.filter { $0.shape != nil }, k: k, n: n, m: m, { ($0.shape!, $0.minRows, $0.maxRows) })
+            else { return nil }
             if !aneBroughtUp, rule.engines == .ane || rule.engines == .aneAMX { return rule.withoutANE ?? .amx }
             return rule.engines
         }
@@ -267,6 +282,32 @@ package struct RouteTable: Codable, Sendable, Equatable {
             let rows = aneOK ? NeuralEngine.rows(m, gpuShare: ane.share(k: k, n: n, m: m), minimum: ane.minimumRows) : 0
             let alongside = rows > 0 && amxOK && (beside ?? ((ane.besideAMX.shares.ratio(k: k, n: n, m: m) ?? 0) >= 0.5))
             return ProductRoute(aneRows: rows, amxBesideANE: alongside, amx: amxOK)
+        }
+    }
+
+    // MARK: - The nearest measured class
+
+    /// **Where a class the map did not measure takes its route**: from the measured rule whose shape is nearest — the
+    /// same shape at the nearest height first, then the nearest shape, each distance in log (a ratio, the way the work
+    /// scales: 3072 is as near 4096 as 3840 is near 5120). The engines' ratios move smoothly with the shape and the
+    /// height; the rule of the nearest point is the map's best guess, and the render's check (predicted against
+    /// measured, `RenderLoop`) says when it was wrong.
+    package enum Nearest {
+        static func distance(_ x: Int, _ low: Int, _ high: Int?) -> Double {
+            let x = Double(max(x, 1)), low = Double(max(low, 1)), high = Double(high ?? Int.max)
+            return x < low ? log(low / x) : x > high ? log(x / high) : 0
+        }
+
+        /// `describe`: a rule's shape `(k, n)` (heads and head dim for an attention) and its height range.
+        static func rule<R>(among rules: [R], k: Int, n: Int, m: Int,
+                            _ describe: (R) -> ((k: Int, n: Int), Int, Int?)) -> R? {
+            rules.min { a, b in
+                let (sa, la, ha) = describe(a), (sb, lb, hb) = describe(b)
+                let shapeA = abs(log(Double(sa.k) / Double(k))) + abs(log(Double(sa.n) / Double(n)))
+                let shapeB = abs(log(Double(sb.k) / Double(k))) + abs(log(Double(sb.n) / Double(n)))
+                if abs(shapeA - shapeB) > 1e-9 { return shapeA < shapeB }
+                return distance(m, la, ha) < distance(m, lb, hb)
+            }
         }
     }
 
@@ -312,8 +353,8 @@ package struct RouteTable: Codable, Sendable, Equatable {
         /// that do not.
         ///
         /// A length no rule covers takes the rule of **its class at the nearest length** (in log) when the table
-        /// has one: a map writes one rule per measured length, and an untabulated format (1024×1536) must not fall
-        /// back to MPSGraph alone while its class's every measured length splits.
+        /// has one, else of the nearest class (`Nearest`): a map writes one rule per measured length, and an
+        /// untabulated format (1024×1536) or model must not fall back to MPSGraph alone while its neighbours split.
         package func route(sequence: Int, heads: Int? = nil, headDim: Int? = nil) -> AttentionRoute {
             let rule = rules.first(where: { $0.matches(sequence: sequence, heads: heads, headDim: headDim) })
                 ?? nearest(sequence: sequence, heads: heads, headDim: headDim)
@@ -321,15 +362,12 @@ package struct RouteTable: Codable, Sendable, Equatable {
             return AttentionRoute(flash: rule.flash, splitFraction: rule.splitFraction)
         }
 
-        /// The rule naming exactly this class whose lengths lie nearest to `sequence`, by the ratio of lengths.
+        /// The rule naming a class nearest this one — its own at the nearest length first, else the nearest heads and
+        /// head dimension (`Nearest`).
         private func nearest(sequence: Int, heads: Int?, headDim: Int?) -> AttentionRule? {
-            guard let heads, let headDim, sequence > 0 else { return nil }
-            func distance(_ r: AttentionRule) -> Double {
-                let low = max(r.minSequence, 1), high = r.maxSequence ?? Int.max
-                if sequence < low { return log(Double(low) / Double(sequence)) }
-                return sequence > high ? log(Double(sequence) / Double(high)) : 0
-            }
-            return rules.filter { $0.heads == heads && $0.headDim == headDim }.min { distance($0) < distance($1) }
+            guard let heads, let headDim else { return nil }
+            let named = rules.filter { $0.heads != nil && $0.headDim != nil }
+            return Nearest.rule(among: named, k: heads, n: headDim, m: sequence) { (($0.heads!, $0.headDim!), $0.minSequence, $0.maxSequence) }
         }
 
         package var usesFlash: Bool { rules.contains { $0.flash } }
