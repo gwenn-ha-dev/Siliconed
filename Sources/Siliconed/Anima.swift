@@ -384,7 +384,7 @@ package final class AnimaDiT {
         }
         if let flash {
             p = .flash(flash)
-        } else if HeadSplitAttention.applies(sequence: s) {
+        } else if HeadSplitAttention.applies(sequence: s, heads: config.heads, headDim: config.headDim) {
             p = .split(try HeadSplitAttention(device: gemm.device, queue: gemm.queue, heads: config.heads,
                                               sequence: s, headDim: config.headDim))
         } else {
@@ -398,7 +398,7 @@ package final class AnimaDiT {
     private func crossAttention(_ s: Int) throws -> AttentionPath {
         if let p = crossPath { return p }
         let p: AttentionPath
-        if HeadSplitAttention.applies(sequence: s) {
+        if HeadSplitAttention.applies(sequence: s, heads: config.heads, headDim: config.headDim) {
             p = .split(try HeadSplitAttention(device: gemm.device, queue: gemm.queue, heads: config.heads,
                                               sequence: s, headDim: config.headDim, keys: textLength))
         } else {

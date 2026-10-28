@@ -113,8 +113,8 @@ package final class Krea2DiT {
     /// tips the ill-conditioned step 3 of the 512² trajectory past its clouds' bar (median 5.47·10⁻⁴
     /// against 5.38); at 1024² it saves ~2.5 s of 29 and the trajectory holds. The memory need reads
     /// the same condition.
-    package static func headSplit(sequence: Int) -> Bool {
-        HeadSplitAttention.applies(sequence: sequence) && sequence >= headSplitRows
+    package static func headSplit(sequence: Int, heads: Int, headDim: Int) -> Bool {
+        HeadSplitAttention.applies(sequence: sequence, heads: heads, headDim: headDim) && sequence >= headSplitRows
     }
     package static let headSplitRows = 2048
 
@@ -488,7 +488,7 @@ package final class Krea2DiT {
 
     private func attend(rows n: Int) throws {
         let d = config.dim, kv = config.kvWidth
-        if Krea2DiT.headSplit(sequence: n) {
+        if Krea2DiT.headSplit(sequence: n, heads: config.heads, headDim: config.headDim) {
             let split: HeadSplitAttention
             if let s = splits[n] { split = s } else {
                 split = try HeadSplitAttention(device: gemm.device, queue: gemm.queue, heads: config.heads, sequence: n,

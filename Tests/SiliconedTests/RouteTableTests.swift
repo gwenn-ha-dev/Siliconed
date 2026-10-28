@@ -199,6 +199,21 @@ final class RouteTableTests: XCTestCase {
         XCTAssertEqual(u.attention.route(sequence: 4096), long, "an omitted class never matches a rule that names one")
     }
 
+    func testAnUntabulatedLengthTakesItsClassAtTheNearestLength() {
+        // A map's table: one rule per measured length, no rule for any other.
+        let a = Table.Attention(rules: [
+            .init(minSequence: 4128, maxSequence: 4128, heads: 30, headDim: 128, splitFraction: 0.4),
+            .init(minSequence: 1056, maxSequence: 1056, heads: 30, headDim: 128),
+        ])
+        XCTAssertTrue(a.route(sequence: 4128, heads: 30, headDim: 128).splits)
+        XCTAssertTrue(a.route(sequence: 6176, heads: 30, headDim: 128).splits, "1024×1536 takes 4128's split")
+        XCTAssertFalse(a.route(sequence: 512, heads: 30, headDim: 128).splits, "below every measured length: the shortest")
+        XCTAssertFalse(a.route(sequence: 2000, heads: 30, headDim: 128).splits, "2000/1056 < 4128/2000: nearer 1056")
+        XCTAssertTrue(a.route(sequence: 2200, heads: 30, headDim: 128).splits)
+        XCTAssertFalse(a.route(sequence: 4128, heads: 24, headDim: 128).splits, "another class borrows nothing")
+        XCTAssertFalse(a.route(sequence: 4128).splits)
+    }
+
     func testAGridIsExtrapolatedPastItsHeightsOnlyWhenAsked() {
         let grid = Conductor.Shares([.init(k: 3840, n: 3840, m: 1024, ratio: 0.5), .init(k: 3840, n: 3840, m: 4096, ratio: 0.8)])
         XCTAssertEqual(grid.ratio(k: 3840, n: 3840, m: 6144)!, 0.8, accuracy: 1e-12, "held at the last height, as before")

@@ -166,9 +166,9 @@ extension MemoryNeed {
             Term("sampler", latent + request.solver.historyBytes(count: latent / f)),
             Term("DiT rotation scratch", maps.ditRotationScratch),
         ] + attention("self-attention", heads: dit.heads, rows: s, keys: s, headDim: dit.headDim, causal: false,
-                      split: HeadSplitAttention.applies(sequence: s), threads: request.threads)
+                      split: HeadSplitAttention.applies(sequence: s, heads: dit.heads, headDim: dit.headDim), threads: request.threads)
           + attention("cross-attention", heads: dit.heads, rows: s, keys: textRows, headDim: dit.headDim, causal: false,
-                      split: HeadSplitAttention.applies(sequence: s), threads: request.threads)
+                      split: HeadSplitAttention.applies(sequence: s, heads: dit.heads, headDim: dit.headDim), threads: request.threads)
           // Every height is exact: the image's tokens, and the text's `L`.
           + gemm("DiT", products: [(s, inDim, d), (s, d, d), (s, d, hidden), (s, hidden, d), (s, d, outDim),
                                    (textRows, dit.textDim, d)],

@@ -223,7 +223,7 @@ package final class Block {
     /// The head split, or `nil` when it does not apply.
     private func headSplit() throws -> HeadSplitAttention? {
         let sequence = shapes.sequence
-        guard HeadSplitAttention.applies(sequence: sequence) else { return nil }
+        guard HeadSplitAttention.applies(sequence: sequence, heads: shapes.heads, headDim: shapes.headDim) else { return nil }
         if let existing = builtHeadSplit { return existing }
         let built = try HeadSplitAttention(device: gemm.device, queue: gemm.queue, heads: shapes.heads,
                                        sequence: sequence, headDim: shapes.headDim)

@@ -177,7 +177,7 @@ extension MemoryNeed {
         let sequence = image + capPadded
         let attentions = [("image refiners", image), ("layers", sequence), ("context refiners", capPadded)].flatMap {
             attention($0.0, heads: dit.heads, rows: $0.1, keys: $0.1, headDim: headDim, causal: false,
-                      split: HeadSplitAttention.applies(sequence: $0.1),
+                      split: HeadSplitAttention.applies(sequence: $0.1, heads: dit.heads, headDim: headDim),
                       threads: request.threads)
         }
         let (d, hidden) = (dit.dim, dit.hidden), inDim = dit.patch * dit.patch * dit.channels

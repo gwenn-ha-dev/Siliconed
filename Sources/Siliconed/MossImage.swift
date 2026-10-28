@@ -101,8 +101,8 @@ package final class MossImageDiT {
 
     /// Where the SDPA is cut by heads between the GPU and the CPU: Krea 2's rule (`HeadSplitAttention.applies`,
     /// from `headSplitRows` rows) — the memory need reads the same condition.
-    package static func headSplit(sequence: Int) -> Bool {
-        HeadSplitAttention.applies(sequence: sequence) && sequence >= headSplitRows
+    package static func headSplit(sequence: Int, heads: Int, headDim: Int) -> Bool {
+        HeadSplitAttention.applies(sequence: sequence, heads: heads, headDim: headDim) && sequence >= headSplitRows
     }
     package static let headSplitRows = 2048
 
@@ -505,7 +505,7 @@ package final class MossImageDiT {
 
     private func attend(rows n: Int) throws {
         let qb = try slice(q), kb = try slice(k), vb = try slice(v), ob = try slice(merged)
-        if MossImageDiT.headSplit(sequence: n) {
+        if MossImageDiT.headSplit(sequence: n, heads: config.heads, headDim: config.headDim) {
             let split: HeadSplitAttention
             if let s = splits[n] { split = s } else {
                 split = try HeadSplitAttention(device: gemm.device, queue: gemm.queue, heads: config.heads, sequence: n,

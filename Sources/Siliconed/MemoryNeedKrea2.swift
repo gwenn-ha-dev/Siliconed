@@ -203,7 +203,7 @@ extension MemoryNeed {
             Term("DiT rotation scratch", maps.ditRotationScratch),
         ]
         // Under the head split, MPSGraph sees the GPU's groups only: its queries' copy and its slices are theirs.
-        let split = Krea2DiT.headSplit(sequence: n)
+        let split = Krea2DiT.headSplit(sequence: n, heads: dit.heads, headDim: dit.headDim)
         let running = MemoryNeed.attention("DiT", heads: dit.heads, rows: n, keys: n, headDim: dit.headDim, causal: false,
                                            split: split, threads: request.threads, group: dit.heads / dit.kvHeads)
             // The image's rows are exact; the sequence's follow the prompt's bound.

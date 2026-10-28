@@ -310,11 +310,26 @@ package struct RouteTable: Codable, Sendable, Equatable {
         /// **What an attention of `sequence` query rows may use.** `heads` / `headDim`: the class, when the caller
         /// knows it; a rule that names them then matches only that class, a call that omits them only the rules
         /// that do not.
+        ///
+        /// A length no rule covers takes the rule of **its class at the nearest length** (in log) when the table
+        /// has one: a map writes one rule per measured length, and an untabulated format (1024×1536) must not fall
+        /// back to MPSGraph alone while its class's every measured length splits.
         package func route(sequence: Int, heads: Int? = nil, headDim: Int? = nil) -> AttentionRoute {
-            guard let rule = rules.first(where: { $0.matches(sequence: sequence, heads: heads, headDim: headDim) }) else {
-                return AttentionRoute(flash: false, splitFraction: nil)
-            }
+            let rule = rules.first(where: { $0.matches(sequence: sequence, heads: heads, headDim: headDim) })
+                ?? nearest(sequence: sequence, heads: heads, headDim: headDim)
+            guard let rule else { return AttentionRoute(flash: false, splitFraction: nil) }
             return AttentionRoute(flash: rule.flash, splitFraction: rule.splitFraction)
+        }
+
+        /// The rule naming exactly this class whose lengths lie nearest to `sequence`, by the ratio of lengths.
+        private func nearest(sequence: Int, heads: Int?, headDim: Int?) -> AttentionRule? {
+            guard let heads, let headDim, sequence > 0 else { return nil }
+            func distance(_ r: AttentionRule) -> Double {
+                let low = max(r.minSequence, 1), high = r.maxSequence ?? Int.max
+                if sequence < low { return log(Double(low) / Double(sequence)) }
+                return sequence > high ? log(Double(sequence) / Double(high)) : 0
+            }
+            return rules.filter { $0.heads == heads && $0.headDim == headDim }.min { distance($0) < distance($1) }
         }
 
         package var usesFlash: Bool { rules.contains { $0.flash } }

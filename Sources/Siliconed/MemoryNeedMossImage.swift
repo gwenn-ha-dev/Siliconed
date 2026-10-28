@@ -121,7 +121,7 @@ extension MemoryNeed {
             // Widening the largest rotated block weight (the Compact's int8 convrot): beside the arena; 0 in bf16.
             Term("DiT rotation scratch", Widen.rotationScratchBytes(header: header, prefixes: (0..<config.layers).map(MossImageDiT.layerPrefix))),
         ]
-        let split = MossImageDiT.headSplit(sequence: n)
+        let split = MossImageDiT.headSplit(sequence: n, heads: config.heads, headDim: config.headDim)
         terms += attention("DiT", heads: config.heads, rows: n, keys: n, headDim: config.headDim, causal: false,
                            split: split, threads: request.threads)
         // The text blocks' SDPA runs at T rows, after the main one is not yet built: the larger of the two is

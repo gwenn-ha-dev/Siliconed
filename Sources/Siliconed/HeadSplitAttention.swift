@@ -75,17 +75,18 @@ package final class HeadSplitAttention {
     /// microseconds and the rendezvous would dominate.
     package static let minimumSequence = 1024
 
-    /// **Whether an attention of `sequence` query rows (of `heads` of `headDim`, when the caller knows) is cut by
+    /// **Whether an attention of `sequence` query rows (of `heads` of `headDim`) is cut by
     /// heads** — the one condition the blocks, Qwen-Image-2.1's target and the memory formulas share: the route
     /// table's (`RouteTable.Attention`; today's `head_split` setting and `minimumSequence` as its rules). Off,
     /// the attention runs in one MPSGraph SDPA.
-    package static func applies(sequence: Int, heads: Int? = nil, headDim: Int? = nil) -> Bool {
+    /// The class is required: a map's rules name it, and a call without it matches none of them.
+    package static func applies(sequence: Int, heads: Int, headDim: Int) -> Bool {
         EngineSettings.effective.routes.attention.route(sequence: sequence, heads: heads, headDim: headDim).splits
     }
 
     /// **Whether the flash kernel is allowed for an attention of `sequence` rows** (the route table's; a model that
     /// implements it takes it before the split).
-    package static func allowsFlash(sequence: Int, heads: Int? = nil, headDim: Int? = nil) -> Bool {
+    package static func allowsFlash(sequence: Int, heads: Int, headDim: Int) -> Bool {
         EngineSettings.effective.routes.attention.route(sequence: sequence, heads: heads, headDim: headDim).flash
     }
 
