@@ -19,14 +19,17 @@
 #      es  a space of any kind after « or before » (Spanish «…» are tight);
 #      it  the same, or a straight apostrophe ' (the Italian one is ’);
 #      ja  a quotation mark of another language (“ ” « » ‘ ’; the Japanese ones are 「」) or a
-#          non-breaking space (U+00A0, U+202F): Japanese is set without spaces around its punctuation.
+#          non-breaking space (U+00A0, U+202F): Japanese is set without spaces around its punctuation;
+#      zh-Hans  a quotation mark of another language (« » ‘ ’ and the Japanese 「」), a non-breaking
+#          space (U+00A0, U+202F), an ASCII , ; : ? ! right after a Han character, or a space beside
+#          full-width punctuation (the Chinese ones are “ ” ， 。 ： ； ？ ！ 、 （ ）).
 #
 # `tools/app.sh` calls it before packaging the app, reads `languages` from here for the bundle's
 # `CFBundleLocalizations`, then compiles the catalog into the bundle.
 set -e
 cd "${0:A:h}/.."
 # The languages the app ships besides English, the source: one list, read by `tools/app.sh` too.
-languages=(fr de es it ja)
+languages=(fr de es it ja zh-Hans)
 catalog=Sources/SiliconedApp/Localizable.xcstrings
 module=""
 # The freshest build that has both modules the app imports.
@@ -90,6 +93,9 @@ untypeset = {
            "a space after « or before », or a straight apostrophe"),
     "ja": (lambda s, v: re.search(r"[“”«»‘’\u00a0\u202f]", s),
            "a “ ” « » ‘ ’ quote (Japanese uses 「」) or a non-breaking space"),
+    "zh-Hans": (lambda s, v: re.search(r"[«»‘’「」\u00a0\u202f]|[\u4e00-\u9fff][,;:?!]|"
+                                      r" [，。：；？！、）”]|[（“] |[，。：；？！、] ", s),
+                "a « » ‘ ’ 「」 quote or non-breaking space, an ASCII , ; : ? ! after a Han character, or a space beside full-width punctuation"),
 }
 wrong = {lang: sorted(s for k, v in c["strings"].items()
                       for s in values(v.get("localizations", {}).get(lang, {}))

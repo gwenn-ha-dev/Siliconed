@@ -40,6 +40,12 @@
             "state": "translated",
             "value": "Siliconedは、このネットワーク上でSiliconedを実行しているほかのMacを探します。そのMacで生成したり、このMacを貸し出したりするためです。"
           }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Siliconed 会查找此网络中运行它的其他 Mac，以便在其中一台上生成，或将这台 Mac 借给它们使用。"
+          }
         }
       }
     }
