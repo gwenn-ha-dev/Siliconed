@@ -103,6 +103,9 @@ package final class WeightProducts {
             }
         }
         var failure: String?
+        // The render's check (`ProductLedger`): this product's wall seconds, as the class and the route it is.
+        let ledger = ProductLedger.current
+        let began = ledger == nil ? 0 : DispatchTime.now().uptimeNanoseconds
         timed("gemm wall") {
             switch path {
             case .bf16(let rounding?):
@@ -121,6 +124,11 @@ package final class WeightProducts {
                                                               weightIsTransposed: transposed)
             }
         }
+        if let ledger {
+            let (kind, route) = classification(of: name, path)
+            ledger.add(.product(k: k, n: n, m: m, kind: kind), route: route,
+                       seconds: Double(DispatchTime.now().uptimeNanoseconds - began) * 1e-9)
+        }
         // A refused slice leaves its columns as they were: a plausible image, wrong exactly there.
         if let failure { throw Artifact.Failure.badHeader(failure) }
         if !merged, let stack, let mid {
@@ -129,6 +137,23 @@ package final class WeightProducts {
                 timings["lora GPU", default: 0] += gemm.lora(x: a, down: stack.down, mid: mb, up: stack.up, c: c,
                                                              m: m, k: k, r: stack.rank, n: n)
             }
+        }
+    }
+
+    /// **The class of the product that just ran, as the capacity map names it**: the weight's kind (as published —
+    /// a K-quant or anything widened counts as bf16, which is how the map folds them) and the route taken: the engines
+    /// the widened product ran on (`GEMM.lastEngines`), or the weight's own form (`gpu/bf16`, `gpu/bf16act`,
+    /// `gpu/int8`, `gpu+amx/int8`, `gpu/q8`, `gpu+amx/q8`).
+    private func classification(of name: String, _ path: Path) -> (RouteTable.WeightKind, String) {
+        switch path {
+        case .bf16(let rounding): return (.bf16, rounding == nil ? "gpu/bf16" : "gpu/bf16act")
+        case .int8(let plan):
+            let kind: RouteTable.WeightKind = plan.block == nil ? .int8 : .q8
+            return (kind, (plan.amxColumns > 0 && gemm.conductor != nil ? "gpu+amx/" : "gpu/") + kind.rawValue)
+        case .widened:
+            var kind = RouteTable.WeightKind.bf16
+            if let tensor = artifact.tensors[name], tensor.dtype == .int8 { kind = tensor.scale?.block == nil ? .int8 : .q8 }
+            return (kind, gemm.lastEngines.rawValue)
         }
     }
 

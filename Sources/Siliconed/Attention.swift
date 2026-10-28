@@ -264,6 +264,9 @@ package final class Attention {
     /// Inputs and output in **fp32**, `[S, H·Dh]`, in buffers that the caller owns.
     package func run(q qBuffer: MTLBuffer, k kBuffer: MTLBuffer, v vBuffer: MTLBuffer,
                     into outBuffer: MTLBuffer) -> Double {
+        // The render's check (`ProductLedger`): this call's wall seconds, as the class it is.
+        let clock = ProductLedger.attention(sequence: sequence, heads: heads, headDim: headDim, route: "graph")
+        defer { clock?.finish() }
         func data(_ buffer: MTLBuffer, _ length: Int) -> MPSGraphTensorData {
             MPSGraphTensorData(buffer, shape: [1, NSNumber(value: length),
                                                NSNumber(value: heads), NSNumber(value: headDim)],

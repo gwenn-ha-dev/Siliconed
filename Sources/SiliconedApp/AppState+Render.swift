@@ -380,6 +380,8 @@ extension AppState {
                     preview = a.cgImage()
                 case .image(_, let renderResult):
                     stageStates[.decoding] = .done
+                    // The render against the map's prediction (`RenderLoop`): kept for the report and the next launch.
+                    checkMap(renderResult, model: model, references: references.count)
                     // The PNG and the thumbnail are made off the main thread; the engine has already
                     // moved on to the next image of the batch.
                     // Named subjects: the PNG keeps the prompt typed, the model's beside it. Nobody

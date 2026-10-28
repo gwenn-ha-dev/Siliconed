@@ -109,12 +109,16 @@ package enum CapacityClasses {
         package var steps: Int
         /// Include the text encoder (a new prompt); an « image suivante » does not run it.
         package var includesEncoder: Bool
+        /// The half-grid evaluations a render actually did, when it is not the family's rule (`SILICONED_SPECTRAL`);
+        /// `nil`: the family's own count.
+        package var halfSteps: Int?
 
         package init(family: Family, variant: Variant = .standard, width: Int = 1024, height: Int = 1024,
-                     fasterRendering: Bool = true, promptTokens: Int = 11, steps: Int = 8, includesEncoder: Bool = true) {
+                     fasterRendering: Bool = true, promptTokens: Int = 11, steps: Int = 8, includesEncoder: Bool = true,
+                     halfSteps: Int? = nil) {
             self.family = family; self.variant = variant; self.width = width; self.height = height
             self.fasterRendering = fasterRendering; self.promptTokens = promptTokens; self.steps = steps
-            self.includesEncoder = includesEncoder
+            self.includesEncoder = includesEncoder; self.halfSteps = halfSteps
         }
     }
 
@@ -215,7 +219,7 @@ package enum CapacityClasses {
         let factor = latentFactor(r.family)
         let halvable = Spectral.divisible(height: r.height / factor, width: r.width / factor, by: 2,
                                           floor: Spectral.floor(factor: factor))
-        let k = r.fasterRendering && halvable ? min(halfSizeSteps(r.family), max(r.steps - 1, 0)) : 0
+        let k = r.fasterRendering && halvable ? min(r.halfSteps ?? halfSizeSteps(r.family), max(r.steps - 1, 0)) : 0
         var result: [(Int, Int)] = []
         if k > 0 { result.append((imageTokens(width: r.width / 2, height: r.height / 2), k)) }
         result.append((imageTokens(width: r.width, height: r.height), r.steps - k))
@@ -392,9 +396,14 @@ package enum CapacityClasses {
     package static let attentionRoutes = ["graph", "flash", "split"]
 
     /// The engines a route keeps busy (the keys of `CapacityMeasure.Heat.factors`): `gpu+ane+amx` → gpu, ane, amx;
-    /// `split` → gpu, cpu (the heads' share on the CPU); the weight's form after a `/` (`gpu+amx/int8`) is no engine.
+    /// `split` → gpu, cpu (the heads' share on the CPU); `graph` and `flash`, the GPU's kernels → gpu (as `CapacityMap.attentionRoutes`
+    /// declares them); the weight's form after a `/` (`gpu+amx/int8`) is no engine.
     package static func engines(ofRoute id: String) -> [String] {
-        id == "split" ? ["gpu", "cpu"] : id.split(separator: "/")[0].split(separator: "+").map(String.init)
+        switch id {
+        case "split": return ["gpu", "cpu"]
+        case "graph", "flash": return ["gpu"]
+        default: return id.split(separator: "/")[0].split(separator: "+").map(String.init)
+        }
     }
 
     /// **Cold rates, FLOP per second, by route**: a default per route and kind of class, and the figures measured
@@ -467,18 +476,36 @@ package enum CapacityClasses {
     }
 
     /// **The route the table gives a class** for `family`: a product's engines (`RouteTable.Products.route`, the AMX only
-    /// from `amxMinimumRows`, never the ANE on an encoder), an attention's kernel (`flash` where the family's code
-    /// tries it before the split — Z-Image, Anima —, `split` where the table splits, else `graph`).
-    package static func route(of c: Class, family: Family, table: RouteTable, amxMinimumRows: Int = 512) -> String {
+    /// from `amxMinimumRows` — the engine's `amx_min` —, never the ANE on an encoder, nor in a process that did not bring
+    /// it up: `aneBroughtUp`), an attention's kernel (`flash` where the family's code tries it before the split — Z-Image
+    /// and Anima's self-attention, not Anima's cross-attention —, `split` where the table splits, else `graph`).
+    ///
+    /// `weightForms`: the route as the map names it for a weight read as published — the weight rule of the table for the
+    /// class's kind says `gpu/bf16`, `gpu/bf16act`, `gpu/int8`, `gpu+amx/int8`, `gpu/q8`, `gpu+amx/q8` (no ANE and, for a
+    /// bf16 weight, no AMX: `TensorGEMM` takes the product whole) —, which is what the rates of the map are keyed by and
+    /// what the ledger records. Off by default: the engines alone.
+    package static func route(of c: Class, family: Family, table: RouteTable,
+                              amxMinimumRows: Int = EngineSettings.defaultAMXMinimumRows,
+                              aneBroughtUp: Bool = true, weightForms: Bool = false) -> String {
         switch c.shape {
         case let .product(k, n, rows, _):
-            var route = table.products.route(k: k, n: n, m: rows)
+            var route = table.products.route(k: k, n: n, m: rows, aneBroughtUp: aneBroughtUp)
             if c.phase == .encoding { route.aneRows = 0; route.amxBesideANE = false }
             if rows < amxMinimumRows, route.aneRows == 0 { route.amx = false }
-            return route.engines.rawValue
-        case let .attention(s, _, heads, _, dim, _):
+            let engines = route.engines
+            // A K-quant has no native form (`weightKind` nil): it widens.
+            guard weightForms, let kind = c.weightKind else { return engines.rawValue }
+            let weight = table.products.weight(kind, k: k, n: n, m: rows)
+            switch weight.path {
+            case .widened: return engines.rawValue
+            case .bf16: return weight.roundsActivation ? "gpu/bf16act" : "gpu/bf16"
+            case .native:
+                let withAMX = (engines == .amx || engines == .aneAMX) && n >= 128 && rows >= amxMinimumRows
+                return (withAMX ? "gpu+amx/" : "gpu/") + kind.rawValue
+            }
+        case let .attention(s, _, heads, _, dim, cross):
             let a = table.attention.route(sequence: s, heads: heads, headDim: dim)
-            if a.flash, family == .zImage || family == .anima { return "flash" }
+            if a.flash, !cross, family == .zImage || family == .anima { return "flash" }
             return a.splits ? "split" : "graph"
         }
     }
@@ -488,10 +515,12 @@ package enum CapacityClasses {
     /// decreasing in every rate, increasing in every heat factor.
     package static func predict(_ classes: [Class], family: Family, table: RouteTable, rates: Rates = .neutral,
                                 heat: CapacityMeasure.Heat = CapacityMeasure.Heat(), phases: Set<Phase> = [.denoising],
-                                amxMinimumRows: Int = 512) -> Prediction {
+                                amxMinimumRows: Int = EngineSettings.defaultAMXMinimumRows,
+                                aneBroughtUp: Bool = true, weightForms: Bool = false) -> Prediction {
         var parts: [Prediction.Part] = []
         for c in classes where phases.contains(c.phase) && (c.executions[family] ?? 0) > 0 {
-            let id = route(of: c, family: family, table: table, amxMinimumRows: amxMinimumRows)
+            let id = route(of: c, family: family, table: table, amxMinimumRows: amxMinimumRows,
+                           aneBroughtUp: aneBroughtUp, weightForms: weightForms)
             let factor = heat.factor(CapacityMeasure.Route(id, engines: engines(ofRoute: id)))
             parts.append(.init(classID: c.routeKey.id, phase: c.phase, route: id,
                                seconds: c.totalFLOP(family) / rates.rate(c, route: id) * factor))

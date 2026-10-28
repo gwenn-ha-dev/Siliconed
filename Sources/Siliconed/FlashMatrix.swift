@@ -378,6 +378,8 @@ package final class FlashMatrix {
 
     @discardableResult
     package func run(q: MTLBuffer, k: MTLBuffer, v: MTLBuffer, into out: MTLBuffer) -> Double {
+        let clock = ProductLedger.attention(sequence: sequence, heads: heads, headDim: FlashMatrix.headDim, route: "flash")
+        defer { clock?.finish() }
         let commands = queue.makeCommandBuffer()!
         let encoder = commands.makeComputeCommandEncoder()!
         encoder.label = "flash_sdpa_matrix"

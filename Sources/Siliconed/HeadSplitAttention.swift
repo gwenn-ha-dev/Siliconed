@@ -388,6 +388,8 @@ package final class HeadSplitAttention {
     package func run(q qBuffer: MTLBuffer, k kBuffer: MTLBuffer, v vBuffer: MTLBuffer, into outBuffer: MTLBuffer,
                      q qPointer: UnsafePointer<Float>, k kPointer: UnsafePointer<Float>, v vPointer: UnsafePointer<Float>,
                      out outPointer: UnsafeMutablePointer<Float>) -> (gpu: Double, cpu: Double) {
+        let clock = ProductLedger.attention(sequence: sequence, heads: heads, headDim: headDim, route: "split")
+        defer { clock?.finish() }
         let n = { (x: Int) in NSNumber(value: x) }
         let shape: [NSNumber] = [1, n(sequence), n(heads), n(headDim)]
         let kvShape: [NSNumber] = [1, n(keys), n(kvHeads), n(headDim)]

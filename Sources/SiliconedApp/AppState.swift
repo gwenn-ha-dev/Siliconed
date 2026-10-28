@@ -516,15 +516,18 @@ final class AppState {
         // with a current map: the app builds only one `AppState` (see `App.swift`). Without one (none yet,
         // or one of another Mac, macOS or build: an update), the settings stay unread until the measure
         // the first render starts (`next`).
-        // An orange map (not complete: its minute, its memory or a route judged wrong) or one that misses an
-        // installed family is measured again at the next launch, whatever the heat: a fanless Mac is never
-        // at rest after a minute of load, and the map judges at the hot regime anyway. Once per orange
-        // map: one orange again for a lasting cause serves until the next (`retriedMapKey`).
-        let stored = Self.readStoredMap()
+        // An orange map (not complete: its minute, its memory or a route judged wrong), one that misses an
+        // installed family, or one the last render doubted (`RenderLoop.launching`) is measured again at the
+        // next launch, whatever the heat: a fanless Mac is never at rest after a minute of load, and the map
+        // judges at the hot regime anyway. Once per orange map: one orange again for a lasting cause serves
+        // until the next (`retriedMapKey`).
+        var stored = Self.readStoredMap()
+        // The last render's verdict on this map, acted on now and never twice.
+        let doubted = Self.actOnRenderNote(&stored)
         storedMap = stored
         if let stored, stored.isCurrent {
-            if !stored.isGreen || !stored.covers(Set(installedFamilies.map(\.rawValue))),
-               stored.date != UserDefaults.standard.string(forKey: Self.retriedMapKey) {
+            let orange = !stored.isGreen || !stored.covers(Set(installedFamilies.map(\.rawValue)))
+            if doubted || (orange && stored.date != UserDefaults.standard.string(forKey: Self.retriedMapKey)) {
                 remeasuringOrange = true
             } else {
                 readSettings(map: stored)
@@ -554,6 +557,32 @@ final class AppState {
         UserDefaults.standard.data(forKey: capacityMapKey).flatMap { try? JSONDecoder().decode(Diagnostic.Report.self, from: $0) }
     }
 
+    /// **The last render's note, acted on at launch** (`RenderLoop.launching`): a correction is applied to the stored map and the
+    /// corrected map kept — so a note never applies twice —, a note that asks for a new map returns `true` once the Mac is at rest.
+    private static func actOnRenderNote(_ stored: inout Diagnostic.Report?) -> Bool {
+        let defaults = UserDefaults.standard
+        let note = defaults.data(forKey: renderNoteKey).flatMap { try? JSONDecoder().decode(RenderLoop.Note.self, from: $0) }
+        guard let map = stored, note != nil else { return false }
+        let launch = RenderLoop.launching(map, note: note)
+        if launch.map != map, let data = try? launch.map.json(pretty: false) {
+            defaults.set(data, forKey: capacityMapKey)
+            stored = launch.map
+        }
+        if launch.consumed { defaults.removeObject(forKey: renderNoteKey) }
+        return launch.remeasure
+    }
+
+    /// **Checks a finished render against the map it ran under**: its note is shown by the report and kept for the next launch.
+    /// Never changes this session — the map in use, the routes, the bits stay as they were.
+    func checkMap(_ render: Engine.Render, model: Model, references: Int) {
+        guard let map = mapInUse,
+              let check = RenderLoop.check(render, variant: model.library?.variant(of: model.family) ?? .standard,
+                                           references: references, report: map, table: EngineSettings.effective.routes,
+                                           amxMinimumRows: Conductor.minimumRows) else { return }
+        renderNote = check.note
+        if let data = try? JSONEncoder().encode(check.note) { UserDefaults.standard.set(data, forKey: Self.renderNoteKey) }
+    }
+
     /// The map kept in the preferences, current or not.
     private(set) var storedMap: Diagnostic.Report?
     /// The map this process's settings were read with — `nil`: not read yet, or read without one (a
@@ -566,6 +595,10 @@ final class AppState {
     /// The kept map is current but provisional (`Diagnostic.Report.isProvisional`) and the Mac is at rest
     /// now: the first render measures again rather than read it.
     private(set) var remeasuringOrange = false
+    /// **The last render against the map it ran under** (`RenderLoop`): what « Report my configuration » carries, and — kept in the
+    /// preferences — what the next launch acts on (a regime corrected, a map measured again), never this session.
+    @ObservationIgnored private(set) var renderNote: RenderLoop.Note?
+    private static let renderNoteKey = "capacityMapRenderNote"
 
     /// Keeps `report` as the map of the next launches — and of this one, when nothing read the settings yet.
     func keep(_ report: Diagnostic.Report) {

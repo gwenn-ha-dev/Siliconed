@@ -129,7 +129,7 @@ extension AppState {
     func openIssue(_ report: Diagnostic.Report) -> String? {
         do {
             copyJSON(report)
-            NSWorkspace.shared.open(try report.issueURL(includingReport: false))
+            NSWorkspace.shared.open(try report.with(render: renderNote).issueURL(includingReport: false))
             return String(localized: "The report is in the clipboard: paste it into the form's “Report” field.")
         } catch {
             return Problem(error).text
@@ -137,7 +137,8 @@ extension AppState {
     }
 
     func copyJSON(_ report: Diagnostic.Report) {
-        guard let data = try? report.json() else { return }
+        // The last render against the map in use travels with the report (`RenderLoop.Note`, ~1 KB).
+        guard let data = try? report.with(render: renderNote).json() else { return }
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(String(decoding: data, as: UTF8.self), forType: .string)
         flash(String(localized: "Report copied (JSON)"))
