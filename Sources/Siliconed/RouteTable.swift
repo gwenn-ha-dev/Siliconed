@@ -376,14 +376,23 @@ package struct RouteTable: Codable, Sendable, Equatable {
     /// plan left open (`chosen == nil`) or does not know keeps what `base` gives it. The engines a rule names
     /// but `base` did not bring up are brought up with `base`'s defaults — the plan never chose an engine
     /// that was not measured.
+    ///
+    /// `renderClasses` (the classes a render runs, `CapacityClasses`) completes the table to the heights nobody
+    /// measured and fixes the weights' forms:
+    ///
+    ///   - a product (or attention) class with no decision of its own takes the route the **neighbouring measured
+    ///     heights** give it (`interpolatedRoute`): the routes' hot-time ratios of the same k×n (the same heads and
+    ///     head dim) at the measured heights, linear in log m, extended past the last measured height by the same
+    ///     line, then the map's rule (`CapacityMeasure.rule`) on them — not the last measured height's route;
+    ///   - a weight prepared once is read in **one form at every height it is used** (`unifyingWeightPaths`).
     package init(plan: CapacityMeasure.Plan, classes: [CapacityMeasure.ComputeClass], base: RouteTable = RouteTable(),
-                 splitFraction: Double = HeadSplitAttention.referenceFraction) {
+                 splitFraction: Double = HeadSplitAttention.referenceFraction,
+                 renderClasses: [CapacityClasses.Class] = []) {
         var table = base
-        for decision in plan.decisions {
-            guard let chosen = decision.chosen, let key = ClassKey(id: decision.classID) else { continue }
+        func apply(_ key: ClassKey, _ chosen: String) {
             switch key {
             case let .product(k, n, m):
-                guard let engines = Engines(rawValue: chosen) else { continue }
+                guard let engines = Engines(rawValue: chosen) else { return }
                 if engines == .amx || engines == .aneAMX { table.products.amx.enabled = true }
                 if engines == .ane || engines == .aneAMX { table.products.ane.enabled = true }
                 table.products.classes.append(.init(engines: engines, k: k, n: n, minRows: m, maxRows: m))
@@ -393,6 +402,19 @@ package struct RouteTable: Codable, Sendable, Equatable {
                                                    splitFraction: chosen == "split" ? splitFraction : nil), at: 0)
             }
         }
+        var decided = Set<String>()
+        for decision in plan.decisions {
+            decided.insert(decision.classID)
+            guard let chosen = decision.chosen, let key = ClassKey(id: decision.classID) else { continue }
+            apply(key, chosen)
+        }
+        var seen = Set<String>()
+        for c in renderClasses {
+            let key = c.routeKey
+            guard !decided.contains(key.id), seen.insert(key.id).inserted else { continue }
+            if let chosen = Self.interpolatedRoute(for: key, plan: plan, classes: classes) { apply(key, chosen) }
+        }
+        if !renderClasses.isEmpty { table.unifyWeightPaths(for: renderClasses) }
         self = table
     }
 

@@ -188,6 +188,25 @@ package enum CapacityMeasure {
         return n % 2 == 1 ? s[n / 2] : 0.5 * (s[n / 2 - 1] + s[n / 2])
     }
 
+    // MARK: - The rule
+
+    /// **The choice among routes, on hot-time ratios** (`ratios[r]` = route r's time over the reference's, `nil`: not a
+    /// candidate; the reference is the first candidate and reads 1): the first efficient route within
+    /// `efficientTolerance` of the best speed that also beats the reference by `tie`, else the simplest route
+    /// that beats the one before it by `tie`. What the plan applies on its estimates and what the route table
+    /// applies on ratios interpolated to a height nobody measured: one rule, one place.
+    package static func rule(ratios: [Double?], efficient: [Bool], settings: Settings = Settings()) -> Int? {
+        guard let ref = ratios.firstIndex(where: { $0 != nil }) else { return nil }
+        let cand = ratios.indices.filter { ratios[$0] != nil }
+        let best = cand.compactMap { ratios[$0] }.min() ?? 1
+        for r in cand where efficient[r] && r != ref {
+            if best / ratios[r]! >= settings.efficientTolerance && ratios[r]! < 1 - settings.tie { return r }
+        }
+        var chosen = ref
+        for r in cand where r > ref && ratios[r]! < ratios[chosen]! * (1 - settings.tie) { chosen = r }
+        return chosen
+    }
+
     // MARK: - State
 
     private enum PairState { case open, lost, hole, capped }
@@ -271,16 +290,10 @@ package enum CapacityMeasure {
 
         /// The rule, on the estimates' means.
         func choose(_ c: Int) -> Int? {
-            guard let ref = refs[c] else { return nil }
-            let cand = candidates(c)
-            let e = Dictionary(uniqueKeysWithValues: cand.map { ($0, exp(estimate(c, $0).mean)) })
-            let best = e.values.min() ?? 1
-            for r in cand where classes[c].routes[r].efficient && r != ref {
-                if best / e[r]! >= settings.efficientTolerance && e[r]! < 1 - settings.tie { return r }
-            }
-            var chosen = ref
-            for r in cand where r > ref && e[r]! < e[chosen]! * (1 - settings.tie) { chosen = r }
-            return chosen
+            guard refs[c] != nil else { return nil }
+            let cand = Set(candidates(c))
+            let ratios: [Double?] = classes[c].routes.indices.map { cand.contains($0) ? exp(estimate(c, $0).mean) : nil }
+            return CapacityMeasure.rule(ratios: ratios, efficient: classes[c].routes.map(\.efficient), settings: settings)
         }
 
         /// The routes that can still be a rival: not wrong, not a hole, not lost (nor the reference).
