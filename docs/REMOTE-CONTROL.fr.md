@@ -83,7 +83,7 @@ d'avant à la fin, même si la série échoue. Éteint, c'est la pleine taille, 
 ## La commande
 
 `silicontrol` est livrée dans l'app, `Siliconed.app/Contents/Helpers/silicontrol` (cible `Silicontrol`,
-`Sources/Silicontrol/main.swift`). Réglages → Ligne de commande (« Installer… ») la lie
+`Sources/Silicontrol/main.swift`). Réglages → Avancé → Ligne de commande (« Installer… ») la lie
 dans `/usr/local/bin`. Ce n'est qu'un tuyau : Foundation et les frameworks du système seulement, elle ne lie pas le moteur. Si
 l'app n'est pas lancée, toute commande sauf l'aide la lance et attend sa prise (30 s au plus) ;
 `silicontrol open` ne fait que cela. L'aide (`help`, `help <sujet>`, `<commande> --help`, aucun

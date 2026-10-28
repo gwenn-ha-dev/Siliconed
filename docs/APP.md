@@ -102,7 +102,7 @@ Rendering happens on your Mac. The only network traffic is the model download yo
 
 ## For AI agents and scripts: silicontrol
 
-Drives the running app from a terminal. It ships in `Siliconed.app/Contents/Helpers/silicontrol`; Settings → Command Line links it into `/usr/local/bin`. What you add appears in the app's window, and there is one queue, never two renders at once.
+Drives the running app from a terminal. It ships in `Siliconed.app/Contents/Helpers/silicontrol`; Settings → Advanced → Command Line links it into `/usr/local/bin`. What you add appears in the app's window, and there is one queue, never two renders at once.
 
 ```
 silicontrol help                 the full reference (always start here)

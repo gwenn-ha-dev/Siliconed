@@ -102,7 +102,7 @@ Le rendu se fait sur votre Mac. Le seul trafic réseau est le téléchargement d
 
 ## Pour les agents IA et les scripts : silicontrol
 
-Pilote l'app ouverte depuis un terminal. Elle est livrée dans `Siliconed.app/Contents/Helpers/silicontrol` ; Réglages → Ligne de commande la lie dans `/usr/local/bin`. Ce que vous ajoutez apparaît dans la fenêtre de l'app, et il n'y a qu'une file, jamais deux rendus à la fois.
+Pilote l'app ouverte depuis un terminal. Elle est livrée dans `Siliconed.app/Contents/Helpers/silicontrol` ; Réglages → Avancé → Ligne de commande la lie dans `/usr/local/bin`. Ce que vous ajoutez apparaît dans la fenêtre de l'app, et il n'y a qu'une file, jamais deux rendus à la fois.
 
 ```
 silicontrol help                 la référence complète (toujours commencer par là)

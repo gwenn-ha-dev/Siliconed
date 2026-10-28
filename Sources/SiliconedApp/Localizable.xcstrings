@@ -355,62 +355,6 @@
         }
       }
     },
-    "%@ doesn't offer the ComfyUI schedule" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ bietet den ComfyUI-Zeitplan nicht an"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ no ofrece el calendario de ComfyUI"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ ne propose pas le calendrier ComfyUI"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ non offre il calendario di ComfyUI"
-          }
-        }
-      }
-    },
-    "%@ doesn't offer the ComfyUI schedule." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ bietet den ComfyUI-Zeitplan nicht an."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ no ofrece el calendario de ComfyUI."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ ne propose pas le calendrier ComfyUI."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ non offre il calendario di ComfyUI."
-          }
-        }
-      }
-    },
     "%@ doesn't start from an image." : {
       "localizations" : {
         "de" : {
@@ -2719,62 +2663,6 @@
         }
       }
     },
-    "--schedule %@ is offered only in Developer Mode" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "--schedule %@ gibt es nur im Entwicklermodus"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "--schedule %@ solo se ofrece en el Modo de desarrollador"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "--schedule %@ n’est proposé qu’en Mode développeur"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "--schedule %@ è disponibile solo nella Modalità sviluppatore"
-          }
-        }
-      }
-    },
-    "--schedule expects official or comfyui, not \"%@\"" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "--schedule erwartet official oder comfyui, nicht „%@“"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "--schedule espera official o comfyui, no «%@»"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "--schedule attend official ou comfyui, pas « %@ »"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "--schedule richiede official o comfyui, non «%@»"
-          }
-        }
-      }
-    },
     "--sketch belongs to « silicontrol grid »" : {
       "localizations" : {
         "de" : {
@@ -4379,6 +4267,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Aggiunge texture fine e piccoli dettagli; Massimo può accentuare troppo la nitidezza"
+          }
+        }
+      }
+    },
+    "Advanced" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Erweitert"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Avanzado"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Avancé"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Avanzate"
           }
         }
       }
@@ -6395,62 +6311,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Chiudi"
-          }
-        }
-      }
-    },
-    "ComfyUI schedule" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ComfyUI-Zeitplan"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Calendario de ComfyUI"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Calendrier ComfyUI"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Calendario ComfyUI"
-          }
-        }
-      }
-    },
-    "ComfyUI's schedule on Qwen-Image-2.1, to compare with the official one" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "den Zeitplan von ComfyUI für Qwen-Image-2.1, zum Vergleich mit dem offiziellen"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "el calendario de ComfyUI en Qwen-Image-2.1, para compararlo con el oficial"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "le calendrier de ComfyUI sur Qwen-Image-2.1, pour le comparer à l’officiel"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "la pianificazione di ComfyUI su Qwen-Image-2.1, per confrontarla con quella ufficiale"
           }
         }
       }
@@ -10074,6 +9934,34 @@
         }
       }
     },
+    "General" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Allgemein"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "General"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Général"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Generali"
+          }
+        }
+      }
+    },
     "Generate" : {
       "localizations" : {
         "de" : {
@@ -12490,34 +12378,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "«%@» perso: nuovo tentativo…"
-          }
-        }
-      }
-    },
-    "Made with ComfyUI's schedule, offered in Developer Mode: the official one will be used." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mit dem Zeitplan von ComfyUI erstellt, den es im Entwicklermodus gibt: Der offizielle wird verwendet."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Hecha con el calendario de ComfyUI, que se ofrece en el Modo de desarrollador: se usará el oficial."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Faite avec le calendrier de ComfyUI, proposé en Mode développeur : le calendrier officiel sera utilisé."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Creata con il calendario di ComfyUI, disponibile nella Modalità sviluppatore: verrà usato quello ufficiale."
           }
         }
       }
@@ -24409,34 +24269,6 @@
         }
       }
     },
-    "Use the official schedule." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Verwenden Sie den offiziellen Zeitplan."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Usa el calendario oficial."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Utilisez le calendrier officiel."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Usa il calendario ufficiale."
-          }
-        }
-      }
-    },
     "Used" : {
       "localizations" : {
         "de" : {
@@ -24853,34 +24685,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "In attesa · %lld"
-          }
-        }
-      }
-    },
-    "Walks the noise levels ComfyUI uses for this model (the base model's), instead of the Turbo's own: to compare, same seed, same steps" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Durchläuft die Rauschstufen, die ComfyUI für dieses Modell verwendet (die des Basismodells), statt der des Turbo: zum Vergleich, gleicher Seed, gleiche Schritte"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Recorre los niveles de ruido que ComfyUI usa para este modelo (los del modelo base) en lugar de los del Turbo: para comparar, misma semilla, mismos pasos"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Parcourt les niveaux de bruit que ComfyUI emploie pour ce modèle (ceux du modèle de base) au lieu de ceux de la Turbo : pour comparer, même graine, mêmes pas"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Percorre i livelli di rumore che ComfyUI usa per questo modello (quelli del modello base) invece di quelli del Turbo: per confrontare, stesso seed, stessi passi"
           }
         }
       }
@@ -26997,34 +26801,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "togli --detail"
-          }
-        }
-      }
-    },
-    "leave out --schedule, or --model qwen-image-2.1" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "--schedule weglassen oder --model qwen-image-2.1"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "quita --schedule, o --model qwen-image-2.1"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "retirez --schedule, ou --model qwen-image-2.1"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "togli --schedule, o --model qwen-image-2.1"
           }
         }
       }

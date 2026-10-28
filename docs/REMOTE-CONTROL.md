@@ -76,7 +76,7 @@ before back at the end, even when the series fails. Off is full size, the same b
 ## The command
 
 `silicontrol` ships inside the app, at `Siliconed.app/Contents/Helpers/silicontrol` (target `Silicontrol`,
-`Sources/Silicontrol/main.swift`). Settings → Command Line ("Install…") links it into
+`Sources/Silicontrol/main.swift`). Settings → Advanced → Command Line ("Install…") links it into
 `/usr/local/bin`. It is a pipe: Foundation and the system's frameworks only, it does not link the engine. If the app is not
 running, any command but the help launches it and waits for its socket (30 s at most); `silicontrol open`
 does only that. The help (`help`, `help <topic>`, `<command> --help`, no argument) is answered by the
