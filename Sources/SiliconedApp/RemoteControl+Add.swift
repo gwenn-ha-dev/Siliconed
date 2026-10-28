@@ -39,12 +39,6 @@ extension RemoteControl {
                     throw Refusal("usage", String(localized: "--solver expects euler, euler-ancestral, dpmpp-2m or unipc, not \"\(v)\""))
                 }
                 d.solver = rule
-            case "--schedule":
-                let v = try value(a)
-                guard let s = SigmaSchedule(rawValue: v.lowercased()) else {
-                    throw Refusal("usage", String(localized: "--schedule expects official or comfyui, not \"\(v)\""))
-                }
-                d.schedule = s
             case "--batch":
                 let v = try value(a)
                 guard let n = Int(v), (1...8).contains(n) else { throw Refusal("usage", String(localized: "--batch expects an integer from 1 to 8, not \"\(v)\"")) }
@@ -148,17 +142,6 @@ extension RemoteControl {
             guard card.map({ AppState.solverFamilies.contains($0.family) }) == true else {
                 throw Refusal("solver", String(localized: "\(card?.name ?? model.name) doesn't offer the \(d.solver.rawValue) solver"),
                               help: String(localized: "Euler only, or --model z-image"))
-            }
-        }
-        // ComfyUI's schedule: the rack's switch, so Developer Mode, and the models that offer it.
-        if d.schedule != .official {
-            guard app.developerMode else {
-                throw Refusal("schedule", String(localized: "--schedule \(d.schedule.rawValue) is offered only in Developer Mode"),
-                              help: String(localized: "turn on Developer Mode in Settings (⌘,)"))
-            }
-            guard model.chain.denoising.schedules.contains(d.schedule) else {
-                throw Refusal("schedule", String(localized: "\(card?.name ?? model.name) doesn't offer the ComfyUI schedule"),
-                              help: String(localized: "leave out --schedule, or --model qwen-image-2.1"))
             }
         }
         // Detail: not on a model that offers none (Anima, Krea 2) — the rack hides it there.
@@ -272,7 +255,7 @@ extension RemoteControl {
         }
         let f = model.chain.denoising.space.factor
         let plan = model.chain.denoising.plan(height: height / f, width: width / f, steps: steps, start: 0,
-                                                 withLoRA: !stack.isEmpty || d.detail != .normal, schedule: d.schedule)
+                                                 withLoRA: !stack.isEmpty || d.detail != .normal)
         // One seed for the whole series, drawn once: the alternatives are compared at the same seeds.
         let firstNumber = d.seed ?? UInt64.random(in: 0...UInt64(UInt32.max))
         if grid {
@@ -298,7 +281,7 @@ extension RemoteControl {
             var settings = RenderSettings(identifier: model.identifier, modelName: card?.name ?? model.name,
                                           prompt: v.prompt, format: RecommendedFormat(width, height), steps: steps,
                                           loras: stack, references: references.count, detail: d.detail,
-                                          solver: d.solver, schedule: d.schedule)
+                                          solver: d.solver)
             let used = app.namedJob(v.prompt, settings: &settings, references: references, model: model)
             var job = Job(ordinal: app.nextJobNumber(), settings: settings,
                           seeds: (0..<d.batch).map { firstNumber &+ UInt64($0) },
@@ -406,7 +389,7 @@ extension RemoteControl {
         }
         let settings = RenderSettings(identifier: model.identifier, modelName: card?.name ?? model.name, prompt: prompt,
                                       format: format, steps: steps, loras: stack, references: references.count, detail: d.detail,
-                                      solver: d.solver, schedule: d.schedule)
+                                      solver: d.solver)
         if d.sketch { app.stopExploring() }
         let (run, jobs) = app.enqueueGrid(g, settings: settings, references: references, previews: d.previews ?? app.previews,
                                           sketch: d.sketch, neuralEngine: d.neuralEngine)

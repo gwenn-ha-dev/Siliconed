@@ -173,7 +173,7 @@ extension RemoteControl {
         let jobs = variants.map { v -> Job in
             var settings = RenderSettings(identifier: card.id, modelName: card.name, prompt: v.prompt, format: format,
                                           steps: steps, loras: stack, references: references.count, detail: d.detail,
-                                          solver: d.solver, schedule: d.schedule)
+                                          solver: d.solver)
             let used = app.namedJob(v.prompt, settings: &settings, references: references, capacity: capacity)
             var job = Job(ordinal: 0, settings: settings, seeds: (0..<d.batch).map { firstNumber &+ UInt64($0) },
                           references: used, previews: d.previews ?? app.previews, defaultSteps: card.defaultSteps, plan: nil)
@@ -281,8 +281,7 @@ extension RemoteControl {
                           help: "silicontrol wait, then retry")
         }
         let settings = RenderSettings(identifier: card.id, modelName: card.name, prompt: prompt, format: format, steps: steps,
-                                      loras: stack, references: references.count, detail: d.detail, solver: d.solver,
-                                      schedule: d.schedule)
+                                      loras: stack, references: references.count, detail: d.detail, solver: d.solver)
         let on = mirror.macName
         do {
             try mirror.explore(g, settings: settings, references: references, stopAfter: 0, neuralEngine: d.neuralEngine,

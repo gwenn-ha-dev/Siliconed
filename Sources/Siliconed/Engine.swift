@@ -93,7 +93,6 @@ package final class Engine: Sendable {
         /// **The update rule** (`Request.solver`); `euler` writes nothing in the metadata.
         package var solver: Solver = .euler
         /// **Whose σ** (`Request.schedule`); `official` writes nothing in the metadata.
-        package var schedule: SigmaSchedule = .official
         /// **The variations its noise was turned by** (`Request.variations`), those of null
         /// strength left out; empty for an ordinary render.
         package var variations: [Variation] = []
@@ -133,7 +132,6 @@ package final class Engine: Sendable {
             if let sketch { m["sketch"] = "\(sketch)" }
             if detail != .normal { m["detail"] = detail.rawValue }
             if solver != .euler { m["solver"] = solver.rawValue }
-            if schedule != .official { m["schedule"] = schedule.rawValue }
             if neuralEngine { m["neural-engine"] = "true" }
             // `seed` stays the origin's: the variations turn its noise, in order (`Variation.text`).
             if !variations.isEmpty { m["variation"] = Variation.text(variations) }
@@ -203,8 +201,6 @@ package final class Engine: Sendable {
             package var detail: Detail = .normal
             /// `Request.solver`; `euler` when the key is absent (every render before it).
             package var solver: Solver = .euler
-            /// `Request.schedule`; `official` when the key is absent (every render before it).
-            package var schedule: SigmaSchedule = .official
             /// `Request.neuralEngine`; false when the key is absent (every render before it, and every one
             /// computed in fp32).
             package var neuralEngine = false
@@ -237,7 +233,6 @@ package final class Engine: Sendable {
                 reproducible = read("reproducible") { Bool($0) }
                 detail = read("detail") { Detail(rawValue: $0) } ?? .normal
                 solver = read("solver") { Solver(rawValue: $0) } ?? .euler
-                schedule = read("schedule") { SigmaSchedule(rawValue: $0) } ?? .official
                 neuralEngine = read("neural-engine") { Bool($0) } ?? false
                 variations = read("variation") { Variation.parse($0) } ?? []
                 if let raw = m["lora"] {

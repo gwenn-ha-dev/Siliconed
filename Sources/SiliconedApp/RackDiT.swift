@@ -176,12 +176,6 @@ struct DiTBox: View {
             }
             .help("How each step moves to the next, with the same steps: Euler is the one this model was distilled for")
         }
-        // Developer Mode, Qwen-Image-2.1: the σ ComfyUI walks for this model, to compare with the official ones.
-        if app.offersComfySchedule {
-            Toggle("ComfyUI schedule", isOn: $app.comfySchedule)
-                .font(.callout)
-                .help("Walks the noise levels ComfyUI uses for this model (the base model's), instead of the Turbo's own: to compare, same seed, same steps")
-        }
         Toggle("Preview every step", isOn: $app.previews)
             .font(.callout)
     }

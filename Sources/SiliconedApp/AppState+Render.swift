@@ -27,7 +27,7 @@ extension AppState {
             var settings = RenderSettings(identifier: identifier, modelName: card?.name ?? identifier, prompt: expanded,
                                           format: format, steps: steps, loras: loras.filter { !$0.path.isEmpty },
                                           references: references.count, variations: variations, detail: effectiveDetail,
-                                          solver: effectiveSolver, schedule: effectiveSchedule)
+                                          solver: effectiveSolver)
             let used = namedJob(expanded, settings: &settings, references: references)
             let plan = expectedPlan(steps: steps, format: format, withLoRA: loras.contains { !$0.path.isEmpty } || !plainSampling,
                                     references: used.count)
@@ -64,13 +64,10 @@ extension AppState {
             if let model, !model.chain.denoising.solvers.contains(s.solver) { s.solver = .euler }
             // …and a cell whose model offers no Detail renders Normal.
             if let model, !model.chain.denoising.acceptsDetail { s.detail = .normal }
-            // …and a cell whose model has no such schedule walks its official σ.
-            if let model, !model.chain.denoising.schedules.contains(s.schedule) { s.schedule = .official }
             var plan = model.map { m in
                 let f = m.chain.denoising.space.factor
                 let plan = m.chain.denoising.plan(height: s.format.height / f, width: s.format.width / f, steps: s.steps,
-                                                  start: 0, withLoRA: !s.loras.isEmpty || s.detail != .normal,
-                                                  schedule: s.schedule)
+                                                  start: 0, withLoRA: !s.loras.isEmpty || s.detail != .normal)
                 return s.references > 0 ? plan.unreduced : plan
             }
             // A stop at or past the plan's count is a finished image — kept by the exploration all the same.
@@ -190,7 +187,6 @@ extension AppState {
             shared.append("\(loraName(l.path)) \(Figures.strength(l.strength))")
         }
         if r.solver != .euler, !varies({ if case .solvers = $0 { true } else { false } }) { shared.append(r.solver.choice) }
-        if r.schedule != .official { shared.append(String(localized: "ComfyUI schedule")) }
         if run.references > 0, !varies({ if case .images = $0 { true } else { false } }) {
             shared.append(String(localized: "edit, \(run.references) images"))
         }
@@ -346,7 +342,6 @@ extension AppState {
             request.sketch = job.sketch
             request.detail = settings.detail
             request.solver = settings.solver
-            request.schedule = settings.schedule
             request.variations = settings.variations
             request.neuralEngine = job.neuralEngine ?? neuralEngine(for: settings.identifier)
 
@@ -562,8 +557,7 @@ extension AppState {
             let f = m.chain.denoising.space.factor
             let plan = m.chain.denoising.plan(height: entry.settings.format.height / f, width: entry.settings.format.width / f,
                                               steps: entry.settings.steps, start: 0,
-                                              withLoRA: !entry.settings.loras.isEmpty || entry.settings.detail != .normal,
-                                              schedule: entry.settings.schedule)
+                                              withLoRA: !entry.settings.loras.isEmpty || entry.settings.detail != .normal)
             return entry.settings.references > 0 ? plan.unreduced : plan
         }
         let jobs = (0..<(count ?? batch)).map { _ in
@@ -610,7 +604,6 @@ extension AppState {
         loras = r.loras.map(allowedStrength)
         detail = r.detail
         solver = r.solver
-        comfySchedule = r.schedule == .comfyUI
     }
 
     /// **A Siliconed PNG dropped on the canvas**: the form takes what its metadata says
@@ -674,11 +667,7 @@ extension AppState {
         restoreSettings(RenderSettings(identifier: model?.id ?? identifier, modelName: model?.name ?? "",
                                        prompt: recipe.prompt ?? prompt, format: restoredFormat,
                                        steps: target == nil ? steps : (recipe.steps ?? target!.defaultSteps),
-                                       loras: stack, detail: recipe.detail, solver: recipe.solver,
-                                       schedule: recipe.schedule))
-        if recipe.schedule != .official, !offersComfySchedule {
-            notes.append(String(localized: "Made with ComfyUI's schedule, offered in Developer Mode: the official one will be used."))
-        }
+                                       loras: stack, detail: recipe.detail, solver: recipe.solver))
         if recipe.solver != .euler, !offeredSolvers.contains(recipe.solver) {
             notes.append(String(localized: "Made with the \(recipe.solver.choice) solver, offered in Developer Mode: Euler will be used."))
         }

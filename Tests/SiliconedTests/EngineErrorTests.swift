@@ -14,7 +14,7 @@ final class EngineErrorTests: XCTestCase {
     func testEveryCaseHasAUniqueCodeAndASentence() {
         let codes = EngineError.samples.map(\.code)
         XCTAssertEqual(Set(codes).count, codes.count, "two cases share a code: \(codes)")
-        XCTAssertEqual(codes.count, 46, "a case was added: give it a sample, a code, a sentence")
+        XCTAssertEqual(codes.count, 45, "a case was added: give it a sample, a code, a sentence")
         for e in EngineError.samples {
             XCTAssertTrue(e.code.allSatisfy { $0.isLowercase || $0 == "_" }, e.code)
             let sentence = e.errorDescription ?? ""

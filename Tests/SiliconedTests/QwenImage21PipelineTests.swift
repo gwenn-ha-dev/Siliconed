@@ -44,19 +44,6 @@ final class QwenImage21PipelineTests: XCTestCase {
         for n in [5, 6, 7, 9] { XCTAssertThrowsError(try QwenImage21Pipeline.check(steps: n), "\(n)") }
     }
 
-    /// **ComfyUI's σ to the bit**, as its own `ModelSamplingFlux` and `simple_scheduler` give them
-    /// (ComfyUI's own code at `ba994879`, run once) — and the module walks them only
-    /// when asked.
-    func testTheComfyScheduleIsComfyUIToTheBit() throws {
-        XCTAssertEqual(bits(QwenImage21Pipeline.comfySigmas(steps: 8)),
-                       [0x3f800000, 0x3f6ee214, 0x3f5b546f, 0x3f44c7a9, 0x3f2a7ccf, 0x3f0b6fc3, 0x3ecc69d5,
-                        0x3e62ffc1, 0])
-        let module = QwenImage21DenoisingModule(map: "", scheduler: QwenImage21Pipeline.Scheduler())
-        XCTAssertEqual(module.schedules, [.official, .comfyUI])
-        XCTAssertEqual(bits(module.sigmas(steps: 8, schedule: .comfyUI)), bits(QwenImage21Pipeline.comfySigmas(steps: 8)))
-        XCTAssertEqual(bits(module.sigmas(steps: 8, schedule: .official)), bits(module.sigmas(steps: 8)))
-    }
-
     /// The configs that would move the published σ are refused: the base model's dynamic shift and
     /// terminal stretch, a non-unit shift, Karras σ; and a `model_index.json` without `sample_sigmas`.
     func testTheSchedulerRefusesWhatWouldMoveTheSchedule() {

@@ -3,8 +3,7 @@
 //     Siliconed ▸ Settings… (⌘,)
 //     ┌───────────────────────────────────────────────────────────────┐
 //     │ Faster Rendering   the first steps at half size, on            │
-//     │ Developer Mode     for comparing and testing: solvers,         │
-//     │                    ComfyUI's schedule                          │
+//     │ Developer Mode     for comparing and testing: solvers          │
 //     │ Experimental       unfinished, off by default: Named Subjects, │
 //     │                    Negative LoRA Strengths                     │
 //     │ Comparison         curtain or side by side                     │
@@ -19,7 +18,7 @@
 //   keep its frame; not restorable. What it sets are the app's preferences (`AppState`'s header), the
 //   same keys as before: a switch moved here keeps its value.
 // - **A switch changes what it changes at once**, as from the menu it replaces: Developer Mode off takes
-//   the solver, the ComfyUI schedule and a solver axis with it (`AppState.developerMode`).
+//   the solver and a solver axis with it (`AppState.developerMode`).
 // - **The capacity map is measured from the sheet**, on the main window (`DiagnosticSheet`): this
 //   window says where the session stands and opens it.
 
@@ -79,8 +78,7 @@ struct SettingsView: View {
                     Toggle(isOn: $app.developerMode) {
                         titled("Developer Mode", "For comparing and testing, not for everyday renders. It shows:")
                     }
-                    bullets(["the solvers Euler a, DPM++ 2M and UniPC beside Euler, in the panel and as an axis of the exploration",
-                             "ComfyUI's schedule on Qwen-Image-2.1, to compare with the official one"])
+                    bullets(["the solvers Euler a, DPM++ 2M and UniPC beside Euler, in the panel and as an axis of the exploration"])
                 }
                 Section {
                     Toggle(isOn: Binding(get: { app.subjects.enabled },

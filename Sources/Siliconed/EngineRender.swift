@@ -105,17 +105,13 @@ extension Engine {
         guard chain.denoising.solvers.contains(request.solver) else {
             throw Request.Failure.solver(request.solver, model: chain.denoising.model)
         }
-        guard chain.denoising.schedules.contains(request.schedule) else {
-            throw Request.Failure.schedule(request.schedule, model: chain.denoising.model)
-        }
         guard request.detail == .normal || chain.denoising.acceptsDetail else {
             throw Request.Failure.detail(model: chain.denoising.model)
         }
         // Detail, like a LoRA, turns Qwen-Image-2.1's spectral schedule off; an edit too
         // (`QwenImage21DenoisingModule.plan`): the plan cannot see the references, the chain can.
         var plan = chain.denoising.plan(height: height, width: width, steps: steps, start: start,
-                                          withLoRA: !request.loras.isEmpty || request.detail != .normal,
-                                          schedule: request.schedule)
+                                          withLoRA: !request.loras.isEmpty || request.detail != .normal)
         if !request.references.isEmpty { plan = plan.unreduced }
         guard plan.evaluations > 0 else {
             // The floor: the last start that keeps an evaluation, `d`, is reached as soon as
@@ -154,7 +150,6 @@ extension Engine {
         context.detail = request.detail
         context.detailScale = Detail.scale(width: request.width, height: request.height)
         context.solver = request.solver
-        context.schedule = request.schedule
         // The library's warnings become events for the duration of the render (and go to
         // `Warnings.outsideRender` without `onProgress`: a "✗ step 3: the VELOCITY carries …" is not lost),
         // and memory is returned to the system on exit — **including on a cancellation**: the
@@ -325,7 +320,7 @@ extension Engine {
                                   strength: request.image != nil ? request.strength : nil, startStep: plan.startStep,
                                   startSigma: plan.startSigma,
                                   timings: context.timings, footprints: context.footprints, tokens: text.tokens,
-                                  detail: request.detail, solver: request.solver, schedule: request.schedule,
+                                  detail: request.detail, solver: request.solver,
                                   variations: request.variations.filter { $0.effectiveStrength > 0 },
                                   modelName: model.card.name, isImportedModel: model.card.isImported,
                                   loraOrigins: stack?.origins ?? [], neuralEngine: context.neuralEngine)

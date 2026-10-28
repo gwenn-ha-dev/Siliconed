@@ -122,8 +122,6 @@ final class PureFunctionsTests: XCTestCase {
         XCTAssertEqual(module.plan(height: 96, width: 64, steps: 8, start: 0, withLoRA: false).reduced,
                        QwenImage21DenoisingModule.halfSizeSteps)
         XCTAssertEqual(module.plan(height: 64, width: 64, steps: 8, start: 0, withLoRA: true).reduced, 0)
-        XCTAssertEqual(module.plan(height: 64, width: 64, steps: 8, start: 0, withLoRA: false,
-                                   schedule: .comfyUI).reduced, 0)
         XCTAssertEqual(module.plan(height: 64, width: 64, steps: 8, start: 1, withLoRA: false).reduced, 0)
         XCTAssertEqual(module.plan(height: 64, width: 64, steps: 12, start: 0, withLoRA: false).reduced, 0)
         // 512² and 832×1216: a half side under 512 px.
@@ -151,8 +149,6 @@ final class PureFunctionsTests: XCTestCase {
         XCTAssertEqual(module.plan(height: 192, width: 128, steps: 8, start: 0, withLoRA: false).reduced,
                        Krea2DenoisingModule.halfSizeSteps)
         XCTAssertEqual(module.plan(height: 128, width: 128, steps: 8, start: 0, withLoRA: true).reduced, 0)
-        XCTAssertEqual(module.plan(height: 128, width: 128, steps: 8, start: 0, withLoRA: false,
-                                   schedule: .comfyUI).reduced, 0)
         XCTAssertEqual(module.plan(height: 128, width: 128, steps: 8, start: 1, withLoRA: false).reduced, 0)
         XCTAssertEqual(module.plan(height: 128, width: 128, steps: 12, start: 0, withLoRA: false).reduced, 0)
         // 512² and 832×1216: a half side under 512 px.

@@ -94,10 +94,6 @@ package struct Request: Sendable, Equatable {
     /// for, unless another is asked — the same steps, the same σ, another walk between them. Only the
     /// models whose `DenoisingModule.solvers` name it accept it; the app offers them in Developer Mode.
     package var solver: Solver = .euler
-    /// **Whose σ** (`SigmaSchedule`): the official recipe, or what ComfyUI walks for the model — a
-    /// comparison. Only the models whose `DenoisingModule.schedules` name it accept it (Qwen-Image-2.1);
-    /// the app offers it in Developer Mode.
-    package var schedule: SigmaSchedule = .official
     /// **Variations** (`Variation`): the seed's starting noise turned towards other seeds', in order —
     /// cousins of the image `seed` gives, its composition kept in proportion to `strength`
     /// (`Variation.Amount`). Empty: the seed's noise, to the bit. Only the noise changes:
@@ -128,8 +124,6 @@ package struct Request: Sendable, Equatable {
         case references(Int, max: Int)
         /// A solver the model's sampler does not walk.
         case solver(Solver, model: String)
-        /// A σ schedule the model does not offer.
-        case schedule(SigmaSchedule, model: String)
         /// More or Most detail asked of a model that does not offer it.
         case detail(model: String)
         /// A prompt longer than its encoder reads, counted without the template (`admitPrompt`).
@@ -143,7 +137,6 @@ package struct Request: Sendable, Equatable {
             case .emptyPrompt: return "empty prompt: there is nothing to render"
             case .steps(let n): return "\(n) steps: a render takes between 1 and \(Request.maximumSteps)"
             case let .solver(solver, model): return "\(model) does not offer the \(solver.rawValue) solver"
-            case let .schedule(schedule, model): return "\(model) does not offer the \(schedule.rawValue) schedule"
             case .detail(let model): return "\(model) does not offer Detail"
             case let .promptTooLong(tokens, max):
                 return "the prompt is \(tokens) tokens long, this model reads at most \(max): shorten it"

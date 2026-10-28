@@ -312,11 +312,6 @@ package enum RemoteControlHelp {
                               the model was distilled for), euler-ancestral, dpmpp-2m or unipc.
                               Same steps, same time, another image. Jobs and images say "solver"
                               when it is not euler.
-          --schedule comfyui  the rack's "ComfyUI schedule", in Developer Mode, Qwen-Image-2.1
-                              only: the noise levels ComfyUI walks for this model (the base
-                              model's) instead of the Turbo's own — to compare, same seed, same
-                              steps. Default: official. Jobs and images say "schedule" when it is
-                              not official.
           --ane, --no-ane     the rack's fp32 tag, as a click: part of the DiT in fp16 on the Neural
                               Engine (less energy, an image a little different from fp32's), or
                               fp32 throughout. Kept for the model's installed version, like the
@@ -373,7 +368,7 @@ package enum RemoteControlHelp {
           estimate_s : the sum, null if one job has no estimate yet.
           With --wait: one "type": "added" line per job, then the lines of « wait » for all.
 
-        FAILURES: usage, prompt, model, solver, schedule, detail, neural_engine, lora, format, steps, edit, ref, img2img
+        FAILURES: usage, prompt, model, solver, detail, neural_engine, lora, format, steps, edit, ref, img2img
         (--image/--strength: the app does none), subject (a named subject the prompt cites, help
         subjects), queue_full (64 waiting, or not enough room for every alternative), busy (an
         installation is running: no render until it is done), write.
@@ -437,7 +432,7 @@ package enum RemoteControlHelp {
           « wait g2 [--out D] » follows a grid later: at once if it has ended.
 
         FAILURES: usage (no --x, --batch, --x given to « add »), grid (an axis that does not read or
-        does not make a grid, more than 64 cells), prompt, model, solver, schedule, detail, neural_engine, lora,
+        does not make a grid, more than 64 cells), prompt, model, solver, detail, neural_engine, lora,
         format, steps, edit, ref, subject (a grid does not cite named subjects), queue_full, busy (an installation
         is running), write.
         """,
@@ -750,8 +745,6 @@ package enum RemoteControlHelp {
           img2img              --image / --strength: not in the app         → leave them out
           solver               --solver outside Developer Mode, or on a model that walks Euler only
                                                                            → leave it out
-          schedule             --schedule comfyui outside Developer Mode, or on a model other than
-                               Qwen-Image-2.1                              → leave it out
           detail               --detail more|most on a model without Detail (Anima, Krea 2)
                                                                            → leave it out
           neural_engine        --ane on a Mac whose capacity map leaves the Neural Engine off
@@ -1059,11 +1052,6 @@ package enum RemoteControlHelp {
                               celui pour lequel le modèle a été distillé), euler-ancestral,
                               dpmpp-2m ou unipc. Mêmes pas, même durée, une autre image. Travaux
                               et images disent "solver" s'il n'est pas euler.
-          --schedule comfyui  le « Calendrier ComfyUI » du rack, en mode développeur, sur
-                              Qwen-Image-2.1 seulement : les niveaux de bruit que ComfyUI parcourt
-                              pour ce modèle (ceux du modèle de base) au lieu de ceux de la Turbo —
-                              pour comparer, même graine, mêmes pas. Défaut : official. Travaux et
-                              images disent "schedule" s'il n'est pas official.
           --ane, --no-ane     l'étiquette fp32 du rack, comme un clic : une part du DiT en fp16 sur
                               le Neural Engine (moins d'énergie, une image un peu différente de
                               celle du fp32), ou le fp32 de bout en bout. Gardé pour la version
@@ -1122,7 +1110,7 @@ package enum RemoteControlHelp {
           estimate_s : la somme, null si un travail n'a pas encore d'estimation.
           Avec --wait : une ligne "type": "added" par travail, puis les lignes de « wait » pour tous.
 
-        ÉCHECS : usage, prompt, model, solver, schedule, detail, neural_engine, lora, format, steps, edit, ref, img2img
+        ÉCHECS : usage, prompt, model, solver, detail, neural_engine, lora, format, steps, edit, ref, img2img
         (--image/--strength : l'app n'en fait pas), subject (un sujet nommé que le prompt cite,
         help subjects), queue_full (64 en attente, ou pas assez de place pour toutes les
         alternatives), busy (une installation tourne : pas de rendu avant qu'elle soit finie), write.
@@ -1186,7 +1174,7 @@ package enum RemoteControlHelp {
           « wait g2 [--out D] » suit une grille plus tard : tout de suite si elle est finie.
 
         ÉCHECS : usage (pas de --x, --batch, --x donné à « add »), grid (un axe illisible ou qui ne
-        fait pas une grille, plus de 64 cases), prompt, model, solver, schedule, detail, neural_engine, lora,
+        fait pas une grille, plus de 64 cases), prompt, model, solver, detail, neural_engine, lora,
         format, steps, edit, ref, subject (une grille ne cite pas de sujets nommés), queue_full, busy (une
         installation tourne), write.
         """,
@@ -1509,8 +1497,6 @@ package enum RemoteControlHelp {
           img2img              --image / --strength : pas dans l'app        → les retirer
           solver               --solver hors du mode développeur, ou sur un modèle qui ne fait
                                qu'Euler                                    → le retirer
-          schedule             --schedule comfyui hors du mode développeur, ou sur un autre modèle
-                               que Qwen-Image-2.1                          → le retirer
           detail               --detail more|most sur un modèle sans Détail (Anima, Krea 2)
                                                                            → le retirer
           neural_engine        --ane sur un Mac dont la carte des capacités laisse le Neural Engine

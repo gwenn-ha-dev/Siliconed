@@ -100,8 +100,6 @@ package enum EngineError: Error, Equatable, Sendable, Codable, LocalizedError, C
     case imageToImageUnsupported(model: String)
     /// A `Solver` the model's sampler does not walk (`DenoisingModule.solvers`).
     case solverUnsupported(solver: String, model: String)
-    /// A `SigmaSchedule` the model does not offer (`DenoisingModule.schedules`).
-    case scheduleUnsupported(schedule: String, model: String)
     /// More or Most detail asked of a model that does not offer it (`DenoisingModule.acceptsDetail`).
     case detailUnsupported(model: String)
     /// An image ImageIO cannot read.
@@ -251,7 +249,6 @@ package enum EngineError: Error, Equatable, Sendable, Codable, LocalizedError, C
         case .strengthTooLow: return "strength_too_low"
         case .imageToImageUnsupported: return "image_to_image_unsupported"
         case .solverUnsupported: return "solver_unsupported"
-        case .scheduleUnsupported: return "schedule_unsupported"
         case .detailUnsupported: return "detail_unsupported"
         case .imageUnreadable: return "image_unreadable"
         case .imageEncodingFailed: return "image_encoding_failed"
@@ -354,7 +351,6 @@ package enum EngineError: Error, Equatable, Sendable, Codable, LocalizedError, C
                 + "it must be above \(String(format: "%.3f", floor))."
         case .imageToImageUnsupported(let model): return "\(model) does not start from an image."
         case let .solverUnsupported(solver, model): return "\(model) does not offer the \(solver) solver."
-        case let .scheduleUnsupported(schedule, model): return "\(model) does not offer the \(schedule) schedule."
         case .detailUnsupported(let model): return "\(model) does not offer Detail."
         case .imageUnreadable(let file): return "This image cannot be read: \(file)."
         case .imageEncodingFailed: return "The image could not be encoded as PNG."
@@ -433,7 +429,6 @@ package enum EngineError: Error, Equatable, Sendable, Codable, LocalizedError, C
         case .strengthTooLow: return "Increase the strength, or the number of steps."
         case .imageToImageUnsupported: return "Pass the image as reference 1 and describe the change."
         case .solverUnsupported: return "Choose Euler."
-        case .scheduleUnsupported: return "Use the official schedule."
         case .detailUnsupported: return "Choose Normal."
         case .imageUnreadable: return "Choose a PNG, JPEG or HEIC image."
         case .imageEncodingFailed: return nil
@@ -474,7 +469,6 @@ package enum EngineError: Error, Equatable, Sendable, Codable, LocalizedError, C
             case .steps(let n): self = .invalidSteps(steps: n, allowed: [])
             case let .references(n, max): self = .tooManyReferences(count: n, max: max)
             case let .solver(solver, model): self = .solverUnsupported(solver: solver.rawValue, model: model)
-            case let .schedule(schedule, model): self = .scheduleUnsupported(schedule: schedule.rawValue, model: model)
             case .detail(let model): self = .detailUnsupported(model: model)
             case let .promptTooLong(tokens, max): self = .promptTooLong(tokens: tokens, max: max)
             }
@@ -581,7 +575,7 @@ package enum EngineError: Error, Equatable, Sendable, Codable, LocalizedError, C
         .promptTooLong(tokens: 600, max: 512), .gridRefused(reason: .groupNotOnAxis),
         .tooManyGridCells(count: 81, max: 64), .strengthOutOfRange(strength: 1.5),
         .strengthTooLow(strength: 0.1, steps: 8, floor: 0.125), .imageToImageUnsupported(model: "qwen-image-2.1"),
-        .solverUnsupported(solver: "unipc", model: "qwen-image-2.1"), .scheduleUnsupported(schedule: "comfyui", model: "anima"),
+        .solverUnsupported(solver: "unipc", model: "qwen-image-2.1"),
         .detailUnsupported(model: "anima"),
         .imageUnreadable(file: "/a.png"), .imageEncodingFailed, .imageWriteFailed(file: "/a.png"),
         .unsupportedLoRA(file: "x.lora.silicon", reason: .noTarget),

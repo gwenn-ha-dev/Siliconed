@@ -159,8 +159,6 @@ struct Problem: Equatable, Sendable {
             return String(localized: "\(name(m)) doesn't start from an image.")
         case let .solverUnsupported(s, m):                           // solver_unsupported
             return String(localized: "\(name(m)) doesn't offer the \(s) solver.")
-        case let .scheduleUnsupported(_, m):                         // schedule_unsupported
-            return String(localized: "\(name(m)) doesn't offer the ComfyUI schedule.")
         case .detailUnsupported(let m):                              // detail_unsupported
             return String(localized: "\(name(m)) doesn't offer Detail.")
         case .imageUnreadable(let f):                                // image_unreadable
@@ -282,8 +280,6 @@ struct Problem: Equatable, Sendable {
             return String(localized: "Give the image as image 1 of an edit, and say what changes.")
         case .solverUnsupported:
             return String(localized: "Choose Euler.")
-        case .scheduleUnsupported:
-            return String(localized: "Use the official schedule.")
         case .detailUnsupported:
             return String(localized: "Choose Normal.")
         case .imageUnreadable:

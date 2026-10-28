@@ -240,7 +240,7 @@ final class RemoteNetworkTests: XCTestCase {
         let job = RemoteJob(ordinal: 3, model: "z-image", modelName: "Z-Image Turbo", prompt: "woman posing in a library",
                             width: 1024, height: 1024, steps: 8, defaultSteps: 8,
                             loras: [RemoteLoRA(path: "/l/a.silicon", strength: 0.8)], seeds: [42, 43], detail: .normal,
-                            solver: .euler, schedule: .official, previews: true, neuralEngine: nil)
+                            solver: .euler, previews: true, neuralEngine: nil)
         var edit = job
         edit.references = [RemoteReference(origin: .history(7), name: "i7", width: 1024, height: 1024),
                            RemoteReference(origin: .file(blob: 3), name: "a.heic", width: 3024, height: 4032),
@@ -268,7 +268,7 @@ final class RemoteNetworkTests: XCTestCase {
                                footprints: Engine.Footprints(), evaluations: 8, metadata: ["parameters": "x"],
                                neuralEngine: false, png: 9)),
             .catalog(MirrorCatalog(ready: ["z-image"], traits: ["z-image": RemoteTraits(
-                maxReferences: 0, readsImages: false, acceptsDetail: true, comfyUI: false, steps: Array(1...50),
+                maxReferences: 0, readsImages: false, acceptsDetail: true, steps: Array(1...50),
                 text: "Qwen3", encoding: nil, decoding: "Flux VAE")], loras: [:], loraNames: [:],
                 ceiling: 10 << 30, settingsRead: true, neuralEngineOffered: true, fasterRendering: true)),
         ]
@@ -282,7 +282,7 @@ final class RemoteNetworkTests: XCTestCase {
     func testSubjectsGridAnswersAndEnlargementSourcesTravelAsJSON() throws {
         var job = RemoteJob(ordinal: 3, model: "qwen-image-2.1", modelName: "Qwen-Image 2.1", prompt: "@ana in a library",
                             width: 1024, height: 1024, steps: 8, defaultSteps: 8, loras: [], seeds: [42], detail: .normal,
-                            solver: .euler, schedule: .official, previews: true, neuralEngine: nil)
+                            solver: .euler, previews: true, neuralEngine: nil)
         job.references = [RemoteReference(origin: .file(blob: 3), name: "a.heic", width: 3024, height: 4032),
                           RemoteReference(origin: .image(blob: 4), name: "@ana", width: 640, height: 480)]
         job.modelPrompt = "A woman, as in image 2, in a library"

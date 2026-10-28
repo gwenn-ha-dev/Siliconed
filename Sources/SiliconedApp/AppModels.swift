@@ -140,8 +140,6 @@ struct RenderSettings {
     var detail: Detail = .normal
     /// **The solver** (`Request.solver`): Euler unless picked in Developer Mode.
     var solver: Solver = .euler
-    /// **Whose σ** (`Request.schedule`): ComfyUI's only when switched on in Developer Mode.
-    var schedule: SigmaSchedule = .official
     /// **Its denoiser could take the Neural Engine** (`Engine.Render.neuralEngine`): set from the render, for
     /// the image's panel — the choice itself is read when the job starts (`Job.neuralEngine`).
     var neuralEngine = false
@@ -217,7 +215,6 @@ struct Entry: Identifiable {
         // Only when it changes the image: Normal and Euler are every render's, they say nothing.
         return base + (settings.detail == .normal ? "" : " · " + settings.detail.label)
             + (settings.solver == .euler ? "" : " · " + settings.solver.label)
-            + (settings.schedule == .official ? "" : " · " + String(localized: "ComfyUI schedule"))
             + (enlarged.map { " · " + String(localized: "enlarged ×\(String($0))") } ?? "")
     }
 }

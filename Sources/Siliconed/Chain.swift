@@ -278,8 +278,6 @@ package final class Context {
     /// rule's noise).
     package var solver: Solver = .euler
     package var solverSeed: UInt64 = 0
-    /// **Whose σ** (`Request.schedule`): the official recipe unless asked otherwise.
-    package var schedule: SigmaSchedule = .official
 
     /// The σs the DiT is told, for a full schedule of which steps `start…` run; no bell, the σ themselves.
     package func told(_ sigmas: [Float], start: Int, bell: Detail.Bell? = nil) -> [Float] {
@@ -374,11 +372,6 @@ package protocol DenoisingModule: Sendable {
     /// The full schedule of `step` steps: `step + 1` σ values, ending in 0. It does not depend on
     /// the strength — img2img slices it, it does not recompute it.
     func sigmas(steps: Int) -> [Float]
-    /// **The σ schedules it walks** (`SigmaSchedule`). By default the official one alone; the chain
-    /// refuses another before any computation.
-    var schedules: [SigmaSchedule] { get }
-    /// The full schedule under `schedule`. By default `sigmas(steps:)`, the official one.
-    func sigmas(steps: Int, schedule: SigmaSchedule) -> [Float]
     /// `height`, `width`: the latent grid, not the pixels. `withLoRA`: the request carries a
     /// stack — Qwen-Image-2.1 turns its spectral schedule off there (`QwenImage21DenoisingModule.plan`).
     func plan(height: Int, width: Int, steps: Int, start: Int, withLoRA: Bool) -> DenoisingPlan
@@ -437,14 +430,6 @@ package extension DenoisingModule {
     func plan(height: Int, width: Int, steps: Int, start: Int) -> DenoisingPlan {
         plan(height: height, width: width, steps: steps, start: start, withLoRA: false)
     }
-    /// The plan under a schedule: another than the official turns Qwen-Image-2.1's half-size steps
-    /// off, like a LoRA — they were judged on its own σ only.
-    func plan(height: Int, width: Int, steps: Int, start: Int, withLoRA: Bool,
-              schedule: SigmaSchedule) -> DenoisingPlan {
-        plan(height: height, width: width, steps: steps, start: start, withLoRA: withLoRA || schedule != .official)
-    }
-    var schedules: [SigmaSchedule] { [.official] }
-    func sigmas(steps: Int, schedule: SigmaSchedule) -> [Float] { sigmas(steps: steps) }
     var maxReferences: Int { 0 }
     func denoise(_ latent: inout Latent, text: Conditioning, steps: Int, start: Int,
                    references: [Latent], lora: LoRA?, context: Context) throws {

@@ -119,9 +119,6 @@ extension RemoteControl {
         var detail = Detail.normal
         /// `--solver NAME`: the rack's Solver (`Request.solver`), Developer Mode and `AppState.solverFamilies` only.
         var solver = Solver.euler
-        /// `--schedule official|comfyui`: the rack's ComfyUI schedule switch (`Request.schedule`), Developer
-        /// Mode and the models that offer it only.
-        var schedule = SigmaSchedule.official
         /// `--ane`, `--no-ane`: the rack's fp32 tag (`Job.neuralEngine`); `nil`, the model's choice.
         var neuralEngine: Bool?
         var loras: [(name: String, strength: Double)] = []

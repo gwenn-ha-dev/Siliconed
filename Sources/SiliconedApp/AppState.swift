@@ -65,7 +65,7 @@ final class AppState {
     /// `Family.allCases`. The others need Developer Mode, and come after them.
     static let frontFamilies: [Family] = [.zImage, .qwenImage21, .anima, .krea2, .mossImage]
     private static let developerModeKey = "developerMode"
-    /// **Developer Mode**: the solvers (`offeredSolvers`), ComfyUI's schedule — and a family not in
+    /// **Developer Mode**: the solvers (`offeredSolvers`) — and a family not in
     /// front, were there one (none since Krea 2 joined them).
     /// One of the app's preferences (with `Curtain.preferred`, the named subjects' switch and the capacity
     /// map) — written without a render gesture, because the user switched it.
@@ -76,7 +76,7 @@ final class AppState {
             // A model that leaves the list leaves the form too, and so does a solver.
             if !isVisible(identifier) { identifier = defaultIdentifier }
             if !developerMode {
-                solver = .euler; comfySchedule = false
+                solver = .euler
                 // The solver axis is the rack's choice swept: it leaves with it.
                 if gridX.kind == .solver { gridX.kind = .seed }
                 if gridY.kind == .solver { gridY.kind = .none }
@@ -222,16 +222,8 @@ final class AppState {
         developerMode && card.map({ Self.solverFamilies.contains($0.family) }) == true ? Solver.allCases : [.euler]
     }
     var effectiveSolver: Solver { offeredSolvers.contains(solver) ? solver : .euler }
-    /// **ComfyUI's σ instead of the official ones** (`SigmaSchedule`), to compare: a switch in Developer
-    /// Mode, on the models whose `DenoisingModule.schedules` offer it (Qwen-Image-2.1). What a render
-    /// takes is `effectiveSchedule`.
-    var comfySchedule = false
-    var offersComfySchedule: Bool {
-        developerMode && (mirror != nil ? traits?.comfyUI == true : model(identifier)?.chain.denoising.schedules.contains(.comfyUI) == true)
-    }
-    var effectiveSchedule: SigmaSchedule { offersComfySchedule && comfySchedule ? .comfyUI : .official }
     /// What turns the half-size first steps off besides a LoRA (`DenoisingModule.plan`).
-    var plainSampling: Bool { effectiveDetail == .normal && effectiveSchedule == .official }
+    var plainSampling: Bool { effectiveDetail == .normal }
     /// Fixed seed (the field) or drawn at random at each render, like Draw Things. A variation
     /// belongs to its seed: changing the seed, or letting it be drawn, drops it.
     var fixedSeed = false { didSet { if !fixedSeed { variations = [] } } }

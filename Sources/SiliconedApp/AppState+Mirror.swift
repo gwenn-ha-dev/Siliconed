@@ -180,7 +180,7 @@ enum MirrorProjection {
         RemoteJob(ordinal: ordinal, model: s.identifier, modelName: s.modelName, prompt: s.prompt,
                   width: s.format.width, height: s.format.height, steps: s.steps, defaultSteps: defaultSteps,
                   loras: s.loras.map { RemoteLoRA(path: $0.path, strength: $0.strength) }, seeds: seeds,
-                  detail: s.detail, solver: s.solver, schedule: s.schedule, previews: previews, neuralEngine: neuralEngine,
+                  detail: s.detail, solver: s.solver, previews: previews, neuralEngine: neuralEngine,
                   variations: s.variations, modelPrompt: s.modelPrompt, subjectImages: s.subjectImages > 0 ? s.subjectImages : nil)
     }
 
@@ -188,7 +188,7 @@ enum MirrorProjection {
         var s = RenderSettings(identifier: r.model, modelName: r.modelName, prompt: r.prompt,
                                format: RecommendedFormat(r.width, r.height), steps: r.steps,
                                loras: r.loras.map { LoRASlot(path: $0.path, strength: $0.strength) },
-                               detail: r.detail, solver: r.solver, schedule: r.schedule)
+                               detail: r.detail, solver: r.solver)
         s.neuralEngine = r.neuralEngine ?? false
         s.variations = r.variations
         s.modelPrompt = r.modelPrompt

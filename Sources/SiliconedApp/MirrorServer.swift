@@ -314,7 +314,7 @@ final class MirrorServer {
         guard (1...8).contains(r.seeds.count) else { throw Refused(.seedCount) }
         let f = denoising.space.factor
         let full = denoising.plan(height: r.height / f, width: r.width / f, steps: r.steps, start: 0,
-                                  withLoRA: !r.loras.isEmpty || r.detail != .normal, schedule: r.schedule)
+                                  withLoRA: !r.loras.isEmpty || r.detail != .normal)
         // An edit's plan is unreduced (`AppState.expectedPlan`).
         let plan = references.isEmpty ? full : full.unreduced
         var job = MirrorProjection.job(r, ordinal: app.nextJobNumber(), plan: plan)
@@ -464,7 +464,7 @@ final class MirrorServer {
             if let m = app.model(id) {
                 let d = m.chain.denoising
                 traits[id] = RemoteTraits(maxReferences: d.maxReferences, readsImages: m.chain.text.output.readsImages,
-                                          acceptsDetail: d.acceptsDetail, comfyUI: d.schedules.contains(.comfyUI),
+                                          acceptsDetail: d.acceptsDetail,
                                           steps: (1...50).filter { (try? d.check(steps: $0, startImage: false)) != nil },
                                           text: m.chain.text.name, encoding: m.chain.encoding?.name,
                                           decoding: m.chain.decoding.name)

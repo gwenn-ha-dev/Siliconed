@@ -102,7 +102,7 @@ package struct MossImageDenoisingModule: DenoisingModule {
         let timesteps = told[start..<(σ.count - 1)].map { $0 * Float(MossImageSchedule.trainTimesteps) }
         let stack = try stack(lora)
         let planned = plan(height: latent.height, width: latent.width, steps: steps, start: start,
-                           withLoRA: lora != nil || context.detail != .normal, schedule: context.schedule)
+                           withLoRA: lora != nil || context.detail != .normal)
         // The modulation depends on σ alone: both grids, and the following images of a batch, read the first's table.
         let key = "moss-image.modulation " + map
         // **Two DiTs, one at a time** (Krea 2's rule): the half grid's — its own RoPE grid, arena and sequence

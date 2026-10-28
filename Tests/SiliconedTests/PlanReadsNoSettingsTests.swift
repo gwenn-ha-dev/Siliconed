@@ -21,8 +21,6 @@ final class PlanReadsNoSettingsTests: XCTestCase {
                     for (h, w) in [(64, 64), (128, 128), (128, 192)] {
                         _ = m.plan(height: h, width: w, steps: m.defaultSteps, start: 0)
                         _ = m.plan(height: h, width: w, steps: m.defaultSteps, start: 0, withLoRA: true)
-                        _ = m.plan(height: h, width: w, steps: m.defaultSteps, start: 0, withLoRA: false,
-                                   schedule: .official)
                     }
                 }
             }

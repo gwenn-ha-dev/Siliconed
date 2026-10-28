@@ -73,8 +73,7 @@ extension AppState {
             guard let m = model(id) else { return (id, steps, nil) }
             let d = m.chain.denoising, f = d.space.factor
             let plan = d.plan(height: format.height / f, width: format.width / f, steps: steps, start: 0,
-                              withLoRA: withLoRA || (detail != .normal && d.acceptsDetail),
-                              schedule: d.schedules.contains(effectiveSchedule) ? effectiveSchedule : .official)
+                              withLoRA: withLoRA || (detail != .normal && d.acceptsDetail))
             let stop = exploreStop > 0 ? exploreStop : m.sketchEvaluations(steps: steps, width: format.width, height: format.height)
             return (id, steps, plan.sketched(stop))
         }
@@ -148,8 +147,7 @@ extension AppState {
         guard let g = try? grid(seed: base).get() else { return }
         let settings = RenderSettings(identifier: identifier, modelName: card?.name ?? identifier, prompt: explorePrompt,
                                       format: exploreFormat, steps: steps, loras: exploresModels ? [] : activeLoRAs,
-                                      references: references.count, detail: effectiveDetail, solver: effectiveSolver,
-                                      schedule: effectiveSchedule)
+                                      references: references.count, detail: effectiveDetail, solver: effectiveSolver)
         followsRender = false
         if let mirror {
             do { try mirror.explore(g, settings: settings, references: references, stopAfter: exploreStop, neuralEngine: nil) }

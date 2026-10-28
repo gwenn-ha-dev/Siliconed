@@ -132,7 +132,6 @@ final class RemoteControl {
             .merging(r.isVariation ? ["variation": Self.json(r.variations)] : [:]) { a, _ in a }
             .merging(r.detail == .normal ? [:] : ["detail": r.detail.rawValue]) { a, _ in a }
             .merging(r.solver == .euler ? [:] : ["solver": r.solver.rawValue]) { a, _ in a }
-            .merging(r.schedule == .official ? [:] : ["schedule": r.schedule.rawValue]) { a, _ in a }
             // What the job will ask, on a Mac whose map offers the Neural Engine: elsewhere, the answer is unchanged.
             .merging(app.neuralEngineOffered ? ["neural_engine": t.neuralEngine ?? app.neuralEngine(for: r.identifier)] : [:]) { a, _ in a }
     }
@@ -159,7 +158,6 @@ final class RemoteControl {
         if r.isVariation { o["variation"] = Self.json(r.variations) }
         if r.detail != .normal { o["detail"] = r.detail.rawValue }
         if r.solver != .euler { o["solver"] = r.solver.rawValue }
-        if r.schedule != .official { o["schedule"] = r.schedule.rawValue }
         if r.neuralEngine { o["neural_engine"] = true }
         if let g = e.grid {
             // A grid's sheet: no job made it; its seconds and evaluations are its cells' sum.

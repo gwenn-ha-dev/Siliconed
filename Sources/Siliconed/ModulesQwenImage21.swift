@@ -65,18 +65,8 @@ package struct QwenImage21DenoisingModule: DenoisingModule {
     /// `check(steps:)` has refused that count before.
     package func sigmas(steps: Int) -> [Float] { scheduler.sigmas }
 
-    /// The official σ, or ComfyUI's for this architecture (`SigmaSchedule`) — a comparison.
-    package var schedules: [SigmaSchedule] { SigmaSchedule.allCases }
-    package func sigmas(steps: Int, schedule: SigmaSchedule) -> [Float] {
-        switch schedule {
-        case .official: return sigmas(steps: steps)
-        case .comfyUI: return QwenImage21Pipeline.comfySigmas(steps: steps)
-        }
-    }
-
     /// **By default every evaluation at full size** (since 0.10): the published recipe as it stands —
-    /// a half-size phase changes the image, and a recipe compared with another (ComfyUI's,
-    /// `SigmaSchedule`) must be the recipe itself.
+    /// a half-size phase changes the image.
     ///
     /// **The half-size start** (`halfSizeStart`, off by default; Z-Image's recipe): the first
     /// `halfSizeSteps` evaluations on the half grid, by the half-size phase of `QwenImage21Sampler` —
@@ -84,7 +74,7 @@ package struct QwenImage21DenoisingModule: DenoisingModule {
     /// latent's high-frequency noise in place and handed the model an alias. Only at the recipe's
     /// eight, from the first step, on a grid whose half stays at 512 px on each side (`Spectral.floor`
     /// in 16-px cells: 1024², 1024×1536 and its transpose; a 512² or 832×1216 never halves), never under
-    /// a user LoRA, Detail or another schedule (`withLoRA`: never judged under them) and never in an
+    /// a user LoRA or Detail (`withLoRA`: never judged under them) and never in an
     /// edit — the plan cannot see the references, the chain zeroes it (`DenoisingPlan.unreduced`) and
     /// the denoiser ignores it with references. `SILICONED_SPECTRAL` forces `k` (a measurement),
     /// within the same rules.
@@ -157,7 +147,7 @@ package struct QwenImage21DenoisingModule: DenoisingModule {
         // Detail, like a LoRA, turns it off (`plan`), and so does another schedule; an edit has none.
         let reduced = references.isEmpty
             ? plan(height: height, width: width, steps: steps, start: start,
-                   withLoRA: lora != nil || context.detail != .normal, schedule: context.schedule).reduced : 0
+                   withLoRA: lora != nil || context.detail != .normal).reduced : 0
         // **The previous image's DiT is reused only when no half-size DiT comes first**
         // (`keepsDenoiser`): the memory need charges one DiT at a time — the half-size one is built and
         // released before the full one —, and the full DiT of image n kept beside the half-size one of
@@ -178,7 +168,7 @@ package struct QwenImage21DenoisingModule: DenoisingModule {
                 sampler.keptReserve = cache.keptReserve
             }
         }
-        let σ = sigmas(steps: steps, schedule: context.schedule)
+        let σ = sigmas(steps: steps)
         context.beginDenoising(evaluations: steps)
         try sampler.run(latent: &latent.values, height: height, width: width, hidden: text.values,
                         slots: text.imageSlots, references: references, sigmas: σ,

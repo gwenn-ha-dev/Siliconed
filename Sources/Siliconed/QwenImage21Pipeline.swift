@@ -132,21 +132,6 @@ package enum QwenImage21Pipeline {
         guard acceptedSteps.contains(steps) else { throw Failure.steps(steps) }
     }
 
-    /// **ComfyUI's σ for Qwen-Image-2.1** (`SigmaSchedule.comfyUI`): `ModelSamplingFlux` with
-    /// `shift 0.69` — a table of 10,000 σ, `e^μ / (e^μ + (1/t − 1))` at `t = k/10000` — read by the
-    /// `simple` scheduler at `int(x · 10000/N)` from its end, then 0. Each operation as torch does it
-    /// in float32: `1/t` and `e^μ / u` are `reciprocal`, then a product by the scalar made float32.
-    package static func comfySigmas(steps: Int) -> [Float] {
-        let table = 10_000
-        let e = Float(exp(0.69))
-        let stride = Double(table) / Double(steps)
-        return (0..<steps).map { x -> Float in
-            let t = Float(table - Int(Double(x) * stride)) / Float(table)
-            let u = e + ((1 / t) * 1 - 1)
-            return (1 / u) * e
-        } + [0]
-    }
-
     /// `scheduler.timesteps`: `σ · 1000` in float32 — what the oracle records.
     package static func timesteps(_ sigmas: [Float]) -> [Float] { sigmas.dropLast().map { $0 * 1000 } }
 

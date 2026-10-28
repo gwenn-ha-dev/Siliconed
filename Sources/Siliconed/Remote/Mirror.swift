@@ -110,7 +110,6 @@ package struct RemoteJob: Codable, Equatable, Sendable {
     package var seeds: [UInt64]
     package var detail: Detail
     package var solver: Solver
-    package var schedule: SigmaSchedule
     package var previews: Bool
     /// The Neural Engine as the rack chose it; `nil`: the mini's choice for the model.
     package var neuralEngine: Bool?
@@ -126,14 +125,14 @@ package struct RemoteJob: Codable, Equatable, Sendable {
 
     package init(ordinal: Int, model: String, modelName: String, prompt: String, width: Int, height: Int, steps: Int,
                  defaultSteps: Int?, loras: [RemoteLoRA], seeds: [UInt64], detail: Detail, solver: Solver,
-                 schedule: SigmaSchedule, previews: Bool, neuralEngine: Bool?, references: [RemoteReference] = [],
+                 previews: Bool, neuralEngine: Bool?, references: [RemoteReference] = [],
                  variations: [Variation] = [], modelPrompt: String? = nil, subjectImages: Int? = nil) {
         self.references = references; self.variations = variations
         self.modelPrompt = modelPrompt; self.subjectImages = subjectImages
         self.ordinal = ordinal; self.model = model; self.modelName = modelName; self.prompt = prompt
         self.width = width; self.height = height; self.steps = steps; self.defaultSteps = defaultSteps
         self.loras = loras; self.seeds = seeds; self.detail = detail; self.solver = solver
-        self.schedule = schedule; self.previews = previews; self.neuralEngine = neuralEngine
+        self.previews = previews; self.neuralEngine = neuralEngine
     }
 }
 
@@ -199,15 +198,14 @@ package struct RemoteTraits: Codable, Equatable, Sendable {
     package var maxReferences: Int
     package var readsImages: Bool
     package var acceptsDetail: Bool
-    package var comfyUI: Bool
     /// The step counts the denoiser has a schedule for, among 1…50.
     package var steps: [Int]
     /// The rack's module names.
     package var text: String?, encoding: String?, decoding: String?
-    package init(maxReferences: Int, readsImages: Bool, acceptsDetail: Bool, comfyUI: Bool, steps: [Int],
+    package init(maxReferences: Int, readsImages: Bool, acceptsDetail: Bool, steps: [Int],
                  text: String?, encoding: String?, decoding: String?) {
         self.maxReferences = maxReferences; self.readsImages = readsImages; self.acceptsDetail = acceptsDetail
-        self.comfyUI = comfyUI; self.steps = steps; self.text = text; self.encoding = encoding; self.decoding = decoding
+        self.steps = steps; self.text = text; self.encoding = encoding; self.decoding = decoding
     }
 }
 

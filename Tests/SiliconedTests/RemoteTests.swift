@@ -234,7 +234,7 @@ final class RemoteTests: XCTestCase {
     func testStatisticsAndLicensesTravelAsJSON() throws {
         let job = RemoteJob(ordinal: 3, model: "z-image", modelName: "Z-Image Turbo", prompt: "p", width: 1024, height: 1024,
                             steps: 8, defaultSteps: 8, loras: [], seeds: [42], detail: .normal, solver: .euler,
-                            schedule: .official, previews: true, neuralEngine: nil)
+                            previews: true, neuralEngine: nil)
         var t = Engine.Timings(); t.total = 12.5
         var st = RemoteStatistics()
         st.measures = RemoteMeasures(job: job, elapsed: 4.5, evaluations: 8, reduced: 2, tokens: 12, tokenizer: 0.01,

@@ -89,7 +89,7 @@ package struct Krea2DenoisingModule: DenoisingModule {
         let merged = try fusion(text, artifact: artifact, lora: lora, context: context)
         let (height, width) = (latent.height, latent.width)
         let planned = plan(height: height, width: width, steps: steps, start: start,
-                           withLoRA: lora != nil || context.detail != .normal, schedule: context.schedule)
+                           withLoRA: lora != nil || context.detail != .normal)
         // The modulation of only the σs evaluated — from `start` to the last non-null one —, in
         // one pass. It depends only on σ: the following images of a batch reuse the first's table.
         let σ = sigmas(steps: steps)

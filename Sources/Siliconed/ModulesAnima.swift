@@ -114,7 +114,7 @@ package struct AnimaDenoisingModule: DenoisingModule {
                           context: Context) throws {
         let (height, width) = (latent.height, latent.width)
         let k = plan(height: height, width: width, steps: steps, start: start,
-                     withLoRA: lora != nil || context.detail != .normal, schedule: context.schedule).reduced
+                     withLoRA: lora != nil || context.detail != .normal).reduced
         // Every σ the DiT will be told (`euler` tells it `context.told`), its modulations computed at once.
         let schedule = sigmas(steps: steps)
         let told = context.told(schedule, start: start)

@@ -346,7 +346,6 @@ extension AppState {
         if steps != card?.defaultSteps { pieces += ["--steps", "\(steps)"] }
         if effectiveDetail != .normal { pieces += ["--detail", effectiveDetail.rawValue] }
         if effectiveSolver != .euler { pieces += ["--solver", effectiveSolver.rawValue] }
-        if effectiveSchedule != .official { pieces += ["--schedule", effectiveSchedule.rawValue] }
         var notes: [String] = []
         for (n, reference) in references.enumerated() {
             if case .file(let url) = reference.source {
