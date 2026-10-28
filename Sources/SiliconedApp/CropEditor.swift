@@ -168,7 +168,7 @@ extension AppState {
         let result = Entry(ordinal: lastImage, job: entry.job, png: png, vignette: vignette,
                            width: image.width, height: image.height, seed: entry.seed, timings: Engine.Timings(),
                            footprints: Engine.Footprints(), evaluations: 0, settings: entry.settings,
-                           metadata: metadata, enlarged: entry.enlarged, cropped: box)
+                           metadata: metadata, enlarged: entry.enlarged, cropped: box, owner: entry.owner)
         // Kept: the crop is still an enlargement's pixels, and `enlargeRefusal` refuses a second pass.
         history.insert(result, at: 0)
         selectedImage = (result.id, image)

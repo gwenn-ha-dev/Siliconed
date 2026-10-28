@@ -17048,6 +17048,74 @@
         }
       }
     },
+    "Renders for others on “%@”: %lld" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Renderings für andere auf „%@“: %lld"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Renders for others on “%1$@”: %2$lld"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Renders para otros en «%@»: %lld"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rendus pour d’autres sur « %@ » : %lld"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Render per altri su «%@»: %lld"
+          }
+        }
+      }
+    },
+    "Renders for others on “%@”: %lld, about %@" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Renderings für andere auf „%@“: %lld, etwa %@"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Renders for others on “%1$@”: %2$lld, about %3$@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Renders para otros en «%@»: %lld, unos %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rendus pour d’autres sur « %@ » : %lld, environ %@"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Render per altri su «%@»: %lld, circa %@"
+          }
+        }
+      }
+    },
     "Renders with what this Mac holds — maybe nothing yet. The library on the other disk is not touched" : {
       "localizations" : {
         "de" : {

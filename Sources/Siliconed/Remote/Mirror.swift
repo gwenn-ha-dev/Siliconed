@@ -5,6 +5,9 @@ import Foundation
 /// decode exactly what the other encoded; the app projects its `Job`, `Entry` and state into them and
 /// back.
 ///
+/// **Each Mac sees only its own**: the queue, the history, the preview and the exploration are published
+/// per client — what the mini renders for itself or for another Mac is only a count (`others`).
+///
 ///     mini → Neo   catalog     the ready models, what each accepts, its LoRAs, B — whenever it changes
 ///                  queue       the job running and its progress, the jobs waiting — whenever it changes
 ///                  entry + PNG one history image, its PNG as the blob that follows; `removed` the reverse
@@ -136,6 +139,10 @@ package struct RemoteQueue: Codable, Equatable, Sendable {
     package var problem: String?
     /// The history image being enlarged (`i` ordinal).
     package var enlarging: Int?
+    /// **What others asked of the mini**, never shown: its own renders and other Macs', as a count, and
+    /// the time they take before it is free (`nil`: one of them never measured).
+    package var others = 0
+    package var othersSeconds: Double?
     package init() {}
 }
 

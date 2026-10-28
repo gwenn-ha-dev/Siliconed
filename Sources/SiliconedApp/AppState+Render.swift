@@ -43,8 +43,10 @@ extension AppState {
     /// what the cells share, the prompt as typed. `sketch`: each cell stops as a sketch (`Sketch`), its
     /// image kept by the run, not the history, and no sheet is drawn unless asked (`addSheet`).
     @discardableResult
+    /// `owner`: another Mac's (`MirrorServer`), whose exploration is not shown here (`shows`).
     func enqueueGrid(_ grid: RenderGrid, settings: RenderSettings, references: [ReferenceImage], previews: Bool,
-                     sketch: Bool = false, stopAfter: Int = 0, neuralEngine: Bool? = nil) -> (run: GridRun, jobs: [Job]) {
+                     sketch: Bool = false, stopAfter: Int = 0, neuralEngine: Bool? = nil, owner: Data? = nil,
+                     shows: Bool = true) -> (run: GridRun, jobs: [Job]) {
         lastGrid += 1
         let jobs = grid.cells.map { cell in
             var s = settings
@@ -79,14 +81,16 @@ extension AppState {
                           previews: previews, defaultSteps: card?.defaultSteps, plan: plan)
             job.sketch = stop
             job.neuralEngine = neuralEngine
+            job.owner = owner
             return job
         }
         var run = GridRun(ordinal: lastGrid, grid: grid, settings: settings, jobs: jobs.map(\.ordinal),
                           references: references.count, sketch: sketch)
         run.cellJobs = jobs
+        run.owner = owner
         gridRuns[run.ordinal] = run
         for (i, job) in jobs.enumerated() { gridCells[job.ordinal] = (run.ordinal, i) }
-        if sketch { explored = run }
+        if sketch, shows { explored = run }
         enqueue(jobs)
         return (run, jobs)
     }
@@ -143,7 +147,8 @@ extension AppState {
                                   timings: timings, footprints: footprints,
                                   evaluations: entries.map(\.evaluations).reduce(0, +), settings: run.settings,
                                   metadata: drawing.metadata,
-                                  grid: GridInfo(ordinal: run.ordinal, grid: run.grid, empty: run.jobs.count - entries.count))
+                                  grid: GridInfo(ordinal: run.ordinal, grid: run.grid, empty: run.jobs.count - entries.count),
+                                  owner: run.owner)
                 history.insert(entry, at: 0)
                 if followsRender {
                     selection = entry.id
@@ -395,7 +400,7 @@ extension AppState {
                                         evaluations: renderResult.evaluations,
                                         settings: { var s = settings; s.neuralEngine = renderResult.neuralEngine; return s }(),
                                         metadata: named ?? renderResult.metadata, references: job.references,
-                                        sketch: renderResult.sketch)
+                                        sketch: renderResult.sketch, owner: job.owner)
                     // A sketch belongs to its exploration, not to the history.
                     if job.sketch != nil, let at = gridCells[job.ordinal] {
                         gridRuns[at.grid]?.entries[at.cell] = entry

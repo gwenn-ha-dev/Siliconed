@@ -473,6 +473,9 @@ final class AppState {
     @ObservationIgnored var mirror: MirrorLink?
     /// What the other Mac published of its models.
     var mirrorCatalog: MirrorCatalog?
+    /// What the other Mac renders for others (itself, other Macs): how many, and for how long (`nil`: unknown).
+    var othersQueued = 0
+    var othersSeconds: Double?
     /// What the other Mac answered to the form's questions (`quoted`).
     var mirrorQuotes: [RemoteQuote: RemoteQuoteAnswer] = [:]
 

@@ -10,6 +10,10 @@
 // - **Every request is judged again**: the model ready, its schedule, the format's rules, B, the LoRAs
 //   forged for it. The borrowing Mac's form judged first, with this Mac's B and traits, but its word is
 //   never the last.
+// - **Each Mac sees only its own** (`Entry.owner`, `Job.owner`): its jobs, its images, its preview, its
+//   exploration — published per client (`Seen`). This Mac's own renders and other Macs' are a count and
+//   a duration (`RemoteQueue.others`), and a client's actions reach only what it asked for. This Mac's
+//   window sees everything: it is its machine.
 // - **An edit's images come as blobs before their render**, but a message never waits for a blob
 //   (`Frames`): the render may come first, and is held until they are all there — in its order, the
 //   renders after it held too. The bytes live in memory only, until the job is made (incognito).
@@ -23,10 +27,21 @@ import Siliconed
 final class MirrorServer {
     private let app: AppState
     private let host: RemoteHost
-    private var clients: Set<Data> = []
-    private var lastQueue: RemoteQueue?
+    /// What each Mac connected was sent, by identity.
+    private var seen: [Data: Seen] = [:]
+    private struct Seen {
+        var queue: RemoteQueue?
+        var entries: Set<Int> = []
+        var exploration: RemoteExploration?
+        var explorationSent = false
+        /// The exploration's cells whose image was sent: [grid, cell].
+        var cells: Set<[Int]> = []
+    }
+    /// Each Mac's last exploration (grid ordinal) — kept across a reconnection.
+    private var explorations: [Data: Int] = [:]
+    /// Those explorations once ended: `finishGrid` takes them out of `gridRuns`.
+    private var ended: [Int: GridRun] = [:]
     private var lastCatalog: MirrorCatalog?
-    private var sentEntries: Set<Int> = []
     private var lastPreview: CGImage?
     private var nextBlob: UInt32 = 1
     private var queueScheduled = false, catalogScheduled = false
@@ -43,42 +58,47 @@ final class MirrorServer {
             }
         }
     }
-    private var lastExploration: RemoteExploration?
-    /// The exploration's cells whose image was sent: [grid, cell].
-    private var sentCells: Set<[Int]> = []
 
     init(app: AppState, host: RemoteHost) {
         self.app = app; self.host = host
-        // What is there now goes to each Mac as it joins (`joined`); what comes after, to all.
-        sentEntries = Set(app.history.map(\.ordinal))
+        _ = app.subscribe { [weak self] s in self?.signal(s) }
         watchQueue()
         watchCatalog()
+    }
+
+    /// A client's render that failed is told to it alone; an exploration that ended is kept for it.
+    private func signal(_ s: Signal) {
+        switch s {
+        case .finished(let job, .failed(let p)):
+            if let owner = job.owner, seen[owner] != nil { host.send(.refused(p.text), to: owner) }
+        case .sheet(let run, _):
+            guard let owner = run.owner, explorations[owner] == run.ordinal else { return }
+            ended = ended.filter { o, _ in explorations.values.contains(o) }
+            ended[run.ordinal] = run
+            scheduleQueue()
+        default:
+            break
+        }
     }
 
     // MARK: - A Mac joins, leaves, asks
 
     func joined(_ identity: Data) {
-        clients.insert(identity)
+        seen[identity] = Seen()
         let catalog = lastCatalog ?? catalogSnapshot()
         lastCatalog = catalog
         host.send(.catalog(catalog), to: identity)
-        host.send(.queue(lastQueue ?? queueSnapshot()), to: identity)
-        // Oldest first: the mirror inserts each at its place.
-        for e in app.history.reversed() { send(e, to: identity) }
-        host.send(.explored(explorationSnapshot()), to: identity)
-        if let r = app.explored {
-            for (cell, e) in r.entries { send(e, cell: [r.ordinal, cell], to: identity); sentCells.insert([r.ordinal, cell]) }
-        }
+        publish(to: identity)
     }
 
     func left(_ identity: Data) {
-        clients.remove(identity)
+        seen[identity] = nil
         uploads[identity] = nil
         held.removeAll { $0.identity == identity }
     }
 
     func received(blob id: UInt32, _ data: Data, from identity: Data) {
-        guard clients.contains(identity) else { return }
+        guard seen[identity] != nil else { return }
         uploads[identity, default: [:]][id] = data
         release()
     }
@@ -92,11 +112,11 @@ final class MirrorServer {
             held.append((identity, .grid(g)))
             release()
         case .addSheet(let n):
-            if let r = app.explored, r.ordinal == n { app.addSheet(r) }
+            if explorations[identity] == n, let r = run(n) { app.addSheet(r) }
         case .quote(let q):
             host.send(.quoted(answer(q)), to: identity)
         case .enlarge(let o, let download):
-            guard let e = app.history.first(where: { $0.ordinal == o }) else { return }
+            guard let e = own(o, identity) else { return }
             Task {
                 do { try await app.enlarged(e, download: download) }
                 catch EnlargeFailure.downloadRequired { host.send(.enlargeNeedsDownload(o), to: identity) }
@@ -105,24 +125,36 @@ final class MirrorServer {
                 catch { host.send(.refused(String(localized: "This image could not be enlarged")), to: identity) }
             }
         case .crop(let o, let box):
-            guard let e = app.history.first(where: { $0.ordinal == o }) else { return }
+            guard let e = own(o, identity) else { return }
             if let refusal = app.cropRefusal(e) { host.send(.refused(refusal), to: identity); return }
             Task { await app.crop(e, box: box) }
         case .cancel:
-            app.cancel()
+            if app.currentJob?.owner == identity { app.cancel() }
         case .removeJob(let n):
-            if let j = (app.file + app.awaitingLicense).first(where: { $0.ordinal == n }) { app.remove(j) }
+            if let j = (app.file + app.awaitingLicense).first(where: { $0.ordinal == n && $0.owner == identity }) { app.remove(j) }
         case .stopAll:
-            app.stopAll()
+            removeWaiting(of: identity)
+            if app.currentJob?.owner == identity { app.cancel() }
         case .clearQueue:
-            app.clearQueue()
+            removeWaiting(of: identity)
         case .deleteImages(let ordinals):
             let gone = Set(ordinals)
-            app.delete(app.history.filter { gone.contains($0.ordinal) })
+            app.delete(app.history.filter { gone.contains($0.ordinal) && $0.owner == identity })
         default:
             break
         }
     }
+
+    /// One of the client's own images; another's is as if it did not exist.
+    private func own(_ ordinal: Int, _ identity: Data) -> Entry? {
+        app.history.first { $0.ordinal == ordinal && $0.owner == identity }
+    }
+
+    private func removeWaiting(of identity: Data, where keep: (Job) -> Bool = { _ in true }) {
+        for j in app.file + app.awaitingLicense where j.owner == identity && keep(j) { app.remove(j) }
+    }
+
+    private func run(_ n: Int) -> GridRun? { app.gridRuns[n] ?? ended[n] }
 
     /// The renders whose images are all here, in order: the first still waiting holds the others.
     private func release() {
@@ -132,8 +164,8 @@ final class MirrorServer {
             held.removeFirst()
             do {
                 switch asked {
-                case .render(let r): app.enqueue([try admit(r, images: sent)])
-                case .grid(let g): try admit(g, images: sent)
+                case .render(let r): app.enqueue([try admit(r, images: sent, from: identity)])
+                case .grid(let g): try admit(g, images: sent, from: identity)
                 }
             } catch let e as Refused {
                 host.send(.refused(e.text), to: identity)
@@ -161,15 +193,15 @@ final class MirrorServer {
 
     /// An edit's image as this Mac reads it: one of its history, or the bytes sent — a file's decoded as
     /// the file (`ImageRGB(data:)`), an image's PNG to the same `CGImage`.
-    private func reference(_ r: RemoteReference, images: [UInt32: Data]) throws -> ReferenceImage {
+    private func reference(_ r: RemoteReference, images: [UInt32: Data], from identity: Data) throws -> ReferenceImage {
         switch r.origin {
         case .history(let o):
-            guard let e = app.history.first(where: { $0.ordinal == o }), let ref = app.fromHistory(e) else {
+            guard let e = own(o, identity), let ref = app.fromHistory(e) else {
                 throw Refused(text: String(localized: "Image i\(String(o)) is no longer in the history."))
             }
             return ref
         case .ofImage(let o, let i):
-            guard let e = app.history.first(where: { $0.ordinal == o }), e.references.indices.contains(i) else {
+            guard let e = own(o, identity), e.references.indices.contains(i) else {
                 throw Refused(text: String(localized: "Image i\(String(o)) is no longer in the history."))
             }
             return e.references[i]
@@ -187,7 +219,7 @@ final class MirrorServer {
 
     /// **A request becomes a job here**, as if typed on this Mac: what the engine would refuse later
     /// is refused now, with its sentence.
-    private func admit(_ r: RemoteJob, images: [UInt32: Data]) throws -> Job {
+    private func admit(_ r: RemoteJob, images: [UInt32: Data], from identity: Data) throws -> Job {
         guard app.readySet.contains(r.model), let card = app.cards.first(where: { $0.id == r.model }) else {
             throw EngineError.modelNotInstalled(model: r.model)
         }
@@ -195,7 +227,7 @@ final class MirrorServer {
         let denoising = model.chain.denoising
         try denoising.check(steps: r.steps, startImage: false)
         try Format.check(width: r.width, height: r.height, family: card.family)
-        let references = try r.references.map { try reference($0, images: images) }
+        let references = try r.references.map { try reference($0, images: images, from: identity) }
         if !references.isEmpty {
             guard references.count <= denoising.maxReferences else {
                 throw Refused(text: String(localized: "\(references.count) references: \(card.name) reads \(denoising.maxReferences) at most"))
@@ -221,14 +253,15 @@ final class MirrorServer {
                   settings: { var s = job.settings; s.modelName = card.name; s.references = references.count; return s }(),
                   seeds: job.seeds, references: references, previews: job.previews, defaultSteps: card.defaultSteps, plan: plan)
         job.neuralEngine = r.neuralEngine
+        job.owner = identity
         return job
     }
 
     /// **An exploration becomes cells here**, by `enqueueGrid` as on this Mac's own form: each cell's
     /// model ready, its format and memory judged, the stack forged; a sketch's stop is this Mac's to find.
-    private func admit(_ g: RemoteGridRequest, images: [UInt32: Data]) throws {
+    private func admit(_ g: RemoteGridRequest, images: [UInt32: Data], from identity: Data) throws {
         let grid = try g.spec.grid()
-        let references = try g.job.references.map { try reference($0, images: images) }
+        let references = try g.job.references.map { try reference($0, images: images, from: identity) }
         var settings = MirrorProjection.settings(g.job)
         for id in Set(grid.cells.map { $0.model ?? g.job.model }) {
             guard app.readySet.contains(id), let card = app.cards.first(where: { $0.id == id }) else {
@@ -242,20 +275,42 @@ final class MirrorServer {
         if let stray = g.job.loras.first(where: { !forged.contains($0.path) }) {
             throw Refused(text: String(localized: "This LoRA isn't installed on this Mac: \(RemoteControl.shortName(stray.path))"))
         }
-        if g.sketch { app.stopExploring() }
-        app.enqueueGrid(grid, settings: settings, references: references, previews: g.job.previews, sketch: g.sketch,
-                        stopAfter: g.stopAfter, neuralEngine: g.job.neuralEngine)
+        // Its last exploration stops, as on this Mac's form — not this Mac's, nor another's — and this
+        // one is not shown in this Mac's window.
+        if g.sketch, let previous = explorations[identity].flatMap(run) {
+            removeWaiting(of: identity) { previous.jobs.contains($0.ordinal) }
+            if let c = app.currentJob, c.owner == identity, previous.jobs.contains(c.ordinal) { app.cancel() }
+        }
+        let (run, _) = app.enqueueGrid(grid, settings: settings, references: references, previews: g.job.previews,
+                                       sketch: g.sketch, stopAfter: g.stopAfter, neuralEngine: g.job.neuralEngine,
+                                       owner: identity, shows: false)
+        if g.sketch { explorations[identity] = run.ordinal }
     }
 
     private struct Refused: Error { let text: String }
 
     // MARK: - Snapshots
 
-    private func queueSnapshot() -> RemoteQueue {
+    /// The queue as `identity` sees it: its jobs, the running one's progress if it is its own; the rest a
+    /// count, and what it takes.
+    private func queueSnapshot(for identity: Data) -> RemoteQueue {
         var q = RemoteQueue()
-        q.current = app.currentJob.map(MirrorProjection.remote)
-        q.waiting = app.file.map(MirrorProjection.remote)
-        q.awaitingLicense = app.awaitingLicense.map(MirrorProjection.remote)
+        let mine = { (j: Job) in j.owner == identity }
+        q.waiting = app.file.filter(mine).map(MirrorProjection.remote)
+        q.awaitingLicense = app.awaitingLicense.filter(mine).map(MirrorProjection.remote)
+        q.enlarging = app.enlarging.flatMap { id in app.history.first { $0.id == id && $0.owner == identity }?.ordinal }
+        var seconds: Double? = 0
+        if let c = app.currentJob, !mine(c) {
+            q.others += 1
+            seconds = app.remaining(at: Date())
+        }
+        for t in app.file where !mine(t) {
+            q.others += 1
+            seconds = seconds.flatMap { s in app.estimation(t).map { s + $0 } }
+        }
+        q.othersSeconds = q.others > 0 ? seconds : nil
+        guard let c = app.currentJob, mine(c) else { return q }
+        q.current = MirrorProjection.remote(c)
         q.fraction = app.fraction
         q.stage = app.stage?.rawValue
         q.currentStep = app.currentStep; q.totalSteps = app.totalSteps
@@ -265,14 +320,11 @@ final class MirrorServer {
         })
         q.stageSeconds = Dictionary(uniqueKeysWithValues: app.stageSeconds.map { ($0.key.rawValue, $0.value) })
         q.remaining = app.remaining(at: Date())
-        q.problem = app.problem?.text
-        q.enlarging = app.enlarging.flatMap { id in app.history.first { $0.id == id }?.ordinal }
         return q
     }
 
-    private func explorationSnapshot() -> RemoteExploration? {
-        guard let r = app.explored else { return nil }
-        return RemoteExploration(
+    private func exploration(_ r: GridRun) -> RemoteExploration {
+        RemoteExploration(
             ordinal: r.ordinal, spec: RemoteGridSpec(r.grid),
             job: MirrorProjection.remote(r.settings, ordinal: 0, seeds: [], previews: true, defaultSteps: nil, neuralEngine: nil),
             cells: r.cellJobs.map(MirrorProjection.remote),
@@ -314,14 +366,14 @@ final class MirrorServer {
                              enlarges: SuperResolution.available)
     }
 
-    private func send(_ e: Entry, to identity: Data? = nil) {
+    private func send(_ e: Entry, to identity: Data) {
         let id = blob()
         host.send(.entry(remote(e, png: id)), to: identity)
         host.send(blob: e.png, id: id, to: identity)
     }
 
     /// An exploration's cell image: `at` is [grid, cell].
-    private func send(_ e: Entry, cell at: [Int], to identity: Data? = nil) {
+    private func send(_ e: Entry, cell at: [Int], to identity: Data) {
         let id = blob()
         host.send(.cellImage(grid: at[0], cell: at[1], remote(e, png: id)), to: identity)
         host.send(blob: e.png, id: id, to: identity)
@@ -350,11 +402,13 @@ final class MirrorServer {
 
     private func watchQueue() {
         withObservationTracking {
-            _ = queueSnapshot()
+            // Everything a client's view reads, whoever it belongs to.
+            _ = (app.currentJob?.ordinal, app.file.map(\.ordinal), app.awaitingLicense.map(\.ordinal), app.enlarging)
+            _ = (app.fraction, app.stage, app.currentStep, app.totalSteps, app.batchImage, app.batchSize)
+            _ = (app.stageStates, app.stageSeconds, app.estimatedRemaining)
             _ = app.history.map(\.ordinal)
             _ = app.preview
-            _ = explorationSnapshot()
-            _ = app.explored?.entries.keys
+            _ = app.gridRuns.mapValues { ($0.issues.count, $0.entries.count) }
         } onChange: { [weak self] in
             DispatchQueue.main.async { MainActor.assumeIsolated { self?.scheduleQueue() } }
         }
@@ -375,39 +429,46 @@ final class MirrorServer {
     }
 
     private func publishQueue() {
-        let q = queueSnapshot()
-        if q != lastQueue {
-            lastQueue = q
-            if !clients.isEmpty { host.send(.queue(q)) }
+        for identity in seen.keys { publish(to: identity) }
+        guard app.preview !== lastPreview else { return }
+        lastPreview = app.preview
+        // The preview is the running render's: its owner's alone.
+        guard let owner = app.currentJob?.owner, seen[owner] != nil else { return }
+        if let p = app.preview, let png = Self.png(p) {
+            let id = blob()
+            host.send(.preview(id), to: owner)
+            host.send(blob: png, id: id, to: owner)
+        } else {
+            host.send(.preview(nil), to: owner)
         }
-        let ordinals = Set(app.history.map(\.ordinal))
-        let gone = sentEntries.subtracting(ordinals)
-        if !gone.isEmpty, !clients.isEmpty { host.send(.removed(gone.sorted())) }
-        for e in app.history.reversed() where !sentEntries.contains(e.ordinal) && !clients.isEmpty { send(e) }
-        sentEntries = ordinals
-        let x = explorationSnapshot()
-        if x != lastExploration {
-            if x?.ordinal != lastExploration?.ordinal { sentCells = [] }
-            lastExploration = x
-            if !clients.isEmpty { host.send(.explored(x)) }
+    }
+
+    /// What `identity` was not sent yet: its queue, its images (oldest first: the mirror inserts each at
+    /// its place), its exploration and the cells' images.
+    private func publish(to identity: Data) {
+        guard var s = seen[identity] else { return }
+        let q = queueSnapshot(for: identity)
+        if q != s.queue { s.queue = q; host.send(.queue(q), to: identity) }
+        let mine = app.history.filter { $0.owner == identity }
+        let ordinals = Set(mine.map(\.ordinal))
+        let gone = s.entries.subtracting(ordinals)
+        if !gone.isEmpty { host.send(.removed(gone.sorted()), to: identity) }
+        for e in mine.reversed() where !s.entries.contains(e.ordinal) { send(e, to: identity) }
+        s.entries = ordinals
+        let r = explorations[identity].flatMap(run)
+        let x = r.map(exploration)
+        if !s.explorationSent || x != s.exploration {
+            if x?.ordinal != s.exploration?.ordinal { s.cells = [] }
+            s.exploration = x; s.explorationSent = true
+            host.send(.explored(x), to: identity)
         }
-        if let r = app.explored, !clients.isEmpty {
-            for (cell, e) in r.entries where !sentCells.contains([r.ordinal, cell]) {
-                sentCells.insert([r.ordinal, cell])
-                send(e, cell: [r.ordinal, cell])
+        if let r {
+            for (cell, e) in r.entries where !s.cells.contains([r.ordinal, cell]) {
+                s.cells.insert([r.ordinal, cell])
+                send(e, cell: [r.ordinal, cell], to: identity)
             }
         }
-        if app.preview !== lastPreview {
-            lastPreview = app.preview
-            guard !clients.isEmpty else { return }
-            if let p = app.preview, let png = Self.png(p) {
-                let id = blob()
-                host.send(.preview(id))
-                host.send(blob: png, id: id)
-            } else {
-                host.send(.preview(nil))
-            }
-        }
+        seen[identity] = s
     }
 
     private func watchCatalog() {
@@ -422,7 +483,7 @@ final class MirrorServer {
         let c = catalogSnapshot()
         if c != lastCatalog {
             lastCatalog = c
-            if !clients.isEmpty { host.send(.catalog(c)) }
+            if !seen.isEmpty { host.send(.catalog(c)) }
         }
         watchCatalog()
     }

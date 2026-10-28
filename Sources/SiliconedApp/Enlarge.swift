@@ -243,7 +243,7 @@ extension AppState {
         let result = Entry(ordinal: lastImage, job: entry.job, png: finished.0, vignette: finished.1.image ?? image,
                            width: image.width, height: image.height, seed: entry.seed, timings: timings,
                            footprints: Engine.Footprints(), evaluations: 0, settings: entry.settings,
-                           metadata: metadata, enlarged: SuperResolution.factor, enlargedFrom: entry.png)
+                           metadata: metadata, enlarged: SuperResolution.factor, enlargedFrom: entry.png, owner: entry.owner)
         history.insert(result, at: 0)
         selectedImage = (result.id, image)
         selection = result.id

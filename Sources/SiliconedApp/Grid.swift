@@ -160,6 +160,8 @@ struct GridRun {
     var sketch = false
     var entries: [Int: Entry] = [:]
     var issues: [Int: Issue] = [:]
+    /// Who asked for it (`Entry.owner`).
+    var owner: Data? = nil
     var name: String { "g\(ordinal)" }
     var isComplete: Bool { issues.count == jobs.count }
 }

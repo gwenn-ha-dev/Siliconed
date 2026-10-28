@@ -216,6 +216,14 @@ private struct Footer: View {
             }
             .controlSize(.extraLarge)
             if app.busy { queue }
+            // In a mirror: the other Mac busy with renders that are not this Mac's — why this one waits.
+            if app.othersQueued > 0, let mirror = app.mirror {
+                Label(app.othersSeconds.map { s in
+                    String(localized: "Renders for others on “\(mirror.macName)”: \(app.othersQueued), about \(Duration.seconds(s).formatted(.units(allowed: [.minutes, .seconds], width: .abbreviated)))")
+                } ?? String(localized: "Renders for others on “\(mirror.macName)”: \(app.othersQueued)"),
+                      systemImage: "person.2")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
             // The models being copied from the library's disk to this Mac (`AppState+Place.swift`).
             if let c = app.copying {
                 VStack(alignment: .leading, spacing: 4) {

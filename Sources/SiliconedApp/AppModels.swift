@@ -183,6 +183,9 @@ struct Entry: Identifiable {
     /// **A crop** (`CropEditor.swift`): the pixels of the image it was cut from. Its settings stay the render's,
     /// like an enlargement's; it was not rendered, so it has no time.
     var cropped: Crop.Box? = nil
+    /// **Who asked for it**: another Mac's identity (`MirrorServer`), `nil` for this Mac. A client sees
+    /// only its own; what is made from an image (crop, enlargement, sheet) keeps its owner.
+    var owner: Data? = nil
 
     var seconds: Double { timings.total }
     var name: String { "i\(ordinal)" }
@@ -302,6 +305,8 @@ struct Job: Identifiable {
     /// **The Neural Engine as the remote control asked it** (`add --ane`, `--no-ane`), frozen in the job;
     /// `nil`, the model's choice when the job starts (`AppState.neuralEngine(for:)`), like a click.
     var neuralEngine: Bool? = nil
+    /// Who asked for it (`Entry.owner`).
+    var owner: Data? = nil
 
     /// The key of the learned speed: same model, same format, same number of references (each one
     /// lengthens the sequence and every evaluation with it), with or without LoRA (the spectral turns off under a LoRA, and the LoRA weighs on
