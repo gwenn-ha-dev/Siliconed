@@ -244,7 +244,9 @@ final class RemoteNetworkTests: XCTestCase {
         var edit = job
         edit.references = [RemoteReference(origin: .history(7), name: "i7", width: 1024, height: 1024),
                            RemoteReference(origin: .file(blob: 3), name: "a.heic", width: 3024, height: 4032),
-                           RemoteReference(origin: .image(blob: 4), name: "pasted", width: 640, height: 480)]
+                           RemoteReference(origin: .image(blob: 4), name: "pasted", width: 640, height: 480),
+                           RemoteReference(origin: .ofImage(9, index: 1), name: "b.png", width: 512, height: 768)]
+        edit.variations = [Variation(seed: 7, strength: 0.25), Variation(seed: 8, strength: 0.5)]
         let quote = RemoteQuote(model: "qwen-image-2.1", width: 1024, height: 1024, first: [3024, 4032], images: 2)
         var q = RemoteQueue()
         q.current = job; q.fraction = 0.5; q.stage = "denoising"; q.remaining = 41.5

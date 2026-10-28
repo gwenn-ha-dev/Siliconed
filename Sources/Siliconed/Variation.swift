@@ -29,7 +29,7 @@ import Foundation
 ///     close to it, not to its parent. Since each step keeps a standard normal, so does the chain.
 ///   - computed in fp64 element by element, rounded once to fp32 — the order of operations of one
 ///     element is fixed, so the same pair of seeds gives the same bits on any machine.
-package struct Variation: Sendable, Hashable {
+package struct Variation: Sendable, Hashable, Codable {
     package var seed: UInt64
     /// In `[0, 1]`: 0 the original noise, 1 the variation seed's. Outside, clamped; not finite, 0.
     package var strength: Double

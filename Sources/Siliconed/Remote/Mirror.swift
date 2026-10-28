@@ -34,6 +34,9 @@ package struct RemoteReference: Codable, Equatable, Sendable {
         case file(blob: UInt32)
         /// An image held in memory on the Neo (pasted, a subject's picture), as a lossless PNG blob.
         case image(blob: UInt32)
+        /// The `index`-th edit image a history image was rendered with (« Variations » of an edit): it
+        /// stays on the mini, the Neo only names it.
+        case ofImage(Int, index: Int)
     }
     package var origin: Origin
     package var name: String
@@ -44,7 +47,7 @@ package struct RemoteReference: Codable, Equatable, Sendable {
 
     package var blob: UInt32? {
         switch origin {
-        case .history: nil
+        case .history, .ofImage: nil
         case .file(let b), .image(let b): b
         }
     }
@@ -94,11 +97,14 @@ package struct RemoteJob: Codable, Equatable, Sendable {
     package var neuralEngine: Bool?
     /// An edit's images, image 1 first.
     package var references: [RemoteReference]
+    /// « Variations »: applied in order over the seed's noise.
+    package var variations: [Variation]
 
     package init(ordinal: Int, model: String, modelName: String, prompt: String, width: Int, height: Int, steps: Int,
                  defaultSteps: Int?, loras: [RemoteLoRA], seeds: [UInt64], detail: Detail, solver: Solver,
-                 schedule: SigmaSchedule, previews: Bool, neuralEngine: Bool?, references: [RemoteReference] = []) {
-        self.references = references
+                 schedule: SigmaSchedule, previews: Bool, neuralEngine: Bool?, references: [RemoteReference] = [],
+                 variations: [Variation] = []) {
+        self.references = references; self.variations = variations
         self.ordinal = ordinal; self.model = model; self.modelName = modelName; self.prompt = prompt
         self.width = width; self.height = height; self.steps = steps; self.defaultSteps = defaultSteps
         self.loras = loras; self.seeds = seeds; self.detail = detail; self.solver = solver

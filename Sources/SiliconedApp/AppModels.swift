@@ -24,8 +24,9 @@ struct LoRASlot: Identifiable, Equatable {
 struct ReferenceImage: Identifiable, @unchecked Sendable {
     /// `subject`: a named subject's picture, cropped to its frame (`Subjects.swift`) — `nil` if its
     /// bytes did not decode, which fails the render naming it. `bytes`: a file's bytes sent by another
-    /// Mac (`MirrorServer`), decoded as the file was there.
-    enum Source { case file(URL), image(CGImage), subject(CGImage?, name: String), bytes(Data) }
+    /// Mac (`MirrorServer`), decoded as the file was there. `remote`: an image that stays on the other
+    /// Mac, named only (a mirrored history image's edit images) — nothing to show or decode here.
+    enum Source { case file(URL), image(CGImage), subject(CGImage?, name: String), bytes(Data), remote(RemoteReference.Origin) }
     let id = UUID()
     let source: Source
     let vignette: NSImage
@@ -40,6 +41,7 @@ struct ReferenceImage: Identifiable, @unchecked Sendable {
         switch source {
         case .image(let cg): image = cg
         case .subject(let cg, _): image = cg
+        case .remote: image = nil
         case .file, .bytes:
             let options: [CFString: Any] = [kCGImageSourceCreateThumbnailFromImageAlways: true,
                                             kCGImageSourceThumbnailMaxPixelSize: max(self.width, self.height),
@@ -58,6 +60,7 @@ struct ReferenceImage: Identifiable, @unchecked Sendable {
         switch source {
         case .file(let url): return try ImageRGB(contentsOf: url)
         case .bytes(let data): return try ImageRGB(data: data, name: name)
+        case .remote: throw EngineError.imageUnreadable(file: name)
         case .image(let cg): return try ImageRGB(cgImage: cg)
         case .subject(let cg, let name):
             guard let cg else { throw EngineError.imageUnreadable(file: name) }
@@ -69,7 +72,7 @@ struct ReferenceImage: Identifiable, @unchecked Sendable {
         switch source {
         case .file(let url): CGImageSourceCreateWithURL(url as CFURL, nil)
         case .bytes(let data): CGImageSourceCreateWithData(data as CFData, nil)
-        case .image, .subject: nil
+        case .image, .subject, .remote: nil
         }
     }
 

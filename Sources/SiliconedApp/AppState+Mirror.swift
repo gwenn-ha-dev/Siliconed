@@ -20,7 +20,9 @@
 //   mini's history by its ordinal (`RemoteReference`); the mini holds the render until they are there.
 //   What the form cannot compute without the maps — an edit's format, a need with images — it asks
 //   (`quote`), and waits for the answer before « Generate ».
-// - Not yet: grids and explorations, variations, enlarging, cropping, the statistics, the license
+// - **« Variations »** of an image: its own variations travel with the job, and an edit's images are
+//   named by the image (`ofImage`) — they never came here.
+// - Not yet: grids and explorations, enlarging, cropping, the statistics, the license
 //   sheet, ⌘Z after a removal.
 
 import AppKit
@@ -68,6 +70,7 @@ final class MirrorLink {
         if let o = ref.ordinal { return .history(o) }
         let data: Data?, file: Bool
         switch ref.source {
+        case .remote(let o): return o
         case .file(let url): data = try? Data(contentsOf: url); file = true
         case .bytes(let d): data = d; file = true
         case .image(let cg), .subject(let cg?, _): data = MirrorServer.png(cg); file = false
@@ -93,7 +96,8 @@ enum MirrorProjection {
         RemoteJob(ordinal: ordinal, model: s.identifier, modelName: s.modelName, prompt: s.prompt,
                   width: s.format.width, height: s.format.height, steps: s.steps, defaultSteps: defaultSteps,
                   loras: s.loras.map { RemoteLoRA(path: $0.path, strength: $0.strength) }, seeds: seeds,
-                  detail: s.detail, solver: s.solver, schedule: s.schedule, previews: previews, neuralEngine: neuralEngine)
+                  detail: s.detail, solver: s.solver, schedule: s.schedule, previews: previews, neuralEngine: neuralEngine,
+                  variations: s.variations)
     }
 
     static func settings(_ r: RemoteJob) -> RenderSettings {
@@ -102,6 +106,8 @@ enum MirrorProjection {
                                loras: r.loras.map { LoRASlot(path: $0.path, strength: $0.strength) },
                                detail: r.detail, solver: r.solver, schedule: r.schedule)
         s.neuralEngine = r.neuralEngine ?? false
+        s.variations = r.variations
+        s.references = r.references.count
         return s
     }
 
@@ -231,10 +237,15 @@ extension AppState {
               let image = Self.decode(data) else { return }
         var settings = MirrorProjection.settings(e.job)
         settings.neuralEngine = e.neuralEngine
-        let entry = Entry(ordinal: e.ordinal, job: e.job.ordinal, png: data,
+        var entry = Entry(ordinal: e.ordinal, job: e.job.ordinal, png: data,
                           vignette: FinishedImage.reduce(image, side: 240) ?? image, width: e.width, height: e.height,
                           seed: e.seed, timings: e.timings, footprints: e.footprints, evaluations: e.evaluations,
                           settings: settings, metadata: e.metadata)
+        // Its edit images stay on the other Mac: named, for « Variations » (`RemoteReference.ofImage`).
+        entry.references = e.job.references.map {
+            ReferenceImage(source: .remote($0.origin), vignette: NSImage(systemSymbolName: "photo", accessibilityDescription: nil) ?? NSImage(),
+                           name: $0.name, width: $0.width, height: $0.height)
+        }
         link.entries[e.ordinal] = entry
         // The history is newest first; entries arrive in their order, the first connection's oldest first.
         let at = history.firstIndex { $0.ordinal < e.ordinal } ?? history.count

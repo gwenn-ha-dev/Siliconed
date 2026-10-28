@@ -129,6 +129,11 @@ final class MirrorServer {
                 throw Refused(text: String(localized: "Image i\(String(o)) is no longer in the history."))
             }
             return ref
+        case .ofImage(let o, let i):
+            guard let e = app.history.first(where: { $0.ordinal == o }), e.references.indices.contains(i) else {
+                throw Refused(text: String(localized: "Image i\(String(o)) is no longer in the history."))
+            }
+            return e.references[i]
         case .file(let b):
             guard let d = images[b], let size = ReferenceImage.size(of: d), let vignette = NSImage(data: d) else {
                 throw EngineError.imageUnreadable(file: r.name)
@@ -230,9 +235,12 @@ final class MirrorServer {
 
     private func send(_ e: Entry, to identity: Data? = nil) {
         let id = blob()
-        let r = RemoteEntry(ordinal: e.ordinal, job: MirrorProjection.remote(e.settings, ordinal: e.job, seeds: [e.seed],
-                                                                             previews: false, defaultSteps: nil,
-                                                                             neuralEngine: e.settings.neuralEngine),
+        var job = MirrorProjection.remote(e.settings, ordinal: e.job, seeds: [e.seed], previews: false, defaultSteps: nil,
+                                          neuralEngine: e.settings.neuralEngine)
+        job.references = e.references.enumerated().map { i, ref in
+            RemoteReference(origin: .ofImage(e.ordinal, index: i), name: ref.name, width: ref.width, height: ref.height)
+        }
+        let r = RemoteEntry(ordinal: e.ordinal, job: job,
                             width: e.width, height: e.height, seed: e.seed, timings: e.timings, footprints: e.footprints,
                             evaluations: e.evaluations, metadata: e.metadata, neuralEngine: e.settings.neuralEngine, png: id)
         host.send(.entry(r), to: identity)
