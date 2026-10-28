@@ -24,8 +24,9 @@
 //   named by the image (`ofImage`) — they never came here.
 // - **Enlarging and cropping** happen there, on its own pixels (`enlarge`, `crop` by ordinal); the
 //   consent to download Apple's model is asked here. An enlargement's curtain has no original here yet.
-// - Not yet: grids and explorations, the statistics, the license
-//   sheet, ⌘Z after a removal.
+// - **The exploration** is asked whole (`grid`) and made there; the panel shows the one it publishes,
+//   its cells' images arriving one by one (`cellImage`). « Finish This Image » is an ordinary render.
+// - Not yet: named subjects, the statistics, the license sheet, ⌘Z after a removal.
 
 import AppKit
 import Foundation
@@ -47,6 +48,11 @@ final class MirrorLink {
     private var nextBlob: UInt32 = 1
     /// The quotes asked and not yet answered: each is asked once.
     var asked: Set<RemoteQuote> = []
+    /// The exploration's cell images, by grid then cell; a cell image waits for its PNG.
+    var cells: [Int: [Int: Entry]] = [:]
+    var pendingCells: [UInt32: (grid: Int, cell: Int, entry: RemoteEntry)] = [:]
+    /// The edit's images the last exploration was asked with: what « Use These Settings » puts back.
+    var exploreReferences: [ReferenceImage] = []
 
     init(macName: String, send: @escaping (SessionMessage) -> Void, sendBlob: @escaping (Data, UInt32) -> Void) {
         self.macName = macName; self.sender = send; self.blobSender = sendBlob
@@ -62,10 +68,24 @@ final class MirrorLink {
     /// The job, its images sent first. A file that can no longer be read refuses it here.
     func render(_ job: Job) throws(EngineError) {
         var r = MirrorProjection.remote(job)
-        r.references = try job.references.map { ref throws(EngineError) in
+        r.references = try remote(job.references)
+        sender(.render(r))
+    }
+
+    /// An exploration: the cells are made there (`enqueueGrid`), where a sketch's stop is known.
+    func explore(_ grid: RenderGrid, settings: RenderSettings, references: [ReferenceImage], stopAfter: Int,
+                 neuralEngine: Bool?) throws(EngineError) {
+        var job = MirrorProjection.remote(settings, ordinal: 0, seeds: [], previews: true, defaultSteps: nil,
+                                          neuralEngine: neuralEngine)
+        job.references = try remote(references)
+        exploreReferences = references
+        sender(.grid(RemoteGridRequest(spec: RemoteGridSpec(grid), job: job, sketch: true, stopAfter: stopAfter)))
+    }
+
+    private func remote(_ references: [ReferenceImage]) throws(EngineError) -> [RemoteReference] {
+        try references.map { ref throws(EngineError) in
             RemoteReference(origin: try origin(ref), name: ref.name, width: ref.width, height: ref.height)
         }
-        sender(.render(r))
     }
 
     private func origin(_ ref: ReferenceImage) throws(EngineError) -> RemoteReference.Origin {
@@ -219,6 +239,31 @@ extension AppState {
         case .preview(let id):
             link.previewBlob = id
             if id == nil { preview = nil }
+        case .explored(let x):
+            guard let x, let grid = try? x.spec.grid() else { explored = nil; return }
+            let refs = link.exploreReferences
+            var run = GridRun(ordinal: x.ordinal, grid: grid, settings: MirrorProjection.settings(x.job),
+                              jobs: x.cells.map(\.ordinal), references: x.job.references.count, sketch: x.sketch)
+            run.cellJobs = zip(grid.cells, x.cells).map { cell, r in
+                let j = MirrorProjection.job(r, ordinal: r.ordinal)
+                // The cell's images are the ones this Mac sent: « Use These Settings » puts them back.
+                let used = cell.image.map { refs.indices.contains($0) ? [refs[$0]] : [] } ?? refs
+                return Job(ordinal: j.ordinal, settings: j.settings, seeds: j.seeds, references: used, previews: j.previews,
+                           defaultSteps: j.defaultSteps, plan: nil)
+            }
+            run.entries = link.cells[x.ordinal] ?? [:]
+            run.issues = x.issues.mapValues { i -> Issue in
+                switch i {
+                case .finished: .finished
+                case .stopped: .stopped
+                case .removed: .removed
+                case .failed(let text): .failed(Problem(text))
+                }
+            }
+            link.cells = link.cells.filter { $0.key == x.ordinal }
+            explored = run
+        case .cellImage(let grid, let cell, let e):
+            link.pendingCells[e.png] = (grid, cell, e)
         case .enlargeNeedsDownload(let o):
             // The consent is asked where the user is; the other Mac downloads Apple's model.
             if link.entries[o] != nil, Self.consentsToDownload() { link.send(.enlarge(o, download: true)) }
@@ -239,14 +284,17 @@ extension AppState {
             preview = Self.decode(data)
             return
         }
+        if let (grid, cell, e) = link.pendingCells.removeValue(forKey: id) {
+            guard let image = Self.decode(data) else { return }
+            var entry = Self.entry(e, png: data, image: image)
+            entry.sketch = e.evaluations
+            link.cells[grid, default: [:]][cell] = entry
+            if explored?.ordinal == grid { explored?.entries[cell] = entry }
+            return
+        }
         guard let e = link.pending.removeValue(forKey: id), link.entries[e.ordinal] == nil,
               let image = Self.decode(data) else { return }
-        var settings = MirrorProjection.settings(e.job)
-        settings.neuralEngine = e.neuralEngine
-        var entry = Entry(ordinal: e.ordinal, job: e.job.ordinal, png: data,
-                          vignette: FinishedImage.reduce(image, side: 240) ?? image, width: e.width, height: e.height,
-                          seed: e.seed, timings: e.timings, footprints: e.footprints, evaluations: e.evaluations,
-                          settings: settings, metadata: e.metadata, enlarged: e.enlarged, cropped: e.cropped)
+        var entry = Self.entry(e, png: data, image: image)
         // Its edit images stay on the other Mac: named, for « Variations » (`RemoteReference.ofImage`).
         entry.references = e.job.references.map {
             ReferenceImage(source: .remote($0.origin), vignette: NSImage(systemSymbolName: "photo", accessibilityDescription: nil) ?? NSImage(),
@@ -262,6 +310,16 @@ extension AppState {
             selection = entry.id
             marked = []; anchor = entry.id
         }
+    }
+
+    private static func entry(_ e: RemoteEntry, png: Data, image: CGImage) -> Entry {
+        var settings = MirrorProjection.settings(e.job)
+        settings.neuralEngine = e.neuralEngine
+        let grid = e.sheet.flatMap { s in (try? s.spec.grid()).map { GridInfo(ordinal: s.ordinal, grid: $0, empty: s.empty) } }
+        return Entry(ordinal: e.ordinal, job: e.job.ordinal, png: png,
+                     vignette: FinishedImage.reduce(image, side: 240) ?? image, width: e.width, height: e.height,
+                     seed: e.seed, timings: e.timings, footprints: e.footprints, evaluations: e.evaluations,
+                     settings: settings, metadata: e.metadata, grid: grid, enlarged: e.enlarged, cropped: e.cropped)
     }
 
     nonisolated static func decode(_ png: Data) -> CGImage? {

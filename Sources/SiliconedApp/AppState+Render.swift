@@ -111,6 +111,8 @@ extension AppState {
     /// **A grid's sheet joins the history**: drawn off the main thread from the cells' PNGs — an empty
     /// cell says why. No cell rendered: no sheet.
     func addSheet(_ run: GridRun) {
+        // In a mirror, the other Mac draws it, from its own cells: the sheet joins its history.
+        if let mirror { mirror.send(.addSheet(run.ordinal)); return }
         let ordinal = run.ordinal
         let entries = run.grid.cells.indices.compactMap { run.entries[$0] }
         guard let first = entries.first else {

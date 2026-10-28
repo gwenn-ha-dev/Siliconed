@@ -10,11 +10,14 @@ import Foundation
 ///                  entry + PNG one history image, its PNG as the blob that follows; `removed` the reverse
 ///                  preview     the denoising's latent preview as a small PNG blob, once per step
 ///                  quoted      the answer to a `quote`
+///                  explored    the exploration under way, without its images; `cellImage` + PNG one cell's
 ///     Neo → mini   render      one job from the Neo's form; the mini checks it again (B, steps) before
 ///                              queueing it — the Neo's judgment is never the last word; an edit's images
 ///                              go first as blobs, or by their history ordinal
 ///                  quote       what an edit's format and a need with images are: the denoiser's rule
 ///                              and the memory need come from maps only the mini holds
+///                  grid        an exploration (or a grid) from the Neo's form: its cells made on the mini,
+///                              which alone knows where a model's sketch stops; `addSheet` draws its sheet
 ///                  enlarge, crop  an image of the mini's history, made there; `enlargeNeedsDownload`
 ///                              asks the Neo's consent to Apple's model
 ///                  cancel, removeJob, stopAll, clearQueue, deleteImages
@@ -151,11 +154,12 @@ package struct RemoteEntry: Codable, Equatable, Sendable {
     /// An enlargement's factor; a crop's box in the image it was cut from.
     package var enlarged: Int?
     package var cropped: Crop.Box?
+    package var sheet: RemoteSheet?
 
     package init(ordinal: Int, job: RemoteJob, width: Int, height: Int, seed: UInt64, timings: Engine.Timings,
                  footprints: Engine.Footprints, evaluations: Int, metadata: [String: String], neuralEngine: Bool, png: UInt32,
-                 enlarged: Int? = nil, cropped: Crop.Box? = nil) {
-        self.enlarged = enlarged; self.cropped = cropped
+                 enlarged: Int? = nil, cropped: Crop.Box? = nil, sheet: RemoteSheet? = nil) {
+        self.enlarged = enlarged; self.cropped = cropped; self.sheet = sheet
         self.ordinal = ordinal; self.job = job; self.width = width; self.height = height; self.seed = seed
         self.timings = timings; self.footprints = footprints; self.evaluations = evaluations
         self.metadata = metadata; self.neuralEngine = neuralEngine; self.png = png
@@ -207,4 +211,56 @@ package struct MirrorCatalog: Codable, Equatable, Sendable {
     }
 
     package static func key(_ width: Int, _ height: Int) -> String { "\(width)x\(height)" }
+}
+
+/// **An XY grid as it crosses**: its base and axes, rebuilt — and so checked again — by
+/// `RenderGrid.init` on the other side.
+package struct RemoteGridSpec: Codable, Equatable, Sendable {
+    package var base: RenderGrid.Base
+    package var x: RenderGrid.Axis
+    package var y: RenderGrid.Axis?
+    package init(_ g: RenderGrid) { base = g.base; x = g.x; y = g.y }
+    package func grid() throws(EngineError) -> RenderGrid { try RenderGrid(base, x: x, y: y) }
+}
+
+/// An exploration asked from the Neo's form. `job`: what the cells share — the prompt as typed, the
+/// format, the stack, the edit's images —; its seeds are none, the grid's are.
+package struct RemoteGridRequest: Codable, Equatable, Sendable {
+    package var spec: RemoteGridSpec
+    package var job: RemoteJob
+    package var sketch: Bool
+    /// The evaluations a sketch stops after; 0: where the model's sketch stops by itself.
+    package var stopAfter: Int
+    package init(spec: RemoteGridSpec, job: RemoteJob, sketch: Bool, stopAfter: Int) {
+        self.spec = spec; self.job = job; self.sketch = sketch; self.stopAfter = stopAfter
+    }
+}
+
+/// How a cell's job ended, as the panel says it.
+package enum RemoteIssue: Codable, Equatable, Sendable {
+    case finished, stopped, removed
+    case failed(String)
+}
+
+/// **The exploration on the mini**, published whole at each change — but its images, which go once
+/// each (`cellImage`).
+package struct RemoteExploration: Codable, Equatable, Sendable {
+    package var ordinal: Int
+    package var spec: RemoteGridSpec
+    package var job: RemoteJob
+    /// Each cell's job, in the grid's order: its ordinal, and its settings whole.
+    package var cells: [RemoteJob]
+    package var issues: [Int: RemoteIssue]
+    package var sketch: Bool
+    package init(ordinal: Int, spec: RemoteGridSpec, job: RemoteJob, cells: [RemoteJob], issues: [Int: RemoteIssue], sketch: Bool) {
+        self.ordinal = ordinal; self.spec = spec; self.job = job; self.cells = cells; self.issues = issues; self.sketch = sketch
+    }
+}
+
+/// A sheet in the history: which grid it drew, and how many cells stayed empty.
+package struct RemoteSheet: Codable, Equatable, Sendable {
+    package var ordinal: Int
+    package var spec: RemoteGridSpec
+    package var empty: Int
+    package init(ordinal: Int, spec: RemoteGridSpec, empty: Int) { self.ordinal = ordinal; self.spec = spec; self.empty = empty }
 }

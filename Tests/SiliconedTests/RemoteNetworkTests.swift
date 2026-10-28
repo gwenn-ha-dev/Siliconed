@@ -248,12 +248,19 @@ final class RemoteNetworkTests: XCTestCase {
                            RemoteReference(origin: .ofImage(9, index: 1), name: "b.png", width: 512, height: 768)]
         edit.variations = [Variation(seed: 7, strength: 0.25), Variation(seed: 8, strength: 0.5)]
         let quote = RemoteQuote(model: "qwen-image-2.1", width: 1024, height: 1024, first: [3024, 4032], images: 2)
+        let grid = try RenderGrid(.init(prompt: "a {cat|dog} in a library", seed: 42, steps: 8, loraStrengths: [0.8], images: 1),
+                                  x: .prompt(group: 0), y: .loraStrength(slot: 0, values: [0.5, 1]))
+        XCTAssertEqual(try RemoteGridSpec(grid).grid(), grid)
+        let exploration = RemoteExploration(ordinal: 2, spec: RemoteGridSpec(grid), job: job, cells: [job, job],
+                                            issues: [0: .finished, 1: .failed("No.")], sketch: true)
         var q = RemoteQueue()
         q.current = job; q.fraction = 0.5; q.stage = "denoising"; q.remaining = 41.5
         var t = Engine.Timings(); t.total = 83.1
         let messages: [SessionMessage] = [
             .render(job), .render(edit), .quote(quote), .quoted(RemoteQuoteAnswer(quote: quote, width: 896, height: 1184, need: 3 << 30)),
             .enlarge(7, download: true), .crop(7, Crop.Box(x: 64, y: 0, width: 768, height: 1024)), .enlargeNeedsDownload(7),
+            .grid(RemoteGridRequest(spec: RemoteGridSpec(grid), job: edit, sketch: true, stopAfter: 0)), .addSheet(2),
+            .explored(exploration), .explored(nil),
             .queue(q), .cancel, .removeJob(4), .deleteImages([1, 2]), .refused("No."), .preview(nil),
             .entry(RemoteEntry(ordinal: 7, job: job, width: 1024, height: 1024, seed: 42, timings: t,
                                footprints: Engine.Footprints(), evaluations: 8, metadata: ["parameters": "x"],

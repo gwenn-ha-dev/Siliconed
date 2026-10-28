@@ -67,12 +67,17 @@ package enum SessionMessage: Codable, Equatable, Sendable {
     case quoted(RemoteQuoteAnswer)
     /// Enlarging this image needs Apple's model, not yet on the mini: the Neo asks the user.
     case enlargeNeedsDownload(Int)
+    case explored(RemoteExploration?)
+    /// One cell's image of the exploration `grid`; its PNG is the blob `entry.png`, which follows.
+    case cellImage(grid: Int, cell: Int, RemoteEntry)
 
     // Neo → mini
     case render(RemoteJob)
     case quote(RemoteQuote)
     case enlarge(Int, download: Bool)
     case crop(Int, Crop.Box)
+    case grid(RemoteGridRequest)
+    case addSheet(Int)
     case cancel
     case removeJob(Int)
     case stopAll

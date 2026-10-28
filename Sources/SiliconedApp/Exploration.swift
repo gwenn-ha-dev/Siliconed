@@ -101,6 +101,14 @@ extension AppState {
             return String(localized: "This grid makes \(String(g.count)) renders: the queue has room for \(String(room)).")
         }
         for (id, steps, _) in cellPlans(g) {
+            // In a mirror: the other Mac's models, and the step counts it published.
+            if mirror != nil {
+                guard readySet.contains(id) else { return String(localized: "\(modelName(id)) isn't installed.") }
+                if let t = mirrorCatalog?.traits[id], !t.steps.contains(steps) {
+                    return String(localized: "\(modelName(id)) has no schedule for \(String(steps)) steps.")
+                }
+                continue
+            }
             guard let m = model(id) else {
                 return String(localized: "\(modelName(id)) isn't installed.")
             }
@@ -143,7 +151,12 @@ extension AppState {
                                       references: references.count, detail: effectiveDetail, solver: effectiveSolver,
                                       schedule: effectiveSchedule)
         followsRender = false
-        enqueueGrid(g, settings: settings, references: references, previews: true, sketch: true, stopAfter: exploreStop)
+        if let mirror {
+            do { try mirror.explore(g, settings: settings, references: references, stopAfter: exploreStop, neuralEngine: nil) }
+            catch { problem = Problem(error); flash(Problem(error).text); return }
+        } else {
+            enqueueGrid(g, settings: settings, references: references, previews: true, sketch: true, stopAfter: exploreStop)
+        }
         showsExploration = true
     }
 

@@ -54,7 +54,7 @@ package struct RenderGrid: Equatable, Sendable {
 
     /// **What an axis varies.** Indices count from 0 (`group` in `PromptAlternatives.groups`, `slot`
     /// in the LoRA stack).
-    package enum Axis: Equatable, Sendable {
+    package enum Axis: Equatable, Sendable, Codable {
         /// The alternatives of the prompt's `group`-th `{…}`, in the order typed.
         case prompt(group: Int)
         /// These seeds, in this order.
@@ -93,7 +93,7 @@ package struct RenderGrid: Equatable, Sendable {
 
     /// **What every cell shares**, unless an axis says otherwise. `prompt` is the prompt as typed,
     /// its `{…}` groups included; `loraStrengths` the stack's strengths, in its order.
-    package struct Base: Equatable, Sendable {
+    package struct Base: Equatable, Sendable, Codable {
         package var prompt: String
         package var seed: UInt64
         package var steps: Int
