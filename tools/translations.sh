@@ -17,14 +17,16 @@
 #      de  « or » (German quotes „…“), or more straight " than the French value has (those quote
 #          code, and the French keeps them too);
 #      es  a space of any kind after « or before » (Spanish «…» are tight);
-#      it  the same, or a straight apostrophe ' (the Italian one is ’).
+#      it  the same, or a straight apostrophe ' (the Italian one is ’);
+#      ja  a quotation mark of another language (“ ” « » ‘ ’; the Japanese ones are 「」) or a
+#          non-breaking space (U+00A0, U+202F): Japanese is set without spaces around its punctuation.
 #
 # `tools/app.sh` calls it before packaging the app, reads `languages` from here for the bundle's
 # `CFBundleLocalizations`, then compiles the catalog into the bundle.
 set -e
 cd "${0:A:h}/.."
 # The languages the app ships besides English, the source: one list, read by `tools/app.sh` too.
-languages=(fr de es it)
+languages=(fr de es it ja)
 catalog=Sources/SiliconedApp/Localizable.xcstrings
 module=""
 # The freshest build that has both modules the app imports.
@@ -86,6 +88,8 @@ untypeset = {
     "es": (lambda s, v: tight.search(s), "a space after « or before »"),
     "it": (lambda s, v: tight.search(s) or "'" in s,
            "a space after « or before », or a straight apostrophe"),
+    "ja": (lambda s, v: re.search(r"[“”«»‘’\u00a0\u202f]", s),
+           "a “ ” « » ‘ ’ quote (Japanese uses 「」) or a non-breaking space"),
 }
 wrong = {lang: sorted(s for k, v in c["strings"].items()
                       for s in values(v.get("localizations", {}).get(lang, {}))

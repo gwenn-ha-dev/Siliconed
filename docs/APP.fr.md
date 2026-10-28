@@ -2,7 +2,7 @@
 
 # L'app Siliconed
 
-`Siliconed.app` génère des images à partir d'un prompt, les édite par instruction, et tient une file et un historique. Elle suit la langue du système (anglais, français, allemand, espagnol ou italien).
+`Siliconed.app` génère des images à partir d'un prompt, les édite par instruction, et tient une file et un historique. Elle suit la langue du système (anglais, français, allemand, espagnol, italien ou japonais).
 
 ![La fenêtre : le rack à gauche (prompt, encodeur de texte, débruiteur, décodeur, chacun avec ses réglages et son temps), une image Krea 2 Turbo en 1248×832 à droite — une Irlandaise rousse qui sort des vagues en riant, sa planche de surf sous le bras, sous un ciel ensoleillé —, l'historique en dessous](images/window.jpg)
 

@@ -23,7 +23,7 @@ struct OtherMacsSection: View {
     var body: some View {
         Section {
             Toggle(isOn: $macs.lending) {
-                titled("Lend This Mac", "The Macs you pair here render on this one, with its models, its queue and its history. Nothing on the network reaches this Mac before you accept a pairing here.")
+                titled("Lend This Mac", "Paired Macs render on this one, with its models. Nothing connects before you accept a pairing.")
             }
             if macs.lending {
                 ForEach(macs.pairings?.lent ?? [], id: \.identity) { m in
@@ -48,7 +48,7 @@ struct OtherMacsSection: View {
                     clientSheet = true
                 }
             } label: {
-                titled("Compute on Another Mac", "A Mac of this network that lends itself: pair it once, with a code shown on both screens.")
+                titled("Compute on Another Mac", "Pair once, with a code shown on both screens.")
             }
             ForEach(macs.pairings?.borrowed ?? [], id: \.id) { m in
                 LabeledContent {

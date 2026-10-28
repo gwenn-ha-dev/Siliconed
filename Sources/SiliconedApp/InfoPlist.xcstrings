@@ -34,6 +34,12 @@
             "state": "translated",
             "value": "Siliconed cerca gli altri Mac di questa rete che lo eseguono, per generare su uno di essi o prestare loro questo Mac."
           }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Siliconedは、このネットワーク上でSiliconedを実行しているほかのMacを探します。そのMacで生成したり、このMacを貸し出したりするためです。"
+          }
         }
       }
     }

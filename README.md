@@ -25,7 +25,7 @@ The app ships as a `.dmg` on the [Releases](https://github.com/gwenn-ha-dev/Sili
 - **Generates images from text and edits them by instruction.** Qwen-Image-2.1 Turbo takes 1 to 3 images and a sentence (“replace the cloudy sky with a blue sky”). Which model for what, with licenses and sizes: [Models](docs/APP.md#models).
 - **Explores before it commits.** A grid of quick sketches across seeds, steps, LoRA strengths or models; the cell you pick becomes the finished image.
 - **Takes your own models.** Import LoRAs and fine-tunes from Civitai or Hugging Face.
-- **Local and private.** Rendering happens on your Mac, with no content filter added by the app. It follows the system language (English, French, German, Spanish or Italian).
+- **Local and private.** Rendering happens on your Mac, with no content filter added by the app. It follows the system language (English, French, German, Spanish, Italian or Japanese).
 - **Scriptable.** `silicontrol` drives the running app from a terminal, for scripts and AI agents ([details](docs/REMOTE-CONTROL.md)).
 
 More about the app: [docs/APP.md](docs/APP.md).

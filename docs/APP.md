@@ -2,7 +2,7 @@ English · [Français](APP.fr.md)
 
 # The Siliconed app
 
-`Siliconed.app` generates images from a prompt, edits them by instruction, and keeps a queue and a history. It follows the system language (English, French, German, Spanish or Italian).
+`Siliconed.app` generates images from a prompt, edits them by instruction, and keeps a queue and a history. It follows the system language (English, French, German, Spanish, Italian or Japanese).
 
 ![The window: the rack on the left (prompt, text encoder, denoiser, decoder, each with its settings and time), a Krea 2 Turbo image at 1248×832 on the right — a laughing red-haired Irish woman running out of the surf, her surfboard under her arm, under a sunny sky —, the history below](images/window.jpg)
 

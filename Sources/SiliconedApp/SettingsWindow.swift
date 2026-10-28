@@ -16,8 +16,11 @@
 //     General     what an everyday user touches: the speed switch, the comparison, the library.
 //     Other Macs  lend this Mac, compute on another (`OtherMacsView.swift`).
 //     Advanced    kept out of the way: Command Line (silicontrol, linked into /usr/local/bin),
-//                 This Mac (the capacity map, measured only when asked), Developer Mode (the
-//                 solvers), Experimental (Named Subjects, Negative LoRA Strengths).
+//                 This Mac (the capacity map, measured only when asked), For Testing (Developer
+//                 Mode, Named Subjects, Negative LoRA Strengths: off by default, may change).
+//                 ┌ Command Line ─ [Install…]
+//                 ├ This Mac ───── [Measure This Mac…]
+//                 └ For Testing ── Developer Mode · Named Subjects · Negative LoRA Strengths
 //
 // - **Incognito**: an NSWindow of ours, as `MainWindow` — not SwiftUI's `Settings` scene, which would
 //   keep its frame; not restorable. What it sets are the app's preferences (`AppState`'s header), the
@@ -99,7 +102,7 @@ struct SettingsView: View {
         Form {
             Section {
                 Toggle(isOn: fasterRendering) {
-                    titled("Faster Rendering", "At 1024² and above, the first steps at half size: a quarter to a third faster, and a slightly different image. Not with a LoRA, Detail or an edit.")
+                    titled("Faster Rendering", "From 1024² up, the first steps at half size: faster, a slightly different image. Not with a LoRA, Detail or an edit.")
                 }
                 if let name = MainWindow.shared.carrier.mirror?.mirror?.macName {
                     Text("This is the setting of “\(name)”, the Mac that computes for you.").font(.caption)
@@ -110,7 +113,7 @@ struct SettingsView: View {
                     Text("Curtain").tag(true)
                     Text("Side by Side").tag(false)
                 } label: {
-                    titled("Comparison", "How two images are compared in the canvas; its toolbar switches too.")
+                    titled("Comparison", "Also switched from the canvas toolbar.")
                 }
                 .pickerStyle(.segmented)
             }
@@ -119,7 +122,7 @@ struct SettingsView: View {
                     Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([app.library.root]) }
                         .disabled(!app.libraryReachable)
                 } label: {
-                    titled("Models", "The models and LoRAs Siliconed installed. Remove a model from the Models window, not from the Finder.")
+                    titled("Models", "Where the installed models and LoRAs live. Remove them in the Models window, not the Finder.")
                 }
                 Text(verbatim: app.library.displayPath).font(.caption).textSelection(.enabled)
                 library
@@ -139,7 +142,7 @@ struct SettingsView: View {
                         command = SilicontrolCommand.state
                     }
                 } label: {
-                    titled("Command Line", "silicontrol drives this app from a terminal or a script — an AI agent can use it too: queue renders and explorations, read the queue and the history, save images. In a terminal: silicontrol help")
+                    titled("Command Line", "silicontrol drives this app from a terminal, a script or an AI agent. See: silicontrol help")
                 }
                 Group {
                     switch command {
@@ -157,7 +160,7 @@ struct SettingsView: View {
                         shown.openDiagnostic()
                     }
                 } label: {
-                    titled("This Mac", "About a minute, without any model: Siliconed measures this Mac before its first render and after each update, and chooses how it computes from it. Measured again here, it applies from the next launch.")
+                    titled("This Mac", "About a minute; done before the first render and after each update. A new measure applies from the next launch.")
                 }
                 if let name = shown.mirror?.macName {
                     Text("This measures “\(name)”, the Mac that computes for you.").font(.caption)
@@ -166,21 +169,18 @@ struct SettingsView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             Section {
+                Toggle(isOn: $app.developerMode) {
+                    titled("Developer Mode", "Adds the solvers Euler a, DPM++ 2M and UniPC, in the panel and as an exploration axis.")
+                }
                 Toggle(isOn: Binding(get: { app.subjects.enabled },
                                      set: { app.subjects.enabled = $0; if !$0 { app.referenceMode = .images } })) {
-                    titled("Named Subjects", "Name a person or a thing from a photo, then cite it as @name in an edit's instruction.")
+                    titled("Named Subjects", "Name a person or thing from a photo, cite it as @name in an edit.")
                 }
                 Toggle(isOn: $app.negativeLoRAStrengths) {
-                    titled("Negative LoRA Strengths", "LoRA sliders from −1.5 to 1.5. For « slider » LoRAs (age, detail…), trained to work both ways; on an ordinary LoRA, a negative strength mostly damages the image.")
+                    titled("Negative LoRA Strengths", "Sliders from −1.5 to 1.5, for « slider » LoRAs; an ordinary LoRA is damaged by a negative strength.")
                 }
             } header: {
-                titled("Experimental", "Unfinished: off by default, and may still change.")
-            }
-            Section {
-                Toggle(isOn: $app.developerMode) {
-                    titled("Developer Mode", "For comparing and testing, not for everyday renders. It shows:")
-                }
-                bullets(["the solvers Euler a, DPM++ 2M and UniPC beside Euler, in the panel and as an axis of the exploration"])
+                titled("For Testing", "To compare and try; off by default, may change.")
             }
         }
         .formStyle(.grouped)
@@ -230,17 +230,5 @@ struct SettingsView: View {
 
     private func explanation(_ text: LocalizedStringKey) -> some View {
         Text(text).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-    }
-
-    private func bullets(_ lines: [LocalizedStringKey]) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            ForEach(lines.indices, id: \.self) { i in
-                HStack(alignment: .firstTextBaseline, spacing: 6) {
-                    Text(verbatim: "•")
-                    Text(lines[i])
-                }
-            }
-        }
-        .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
     }
 }
