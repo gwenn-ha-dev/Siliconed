@@ -241,7 +241,7 @@ struct RackView: View {
         HStack(alignment: .firstTextBaseline, spacing: 10) {
             // The engine's settings come from this Mac's measure (`CapacityRules`): the title and its
             // chip open it, orange until it is taken — the first render waits for it — or while the one
-            // kept is provisional (taken off rest), a green chip once a current one is kept.
+            // kept is orange (incomplete, a route unjudged, its memory or its seconds beyond), a green chip once a green one is kept.
             let measured = app.mapMeasured
             Button { app.openDiagnostic() } label: {
                 HStack(spacing: 6) {

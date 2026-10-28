@@ -49,7 +49,8 @@ import Foundation
 ///     the seconds where the weight is.
 ///   - **The ANE keeps its favour**: an efficient route is taken as soon as it reaches 90 % of the best
 ///     speed (`efficientTolerance`) **and beats the simplest route** (today's rule: "where its pair beats the
-///     GPU alone and keeps 90 % of the AMX's speed"); its 10 % slack is not a loss either (`slack`). Among
+///     GPU alone and keeps 90 % of the AMX's speed"); its 10 % slack is not a loss either (`slack`) — against any
+///     rival, an efficient one too. Among
 ///     routes at a tie the simplest wins: a route must beat the one before it by `tie` (1 %).
 ///   - **The heat factor is a time multiplier per engine** (hot / cold, from witnesses; 1 when none). A
 ///     route runs at the speed of its slowest engine: the cuts are frozen in the map, and the engine that
@@ -152,6 +153,8 @@ package enum CapacityMeasure {
         package var hotRatios: [Double?]
         /// Probe runs spent on this class.
         package var runs: Int
+        /// The standard error of each route's log-ratio (`hotRatios` order, `nil`: not a candidate; 0 for the reference).
+        package var spread: [Double?] = []
     }
 
     package struct Plan: Sendable, Equatable {
@@ -233,10 +236,19 @@ package enum CapacityMeasure {
 
     // MARK: - Planning
 
-    package static func plan(classes: [ComputeClass], heat: Heat = Heat(), witness: Witness = Witness(),
-                             settings: Settings = Settings(), clock: Clock, probe: Probe) -> Plan {
+    ///
+    /// `finalHeat`: the regime the table is decided at. It is asked **once, when the allocation is over** (the end
+    /// witnesses can only be read then), and replaces `heat` for the decisions, the losses and the ratios of the plan:
+    /// the pairs were measured cold-to-warm, the table is for the regime of a render of several minutes. The seconds
+    /// it takes belong to the caller's reserve of the budget.
+    /// `extraWeight`: the weight of what the plan is not given (the classes under the cut), so that a loss is a
+    /// fraction of the whole render and not of the part decided here.
+    package static func plan(classes: [ComputeClass], heat startHeat: Heat = Heat(), witness: Witness = Witness(),
+                             settings: Settings = Settings(), extraWeight: Double = 0, finalHeat: (() -> Heat)? = nil,
+                             clock: Clock, probe: Probe) -> Plan {
         let start = clock.now()
-        let total = max(classes.map(\.weight).reduce(0, +), 1e-12)
+        var heat = startHeat
+        let total = max(classes.map(\.weight).reduce(0, +) + extraWeight, 1e-12)
         let weights = classes.map { $0.weight / total }
         let refs: [Int?] = classes.map { $0.routes.firstIndex(where: \.correct) }
         var pairs: [[Pair]] = classes.map { Array(repeating: Pair(), count: $0.routes.count) }
@@ -306,8 +318,10 @@ package enum CapacityMeasure {
 
         func pairLoss(_ c: Int, chosen: Int, rival r: Int) -> Double {
             let ec = estimate(c, chosen), er = estimate(c, r)
-            let slack = classes[c].routes[chosen].efficient && !classes[c].routes[r].efficient
-                ? log(1 / settings.efficientTolerance) : 0
+            // The rule takes the first efficient route within the tolerance of the best — another efficient one included: the ANE
+            // is kept against a three-engine route 5 % faster (the pair is the cooler of the two and the rule says so), so that gap
+            // is no loss. Counting it as one left such a class open for the whole budget (a simulated map: 805 runs on one class).
+            let slack = classes[c].routes[chosen].efficient ? log(1 / settings.efficientTolerance) : 0
             let sd = (ec.sd * ec.sd + er.sd * er.sd).squareRoot()
             return min(shortfall(mean: ec.mean - er.mean, sd: sd, slack: slack), 1)
         }
@@ -376,12 +390,14 @@ package enum CapacityMeasure {
             step(pick.c, pick.r)
         }
 
+        if let finalHeat { heat = finalHeat() }
         var decisions: [Decision] = []
         var residual = 0.0
         for (c, cls) in classes.enumerated() {
             guard let ref = refs[c] else {
                 decisions.append(Decision(classID: cls.id, chosen: nil, status: .none, loss: 0,
-                                          hotRatios: cls.routes.map { _ in nil }, runs: runs[c]))
+                                          hotRatios: cls.routes.map { _ in nil }, runs: runs[c],
+                                          spread: cls.routes.map { _ in nil }))
                 continue
             }
             let rule = choose(c) ?? ref
@@ -401,8 +417,9 @@ package enum CapacityMeasure {
                 candidates(c).contains(r) ? exp(estimate(c, r).mean) : nil
             }
             residual += loss
+            let spread: [Double?] = cls.routes.indices.map { r in candidates(c).contains(r) ? estimate(c, r).sd : nil }
             decisions.append(Decision(classID: cls.id, chosen: cls.routes[chosen].id, status: status, loss: loss,
-                                      hotRatios: ratios, runs: runs[c]))
+                                      hotRatios: ratios, runs: runs[c], spread: spread))
         }
         return Plan(decisions: decisions, residualLoss: residual, spent: clock.now() - start, exhausted: exhausted)
     }

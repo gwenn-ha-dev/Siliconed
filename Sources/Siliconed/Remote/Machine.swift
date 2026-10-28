@@ -9,15 +9,15 @@ import Foundation
 /// by its rank, a failure as a `RemoteRefusal`, what blocks a measure as a code — all said in the reader's language.
 
 /// **A capacity map as the other end needs it**: the day it was measured, and whether it still describes
-/// that Mac (`Diagnostic.Report.isCurrent`) and was taken at rest (`isProvisional`).
+/// that Mac (`Diagnostic.Report.isCurrent`) and is green (`isGreen`: complete, judged, within its memory and its seconds).
 package struct RemoteMap: Codable, Equatable, Sendable {
     package var date: String
     package var current: Bool
-    package var provisional: Bool
-    package init(date: String, current: Bool, provisional: Bool) {
-        self.date = date; self.current = current; self.provisional = provisional
+    package var green: Bool
+    package init(date: String, current: Bool, green: Bool) {
+        self.date = date; self.current = current; self.green = green
     }
-    package init(_ r: Diagnostic.Report) { self.init(date: r.date, current: r.isCurrent, provisional: r.isProvisional) }
+    package init(_ r: Diagnostic.Report) { self.init(date: r.date, current: r.isCurrent, green: r.isGreen) }
 }
 
 /// Why the lender cannot measure now (`AppState.diagnosticBlocker`), as a code.
@@ -45,7 +45,7 @@ package struct RemoteMachine: Codable, Equatable, Sendable {
     /// The map kept in the preferences, and the one this session's settings were read with.
     package var stored: RemoteMap?
     package var inUse: RemoteMap?
-    /// The kept map is provisional and the lender is at rest: it is measured again before the next render.
+    /// The kept map is orange and the lender is at rest: it is measured again before the next render.
     package var remeasuring: Bool
     /// `AppState.profileWarnings`, as the engine words them (the borrower says them in its language).
     package var warnings: [String]
@@ -61,8 +61,8 @@ package struct RemoteMachine: Codable, Equatable, Sendable {
         self.diagnostic = diagnostic; self.blocker = blocker
     }
 
-    /// The map is made, current and taken at rest: the chip of « Chain » is green, as on the lender.
-    package var measured: Bool { stored.map { $0.current && !$0.provisional } == true }
+    /// The map is made, current and green: the chip of « Chain » is green, as on the lender.
+    package var measured: Bool { stored.map { $0.current && $0.green } == true }
 
     /// What the menu keeps from one session to the next: all but the diagnostic, whose report is big
     /// and whose phase is the session's.

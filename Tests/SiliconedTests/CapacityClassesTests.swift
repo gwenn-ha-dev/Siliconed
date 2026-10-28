@@ -440,11 +440,14 @@ final class CapacityClassesTests: XCTestCase {
     func testAPlanThatInterpolatesAndUnifiesInOneInit() {
         let routes = [CM.Route("gpu"), CM.Route("gpu+ane", efficient: true, engines: ["gpu", "ane"])]
         let lo = product(3840, 10240, 1024), hi = product(3840, 10240, 4096)
-        let p = plan([decision(lo, "gpu", [1, 1.3]), decision(hi, "gpu+ane", [1, 0.7])])
+        // The classes are int8's: their ids say so (`~int8`), and only a decision of the same kind is a neighbour.
+        func int8(_ d: CM.Decision) -> CM.Decision { var d = d; d.classID += "~int8"; return d }
+        func int8(_ c: CM.ComputeClass) -> CM.ComputeClass { CM.ComputeClass(c.id + "~int8", weight: c.weight, routes: c.routes) }
+        let p = plan([int8(decision(lo, "gpu", [1, 1.3])), int8(decision(hi, "gpu+ane", [1, 0.7]))])
         var base = RouteTable()
         base.products.weights = [.init(kind: .int8, path: .native, minRows: 2048)]
         let cs = int8Classes(rowsAndCounts: [(1056, 3), (2048, 1), (4128, 5)])
-        let table = RouteTable(plan: p, classes: [computeClass(lo, routes), computeClass(hi, routes)], base: base, renderClasses: cs)
+        let table = RouteTable(plan: p, classes: [int8(computeClass(lo, routes)), int8(computeClass(hi, routes))], base: base, renderClasses: cs)
         XCTAssertEqual(table.products.forced(k: 3840, n: 10240, m: 2048), .ane)
         XCTAssertEqual(table.products.forced(k: 3840, n: 10240, m: 1056), .gpu)
         XCTAssertTrue(table.weightPathConflicts(for: cs).isEmpty)

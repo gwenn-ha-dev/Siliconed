@@ -361,9 +361,114 @@ extension Diagnostic {
         package var need: [String: Int]
         package var peak: [String: Int]
 
-        package init(plan: Plan, peaks: [String: Int]) {
+        package init(plan: Plan, peaks: [String: Int], aneBatches: Int? = nil) {
             budget = plan.budget; base = plan.base; need = plan.need.steps; peak = peaks
-            aneBatches = Diagnostic.aneBatches(allotment: plan.aneAllotment).count
+            self.aneBatches = aneBatches ?? Diagnostic.aneBatches(allotment: plan.aneAllotment).count
+        }
+
+        /// **The memory held**: every step's peak under `base + need`, and the largest of them under B.
+        package var held: Bool {
+            peak.allSatisfy { step, bytes in bytes <= base + (need[step] ?? 0) } && base + (need.values.max() ?? 0) <= budget
+        }
+    }
+
+
+    // ── the map of schema 13: classes, regime, verdict ───────────────────────────────────────
+
+    /// **One class of the map, as the report keeps it**: what it computes, its weight, the route chosen, the
+    /// loss that stays on it (a fraction of the render), the pairs spent on it and, per route that was a candidate, its
+    /// hot-time ratio to the reference and the log standard error of that ratio. One line of a JSON array, the ids
+    /// being the bytes of the issue link: `[id, weight, chosen, loss, runs, status, [[route, ratio, error], …]]`.
+    package struct MapClass: Codable, Sendable, Equatable {
+        package var id: String
+        package var weight: Double
+        package var chosen: String?
+        package var loss: Double
+        package var runs: Int
+        package var status: CapacityMeasure.Status
+        package var timings: [Timing]
+
+        package struct Timing: Codable, Sendable, Equatable {
+            package var route: String
+            package var ratio: Double
+            package var error: Double
+            package init(route: String, ratio: Double, error: Double) {
+                self.route = route; self.ratio = Diagnostic.significant(ratio, 3); self.error = Diagnostic.significant(error, 2)
+            }
+            package init(from decoder: any Decoder) throws {
+                var c = try decoder.unkeyedContainer()
+                route = try c.decode(String.self); ratio = try c.decode(Double.self); error = try c.decode(Double.self)
+            }
+            package func encode(to encoder: any Encoder) throws {
+                var c = encoder.unkeyedContainer()
+                try c.encode(route); try c.encode(Diagnostic.significant(ratio, 3)); try c.encode(Diagnostic.significant(error, 2))
+            }
+        }
+
+        package init(id: String, weight: Double, chosen: String?, loss: Double, runs: Int, status: CapacityMeasure.Status, timings: [Timing]) {
+            self.id = id; self.weight = Diagnostic.significant(weight, 3); self.chosen = chosen
+            self.loss = Diagnostic.significant(loss, 2); self.runs = runs; self.status = status
+            self.timings = timings
+        }
+
+        private static let letters: [CapacityMeasure.Status: String] = [.closed: "c", .open: "o", .unmeasured: "u", .none: "n"]
+        package init(from decoder: any Decoder) throws {
+            var c = try decoder.unkeyedContainer()
+            id = try c.decode(String.self); weight = try c.decode(Double.self); chosen = try c.decode(String?.self)
+            loss = try c.decode(Double.self); runs = try c.decode(Int.self)
+            let letter = try c.decode(String.self)
+            guard let s = Self.letters.first(where: { $0.value == letter })?.key else {
+                throw DecodingError.dataCorruptedError(in: c, debugDescription: "unknown status « \(letter) »")
+            }
+            status = s
+            timings = try c.decode([Timing].self)
+        }
+        package func encode(to encoder: any Encoder) throws {
+            var c = encoder.unkeyedContainer()
+            try c.encode(id); try c.encode(Diagnostic.significant(weight, 3)); try c.encode(chosen)
+            try c.encode(Diagnostic.significant(loss, 2)); try c.encode(runs); try c.encode(Self.letters[status]!)
+            try c.encode(timings)
+        }
+    }
+
+    /// **What the plan spent and what it leaves**: the classes, the residual loss against ε (fractions of the render), the
+    /// seconds of the plan against its budget, the share of the catalogue under the cut, the seconds of exactness checks,
+    /// and the routes judged wrong (`class route`) — excluded from their class only.
+    package struct MapResult: Codable, Sendable, Equatable {
+        package var classes: [MapClass]
+        package var residualLoss: Double
+        package var epsilon: Double
+        package var spent: Double
+        package var budget: Double
+        package var exhausted: Bool
+        package var tail: Double
+        package var judged: Double
+        package var wrong: [String]
+        /// The families the map decided for (`Family.rawValue`): a map made for the models installed does not speak of the others.
+        package var families: [String]
+
+        package init(classes: [MapClass], residualLoss: Double, epsilon: Double, spent: Double, budget: Double, exhausted: Bool,
+                     tail: Double, judged: Double, wrong: [String], families: [String] = []) {
+            self.families = families
+            self.classes = classes
+            self.residualLoss = Diagnostic.significant(residualLoss, 3); self.epsilon = epsilon
+            self.spent = Diagnostic.significant(spent, 3); self.budget = Diagnostic.significant(budget, 3)
+            self.exhausted = exhausted; self.tail = Diagnostic.significant(tail, 2)
+            self.judged = Diagnostic.significant(judged, 2); self.wrong = wrong
+        }
+    }
+
+    /// **The regime the table was decided at**: each engine's witness at the start and at the end of the map, and the
+    /// heat factor that came out of it (1 when inside the witness's own noise). Facts, not verdicts.
+    package struct Regime: Codable, Sendable, Equatable {
+        package var witnesses: [CapacityMap.EngineWitness]
+        package var heat: [String: Double]
+        package init(witnesses: [CapacityMap.EngineWitness]) {
+            self.witnesses = witnesses.map {
+                CapacityMap.EngineWitness(engine: $0.engine, before: Diagnostic.significant($0.before, 4), after: Diagnostic.significant($0.after, 4),
+                                          errorBefore: Diagnostic.significant($0.errorBefore, 2), errorAfter: Diagnostic.significant($0.errorAfter, 2))
+            }
+            heat = CapacityMap.heat(witnesses).factors.mapValues { Diagnostic.significant($0, 4) }
         }
     }
 
@@ -403,13 +508,22 @@ extension Diagnostic {
         /// it; `nil` in a report that predates it. The engine never reads this field: it applies the
         /// rules to the measures again (`EngineSettings.load(from:map:)`).
         package var decisions: Decisions?
+        /// **The route table this map made** (schema 13): what the engine reads (`EngineSettings.load(from:map:)`).
+        package var routes: RouteTable?
+        /// The classes it decided, the loss that stays, the seconds it spent (schema 13).
+        package var map: MapResult?
+        /// The regime it was decided at (schema 13).
+        package var regime: Regime?
+        /// Green or orange, and why (schema 13, `CapacityMap.Verdict`).
+        package var verdict: CapacityMap.Verdict?
 
         package init(schema: Int = Diagnostic.schema, date: String, seconds: Double, machine: Machine,
                     cpuFeatures: [String: Int], settings: [String: String] = [:], before: Conditions, after: Conditions,
                     products: [Product], lowPrecision: [LowPrecision], attention: [AttentionCapacity],
                     widening: [Widening], witness: Witness, thresholds: Thresholds = Thresholds(),
                     stages: [String: Double]? = nil, cuts: [Cut]? = nil, aneCuts: [Cut]? = nil,
-                    memory: Memory? = nil) {
+                    memory: Memory? = nil, routes: RouteTable? = nil, map: MapResult? = nil, regime: Regime? = nil,
+                    verdict: CapacityMap.Verdict? = nil) {
             self.schema = schema; self.date = date; self.seconds = Diagnostic.significant(seconds, 3)
             self.thresholds = thresholds
             self.machine = machine; self.cpuFeatures = cpuFeatures; self.settings = settings
@@ -417,8 +531,10 @@ extension Diagnostic {
             self.attention = attention; self.widening = widening; self.witness = witness; self.cuts = cuts
             self.aneCuts = aneCuts; self.memory = memory
             self.stages = stages?.mapValues { Diagnostic.significant($0, 3) }
-            self.decisions = Diagnostic.decide(products: products, attention: attention, widening: widening, witness: witness,
-                                               cuts: cuts ?? [], aneCuts: aneCuts ?? [])
+            self.routes = routes; self.map = map; self.regime = regime; self.verdict = verdict
+            // A map of schema 13 decides by its classes; the rules of `CapacityRules.swift` are for the older reports.
+            self.decisions = map != nil ? nil : Diagnostic.decide(products: products, attention: attention, widening: widening,
+                                                                  witness: witness, cuts: cuts ?? [], aneCuts: aneCuts ?? [])
         }
 
         /// What the report is valid for: the machine and the binary that measured it.
@@ -427,13 +543,16 @@ extension Diagnostic {
         /// handing it to `EngineSettings.load(from:map:)`; when it does not, the app offers to measure again.
         package var isCurrent: Bool { schema == Diagnostic.schema && fingerprint == .current }
 
-        /// **Taken on a machine that was not at rest**: warm or in Low Power Mode before or after, or swap
-        /// growing over the measure — another process pressing on memory (a Mac mini M4, 20/10/2026: swap
-        /// 6.74 → 6.83 GB, MPSGraph's attention at ~1 TFLOP/s, half its sibling's). Such a map still
-        /// serves — refusing a render on it would be worse —, and the app measures again at its next
-        /// launch at rest.
-        package var isProvisional: Bool {
-            !before.isNominal || !after.isNominal || after.swapUsedBytes > before.swapUsedBytes
+        /// **The map is green (M6)**: complete, every route it uses judged right, its peak under its need under B, its seconds
+        /// in the budget. Not a question of the hour — heat, the battery, Low Power Mode and another process's swap are
+        /// facts of the regime (`before`, `after`, `regime`), and the pairs measure through them. A report of an
+        /// older schema is never green: it is not read (`isCurrent`).
+        package var isGreen: Bool { verdict?.green == true }
+
+        /// **The map speaks of these families** (it was made for them, or for more). An app that installs a model of a family the
+        /// map did not decide for measures again.
+        package func covers(_ families: Set<String>) -> Bool {
+            map.map { Set($0.families).isSuperset(of: families) } ?? false
         }
 
         /// Every measure of the report, in its order.
@@ -444,7 +563,7 @@ extension Diagnostic {
                 + widening.map(\.cpu)
         }
         /// Every engine that ran computed right.
-        package var passes: Bool { measures.allSatisfy(\.pass) }
+        package var passes: Bool { measures.allSatisfy(\.pass) && map?.wrong.isEmpty != false }
 
         /// **Stable JSON**: sorted keys, so two reports diff line by line. `pretty: false` for the
         /// issue URL, where every byte counts.
@@ -474,6 +593,16 @@ extension Diagnostic {
             // the link's bytes are counted.
             var measures = self
             measures.decisions = nil
+            // The table is what the classes' timings and the grids' shares make: the link keeps the timings.
+            measures.routes = nil
+            // …and the heaviest classes, each with the chosen route's ratio and dispersion: the rest is in the JSON the app keeps and
+            // the clipboard (`includingReport: false`), the link's bytes are counted.
+            if var map = measures.map {
+                map.classes = map.classes.prefix(Diagnostic.linkClasses).map { c in
+                    var c = c; c.timings = c.timings.filter { $0.route == c.chosen }; return c
+                }
+                measures.map = map
+            }
             if includingReport { fields.append(("report", String(decoding: try measures.json(pretty: false), as: UTF8.self))) }
             return Diagnostic.issueURL(fields: fields)
         }
@@ -492,6 +621,9 @@ extension Diagnostic {
         }.joined(separator: "&")
         return URL(string: "\(repository)/issues/new?\(query)")!
     }
+
+    /// The classes of a map the link to an issue keeps (the heaviest).
+    package static let linkClasses = 24
 
     /// `x` to `digits` significant digits, so the JSON says `3.312`, not `3.3123456789012`; a
     /// non-finite value becomes the largest finite double (JSON has no infinity).

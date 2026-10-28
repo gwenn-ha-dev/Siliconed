@@ -241,6 +241,9 @@ package final class WeightProducts {
     /// `minimumRows`.
     private func amxColumns(k: Int, n: Int, m: Int) -> Int {
         guard n >= 128, let conductor = gemm.conductor, m >= Conductor.minimumRows else { return 0 }
+        // A class the table keeps off the AMX (`gpu/int8`, or any engines but the AMX's) is the GPU's whole.
+        if let forced = gemm.routes.products.forced(k: k, n: n, m: m, aneBroughtUp: gemm.neuralEngine != nil),
+           forced != .amx, forced != .aneAMX { return 0 }
         let T = int8Share?(k, n, m) ?? conductor.shares.share(k: k, n: n, m: m) ?? conductor.initialFraction
         guard T < 1 else { return 0 }
         return Self.amxColumns(n: n, share: T)

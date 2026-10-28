@@ -230,6 +230,9 @@ package struct EngineSettings: Sendable {
     package private(set) var mapRead: String? = nil
     /// What the rules made of it.
     package private(set) var mapDecisions: Diagnostic.Decisions? = nil
+    /// **The route table of a map of schema 13**: the table the engine runs under, the settings that were forced (profile,
+    /// environment) rewriting their part of it (`finalRoutes`). `nil`: the table is the switches' (`RouteTable(settings:)`).
+    private var mapRoutes: RouteTable? = nil
     /// **What the reading refused** — a profile from another machine, a setting a profile is not
     /// allowed to write. The library writes nothing to standard error: the caller displays them
     /// (the CLI at startup, an app wherever it likes).
@@ -375,10 +378,14 @@ package struct EngineSettings: Sendable {
         // ── the capacity map, if an app designated one and it is this machine's, this build's ────────
         if let map = EngineSettings.designated.withLock({ $0.map }) {
             if map.isCurrent {
-                let decisions = Diagnostic.decide(map)
                 mapRead = map.date
-                mapDecisions = decisions
-                apply(decisions.settings, .map)
+                if let table = map.routes {
+                    adopt(table)
+                } else {
+                    let decisions = Diagnostic.decide(map)
+                    mapDecisions = decisions
+                    apply(decisions.settings, .map)
+                }
             } else {
                 warnings.append("⚠ the capacity map of \(map.date) was measured on \(map.fingerprint), this is "
                                 + "\(Diagnostic.Fingerprint.current) — map ignored, the defaults apply.")
@@ -439,16 +446,47 @@ package struct EngineSettings: Sendable {
         apply(fromEnv, .environment)
 
         if let refusal { warnings.insert(refusal, at: 0) }
-        routes = RouteTable(settings: self)
+        routes = finalRoutes()
+    }
+
+    /// **A map of schema 13 read**: its table, and the switches the rest of the engine still reads (`amx`, `gemm_ane`,
+    /// `flash`…) set to what the table brings up, so that nothing reads a switch that contradicts the table.
+    private mutating func adopt(_ table: RouteTable) {
+        mapRoutes = table
+        let p = table.products
+        let flat: [(String, Bool)] = [("amx", p.usesAMX), ("gemm_ane", p.usesANE), ("gemm_tensor", p.usesBF16Weights),
+                                      ("gemm_int8", p.usesInt8Weights), ("gemm_q8", p.usesQ8Weights),
+                                      ("gemm_bf16_act", p.roundsActivations), ("flash", table.attention.usesFlash),
+                                      ("head_split", table.attention.usesHeadSplit)]
+        apply(Dictionary(uniqueKeysWithValues: flat.map { ($0.0, $0.1 as Any) }), .map)
+    }
+
+    /// **The table the engine runs under**: the map's (schema 13), with each setting forced by a profile or the environment
+    /// rewriting its part — the switches and grids of `RouteTable(settings:)` replace the map's AMX, ANE, weight rules or
+    /// attention rules; without a map, or with an older one, the switches' table alone.
+    private func finalRoutes() -> RouteTable {
+        guard var table = mapRoutes else { return RouteTable(settings: self) }
+        let forced = Set(provenance.filter { $0.value == .profile || $0.value == .environment }.keys)
+        guard !forced.isEmpty else { return table }
+        let flat = RouteTable(settings: self)
+        func touches(_ keys: [String]) -> Bool { !forced.isDisjoint(with: keys) }
+        if touches(["amx", "amx_fraction", "amx_shares"]) { table.products.amx = flat.products.amx }
+        if touches(["gemm_ane", "ane_fraction", "ane_min", "ane_shares", "ane_amx"]) { table.products.ane = flat.products.ane }
+        if touches(["gemm_tensor", "gemm_int8", "gemm_q8", "gemm_bf16_act", "bf16_act_min", "bf16_act_8bit"]) {
+            table.products.weights = flat.products.weights
+        }
+        if touches(["flash", "head_split", "head_split_fraction"]) { table.attention = flat.attention }
+        return table
     }
 
     /// **Settings from values alone** — the defaults, then `values` as a map's decisions write them
     /// (`Decisions.settings`): no environment, no profile, no process-wide state. What the pure tests and
     /// `RouteTable(decisions:)` read.
-    package init(applying values: [String: Any]) {
+    package init(applying values: [String: Any], map: Diagnostic.Report? = nil) {
         machine = Machine.detected()
+        if let table = map?.routes { adopt(table) }
         apply(values, .map)
-        routes = RouteTable(settings: self)
+        routes = finalRoutes()
     }
 
     /// **A flag is read by its presence, and taken down with `=0`.** Historically the engine

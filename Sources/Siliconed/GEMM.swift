@@ -273,7 +273,7 @@ package final class GEMM {
         // alone, never a half-computed output.
         // A class the table forces to one set of engines (`RouteTable.ClassRule`) is ahead of the grids the
         // engines hold.
-        let forced = routes.products.forced(k: k, n: n, m: m)
+        let forced = routes.products.forced(k: k, n: n, m: m, aneBroughtUp: neuralEngine != nil)
         let aneAllowed = forced == nil || forced == .ane || forced == .aneAMX
         let amxAllowed = forced == nil || forced == .amx || forced == .aneAMX
         if aneAllowed, let ane = neuralEngine, weightIsTransposed, case let rows = ane.rows(m, k: k, n: n), rows > 0, ane.accepts(rows: rows, k: k, n: n) {

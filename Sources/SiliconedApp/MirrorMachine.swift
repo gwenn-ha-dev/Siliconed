@@ -47,7 +47,7 @@ final class MachinePublisher {
         return RemoteMachine(
             chip: machine.chip, memoryBytes: machine.memoryBytes, ceiling: app.memoryCeiling, ready: app.readySet.sorted(),
             stored: app.storedMap.map(RemoteMap.init), inUse: app.mapInUse.map(RemoteMap.init),
-            remeasuring: app.remeasuringProvisional, warnings: app.profileWarnings, diagnostic: phase,
+            remeasuring: app.remeasuringOrange, warnings: app.profileWarnings, diagnostic: phase,
             blocker: app.diagnosticBlock)
     }
 
@@ -124,11 +124,11 @@ extension AppState {
         if mirror != nil {
             return MapFacts(inUse: mirrorMachine?.inUse, stored: mirrorMachine?.stored, remeasuring: mirrorMachine?.remeasuring ?? false)
         }
-        return MapFacts(inUse: mapInUse.map(RemoteMap.init), stored: storedMap.map(RemoteMap.init), remeasuring: remeasuringProvisional)
+        return MapFacts(inUse: mapInUse.map(RemoteMap.init), stored: storedMap.map(RemoteMap.init), remeasuring: remeasuringOrange)
     }
 
     /// A current map taken at rest is kept (the chip of « Chain » is green).
-    var mapMeasured: Bool { mapFacts.stored.map { $0.current && !$0.provisional } == true }
+    var mapMeasured: Bool { mapFacts.stored.map { $0.current && $0.green } == true }
 
     /// This report is the map the settings were read with.
     func inUse(_ report: Diagnostic.Report) -> Bool {

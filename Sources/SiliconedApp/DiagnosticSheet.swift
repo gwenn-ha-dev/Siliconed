@@ -52,7 +52,7 @@ struct DiagnosticSheet: View {
 
     private var ready: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Matrix products, attention and weight widening, on the GPU and on the CPU, each checked against the exact result. No model is needed, nothing is downloaded. About a minute; the queue waits meanwhile.")
+            Text("Matrix products and attention on the GPU, the AMX and the Neural Engine, each route checked against the exact result, and the table of routes this Mac renders with. No model is needed, nothing is downloaded. About a minute; the queue waits meanwhile.")
                 .font(.callout)
                 .fixedSize(horizontal: false, vertical: true)
             mapStatus
@@ -75,15 +75,15 @@ struct DiagnosticSheet: View {
     static func mapStatus(_ app: AppState) -> LocalizedStringKey {
         let map = app.mapFacts
         if let used = map.inUse {
-            if used == map.stored, used.provisional {
-                return "This session uses the measure of \(day(used.date)), taken while the Mac was warm, in Low Power Mode or short of memory: it is measured again at its next launch at rest."
+            if used == map.stored, !used.green {
+                return "This session uses the measure of \(day(used.date)), which was not complete (its minute, its memory or a route judged wrong): it is measured again at its next launch at rest."
             }
             return used == map.stored
                 ? "This session uses the choices of this Mac's measure of \(day(used.date))."
                 : "This session uses the measure of \(day(used.date)); the newer one applies from the next launch."
         }
         if map.remeasuring, let stored = map.stored {
-            return "The measure of \(day(stored.date)) was taken while the Mac was not at rest: it is measured again before the next render."
+            return "The measure of \(day(stored.date)) was not complete (its minute, its memory or a route judged wrong): it is measured again before the next render."
         }
         if let stored = map.stored, !stored.current {
             return "The measure of \(day(stored.date)) was taken with another macOS or another version of Siliconed: this Mac is measured again before the next render."
@@ -161,6 +161,18 @@ private struct ReportView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 machine
+                if let map = report.map { routes(map) }
+                if report.map == nil { legacyMeasures }
+                if let d = report.decisions { decisions(d) }
+                Text("\(Figures.duration(report.seconds)) in all")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            .padding(20)
+        }
+    }
+
+    /// The measures of a report before schema 13: one line per capacity.
+    @ViewBuilder private var legacyMeasures: some View {
                 Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 5) {
                     let products = report.products
                     row("Matrix products, GPU", products.map(\.gpu), unit: "TFLOP/s")
@@ -182,11 +194,30 @@ private struct ReportView: View {
                 }
                 .font(.callout)
                 .textSelection(.enabled)
-                if let d = report.decisions { decisions(d) }
-                Text("\(Figures.duration(report.seconds)) in all")
+    }
+
+    /// **What the map decided** (schema 13): the share of a render each route takes — GPU alone, with the AMX, the Neural
+    /// Engine, the three, the weight read as published, the attention kernels —, then whether it is complete.
+    @ViewBuilder private func routes(_ map: Diagnostic.MapResult) -> some View {
+        let shares = Dictionary(map.classes.compactMap { c in c.chosen.map { ($0, c.weight) } }, uniquingKeysWith: +)
+        let covered = 1 - map.tail
+        VStack(alignment: .leading, spacing: 6) {
+            Text("What this Mac uses").font(.headline)
+            Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 5) {
+                ForEach(shares.sorted { ($1.value, $0.key) < ($0.value, $1.key) }, id: \.key) { route, weight in
+                    GridRow {
+                        Text(verbatim: route).foregroundStyle(.secondary)
+                        Text(verbatim: String(format: "%.0f %%", 100 * weight / max(covered, 1e-9))).monospacedDigit()
+                    }
+                }
+            }
+            .font(.callout)
+            .textSelection(.enabled)
+            if let verdict = report.verdict {
+                Text(verdict.green ? "The measure is complete."
+                     : "The measure is not complete: \(verdict.reasons.joined(separator: ", ")).")
                     .font(.caption).foregroundStyle(.secondary)
             }
-            .padding(20)
         }
     }
 

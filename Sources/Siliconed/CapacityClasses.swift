@@ -392,9 +392,9 @@ package enum CapacityClasses {
     package static let attentionRoutes = ["graph", "flash", "split"]
 
     /// The engines a route keeps busy (the keys of `CapacityMeasure.Heat.factors`): `gpu+ane+amx` → gpu, ane, amx;
-    /// `split` → gpu, cpu (the heads' share on the CPU).
+    /// `split` → gpu, cpu (the heads' share on the CPU); the weight's form after a `/` (`gpu+amx/int8`) is no engine.
     package static func engines(ofRoute id: String) -> [String] {
-        id == "split" ? ["gpu", "cpu"] : id.split(separator: "+").map(String.init)
+        id == "split" ? ["gpu", "cpu"] : id.split(separator: "/")[0].split(separator: "+").map(String.init)
     }
 
     /// **Cold rates, FLOP per second, by route**: a default per route and kind of class, and the figures measured

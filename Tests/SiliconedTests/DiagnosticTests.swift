@@ -62,26 +62,17 @@ final class DiagnosticTests: XCTestCase {
 
     // ── off rest ────────────────────────────────────────────────────────────────────────────
 
-    /// A map is provisional when the machine was warm or in Low Power Mode at either end, or its swap grew
-    /// over the measure; the battery alone, a swap already there and unchanged, or one that shrank, are not.
-    func testProvisionalOffRestOnly() {
+    /// A map's conditions are facts of its regime, never a reason for it to be orange (`Report.isGreen`, `CapacityMapTests`):
+    /// `isNominal` only says what the machine was doing.
+    func testConditionsAreFactsOfTheRegime() {
         func conditions(_ thermal: String = "nominal", lowPower: Bool = false, battery: Bool? = nil, swap: Int = 0) -> Diagnostic.Conditions {
             Diagnostic.Conditions(thermal: thermal, lowPowerMode: lowPower, onBattery: battery, swapUsedBytes: swap)
         }
-        func provisional(_ before: Diagnostic.Conditions, _ after: Diagnostic.Conditions) -> Bool {
-            var r = sample(); r.before = before; r.after = after
-            return r.isProvisional
-        }
-        XCTAssertFalse(sample().isProvisional)
-        XCTAssertFalse(provisional(conditions(battery: true), conditions(battery: true)))
-        XCTAssertFalse(provisional(conditions(swap: 2_900_000), conditions(swap: 2_900_000)))   // M5 Pro, 20/10
-        XCTAssertFalse(provisional(conditions(swap: 7_000_000_000), conditions(swap: 6_000_000_000)))
-        XCTAssertTrue(provisional(conditions(swap: 6_740_000_000), conditions(swap: 6_830_000_000)))   // Mac mini M4, 20/10
-        XCTAssertTrue(provisional(conditions(), conditions("fair")))
-        XCTAssertTrue(provisional(conditions("serious"), conditions()))
-        XCTAssertTrue(provisional(conditions(lowPower: true), conditions()))
+        var warm = sample(); warm.before = conditions(); warm.after = conditions("serious", lowPower: true, swap: 7_000_000_000)
+        XCTAssertFalse(warm.isGreen, "a legacy report holds no verdict")
         XCTAssertTrue(conditions(battery: true).isNominal)
         XCTAssertFalse(conditions("fair").isNominal)
+        XCTAssertFalse(conditions(lowPower: true).isNominal)
     }
 
     // ── the JSON ────────────────────────────────────────────────────────────────────────────
@@ -96,8 +87,8 @@ final class DiagnosticTests: XCTestCase {
         // Sorted keys: `attention` before `machine` before `products` before `schema` before `widening`.
         let order = ["\"attention\"", "\"machine\"", "\"products\"", "\"schema\"", "\"widening\""].map { text.range(of: $0)!.lowerBound }
         XCTAssertEqual(order, order.sorted())
-        XCTAssertTrue(text.contains("\"schema\" : 12"))
-        XCTAssertEqual(Diagnostic.schema, 12)
+        XCTAssertTrue(text.contains("\"schema\" : 13"))
+        XCTAssertEqual(Diagnostic.schema, 13)
         XCTAssertEqual(String(decoding: try JSONEncoder().encode(Diagnostic.Cut(k: 16384, n: 6144, m: 4096, share: 0.68764)), as: UTF8.self),
                        "[16384,6144,4096,0.688]", "a cut is a quadruple, its share rounded")
     }

@@ -256,6 +256,13 @@ extension Diagnostic {
                     .map { Arena.capacity(for: max(1, $0)) }.reduce(0, +)
             }
         }
+        /// **The operands of the capacity map's classes** (`CapacityMap.Entry`) and of the witnesses: the largest of each.
+        static func sizes(products: [(m: Int, k: Int, n: Int, kind: RouteTable.WeightKind)]) -> Sizes {
+            let eightBit = products.filter { $0.kind != .bf16 }
+            return Sizes(aFloats: products.map { $0.m * $0.k }.max() ?? 1, bFloats: products.map { $0.k * $0.n }.max() ?? 1,
+                         cFloats: products.map { $0.m * $0.n }.max() ?? 1, qValues: max(1, eightBit.map { $0.k * $0.n }.max() ?? 1),
+                         scaleCount: max(1, eightBit.map { ($0.k + Diagnostic.q8Block - 1) / Diagnostic.q8Block * $0.n }.max() ?? 1))
+        }
         static var sizes: Sizes {
             let m = Diagnostic.heights.max()!
             let shapes = Diagnostic.shapes.map { (m: $0.m, k: $0.k, n: $0.n) }
@@ -264,8 +271,7 @@ extension Diagnostic {
                          cFloats: shapes.map { $0.m * $0.n }.max()!, qValues: Diagnostic.shapes.map { $0.k * $0.n }.max()!,
                          scaleCount: Diagnostic.shapes.map { ($0.k + q8Block - 1) / q8Block * $0.n }.max()!)
         }
-        init() {
-            let size = Operands.sizes
+        init(_ size: Sizes = Operands.sizes) {
             let (aFloats, bFloats) = (size.aFloats, size.bFloats)
             a = Pages(bytes: aFloats * 4); b = Pages(bytes: bFloats * 4); bf16 = Pages(bytes: bFloats * 2)
             c = Pages(bytes: size.cFloats * 4)

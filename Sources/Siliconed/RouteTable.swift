@@ -130,9 +130,15 @@ package struct RouteTable: Codable, Sendable, Equatable {
         package var n: Int?
         package var minRows = 0
         package var maxRows: Int?
+        /// What the class takes in a process that did not bring the ANE up (a model that keeps it off: the Standard's
+        /// products are bf16, the ANE computes in fp16): the best route of the map **without** the ANE's. `nil`: the
+        /// engines named above, whatever the process holds.
+        package var withoutANE: Engines?
 
-        package init(engines: Engines, k: Int? = nil, n: Int? = nil, minRows: Int = 0, maxRows: Int? = nil) {
+        package init(engines: Engines, k: Int? = nil, n: Int? = nil, minRows: Int = 0, maxRows: Int? = nil,
+                     withoutANE: Engines? = nil) {
             self.engines = engines; self.k = k; self.n = n; self.minRows = minRows; self.maxRows = maxRows
+            self.withoutANE = withoutANE
         }
 
         func matches(k: Int, n: Int, m: Int) -> Bool {
@@ -234,8 +240,10 @@ package struct RouteTable: Codable, Sendable, Equatable {
         /// **The engines a class rule forces on a product**, `nil` when none matches (the grids decide). What
         /// `GEMM.linear` asks at every product; the engine instances (a conductor, a `NeuralEngine`) hold the
         /// grids, built from this table and moved by the diagnostic, which measures at shares of its own.
-        package func forced(k: Int, n: Int, m: Int) -> Engines? {
-            classes.first(where: { $0.matches(k: k, n: n, m: m) })?.engines
+        package func forced(k: Int, n: Int, m: Int, aneBroughtUp: Bool = true) -> Engines? {
+            guard let rule = classes.first(where: { $0.matches(k: k, n: n, m: m) }) else { return nil }
+            if !aneBroughtUp, rule.engines == .ane || rule.engines == .aneAMX { return rule.withoutANE ?? .amx }
+            return rule.engines
         }
 
         /// **The engines of a product `k × n` at `m` rows**, resolved from the table alone: a class rule if one
@@ -358,7 +366,19 @@ package struct RouteTable: Codable, Sendable, Equatable {
             }
         }
 
+        /// The id's tail for a weight kind: none for bf16 (the Standard's, and the K-quants' that widen), `~int8`, `~q8`.
+        package static func suffix(_ kind: WeightKind) -> String { kind == .bf16 ? "" : "~" + kind.rawValue }
+
+        /// A plan's class id: the key and the weight kind (`bf16` when the id says none).
+        package static func parse(_ id: String) -> (key: ClassKey, kind: WeightKind)? {
+            let halves = id.split(separator: "~", maxSplits: 1).map(String.init)
+            guard let key = ClassKey(id: halves[0]) else { return nil }
+            guard halves.count == 2 else { return (key, .bf16) }
+            return WeightKind(rawValue: halves[1]).map { (key, $0) }
+        }
+
         package init?(id: String) {
+            let id = String(id.split(separator: "~", maxSplits: 1)[0])
             let parts = id.split(separator: ":", maxSplits: 1).map(String.init)
             guard parts.count == 2 else { return nil }
             let numbers = parts[1].split(whereSeparator: { "x@/".contains($0) }).compactMap { Int($0) }
@@ -389,30 +409,63 @@ package struct RouteTable: Codable, Sendable, Equatable {
                  splitFraction: Double = HeadSplitAttention.referenceFraction,
                  renderClasses: [CapacityClasses.Class] = []) {
         var table = base
-        func apply(_ key: ClassKey, _ chosen: String) {
+        /// `chosen`: a route id, `engines` or `engines/form`; `withoutANE`: the best route of the class that does not use the ANE.
+        func apply(_ key: ClassKey, _ kind: WeightKind, _ chosen: String, withoutANE: String?) {
             switch key {
             case let .product(k, n, m):
-                guard let engines = Engines(rawValue: chosen) else { return }
+                let parts = chosen.split(separator: "/").map(String.init)
+                guard let engines = Engines(rawValue: parts[0]) else { return }
+                let form = parts.count > 1 ? parts[1] : nil
                 if engines == .amx || engines == .aneAMX { table.products.amx.enabled = true }
                 if engines == .ane || engines == .aneAMX { table.products.ane.enabled = true }
-                table.products.classes.append(.init(engines: engines, k: k, n: n, minRows: m, maxRows: m))
+                // One engine rule per height, whatever the weight kind: the engines are the same hardware, the first
+                // class to name the height (the heaviest: the plan is in that order) names them.
+                if !table.products.classes.contains(where: { $0.k == k && $0.n == n && $0.minRows == m && $0.maxRows == m }) {
+                    table.products.classes.append(.init(engines: engines, k: k, n: n, minRows: m, maxRows: m,
+                                                        withoutANE: withoutANE.flatMap { Engines(rawValue: String($0.split(separator: "/")[0])) }))
+                }
+                func pin(_ path: WeightPath, rounds: Bool = false) {
+                    table.products.weights.insert(.init(kind: kind, path: path, roundsActivation: rounds, k: k, n: n,
+                                                        minRows: m, maxRows: m), at: 0)
+                }
+                switch form {
+                case nil:
+                    if table.products.weight(kind, k: k, n: n, m: m).path != .widened { pin(.widened) }
+                case "bf16": pin(.bf16)
+                case "bf16act": pin(.bf16, rounds: true)
+                default: pin(.native)
+                }
             case let .attention(s, heads, headDim):
                 table.attention.rules.insert(.init(minSequence: s, maxSequence: s, heads: heads, headDim: headDim,
                                                    flash: chosen == "flash",
                                                    splitFraction: chosen == "split" ? splitFraction : nil), at: 0)
             }
         }
+        /// The best route of a decision that does not use the ANE (the rule on its ratios with the ANE's removed).
+        func withoutANE(of decision: CapacityMeasure.Decision) -> String? {
+            guard let compute = classes.first(where: { $0.id == decision.classID }),
+                  compute.routes.count == decision.hotRatios.count else { return nil }
+            let ratios = zip(compute.routes, decision.hotRatios).map { route, ratio in
+                route.id.hasPrefix("gpu+ane") ? nil : ratio
+            }
+            return CapacityMeasure.rule(ratios: ratios, efficient: compute.routes.map(\.efficient)).map { compute.routes[$0].id }
+        }
         var decided = Set<String>()
         for decision in plan.decisions {
             decided.insert(decision.classID)
-            guard let chosen = decision.chosen, let key = ClassKey(id: decision.classID) else { continue }
-            apply(key, chosen)
+            guard let chosen = decision.chosen, let (key, kind) = ClassKey.parse(decision.classID) else { continue }
+            apply(key, kind, chosen, withoutANE: chosen.hasPrefix("gpu+ane") ? withoutANE(of: decision) : nil)
         }
         var seen = Set<String>()
         for c in renderClasses {
-            let key = c.routeKey
-            guard !decided.contains(key.id), seen.insert(key.id).inserted else { continue }
-            if let chosen = Self.interpolatedRoute(for: key, plan: plan, classes: classes) { apply(key, chosen) }
+            let key = c.routeKey, kind = c.weightKind ?? .bf16
+            let id = key.id + ClassKey.suffix(kind)
+            guard !decided.contains(id), seen.insert(id).inserted else { continue }
+            if let chosen = Self.interpolatedRoute(for: key, kind: kind, plan: plan, classes: classes) {
+                let fallback = chosen.hasPrefix("gpu+ane")
+                    ? Self.interpolatedRoute(for: key, kind: kind, plan: plan, classes: classes, excludingANE: true) : nil
+                apply(key, kind, chosen, withoutANE: fallback)
+            }
         }
         if !renderClasses.isEmpty { table.unifyWeightPaths(for: renderClasses) }
         self = table

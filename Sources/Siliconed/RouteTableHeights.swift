@@ -39,8 +39,8 @@ extension RouteTable {
 
     /// **The route a class takes at a height the plan did not measure**, from the plan's decisions at the same
     /// k×n (products) or the same heads and head dim (attentions), `nil` when it has none to start from.
-    package static func interpolatedRoute(for key: ClassKey, plan: CapacityMeasure.Plan,
-                                          classes: [CapacityMeasure.ComputeClass]) -> String? {
+    package static func interpolatedRoute(for key: ClassKey, kind: WeightKind = .bf16, plan: CapacityMeasure.Plan,
+                                          classes: [CapacityMeasure.ComputeClass], excludingANE: Bool = false) -> String? {
         var anchors: [Anchor] = []
         let target: Double
         switch key {
@@ -48,7 +48,8 @@ extension RouteTable {
         case let .attention(s, _, _): target = Double(s)
         }
         for decision in plan.decisions where decision.status == .closed || decision.status == .open {
-            guard let other = ClassKey(id: decision.classID),
+            guard let (other, otherKind) = ClassKey.parse(decision.classID),
+                  { if case .product = key { return otherKind == kind } else { return true } }(),
                   let compute = classes.first(where: { $0.id == decision.classID }),
                   compute.routes.count == decision.hotRatios.count else { continue }
             let x: Double
@@ -58,7 +59,9 @@ extension RouteTable {
             default: continue
             }
             anchors.append(Anchor(x: x, ids: compute.routes.map(\.id), efficient: compute.routes.map(\.efficient),
-                                  ratios: decision.hotRatios.map { $0.flatMap { $0 > 0 ? $0 : nil } }))
+                                  ratios: zip(compute.routes, decision.hotRatios).map { route, ratio in
+                                      excludingANE && route.id.hasPrefix("gpu+ane") ? nil : ratio.flatMap { $0 > 0 ? $0 : nil }
+                                  }))
         }
         anchors.sort { $0.x < $1.x }
         guard let first = anchors.first else { return nil }

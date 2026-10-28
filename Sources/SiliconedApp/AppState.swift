@@ -521,9 +521,9 @@ final class AppState {
         let stored = Self.readStoredMap()
         storedMap = stored
         if let stored, stored.isCurrent {
-            if stored.isProvisional, stored.date != UserDefaults.standard.string(forKey: Self.retriedMapKey),
+            if !stored.isGreen || !stored.covers(Set(installedFamilies.map(\.rawValue))), stored.date != UserDefaults.standard.string(forKey: Self.retriedMapKey),
                Diagnostic.conditions().isNominal {
-                remeasuringProvisional = true
+                remeasuringOrange = true
             } else {
                 readSettings(map: stored)
             }
@@ -533,6 +533,9 @@ final class AppState {
     }
 
     // MARK: Capacity map
+
+    /// The families of the models installed (not the imported ones): what the map decides for.
+    var installedFamilies: Set<Family> { Set(cards.filter { readySet.contains($0.id) && !$0.isImported }.map(\.family)) }
 
     /// **The capacity map, in the app's preferences** (`Diagnostic.Report`, its JSON): what the engine
     /// branches on (`CapacityRules.swift`). **No render without one** (the user, 18/10/2026): the defaults
@@ -560,16 +563,16 @@ final class AppState {
     var settingsRead = false
     /// The kept map is current but provisional (`Diagnostic.Report.isProvisional`) and the Mac is at rest
     /// now: the first render measures again rather than read it.
-    private(set) var remeasuringProvisional = false
+    private(set) var remeasuringOrange = false
 
     /// Keeps `report` as the map of the next launches — and of this one, when nothing read the settings yet.
     func keep(_ report: Diagnostic.Report) {
         guard let data = try? report.json(pretty: false) else { return }
         UserDefaults.standard.set(data, forKey: Self.capacityMapKey)
-        if remeasuringProvisional, report.isProvisional {
+        if remeasuringOrange, !report.isGreen {
             UserDefaults.standard.set(report.date, forKey: Self.retriedMapKey)
         }
-        remeasuringProvisional = false
+        remeasuringOrange = false
         storedMap = report
         if !settingsRead { readSettings(map: report) }
     }
@@ -577,8 +580,8 @@ final class AppState {
     /// **A measure taken again failed or was stopped**: the provisional map kept serves this session
     /// rather than leave the queue waiting — it is current, only taken off rest.
     func fallBackOnStoredMap() {
-        guard remeasuringProvisional, !settingsRead, let stored = storedMap, stored.isCurrent else { return }
-        remeasuringProvisional = false
+        guard remeasuringOrange, !settingsRead, let stored = storedMap, stored.isCurrent else { return }
+        remeasuringOrange = false
         readSettings(map: stored)
     }
 

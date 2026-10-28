@@ -15,7 +15,7 @@ final class RemoteMachineTests: XCTestCase {
     }
 
     func testMachineAndItsAsksTravelAsJSON() throws {
-        let map = RemoteMap(date: "2026-10-28T10:00:00Z", current: true, provisional: false)
+        let map = RemoteMap(date: "2026-10-28T10:00:00Z", current: true, green: true)
         var m = RemoteMachine(chip: "Apple M4", memoryBytes: 17_179_869_184, ceiling: 10_737_418_240, ready: ["z-image", "qwen-image-2.1"],
                               stored: map, inUse: map, warnings: ["« x » ignored in the profile"])
         XCTAssertTrue(m.measured)
@@ -36,21 +36,21 @@ final class RemoteMachineTests: XCTestCase {
         }
     }
 
-    func testMapIsMeasuredOnlyWhenCurrentAndAtRest() {
+    func testMapIsMeasuredOnlyWhenCurrentAndGreen() {
         var m = RemoteMachine(chip: "c", memoryBytes: 1, ceiling: 1, ready: [])
         XCTAssertFalse(m.measured, "no map")
-        m.stored = RemoteMap(date: "d", current: true, provisional: true)
-        XCTAssertFalse(m.measured, "taken off rest")
-        m.stored = RemoteMap(date: "d", current: false, provisional: false)
+        m.stored = RemoteMap(date: "d", current: true, green: false)
+        XCTAssertFalse(m.measured, "orange")
+        m.stored = RemoteMap(date: "d", current: false, green: true)
         XCTAssertFalse(m.measured, "another macOS or build")
-        m.stored = RemoteMap(date: "d", current: true, provisional: false)
+        m.stored = RemoteMap(date: "d", current: true, green: true)
         XCTAssertTrue(m.measured)
     }
 
     func testTheMenuKeepsNeitherReportNorPhase() throws {
         var m = RemoteMachine(chip: "c", memoryBytes: 1, ceiling: 1, ready: ["z-image"], warnings: ["w"],
                               diagnostic: .finished(report()), blocker: .rendering)
-        m.stored = RemoteMap(date: "d", current: true, provisional: false)
+        m.stored = RemoteMap(date: "d", current: true, green: true)
         let kept = m.forMenu
         XCTAssertEqual(kept.diagnostic, .idle)
         XCTAssertNil(kept.blocker)
@@ -64,7 +64,7 @@ final class RemoteMachineTests: XCTestCase {
         let r = report()
         let m = RemoteMap(r)
         XCTAssertEqual(m.date, r.date)
-        XCTAssertEqual(m.provisional, r.isProvisional)
+        XCTAssertEqual(m.green, r.isGreen)
         XCTAssertEqual(m.current, r.isCurrent)
     }
 }

@@ -15654,40 +15654,6 @@
         }
       }
     },
-    "Matrix products, attention and weight widening, on the GPU and on the CPU, each checked against the exact result. No model is needed, nothing is downloaded. About a minute; the queue waits meanwhile." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Matrixprodukte, Attention und Aufweitung der Gewichte, auf der GPU und auf der CPU, jeweils gegen das exakte Ergebnis geprüft. Kein Modell nötig, nichts wird heruntergeladen. Etwa eine Minute; die Warteschlange wartet so lange."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Productos matriciales, atención y ampliación de los pesos, en la GPU y en la CPU, cada uno comprobado frente al resultado exacto. No hace falta ningún modelo, no se descarga nada. Alrededor de un minuto; la cola espera mientras tanto."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Produits matriciels, attention et élargissement des poids, sur le GPU et sur le CPU, chacun vérifié contre le résultat exact. Aucun modèle n’est nécessaire, rien n’est téléchargé. Environ une minute ; la file attend pendant ce temps."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Prodotti matriciali, attenzione e ampliamento dei pesi, sulla GPU e sulla CPU, ciascuno verificato rispetto al risultato esatto. Non serve alcun modello, non si scarica nulla. Circa un minuto; la coda attende nel frattempo."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "行列積、アテンション、重みの展開を、GPUとCPUの両方で実行し、それぞれを正確な結果と照合します。モデルは不要で、何もダウンロードされません。約1分かかり、その間キューは待機します。"
-          }
-        }
-      }
-    },
     "Measure Again" : {
       "localizations" : {
         "de" : {
@@ -26703,40 +26669,6 @@
         }
       }
     },
-    "The measure of %@ was taken while the Mac was not at rest: it is measured again before the next render." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Die Messung vom %@ wurde nicht im Ruhezustand des Mac aufgenommen: Sie wird vor dem nächsten Rendern wiederholt."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "La medición del %@ se tomó con el Mac sin estar en reposo: se repite antes del próximo render."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "La mesure du %@ a été prise sur un Mac qui n’était pas au repos : elle est refaite avant le prochain rendu."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "La misura del %@ è stata presa con il Mac non a riposo: viene ripetuta prima del prossimo rendering."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@の測定は、Macが安静でない状態で行われました：次の生成の前に再測定されます。"
-          }
-        }
-      }
-    },
     "The measure of %@ was taken with another macOS or another version of Siliconed: this Mac is measured again before the next render." : {
       "localizations" : {
         "de" : {
@@ -29603,40 +29535,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "このセッションは、このMacの%@の測定による選択を使っています。"
-          }
-        }
-      }
-    },
-    "This session uses the measure of %@, taken while the Mac was warm, in Low Power Mode or short of memory: it is measured again at its next launch at rest." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Diese Sitzung verwendet die Messung vom %@, aufgenommen bei warmem Mac, im Stromsparmodus oder bei knappem Speicher: Sie wird beim nächsten Start im Ruhezustand wiederholt."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Esta sesión usa la medición del %@, tomada con el Mac caliente, en modo de bajo consumo o con poca memoria: se repetirá en su próximo inicio en reposo."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cette session utilise la mesure du %@, prise sur un Mac chaud, en mode économie d’énergie ou à court de mémoire : elle sera refaite à son prochain lancement au repos."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Questa sessione usa la misura del %@, presa con il Mac caldo, in modalità Risparmio energetico o a corto di memoria: verrà ripetuta al prossimo avvio a riposo."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "このセッションは、Macが高温、低電力モード、またはメモリ不足の状態で取った%@の測定を使っています：次回の起動時に、安静な状態で再測定されます。"
           }
         }
       }
@@ -33857,74 +33755,6 @@
         }
       }
     },
-    "matrix products in fp16 and bf16" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Matrixprodukte in fp16 und bf16"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "productos matriciales en fp16 y bf16"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "produits matriciels en fp16 et bf16"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "prodotti matriciali in fp16 e bf16"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "fp16とbf16での行列積"
-          }
-        }
-      }
-    },
-    "matrix products in fp32" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Matrixprodukte in fp32"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "productos matriciales en fp32"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "produits matriciels en fp32"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "prodotti matriciali in fp32"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "fp32での行列積"
-          }
-        }
-      }
-    },
     "memory (peak)" : {
       "localizations" : {
         "de" : {
@@ -35915,40 +35745,6 @@
         }
       }
     },
-    "the first measurement again" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "die erste Messung erneut"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "de nuevo la primera medición"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "la première mesure, de nouveau"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "di nuovo la prima misura"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "最初の測定をもう一度"
-          }
-        }
-      }
-    },
     "the prompt is ONE argument: put it in quotes — silicontrol help add" : {
       "localizations" : {
         "de" : {
@@ -37159,6 +36955,96 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "インストール後は約%1$@ · %2$@"
+          }
+        }
+      }
+    },
+    "Matrix products and attention on the GPU, the AMX and the Neural Engine, each route checked against the exact result, and the table of routes this Mac renders with. No model is needed, nothing is downloaded. About a minute; the queue waits meanwhile." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Produits matriciels et attention sur le GPU, l’AMX et le Neural Engine, chaque route vérifiée contre le résultat exact, et la table des routes avec laquelle ce Mac fait ses rendus. Aucun modèle n’est nécessaire, rien n’est téléchargé. Environ une minute ; la file attend pendant ce temps."
+          }
+        }
+      }
+    },
+    "The measure of %@ was not complete (its minute, its memory or a route judged wrong): it is measured again before the next render." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La mesure du %@ n’était pas complète (sa minute, sa mémoire ou une route jugée fausse) : elle est refaite avant le prochain rendu."
+          }
+        }
+      }
+    },
+    "This session uses the measure of %@, which was not complete (its minute, its memory or a route judged wrong): it is measured again at its next launch at rest." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette session utilise la mesure du %@, qui n’était pas complète (sa minute, sa mémoire ou une route jugée fausse) : elle est refaite à son prochain lancement, au repos."
+          }
+        }
+      }
+    },
+    "weight preparation" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "préparation des poids"
+          }
+        }
+      }
+    },
+    "the engines' first measurement" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "première mesure des moteurs"
+          }
+        }
+      }
+    },
+    "compute routes" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "routes de calcul"
+          }
+        }
+      }
+    },
+    "the engines again" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "les moteurs, de nouveau"
+          }
+        }
+      }
+    },
+    "The measure is complete." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La mesure est complète."
+          }
+        }
+      }
+    },
+    "The measure is not complete: %@." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La mesure n’est pas complète : %@."
           }
         }
       }

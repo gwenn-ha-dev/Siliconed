@@ -48,10 +48,13 @@ extension Diagnostic {
 
     /// **The plan's lever**: the surface bytes one ANE engine may hold before the grid goes on with a new
     /// one. `nil`: one engine for the whole grid. A batch holds at least one point, whatever its size.
-    package static func aneBatches(allotment: Int?) -> [[GridPoint]] {
-        guard let allotment else { return [aneGrid] }
+    package static func aneBatches(allotment: Int?) -> [[GridPoint]] { aneBatches(points: aneGrid, allotment: allotment) }
+
+    /// The same over any list of points (the capacity map's classes, in the order they are asked).
+    package static func aneBatches(points: [GridPoint], allotment: Int?) -> [[GridPoint]] {
+        guard let allotment else { return [points] }
         var batches: [[GridPoint]] = []
-        for point in aneGrid {
+        for point in points {
             if let last = batches.last, engineBytes(last + [point]) <= allotment { batches[batches.count - 1].append(point) }
             else { batches.append([point]) }
         }
@@ -160,10 +163,10 @@ extension Diagnostic {
         /// From the largest allotment (the whole grid on one engine, a release wait saved per batch) to none.
         package static let allotments: [Int?] = [nil, 1 << 30, 1 << 29, 1 << 28, 0]
 
-        package static func choose(budget: Int, base: Int) throws(EngineError) -> Plan {
+        package static func choose(budget: Int, base: Int, need needFor: (Int?) -> Need = { Diagnostic.need(allotment: $0) }) throws(EngineError) -> Plan {
             var smallest = 0
             for allotment in allotments {
-                let need = Diagnostic.need(allotment: allotment)
+                let need = needFor(allotment)
                 smallest = need.peak
                 if base + need.peak <= budget { return Plan(budget: budget, base: base, aneAllotment: allotment, need: need) }
             }
