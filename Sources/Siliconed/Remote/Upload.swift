@@ -301,7 +301,12 @@ package enum UploadStore {
     /// **What the volume must hold** for a file of `size`: the temporary copy, and — an import being a
     /// forge, whose peak is not announced and whose output is a clone only on APFS — as much again, plus
     /// a margin for the system. Refused before the first byte, never discovered halfway.
-    package static func needed(for size: Int64) -> Int64 { 2 * size + (1 << 30) }
+    /// `size` comes from the other Mac: a figure that overflows asks for more than any volume has.
+    package static func needed(for size: Int64) -> Int64 {
+        let (twice, overflow) = size.multipliedReportingOverflow(by: 2)
+        let (total, overflowed) = twice.addingReportingOverflow(1 << 30)
+        return overflow || overflowed ? .max : total
+    }
 
     /// The bytes the volume holding `folder` gives to an app (purgeable space counted).
     @Sendable package static func available(_ folder: URL) -> Int64? {

@@ -23,6 +23,8 @@ package enum AppRefusal: Codable, Equatable, Sendable {
     /// `name`: the LoRA's file name without its path or suffix.
     case loraNotInstalled(name: String)
     case seedCount
+    /// The lender's queue has no room for what was asked (`AppState.maxQueueLength`).
+    case queueFull
     case enlargeModelDownload, enlargeFailed
     case gridNotCropped, sketchNotCropped
     case cropNeeds(side: Int), cropSmallest(side: Int)

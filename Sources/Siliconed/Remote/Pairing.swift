@@ -89,6 +89,16 @@ package enum Pairing {
         return String(repeating: "0", count: 6 - s.count) + s
     }
 
+    package static let nameLimit = 64
+
+    /// **A name that crossed, fit to be shown**: the other Mac chose it, and it goes into a sheet and an alert.
+    /// Without control characters or line breaks, trimmed, at most `nameLimit` characters.
+    package static func displayName(_ raw: String) -> String {
+        let clean = String(String.UnicodeScalarView(raw.unicodeScalars.filter { !$0.properties.generalCategory.isControl }))
+        let name = String(clean.trimmingCharacters(in: .whitespaces).prefix(nameLimit))
+        return name.isEmpty ? "Mac" : name
+    }
+
     /// `482 913`, as the screens write it.
     package static func spaced(_ code: String) -> String {
         "\(code.prefix(3)) \(code.suffix(3))"
@@ -223,7 +233,7 @@ package struct PairingServer: Sendable {
             throw .refused
         case (.waiting, .start(let client, let name)):
             _ = try Pairing.publicKey(client)
-            clientName = name
+            clientName = Pairing.displayName(name)
             step = .committed(client: client)
             return .commit(publicKey: publicKey, commitment: Pairing.commitment(server: publicKey, client: client, nonce: nonce))
         case (.committed(let client), .nonce(let clientNonce)):
@@ -259,5 +269,15 @@ package struct PairingServer: Sendable {
         step = .done
         key = nil
         return .refused
+    }
+}
+
+private extension Unicode.GeneralCategory {
+    /// Controls, and the characters that break lines.
+    var isControl: Bool {
+        switch self {
+        case .control, .lineSeparator, .paragraphSeparator: true
+        default: false
+        }
     }
 }

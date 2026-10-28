@@ -70,6 +70,7 @@ extension AppState {
 
     /// What the form itself refuses: everything but the memory.
     var formBlocker: String? {
+        if let reason = linkBlocker { return reason }
         if let reason = libraryBlocker { return reason }
         if let reason = installBlocker { return reason }
         if missing != nil { return String(localized: "This model isn't installed.") }

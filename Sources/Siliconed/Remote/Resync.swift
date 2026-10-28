@@ -13,6 +13,26 @@ package struct RemoteSync: Codable, Equatable, Sendable {
     package init(entries: [Int], jobs: [Int]) { self.entries = entries; self.jobs = jobs }
 }
 
+/// **The images a borrower holds, readable from the link's queue** (`RemoteLink.resume`): the owner keeps
+/// it up to date from the main actor, the link reads it when it joins. A lock between the two.
+package final class HeldImages: @unchecked Sendable {
+    private let lock = NSLock()
+    private var ordinals: Set<Int> = []
+    package init() {}
+    package func set(_ new: Set<Int>) { lock.withLock { ordinals = new } }
+    package var sorted: [Int] { lock.withLock { ordinals.sorted() } }
+}
+
+/// **What a lender sends again at a join**, given what the borrower says it holds. Pure, so that it is tested:
+/// the ordinals the borrower names are trusted only if they were numbered by this very launch, and only
+/// those the lender still has (the others are removed by the join's `synced`).
+package enum RemoteResume {
+    package static func alreadyHeld(by theirs: Hello, launch: UInt64?, lenderHas ordinals: Set<Int>) -> Set<Int> {
+        guard let held = theirs.held, let launch, held.launch == launch else { return [] }
+        return Set(held.entries).intersection(ordinals)
+    }
+}
+
 /// **The images a client removed, kept until it leaves** — in the lending Mac's memory only, never on
 /// disk (the session is incognito): « Undo » asks them back by ordinal. Bounded: the oldest removed
 /// is forgotten first.

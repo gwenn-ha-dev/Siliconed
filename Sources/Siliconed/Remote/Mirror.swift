@@ -84,6 +84,18 @@ package struct RemoteQuote: Codable, Hashable, Sendable {
     }
 }
 
+extension RemoteQuote {
+    /// **Whether a lender may compute this**: the numbers come from another Mac and reach products and sums
+    /// that trap on overflow (`memoryNeed`, `editFormat`). A side up to what any model draws, an image up to
+    /// what a camera makes, a handful of images.
+    package var isSane: Bool {
+        let sides = 1...Format.maximumSide
+        guard sides.contains(width), sides.contains(height), (0...32).contains(images) else { return false }
+        guard let first else { return true }
+        return first.count == 2 && first.allSatisfy { (1...(1 << 16)).contains($0) }
+    }
+}
+
 /// The mini's answer: the format the render will have, and its memory need there (`nil`: not computable).
 package struct RemoteQuoteAnswer: Codable, Equatable, Sendable {
     package var quote: RemoteQuote

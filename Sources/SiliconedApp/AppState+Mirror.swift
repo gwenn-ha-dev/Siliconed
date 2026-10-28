@@ -57,7 +57,18 @@ final class MirrorLink {
     var waiters: [Int: (RemoteAnswer) -> Void] = [:]
     /// The job each request asked for, until the mini numbers it.
     var requested: [Int: Job] = [:]
-    var entries: [Int: Entry] = [:]
+    var entries: [Int: Entry] = [:] {
+        didSet { held.set(Set(entries.keys)) }
+    }
+    /// The ordinals of `entries`, for the link's next join: the lender does not send those again.
+    let held = HeldImages()
+    /// **Why a request would be lost**: the link is not joined (`AppState.linkBlocker`). Then `render` and
+    /// `explore` answer a refusal at once, so that nothing waits for ever for a word that cannot come.
+    var down: String?
+    /// The lender's launch (`Hello.launch`) as its last `welcome` said it, and whether it changed since
+    /// the images and jobs were numbered: its ordinals start again (`settle` forgets the old ones).
+    var launch: UInt64?
+    var restarted = false
     /// An entry waits for its PNG, the blob that follows it.
     var pending: [UInt32: RemoteEntry] = [:]
     /// Ends told before their images' PNGs came (messages never wait for blobs): held until they all have.
@@ -107,6 +118,7 @@ final class MirrorLink {
     /// The job, its images sent first. A file that can no longer be read refuses it here. `format: false`:
     /// the mini derives an edit's format from image 1. `answered`: the mini's word, when it comes.
     func render(_ job: Job, format: Bool = true, answered: ((RemoteAnswer) -> Void)? = nil) throws(EngineError) {
+        if let down { answered?(.refused(.text(down))); return }
         var r = MirrorProjection.remote(job)
         r.references = try remote(job.references)
         if !format { r.width = 0; r.height = 0 }
@@ -123,6 +135,7 @@ final class MirrorLink {
     func explore(_ grid: RenderGrid, settings: RenderSettings, references: [ReferenceImage], stopAfter: Int,
                  neuralEngine: Bool?, sketch: Bool = true, previews: Bool = true,
                  answered: ((RemoteAnswer) -> Void)? = nil) throws(EngineError) {
+        if let down { answered?(.refused(.text(down))); return }
         var job = MirrorProjection.remote(settings, ordinal: 0, seeds: [], previews: previews, defaultSteps: nil,
                                           neuralEngine: neuralEngine)
         job.references = try remote(references)
@@ -479,13 +492,26 @@ extension AppState {
     /// problem goes.
     func linkChanged(_ s: RemoteLink.State, name: String) {
         switch s {
-        case .connected:
+        case .connected(let hello):
+            linkBlocker = nil; mirror?.down = nil
             if problem?.code == "remote" { problem = nil }
             // Asked before a cut: asked again.
             mirror?.asked = []
+            if let link = mirror, let launch = hello.launch {
+                if let known = link.launch, known != launch { link.restarted = true }
+                link.launch = launch
+            }
         case .connecting, .off: break
-        case .waiting: remoteConfirming = false; uploadLinkChanged(s); noteCut(); problem = { var p = Problem(String(localized: "Lost “\(name)”: trying again…")); p.code = "remote"; return p }()
-        case .refused: remoteConfirming = false; uploadLinkChanged(s); problem = { var p = Problem(OtherMacsSection.state(s, found: true)); p.code = "remote"; return p }()
+        case .waiting:
+            let lost = String(localized: "Lost “\(name)”: trying again…")
+            linkBlocker = lost; mirror?.down = lost
+            remoteConfirming = false; uploadLinkChanged(s); noteCut()
+            problem = { var p = Problem(lost); p.code = "remote"; return p }()
+        case .refused:
+            let why = OtherMacsSection.state(s, found: true)
+            linkBlocker = why; mirror?.down = why
+            remoteConfirming = false; uploadLinkChanged(s)
+            problem = { var p = Problem(why); p.code = "remote"; return p }()
         }
     }
 }
@@ -519,10 +545,14 @@ extension AppState {
 
     /// The link was cut: what is in flight is noted, for `settle`.
     func noteCut() {
-        guard let link = mirror, link.cut == nil else { return }
+        guard let link = mirror else { return }
         let held = Set(link.endings.map(\.ordinal))
-        link.cut = (Set(link.jobs.keys.filter { completed[$0] == nil && !held.contains($0) }),
-                    Set(link.waiters.keys).union(link.requested.keys))
+        let jobs = Set(link.jobs.keys.filter { completed[$0] == nil && !held.contains($0) })
+        let requests = Set(link.waiters.keys).union(link.requested.keys)
+        // Lost again before the join's `synced` came: what the first cut noted is still in flight, and what
+        // was asked in between too.
+        if let before = link.cut { link.cut = (before.jobs.union(jobs), before.requests.union(requests)) }
+        else { link.cut = (jobs, requests) }
     }
 
     /// **The other Mac's word on what it still holds of ours**, at each join: the history and the jobs are
@@ -553,6 +583,13 @@ extension AppState {
             }
         }
         link.cut = nil
+        // The lender restarted: it numbers from 1 again, so the jobs and ends kept under the old numbers
+        // would be taken for the new ones (a job shown with another's prompt, an end swallowed).
+        if link.restarted {
+            link.restarted = false
+            link.jobs = [:]; link.grids = [:]; link.endings = []
+            forgetCompletedJobs()
+        }
         endHeld()
     }
 }

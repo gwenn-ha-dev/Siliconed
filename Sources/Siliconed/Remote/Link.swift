@@ -6,7 +6,8 @@ import Network
 ///
 /// A session that drops is tried again — 1, 2, 4, then every 8 s, or at once when the owner sees the
 /// Mac come back on Bonjour (`retryNow`) — but a refusal is not: a key the other Mac no longer holds,
-/// or another build, will not change by waiting. The owner says it and the user decides.
+/// or another build, will not change by waiting. The owner says it and the user decides. A handshake that
+/// fails can also be a network hiccup, so « forgotten » is concluded at the second one in a row only.
 package final class RemoteLink: @unchecked Sendable {
     package enum State: Equatable, Sendable {
         case connecting
@@ -33,6 +34,11 @@ package final class RemoteLink: @unchecked Sendable {
     private var wanted = false
     private var channel: RemoteChannel?
     private var failures = 0
+    /// Handshakes refused in a row: one may be the network, two are the other Mac's word.
+    private var refusals = 0
+    /// The lender's launch (`Hello.launch`) as the last `welcome` said it, and the images held (`Hello.Held`).
+    private var launch: UInt64?
+    private var entries: (@Sendable () -> [Int])?
     private var retry: DispatchWorkItem?
     private var joined = false
     private var messages: (@Sendable (SessionMessage) -> Void)?
@@ -48,6 +54,7 @@ package final class RemoteLink: @unchecked Sendable {
             self.handler = handler
             wanted = true
             failures = 0
+            refusals = 0
             attempt()
         }
     }
@@ -57,7 +64,14 @@ package final class RemoteLink: @unchecked Sendable {
         queue.async { [self] in self.messages = messages; self.blobs = blobs }
     }
 
+    /// The `i` ordinals of the images the owner holds, asked at each join: the lender does not send them again
+    /// (when it is the same launch that numbered them). Called on the link's queue: it must not wait on another.
+    package func resume(entries: @escaping @Sendable () -> [Int]) {
+        queue.async { [self] in self.entries = entries }
+    }
+
     /// Dropped when not joined: a request made while the link is down is not kept for later.
+    /// The owner does not offer what it would lose (the form is blocked while the link is down).
     package func send(_ m: SessionMessage) {
         queue.async { [self] in if joined { channel?.send(m) } }
     }
@@ -114,12 +128,16 @@ package final class RemoteLink: @unchecked Sendable {
                 guard let m = try? JSONDecoder().decode(SessionMessage.self, from: json) else { c.close(); return }
                 switch m {
                 case .challenge(let challenge) where !joined:
-                    c.send(SessionMessage.join(hello: hello, identity: key.identity,
+                    var mine = hello
+                    if let launch, let entries { mine.held = Hello.Held(launch: launch, entries: entries()) }
+                    c.send(SessionMessage.join(hello: mine, identity: key.identity,
                                                proof: SessionMessage.proof(key, challenge: challenge)))
                 case .welcome(let theirs) where !joined:
                     if let mm = hello.mismatch(with: theirs) { refuse(.mismatch(mm)); return }
                     joined = true
                     failures = 0
+                    refusals = 0
+                    launch = theirs.launch
                     handler?(.connected(theirs))
                 case .mismatch(let mm):
                     refuse(.mismatch(mm))
@@ -130,9 +148,11 @@ package final class RemoteLink: @unchecked Sendable {
                 channel = nil
                 switch how {
                 // A forgotten Mac's key leaves the server's listener (`RemoteHost.lend`): the handshake fails.
-                case .refused: refuse(.forgotten)
-                case .lost(let why): wait(why)
-                case .broken(let f): wait("\(f)")
+                case .refused:
+                    refusals += 1
+                    if refusals >= 2 { refuse(.forgotten) } else { wait("the key was not accepted") }
+                case .lost(let why): refusals = 0; wait(why)
+                case .broken(let f): refusals = 0; wait("\(f)")
                 case .closed: break
                 }
             }

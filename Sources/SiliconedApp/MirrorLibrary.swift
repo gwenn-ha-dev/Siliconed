@@ -30,7 +30,7 @@ extension AppState {
     /// **May the library change now**: this Mac's (`managementPossible`), or the lender's — nothing of
     /// ours running, no installation under way there; the lender judges again.
     var libraryManageable: Bool {
-        mirror == nil ? managementPossible : remoteLibrary != nil && remoteForge == nil && !busy && !remoteConfirming
+        mirror == nil ? managementPossible : linkBlocker == nil && remoteLibrary != nil && remoteForge == nil && !busy && !remoteConfirming
     }
 
     func askLibrary(_ r: RemoteLibraryRequest) { mirror?.send(.libraryAsk(r)) }
@@ -243,7 +243,8 @@ final class MirrorLibraryHost {
     func joined(_ identity: Data) {
         if library == nil { library = snapshot() }
         if let library { host.send(.libraryNews(.library(library)), to: identity) }
-        if let forge { host.send(.libraryNews(.forge(forge)), to: identity) }
+        // Said when none runs too: the line a client kept across a cut (« Importing… ») ends with it.
+        host.send(.libraryNews(.forge(forge)), to: identity)
     }
 
     // MARK: Publishing
@@ -451,13 +452,26 @@ final class MirrorLibraryHost {
             refuse(.app(.licenseMismatch(model: card.id)), identity)
             return
         }
+        let plan: Library.InstallPlan
         do {
-            let plan = try app.library.installPlan(i.family, variant: i.variant, baseDiT: i.baseDiT)
+            plan = try app.library.installPlan(i.family, variant: i.variant, baseDiT: i.baseDiT)
             guard plan.fits else { throw EngineError.diskFull(needed: plan.peak, available: app.library.freeSpace() ?? 0) }
         } catch {
             refuse(RemoteRefusal(error), identity)
             return
         }
+        // An installation that replaces the other version removes files: this Mac's user clicks first,
+        // as for a removal — the borrower's click is not enough to take a version off this disk.
+        guard let old = plan.replacing, RemotePlan(plan, baseDiT: i.baseDiT).deletes else { begin(i, from: identity); return }
+        let sentence = plan.removesFirst
+            ? String(localized: "“\(who(identity))” wants to install \(i.family.name) (\(VersionChoice.name(i.variant))), which removes the \(VersionChoice.name(old)) version first: until it is installed, \(i.family.name) cannot render.")
+            : String(localized: "“\(who(identity))” wants to install \(i.family.name) (\(VersionChoice.name(i.variant))), which replaces the \(VersionChoice.name(old)) version once it is ready.")
+        confirm(identity, sentence) { [self] in
+            if manageable(identity) { begin(i, from: identity) }
+        }
+    }
+
+    private func begin(_ i: RemoteInstall, from identity: Data) {
         started(by: identity)
         afterInstall = i.thenHub.map { ($0, identity) }
         app.acceptAndInstall(i.family, variant: i.variant, baseDiT: i.baseDiT, asked: true)

@@ -41,6 +41,9 @@ final class MirrorServer {
         var statistics: RemoteStatistics?
         /// The license asked (`licensing`), whether it was sent, and what.
         var license: RemoteLicense?
+        /// The first `licensing` of a session is sent even when it is `nil`: a sheet the client left open
+        /// across a cut closes with it.
+        var licenseSent = false
     }
     /// Each Mac's last exploration (grid ordinal) — kept across a reconnection.
     private var explorations: [Data: Int] = [:]
@@ -131,14 +134,23 @@ final class MirrorServer {
 
     // MARK: - A Mac joins, leaves, asks
 
-    func joined(_ identity: Data) {
-        seen[identity] = Seen()
+    /// `theirs`: the client's hello, with the images it still holds (`Hello.held`).
+    func joined(_ identity: Data, _ theirs: Hello) {
+        // Joined again with no leave between (the old session died unseen): what it had under way went with it.
+        if seen[identity] != nil { left(identity) }
+        // The images the client names are not sent again — if this very launch numbered them.
+        var first = Seen()
+        first.entries = RemoteResume.alreadyHeld(by: theirs, launch: Hello.thisLaunch,
+                                                 lenderHas: Set(app.history.filter { $0.owner == identity }.map(\.ordinal)))
+        seen[identity] = first
         let catalog = lastCatalog ?? catalogSnapshot()
         lastCatalog = catalog
         host.send(.catalog(catalog), to: identity)
         machine.joined(identity)
         host.send(.synced(sync(for: identity)), to: identity)
         library.joined(identity)
+        // The preview of a render under way is the client's alone; none otherwise — a stale one is cleared.
+        sendPreview(to: identity)
         // The ends of its jobs, again: one that finished during a cut was told to a `Seen` that is gone.
         seen[identity]?.ended = endedJobs(of: identity)
         publish(to: identity)
@@ -150,6 +162,8 @@ final class MirrorServer {
         seen[identity] = nil
         uploads[identity] = nil
         held.removeAll { $0.identity == identity }
+        // Another Mac's request may have waited behind one of this Mac's.
+        release()
     }
 
     func received(blob id: UInt32, _ data: Data, from identity: Data) {
@@ -161,11 +175,9 @@ final class MirrorServer {
     func handle(_ m: SessionMessage, from identity: Data) {
         switch m {
         case .render(let r):
-            held.append((identity, .render(r)))
-            release()
+            hold(.render(r), from: identity)
         case .grid(let g):
-            held.append((identity, .grid(g)))
-            release()
+            hold(.grid(g), from: identity)
         case .addSheet(let n):
             if explorations[identity] == n, let r = run(n) { app.addSheet(r) }
         case .quote(let q):
@@ -220,17 +232,28 @@ final class MirrorServer {
 
     private func run(_ n: Int) -> GridRun? { app.gridRuns[n] ?? ended[n] }
 
+    /// A client that waits for more renders than the queue holds is asking for nothing the queue could give.
+    private func hold(_ asked: Asked, from identity: Data) {
+        guard held.filter({ $0.identity == identity }).count < AppState.maxQueueLength else {
+            refuse(.app(.queueFull), asked, to: identity)
+            return
+        }
+        held.append((identity, asked))
+        release()
+    }
+
+    /// A render is answered with its request number; an exploration's refusal is said.
+    private func refuse(_ text: RemoteRefusal, _ asked: Asked, to identity: Data) {
+        if let n = asked.request { host.send(.answer(request: n, .refused(text)), to: identity) }
+        else { host.send(.refused(text), to: identity) }
+    }
+
     /// The renders whose images are all here, in order: the first still waiting holds the others.
     private func release() {
         while let (identity, asked) = held.first {
             let sent = uploads[identity] ?? [:]
             guard asked.references.allSatisfy({ $0.blob.map { sent[$0] != nil } ?? true }) else { return }
             held.removeFirst()
-            // A render is answered with its request number; an exploration's refusal is said.
-            func refuse(_ text: RemoteRefusal) {
-                if let n = asked.request { host.send(.answer(request: n, .refused(text)), to: identity) }
-                else { host.send(.refused(text), to: identity) }
-            }
             do {
                 switch asked {
                 case .render(let r):
@@ -249,9 +272,9 @@ final class MirrorServer {
                     }
                 }
             } catch let e as Refused {
-                refuse(.app(e.refusal))
+                refuse(.app(e.refusal), asked, to: identity)
             } catch {
-                refuse(.engine(EngineError(error)))
+                refuse(.engine(EngineError(error)), asked, to: identity)
             }
             for b in asked.references.compactMap(\.blob) { uploads[identity]?[b] = nil }
         }
@@ -260,6 +283,8 @@ final class MirrorServer {
     /// **What the borrowing Mac's form cannot compute**: an edit's format (the denoiser's rule, capped as
     /// the app caps it), the need with images — from this Mac's maps, as its own form would.
     private func answer(_ q: RemoteQuote) -> RemoteQuoteAnswer {
+        // Numbers from another Mac reach arithmetic that traps on overflow: out of bounds, no need.
+        guard q.isSane else { return RemoteQuoteAnswer(quote: q, width: q.width, height: q.height, need: nil) }
         var f = RecommendedFormat(q.width, q.height)
         var need: Int?
         if app.readySet.contains(q.model), let card = app.cards.first(where: { $0.id == q.model }) {
@@ -308,6 +333,12 @@ final class MirrorServer {
         let model = try Model.named(r.model, in: app.library)
         let denoising = model.chain.denoising
         try denoising.check(steps: r.steps, startImage: false)
+        // What costs nothing to judge, before anything is decoded.
+        guard app.file.count < AppState.maxQueueLength else { throw Refused(.queueFull) }
+        guard r.references.count <= denoising.maxReferences else {
+            throw Refused(.tooManyReferences(count: r.references.count, model: card.id, max: denoising.maxReferences))
+        }
+        guard (1...8).contains(r.seeds.count) else { throw Refused(.seedCount) }
         let references = try r.references.map { try reference($0, images: images, from: identity) }
         // A job that cites named subjects (which stayed on the Neo): the rewrite the model reads, and their
         // pictures last among the references — rebuilt as if the subjects were here.
@@ -324,9 +355,6 @@ final class MirrorServer {
         }
         try Format.check(width: r.width, height: r.height, family: card.family)
         if !references.isEmpty {
-            guard references.count <= denoising.maxReferences else {
-                throw Refused(.tooManyReferences(count: references.count, model: card.id, max: denoising.maxReferences))
-            }
             // The app edits up to 1024² of area (`AppState.editingSurface`), as on this Mac's own form.
             guard r.width * r.height <= AppState.editingSurface else {
                 throw Refused(.editSurface(width: r.width, height: r.height))
@@ -337,7 +365,6 @@ final class MirrorServer {
         if let stray = r.loras.first(where: { !forged.contains($0.path) }) {
             throw Refused(.loraNotInstalled(name: RemoteControl.shortName(stray.path)))
         }
-        guard (1...8).contains(r.seeds.count) else { throw Refused(.seedCount) }
         let f = denoising.space.factor
         let full = denoising.plan(height: r.height / f, width: r.width / f, steps: r.steps, start: 0,
                                   withLoRA: !r.loras.isEmpty || r.detail != .normal)
@@ -356,6 +383,11 @@ final class MirrorServer {
     /// model ready, its format and memory judged, the stack forged; a sketch's stop is this Mac's to find.
     private func admit(_ g: RemoteGridRequest, images: [UInt32: Data], from identity: Data) throws -> (run: GridRun, jobs: [Job]) {
         let grid = try g.spec.grid()
+        // Before anything is decoded: the cells the queue has room for, and no more images than any model reads.
+        guard app.file.count + grid.cells.count <= AppState.maxQueueLength else { throw Refused(.queueFull) }
+        guard g.job.references.count <= Self.gridReferenceBound else {
+            throw Refused(.tooManyReferences(count: g.job.references.count, model: g.job.model, max: Self.gridReferenceBound))
+        }
         let references = try g.job.references.map { try reference($0, images: images, from: identity) }
         var settings = MirrorProjection.settings(g.job)
         for id in Set(grid.cells.map { $0.model ?? g.job.model }) {
@@ -387,6 +419,9 @@ final class MirrorServer {
         if g.sketch { explorations[identity] = made.run.ordinal }
         return made
     }
+
+    /// No model reads more than 3 images (`maxReferences`); each cell is judged against its own model's later.
+    private static let gridReferenceBound = 8
 
     private struct Refused: Error {
         let refusal: AppRefusal
@@ -580,12 +615,18 @@ final class MirrorServer {
         lastPreview = app.preview
         // The preview is the running render's: its owner's alone.
         guard let owner = app.currentJob?.owner, seen[owner] != nil else { return }
-        if let p = app.preview, let png = Self.png(p) {
+        sendPreview(to: owner)
+    }
+
+    /// The preview of the render under way, if it is `identity`'s; else none — said, so that a preview
+    /// the client kept across a cut does not stay on its canvas.
+    private func sendPreview(to identity: Data) {
+        if app.currentJob?.owner == identity, let p = app.preview, let png = Self.png(p) {
             let id = blob()
-            host.send(.preview(id), to: owner)
-            host.send(blob: png, id: id, to: owner)
+            host.send(.preview(id), to: identity)
+            host.send(blob: png, id: id, to: identity)
         } else {
-            host.send(.preview(nil), to: owner)
+            host.send(.preview(nil), to: identity)
         }
     }
 
@@ -688,8 +729,9 @@ final class MirrorServer {
                 let v = app.library.variant(of: card.family)
                 return RemoteLicense(model: card.id, variant: v.rawValue, digest: LicenseDigest.of(card, variant: v))
             }
-        guard want != s.license else { return }
+        guard want != s.license || !s.licenseSent else { return }
         s.license = want
+        s.licenseSent = true
         host.send(.licensing(want), to: identity)
     }
 
