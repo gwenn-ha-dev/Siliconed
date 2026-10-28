@@ -95,7 +95,8 @@ final class RemoteControl {
             case "follow": follow(c)
             case "cancel": finish(c, try cancel(arguments))
             case "clear": finish(c, clear())
-            case "set": finish(c, try set(arguments))
+            case "set":
+                if let mirror = app.mirror { try setOnMirror(mirror, arguments, c) } else { finish(c, try set(arguments)) }
             case "history": finish(c, try history(arguments))
             case "save": finish(c, try save(arguments, cwd: cwd))
             case "vary":
@@ -203,11 +204,11 @@ final class RemoteControl {
     private func state() -> [String: Any] {
         var o: [String: Any] = ["ok": true, "library": app.library.root.path,
                                 "history_images": app.history.count,
-                                "faster_rendering": app.fasterRendering]
+                                "faster_rendering": app.fasterRenderingShown]
         // The settings renders run on: a series compared across launches compares maps too.
-        o["settings"] = ["read": app.settingsRead, "map": app.mapInUse?.date ?? NSNull(),
-                         "provisional": app.mapInUse?.isProvisional ?? NSNull(),
-                         "remeasuring": app.remeasuringProvisional,
+        o["settings"] = ["read": app.settingsRead, "map": app.mapFacts.inUse?.date ?? NSNull(),
+                         "provisional": app.mapFacts.inUse?.provisional ?? NSNull(),
+                         "remeasuring": app.mapFacts.remeasuring,
                          "warnings": app.profileWarnings] as [String: Any]
         if let t = app.currentJob {
             var e = json(t)

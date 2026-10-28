@@ -26,6 +26,10 @@ struct DiagnosticSheet: View {
                 Text("Siliconed measures what this Mac's chip computes, and how fast, then turns on only the compute paths that are right and faster here. Sharing the result is optional: a prefilled GitHub issue, opened only by your click.")
                     .font(.callout).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
+                if let name = app.mirror?.macName {
+                    Text("This measures “\(name)”, the Mac that computes for you.")
+                        .font(.callout.weight(.medium))
+                }
             }
             .padding(20)
             Divider()
@@ -33,7 +37,7 @@ struct DiagnosticSheet: View {
                 switch app.diagnostic {
                 case .ready: ready
                 case let .running(done, total, line): running(done: done, total: total, line: line)
-                case .finished(let report): ReportView(report: report, inUse: report == app.mapInUse)
+                case .finished(let report): ReportView(report: report, inUse: app.inUse(report))
                 case .failed(let problem): ProblemView(problem: problem).padding(20)
                 }
             }
@@ -69,18 +73,19 @@ struct DiagnosticSheet: View {
 
     /// The sentence of `mapStatus` — the settings window says it too.
     static func mapStatus(_ app: AppState) -> LocalizedStringKey {
-        if let used = app.mapInUse {
-            if used == app.storedMap, used.isProvisional {
+        let map = app.mapFacts
+        if let used = map.inUse {
+            if used == map.stored, used.provisional {
                 return "This session uses the measure of \(day(used.date)), taken while the Mac was warm, in Low Power Mode or short of memory: it is measured again at its next launch at rest."
             }
-            return used == app.storedMap
+            return used == map.stored
                 ? "This session uses the choices of this Mac's measure of \(day(used.date))."
                 : "This session uses the measure of \(day(used.date)); the newer one applies from the next launch."
         }
-        if app.remeasuringProvisional, let stored = app.storedMap {
+        if map.remeasuring, let stored = map.stored {
             return "The measure of \(day(stored.date)) was taken while the Mac was not at rest: it is measured again before the next render."
         }
-        if let stored = app.storedMap, !stored.isCurrent {
+        if let stored = map.stored, !stored.current {
             return "The measure of \(day(stored.date)) was taken with another macOS or another version of Siliconed: this Mac is measured again before the next render."
         }
         return "This Mac is measured before its first render: Siliconed chooses its compute paths from it."

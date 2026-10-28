@@ -32,6 +32,7 @@ extension AppState {
     /// **A link arrives** (`Delegate.application(_:open:)`): the sheet opens at once, the Hub answers
     /// behind it.
     func open(_ link: HubLink) {
+        if mirror != nil { openRemotely(link); return }
         let offer = HubOffer(link: link)
         hubOffer = offer
         let b = library
@@ -75,12 +76,18 @@ extension AppState {
     /// **« Import »**: the file downloads at the commit read, its sha256 checked, then imports as a
     /// dropped file. A LoRA for a family not installed offers that family first, the import after it.
     func importFromHub() {
-        guard managementPossible, let offer = hubOffer, let r = offer.repository, let (f, verdict) = offer.choice,
-              HubOffer.importable(verdict) else { return }
+        if mirror != nil { importFromHubRemotely(); return }
+        guard managementPossible, let offer = hubOffer, let r = offer.repository, let (f, judged) = offer.choice,
+              let verdict = judged, HubOffer.importable(verdict) else { return }
         hubOffer = nil
+        downloadFromHub(r, f, verdict: verdict)
+    }
+
+    /// The download and the import of a file judged — the user's here, or a borrowing Mac's (`MirrorLibraryHost`).
+    func downloadFromHub(_ r: HubRepository, _ f: HubRepository.File, verdict: HubImport.Verdict) {
         let destination = HubImport.destination(r, f, in: library)
         let name = (f.path as NSString).lastPathComponent
-        launchForge(String(localized: "Downloading \(name)")) { b, cancellation, journal in
+        launchForge(String(localized: "Downloading \(name)"), task: .downloading(file: name)) { b, cancellation, journal in
             // The file, and its map beside it: never wider than the file (a LoRA in fp32 halves in bf16).
             try b.checkSpace(2 * f.size)
             try HubImport.download(r, f, to: destination, cancellation: cancellation, journal: journal)

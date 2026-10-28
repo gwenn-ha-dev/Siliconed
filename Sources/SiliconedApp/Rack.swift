@@ -242,7 +242,7 @@ struct RackView: View {
             // The engine's settings come from this Mac's measure (`CapacityRules`): the title and its
             // chip open it, orange until it is taken — the first render waits for it — or while the one
             // kept is provisional (taken off rest), a green chip once a current one is kept.
-            let measured = app.storedMap.map { $0.isCurrent && !$0.isProvisional } == true
+            let measured = app.mapMeasured
             Button { app.openDiagnostic() } label: {
                 HStack(spacing: 6) {
                     Text("Chain").font(.headline).fixedSize()
@@ -335,6 +335,8 @@ private struct ComputeOnMenu: View {
                         else { Text("\(b.name) — not on the network") }
                     }
                     .disabled(!found && shown?.id != b.id)
+                    // What is known of it: chip, memory, B, map, models.
+                    if let machine = w.otherMacs.machines[b.id] { Text(verbatim: machine.summary) }
                 }
                 Divider()
                 Button("Other Macs…") { SettingsWindow.shared.show(w.local) }

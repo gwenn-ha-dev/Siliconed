@@ -70,6 +70,17 @@ struct SettingsView: View {
     /// Read again after an install: the link is the file system's, not the app's.
     @State private var command = SilicontrolCommand.state
 
+    /// The state the window shows: the Mac that computes, whose switch and map these are.
+    private var shown: AppState { MainWindow.shared.carrier.mirror ?? app }
+
+    /// « Faster Rendering » of the Mac that computes: this one's preference, or the lender's by a message.
+    private var fasterRendering: Binding<Bool> {
+        if let mirrored = MainWindow.shared.carrier.mirror {
+            return Binding(get: { mirrored.fasterRenderingShown }, set: { mirrored.setFasterRenderingOnLender($0) })
+        }
+        return $app.fasterRendering
+    }
+
     var body: some View {
         // A fixed frame: a TabView takes the size of no tab in particular, and a window that changed
         // size from one tab to the next would jump under the pointer. A tab longer than this scrolls.
@@ -87,8 +98,11 @@ struct SettingsView: View {
     private var general: some View {
         Form {
             Section {
-                Toggle(isOn: $app.fasterRendering) {
+                Toggle(isOn: fasterRendering) {
                     titled("Faster Rendering", "At 1024² and above, the first steps at half size: a quarter to a third faster, and a slightly different image. Not with a LoRA, Detail or an edit.")
+                }
+                if let name = MainWindow.shared.carrier.mirror?.mirror?.macName {
+                    Text("This is the setting of “\(name)”, the Mac that computes for you.").font(.caption)
                 }
             }
             Section {
@@ -140,12 +154,15 @@ struct SettingsView: View {
                 LabeledContent {
                     Button("Measure This Mac…") {
                         MainWindow.shared.show()
-                        app.openDiagnostic()
+                        shown.openDiagnostic()
                     }
                 } label: {
                     titled("This Mac", "About a minute, without any model: Siliconed measures this Mac before its first render and after each update, and chooses how it computes from it. Measured again here, it applies from the next launch.")
                 }
-                Text(DiagnosticSheet.mapStatus(app)).font(.caption)
+                if let name = shown.mirror?.macName {
+                    Text("This measures “\(name)”, the Mac that computes for you.").font(.caption)
+                }
+                Text(DiagnosticSheet.mapStatus(shown)).font(.caption)
                     .fixedSize(horizontal: false, vertical: true)
             }
             Section {

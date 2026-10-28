@@ -78,6 +78,13 @@ package enum SessionMessage: Codable, Equatable, Sendable {
     case licensing(RemoteLicense?)
     /// First after `catalog` at each join (see `RemoteSync`).
     case synced(RemoteSync)
+    /// The lender's machine, its map and its diagnostic (`Machine.swift`): at each join, then when one changes.
+    case machine(RemoteMachine)
+    /// The lender's library, an installation under way, a Hub file judged (`Installing.swift`).
+    case libraryNews(RemoteLibraryNews)
+    /// An upload offered (`Upload.swift`): taken or refused before its first byte, then verified or failed.
+    case uploadAnswer(id: UInt32, UploadAnswer)
+    case uploadResult(id: UInt32, UploadResult)
 
     // Neo → mini
     case render(RemoteJob)
@@ -94,6 +101,16 @@ package enum SessionMessage: Codable, Equatable, Sendable {
     case answerLicense(RemoteLicenseAnswer)
     /// « Undo » of a deletion: the images (by `i` ordinal) back in the history, in their place.
     case restoreImages([Int])
+    /// « Measure This Mac » of the lender, asked from the borrower's sheet; `stopMeasure` stops it.
+    case measure
+    case stopMeasure
+    /// The lender's « Faster Rendering » (`Spectral.halfSizeStart` is its process's); the new value shows in the catalog.
+    case setFasterRendering(Bool)
+    /// Install, remove, stop, judge a Hub file: the lender's library is common to its clients (`Installing.swift`).
+    case libraryAsk(RemoteLibraryRequest)
+    /// A file of the Neo to import on the mini: offered, then streamed (`Upload.swift`) if the answer is yes.
+    case uploadOffer(UploadOffer)
+    case uploadCancel(UInt32)
 
     package static func proof(_ key: PairedKey, challenge: Data) -> Data {
         Pairing.proof(key.key, side: "session", transcript: challenge)

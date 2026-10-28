@@ -54,6 +54,10 @@ final class MirrorServer {
     /// is, so that ⌘Z still works after the link came back (`remove`, `restore`).
     private var trash: [Data: SessionTrash<Entry>] = [:]
     private var lastCatalog: MirrorCatalog?
+    /// The machine, its map and its diagnostic (`MirrorMachine.swift`).
+    private let machine: MachinePublisher
+    /// The library, common to all clients (`MirrorLibrary.swift`).
+    private let library: MirrorLibraryHost
     private var lastPreview: CGImage?
     private var nextBlob: UInt32 = 1
     private var queueScheduled = false, catalogScheduled = false
@@ -78,8 +82,19 @@ final class MirrorServer {
         }
     }
 
+    /// The files other Macs import here (`MirrorUpload.swift`).
+    private lazy var importHub = UploadHub(app: app) { [weak self] m, identity in self?.host.send(m, to: identity) }
+
     init(app: AppState, host: RemoteHost) {
         self.app = app; self.host = host
+        machine = MachinePublisher(app: app, host: host)
+        library = MirrorLibraryHost(app: app, host: host)
+        let inbox = importHub.inbox
+        host.receive(streams: { [weak self] identity, id, bytes, last in
+            guard let (offer, step) = inbox.piece(identity: identity, id: id, bytes, last: last) else { return }
+            if case .more(_, false) = step { return }
+            DispatchQueue.main.async { MainActor.assumeIsolated { self?.importHub.stepped(identity, offer, step) } }
+        })
         _ = app.subscribe { [weak self] s in self?.signal(s) }
         watchQueue()
         watchCatalog()
@@ -120,13 +135,16 @@ final class MirrorServer {
         let catalog = lastCatalog ?? catalogSnapshot()
         lastCatalog = catalog
         host.send(.catalog(catalog), to: identity)
+        machine.joined(identity)
         host.send(.synced(sync(for: identity)), to: identity)
+        library.joined(identity)
         // The ends of its jobs, again: one that finished during a cut was told to a `Seen` that is gone.
         seen[identity]?.ended = endedJobs(of: identity)
         publish(to: identity)
     }
 
     func left(_ identity: Data) {
+        importHub.abort(identity)
         seen[identity] = nil
         uploads[identity] = nil
         held.removeAll { $0.identity == identity }
@@ -178,8 +196,14 @@ final class MirrorServer {
             restore(ordinals, for: identity)
         case .answerLicense(let a):
             answerLicense(a, from: identity)
+        case .libraryAsk(let r):
+            library.handle(r, from: identity)
+        case .uploadOffer(let o):
+            importHub.offer(o, from: identity)
+        case .uploadCancel(let id):
+            importHub.abort(identity, id: id)
         default:
-            break
+            machine.handle(m, from: identity)
         }
     }
 

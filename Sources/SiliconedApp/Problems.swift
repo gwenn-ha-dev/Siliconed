@@ -350,6 +350,7 @@ extension ModelCard {
 /// `… %` after a `↓` is always the download's.
 enum ForgeProgress {
     static func line(_ journal: [String]) -> String? {
+        if let upload = UploadProgress.line(journal) { return upload }
         var said: String?
         var downloading: String?, received: String?, preparing: String?, converted: String?
         for row in journal {

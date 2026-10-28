@@ -49,6 +49,7 @@ package final class RemoteHost: @unchecked Sendable {
     private let service: (name: String, txt: [String: String])?
     private let loopbackOnly: Bool
     private var handler: (@Sendable (Event) -> Void)?
+    private var streamHandler: (@Sendable (Data, UInt32, Data, Bool) -> Void)?
 
     private var keys: [PairedKey] = []
     private var listener: NWListener?
@@ -74,6 +75,12 @@ package final class RemoteHost: @unchecked Sendable {
 
     package func start(_ handler: @escaping @Sendable (Event) -> Void) {
         queue.async { self.handler = handler }
+    }
+
+    /// What joined Macs stream up (an upload): their identity, the stream's id, a piece, whether it is the
+    /// last — on the host's queue, in order, each piece handled before the next is read.
+    package func receive(streams handler: @escaping @Sendable (Data, UInt32, Data, Bool) -> Void) {
+        queue.async { self.streamHandler = handler }
     }
 
     // MARK: - Lending
@@ -138,6 +145,9 @@ package final class RemoteHost: @unchecked Sendable {
         let id = ObjectIdentifier(channel)
         let challenge = Pairing.random(Pairing.nonceSize)
         sessions[id] = Session(channel: channel, challenge: challenge)
+        channel.streams = { [weak self] stream, bytes, last in
+            if let identity = self?.sessions[id]?.identity { self?.streamHandler?(identity, stream, bytes, last) }
+        }
         channel.start { [weak self] event in
             guard let self else { return }
             switch event {

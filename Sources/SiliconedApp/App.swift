@@ -69,7 +69,7 @@ private struct AppCommands: Commands {
                 .keyboardShortcut("n")
             Button("Import a Model or LoRA…") { app.chooseToImport() }
                 .keyboardShortcut("o")
-                .disabled(!app.managementPossible)
+                .disabled(!app.importPossible)
             Button("Models…") { app.managementOpen = true }
                 .keyboardShortcut("m", modifiers: [.command, .shift])
         }
@@ -332,7 +332,11 @@ final class MainWindow: NSObject, NSWindowDelegate {
         otherMacs.show(nil, in: nil)
         if let mac {
             let link = MirrorLink(macName: mac.name, send: { [weak self] m in self?.otherMacs.send(m, to: mac.id) },
-                                  sendBlob: { [weak self] d, id in self?.otherMacs.send(blob: d, id: id, to: mac.id) })
+                                  sendBlob: { [weak self] d, id in self?.otherMacs.send(blob: d, id: id, to: mac.id) },
+                                  uploadPort: UploadPort(
+                                    linked: { [weak self] in self?.otherMacs.isJoined(mac.id) ?? false },
+                                    send: { [weak self] id, source in self?.otherMacs.send(stream: source, id: id, to: mac.id) },
+                                    cancel: { [weak self] id in self?.otherMacs.cancel(stream: id, to: mac.id) }))
             let m = AppState(mirroring: link, library: local.library, subjects: local.subjects)
             m.prompt = from.prompt; m.identifier = from.identifier; m.steps = from.steps
             m.orientation = from.orientation; m.format = from.format; m.batch = from.batch

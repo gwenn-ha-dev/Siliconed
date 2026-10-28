@@ -66,6 +66,17 @@ package final class RemoteLink: @unchecked Sendable {
         queue.async { [self] in if joined { channel?.send(blob: blob, id: id) } }
     }
 
+    /// An upload: `source` is read as the network takes it. Dropped when not joined, like the rest.
+    package func send(stream source: any StreamSource, id: UInt32) {
+        queue.async { [self] in
+            if joined, let channel { channel.send(stream: source, id: id) } else { source.close() }
+        }
+    }
+
+    package func cancel(stream id: UInt32) {
+        queue.async { [self] in channel?.cancel(stream: id) }
+    }
+
     package func disconnect() {
         queue.async { [self] in
             wanted = false

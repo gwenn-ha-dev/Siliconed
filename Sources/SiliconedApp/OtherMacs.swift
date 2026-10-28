@@ -51,6 +51,12 @@ final class OtherMacs {
     private(set) var found: [String: Found] = [:]
     /// Pairing windows open on the network, while the borrowing sheet is open.
     private(set) var pairable: [Found] = []
+    /// What each Mac lent last said of its machine (`RemoteMachine.forMenu`), by `id`: shown by the « On: »
+    /// menu and the Settings while it is not the one shown. Kept across launches.
+    private(set) var machines: [String: RemoteMachine] = {
+        UserDefaults.standard.data(forKey: OtherMacs.machinesKey).flatMap { try? JSONDecoder().decode([String: RemoteMachine].self, from: $0) } ?? [:]
+    }()
+    private static let machinesKey = "remoteMachines" + (ProcessInfo.processInfo.environment["SILICONED_ROOT"].map { " " + $0 } ?? "")
     /// The sessions wanted, by the other Mac's `id`.
     private(set) var links: [String: RemoteLink.State] = [:]
     /// The borrowing side's pairing, while its sheet is open.
@@ -312,6 +318,9 @@ final class OtherMacs {
 
     func send(_ m: SessionMessage, to id: String) { linkObjects[id]?.send(m) }
     func send(blob data: Data, id: UInt32, to mac: String) { linkObjects[mac]?.send(blob: data, id: id) }
+    func send(stream source: any StreamSource, id: UInt32, to mac: String) { linkObjects[mac]?.send(stream: source, id: id) }
+    func cancel(stream id: UInt32, to mac: String) { linkObjects[mac]?.cancel(stream: id) }
+    func isJoined(_ mac: String) -> Bool { if case .connected? = links[mac] { true } else { false } }
 
     func connect(_ b: Pairings.Borrowed) {
         guard let p = pairings, linkObjects[b.id] == nil else { return }
@@ -321,7 +330,13 @@ final class OtherMacs {
         linkObjects[id] = l
         links[id] = .connecting
         l.listen(messages: { [weak self] m in
-            DispatchQueue.main.async { MainActor.assumeIsolated { if let s = self, s.mirrored?.id == id { s.mirrored?.app.receive(m) } } }
+            DispatchQueue.main.async {
+                MainActor.assumeIsolated {
+                    guard let s = self else { return }
+                    if case .machine(let machine) = m { s.remember(machine, of: id) }
+                    if s.mirrored?.id == id { s.mirrored?.app.receive(m) }
+                }
+            }
         }, blobs: { [weak self] blob, data in
             DispatchQueue.main.async {
                 MainActor.assumeIsolated { if let s = self, s.mirrored?.id == id { s.mirrored?.app.receive(blob: blob, data) } }
@@ -339,6 +354,11 @@ final class OtherMacs {
         }
     }
 
+    private func remember(_ m: RemoteMachine, of id: String) {
+        machines[id] = m.forMenu
+        if let data = try? JSONEncoder().encode(machines) { UserDefaults.standard.set(data, forKey: Self.machinesKey) }
+    }
+
     func disconnect(_ id: String) {
         linkObjects.removeValue(forKey: id)?.disconnect()
         links[id] = nil
@@ -347,6 +367,7 @@ final class OtherMacs {
     func forget(borrowed b: Pairings.Borrowed) {
         disconnect(b.id)
         save { $0.borrowed.removeAll { $0.id == b.id } }
+        machines[b.id] = nil
     }
 }
 

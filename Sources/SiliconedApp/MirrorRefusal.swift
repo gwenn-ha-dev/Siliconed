@@ -34,6 +34,20 @@ extension AppRefusal {
             String(localized: "These images can't be restored.")
         case .subjectsIncomplete:
             String(localized: "A render that cites named subjects needs their prompt and images.")
+        case .machineBusy:
+            String(localized: "That Mac is busy: a render, an installation or the diagnostic is running.")
+        case .libraryBusy:
+            String(localized: "That Mac is busy: its library can change once its render, installation or measure is done.")
+        case .libraryUnreachable:
+            String(localized: "The disk of that Mac's library is not connected.")
+        case .familyUnknown(let id):
+            String(localized: "That Mac doesn't offer \(id).")
+        case .modelUnknown(let id):
+            String(localized: "That Mac doesn't hold the model \(id).")
+        case .hubNeedsFamily(let family):
+            String(localized: "This LoRA is for \(family.name), which isn't installed on that Mac yet: install it first.")
+        case .hubFileUnknown(let path):
+            String(localized: "Hugging Face doesn't list \(path) any more.")
         case .licenseMismatch(let model):
             String(localized: "The license shown is not this Mac's text for \(ModelCard.withID(model)?.name ?? model): nothing was accepted.")
         }

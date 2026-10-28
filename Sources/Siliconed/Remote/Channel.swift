@@ -38,6 +38,9 @@ package final class RemoteChannel: @unchecked Sendable {
     /// `finish()` was asked: close once the outbox is empty.
     private var finishing = false
     private var ended = false
+    /// What a stream brings in (`Frames.swift`): its id, a piece, whether it is the last. Set before
+    /// `start`, called on `queue`; without it the pieces are dropped (a pairing carries none).
+    package var streams: (@Sendable (UInt32, Data, Bool) -> Void)?
 
     package init(_ connection: NWConnection, queue: DispatchQueue) {
         self.connection = connection; self.queue = queue
@@ -76,6 +79,20 @@ package final class RemoteChannel: @unchecked Sendable {
         }
     }
 
+    /// A stream of bytes pulled from `source` as the network takes them (an upload): after the messages
+    /// and the blobs waiting, never ahead of them.
+    package func send(stream source: any StreamSource, id: UInt32) {
+        queue.async { [self] in
+            guard !ended else { source.close(); return }
+            outbox.send(stream: source, id: id)
+            pump()
+        }
+    }
+
+    package func cancel(stream id: UInt32) {
+        queue.async { [self] in outbox.cancel(stream: id) }
+    }
+
     /// Closes once what is queued has gone out — a refusal sent just before must reach the other side.
     package func finish() {
         queue.async { [self] in
@@ -109,6 +126,7 @@ package final class RemoteChannel: @unchecked Sendable {
     private func end(_ how: End) {
         guard !ended else { return }
         ended = true
+        outbox.closeStreams()
         connection.cancel()
         let h = handler
         handler = nil
@@ -125,6 +143,9 @@ package final class RemoteChannel: @unchecked Sendable {
                         switch f.kind {
                         case .message: handler?(.message(f.payload))
                         case .piece: if let b = try blobs.receive(f) { handler?(.blob(id: b.id, data: b.data)) }
+                        case .stream:
+                            let p = try f.streamPiece()
+                            streams?(p.id, p.bytes, p.last)
                         }
                         if ended { return }
                     }

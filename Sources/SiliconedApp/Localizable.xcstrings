@@ -793,6 +793,40 @@
         }
       }
     },
+    "%@ of %@" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ von %@"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ of %2$@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ de %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ sur %@"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ di %@"
+          }
+        }
+      }
+    },
     "%@ on disk" : {
       "localizations" : {
         "de" : {
@@ -5083,6 +5117,34 @@
         }
       }
     },
+    "Budget %@" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Budget %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Presupuesto %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Budget %@"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Budget %@"
+          }
+        }
+      }
+    },
     "Build the app with tools/app.sh." : {
       "localizations" : {
         "de" : {
@@ -5415,6 +5477,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Verificato una volta scaricato"
+          }
+        }
+      }
+    },
+    "Checking %@" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prüfe %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Comprobando %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vérification de %@"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verifica di %@"
           }
         }
       }
@@ -10388,6 +10478,34 @@
         }
       }
     },
+    "Hugging Face doesn't list %@ any more." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hugging Face führt %@ nicht mehr."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hugging Face ya no lista %@."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hugging Face ne liste plus %@."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hugging Face non elenca più %@."
+          }
+        }
+      }
+    },
     "Illustration, painting and anime. No photorealism: its publisher's choice." : {
       "localizations" : {
         "de" : {
@@ -10870,6 +10988,34 @@
         }
       }
     },
+    "Import from another Mac stopped: nothing was kept." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Import von einem anderen Mac gestoppt: Nichts wurde behalten."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Importación desde otro Mac detenida: no se conservó nada."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Import depuis un autre Mac arrêté : rien n’a été gardé."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Importazione da un altro Mac interrotta: non è stato conservato nulla."
+          }
+        }
+      }
+    },
     "Import is possible once the render or installation in progress is done." : {
       "localizations" : {
         "de" : {
@@ -10922,6 +11068,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Importalo invece come modello."
+          }
+        }
+      }
+    },
+    "Import stopped: the part already sent was deleted." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Import gestoppt: Der bereits gesendete Teil wurde gelöscht."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Importación detenida: se eliminó la parte ya enviada."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Import arrêté : la partie déjà envoyée a été supprimée."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Importazione interrotta: la parte già inviata è stata eliminata."
           }
         }
       }
@@ -11006,6 +11180,62 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Importazione di %@"
+          }
+        }
+      }
+    },
+    "Importing from another Mac" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Import von einem anderen Mac"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Importando desde otro Mac"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Import depuis un autre Mac"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Importazione da un altro Mac"
+          }
+        }
+      }
+    },
+    "Importing on “%@”" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Import auf „%@“"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Importando en «%@»"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Import sur « %@ »"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Importazione su «%@»"
           }
         }
       }
@@ -12830,6 +13060,34 @@
         }
       }
     },
+    "Measured" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gemessen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Medido"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mesuré"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Misurato"
+          }
+        }
+      }
+    },
     "Measures what this Mac computes, then opens a prefilled GitHub issue" : {
       "localizations" : {
         "de" : {
@@ -13050,6 +13308,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Modelli"
+          }
+        }
+      }
+    },
+    "Models ready: %lld" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bereite Modelle: %lld"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modelos listos: %lld"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modèles prêts : %lld"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modelli pronti: %lld"
           }
         }
       }
@@ -14441,6 +14727,34 @@
         }
       }
     },
+    "Not measured yet" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Noch nicht gemessen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aún sin medir"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pas encore mesuré"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Non ancora misurato"
+          }
+        }
+      }
+    },
     "Not supported — hover for the reason" : {
       "localizations" : {
         "de" : {
@@ -14886,6 +15200,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Un’immagine non è mai stata salvata."
+          }
+        }
+      }
+    },
+    "Only a .safetensors or a .gguf file can be imported." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nur eine .safetensors- oder .gguf-Datei kann importiert werden."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Solo se puede importar un archivo .safetensors o .gguf."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seul un fichier .safetensors ou .gguf peut être importé."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Si può importare solo un file .safetensors o .gguf."
           }
         }
       }
@@ -16064,6 +16406,68 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Lettura del repository…"
+          }
+        }
+      }
+    },
+    "Receiving %@" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Empfange %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recibiendo %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Réception de %@"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ricezione di %@"
+          }
+        }
+      }
+    },
+    "Receiving %@: %@" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Empfange %@: %@"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Receiving %1$@: %2$@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recibiendo %@: %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Réception de %@ : %@"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ricezione di %@: %@"
           }
         }
       }
@@ -17572,6 +17976,68 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Seleziona tutte le immagini"
+          }
+        }
+      }
+    },
+    "Sending %@" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sende %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enviando %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Envoi de %@"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Invio di %@"
+          }
+        }
+      }
+    },
+    "Sending %@: %@" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sende %@: %@"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Sending %1$@: %2$@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enviando %@: %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Envoi de %@ : %@"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Invio di %@: %@"
           }
         }
       }
@@ -19711,6 +20177,118 @@
         }
       }
     },
+    "That Mac doesn't hold the model %@." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dieser Mac hat das Modell %@ nicht."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ese Mac no tiene el modelo %@."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce Mac n’a pas le modèle %@."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quel Mac non ha il modello %@."
+          }
+        }
+      }
+    },
+    "That Mac doesn't offer %@." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dieser Mac bietet %@ nicht an."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ese Mac no ofrece %@."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce Mac ne propose pas %@."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quel Mac non offre %@."
+          }
+        }
+      }
+    },
+    "That Mac is busy: a render, an installation or the diagnostic is running." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dieser Mac ist beschäftigt: Ein Rendering, eine Installation oder die Diagnose läuft."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ese Mac está ocupado: hay un render, una instalación o el diagnóstico en curso."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce Mac est occupé : un rendu, une installation ou le diagnostic est en cours."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quel Mac è occupato: è in corso un rendering, un’installazione o la diagnosi."
+          }
+        }
+      }
+    },
+    "That Mac is busy: its library can change once its render, installation or measure is done." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dieser Mac ist beschäftigt: Seine Bibliothek kann sich ändern, sobald Rendering, Installation oder Messung fertig sind."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ese Mac está ocupado: su biblioteca podrá cambiar cuando terminen su render, su instalación o su medición."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce Mac est occupé : sa bibliothèque pourra changer une fois son rendu, son installation ou sa mesure terminés."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quel Mac è occupato: la sua libreria potrà cambiare quando rendering, installazione o misura saranno finiti."
+          }
+        }
+      }
+    },
     "The DiT in fp32 throughout, the image verified against the reference. Click to run part of it in fp16 on the Neural Engine: less energy (about a fifth on an M1 Pro), an image a little different." : {
       "localizations" : {
         "de" : {
@@ -20109,6 +20687,34 @@
         }
       }
     },
+    "The disk of that Mac's library is not connected." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das Laufwerk der Bibliothek dieses Macs ist nicht angeschlossen."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El disco de la biblioteca de ese Mac no está conectado."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le disque de la bibliothèque de ce Mac n’est pas branché."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il disco della libreria di quel Mac non è collegato."
+          }
+        }
+      }
+    },
     "The download of %@ is corrupt: its checksum doesn't match." : {
       "localizations" : {
         "de" : {
@@ -20419,6 +21025,62 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Il pannello dell’esplorazione (⌥⌘G)"
+          }
+        }
+      }
+    },
+    "The file arrived damaged on “%@”: nothing was kept. Send it again." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Datei kam beschädigt auf „%@“ an: Nichts wurde behalten. Senden Sie sie erneut."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El archivo llegó dañado a «%@»: no se conservó nada. Envíelo de nuevo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le fichier est arrivé abîmé sur « %@ » : rien n’a été gardé. Envoyez-le à nouveau."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il file è arrivato danneggiato su «%@»: non è stato conservato nulla. Invialo di nuovo."
+          }
+        }
+      }
+    },
+    "The file could not be read." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Datei konnte nicht gelesen werden."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se pudo leer el archivo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le fichier n’a pas pu être lu."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Non è stato possibile leggere il file."
           }
         }
       }
@@ -21091,6 +21753,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "La licenza mostrata non è il testo di questo Mac per %@: non è stato accettato nulla."
+          }
+        }
+      }
+    },
+    "The link to “%@” was lost: the part already sent was deleted. Send it again." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Verbindung zu „%@“ ist abgebrochen: Der bereits gesendete Teil wurde gelöscht. Senden Sie die Datei erneut."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Se perdió la conexión con «%@»: se eliminó la parte ya enviada. Envíelo de nuevo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le lien avec « %@ » est perdu : la partie déjà envoyée a été supprimée. Envoyez-le à nouveau."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il collegamento con «%@» si è interrotto: la parte già inviata è stata eliminata. Invialo di nuovo."
           }
         }
       }
@@ -22541,6 +23231,34 @@
         }
       }
     },
+    "This LoRA is for %@, which isn't installed on that Mac yet: install it first." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diese LoRA ist für %@, das auf diesem Mac noch nicht installiert ist: Installieren Sie es zuerst."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Este LoRA es para %@, que aún no está instalado en ese Mac: instálelo primero."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce LoRA est pour %@, pas encore installé sur ce Mac : installez-le d’abord."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Questo LoRA è per %@, non ancora installato su quel Mac: installalo prima."
+          }
+        }
+      }
+    },
     "This LoRA isn't installed on this Mac: %@" : {
       "localizations" : {
         "de" : {
@@ -23171,6 +23889,90 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Questa immagine è più grande di ciò che macOS ingrandisce: al massimo %@ px per lato"
+          }
+        }
+      }
+    },
+    "This is the library of “%@”: only that Mac can open it, move it or show it in the Finder." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dies ist die Bibliothek von „%@“: Nur dieser Mac kann sie öffnen, verschieben oder im Finder zeigen."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Es la biblioteca de «%@»: solo ese Mac puede abrirla, moverla o mostrarla en el Finder."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "C’est la bibliothèque de « %@ » : seul ce Mac peut l’ouvrir, la déplacer ou la montrer dans le Finder."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "È la libreria di «%@»: solo quel Mac può aprirla, spostarla o mostrarla nel Finder."
+          }
+        }
+      }
+    },
+    "This is the setting of “%@”, the Mac that computes for you." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dies ist die Einstellung von „%@“, dem Mac, der für Sie rechnet."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Es el ajuste de «%@», el Mac que calcula por usted."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "C’est le réglage de « %@ », le Mac qui calcule pour vous."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "È l’impostazione di «%@», il Mac che calcola per te."
+          }
+        }
+      }
+    },
+    "This measures “%@”, the Mac that computes for you." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dies misst „%@“, den Mac, der für Sie rechnet."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esto mide «%@», el Mac que calcula por usted."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ceci mesure « %@ », le Mac qui calcule pour vous."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Questo misura «%@», il Mac che calcola per te."
           }
         }
       }
@@ -24971,6 +25773,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Larghezza × altezza: ogni lato da 512 a %@ e multiplo di %@."
+          }
+        }
+      }
+    },
+    "Working on the library of “%@”" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Arbeit an der Bibliothek von „%@“"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trabajando en la biblioteca de «%@»"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Travail sur la bibliothèque de « %@ »"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lavoro sulla libreria di «%@»"
           }
         }
       }
@@ -29315,6 +30145,62 @@
         }
       }
     },
+    "“%@” could not write the file." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "„%@“ konnte die Datei nicht schreiben."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "«%@» no pudo escribir el archivo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "« %@ » n’a pas pu écrire le fichier."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "«%@» non è riuscito a scrivere il file."
+          }
+        }
+      }
+    },
+    "“%@” is busy: an installation, an import or a render is running." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "„%@“ ist beschäftigt: Eine Installation, ein Import oder ein Rendering läuft."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "«%@» está ocupado: hay una instalación, una importación o un render en curso."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "« %@ » est occupé : une installation, un import ou un rendu est en cours."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "«%@» è occupato: è in corso un’installazione, un’importazione o un rendering."
+          }
+        }
+      }
+    },
     "“%@” is no longer waiting for a Mac: open its pairing window again." : {
       "localizations" : {
         "de" : {
@@ -29339,6 +30225,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "«%@» non aspetta più un Mac: riapri la sua finestra di abbinamento."
+          }
+        }
+      }
+    },
+    "“%@” is on “%@”: it is being imported there." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "„%@“ ist auf „%@“: Dort wird es importiert."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "“%1$@” is on “%2$@”: it is being imported there."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "«%@» está en «%@»: se está importando allí."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "« %@ » est sur « %@ » : il y est en cours d’import."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "«%@» è su «%@»: lì è in corso l’importazione."
           }
         }
       }

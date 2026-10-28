@@ -198,7 +198,7 @@ struct DiTBox: View {
                 }
                 Button("Import…") { app.chooseToImport() }
                     .buttonStyle(.link)
-                    .disabled(!app.managementPossible)
+                    .disabled(!app.importPossible)
                     .help("A model (.safetensors or .gguf) or a LoRA (.safetensors), as published on Civitai")
             }
             .font(.callout)

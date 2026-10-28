@@ -6,7 +6,8 @@
 //   answer comes before the verdict, so a refusal is the command's own. An edit with no format typed
 //   leaves its size to the other Mac (image 1's, by its denoiser's rule).
 // - `wait` and `follow` read the signals the mirror gives from what the other Mac publishes.
-// - What acts on this Mac — `install`, `diagnose`, `set` — refuses: the window says where it computes.
+// - What acts on this Mac — `install` — refuses; `diagnose` and `set faster-rendering` act on the other Mac's
+//   (`MirrorMachine.swift`, `diagnose` in `RemoteControl+Commands.swift`); the window says where it computes.
 // - `grid` (and `add` of a series with `--sketch`, `--x`, `--y`) is asked whole of the other Mac, which
 //   makes the cells (`MirrorLink.explore`) and answers with them (`gridQueued`); `wait g2` follows it
 //   from what it publishes. `vary` is the window's « Variations » (the same jobs, each answered by the
@@ -26,7 +27,7 @@ extension RemoteControl {
         guard let mirror = app.mirror else { return }
         let name = mirror.macName
         switch command {
-        case "install", "diagnose", "set":
+        case "install":
             throw Refusal("remote", String(localized: "\(command) acts on this Mac, and the window computes on “\(name)”"),
                           help: String(localized: "Render › Compute On › This Mac, then retry"))
         default:

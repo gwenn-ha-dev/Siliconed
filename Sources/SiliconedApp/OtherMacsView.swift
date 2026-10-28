@@ -63,6 +63,7 @@ struct OtherMacsSection: View {
                 } label: {
                     Text(verbatim: m.name)
                     Text(Self.state(macs.links[m.id], found: macs.found[m.id] != nil)).font(.caption)
+                    if let machine = macs.machines[m.id] { Text(verbatim: machine.summary).font(.caption) }
                 }
             }
         } header: {

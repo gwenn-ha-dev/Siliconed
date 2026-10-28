@@ -88,8 +88,13 @@ final class MirrorLink {
     var grids: [Int: (jobs: [Int], sketch: Bool)] = [:]
     private var sketches: [Int: Bool] = [:]
 
-    init(macName: String, send: @escaping (SessionMessage) -> Void, sendBlob: @escaping (Data, UInt32) -> Void) {
+    /// The files this Mac offers to import there (`MirrorUpload.swift`).
+    let uploads: UploadBorrower
+
+    init(macName: String, send: @escaping (SessionMessage) -> Void, sendBlob: @escaping (Data, UInt32) -> Void,
+         uploadPort: UploadPort? = nil) {
         self.macName = macName; self.sender = send; self.blobSender = sendBlob
+        uploads = UploadBorrower(port: uploadPort)
     }
 
     func send(_ m: SessionMessage) { sender(m) }
@@ -367,6 +372,7 @@ extension AppState {
         case .licensing(let l):
             receiveLicensing(l)
         case .refused(let r):
+            measureRefused(r)
             let p = Problem(r)
             // An enlargement asked by `silicontrol` is answered there; its refusal is not the window's.
             if !link.enlargeWaiters.isEmpty { link.enlargeWaiters.removeFirst()(.refused(p.text)); return }
@@ -374,6 +380,12 @@ extension AppState {
             flash(p.text)
         case .synced(let s):
             settle(s)
+        case .machine(let m):
+            receiveMachine(m)
+        case .libraryNews(let n):
+            receiveLibrary(n)
+        case .uploadAnswer, .uploadResult:
+            receive(upload: m)
         default:
             break
         }
@@ -472,8 +484,8 @@ extension AppState {
             // Asked before a cut: asked again.
             mirror?.asked = []
         case .connecting, .off: break
-        case .waiting: noteCut(); problem = { var p = Problem(String(localized: "Lost “\(name)”: trying again…")); p.code = "remote"; return p }()
-        case .refused: problem = { var p = Problem(OtherMacsSection.state(s, found: true)); p.code = "remote"; return p }()
+        case .waiting: uploadLinkChanged(s); noteCut(); problem = { var p = Problem(String(localized: "Lost “\(name)”: trying again…")); p.code = "remote"; return p }()
+        case .refused: uploadLinkChanged(s); problem = { var p = Problem(OtherMacsSection.state(s, found: true)); p.code = "remote"; return p }()
         }
     }
 }

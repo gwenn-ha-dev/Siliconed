@@ -12,10 +12,14 @@ extension AppState {
 
     /// Why the diagnostic cannot start now, or `nil`. It occupies the GPU and the CPU like a render —
     /// measured beside one, it would measure both.
-    var diagnosticBlocker: String? {
-        if diagnosticRunning { return String(localized: "A diagnostic is already running.") }
-        if busy { return String(localized: "A render is running: the diagnostic can start once the queue is empty.") }
-        if forgeInProgress != nil { return String(localized: "An installation is running: the diagnostic can start once it is done.") }
+    var diagnosticBlocker: String? { diagnosticBlock?.sentence }
+
+    /// The same, as a code: in a mirror, the lending Mac's (it renders for others too, which this one does not see).
+    var diagnosticBlock: RemoteBlocker? {
+        if mirror != nil { return mirrorMachine?.blocker }
+        if diagnosticRunning { return .measuring }
+        if busy { return .rendering }
+        if forgeInProgress != nil { return .installing }
         return nil
     }
 
@@ -31,6 +35,12 @@ extension AppState {
     /// **Runs `Diagnostic.run`** in a child process (`CapacityMeasure`, ~1 min), the queue held meanwhile.
     func startDiagnostic() {
         guard diagnosticBlocker == nil else { return }
+        // In a mirror the lending Mac measures itself; the sheet shows it starting until its word comes.
+        if let mirror {
+            diagnostic = .running(done: 0, total: Diagnostic.Stage.allCases.count, line: Self.diagnosticLine(0))
+            mirror.send(.measure)
+            return
+        }
         measure()
     }
 
@@ -89,6 +99,7 @@ extension AppState {
     }
 
     func cancelDiagnostic() {
+        if let mirror { if diagnosticRunning { mirror.send(.stopMeasure) }; return }
         guard let process = diagnosticProcess else { return }
         diagnosticStopped = true
         process.terminate()
@@ -97,14 +108,17 @@ extension AppState {
     /// The library names the stage (`Diagnostic.Stage`): the app says it in the user's language.
     private func diagnosticProgress(_ stage: Diagnostic.Stage) {
         guard case .running = diagnostic, let i = Diagnostic.Stage.allCases.firstIndex(of: stage) else { return }
-        let line = switch stage {
+        diagnostic = .running(done: i, total: Diagnostic.Stage.allCases.count, line: Self.diagnosticLine(stage))
+    }
+
+    static func diagnosticLine(_ stage: Diagnostic.Stage) -> String {
+        switch stage {
         case .products: String(localized: "matrix products in fp32")
         case .lowPrecision: String(localized: "matrix products in fp16 and bf16")
         case .attention: String(localized: "attention")
         case .widening: String(localized: "weight widening")
         case .witness: String(localized: "the first measurement again")
         }
-        diagnostic = .running(done: i, total: Diagnostic.Stage.allCases.count, line: line)
     }
 
     /// **« Open the issue »**: the report goes to the clipboard, and GitHub's form opens with every field
@@ -134,7 +148,8 @@ extension AppState {
         toastTask?.cancel()
         clearQueue()
         task?.cancel()
-        cancelDiagnostic()
+        // A mirror's window closing does not stop the measure of the Mac it shows.
+        if mirror == nil { cancelDiagnostic() }
     }
 }
 

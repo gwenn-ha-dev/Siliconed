@@ -35,7 +35,7 @@ struct Sidebar: View {
         // A `.safetensors` or a `.gguf` dropped on the column is imported (model or LoRA).
         .dropDestination(for: URL.self) { urls, _ in
             let s = urls.filter(AppState.importable)
-            guard !s.isEmpty, app.managementPossible else { return false }
+            guard !s.isEmpty, app.importPossible else { return false }
             app.perform(s)
             return true
         }
@@ -242,11 +242,11 @@ private struct Footer: View {
                             .buttonStyle(.link).font(.caption)
                             .help("Stops the installation: the files already downloaded are kept, the one in progress will start over")
                     }
-                    if let line = ForgeProgress.line(app.forgeJournal) {
+                    if let line = app.forgeLine {
                         Text(line).font(.caption).monospacedDigit().foregroundStyle(.secondary).lineLimit(2)
                     }
                 }
-                .help(app.forgeJournal.joined(separator: "\n"))
+                .help(app.forgeHelp)
             }
             if let problem = app.problem {
                 ProblemView(problem: problem) { app.problem = nil }

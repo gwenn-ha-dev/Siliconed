@@ -74,7 +74,7 @@ struct ModelManagement: View {
                             }
                             Spacer()
                             Text(Figures.disk(t)).monospacedDigit().foregroundStyle(.secondary)
-                            Button("Discard") { app.emptyDownloads() }.disabled(!app.managementPossible)
+                            Button("Discard") { app.emptyDownloads() }.disabled(!app.libraryManageable)
                         }
                     }
                 }
@@ -114,12 +114,14 @@ struct ModelManagement: View {
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("Models").font(.title2.weight(.semibold))
-                    Text(verbatim: app.library.displayPath)
+                    Text(verbatim: app.libraryTitle)
                         .font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
                         .lineLimit(1).truncationMode(.middle)
                 }
                 Spacer()
                 Button("Show in Finder") { app.showInFinder() }
+                    .disabled(app.mirror != nil)
+                    .help(app.localOnlyHelp ?? "")
                 Button("Measure This Mac…") { app.openDiagnostic() }
                     .help("Measures what this Mac computes, then opens a prefilled GitHub issue")
             }
@@ -138,10 +140,10 @@ struct ModelManagement: View {
                 ProgressView().controlSize(.small)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title).font(.callout).lineLimit(1)
-                    Text(ForgeProgress.line(app.forgeJournal) ?? "…")
+                    Text(app.forgeLine ?? "…")
                         .font(.caption).monospacedDigit().foregroundStyle(.secondary).lineLimit(1)
                 }
-                .help(Library.withoutHome(app.forgeJournal.joined(separator: "\n")))
+                .help(app.forgeHelp)
                 Spacer()
                 Button("Stop") { app.cancelForge() }
                     .help("Stops the installation: the files already downloaded are kept, the one in progress will start over")
@@ -151,7 +153,7 @@ struct ModelManagement: View {
                 }
                 Spacer()
                 Button("Import…") { app.chooseToImport() }
-                    .disabled(!app.managementPossible)
+                    .disabled(!app.importPossible)
                     .help("A model (.safetensors or .gguf) or a LoRA (.safetensors), as published on Civitai")
             }
             Button("Done") { shutDown() }
@@ -180,7 +182,7 @@ struct ModelManagement: View {
         let card = ModelCard.of(p.family)
         // What `install` will do, read from the disk now (`Library.installPlan`): the version, what it
         // adds, the version it replaces and whether that one must go before the first byte.
-        let plan = try? app.library.installPlan(p.family, variant: offer.variant, baseDiT: offer.baseDiT)
+        let plan = app.installPlan(p.family, variant: offer.variant, baseDiT: offer.baseDiT)
         let bytes = plan?.added ?? toDownload(p, baseDiT: offer.baseDiT, variant: offer.variant)
         let choice = Binding(get: { app.installOffer?.variant ?? offer.variant }, set: { app.installOffer?.variant = $0 })
         return VStack(alignment: .leading, spacing: 12) {
@@ -235,7 +237,7 @@ struct ModelManagement: View {
                 Button("Cancel") { app.installOffer = nil }
                 Button("Accept and Install") { app.acceptAndInstall(p.family, variant: offer.variant, baseDiT: offer.baseDiT) }
                     .buttonStyle(.borderedProminent)
-                    .disabled(!app.managementPossible || tooBig)
+                    .disabled(!app.libraryManageable || tooBig)
             }
         }
         .padding(12)
@@ -281,7 +283,7 @@ struct ModelManagement: View {
                 .disabled(app.identifier == card.id)
         } else {
             Button(p.present ? "Finish Installing…" : "Install…") { app.offerInstall(p.family) }
-                .disabled(!app.managementPossible || app.installOffer?.family == p.family)
+                .disabled(!app.libraryManageable || app.installOffer?.family == p.family)
                 .help(String(localized: "Shows the license and the space it takes; nothing is downloaded before you accept"))
         }
         if p.present {
@@ -295,7 +297,7 @@ struct ModelManagement: View {
                 Button("Uninstall…", role: .destructive) { removal = .family(p.family) }
             } label: { Image(systemName: "ellipsis") }
                 .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
-                .disabled(!app.managementPossible)
+                .disabled(!app.libraryManageable)
         }
     }
 
@@ -308,7 +310,7 @@ struct ModelManagement: View {
     private func state(_ p: Library.Occupancy.FamilyPart) -> String {
         let card = ModelCard.of(p.family)
         if p.isReady && p.dit > 0 {
-            return app.library.isLicenseAccepted(card)
+            return app.licenseAccepted(card)
                 ? String(localized: "\(card.licenseName) · license accepted")
                 : String(localized: "\(card.licenseName) · license not accepted yet: asked at the first render")
         }
@@ -321,7 +323,7 @@ struct ModelManagement: View {
     /// disk (`Library.InstallPlan.added`) — an encoder already there counts for nothing. The other version
     /// counts for nothing either: it goes once the new one is ready.
     private func toDownload(_ p: Library.Occupancy.FamilyPart, baseDiT: Bool = true, variant: Variant = .standard) -> Int {
-        if let plan = try? app.library.installPlan(p.family, variant: variant, baseDiT: baseDiT) { return plan.added }
+        if let plan = app.installPlan(p.family, variant: variant, baseDiT: baseDiT) { return plan.added }
         let t = p.family.installedSize(variant)
         return (baseDiT ? t.dit : 0) + t.encoder + (p.components > 0 ? 0 : t.components)
     }
@@ -346,11 +348,11 @@ struct ModelManagement: View {
                     .disabled(app.identifier == f.id)
             } else {
                 Button("Install \(f.family.name)…") { app.offerInstall(f.family, baseDiT: false) }
-                    .disabled(!app.managementPossible)
+                    .disabled(!app.libraryManageable)
             }
             Button { removal = .model(f) } label: { Image(systemName: "trash") }
                 .buttonStyle(.borderless).help("Remove this model")
-                .disabled(!app.managementPossible)
+                .disabled(!app.libraryManageable)
         }
         .padding(.vertical, 2)
     }
@@ -370,7 +372,7 @@ struct ModelManagement: View {
             Text(Figures.disk(bytes)).monospacedDigit().foregroundStyle(.secondary)
             Button { removal = .lora(l) } label: { Image(systemName: "trash") }
                 .buttonStyle(.borderless).help("Remove this LoRA")
-                .disabled(!app.managementPossible)
+                .disabled(!app.libraryManageable)
         }
         .padding(.vertical, 2)
     }

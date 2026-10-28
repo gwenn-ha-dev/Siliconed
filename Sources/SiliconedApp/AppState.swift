@@ -53,7 +53,8 @@ final class AppState {
     @ObservationIgnored var warmCancellation: Cancellation?
     @ObservationIgnored var volumeObservers: [NSObjectProtocol] = []
     /// The warnings of the machine profile (a profile measured elsewhere, for example).
-    private(set) var profileWarnings: [String] = []
+    /// (Set by a mirror from what the lending Mac published.)
+    var profileWarnings: [String] = []
     /// All the known models — the publisher's, then the imported ones (`Library.cards()`).
     var cards: [ModelCard] = []
     /// The ready models (all their files present).
@@ -398,6 +399,11 @@ final class AppState {
     /// An installation or an import in progress (several minutes, several GB) — and what it says.
     var forgeInProgress: String?
     var forgeJournal: [String] = []
+    /// What the forge in progress is, by identifiers: what a borrowing Mac is told (`RemoteForge`).
+    var forgeTask: RemoteForge.Task = .other
+    /// In a mirror: the other Mac's library and the installation under way there (`MirrorLibrary.swift`).
+    var remoteLibrary: RemoteLibrary?
+    var remoteForge: RemoteForge?
     /// The token of the forge in progress: "Stop" cuts a download in the middle.
     var cancellationForge: Cancellation?
     /// What the library occupies — the "Models" sheet; re-read with the catalog.
@@ -468,6 +474,8 @@ final class AppState {
     @ObservationIgnored var mirror: MirrorLink?
     /// What the other Mac published of its models.
     var mirrorCatalog: MirrorCatalog?
+    /// The other Mac's chip, map and diagnostic (`MirrorMachine.swift`).
+    var mirrorMachine: RemoteMachine?
     /// What the other Mac renders for others (itself, other Macs): how many, and for how long (`nil`: unknown).
     var othersQueued = 0
     var othersSeconds: Double?

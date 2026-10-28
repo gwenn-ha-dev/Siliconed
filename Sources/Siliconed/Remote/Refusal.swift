@@ -32,4 +32,17 @@ package enum AppRefusal: Codable, Equatable, Sendable {
     case licenseMismatch(model: String)
     /// A render whose named subjects came without their rewritten prompt, or without their images.
     case subjectsIncomplete
+    /// A measure or a setting asked of a Mac that renders, installs or measures.
+    case machineBusy
+    /// A change of the library while a render, an installation or a measure runs there.
+    case libraryBusy
+    /// The library's disk is not connected.
+    case libraryUnreachable
+    /// A family or a version the lender does not offer (`family` or `family/version`), a model it does not hold (an identifier).
+    case familyUnknown(String)
+    case modelUnknown(String)
+    /// A LoRA for a family not installed there: install it first, then import again.
+    case hubNeedsFamily(Family)
+    /// A file the Hub no longer lists in that repository.
+    case hubFileUnknown(String)
 }

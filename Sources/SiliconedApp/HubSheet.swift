@@ -34,7 +34,7 @@ struct HubSheet: View {
                 }
             }
             HStack {
-                if offer?.repository != nil, !app.managementPossible {
+                if offer?.repository != nil, !app.libraryManageable {
                     Text("Import is possible once the render or installation in progress is done.")
                         .font(.caption).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -44,7 +44,7 @@ struct HubSheet: View {
                     .keyboardShortcut(.cancelAction)
                 Button(importTitle(offer)) { app.importFromHub() }
                     .keyboardShortcut(.defaultAction)
-                    .disabled(!(offer.map { AppState.HubOffer.importable($0.choice?.verdict) } ?? false) || !app.managementPossible)
+                    .disabled(!(offer.map { AppState.HubOffer.importable($0.choice?.verdict) } ?? false) || !app.libraryManageable)
             }
         }
         .padding(20)

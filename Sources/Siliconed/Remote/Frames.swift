@@ -9,6 +9,12 @@ import Foundation
 ///     frame = kind u8 ‖ flags u8 ‖ length u32 (big-endian) ‖ payload
 ///       kind 0, message:  payload = JSON
 ///       kind 1, piece:    payload = blob id u32 ‖ bytes ; flags bit 0 = last piece
+///       kind 2, stream:   payload = stream id u32 ‖ bytes ; flags bit 0 = last piece (`Upload.swift`)
+///
+/// **A blob is whole in memory** on both sides (a PNG: megabytes, bounded at 64 MiB). **A stream is
+/// never**: a file of several GB goes out as it is read, one piece pulled from its source when the
+/// network took the last, and comes in as it is written (`StreamSource`, `RemoteChannel.streams`).
+/// Messages go first, then blob pieces, then stream pieces: an upload yields to a PNG coming down.
 ///
 /// **The stream comes from the network**: a length is bounded before anything is allocated, a blob
 /// is bounded as it grows, and an unknown kind ends the session rather than being skipped.
@@ -16,7 +22,7 @@ import Foundation
 // MARK: - A frame
 
 package struct Frame: Equatable, Sendable {
-    package enum Kind: UInt8, Sendable { case message = 0, piece = 1 }
+    package enum Kind: UInt8, Sendable { case message = 0, piece = 1, stream = 2 }
 
     package let kind: Kind
     package let flags: UInt8
@@ -53,6 +59,22 @@ package enum FrameFailure: Error, Equatable, Sendable {
     case truncatedPiece
     case blobTooLarge(id: UInt32)
     case tooManyBlobs
+}
+
+extension Frame {
+    /// A stream frame's id, bytes and last flag.
+    package func streamPiece() throws(FrameFailure) -> (id: UInt32, bytes: Data, last: Bool) {
+        guard payload.count >= 4 else { throw .truncatedPiece }
+        return (Frame.readBigEndian(payload, at: payload.startIndex), Data(payload.dropFirst(4)), flags & 1 != 0)
+    }
+}
+
+/// **Where a stream's bytes come from**, pulled one piece at a time by the channel's queue — the file
+/// is read as it goes out, never whole. `next` throwing abandons the stream (the source says why to its
+/// owner itself); `close` is called once the stream is over, abandoned, or the channel is.
+package protocol StreamSource: AnyObject, Sendable {
+    func next(_ limit: Int) throws -> (bytes: Data, last: Bool)
+    func close()
 }
 
 // MARK: - Reading
@@ -116,19 +138,33 @@ package struct Outbox: Sendable {
 
     private var messages: [Data] = []
     private var blobs: [(id: UInt32, data: Data, offset: Int)] = []
+    private var streams: [(id: UInt32, source: any StreamSource)] = []
 
     package init() {}
 
-    package var isEmpty: Bool { messages.isEmpty && blobs.isEmpty }
+    package var isEmpty: Bool { messages.isEmpty && blobs.isEmpty && streams.isEmpty }
 
     package mutating func send(message json: Data) { messages.append(json) }
 
     package mutating func send(blob data: Data, id: UInt32) { blobs.append((id, data, 0)) }
 
+    package mutating func send(stream source: any StreamSource, id: UInt32) { streams.append((id, source)) }
+
+    /// Drops a stream (its source is closed), whether it started or not.
+    package mutating func cancel(stream id: UInt32) {
+        for s in streams where s.id == id { s.source.close() }
+        streams.removeAll { $0.id == id }
+    }
+
+    package mutating func closeStreams() {
+        for s in streams { s.source.close() }
+        streams = []
+    }
+
     /// The next frame to write.
     package mutating func next() -> Frame? {
         if !messages.isEmpty { return Frame(kind: .message, payload: messages.removeFirst()) }
-        guard !blobs.isEmpty else { return nil }
+        guard !blobs.isEmpty else { return nextStreamPiece() }
         let b = blobs[0]
         let end = min(b.offset + Self.pieceSize, b.data.count)
         let last = end == b.data.count
@@ -137,5 +173,22 @@ package struct Outbox: Sendable {
         payload.append(b.data[(s + b.offset)..<(s + end)])
         if last { blobs.removeFirst() } else { blobs[0].offset = end }
         return Frame(kind: .piece, flags: last ? 1 : 0, payload: payload)
+    }
+
+    /// One piece of the first stream, pulled now: only this one is in memory.
+    private mutating func nextStreamPiece() -> Frame? {
+        while let s = streams.first {
+            do {
+                let (bytes, last) = try s.source.next(Self.pieceSize)
+                var payload = Data(Frame.bigEndian(s.id))
+                payload.append(bytes)
+                if last { s.source.close(); streams.removeFirst() }
+                return Frame(kind: .stream, flags: last ? 1 : 0, payload: payload)
+            } catch {
+                s.source.close()
+                streams.removeFirst()
+            }
+        }
+        return nil
     }
 }
