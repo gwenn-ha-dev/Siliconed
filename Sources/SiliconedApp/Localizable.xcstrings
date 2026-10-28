@@ -57,6 +57,40 @@
         }
       }
     },
+    "%@ acts on this Mac, and the window computes on “%@”" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ wirkt auf diesen Mac, und das Fenster rechnet auf „%@“"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ acts on this Mac, and the window computes on “%2$@”"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ actúa sobre este Mac, y la ventana calcula en «%@»"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ agit sur ce Mac, et la fenêtre calcule sur « %@ »"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ agisce su questo Mac, e la finestra calcola su «%@»"
+          }
+        }
+      }
+    },
     "%@ architecture" : {
       "localizations" : {
         "de" : {
@@ -165,6 +199,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@ non fa modifiche per riferimento (--ref)"
+          }
+        }
+      }
+    },
+    "%@ does not work on another Mac yet: the window computes on “%@”" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ funktioniert noch nicht auf einem anderen Mac: Das Fenster rechnet auf „%@“"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ does not work on another Mac yet: the window computes on “%2$@”"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ aún no funciona en otro Mac: la ventana calcula en «%@»"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ ne marche pas encore sur un autre Mac : la fenêtre calcule sur « %@ »"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ non funziona ancora su un altro Mac: la finestra calcola su «%@»"
           }
         }
       }
@@ -17014,6 +17082,34 @@
         }
       }
     },
+    "Render › Compute On › This Mac, then retry" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rendern › Rechnen auf › Dieser Mac, dann erneut versuchen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Renderizado › Calcular en › Este Mac, y vuelve a intentarlo"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rendu › Calculer sur › Ce Mac, puis réessayer"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rendering › Calcola su › Questo Mac, poi riprova"
+          }
+        }
+      }
+    },
     "Rendering cell %lld of %lld — step %lld/%lld" : {
       "localizations" : {
         "de" : {
@@ -27019,6 +27115,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "modello"
+          }
+        }
+      }
+    },
+    "model \"%@\" is not ready on “%@”" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das Modell „%@“ ist auf „%@“ nicht bereit"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "model \"%1$@\" is not ready on “%2$@”"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "el modelo «%@» no está listo en «%@»"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "le modèle « %@ » n’est pas prêt sur « %@ »"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "il modello «%@» non è pronto su «%@»"
           }
         }
       }

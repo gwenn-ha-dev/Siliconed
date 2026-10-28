@@ -65,6 +65,8 @@ package enum SessionMessage: Codable, Equatable, Sendable {
     /// A `render` the mini did not queue, in its words.
     case refused(String)
     case quoted(RemoteQuoteAnswer)
+    case answer(request: Int, RemoteAnswer)
+    case ended(RemoteEnded)
     /// Enlarging this image needs Apple's model, not yet on the mini: the Neo asks the user.
     case enlargeNeedsDownload(Int)
     case explored(RemoteExploration?)

@@ -8,7 +8,7 @@ import Siliconed
 import SilicontrolHelp
 
 extension RemoteControl {
-    private func parse(_ arguments: [String]) throws -> RenderOrder {
+    func parse(_ arguments: [String]) throws -> RenderOrder {
         var d = RenderOrder()
         var positional: [String] = []
         var i = 0

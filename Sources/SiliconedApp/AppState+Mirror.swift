@@ -40,8 +40,14 @@ import Siliconed
 final class MirrorLink {
     let macName: String
     private let sender: (SessionMessage) -> Void
-    /// Jobs and images already built here, by ordinal: their `UUID` stays.
+    /// Jobs and images already built here, by ordinal: their `UUID` stays. A job stays once gone from the
+    /// queue: its end (`ended`) comes after.
     var jobs: [Int: Job] = [:]
+    private var nextRequest = 1
+    /// Who waits for the mini's word on a render (`silicontrol add`), by request number.
+    var waiters: [Int: (RemoteAnswer) -> Void] = [:]
+    /// The job each request asked for, until the mini numbers it.
+    var requested: [Int: Job] = [:]
     var entries: [Int: Entry] = [:]
     /// An entry waits for its PNG, the blob that follows it.
     var pending: [UInt32: RemoteEntry] = [:]
@@ -67,10 +73,16 @@ final class MirrorLink {
         sender(.quote(q))
     }
 
-    /// The job, its images sent first. A file that can no longer be read refuses it here.
-    func render(_ job: Job) throws(EngineError) {
+    /// The job, its images sent first. A file that can no longer be read refuses it here. `format: false`:
+    /// the mini derives an edit's format from image 1. `answered`: the mini's word, when it comes.
+    func render(_ job: Job, format: Bool = true, answered: ((RemoteAnswer) -> Void)? = nil) throws(EngineError) {
         var r = MirrorProjection.remote(job)
         r.references = try remote(job.references)
+        if !format { r.width = 0; r.height = 0 }
+        r.ordinal = nextRequest
+        nextRequest += 1
+        if let answered { waiters[r.ordinal] = answered }
+        requested[r.ordinal] = job
         sender(.render(r))
     }
 
@@ -202,12 +214,11 @@ extension AppState {
                 return j
             }
             let running = q.current.map(job)
+            let was = (job: currentJob?.ordinal, stage: stage, step: currentStep)
             if running?.ordinal != currentJob?.ordinal { batchSize = running?.seeds.count ?? 1 }
             currentJob = running
             file = q.waiting.map(job)
             awaitingLicense = q.awaitingLicense.map(job)
-            let kept = Set(([q.current].compactMap { $0 } + q.waiting + q.awaitingLicense).map(\.ordinal))
-            link.jobs = link.jobs.filter { kept.contains($0.key) }
             fraction = q.fraction
             stage = q.stage.flatMap(Engine.Stage.init(rawValue:))
             currentStep = q.currentStep; totalSteps = q.totalSteps
@@ -223,6 +234,14 @@ extension AppState {
             othersQueued = q.others; othersSeconds = q.othersSeconds
             enlarging = q.enlarging.flatMap { link.entries[$0]?.id }
             if running == nil { preview = nil }
+            // What the engine signals here, said from what the other Mac published (`silicontrol follow`).
+            if let running {
+                if running.ordinal != was.job { signal(.started(running)) }
+                if let s = stage, s != was.stage || running.ordinal != was.job { signal(.stage(running, s, image: batchImage)) }
+                if currentStep > 0, currentStep != was.step {
+                    signal(.step(running, image: batchImage, index: currentStep, total: totalSteps, seconds: 0))
+                }
+            }
         case .entry(let e):
             link.pending[e.png] = e
         case .removed(let ordinals):
@@ -269,6 +288,29 @@ extension AppState {
         case .enlargeNeedsDownload(let o):
             // The consent is asked where the user is; the other Mac downloads Apple's model.
             if link.entries[o] != nil, Self.consentsToDownload() { link.send(.enlarge(o, download: true)) }
+        case .answer(let request, let a):
+            if case let .queued(o, _, w, h) = a, let j = link.requested[request], link.jobs[o] == nil {
+                var settings = j.settings
+                settings.format = RecommendedFormat(w, h)
+                var known = Job(ordinal: o, settings: settings, seeds: j.seeds, references: j.references, previews: j.previews,
+                                defaultSteps: j.defaultSteps, plan: nil)
+                known.neuralEngine = j.neuralEngine
+                link.jobs[o] = known
+            }
+            link.requested[request] = nil
+            if let waiter = link.waiters.removeValue(forKey: request) { waiter(a); return }
+            if case .refused(let text) = a { problem = Problem(text); flash(text) }
+        case .ended(let e):
+            // Known from the queue, or from the answer to its `render` (a job that ended between two snapshots).
+            guard let job = link.jobs[e.ordinal] else { return }
+            let issue: Issue = switch e.issue {
+            case .finished: .finished
+            case .stopped: .stopped
+            case .removed: .removed
+            case .failed(let text): .failed(Problem(text))
+            }
+            if case .failed(let p) = issue { problem = p }
+            complete(job, issue, images: e.images, warnings: e.warnings)
         case .quoted(let a):
             link.asked.remove(a.quote)
             mirrorQuotes[a.quote] = a
@@ -303,6 +345,7 @@ extension AppState {
                            name: $0.name, width: $0.width, height: $0.height)
         }
         link.entries[e.ordinal] = entry
+        if let job = link.jobs[e.job.ordinal] { signal(.image(job, entry)) }
         // The history is newest first; entries arrive in their order, the first connection's oldest first.
         let at = history.firstIndex { $0.ordinal < e.ordinal } ?? history.count
         history.insert(entry, at: at)

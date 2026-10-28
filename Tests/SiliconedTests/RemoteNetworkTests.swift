@@ -261,6 +261,8 @@ final class RemoteNetworkTests: XCTestCase {
             .enlarge(7, download: true), .crop(7, Crop.Box(x: 64, y: 0, width: 768, height: 1024)), .enlargeNeedsDownload(7),
             .grid(RemoteGridRequest(spec: RemoteGridSpec(grid), job: edit, sketch: true, stopAfter: 0)), .addSheet(2),
             .explored(exploration), .explored(nil),
+            .answer(request: 3, .queued(ordinal: 12, estimate: 41.5, width: 896, height: 1184)), .answer(request: 4, .refused("No.")),
+            .ended(RemoteEnded(ordinal: 12, issue: .failed("No."), images: [7, 8], warnings: ["w"])),
             .queue(q), .cancel, .removeJob(4), .deleteImages([1, 2]), .refused("No."), .preview(nil),
             .entry(RemoteEntry(ordinal: 7, job: job, width: 1024, height: 1024, seed: 42, timings: t,
                                footprints: Engine.Footprints(), evaluations: 8, metadata: ["parameters": "x"],

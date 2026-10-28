@@ -29,15 +29,18 @@ import SilicontrolHelp
 
 @MainActor @Observable
 final class RemoteControl {
-    @ObservationIgnored let app: AppState
+    /// This Mac's state, whose library holds the socket.
+    @ObservationIgnored let local: AppState
+    /// What the window shows: another Mac's mirror once switched (`RemoteControl+Mirror.swift`), else this Mac.
+    var app: AppState { MainWindow.shared.carrier.mirror ?? local }
     @ObservationIgnored private var source: DispatchSourceRead?
     /// Why the remote control is not listening (another Siliconed, a path too long), or `nil` —
     /// shown greyed in the Siliconed menu, under « Install the silicontrol command… ».
     private(set) var failureMessage: String?
 
-    init(app: AppState) { self.app = app }
+    init(app: AppState) { local = app }
 
-    var path: String { app.library.socket }
+    var path: String { local.library.socket }
 
     func boot() {
         do {
@@ -78,12 +81,14 @@ final class RemoteControl {
         let command = argv.first ?? ""
         let arguments = Array(argv.dropFirst())
         do {
+            try refuseOnMirror(command)
             switch command {
             case "status": finish(c, state())
-            case "models": finish(c, models())
+            case "models": finish(c, app.mirror == nil ? models() : mirroredModels())
             case "install": finish(c, try install(arguments))
             case "diagnose": try diagnose(arguments, c)
-            case "add": try add(arguments, cwd: cwd, c)
+            case "add":
+                if let mirror = app.mirror { try addOnMirror(mirror, arguments, cwd: cwd, c) } else { try add(arguments, cwd: cwd, c) }
             case "grid": try add(arguments, cwd: cwd, c, grid: true)
             case "wait": try wait(arguments, cwd: cwd, c)
             case "follow": follow(c)
@@ -237,6 +242,7 @@ final class RemoteControl {
         let remaining = app.remainingInQueue(at: Date())
         o["queue_remaining_s"] = Response.number(remaining.seconds, 1)
         o["remaining_complete"] = remaining.isComplete
+        o["computing_on"] = app.mirror?.macName ?? NSNull()
         return o
     }
 

@@ -12,7 +12,8 @@ import Foundation
 ///                  queue       the job running and its progress, the jobs waiting — whenever it changes
 ///                  entry + PNG one history image, its PNG as the blob that follows; `removed` the reverse
 ///                  preview     the denoising's latent preview as a small PNG blob, once per step
-///                  quoted      the answer to a `quote`
+///                  quoted      the answer to a `quote`; `answer` the one to a `render`
+///                  ended       one of the Neo's jobs ended, after its images (what `silicontrol wait` reads)
 ///                  explored    the exploration under way, without its images; `cellImage` + PNG one cell's
 ///     Neo → mini   render      one job from the Neo's form; the mini checks it again (B, steps) before
 ///                              queueing it — the Neo's judgment is never the last word; an edit's images
@@ -87,11 +88,13 @@ package struct RemoteQuoteAnswer: Codable, Equatable, Sendable {
 
 /// A job, as the queue shows it and as the Neo asks for it.
 package struct RemoteJob: Codable, Equatable, Sendable {
-    /// The mini's `t` ordinal; 0 in a `render` request (the mini numbers it).
+    /// The mini's `t` ordinal; in a `render` request, the Neo's request number, which the mini's
+    /// `answer` carries back (the mini numbers the job).
     package var ordinal: Int
     package var model: String
     package var modelName: String
     package var prompt: String
+    /// 0 × 0 in an edit's `render`: the mini derives the format from image 1 (`silicontrol add --ref`).
     package var width: Int, height: Int
     package var steps: Int
     package var defaultSteps: Int?
@@ -270,4 +273,23 @@ package struct RemoteSheet: Codable, Equatable, Sendable {
     package var spec: RemoteGridSpec
     package var empty: Int
     package init(ordinal: Int, spec: RemoteGridSpec, empty: Int) { self.ordinal = ordinal; self.spec = spec; self.empty = empty }
+}
+
+/// **The mini's word on a `render`**, carried back with the Neo's request number.
+package enum RemoteAnswer: Codable, Equatable, Sendable {
+    /// Queued as this job, with what the mini estimates it takes (`nil`: never measured).
+    case queued(ordinal: Int, estimate: Double?, width: Int, height: Int)
+    case refused(String)
+}
+
+/// **A job of the Neo's that ended** on the mini — sent after its images, so that whoever follows it
+/// has them all when the verdict comes.
+package struct RemoteEnded: Codable, Equatable, Sendable {
+    package var ordinal: Int
+    package var issue: RemoteIssue
+    package var images: [Int]
+    package var warnings: [String]
+    package init(ordinal: Int, issue: RemoteIssue, images: [Int], warnings: [String]) {
+        self.ordinal = ordinal; self.issue = issue; self.images = images; self.warnings = warnings
+    }
 }

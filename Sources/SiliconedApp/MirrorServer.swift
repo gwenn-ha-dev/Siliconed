@@ -36,6 +36,8 @@ final class MirrorServer {
         var explorationSent = false
         /// The exploration's cells whose image was sent: [grid, cell].
         var cells: Set<[Int]> = []
+        /// Its jobs that ended, told once their images are sent.
+        var ended: [RemoteEnded] = []
     }
     /// Each Mac's last exploration (grid ordinal) — kept across a reconnection.
     private var explorations: [Data: Int] = [:]
@@ -66,11 +68,15 @@ final class MirrorServer {
         watchCatalog()
     }
 
-    /// A client's render that failed is told to it alone; an exploration that ended is kept for it.
+    /// A client's job that ended is told to it alone, after its images; an exploration that ended is kept for it.
     private func signal(_ s: Signal) {
         switch s {
-        case .finished(let job, .failed(let p)):
-            if let owner = job.owner, seen[owner] != nil { host.send(.refused(p.text), to: owner) }
+        case .finished(let job, let issue):
+            guard let owner = job.owner, seen[owner] != nil else { return }
+            let done = app.completed[job.ordinal]
+            seen[owner]?.ended.append(RemoteEnded(ordinal: job.ordinal, issue: Self.remote(issue), images: done?.images ?? [],
+                                                  warnings: done?.warnings ?? []))
+            scheduleQueue()
         case .sheet(let run, _):
             guard let owner = run.owner, explorations[owner] == run.ordinal else { return }
             ended = ended.filter { o, _ in explorations.values.contains(o) }
@@ -162,15 +168,25 @@ final class MirrorServer {
             let sent = uploads[identity] ?? [:]
             guard asked.references.allSatisfy({ $0.blob.map { sent[$0] != nil } ?? true }) else { return }
             held.removeFirst()
+            // A render is answered with its request number; an exploration's refusal is said.
+            func refuse(_ text: String) {
+                if case .render(let r) = asked { host.send(.answer(request: r.ordinal, .refused(text)), to: identity) }
+                else { host.send(.refused(text), to: identity) }
+            }
             do {
                 switch asked {
-                case .render(let r): app.enqueue([try admit(r, images: sent, from: identity)])
+                case .render(let r):
+                    let job = try admit(r, images: sent, from: identity)
+                    app.enqueue([job])
+                    host.send(.answer(request: r.ordinal, .queued(ordinal: job.ordinal, estimate: app.estimation(job),
+                                                                  width: job.settings.format.width,
+                                                                  height: job.settings.format.height)), to: identity)
                 case .grid(let g): try admit(g, images: sent, from: identity)
                 }
             } catch let e as Refused {
-                host.send(.refused(e.text), to: identity)
+                refuse(e.text)
             } catch {
-                host.send(.refused(Problem(EngineError(error)).text), to: identity)
+                refuse(Problem(EngineError(error)).text)
             }
             for b in asked.references.compactMap(\.blob) { uploads[identity]?[b] = nil }
         }
@@ -219,15 +235,22 @@ final class MirrorServer {
 
     /// **A request becomes a job here**, as if typed on this Mac: what the engine would refuse later
     /// is refused now, with its sentence.
-    private func admit(_ r: RemoteJob, images: [UInt32: Data], from identity: Data) throws -> Job {
+    private func admit(_ asked: RemoteJob, images: [UInt32: Data], from identity: Data) throws -> Job {
+        var r = asked
         guard app.readySet.contains(r.model), let card = app.cards.first(where: { $0.id == r.model }) else {
             throw EngineError.modelNotInstalled(model: r.model)
         }
         let model = try Model.named(r.model, in: app.library)
         let denoising = model.chain.denoising
         try denoising.check(steps: r.steps, startImage: false)
-        try Format.check(width: r.width, height: r.height, family: card.family)
         let references = try r.references.map { try reference($0, images: images, from: identity) }
+        // No format with an edit (`silicontrol add --ref`): image 1's, as this Mac's form derives it.
+        if r.width == 0, r.height == 0, let first = references.first {
+            let f = denoising.editFormat(referenceWidth: first.width, referenceHeight: first.height)
+            let capped = AppState.cappedForEditing(RecommendedFormat(f.width, f.height))
+            r.width = capped.width; r.height = capped.height
+        }
+        try Format.check(width: r.width, height: r.height, family: card.family)
         if !references.isEmpty {
             guard references.count <= denoising.maxReferences else {
                 throw Refused(text: String(localized: "\(references.count) references: \(card.name) reads \(denoising.maxReferences) at most"))
@@ -323,19 +346,21 @@ final class MirrorServer {
         return q
     }
 
+    static func remote(_ i: Issue) -> RemoteIssue {
+        switch i {
+        case .finished: .finished
+        case .stopped: .stopped
+        case .removed: .removed
+        case .failed(let p): .failed(p.text)
+        }
+    }
+
     private func exploration(_ r: GridRun) -> RemoteExploration {
         RemoteExploration(
             ordinal: r.ordinal, spec: RemoteGridSpec(r.grid),
             job: MirrorProjection.remote(r.settings, ordinal: 0, seeds: [], previews: true, defaultSteps: nil, neuralEngine: nil),
             cells: r.cellJobs.map(MirrorProjection.remote),
-            issues: r.issues.mapValues { i in
-                switch i {
-                case .finished: .finished
-                case .stopped: .stopped
-                case .removed: .removed
-                case .failed(let p): .failed(p.text)
-                }
-            },
+            issues: r.issues.mapValues(Self.remote),
             sketch: r.sketch)
     }
 
@@ -455,6 +480,8 @@ final class MirrorServer {
         if !gone.isEmpty { host.send(.removed(gone.sorted()), to: identity) }
         for e in mine.reversed() where !s.entries.contains(e.ordinal) { send(e, to: identity) }
         s.entries = ordinals
+        for e in s.ended { host.send(.ended(e), to: identity) }
+        s.ended = []
         let r = explorations[identity].flatMap(run)
         let x = r.map(exploration)
         if !s.explorationSent || x != s.exploration {
