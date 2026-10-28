@@ -490,13 +490,13 @@ package enum RemoteControlHelp {
            "installing": {"title": "Installing Z-Image Turbo", "last": "forging the DiT → …"} | null,
            "queue_remaining_s": 66.5, "remaining_complete": true,
            "history_images": 12, "library": "/Users/…/Siliconed", "faster_rendering": true,
-           "settings": {"read": true, "map": "2026-10-26T14:43:50Z", "provisional": false,
+           "settings": {"read": true, "map": "2026-10-26T14:43:50Z", "green": true,
                         "remeasuring": false, "warnings": []}}
 
         faster_rendering   : the Settings switch (help set).
         settings           : the engine settings renders run on — read: false until this Mac's map is; map: the
-                             capacity map's date (null: the defaults); provisional: that map was taken off rest
-                             (warm, Low Power Mode, swap growing) and is measured again at the next launch at rest;
+                             capacity map's date (null: the defaults); green: that map is complete (its minute, its
+                             memory under B, every route judged right) — false: it is measured again at the next launch;
                              remeasuring: this launch measures again before its first render; warnings: why a map or
                              profile was refused. Two series compared across launches compare their maps too.
         stage              : text, image (encoding a reference), denoising, decoding.
@@ -1234,14 +1234,14 @@ package enum RemoteControlHelp {
            "installing": {"title": "Installing Z-Image Turbo", "last": "forging the DiT → …"} | null,
            "queue_remaining_s": 66.5, "remaining_complete": true,
            "history_images": 12, "library": "/Users/…/Siliconed", "faster_rendering": true,
-           "settings": {"read": true, "map": "2026-10-26T14:43:50Z", "provisional": false,
+           "settings": {"read": true, "map": "2026-10-26T14:43:50Z", "green": true,
                         "remeasuring": false, "warnings": []}}
 
         faster_rendering   : l'interrupteur des Réglages (help set).
         settings           : les réglages du moteur des rendus — read : false tant que la carte de ce Mac ne l'est
-                             pas ; map : la date de la carte (null : les défauts) ; provisional : cette carte a été
-                             prise hors repos (chaleur, mode économie, swap qui monte) et se refait au prochain
-                             lancement au repos ; remeasuring : ce lancement mesure à nouveau avant son premier rendu ;
+                             pas ; map : la date de la carte (null : les défauts) ; green : cette carte est
+                             complète (sa minute, sa mémoire sous B, chaque route jugée juste) — false : elle se refait
+                             au prochain lancement ; remeasuring : ce lancement mesure à nouveau avant son premier rendu ;
                              warnings : pourquoi une carte ou un profil a été refusé. Deux séries de deux lancements
                              comparent aussi leurs cartes.
         stage              : text, image (encodage d'une référence), denoising, decoding.

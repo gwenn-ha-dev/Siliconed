@@ -76,7 +76,7 @@ struct DiagnosticSheet: View {
         let map = app.mapFacts
         if let used = map.inUse {
             if used == map.stored, !used.green {
-                return "This session uses the measure of \(day(used.date)), which was not complete (its minute, its memory or a route judged wrong): it is measured again at its next launch at rest."
+                return "This session uses the measure of \(day(used.date)), which was not complete (its minute, its memory or a route judged wrong): it is measured again at its next launch."
             }
             return used == map.stored
                 ? "This session uses the choices of this Mac's measure of \(day(used.date))."

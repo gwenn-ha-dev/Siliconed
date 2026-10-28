@@ -516,13 +516,15 @@ final class AppState {
         // with a current map: the app builds only one `AppState` (see `App.swift`). Without one (none yet,
         // or one of another Mac, macOS or build: an update), the settings stay unread until the measure
         // the first render starts (`next`).
-        // A provisional map (taken warm, in Low Power Mode or under swap) is measured again once the Mac
-        // is at rest — once: a measure again provisional serves until the next one (`retriedMapKey`).
+        // An orange map (not complete: its minute, its memory or a route judged wrong) or one that misses an
+        // installed family is measured again at the next launch, whatever the heat: a fanless Mac is never
+        // at rest after a minute of load, and the map judges at the hot regime anyway. Once per orange
+        // map: one orange again for a lasting cause serves until the next (`retriedMapKey`).
         let stored = Self.readStoredMap()
         storedMap = stored
         if let stored, stored.isCurrent {
-            if !stored.isGreen || !stored.covers(Set(installedFamilies.map(\.rawValue))), stored.date != UserDefaults.standard.string(forKey: Self.retriedMapKey),
-               Diagnostic.conditions().isNominal {
+            if !stored.isGreen || !stored.covers(Set(installedFamilies.map(\.rawValue))),
+               stored.date != UserDefaults.standard.string(forKey: Self.retriedMapKey) {
                 remeasuringOrange = true
             } else {
                 readSettings(map: stored)
