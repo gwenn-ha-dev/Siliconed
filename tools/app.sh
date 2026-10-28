@@ -56,6 +56,7 @@ cp .build/release/silicontrol "$app/Contents/Helpers/silicontrol"
 cp .build/release/siliconed "$app/Contents/Helpers/siliconed"
 (( dev )) && cp .build/release/siliconed-dev "$app/Contents/Helpers/siliconed-dev"
 xcrun xcstringstool compile Sources/SiliconedApp/Localizable.xcstrings --output-directory "$app/Contents/Resources" >/dev/null
+xcrun xcstringstool compile Sources/SiliconedApp/InfoPlist.xcstrings --output-directory "$app/Contents/Resources" >/dev/null
 # English is the language of the keys: the compiler emits only what differs (the translations, and
 # the plurals), so its table may be empty, but `en.lproj` must exist for a system in English to pick
 # it rather than another language present. The other languages: the one list of `translations.sh`.
@@ -113,6 +114,8 @@ cat > "$app/Contents/Info.plist" <<PLIST
   <key>LSMinimumSystemVersion</key><string>26.0</string>
   <key>NSHighResolutionCapable</key><true/>
   <key>NSHumanReadableCopyright</key><string>Siliconed</string>
+  <key>NSLocalNetworkUsageDescription</key><string>Siliconed finds the other Macs of this network that run it, to render on one of them or to lend this Mac to them.</string>
+  <key>NSBonjourServices</key><array><string>_siliconed._tcp</string><string>_siliconed-pair._tcp</string></array>
   <key>CFBundleURLTypes</key><array><dict>
     <key>CFBundleURLName</key><string>dev.gwenn-ha.siliconed.hub</string>
     <key>CFBundleURLSchemes</key><array><string>siliconed</string></array>

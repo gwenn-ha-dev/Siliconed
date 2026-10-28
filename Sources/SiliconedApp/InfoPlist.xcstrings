@@ -1,0 +1,41 @@
+{
+  "sourceLanguage": "en",
+  "version": "1.0",
+  "strings": {
+    "NSLocalNetworkUsageDescription": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Siliconed finds the other Macs of this network that run it, to render on one of them or to lend this Mac to them."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Siliconed cherche les autres Mac de ce réseau qui l’ouvrent, pour rendre sur l’un d’eux ou leur prêter ce Mac."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Siliconed sucht die anderen Macs in diesem Netzwerk, auf denen es läuft, um auf einem davon zu rendern oder ihnen diesen Mac zu leihen."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Siliconed busca los otros Mac de esta red que lo ejecutan, para generar en uno de ellos o prestarles este Mac."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Siliconed cerca gli altri Mac di questa rete che lo eseguono, per generare su uno di essi o prestare loro questo Mac."
+          }
+        }
+      }
+    }
+  }
+}

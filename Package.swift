@@ -27,8 +27,9 @@ let package = Package(
         // Its phrases (`Localizable.xcstrings`, English source, fr de es it translations) are not a resource of it:
         // `tools/app.sh` compiles them into `Siliconed.app/Contents/Resources`, where `Text("…")`
         // looks for them (the main bundle). Under `swift run`, the app speaks the source language.
+        // `InfoPlist.xcstrings`: the Info.plist's one phrase (the local network's), compiled beside them.
         .executableTarget(name: "SiliconedApp", dependencies: ["Siliconed", "SilicontrolHelp"],
-                          exclude: ["Localizable.xcstrings"]),
+                          exclude: ["Localizable.xcstrings", "InfoPlist.xcstrings"]),
         // **`silicontrol`, the app's remote control**, shipped as
         // `Siliconed.app/Contents/Helpers/silicontrol`: a pipe to the running app's socket,
         // system frameworks only — it does not link the engine.

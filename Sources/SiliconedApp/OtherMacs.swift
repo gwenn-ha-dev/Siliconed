@@ -1,0 +1,308 @@
+// **Other Macs of the network**: this Mac lent to the ones it paired, or computing on one that paired it.
+// The channel only (lot 2 of `Remote/`): pairing on both sides, sessions kept up, Bonjour. What a
+// session carries — the queue, the render, the history — comes with the switch of the whole app.
+//
+//     lending (the mini)                        borrowing (the Neo)
+//       Settings › « Lend This Mac »              Settings › « Pair With a Mac… »
+//         RemoteHost: _siliconed._tcp, the keys     browses _siliconed-pair._tcp
+//       « Pair a Mac… » opens the window          picks the mini, shows the code
+//         _siliconed-pair._tcp, one attempt         ⟶ same six digits on both screens
+//       « Accept » (only here)                    the key filed under the mini's `id`
+//
+// - **Off by default**, and nothing listens before a pairing is accepted here: lending with no Mac
+//   paired opens no port.
+// - **The keys** are in the Keychain (`Pairings`), read on first need — the Settings window, or a launch
+//   with lending on — not at every launch: a build signed ad hoc asks the user before reading them.
+// - **This Mac's name** is the one of System Settings › General › Sharing; under `SILICONED_ROOT` (two
+//   instances on one Mac, the test of the channel), the root's folder is added to tell them apart.
+
+import AppKit
+import Foundation
+import Network
+import Observation
+import Siliconed
+import SystemConfiguration
+
+@MainActor @Observable
+final class OtherMacs {
+    /// What the Keychain holds; `nil` until read, or if the user denied it (`unreadable`).
+    private(set) var pairings: Pairings?
+    private(set) var unreadable = false
+
+    /// « Lend This Mac », kept across launches.
+    var lending: Bool = UserDefaults.standard.bool(forKey: "lendThisMac") {
+        didSet {
+            UserDefaults.standard.set(lending, forKey: "lendThisMac")
+            applyLending()
+        }
+    }
+    private(set) var lendingProblem: String?
+    /// The Macs lent to, connected now: identity → what they said.
+    private(set) var connected: [Data: Hello] = [:]
+    /// The server's pairing window, while its sheet is open.
+    private(set) var window: RemoteHost.PairingWindow?
+
+    /// The other Macs that lend themselves, as Bonjour shows them, by `id`.
+    private(set) var found: [String: Found] = [:]
+    /// Pairing windows open on the network, while the borrowing sheet is open.
+    private(set) var pairable: [Found] = []
+    /// The sessions wanted, by the other Mac's `id`.
+    private(set) var links: [String: RemoteLink.State] = [:]
+    /// The borrowing side's pairing, while its sheet is open.
+    private(set) var attempt: Attempt?
+
+    struct Found: Equatable, Identifiable {
+        let id: String
+        let name: String
+        let version: String
+        let endpoint: NWEndpoint
+    }
+
+    struct Attempt: Equatable {
+        let with: Found
+        var step: Step
+        enum Step: Equatable {
+            case connecting
+            case compare(code: String)
+            case paired
+            case ended(RemotePairingAttempt.PairingEnd)
+        }
+    }
+
+    let name: String
+    /// Read on first need: the machine's description touches Metal and the executable.
+    @ObservationIgnored private lazy var hello = Hello(name: name, machine: Diagnostic.machine())
+    private var host: RemoteHost?
+    private var sessionBrowser: NWBrowser?
+    private var pairingBrowser: NWBrowser?
+    private var linkObjects: [String: RemoteLink] = [:]
+    private var attemptObject: RemotePairingAttempt?
+    private let book = Endpoints()
+    private var awake: NSObjectProtocol?
+
+    init() {
+        // Not `Host.current()`, which may wait on the DNS.
+        var n = SCDynamicStoreCopyComputerName(nil, nil).map { $0 as String } ?? "Mac"
+        if let root = ProcessInfo.processInfo.environment["SILICONED_ROOT"], !root.isEmpty {
+            n += " (\(URL(fileURLWithPath: root).lastPathComponent))"
+        }
+        name = n
+    }
+
+    /// At launch: lends at once if it was on.
+    func boot() {
+        if lending { applyLending() }
+    }
+
+    func stop() {
+        host?.stop()
+        linkObjects.values.forEach { $0.disconnect() }
+        sessionBrowser?.cancel(); pairingBrowser?.cancel()
+    }
+
+    /// Reads the Keychain once.
+    @discardableResult
+    func load() -> Pairings? {
+        if let pairings { return pairings }
+        guard !unreadable else { return nil }
+        guard let p = Pairings.load() else { unreadable = true; return nil }
+        pairings = p
+        if !p.borrowed.isEmpty { browseSessions() }
+        return p
+    }
+
+    private func save(_ change: (inout Pairings) -> Void) {
+        guard var p = load() else { return }
+        change(&p)
+        pairings = p
+        if !p.save() { lendingProblem = String(localized: "The Keychain did not keep the pairing.") }
+    }
+
+    private var txt: [String: String] {
+        ["id": pairings?.id ?? "", "v": hello.machine.version]
+    }
+
+    // MARK: - Lending
+
+    private func applyLending() {
+        guard lending else {
+            host?.stop()
+            host = nil
+            connected = [:]
+            window = nil
+            lendingProblem = nil
+            hold()
+            return
+        }
+        guard let p = load() else { lendingProblem = String(localized: "The Keychain could not be read."); return }
+        let h = host ?? makeHost()
+        h.lend(keys: p.lendingKeys)
+    }
+
+    private func makeHost() -> RemoteHost {
+        let h = RemoteHost(hello: hello, service: (name, txt))
+        h.start { [weak self] e in DispatchQueue.main.async { MainActor.assumeIsolated { self?.handle(e) } } }
+        host = h
+        return h
+    }
+
+    private func handle(_ e: RemoteHost.Event) {
+        switch e {
+        case .lending:
+            lendingProblem = nil
+        case .lendingFailed(let why):
+            lendingProblem = why
+        case .pairing(let w):
+            window = w
+            if case .paired(let key, let client) = w {
+                save { $0.lend(to: client, key) }
+                pairings.map { host?.lend(keys: $0.lendingKeys) }
+            }
+        case .connected(let identity, let theirs):
+            connected[identity] = theirs
+        case .disconnected(let identity):
+            connected[identity] = nil
+        case .turnedAway:
+            break
+        }
+        hold()
+    }
+
+    /// The pairing window, from « Pair a Mac… »: one attempt, two minutes at most.
+    func openPairing() {
+        guard lending, load() != nil else { return }
+        window = nil
+        (host ?? makeHost()).openPairing()
+    }
+
+    func acceptPairing() { host?.acceptPairing() }
+    func refusePairing() { host?.refusePairing() }
+
+    func closePairing() {
+        host?.closePairing()
+        window = nil
+    }
+
+    /// Forgotten here: its session closes, and its key no longer opens one.
+    func forget(lent: Pairings.Lent) {
+        save { $0.lent.removeAll { $0.identity == lent.identity } }
+        connected[lent.identity] = nil
+        if lending, let p = pairings { host?.lend(keys: p.lendingKeys) }
+    }
+
+    /// While a Mac is connected, this one does not go to sleep on it.
+    private func hold() {
+        if connected.isEmpty {
+            awake.map(ProcessInfo.processInfo.endActivity)
+            awake = nil
+        } else if awake == nil {
+            awake = ProcessInfo.processInfo.beginActivity(options: [.idleSystemSleepDisabled],
+                                                          reason: "Another Mac computes on this one")
+        }
+    }
+
+    // MARK: - Borrowing
+
+    private func browseSessions() {
+        guard sessionBrowser == nil else { return }
+        sessionBrowser = browse(RemoteTransport.sessionService) { [weak self] results in
+            guard let self else { return }
+            found = Dictionary(results.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+            book.set(found.mapValues(\.endpoint))
+            for (id, link) in linkObjects where found[id] != nil { link.retryNow() }
+        }
+    }
+
+    /// The borrowing sheet opens: the pairing windows of the network are listed.
+    func lookForPairable() {
+        load()
+        pairable = []
+        pairingBrowser?.cancel()
+        pairingBrowser = browse(RemoteTransport.pairingService) { [weak self] results in
+            self?.pairable = results.sorted { $0.name < $1.name }
+        }
+    }
+
+    func stopLookingForPairable() {
+        pairingBrowser?.cancel(); pairingBrowser = nil
+        attemptObject?.cancel(); attemptObject = nil
+        attempt = nil
+        pairable = []
+    }
+
+    private func browse(_ type: String, _ update: @escaping @MainActor ([Found]) -> Void) -> NWBrowser {
+        let b = NWBrowser(for: .bonjourWithTXTRecord(type: type, domain: nil), using: NWParameters())
+        let mine = pairings?.id
+        b.browseResultsChangedHandler = { results, _ in
+            let list = results.compactMap { r -> Found? in
+                guard case .service(let n, _, _, _) = r.endpoint, case .bonjour(let t) = r.metadata,
+                      let id = t["id"], !id.isEmpty, id != mine else { return nil }
+                return Found(id: id, name: n, version: t["v"] ?? "", endpoint: r.endpoint)
+            }
+            DispatchQueue.main.async { MainActor.assumeIsolated { update(list) } }
+        }
+        b.start(queue: .main)
+        return b
+    }
+
+    func pair(with mac: Found) {
+        attemptObject?.cancel()
+        attempt = Attempt(with: mac, step: .connecting)
+        let a = RemotePairingAttempt(to: mac.endpoint, name: name)
+        attemptObject = a
+        a.start { [weak self] e in DispatchQueue.main.async { MainActor.assumeIsolated { self?.handle(e, from: mac, a) } } }
+    }
+
+    private func handle(_ e: RemotePairingAttempt.Event, from mac: Found, _ a: RemotePairingAttempt) {
+        guard a === attemptObject else { return }
+        switch e {
+        case .compare(let code):
+            attempt?.step = .compare(code: code)
+        case .paired(let key):
+            attempt?.step = .paired
+            attemptObject = nil
+            save { $0.borrow(from: mac.id, name: mac.name, key) }
+            disconnect(mac.id)
+            browseSessions()
+        case .ended(let how):
+            attempt?.step = .ended(how)
+            attemptObject = nil
+        }
+    }
+
+    func connect(_ b: Pairings.Borrowed) {
+        guard let p = pairings, linkObjects[b.id] == nil else { return }
+        browseSessions()
+        let id = b.id, book = book
+        let l = RemoteLink(key: p.key(of: b), hello: hello) { book.endpoint(id) }
+        linkObjects[id] = l
+        links[id] = .connecting
+        l.connect { [weak self] s in
+            DispatchQueue.main.async {
+                MainActor.assumeIsolated {
+                    guard let self, self.linkObjects[id] === l else { return }
+                    self.links[id] = s
+                    if case .refused = s { self.linkObjects[id] = nil }
+                }
+            }
+        }
+    }
+
+    func disconnect(_ id: String) {
+        linkObjects.removeValue(forKey: id)?.disconnect()
+        links[id] = nil
+    }
+
+    func forget(borrowed b: Pairings.Borrowed) {
+        disconnect(b.id)
+        save { $0.borrowed.removeAll { $0.id == b.id } }
+    }
+}
+
+/// Where Bonjour last saw each Mac, read by the links from their queues.
+private final class Endpoints: @unchecked Sendable {
+    private let lock = NSLock()
+    private var byID: [String: NWEndpoint] = [:]
+    func set(_ d: [String: NWEndpoint]) { lock.withLock { byID = d } }
+    func endpoint(_ id: String) -> NWEndpoint? { lock.withLock { byID[id] } }
+}

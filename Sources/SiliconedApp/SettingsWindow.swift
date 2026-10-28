@@ -8,6 +8,7 @@
 //     │ Experimental       unfinished, off by default: Named Subjects, │
 //     │                    Negative LoRA Strengths                     │
 //     │ Comparison         curtain or side by side                     │
+//     │ Other Macs         lend this one, compute on another           │
 //     │ This Mac           the capacity map, measured only when asked  │
 //     │ Command Line       silicontrol, linked into /usr/local/bin     │
 //     │ Models             where the library is, shown in the Finder;  │
@@ -37,7 +38,7 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
             window.makeKeyAndOrderFront(nil)
             return
         }
-        let host = NSHostingController(rootView: SettingsView(app: app, curtain: .shared))
+        let host = NSHostingController(rootView: SettingsView(app: app, curtain: .shared, macs: MainWindow.shared.otherMacs))
         host.sizingOptions = [.preferredContentSize]
         let w = NSWindow(contentViewController: host)
         w.title = String(localized: "Settings")
@@ -57,10 +58,11 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
     }
 }
 
-/// **What the window shows**: five sections, each switch with its sentence.
+/// **What the window shows**: six sections, each switch with its sentence.
 struct SettingsView: View {
     @Bindable var app: AppState
     @Bindable var curtain: Curtain
+    let macs: OtherMacs
     /// Read again after an install: the link is the file system's, not the app's.
     @State private var command = SilicontrolCommand.state
 
@@ -100,6 +102,7 @@ struct SettingsView: View {
                     }
                     .pickerStyle(.segmented)
                 }
+                OtherMacsSection(macs: macs)
             }
             .formStyle(.grouped)
             .frame(width: 440)

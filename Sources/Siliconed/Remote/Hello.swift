@@ -19,7 +19,7 @@ package struct Hello: Codable, Equatable, Sendable {
         self.protocolVersion = protocolVersion; self.name = name; self.machine = machine
     }
 
-    package enum Mismatch: Error, Equatable, Sendable {
+    package enum Mismatch: Error, Codable, Equatable, Sendable {
         case protocolVersion(mine: Int, theirs: Int)
         /// The two apps are different builds: the older one is to be updated.
         case appVersion(mine: String, theirs: String)
@@ -34,5 +34,31 @@ package struct Hello: Codable, Equatable, Sendable {
             return .appVersion(mine: machine.version, theirs: theirs.machine.version)
         }
         return nil
+    }
+}
+
+/// **What a session says**, once the TLS handshake proved the client holds one of the server's keys.
+///
+///     server: challenge(c) ──▶                       ◀── client: join(hello, identity, HMAC(key, "session" ‖ c))
+///     server: welcome(hello) ──▶     or     mismatch ──▶ and close
+///
+/// **Why a proof inside TLS.** The server's listener holds every paired Mac's key, and its TLS reads
+/// back all of them, not the one the handshake used (`sec_protocol_metadata_access_pre_shared_keys`,
+/// measured 28/10): it cannot tell which Mac came in. The client proves it here, with the key filed under
+/// the identity it names — so one paired Mac cannot pass for another, and forgetting a Mac on the server
+/// shuts out that Mac alone. The render's messages join this list (lot 3).
+package enum SessionMessage: Codable, Equatable, Sendable {
+    case challenge(Data)
+    case join(hello: Hello, identity: Data, proof: Data)
+    case welcome(Hello)
+    /// The two builds differ: said, then the server closes; the client does not retry.
+    case mismatch(Hello.Mismatch)
+
+    package static func proof(_ key: PairedKey, challenge: Data) -> Data {
+        Pairing.proof(key.key, side: "session", transcript: challenge)
+    }
+
+    package static func checks(_ proof: Data, _ key: PairedKey, challenge: Data) -> Bool {
+        Pairing.checks(proof, key.key, side: "session", transcript: challenge)
     }
 }

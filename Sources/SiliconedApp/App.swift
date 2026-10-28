@@ -172,6 +172,7 @@ final class Delegate: NSObject, NSApplicationDelegate {
             MainWindow.shared.show()
             // The remote control (`silicontrol …`): the same queue, the same history.
             MainWindow.shared.remote.boot()
+            MainWindow.shared.otherMacs.boot()
         }
     }
 
@@ -184,6 +185,7 @@ final class Delegate: NSObject, NSApplicationDelegate {
     func applicationWillTerminate(_ notification: Notification) {
         MainActor.assumeIsolated {
             MainWindow.shared.remote.stop()
+            MainWindow.shared.otherMacs.stop()
             MainWindow.shared.emptyRenderCache()
             MainWindow.shared.app.removeWorkingCopy()
         }
@@ -227,6 +229,8 @@ final class MainWindow: NSObject, NSWindowDelegate {
         return b
     }())
     private(set) lazy var remote = RemoteControl(app: app)
+    /// The other Macs of the network (`OtherMacs.swift`).
+    private(set) lazy var otherMacs = OtherMacs()
 
     /// Empties `<root>/cache/` (incognito, `Delegate`). A failure costs nothing but disk: the next
     /// launch tries again.

@@ -3167,6 +3167,34 @@
         }
       }
     },
+    "A Mac of this network that lends itself: pair it once, with a code shown on both screens." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ein Mac in diesem Netzwerk, der sich ausleiht: einmal koppeln, mit einem Code auf beiden Bildschirmen."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un Mac de esta red que se presta: vincúlalo una vez, con un código en ambas pantallas."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un Mac de ce réseau qui se prête : appairez-le une fois, avec un code affiché sur les deux écrans."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un Mac di questa rete che si presta: abbinalo una volta, con un codice mostrato su entrambi gli schermi."
+          }
+        }
+      }
+    },
     "A diagnostic is already running." : {
       "localizations" : {
         "de" : {
@@ -3873,6 +3901,34 @@
         }
       }
     },
+    "Accept" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Annehmen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aceptar"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Accepter"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Accetta"
+          }
+        }
+      }
+    },
     "Accept and Install" : {
       "localizations" : {
         "de" : {
@@ -3925,6 +3981,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Accetta e avvia il rendering"
+          }
+        }
+      }
+    },
+    "Accept only if both screens show the same six digits." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nur annehmen, wenn beide Bildschirme dieselben sechs Ziffern zeigen."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Acepta solo si ambas pantallas muestran los mismos seis dígitos."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "N’acceptez que si les deux écrans montrent les mêmes six chiffres."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Accetta solo se entrambi gli schermi mostrano le stesse sei cifre."
           }
         }
       }
@@ -5133,6 +5217,34 @@
         }
       }
     },
+    "Check that “%@” shows this code, and accept there." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prüfe, ob „%@“ diesen Code zeigt, und nimm dort an."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Comprueba que «%@» muestra este código y acepta allí."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vérifiez que « %@ » affiche ce code, et acceptez là-bas."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Controlla che «%@» mostri questo codice e accetta lì."
+          }
+        }
+      }
+    },
     "Check the connection and start again: the files already downloaded are kept, the interrupted one starts over." : {
       "localizations" : {
         "de" : {
@@ -5745,6 +5857,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Scegli una delle dimensioni del modello, come 1024 × 1024 o 832 × 1216."
+          }
+        }
+      }
+    },
+    "Choose the Mac to compute on" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mac zum Rechnen wählen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Elige el Mac donde calcular"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choisir le Mac où calculer"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scegli il Mac su cui calcolare"
           }
         }
       }
@@ -6393,6 +6533,34 @@
         }
       }
     },
+    "Compute on Another Mac" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Auf einem anderen Mac rechnen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Calcular en otro Mac"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Calculer sur un autre Mac"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Calcola su un altro Mac"
+          }
+        }
+      }
+    },
     "Computed right: within its threshold of the exact result" : {
       "localizations" : {
         "de" : {
@@ -6449,6 +6617,34 @@
         }
       }
     },
+    "Connect" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verbinden"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Conectar"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Se connecter"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connetti"
+          }
+        }
+      }
+    },
     "Connect it to render. Settings can also go back to this Mac's library." : {
       "localizations" : {
         "de" : {
@@ -6501,6 +6697,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Collega il disco — oppure, nelle Impostazioni, torna alla libreria di questo Mac."
+          }
+        }
+      }
+    },
+    "Connecting to “%@”…" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verbinde mit „%@“…"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Conectando con «%@»…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connexion à « %@ »…"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connessione a «%@»…"
           }
         }
       }
@@ -7677,6 +7901,62 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Scarta"
+          }
+        }
+      }
+    },
+    "Disconnect" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trennen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Desconectar"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Se déconnecter"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Disconnetti"
+          }
+        }
+      }
+    },
+    "Does “%@” show this code?" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zeigt „%@“ diesen Code?"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¿«%@» muestra este código?"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "« %@ » affiche-t-il ce code ?"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "«%@» mostra questo codice?"
           }
         }
       }
@@ -9335,6 +9615,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Per confrontare e provare, non per le immagini di tutti i giorni. Mostra:"
+          }
+        }
+      }
+    },
+    "Forget" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vergessen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Olvidar"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Oublier"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dimentica"
           }
         }
       }
@@ -11396,6 +11704,34 @@
         }
       }
     },
+    "Lend This Mac" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diesen Mac ausleihen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prestar este Mac"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prêter ce Mac"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Presta questo Mac"
+          }
+        }
+      }
+    },
     "Letters, digits, - and _ only, without spaces." : {
       "localizations" : {
         "de" : {
@@ -13302,6 +13638,34 @@
         }
       }
     },
+    "No Mac came in two minutes." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "In zwei Minuten kam kein Mac."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ningún Mac llegó en dos minutos."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun Mac n’est venu en deux minutes."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nessun Mac è arrivato in due minuti."
+          }
+        }
+      }
+    },
     "No Siliconed settings in this image" : {
       "localizations" : {
         "de" : {
@@ -14212,6 +14576,62 @@
         }
       }
     },
+    "On that Mac: Settings → Other Macs → Lend This Mac, then Pair a Mac…" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Auf jenem Mac: Einstellungen → Andere Macs → Diesen Mac ausleihen, dann Mac koppeln…"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En ese Mac: Ajustes → Otros Mac → Prestar este Mac, y luego Vincular un Mac…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sur ce Mac : Réglages → Autres Mac → Prêter ce Mac, puis Appairer un Mac…"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Su quel Mac: Impostazioni → Altri Mac → Presta questo Mac, poi Abbina un Mac…"
+          }
+        }
+      }
+    },
+    "On the other Mac: Settings → Other Macs → Pair With a Mac…, then choose “%@”." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Auf dem anderen Mac: Einstellungen → Andere Macs → Mit einem Mac koppeln…, dann „%@“ wählen."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En el otro Mac: Ajustes → Otros Mac → Vincular con un Mac…, y luego elige «%@»."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sur l’autre Mac : Réglages → Autres Mac → Appairer avec un Mac…, puis choisissez « %@ »."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sull’altro Mac: Impostazioni → Altri Mac → Abbina a un Mac…, poi scegli «%@»."
+          }
+        }
+      }
+    },
     "On this Mac. To free its disk, move the library to another one — an external disk, a network share: Siliconed then copies to this Mac only the model it renders, for the session." : {
       "localizations" : {
         "de" : {
@@ -14236,6 +14656,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Su questo Mac. Per liberarne il disco, sposta la libreria su un altro — un disco esterno, una condivisione di rete: Siliconed copia allora su questo Mac solo il modello del rendering, per la sessione."
+          }
+        }
+      }
+    },
+    "One Mac renders for another on the same network." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ein Mac rechnet für einen anderen im selben Netzwerk."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un Mac calcula para otro en la misma red."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un Mac calcule pour un autre sur le même réseau."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un Mac calcola per un altro sulla stessa rete."
           }
         }
       }
@@ -14492,6 +14940,34 @@
         }
       }
     },
+    "Other Macs" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Andere Macs"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Otros Mac"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Autres Mac"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Altri Mac"
+          }
+        }
+      }
+    },
     "PNG keeps the prompt, seed and model. JPEG and HEIC are plain pictures, with no metadata." : {
       "localizations" : {
         "de" : {
@@ -14516,6 +14992,146 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Il PNG conserva il prompt, il seme e il modello. JPEG e HEIC sono immagini semplici, senza metadati."
+          }
+        }
+      }
+    },
+    "Pair With a Mac…" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mit einem Mac koppeln…"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vincular con un Mac…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Appairer avec un Mac…"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abbina a un Mac…"
+          }
+        }
+      }
+    },
+    "Pair a Mac…" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mac koppeln…"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vincular un Mac…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Appairer un Mac…"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abbina un Mac…"
+          }
+        }
+      }
+    },
+    "Paired with “%@”." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gekoppelt mit „%@“."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vinculado con «%@»."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Appairé avec « %@ »."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abbinato a «%@»."
+          }
+        }
+      }
+    },
+    "Pairing cancelled." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kopplung abgebrochen."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vinculación cancelada."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Appairage annulé."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abbinamento annullato."
+          }
+        }
+      }
+    },
+    "Pairing refused." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kopplung abgelehnt."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vinculación rechazada."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Appairage refusé."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abbinamento rifiutato."
           }
         }
       }
@@ -15386,6 +16002,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Riferimenti"
+          }
+        }
+      }
+    },
+    "Refuse" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ablehnen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rechazar"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Refuser"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rifiuta"
           }
         }
       }
@@ -18797,6 +19441,62 @@
         }
       }
     },
+    "The Keychain could not be read." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Der Schlüsselbund konnte nicht gelesen werden."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se pudo leer el llavero."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le Trousseau n’a pas pu être lu."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossibile leggere il portachiavi."
+          }
+        }
+      }
+    },
+    "The Keychain did not keep the pairing." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Der Schlüsselbund hat die Kopplung nicht behalten."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El llavero no guardó la vinculación."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le Trousseau n’a pas gardé l’appairage."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il portachiavi non ha conservato l’abbinamento."
+          }
+        }
+      }
+    },
     "The LoRA %@ doesn't say which model it's for." : {
       "localizations" : {
         "de" : {
@@ -18883,6 +19583,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "La LoRA %@ è per %@, non per %@."
+          }
+        }
+      }
+    },
+    "The Macs you pair here render on this one, with its models, its queue and its history. Nothing on the network reaches this Mac before you accept a pairing here." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die hier gekoppelten Macs rechnen auf diesem, mit seinen Modellen, seiner Warteschlange und seinem Verlauf. Nichts aus dem Netzwerk erreicht diesen Mac, bevor du hier eine Kopplung annimmst."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Los Mac vinculados aquí calculan en este, con sus modelos, su cola y su historial. Nada de la red llega a este Mac antes de que aceptes aquí una vinculación."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les Mac appairés ici calculent sur celui-ci, avec ses modèles, sa file et son historique. Rien du réseau n’atteint ce Mac avant que vous acceptiez un appairage ici."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I Mac abbinati qui calcolano su questo, con i suoi modelli, la sua coda e la sua cronologia. Nulla dalla rete raggiunge questo Mac prima che tu accetti qui un abbinamento."
           }
         }
       }
@@ -20345,6 +21073,62 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Solo l’oggetto, il suo design esatto."
+          }
+        }
+      }
+    },
+    "The other Mac stopped the pairing." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Der andere Mac hat die Kopplung beendet."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El otro Mac detuvo la vinculación."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’autre Mac a arrêté l’appairage."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’altro Mac ha interrotto l’abbinamento."
+          }
+        }
+      }
+    },
+    "The pairing failed: nothing was kept." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Kopplung ist fehlgeschlagen: nichts wurde behalten."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La vinculación falló: no se guardó nada."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’appairage a échoué : rien n’a été gardé."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’abbinamento non è riuscito: non è stato conservato nulla."
           }
         }
       }
@@ -23383,6 +24167,34 @@
         }
       }
     },
+    "Waiting for a Mac…" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Warte auf einen Mac…"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esperando un Mac…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En attente d’un Mac…"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "In attesa di un Mac…"
+          }
+        }
+      }
+    },
     "Waiting · %lld" : {
       "localizations" : {
         "de" : {
@@ -24537,6 +25349,62 @@
         }
       }
     },
+    "connected" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "verbunden"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "conectado"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "connecté"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "connesso"
+          }
+        }
+      }
+    },
+    "connecting…" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "verbinde…"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "conectando…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "connexion…"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "connessione…"
+          }
+        }
+      }
+    },
     "dropped image" : {
       "localizations" : {
         "de" : {
@@ -25555,6 +26423,34 @@
         }
       }
     },
+    "lost, trying again…" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "verloren, neuer Versuch…"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "perdido, reintentando…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "perdu, nouvel essai…"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "perso, nuovo tentativo…"
+          }
+        }
+      }
+    },
     "macOS does not have Apple's enlargement model yet" : {
       "localizations" : {
         "de" : {
@@ -26199,6 +27095,62 @@
         }
       }
     },
+    "not connected" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "nicht verbunden"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "no conectado"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "non connecté"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "non connesso"
+          }
+        }
+      }
+    },
+    "not on the network" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "nicht im Netzwerk"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "no está en la red"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "absent du réseau"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "non è in rete"
+          }
+        }
+      }
+    },
     "nothing is running or waiting" : {
       "localizations" : {
         "de" : {
@@ -26223,6 +27175,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "nulla in esecuzione né in attesa"
+          }
+        }
+      }
+    },
+    "on the network" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "im Netzwerk"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "en la red"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "sur le réseau"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "in rete"
           }
         }
       }
@@ -26475,6 +27455,62 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "pronti: %@ — silicontrol models"
+          }
+        }
+      }
+    },
+    "refused: that Mac forgot this one; pair again" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "abgelehnt: jener Mac hat diesen vergessen; neu koppeln"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "rechazado: ese Mac olvidó este; vincula de nuevo"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "refusé : ce Mac a oublié celui-ci ; appairez de nouveau"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "rifiutato: quel Mac ha dimenticato questo; abbina di nuovo"
+          }
+        }
+      }
+    },
+    "refused: the two Macs must run the same version of Siliconed" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "abgelehnt: beide Macs brauchen dieselbe Version von Siliconed"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "rechazado: los dos Mac deben tener la misma versión de Siliconed"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "refusé : les deux Mac doivent avoir la même version de Siliconed"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "rifiutato: i due Mac devono avere la stessa versione di Siliconed"
           }
         }
       }
@@ -27835,6 +28871,34 @@
         }
       }
     },
+    "“%@” is no longer waiting for a Mac: open its pairing window again." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "„%@“ wartet nicht mehr auf einen Mac: öffne sein Kopplungsfenster erneut."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "«%@» ya no espera ningún Mac: vuelve a abrir su ventana de vinculación."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "« %@ » n’attend plus de Mac : rouvrez sa fenêtre d’appairage."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "«%@» non aspetta più un Mac: riapri la sua finestra di abbinamento."
+          }
+        }
+      }
+    },
     "“%@” isn't a size: write it as width × height, like 832x1216." : {
       "localizations" : {
         "de" : {
@@ -27859,6 +28923,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "«%@» non è una dimensione: scrivila come larghezza × altezza, ad esempio 832x1216."
+          }
+        }
+      }
+    },
+    "“%@” refused the pairing." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "„%@“ hat die Kopplung abgelehnt."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "«%@» rechazó la vinculación."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "« %@ » a refusé l’appairage."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "«%@» ha rifiutato l’abbinamento."
           }
         }
       }
