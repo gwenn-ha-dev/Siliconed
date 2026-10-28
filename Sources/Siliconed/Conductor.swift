@@ -438,12 +438,19 @@ package final class Conductor: @unchecked Sendable {
         package var isEmpty: Bool { points.isEmpty }
 
         /// `T(k, n, m)`, clamped to `range` (`Conductor.fractionRange` for the AMX's cut; the ANE's is wider).
-        package func share(k: Int, n: Int, m: Int, range: ClosedRange<Double> = Conductor.fractionRange) -> Double? {
-            ratio(k: k, n: n, m: m).map { min(range.upperBound, max(range.lowerBound, 1 / (1 + $0))) }
+        package func share(k: Int, n: Int, m: Int, range: ClosedRange<Double> = Conductor.fractionRange,
+                           extrapolatingHeights: Bool = false) -> Double? {
+            ratio(k: k, n: n, m: m, extrapolatingHeights: extrapolatingHeights)
+                .map { min(range.upperBound, max(range.lowerBound, 1 / (1 + $0))) }
         }
 
         /// `ρ(k, n, m)` itself, read as `share` reads it, unclamped: what a grid of 0 and 1 (`ane_amx`) says of a product.
-        package func ratio(k: Int, n: Int, m: Int) -> Double? {
+        ///
+        /// `extrapolatingHeights`: past the measured heights, ρ goes on along the line in `log m` through the two
+        /// nearest heights (a 6 144-row product beside a grid measured at 1 024 and 4 096), where the default holds
+        /// the nearest height's ρ. The route table's lookup for classes that sit beyond their measure; the caller
+        /// bounds the result (`share`'s range).
+        package func ratio(k: Int, n: Int, m: Int, extrapolatingHeights: Bool = false) -> Double? {
             let heights = Array(Set(points.map(\.m))).sorted()
             guard !heights.isEmpty else { return nil }
             /// Linear in `log x` between the two points around `x`, the nearest outside.
@@ -471,7 +478,13 @@ package final class Conductor: @unchecked Sendable {
                 let width = between(level.filter { $0.k == pivot.k }, n, at: \.n, value: \.ratio)
                 return depth * width / pivot.ratio
             }
-            return between(heights.map { ($0, ratio(at: $0)) }, m, at: \.0, value: \.1)
+            let levels = heights.map { ($0, ratio(at: $0)) }
+            if extrapolatingHeights, levels.count >= 2, m < levels[0].0 || m > levels[levels.count - 1].0 {
+                let (a, b) = m < levels[0].0 ? (levels[0], levels[1]) : (levels[levels.count - 2], levels[levels.count - 1])
+                let t = log(Double(m) / Double(a.0)) / log(Double(b.0) / Double(a.0))
+                return a.1 + t * (b.1 - a.1)
+            }
+            return between(levels, m, at: \.0, value: \.1)
         }
 
         /// `2048×6144@1024=0.601,…` — `k×n@m=ρ`, the setting's text (`amx_shares`), the profile's and the

@@ -263,11 +263,18 @@ package final class WeightProducts {
         func expect(_ got: Int) throws {
             guard got == count else { throw Artifact.Failure.badHeader("\(name): \(got) values, \(count) expected") }
         }
-        // The operand rounded to bf16 (`gemm_bf16_act`) where this product is tall enough to gain.
-        let rounds = roundsActivations && gemm.bf16Activations && m >= EngineSettings.effective.bf16ActivationMinimumRows
-        if gemm.tensorBF16 || rounds, let tensor = artifact.tensors[name], tensor.dtype == .bfloat16 {
-            let rounding = rounds ? Self.roundingPlan(k: count / n, n: n, capacity: capacity) : nil
-            if gemm.tensorBF16 || rounding != nil, let got = try timed("staging", {
+        // The route table says how this product reads its weight (`GEMM.weightRoute`): the bf16 weight as
+        // published, its operand rounded to bf16 where the product is tall enough to gain (`gemm_bf16_act`),
+        // the 8-bit weight as published, or widened.
+        if let tensor = artifact.tensors[name], tensor.dtype == .bfloat16 {
+            var route = gemm.weightRoute(.bf16, k: count / n, n: n, m: m, rounding: roundsActivations)
+            var rounding: Rounding?
+            if route.path == .bf16 && route.roundsActivation {
+                rounding = Self.roundingPlan(k: count / n, n: n, capacity: capacity)
+                // The rounding does not fit the reserve: the rule below it (the plain bf16 weight, if any).
+                if rounding == nil { route = gemm.weightRoute(.bf16, k: count / n, n: n, m: m, rounding: false) }
+            }
+            if route.path == .bf16, let got = try timed("staging", {
                 try artifact.stage(name, into: UnsafeMutableRawPointer(reserve), capacity: 2 * capacity)
             }) {
                 try expect(got)
@@ -276,9 +283,11 @@ package final class WeightProducts {
         }
         if transposed, let tensor = artifact.tensors[name], tensor.dtype == .int8,
            let scale = tensor.scale, tensor.shape == [count / n, n],
-           scale.block == nil ? gemm.tensorInt8 && scale.shape.count <= 1 : gemm.tensorQ8 && scale.shape.count == 2 {
+           scale.block == nil ? scale.shape.count <= 1 : scale.shape.count == 2,
+           case let route = gemm.weightRoute(scale.block == nil ? .int8 : .q8, k: count / n, n: n, m: m, rounding: roundsActivations),
+           route.path == .native {
             let (k, perColumn, group) = (count / n, scale.shape.count == 1, tensor.rotation?.group)
-            let roundsHere = rounds && EngineSettings.effective.bf16ActivationEightBit && (scale.block == nil || gemm.tensor?.roundsBlocks == true)
+            let roundsHere = route.roundsActivation
             // Rounded, the GPU alone: the AMX reads the fp32 activation, one rounding for some columns only.
             guard let plan = (roundsHere ? Self.int8Plan(k: k, n: n, capacity: capacity, perColumn: perColumn, group: group,
                                                          amxColumns: 0, block: scale.block, rounded: true) : nil)

@@ -149,6 +149,9 @@ package final class GEMM {
     package private(set) var tensor: TensorGEMM?
     /// The Neural Engine on the last rows of a widened product (`gemm_ane`); `nil` when off.
     package private(set) var neuralEngine: NeuralEngine?
+    /// **The route table this GEMM runs under** (`RouteTable`): the process's (`EngineSettings.routes`), with the
+    /// engines and weight branches the init's arguments force. A class rule is asked at every product.
+    package let routes: RouteTable
     /// The last product cut with the ANE: each side's wall seconds and rows, from which the map reads the
     /// share that would have ended both together.
     package private(set) var lastSides: (gpu: Double, gpuRows: Int, ane: Double, aneRows: Int)?
@@ -167,25 +170,46 @@ package final class GEMM {
     /// - Parameter freezeCut: the GPU/AMX cut is not servo-controlled. This is the reproducible mode:
     ///   `T` stays the profile's, so `cut` is a pure function and two renders of the same
     ///   seed return the same bits. No effect when co-execution is off.
-    /// - Parameter coexecution: the GPU/AMX conductor, `Conductor.enabled` by default. The diagnostic
+    /// - Parameter coexecution: the GPU/AMX conductor, the route table's (`usesAMX`) by default. The diagnostic
     ///   asks for both on any chip: the GPU alone and the cut, measured on the same product.
     /// - Parameter tensorWeights: the bf16-weight product (`gemm_tensor`); the diagnostic asks for it on
     ///   any chip that has it, to measure it. `int8Weights`: the published-int8 one (`gemm_int8`);
     ///   `q8Weights`: the Q8_0 one (`gemm_q8`).
-    package init(freezeCut: Bool = EngineSettings.effective.frozenCut, coexecution: Bool = Conductor.enabled,
-                 tensorWeights: Bool = EngineSettings.effective.gemmTensor,
-                 int8Weights: Bool = EngineSettings.effective.gemmInt8,
-                 q8Weights: Bool = EngineSettings.effective.gemmQ8,
-                 bf16Activations: Bool = EngineSettings.effective.gemmBF16Activations,
-                 neuralEngine: Bool = EngineSettings.effective.gemmANE,
-                 neuralEngineShare: Double = EngineSettings.effective.aneFraction) throws {
+    ///
+    /// Each argument defaults to what the process's route table brings up (`RouteTable.Products.usesAMX`…); one
+    /// that differs forces the engine or the branch on this GEMM's own copy of the table — the checks and the
+    /// diagnostic measure a path on any chip.
+    package init(freezeCut: Bool = EngineSettings.effective.frozenCut,
+                 coexecution: Bool = EngineSettings.effective.routes.products.usesAMX,
+                 tensorWeights: Bool = EngineSettings.effective.routes.products.usesBF16Weights,
+                 int8Weights: Bool = EngineSettings.effective.routes.products.usesInt8Weights,
+                 q8Weights: Bool = EngineSettings.effective.routes.products.usesQ8Weights,
+                 bf16Activations: Bool = EngineSettings.effective.routes.products.roundsActivations,
+                 neuralEngine: Bool = EngineSettings.effective.routes.products.usesANE,
+                 neuralEngineShare: Double = EngineSettings.effective.routes.products.ane.gpuShare,
+                 routes base: RouteTable = EngineSettings.effective.routes) throws {
         guard let device = MTLCreateSystemDefaultDevice(), let queue = device.makeCommandQueue() else {
             throw Failure.noDevice
         }
         self.device = device
         self.queue = queue
+        var table = base
+        table.products.amx.enabled = coexecution
+        table.products.ane.enabled = neuralEngine
+        table.products.ane.gpuShare = neuralEngineShare
+        let p = base.products
+        if (tensorWeights, int8Weights, q8Weights, bf16Activations)
+            != (p.usesBF16Weights, p.usesInt8Weights, p.usesQ8Weights, p.roundsActivations) {
+            let settings = EngineSettings.effective
+            table.products.weights = RouteTable.Products.weightRules(
+                bf16: tensorWeights, int8: int8Weights, q8: q8Weights, rounded: bf16Activations,
+                minRows: settings.bf16ActivationMinimumRows, eightBit: settings.bf16ActivationEightBit)
+        }
+        routes = table
         if coexecution {
             conductor = Conductor(queue: queue, driven: !freezeCut)
+            conductor?.shares = table.products.amx.grid.shares
+            conductor?.initialFraction = table.products.amx.gpuShare
         }
         if tensorWeights || int8Weights || q8Weights || bf16Activations {
             tensor = TensorGEMM(device: device, queue: queue, roundingActivations: bf16Activations)
@@ -195,8 +219,8 @@ package final class GEMM {
         tensorInt8 = tensor != nil && int8Weights
         tensorQ8 = tensor?.readsBlocks == true && q8Weights
         if neuralEngine {
-            self.neuralEngine = NeuralEngine(gpuShare: neuralEngineShare, shares: EngineSettings.effective.aneShares)
-            self.neuralEngine?.besideAMX = EngineSettings.effective.aneAMX
+            self.neuralEngine = NeuralEngine(gpuShare: neuralEngineShare, shares: table.products.ane.grid.shares)
+            self.neuralEngine?.besideAMX = table.products.ane.besideAMX.shares
         }
     }
 
@@ -247,7 +271,12 @@ package final class GEMM {
         // map gave all three (`ane_amx`); the AMX alone beside the GPU on the shapes the ANE's grid does not take
         // (`ane_shares`): at the same time, each row one engine's. Its rows refused or non-finite: the whole product again on the GPU — the bits of the GPU
         // alone, never a half-computed output.
-        if let ane = neuralEngine, weightIsTransposed, case let rows = ane.rows(m, k: k, n: n), rows > 0, ane.accepts(rows: rows, k: k, n: n) {
+        // A class the table forces to one set of engines (`RouteTable.ClassRule`) is ahead of the grids the
+        // engines hold.
+        let forced = routes.products.forced(k: k, n: n, m: m)
+        let aneAllowed = forced == nil || forced == .ane || forced == .aneAMX
+        let amxAllowed = forced == nil || forced == .amx || forced == .aneAMX
+        if aneAllowed, let ane = neuralEngine, weightIsTransposed, case let rows = ane.rows(m, k: k, n: n), rows > 0, ane.accepts(rows: rows, k: k, n: n) {
             let first = m - rows
             nonisolated(unsafe) let (pa, pb, pc) = (a.contents().assumingMemoryBound(to: Float.self),
                                                     b.contents().assumingMemoryBound(to: Float.self),
@@ -262,7 +291,7 @@ package final class GEMM {
             }
             // The GPU's side alone, or beside the AMX where the map gave the shape all three (`ane_amx`).
             _ = gpuLinear(a: a, b: b, c: c, m: first, k: k, n: n, weightIsTransposed: weightIsTransposed,
-                          conductor: ane.takesAMX(m, k: k, n: n))
+                          conductor: forced.map { $0 == .aneAMX } ?? ane.takesAMX(m, k: k, n: n))
             let gpuWall = Double(DispatchTime.now().uptimeNanoseconds - began) * 1e-9
             group.wait()
             lastSides = (gpuWall, first, aneWall, rows)
@@ -274,7 +303,24 @@ package final class GEMM {
             record(key, wall)
             return wall
         }
-        return gpuLinear(a: a, b: b, c: c, m: m, k: k, n: n, weightIsTransposed: weightIsTransposed)
+        return gpuLinear(a: a, b: b, c: c, m: m, k: k, n: n, weightIsTransposed: weightIsTransposed, conductor: amxAllowed)
+    }
+
+    /// **How a product of `kind` weights, `k × n` at `m` rows, reads its weight on this GEMM**: the table's rule,
+    /// among those this process can run — `TensorGEMM` built, its Q8_0 reading and its rounding kernels
+    /// present, the caller (`rounding`) willing to round. A rule it cannot run is skipped, not refused: the one
+    /// below applies, down to the widened path.
+    package func weightRoute(_ kind: RouteTable.WeightKind, k: Int, n: Int, m: Int, rounding: Bool) -> RouteTable.WeightRoute {
+        routes.products.weight(kind, k: k, n: n, m: m) { rule in
+            if rule.path == .widened { return true }
+            guard let tensor else { return false }
+            if kind == .q8 && !tensor.readsBlocks { return false }
+            if rule.roundsActivation {
+                guard rounding && bf16Activations else { return false }
+                if kind == .q8 && !tensor.roundsBlocks { return false }
+            }
+            return true
+        }
     }
 
     /// `linear` on the GPU (and the AMX's cut, unless `conductor` is false): what every product ran before

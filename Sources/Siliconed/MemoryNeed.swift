@@ -221,7 +221,7 @@ package struct MemoryNeed: Sendable, Equatable {
     package static func attention(_ name: String, heads: Int, rows: Int, keys: Int, headDim: Int, causal: Bool,
                                   split: Bool, threads: Int, group: Int = 1) -> [Term] {
         // The GPU's heads: all of them in one MPSGraph SDPA, or what the head split leaves it.
-        let gpu = split ? HeadSplitAttention.partition(heads: heads, fraction: HeadSplitAttention.cpuFraction, group: group).gpu.count
+        let gpu = split ? HeadSplitAttention.partition(heads: heads, fraction: HeadSplitAttention.cpuFraction(sequence: rows, heads: heads, headDim: headDim), group: group).gpu.count
             : heads
         // Past `Attention.maxMatrix` the unmasked graph runs in query slices, which MPSGraph concatenates:
         // one more copy of the GPU heads' output (`Attention.init`, `HeadSplitAttention.init`). A causal
@@ -254,8 +254,9 @@ package struct MemoryNeed: Sendable, Equatable {
     /// (`NeuralEngine.bytes`).
     package static func gemm(_ name: String, products: [(m: Int, k: Int, n: Int)] = [],
                              bounded: [(m: Int, k: Int, n: Int)] = [], rank: Int = 0,
-                             amx: Bool = EngineSettings.effective.amx,
-                             int8: Bool = EngineSettings.effective.gemmInt8 || EngineSettings.effective.gemmQ8,
+                             amx: Bool = EngineSettings.effective.routes.products.usesAMX,
+                             int8: Bool = EngineSettings.effective.routes.products.usesInt8Weights
+                                 || EngineSettings.effective.routes.products.usesQ8Weights,
                              ane: Bool = false) -> [Term] {
         var workspace = 0
         if amx {
@@ -277,8 +278,8 @@ package struct MemoryNeed: Sendable, Equatable {
             }
         }
         let tiers = GEMM.tierBytes(products: products, bounded: bounded, rank: rank)
-        let neural = ane ? NeuralEngine.bytes(products: products + bounded, gpuShare: EngineSettings.effective.aneFraction,
-                                                shares: EngineSettings.effective.aneShares) : 0
+        let neural = ane ? NeuralEngine.bytes(products: products + bounded, gpuShare: EngineSettings.effective.routes.products.ane.gpuShare,
+                                                shares: EngineSettings.effective.routes.products.ane.grid.shares) : 0
         return (tiers > 0 ? [Term("\(name) GEMM tiers", tiers)] : [])
             + (workspace > 0 ? [Term("\(name) conductor workspace", Arena.capacity(for: workspace))] : [])
             + (neural > 0 ? [Term("\(name) Neural Engine", neural)] : [])

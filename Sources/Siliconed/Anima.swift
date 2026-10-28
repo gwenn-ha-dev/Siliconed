@@ -373,7 +373,7 @@ package final class AnimaDiT {
         if let p = selfPath { return p }
         let p: AttentionPath
         var flash: FlashMatrix?
-        if EngineSettings.effective.flash {
+        if HeadSplitAttention.allowsFlash(sequence: s, heads: config.heads, headDim: config.headDim) {
             do {
                 flash = try FlashMatrix(device: gemm.device, queue: gemm.queue, heads: config.heads, sequence: s,
                                         headDim: config.headDim, rowsPerSimdgroup: 8, dimsPerSimdgroup: 64,

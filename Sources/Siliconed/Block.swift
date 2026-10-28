@@ -64,7 +64,6 @@ package final class Block {
     /// isolation it is on a par with `MPSGraph`, and what decides is what it returns *inside the
     /// engine*, where it removes 6.1 GB of traffic per call.
     private var builtFlash: FlashMatrix?
-    static let useFlash = EngineSettings.effective.flash
     /// The SDPA cut by heads between the GPU and the AMX. Not taken under `flash`, nor where
     /// `HeadSplitAttention.applies` says no (`head_split` off, half precision, below
     /// `minimumSequence`, where the text blocks run at 32 tokens): MPSGraph there.
@@ -205,7 +204,7 @@ package final class Block {
     /// not to apply is a path of which we will not know later whether it was used*: the fallback
     /// is reported once, through the warnings.
     private func flash() -> FlashMatrix? {
-        guard Block.useFlash else { return nil }
+        guard HeadSplitAttention.allowsFlash(sequence: shapes.sequence, heads: shapes.heads, headDim: shapes.headDim) else { return nil }
         if let existing = builtFlash { return existing }
         let sequence = shapes.sequence
         do {

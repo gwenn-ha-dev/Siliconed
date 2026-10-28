@@ -189,10 +189,15 @@ package final class NeuralEngine: @unchecked Sendable {
     /// The ANE's rows of an `m`-row product `k → n`: `0` when the GPU keeps them all. The share is the grid's
     /// at `(k, n, m)` when there is one, `gpuShare` otherwise.
     package func rows(_ m: Int, k: Int, n: Int) -> Int {
-        guard m >= NeuralEngine.minimumRows else { return 0 }
-        let share = shares.share(k: k, n: n, m: m, range: NeuralEngine.shareRange) ?? gpuShare
-        let unit = Double(NeuralEngine.rowUnit)
-        let r = Int((Double(m) * (1 - share) / unit).rounded()) * NeuralEngine.rowUnit
+        NeuralEngine.rows(m, gpuShare: shares.share(k: k, n: n, m: m, range: NeuralEngine.shareRange) ?? gpuShare,
+                          minimum: NeuralEngine.minimumRows)
+    }
+
+    /// The same from a share already read: what the route table (`RouteTable.Products.route`) asks at each product.
+    package static func rows(_ m: Int, gpuShare share: Double, minimum: Int) -> Int {
+        guard m >= minimum else { return 0 }
+        let unit = Double(rowUnit)
+        let r = Int((Double(m) * (1 - share) / unit).rounded()) * rowUnit
         return r > 0 && r < m ? r : 0
     }
 

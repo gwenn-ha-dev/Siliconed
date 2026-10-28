@@ -155,6 +155,12 @@ package struct EngineSettings: Sendable {
     /// set by the map where the three engines at once beat both pairs (`NeuralEngine.besideAMX`).
     package var aneAMX = Conductor.Shares.none
 
+    /// **The route table these settings make** (`RouteTable`): what the engine consults, product by product and
+    /// attention by attention, instead of the switches above. Derived once, after the last override (map,
+    /// profile, environment) — a forced setting is a setting, hence a table. The switches stay the input
+    /// layer: checks, bench and the environment force them as they always did.
+    package private(set) var routes = RouteTable()
+
     /// The half-size start, **when forced** (`SILICONED_SPECTRAL`): `k` half-size evaluations of
     /// Z-Image, Qwen-Image-2.1, Anima or Krea 2, 0 = full schedule, within each plan's rules (`Spectral.forced`).
     /// Not forced, the product decides (`Spectral.halfSizeStart`). A measurement's
@@ -433,6 +439,16 @@ package struct EngineSettings: Sendable {
         apply(fromEnv, .environment)
 
         if let refusal { warnings.insert(refusal, at: 0) }
+        routes = RouteTable(settings: self)
+    }
+
+    /// **Settings from values alone** — the defaults, then `values` as a map's decisions write them
+    /// (`Decisions.settings`): no environment, no profile, no process-wide state. What the pure tests and
+    /// `RouteTable(decisions:)` read.
+    package init(applying values: [String: Any]) {
+        machine = Machine.detected()
+        apply(values, .map)
+        routes = RouteTable(settings: self)
     }
 
     /// **A flag is read by its presence, and taken down with `=0`.** Historically the engine
