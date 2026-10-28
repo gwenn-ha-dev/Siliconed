@@ -43507,10 +43507,22 @@
     },
     "“%@” wants to install %@ (%@), which removes the %@ version first: until it is installed, %@ cannot render." : {
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "„%@“ möchte %@ (%@) installieren und entfernt dafür zuerst die Version %@: Bis die Installation fertig ist, kann %@ nicht rendern."
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "“%1$@” wants to install %2$@ (%3$@), which removes the %4$@ version first: until it is installed, %5$@ cannot render."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "«%@» quiere instalar %@ (%@), que primero retira la versión %@: hasta que termine la instalación, %@ no puede generar imágenes."
           }
         },
         "fr" : {
@@ -43518,21 +43530,69 @@
             "state" : "translated",
             "value" : "« %@ » veut installer %@ (%@), ce qui retire d’abord la version %@ : tant que l’installation n’est pas finie, %@ ne peut pas rendre."
           }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "«%@» vuole installare %@ (%@), che prima rimuove la versione %@: finché l’installazione non è finita, %@ non può generare immagini."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「%@」が %@（%@）をインストールしようとしています。先に %@ 版が削除されるため、インストールが終わるまで %@ では生成できません。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@”想要安装 %@（%@），这会先移除 %@ 版本：安装完成前，%@ 无法生成图像。"
+          }
         }
       }
     },
     "“%@” wants to install %@ (%@), which replaces the %@ version once it is ready." : {
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "„%@“ möchte %@ (%@) installieren; die Version %@ wird ersetzt, sobald sie bereit ist."
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "“%1$@” wants to install %2$@ (%3$@), which replaces the %4$@ version once it is ready."
           }
         },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "«%@» quiere instalar %@ (%@), que sustituirá a la versión %@ cuando esté lista."
+          }
+        },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "« %@ » veut installer %@ (%@), ce qui remplacera la version %@ une fois qu’elle sera prête."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "«%@» vuole installare %@ (%@), che sostituirà la versione %@ quando sarà pronta."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「%@」が %@（%@）をインストールしようとしています。準備ができ次第、%@ 版と置き換えられます。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@”想要安装 %@（%@），准备就绪后将替换 %@ 版本。"
           }
         }
       }
