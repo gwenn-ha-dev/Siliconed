@@ -41,7 +41,6 @@ extension AppState {
 
     /// Why « Crop » cannot take this image, in a sentence — `nil` when it can.
     func cropRefusal(_ entry: Entry) -> String? {
-        if let mirror { return String(localized: "Not on “\(mirror.macName)” yet") }
         if entry.grid != nil { return String(localized: "A grid is not cropped") }
         if entry.sketch != nil { return String(localized: "A sketch is not cropped") }
         return cropRefusal(width: entry.width, height: entry.height)
@@ -126,6 +125,8 @@ extension AppState {
         switch s.target {
         case .entry(let id):
             guard let entry = history.first(where: { $0.id == id }) else { return }
+            // In a mirror, the other Mac cuts its own pixels: the same box, the same image, in its history.
+            if let mirror { mirror.send(.crop(entry.ordinal, s.box)); return }
             Task { await cropped(entry, image: s.image, box: s.box) }
         case .reference(let id):
             cropReference(id, image: s.image, box: s.box)
@@ -143,6 +144,13 @@ extension AppState {
                                 space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: alpha.rawValue) else { return nil }
         c.draw(part, in: CGRect(x: 0, y: 0, width: box.width, height: box.height))
         return c.makeImage()
+    }
+
+    /// A crop asked by another Mac (`MirrorServer`): the box in this image's own pixels.
+    func crop(_ entry: Entry, box: Crop.Box) async {
+        guard let image = await Entry.decoded(entry.png).image,
+              box.x >= 0, box.y >= 0, box.maxX <= image.width, box.maxY <= image.height, box.width > 0, box.height > 0 else { return }
+        await cropped(entry, image: image, box: box)
     }
 
     private func cropped(_ entry: Entry, image: CGImage, box: Crop.Box) async {

@@ -153,8 +153,7 @@ enum EnlargeFailure: Error {
 extension AppState {
     /// Why « Enlarge » cannot take this image now, in a sentence — `nil` when it can.
     func enlargeRefusal(_ entry: Entry) -> String? {
-        if let mirror { return String(localized: "Not on “\(mirror.macName)” yet") }
-        if !SuperResolution.available { return String(localized: "This Mac does not offer macOS's super-resolution") }
+        if !(mirrorCatalog.map(\.enlarges) ?? SuperResolution.available) { return String(localized: "This Mac does not offer macOS's super-resolution") }
         if entry.grid != nil || entry.sketch != nil { return String(localized: "A grid is not enlarged") }
         if entry.enlarged != nil { return String(localized: "This image is already enlarged") }
         // A render past 1920 px (the sizes B now allows) is no enlargement: it is beyond macOS's input.
@@ -182,14 +181,11 @@ extension AppState {
     /// offers to download it — Apple's, kept by macOS —, then enlarges.
     func enlarge(_ entry: Entry) {
         guard enlargeRefusal(entry) == nil else { return }
+        // In a mirror, the other Mac enlarges; if it needs Apple's model, it says so and the alert is here.
+        if let mirror { mirror.send(.enlarge(entry.ordinal, download: false)); return }
         var download = false
         if SuperResolution.state(width: entry.width, height: entry.height) == .downloadRequired {
-            let alert = NSAlert()
-            alert.messageText = String(localized: "Enlarge with macOS's super-resolution?")
-            alert.informativeText = String(localized: "Siliconed enlarges ×4 with a model made by Apple: it sees only the image — no prompt — and sharpens edges and textures without adding anything. macOS downloads it once from Apple and keeps it; it is not in your models folder.")
-            alert.addButton(withTitle: String(localized: "Download and Enlarge"))
-            alert.addButton(withTitle: String(localized: "Cancel"))
-            guard alert.runModal() == .alertFirstButtonReturn else { return }
+            guard Self.consentsToDownload() else { return }
             download = true
         }
         Task {
@@ -198,6 +194,16 @@ extension AppState {
             catch EnlargeFailure.download { flash(String(localized: "The enlargement model could not be downloaded")) }
             catch { flash(String(localized: "This image could not be enlarged")) }
         }
+    }
+
+    /// Apple's model, downloaded once: asked of the user first.
+    static func consentsToDownload() -> Bool {
+        let alert = NSAlert()
+        alert.messageText = String(localized: "Enlarge with macOS's super-resolution?")
+        alert.informativeText = String(localized: "Siliconed enlarges ×4 with a model made by Apple: it sees only the image — no prompt — and sharpens edges and textures without adding anything. macOS downloads it once from Apple and keeps it; it is not in your models folder.")
+        alert.addButton(withTitle: String(localized: "Download and Enlarge"))
+        alert.addButton(withTitle: String(localized: "Cancel"))
+        return alert.runModal() == .alertFirstButtonReturn
     }
 
     /// **The enlargement itself**, for the app and `silicontrol enlarge`: downloads Apple's model if

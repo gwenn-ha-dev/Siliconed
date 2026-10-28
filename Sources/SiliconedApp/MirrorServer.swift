@@ -74,6 +74,19 @@ final class MirrorServer {
             release()
         case .quote(let q):
             host.send(.quoted(answer(q)), to: identity)
+        case .enlarge(let o, let download):
+            guard let e = app.history.first(where: { $0.ordinal == o }) else { return }
+            Task {
+                do { try await app.enlarged(e, download: download) }
+                catch EnlargeFailure.downloadRequired { host.send(.enlargeNeedsDownload(o), to: identity) }
+                catch EnlargeFailure.refused(let sentence) { host.send(.refused(sentence), to: identity) }
+                catch EnlargeFailure.download { host.send(.refused(String(localized: "The enlargement model could not be downloaded")), to: identity) }
+                catch { host.send(.refused(String(localized: "This image could not be enlarged")), to: identity) }
+            }
+        case .crop(let o, let box):
+            guard let e = app.history.first(where: { $0.ordinal == o }) else { return }
+            if let refusal = app.cropRefusal(e) { host.send(.refused(refusal), to: identity); return }
+            Task { await app.crop(e, box: box) }
         case .cancel:
             app.cancel()
         case .removeJob(let n):
@@ -204,6 +217,7 @@ final class MirrorServer {
         q.stageSeconds = Dictionary(uniqueKeysWithValues: app.stageSeconds.map { ($0.key.rawValue, $0.value) })
         q.remaining = app.remaining(at: Date())
         q.problem = app.problem?.text
+        q.enlarging = app.enlarging.flatMap { id in app.history.first { $0.id == id }?.ordinal }
         return q
     }
 
@@ -230,7 +244,8 @@ final class MirrorServer {
         }
         return MirrorCatalog(ready: app.readySet.sorted(), traits: traits, loras: loras, loraNames: names, needs: needs,
                              ceiling: app.memoryCeiling, settingsRead: app.settingsRead,
-                             neuralEngineOffered: app.neuralEngineOffered, fasterRendering: app.fasterRendering)
+                             neuralEngineOffered: app.neuralEngineOffered, fasterRendering: app.fasterRendering,
+                             enlarges: SuperResolution.available)
     }
 
     private func send(_ e: Entry, to identity: Data? = nil) {
@@ -242,7 +257,8 @@ final class MirrorServer {
         }
         let r = RemoteEntry(ordinal: e.ordinal, job: job,
                             width: e.width, height: e.height, seed: e.seed, timings: e.timings, footprints: e.footprints,
-                            evaluations: e.evaluations, metadata: e.metadata, neuralEngine: e.settings.neuralEngine, png: id)
+                            evaluations: e.evaluations, metadata: e.metadata, neuralEngine: e.settings.neuralEngine, png: id,
+                            enlarged: e.enlarged, cropped: e.cropped)
         host.send(.entry(r), to: identity)
         host.send(blob: e.png, id: id, to: identity)
     }

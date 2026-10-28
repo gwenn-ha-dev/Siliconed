@@ -22,7 +22,9 @@
 //   (`quote`), and waits for the answer before « Generate ».
 // - **« Variations »** of an image: its own variations travel with the job, and an edit's images are
 //   named by the image (`ofImage`) — they never came here.
-// - Not yet: grids and explorations, enlarging, cropping, the statistics, the license
+// - **Enlarging and cropping** happen there, on its own pixels (`enlarge`, `crop` by ordinal); the
+//   consent to download Apple's model is asked here. An enlargement's curtain has no original here yet.
+// - Not yet: grids and explorations, the statistics, the license
 //   sheet, ⌘Z after a removal.
 
 import AppKit
@@ -197,6 +199,7 @@ extension AppState {
             estimatedRemaining = q.remaining
             remainingInstant = Date()
             problem = q.problem.map { Problem($0) }
+            enlarging = q.enlarging.flatMap { link.entries[$0]?.id }
             if running == nil { preview = nil }
         case .entry(let e):
             link.pending[e.png] = e
@@ -216,6 +219,9 @@ extension AppState {
         case .preview(let id):
             link.previewBlob = id
             if id == nil { preview = nil }
+        case .enlargeNeedsDownload(let o):
+            // The consent is asked where the user is; the other Mac downloads Apple's model.
+            if link.entries[o] != nil, Self.consentsToDownload() { link.send(.enlarge(o, download: true)) }
         case .quoted(let a):
             link.asked.remove(a.quote)
             mirrorQuotes[a.quote] = a
@@ -240,7 +246,7 @@ extension AppState {
         var entry = Entry(ordinal: e.ordinal, job: e.job.ordinal, png: data,
                           vignette: FinishedImage.reduce(image, side: 240) ?? image, width: e.width, height: e.height,
                           seed: e.seed, timings: e.timings, footprints: e.footprints, evaluations: e.evaluations,
-                          settings: settings, metadata: e.metadata)
+                          settings: settings, metadata: e.metadata, enlarged: e.enlarged, cropped: e.cropped)
         // Its edit images stay on the other Mac: named, for « Variations » (`RemoteReference.ofImage`).
         entry.references = e.job.references.map {
             ReferenceImage(source: .remote($0.origin), vignette: NSImage(systemSymbolName: "photo", accessibilityDescription: nil) ?? NSImage(),

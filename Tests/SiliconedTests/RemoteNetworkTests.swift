@@ -253,6 +253,7 @@ final class RemoteNetworkTests: XCTestCase {
         var t = Engine.Timings(); t.total = 83.1
         let messages: [SessionMessage] = [
             .render(job), .render(edit), .quote(quote), .quoted(RemoteQuoteAnswer(quote: quote, width: 896, height: 1184, need: 3 << 30)),
+            .enlarge(7, download: true), .crop(7, Crop.Box(x: 64, y: 0, width: 768, height: 1024)), .enlargeNeedsDownload(7),
             .queue(q), .cancel, .removeJob(4), .deleteImages([1, 2]), .refused("No."), .preview(nil),
             .entry(RemoteEntry(ordinal: 7, job: job, width: 1024, height: 1024, seed: 42, timings: t,
                                footprints: Engine.Footprints(), evaluations: 8, metadata: ["parameters": "x"],

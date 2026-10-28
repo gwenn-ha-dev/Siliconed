@@ -65,10 +65,14 @@ package enum SessionMessage: Codable, Equatable, Sendable {
     /// A `render` the mini did not queue, in its words.
     case refused(String)
     case quoted(RemoteQuoteAnswer)
+    /// Enlarging this image needs Apple's model, not yet on the mini: the Neo asks the user.
+    case enlargeNeedsDownload(Int)
 
     // Neo → mini
     case render(RemoteJob)
     case quote(RemoteQuote)
+    case enlarge(Int, download: Bool)
+    case crop(Int, Crop.Box)
     case cancel
     case removeJob(Int)
     case stopAll

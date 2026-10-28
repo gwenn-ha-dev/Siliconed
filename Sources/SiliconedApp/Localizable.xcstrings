@@ -14519,34 +14519,6 @@
         }
       }
     },
-    "Not on “%@” yet" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Noch nicht auf „%@“"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Aún no en «%@»"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Pas encore sur « %@ »"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Non ancora su «%@»"
-          }
-        }
-      }
-    },
     "Not supported — hover for the reason" : {
       "localizations" : {
         "de" : {

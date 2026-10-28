@@ -15,6 +15,8 @@ import Foundation
 ///                              go first as blobs, or by their history ordinal
 ///                  quote       what an edit's format and a need with images are: the denoiser's rule
 ///                              and the memory need come from maps only the mini holds
+///                  enlarge, crop  an image of the mini's history, made there; `enlargeNeedsDownload`
+///                              asks the Neo's consent to Apple's model
 ///                  cancel, removeJob, stopAll, clearQueue, deleteImages
 ///
 /// **No `Date` crosses**: the two clocks differ. What remains of a render is a duration.
@@ -129,6 +131,8 @@ package struct RemoteQueue: Codable, Equatable, Sendable {
     package var remaining: Double?
     /// The last refusal or failure, in the mini's words.
     package var problem: String?
+    /// The history image being enlarged (`i` ordinal).
+    package var enlarging: Int?
     package init() {}
 }
 
@@ -144,9 +148,14 @@ package struct RemoteEntry: Codable, Equatable, Sendable {
     package var metadata: [String: String]
     package var neuralEngine: Bool
     package var png: UInt32
+    /// An enlargement's factor; a crop's box in the image it was cut from.
+    package var enlarged: Int?
+    package var cropped: Crop.Box?
 
     package init(ordinal: Int, job: RemoteJob, width: Int, height: Int, seed: UInt64, timings: Engine.Timings,
-                 footprints: Engine.Footprints, evaluations: Int, metadata: [String: String], neuralEngine: Bool, png: UInt32) {
+                 footprints: Engine.Footprints, evaluations: Int, metadata: [String: String], neuralEngine: Bool, png: UInt32,
+                 enlarged: Int? = nil, cropped: Crop.Box? = nil) {
+        self.enlarged = enlarged; self.cropped = cropped
         self.ordinal = ordinal; self.job = job; self.width = width; self.height = height; self.seed = seed
         self.timings = timings; self.footprints = footprints; self.evaluations = evaluations
         self.metadata = metadata; self.neuralEngine = neuralEngine; self.png = png
@@ -186,8 +195,12 @@ package struct MirrorCatalog: Codable, Equatable, Sendable {
     package var settingsRead: Bool
     package var neuralEngineOffered: Bool
     package var fasterRendering: Bool
+    /// macOS's super-resolution is offered there (`SuperResolution.available`).
+    package var enlarges: Bool
     package init(ready: [String], traits: [String: RemoteTraits], loras: [String: [RemoteLoRA]], loraNames: [String: String],
-                 needs: [String: [String: Int]] = [:], ceiling: Int, settingsRead: Bool, neuralEngineOffered: Bool, fasterRendering: Bool) {
+                 needs: [String: [String: Int]] = [:], ceiling: Int, settingsRead: Bool, neuralEngineOffered: Bool, fasterRendering: Bool,
+                 enlarges: Bool = false) {
+        self.enlarges = enlarges
         self.ready = ready; self.traits = traits; self.loras = loras; self.loraNames = loraNames; self.needs = needs
         self.ceiling = ceiling
         self.settingsRead = settingsRead; self.neuralEngineOffered = neuralEngineOffered; self.fasterRendering = fasterRendering

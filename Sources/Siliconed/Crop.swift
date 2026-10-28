@@ -24,7 +24,7 @@ import Foundation
 
 package enum Crop {
     /// A rectangle in pixels of the image, origin at the top left.
-    package struct Box: Equatable, Hashable, Sendable {
+    package struct Box: Equatable, Hashable, Sendable, Codable {
         package var x: Int, y: Int, width: Int, height: Int
         package init(x: Int, y: Int, width: Int, height: Int) {
             self.x = x; self.y = y; self.width = width; self.height = height
