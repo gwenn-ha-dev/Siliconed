@@ -51,7 +51,10 @@ package struct EngineSettings: Sendable {
     /// 0.49 or 0.74 of the rows, and the computed shares fall between.
     package var amxQuantum = 256
     /// Below that, the split costs more than the computation handed over (the text blocks run at m = 32).
-    package var amxMinimumRows = 512
+    package var amxMinimumRows = EngineSettings.defaultAMXMinimumRows
+    /// The default of `amx_min`, where the pure side (the catalogue's routes, the map's limits, the render's check) reads it
+    /// instead of copying it.
+    package static let defaultAMXMinimumRows = 512
     /// **The fraction of rows handed to the GPU** — the servo's starting point, and the **frozen**
     /// value when the split is not servo-controlled (`frozenCut`, or a render's `reproducible`).
     ///

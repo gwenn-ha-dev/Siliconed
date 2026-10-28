@@ -250,10 +250,13 @@ package struct RouteTable: Codable, Sendable, Equatable {
         /// matches (among the engines brought up), the grids otherwise — the ANE where its rows are worth a
         /// program (`NeuralEngine.rows`), the AMX beside the GPU on the rest. What the engine's instances give,
         /// built from this table (the pure test compares the two).
-        package func route(k: Int, n: Int, m: Int) -> ProductRoute {
-            var (aneOK, amxOK) = (ane.enabled, amx.enabled)
+        ///
+        /// `aneBroughtUp: false`: a process whose products do not take the ANE (the Standard's, the encoders'): a class
+        /// rule that names it gives the route it keeps without it (`ClassRule.withoutANE`), as `GEMM.linear` does.
+        package func route(k: Int, n: Int, m: Int, aneBroughtUp: Bool = true) -> ProductRoute {
+            var (aneOK, amxOK) = (ane.enabled && aneBroughtUp, amx.enabled)
             var beside: Bool?
-            if let engines = forced(k: k, n: n, m: m) {
+            if let engines = forced(k: k, n: n, m: m, aneBroughtUp: aneBroughtUp) {
                 switch engines {
                 case .gpu: (aneOK, amxOK) = (false, false)
                 case .amx: aneOK = false

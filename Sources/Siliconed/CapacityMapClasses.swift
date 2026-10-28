@@ -88,7 +88,7 @@ package enum CapacityMap {
 
     /// The rows from which an engine or a form is worth asking (`EngineSettings`' defaults).
     package struct Limits: Sendable, Equatable {
-        package var amxRows = 512
+        package var amxRows = EngineSettings.defaultAMXMinimumRows
         package var aneRows = 1024
         package var roundingRows = 256
         package init(amxRows: Int = 512, aneRows: Int = 1024, roundingRows: Int = 256) {

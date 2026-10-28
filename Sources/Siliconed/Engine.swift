@@ -112,6 +112,10 @@ package final class Engine: Sendable {
         /// **Its denoiser's products could take the Neural Engine** (`Request.neuralEngine`, resolved against
         /// the map): fp16 products, another image than fp32's. False writes nothing in the metadata.
         package var neuralEngine = false
+        /// **What the denoising computed, by class and route** (`ProductLedger`): every product by a weight and every
+        /// attention of this image's evaluations, with the executions and wall seconds of each — what the capacity
+        /// map's prediction is compared with (`RenderLoop`). Empty for a render that was not recorded (a test's).
+        package var classes: [ProductLedger.Tally] = []
 
         /// **The generation metadata**, as `png()` writes it (`iTXt` chunks). ASCII keys, readable
         /// values; **no date** — two identical renders must remain two identical files.

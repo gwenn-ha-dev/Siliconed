@@ -258,7 +258,7 @@ extension Engine {
             // the compressor, which keeps it: its floor climbed ~2.3 GB at every image boundary, never
             // within a denoising. In this order a batch has the one switch of a single render; the
             // latents waiting meanwhile are kilobytes. Same bits: each image is the same computation.
-            var pending: [(latent: Latent, timings: Timings, elapsed: TimeInterval)] = []
+            var pending: [(latent: Latent, timings: Timings, elapsed: TimeInterval, classes: [ProductLedger.Tally])] = []
             var imageStart = totalStart
             for (n, seed) in seeds.enumerated() {
                 try context.check()
@@ -275,17 +275,21 @@ extension Engine {
 
                 context.emit(.stage(.denoising, image: n))
                 let denoisingStart = Date()
+                // The classes this image's evaluations ran, by route (`ProductLedger`): armed for the denoising alone.
+                let ledger = ProductLedger()
                 do {
                     try autoreleasepool {
-                        try chain.denoising.denoise(&latent, text: text, steps: steps, start: start,
-                                                    references: references, lora: stack, context: context)
+                        try ProductLedger.recording(into: ledger) {
+                            try chain.denoising.denoise(&latent, text: text, steps: steps, start: start,
+                                                        references: references, lora: stack, context: context)
+                        }
                     }
                 } catch is Context.Sketched {
                     latent.values = context.estimate!
                 }
                 context.timings.denoising = Date().timeIntervalSince(denoisingStart)
                 PhaseBoundary.mark("denoising")
-                pending.append((latent, context.timings, Date().timeIntervalSince(imageStart)))
+                pending.append((latent, context.timings, Date().timeIntervalSince(imageStart), ledger.tallies))
             }
 
             context.keptDenoiser = nil
@@ -294,7 +298,7 @@ extension Engine {
 
             var renderResults: [Render] = []
             var refused = false
-            for (n, (latent, timings, elapsed)) in pending.enumerated() {
+            for (n, (latent, timings, elapsed, classes)) in pending.enumerated() {
                 try context.check()
                 context.image = n
                 context.timings = timings
@@ -323,7 +327,7 @@ extension Engine {
                                   detail: request.detail, solver: request.solver,
                                   variations: request.variations.filter { $0.effectiveStrength > 0 },
                                   modelName: model.card.name, isImportedModel: model.card.isImported,
-                                  loraOrigins: stack?.origins ?? [], neuralEngine: context.neuralEngine)
+                                  loraOrigins: stack?.origins ?? [], neuralEngine: context.neuralEngine, classes: classes)
                 context.emit(.image(index: n, renderResult))
                 renderResults.append(renderResult)
             }

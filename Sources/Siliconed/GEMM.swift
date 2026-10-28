@@ -155,6 +155,11 @@ package final class GEMM {
     /// The last product cut with the ANE: each side's wall seconds and rows, from which the map reads the
     /// share that would have ended both together.
     package private(set) var lastSides: (gpu: Double, gpuRows: Int, ane: Double, aneRows: Int)?
+    /// **The engines the last widened product (`linear(a:b:…)`) ran on**: what the render's check records
+    /// (`ProductLedger`), the route taken and not the one the table planned — the ANE's refusal gives the
+    /// product back to the GPU, the conductor declines a short slice.
+    package private(set) var lastEngines = RouteTable.Engines.gpu
+    private var conductorTookRows = false
     /// Every product of this process the ANE was handed, and how many of them it gave back (refused or
     /// non-finite, recomputed on the GPU alone): a check run on the ANE says what the ANE actually computed.
     package static let neuralEngineTally = Mutex<(handed: Int, givenBack: Int)>((0, 0))
@@ -292,6 +297,7 @@ package final class GEMM {
             // The GPU's side alone, or beside the AMX where the map gave the shape all three (`ane_amx`).
             _ = gpuLinear(a: a, b: b, c: c, m: first, k: k, n: n, weightIsTransposed: weightIsTransposed,
                           conductor: forced.map { $0 == .aneAMX } ?? ane.takesAMX(m, k: k, n: n))
+            let besideAMX = conductorTookRows
             let gpuWall = Double(DispatchTime.now().uptimeNanoseconds - began) * 1e-9
             group.wait()
             lastSides = (gpuWall, first, aneWall, rows)
@@ -299,11 +305,14 @@ package final class GEMM {
             let key = "\(m)×\(k)×\(n)ᵀ ane \(rows)"
             record(key + " GPU side", gpuWall)
             if !computed { _ = gpuLinear(a: a, b: b, c: c, m: m, k: k, n: n, weightIsTransposed: weightIsTransposed, conductor: false) }
+            lastEngines = computed ? (besideAMX ? .aneAMX : .ane) : .gpu
             let wall = Double(DispatchTime.now().uptimeNanoseconds - began) * 1e-9
             record(key, wall)
             return wall
         }
-        return gpuLinear(a: a, b: b, c: c, m: m, k: k, n: n, weightIsTransposed: weightIsTransposed, conductor: amxAllowed)
+        let wall = gpuLinear(a: a, b: b, c: c, m: m, k: k, n: n, weightIsTransposed: weightIsTransposed, conductor: amxAllowed)
+        lastEngines = conductorTookRows ? .amx : .gpu
+        return wall
     }
 
     /// **How a product of `kind` weights, `k × n` at `m` rows, reads its weight on this GEMM**: the table's rule,
@@ -327,6 +336,7 @@ package final class GEMM {
     /// the Neural Engine.
     private func gpuLinear(a: MTLBuffer, b: MTLBuffer, c: MTLBuffer, m: Int, k: Int, n: Int,
                            weightIsTransposed: Bool, conductor allowed: Bool = true) -> Double {
+        conductorTookRows = false
         // From 8 to 32 rows, the GEMM goes through the padding tiers (see `poisonedRows`). The
         // GPU/AMX cut never applies there (`amx_min` = 512).
         if GEMM.poisonedRows.contains(m) {
@@ -345,6 +355,7 @@ package final class GEMM {
             // census that compares neither with itself nor with previous sessions.
             let key = "\(m)×\(k)×\(n)\(weightIsTransposed ? "ᵀ" : "")‖"
             record(key, wall)
+            conductorTookRows = true
             return wall
         }
         return submitRows(a: a, b: b, c: c, m: m, k: k, n: n,

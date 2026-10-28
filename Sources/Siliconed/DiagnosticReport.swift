@@ -463,6 +463,10 @@ extension Diagnostic {
     package struct Regime: Codable, Sendable, Equatable {
         package var witnesses: [CapacityMap.EngineWitness]
         package var heat: [String: Double]
+        /// **What the renders taught** (`RenderLoop`): a factor per engine, multiplying `heat` to predict a render. The routes were
+        /// decided at `heat`; a regime learned does not move them, it moves the prediction — and a correction that would move a
+        /// route is a map to measure again. `nil`: nothing learned.
+        package var learned: [String: Double]?
         package init(witnesses: [CapacityMap.EngineWitness]) {
             self.witnesses = witnesses.map {
                 CapacityMap.EngineWitness(engine: $0.engine, before: Diagnostic.significant($0.before, 4), after: Diagnostic.significant($0.after, 4),
@@ -516,6 +520,9 @@ extension Diagnostic {
         package var regime: Regime?
         /// Green or orange, and why (schema 13, `CapacityMap.Verdict`).
         package var verdict: CapacityMap.Verdict?
+        /// **The last render against this map's prediction** (`RenderLoop.Note`): the report an app sends carries it; the map itself
+        /// is kept without it.
+        package var render: RenderLoop.Note?
 
         package init(schema: Int = Diagnostic.schema, date: String, seconds: Double, machine: Machine,
                     cpuFeatures: [String: Int], settings: [String: String] = [:], before: Conditions, after: Conditions,
