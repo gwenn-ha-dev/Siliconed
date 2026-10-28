@@ -409,7 +409,8 @@ final class CapacityClassesTests: XCTestCase {
         for m in [1056, 4128] { XCTAssertEqual(table.products.weight(.int8, k: 3840, n: 10240, m: m).path, .native, "the heavy height's form") }
         // Other shapes of the same kind keep the general rule that matches them; one no rule matches takes its neighbour's.
         XCTAssertEqual(table.products.weight(.int8, k: 4096, n: 4096, m: 2048).path, .native)
-        XCTAssertEqual(table.products.weight(.int8, k: 4096, n: 4096, m: 1056).path, .native, "no general rule below 2 048: 3840×10240's")
+        XCTAssertEqual(table.products.weight(.int8, k: 4096, n: 12288, m: 1056).path, .native, "no general rule below 2 048: 3840×10240's")
+        XCTAssertEqual(table.products.weight(.int8, k: 4096, n: 4096, m: 1056).path, .widened, "beyond reach of 3840×10240")
 
         // Heavy at the small height: the other way round.
         let light = int8Classes(rowsAndCounts: [(1056, 400), (4128, 1)])

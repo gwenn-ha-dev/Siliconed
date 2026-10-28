@@ -212,9 +212,8 @@ final class CapacityMapTests: XCTestCase {
         for h in tall.heights.dropFirst() {
             XCTAssertEqual(table.products.route(k: k, n: n, m: h).engines.rawValue, String(chosen.split(separator: "/")[0]), "\(tall.id) @ \(h)")
         }
-        // Any other shape — another format, another model — takes a measured class's rule: no catch-all.
-        XCTAssertNotNil(table.products.forced(k: 7, n: 7, m: 4096))
-        XCTAssertFalse(table.products.classes.contains { $0.k == nil })
+        // A shape no measured class reaches is the simplest route.
+        XCTAssertEqual(table.products.route(k: 7, n: 7, m: 4096).aneRows, 0)
     }
 
     func testAClassThatChoseTheANEKnowsItsRouteWithoutTheANE() {

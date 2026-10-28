@@ -180,10 +180,12 @@ final class RouteTableTests: XCTestCase {
         XCTAssertEqual(t.products.forced(k: 3840, n: 10240, m: 1), .amx)
         XCTAssertEqual(t.products.forced(k: 4096, n: 4096, m: 4096), .gpu, "another shape takes the nearest shape's")
         XCTAssertEqual(t.products.forced(k: 4096, n: 12288, m: 4096), .amx, "4096×12288 is nearer 3840×10240")
-        // A general rule that matches is ahead of a neighbour.
-        t.products.classes.append(.init(engines: .ane, minRows: 6000))
-        XCTAssertEqual(t.products.forced(k: 4096, n: 4096, m: 6144), .ane)
+        // A neighbour is ahead of a rule that names no shape; beyond reach, that rule.
+        t.products.classes.append(.init(engines: .ane))
+        XCTAssertEqual(t.products.forced(k: 4096, n: 4096, m: 6144), .gpu)
+        XCTAssertEqual(t.products.forced(k: 64, n: 3840, m: 4096), .ane, "64 wide is no 3840×3840")
         t.products.classes.removeLast()
+        XCTAssertNil(t.products.forced(k: 64, n: 3840, m: 4096), "beyond reach and no rule: the grids")
         // Without a class rule, the grids decide (the switches' tables).
         var g = t; g.products.classes = []
         XCTAssertNil(g.products.forced(k: 4096, n: 4096, m: 4096))
@@ -219,6 +221,7 @@ final class RouteTableTests: XCTestCase {
         XCTAssertFalse(a.route(sequence: 2000, heads: 30, headDim: 128).splits, "2000/1056 < 4128/2000: nearer 1056")
         XCTAssertTrue(a.route(sequence: 2200, heads: 30, headDim: 128).splits)
         XCTAssertTrue(a.route(sequence: 4128, heads: 24, headDim: 128).splits, "another class takes the nearest class's")
+        XCTAssertFalse(a.route(sequence: 4128, heads: 8, headDim: 128).splits, "beyond reach")
         XCTAssertFalse(a.route(sequence: 4128).splits)
     }
 

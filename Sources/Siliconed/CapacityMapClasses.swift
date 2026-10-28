@@ -281,8 +281,8 @@ package enum CapacityMap {
 
     /// **The table a plan makes**: its decisions as class rules over the grids the cuts give (`cuts[i]` for `catalogue.entries[i]`), the
     /// catalogue completing it to the heights nobody measured. A product of no class — another format, another model — takes
-    /// the nearest measured class's rule (`RouteTable.Nearest`), never a catch-all: « GPU alone » for every shape the catalogue
-    /// did not list left a 1024×1536 render without the ANE.
+    /// the nearest measured class's rule within reach (`RouteTable.Nearest`), and only beyond it the simplest route: « GPU
+    /// alone » for every shape the catalogue did not list left a 1024×1536 render without the ANE.
     package static func table(plan: CapacityMeasure.Plan, catalogue: Catalogue, cuts: [Cut], limits: Limits = Limits()) -> RouteTable {
         var amxPoints: [Conductor.Shares.Point] = [], anePoints: [Conductor.Shares.Point] = []
         var seenAMX = Set<[Int]>(), seenANE = Set<[Int]>()
@@ -301,7 +301,9 @@ package enum CapacityMap {
         base.products.amx = .init(enabled: false, gpuShare: shares.isEmpty ? 0.631 : shares[shares.count / 2],
                                   grid: .init(Conductor.Shares(amxPoints)))
         base.products.ane = .init(enabled: false, gpuShare: 0.5, minimumRows: limits.aneRows, grid: .init(Conductor.Shares(anePoints)))
-        return RouteTable(plan: plan, classes: catalogue.entries.map(\.compute), base: base, renderClasses: catalogue.render)
+        var table = RouteTable(plan: plan, classes: catalogue.entries.map(\.compute), base: base, renderClasses: catalogue.render)
+        table.products.classes.append(.init(engines: .gpu))
+        return table
     }
 
     // MARK: - Regime

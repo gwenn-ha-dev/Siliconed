@@ -249,13 +249,15 @@ package struct RouteTable: Codable, Sendable, Equatable {
         /// `GEMM.linear` asks at every product; the engine instances (a conductor, a `NeuralEngine`) hold the
         /// grids, built from this table and moved by the diagnostic, which measures at shares of its own.
         ///
-        /// As for the weights, a product no rule matches takes the **nearest shaped rule** (`Nearest`): the map rules every
-        /// class it measured, and a format or a model it did not see takes its measured neighbour's route — a route
-        /// judged, where the grids alone would give one nobody judged. The grids decide only in a table without a class
-        /// rule (the switches').
+        /// As for the weights, a product no shaped rule matches takes the **nearest shaped rule** within reach (`Nearest`):
+        /// the map rules every class it measured, and a format or a model it did not see takes its measured neighbour's
+        /// route — a route judged. A rule that names no shape (the map's « GPU alone ») is what is left beyond reach; the
+        /// grids decide only where no rule speaks (the switches' tables have none).
         package func forced(k: Int, n: Int, m: Int, aneBroughtUp: Bool = true) -> Engines? {
-            guard let rule = classes.first(where: { $0.matches(k: k, n: n, m: m) })
-                    ?? Nearest.rule(among: classes.filter { $0.shape != nil }, k: k, n: n, m: m, { ($0.shape!, $0.minRows, $0.maxRows) })
+            let shaped = classes.filter { $0.shape != nil }
+            guard let rule = shaped.first(where: { $0.matches(k: k, n: n, m: m) })
+                    ?? Nearest.rule(among: shaped, k: k, n: n, m: m, { ($0.shape!, $0.minRows, $0.maxRows) })
+                    ?? classes.first(where: { $0.shape == nil && $0.matches(k: k, n: n, m: m) })
             else { return nil }
             if !aneBroughtUp, rule.engines == .ane || rule.engines == .aneAMX { return rule.withoutANE ?? .amx }
             return rule.engines
@@ -291,8 +293,12 @@ package struct RouteTable: Codable, Sendable, Equatable {
     /// same shape at the nearest height first, then the nearest shape, each distance in log (a ratio, the way the work
     /// scales: 3072 is as near 4096 as 3840 is near 5120). The engines' ratios move smoothly with the shape and the
     /// height; the rule of the nearest point is the map's best guess, and the render's check (predicted against
-    /// measured, `RenderLoop`) says when it was wrong.
+    /// measured, `RenderLoop`) says when it was wrong. **Within reach only**: a shape more than `reach` away in all (a 64-wide
+    /// projection against 3840×3840) is not one the measured class speaks for, and takes no rule from it.
     package enum Nearest {
+        /// The farthest shape a rule stands for: twice as large on one side, or √2 on both.
+        package static let reach = log(2.0)
+
         static func distance(_ x: Int, _ low: Int, _ high: Int?) -> Double {
             let x = Double(max(x, 1)), low = Double(max(low, 1)), high = Double(high ?? Int.max)
             return x < low ? log(low / x) : x > high ? log(x / high) : 0
@@ -301,10 +307,13 @@ package struct RouteTable: Codable, Sendable, Equatable {
         /// `describe`: a rule's shape `(k, n)` (heads and head dim for an attention) and its height range.
         static func rule<R>(among rules: [R], k: Int, n: Int, m: Int,
                             _ describe: (R) -> ((k: Int, n: Int), Int, Int?)) -> R? {
-            rules.min { a, b in
-                let (sa, la, ha) = describe(a), (sb, lb, hb) = describe(b)
-                let shapeA = abs(log(Double(sa.k) / Double(k))) + abs(log(Double(sa.n) / Double(n)))
-                let shapeB = abs(log(Double(sb.k) / Double(k))) + abs(log(Double(sb.n) / Double(n)))
+            func shape(_ r: R) -> Double {
+                let s = describe(r).0
+                return abs(log(Double(s.k) / Double(k))) + abs(log(Double(s.n) / Double(n)))
+            }
+            return rules.filter { shape($0) <= reach + 1e-9 }.min { a, b in
+                let (_, la, ha) = describe(a), (_, lb, hb) = describe(b)
+                let (shapeA, shapeB) = (shape(a), shape(b))
                 if abs(shapeA - shapeB) > 1e-9 { return shapeA < shapeB }
                 return distance(m, la, ha) < distance(m, lb, hb)
             }
