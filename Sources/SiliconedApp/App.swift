@@ -331,7 +331,8 @@ final class MainWindow: NSObject, NSWindowDelegate {
         let from = app
         otherMacs.show(nil, in: nil)
         if let mac {
-            let link = MirrorLink(macName: mac.name) { [weak self] m in self?.otherMacs.send(m, to: mac.id) }
+            let link = MirrorLink(macName: mac.name, send: { [weak self] m in self?.otherMacs.send(m, to: mac.id) },
+                                  sendBlob: { [weak self] d, id in self?.otherMacs.send(blob: d, id: id, to: mac.id) })
             let m = AppState(mirroring: link, library: local.library)
             m.prompt = from.prompt; m.identifier = from.identifier; m.steps = from.steps
             m.orientation = from.orientation; m.format = from.format; m.batch = from.batch

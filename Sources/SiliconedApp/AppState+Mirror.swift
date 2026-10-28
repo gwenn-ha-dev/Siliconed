@@ -16,8 +16,12 @@
 //   renders the same bits as if it had been asked on its own screen.
 // - **Ordinals are the identities** (`t3`, `i7`), as for `silicontrol`: a job or an image keeps its
 //   `UUID` here from one snapshot to the next, so that the selection holds.
-// - Not yet: edits with references (`maxReferences` is 0), grids and explorations, variations,
-//   enlarging, the statistics, the license sheet, ⌘Z after a removal.
+// - **An edit's images go first**: a file's own bytes, an image in memory as a PNG, an image of the
+//   mini's history by its ordinal (`RemoteReference`); the mini holds the render until they are there.
+//   What the form cannot compute without the maps — an edit's format, a need with images — it asks
+//   (`quote`), and waits for the answer before « Generate ».
+// - Not yet: grids and explorations, variations, enlarging, cropping, the statistics, the license
+//   sheet, ⌘Z after a removal.
 
 import AppKit
 import Foundation
@@ -35,14 +39,46 @@ final class MirrorLink {
     /// An entry waits for its PNG, the blob that follows it.
     var pending: [UInt32: RemoteEntry] = [:]
     var previewBlob: UInt32?
+    private let blobSender: (Data, UInt32) -> Void
+    private var nextBlob: UInt32 = 1
+    /// The quotes asked and not yet answered: each is asked once.
+    var asked: Set<RemoteQuote> = []
 
-    init(macName: String, send: @escaping (SessionMessage) -> Void) {
-        self.macName = macName; self.sender = send
+    init(macName: String, send: @escaping (SessionMessage) -> Void, sendBlob: @escaping (Data, UInt32) -> Void) {
+        self.macName = macName; self.sender = send; self.blobSender = sendBlob
     }
 
     func send(_ m: SessionMessage) { sender(m) }
 
-    func render(_ job: Job) { sender(.render(MirrorProjection.remote(job))) }
+    func ask(_ q: RemoteQuote) {
+        guard asked.insert(q).inserted else { return }
+        sender(.quote(q))
+    }
+
+    /// The job, its images sent first. A file that can no longer be read refuses it here.
+    func render(_ job: Job) throws(EngineError) {
+        var r = MirrorProjection.remote(job)
+        r.references = try job.references.map { ref throws(EngineError) in
+            RemoteReference(origin: try origin(ref), name: ref.name, width: ref.width, height: ref.height)
+        }
+        sender(.render(r))
+    }
+
+    private func origin(_ ref: ReferenceImage) throws(EngineError) -> RemoteReference.Origin {
+        if let o = ref.ordinal { return .history(o) }
+        let data: Data?, file: Bool
+        switch ref.source {
+        case .file(let url): data = try? Data(contentsOf: url); file = true
+        case .bytes(let d): data = d; file = true
+        case .image(let cg), .subject(let cg?, _): data = MirrorServer.png(cg); file = false
+        case .subject(nil, _): data = nil; file = false
+        }
+        guard let data else { throw .imageUnreadable(file: ref.name) }
+        let id = nextBlob
+        nextBlob = nextBlob &+ 1 == 0 ? 1 : nextBlob &+ 1
+        blobSender(data, id)
+        return file ? .file(blob: id) : .image(blob: id)
+    }
 }
 
 /// Between the app's types and what crosses (`Mirror.swift`), both ways.
@@ -83,6 +119,20 @@ extension AppState {
     /// The chosen model's traits, as the other Mac published them.
     var traits: RemoteTraits? { mirrorCatalog?.traits[identifier] }
 
+    /// The other Mac's answer, or `nil` while it is asked.
+    func quoted(_ q: RemoteQuote) -> RemoteQuoteAnswer? {
+        if let a = mirrorQuotes[q] { return a }
+        mirror?.ask(q)
+        return nil
+    }
+
+    /// The edit's quote: the format image 1 gives, and the need with every image read.
+    var editQuote: RemoteQuote? {
+        guard mirror != nil, let first = references.first else { return nil }
+        return RemoteQuote(model: identifier, width: format.width, height: format.height,
+                           first: [first.width, first.height], images: references.count + subjectImageCount)
+    }
+
     /// The rack's three module names: from the chain here, from the traits in a mirror.
     var moduleNames: (text: String?, encoding: String?, decoding: String?) {
         if mirror != nil { return (traits?.text, traits?.encoding, traits?.decoding) }
@@ -105,6 +155,8 @@ extension AppState {
         switch m {
         case .catalog(let c):
             mirrorCatalog = c
+            // What a quote answered may have changed with the models or B.
+            mirrorQuotes = [:]; link.asked = []
             readySet = Set(c.ready)
             memoryCeiling = c.ceiling
             // Not `fasterRendering`: its setter writes this Mac's preference and the engine's switch.
@@ -158,6 +210,9 @@ extension AppState {
         case .preview(let id):
             link.previewBlob = id
             if id == nil { preview = nil }
+        case .quoted(let a):
+            link.asked.remove(a.quote)
+            mirrorQuotes[a.quote] = a
         case .refused(let text):
             problem = Problem(text)
             flash(text)
@@ -203,7 +258,10 @@ extension AppState {
     /// problem goes.
     func linkChanged(_ s: RemoteLink.State, name: String) {
         switch s {
-        case .connected: if problem?.code == "remote" { problem = nil }
+        case .connected:
+            if problem?.code == "remote" { problem = nil }
+            // Asked before a cut: asked again.
+            mirror?.asked = []
         case .connecting, .off: break
         case .waiting: problem = { var p = Problem(String(localized: "Lost “\(name)”: trying again…")); p.code = "remote"; return p }()
         case .refused: problem = { var p = Problem(OtherMacsSection.state(s, found: true)); p.code = "remote"; return p }()

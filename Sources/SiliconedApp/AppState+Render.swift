@@ -205,7 +205,10 @@ extension AppState {
     /// Ready-made jobs enter the queue, in order — the path of the button and of the remote control.
     func enqueue(_ jobs: [Job]) {
         guard !jobs.isEmpty else { return }
-        if let mirror { for j in jobs { mirror.render(j) }; return }
+        if let mirror {
+            do { for j in jobs { try mirror.render(j) } } catch { problem = Problem(error); flash(Problem(error).text) }
+            return
+        }
         // A measure that failed before the first render is retried by the next click, not by itself.
         if !settingsRead, case .failed = diagnostic { diagnostic = .ready }
         file.append(contentsOf: jobs)

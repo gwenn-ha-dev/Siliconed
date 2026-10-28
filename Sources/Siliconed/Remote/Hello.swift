@@ -64,9 +64,11 @@ package enum SessionMessage: Codable, Equatable, Sendable {
     case preview(UInt32?)
     /// A `render` the mini did not queue, in its words.
     case refused(String)
+    case quoted(RemoteQuoteAnswer)
 
     // Neo → mini
     case render(RemoteJob)
+    case quote(RemoteQuote)
     case cancel
     case removeJob(Int)
     case stopAll

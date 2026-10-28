@@ -16,8 +16,7 @@ extension AppState {
     func loraCard(_ path: String) -> LoRACard? { compatibleLoras.first { $0.path == path } }
     var canAddLoRA: Bool { loras.count < Self.maxLoRA && !compatibleLoras.isEmpty }
     /// How many references the chosen model reads (0: it does no editing).
-    /// In a mirror, none yet: an edit's format is the denoiser's rule, which the borrowing Mac does not hold.
-    var maxReferences: Int { mirror != nil ? 0 : chain?.denoising.maxReferences ?? 0 }
+    var maxReferences: Int { mirror != nil ? traits?.maxReferences ?? 0 : chain?.denoising.maxReferences ?? 0 }
     var editingPossible: Bool { maxReferences > 0 }
     var editors: [ModelCard] { visibleReady.filter { editingModels.contains($0.id) } }
     func model(_ id: String) -> Model? {
@@ -37,6 +36,8 @@ extension AppState {
     /// (`DenoisingModule.editFormat`, the rule the developer's command line applies too), the chosen one
     /// otherwise.
     var outputFormat: RecommendedFormat {
+        // In a mirror, the other Mac's answer; the chosen format while it is asked (« Generate » waits).
+        if let q = editQuote { return quoted(q).map { RecommendedFormat($0.width, $0.height) } ?? format }
         guard let first = references.first, let denoising = chain?.denoising else { return format }
         let f = denoising.editFormat(referenceWidth: first.width, referenceHeight: first.height)
         return Self.cappedForEditing(RecommendedFormat(f.width, f.height))
@@ -84,6 +85,9 @@ extension AppState {
             let room = Self.maxQueueLength - file.count
             return String(localized: "These alternatives make \(String(n)) renders: the queue has room for \(String(room)).")
         }
+        if let q = editQuote, quoted(q) == nil, let mirror {
+            return String(localized: "Asking “\(mirror.macName)” for the edit’s size…")
+        }
         if mirror != nil, let t = traits, !t.steps.contains(steps) {
             let accepted = t.steps.map(String.init).formatted(.list(type: .or))
             return String(localized: "This model has no schedule for \(String(steps)) steps: \(accepted).")
@@ -99,7 +103,11 @@ extension AppState {
     /// headers — or, in a mirror, the one the other Mac published (`MirrorCatalog.needs`: its formats,
     /// without references). A format it did not publish has no need here: the other Mac judges it.
     func need(_ f: RecommendedFormat, images: Int) -> Int? {
-        if mirror != nil { return images == 0 ? mirrorCatalog?.needs[identifier]?[MirrorCatalog.key(f.width, f.height)] : nil }
+        if mirror != nil {
+            if images == 0 { return mirrorCatalog?.needs[identifier]?[MirrorCatalog.key(f.width, f.height)] }
+            if let e = editQuote, let a = mirrorQuotes[e], a.width == f.width, a.height == f.height, e.images == images { return a.need }
+            return quoted(RemoteQuote(model: identifier, width: f.width, height: f.height, first: nil, images: images))?.need
+        }
         return card?.memoryNeed(width: f.width, height: f.height, references: images)
     }
 

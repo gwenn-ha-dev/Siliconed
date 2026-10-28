@@ -241,11 +241,17 @@ final class RemoteNetworkTests: XCTestCase {
                             width: 1024, height: 1024, steps: 8, defaultSteps: 8,
                             loras: [RemoteLoRA(path: "/l/a.silicon", strength: 0.8)], seeds: [42, 43], detail: .normal,
                             solver: .euler, schedule: .official, previews: true, neuralEngine: nil)
+        var edit = job
+        edit.references = [RemoteReference(origin: .history(7), name: "i7", width: 1024, height: 1024),
+                           RemoteReference(origin: .file(blob: 3), name: "a.heic", width: 3024, height: 4032),
+                           RemoteReference(origin: .image(blob: 4), name: "pasted", width: 640, height: 480)]
+        let quote = RemoteQuote(model: "qwen-image-2.1", width: 1024, height: 1024, first: [3024, 4032], images: 2)
         var q = RemoteQueue()
         q.current = job; q.fraction = 0.5; q.stage = "denoising"; q.remaining = 41.5
         var t = Engine.Timings(); t.total = 83.1
         let messages: [SessionMessage] = [
-            .render(job), .queue(q), .cancel, .removeJob(4), .deleteImages([1, 2]), .refused("No."), .preview(nil),
+            .render(job), .render(edit), .quote(quote), .quoted(RemoteQuoteAnswer(quote: quote, width: 896, height: 1184, need: 3 << 30)),
+            .queue(q), .cancel, .removeJob(4), .deleteImages([1, 2]), .refused("No."), .preview(nil),
             .entry(RemoteEntry(ordinal: 7, job: job, width: 1024, height: 1024, seed: 42, timings: t,
                                footprints: Engine.Footprints(), evaluations: 8, metadata: ["parameters": "x"],
                                neuralEngine: false, png: 9)),

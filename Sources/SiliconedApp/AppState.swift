@@ -473,6 +473,8 @@ final class AppState {
     @ObservationIgnored var mirror: MirrorLink?
     /// What the other Mac published of its models.
     var mirrorCatalog: MirrorCatalog?
+    /// What the other Mac answered to the form's questions (`quoted`).
+    var mirrorQuotes: [RemoteQuote: RemoteQuoteAnswer] = [:]
 
     /// **The state of another Mac**, shown here (`AppState+Mirror.swift`): nothing read from this Mac's
     /// library but the named subjects, which stay with the user; no capacity map, no copy, no warm-up.

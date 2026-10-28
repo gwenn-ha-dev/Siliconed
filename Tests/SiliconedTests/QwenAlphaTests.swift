@@ -72,6 +72,23 @@ final class QwenAlphaTests: XCTestCase {
         XCTAssertEqual(try ImageRGB(contentsOf: url).rgba, pixels)
     }
 
+    /// A file's bytes sent by another Mac decode as the file does: transparency, and a JPEG turned by EXIF.
+    func testBytesDecodeAsTheirFile() throws {
+        var opaque = [UInt8](repeating: 0, count: 4 * 40 * 30)
+        for p in 0..<(40 * 30) { opaque[4 * p] = UInt8(p % 256); opaque[4 * p + 1] = UInt8((p / 3) % 256); opaque[4 * p + 3] = 255 }
+        for (bytes, w, h, type, orientation) in [(pixels, 4, 1, UTType.png, 1), (opaque, 40, 30, UTType.jpeg, 6)] {
+            let url = FileManager.default.temporaryDirectory.appendingPathComponent("siliconed-bytes-\(UUID().uuidString)")
+            defer { try? FileManager.default.removeItem(at: url) }
+            let destination = CGImageDestinationCreateWithURL(url as CFURL, type.identifier as CFString, 1, nil)!
+            CGImageDestinationAddImage(destination, image(bytes, width: w, height: h),
+                                       [kCGImagePropertyOrientation: orientation] as CFDictionary)
+            XCTAssertTrue(CGImageDestinationFinalize(destination))
+            let file = try ImageRGB(contentsOf: url)
+            XCTAssertEqual(try ImageRGB(data: Data(contentsOf: url), name: "sent"), file)
+            XCTAssertEqual(file.width, orientation == 6 ? h : w, "upright")
+        }
+    }
+
     /// An opaque image — even stored with an alpha channel — has no `rgba`, and is prepared as before.
     func testAnOpaqueImageIsUnchanged() throws {
         var opaque = [UInt8](repeating: 0, count: 4 * 40 * 30)

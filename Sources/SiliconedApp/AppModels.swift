@@ -23,13 +23,16 @@ struct LoRASlot: Identifiable, Equatable {
 /// `@unchecked Sendable`: immutable; the thumbnail (`NSImage`) is read only by the view.
 struct ReferenceImage: Identifiable, @unchecked Sendable {
     /// `subject`: a named subject's picture, cropped to its frame (`Subjects.swift`) — `nil` if its
-    /// bytes did not decode, which fails the render naming it.
-    enum Source { case file(URL), image(CGImage), subject(CGImage?, name: String) }
+    /// bytes did not decode, which fails the render naming it. `bytes`: a file's bytes sent by another
+    /// Mac (`MirrorServer`), decoded as the file was there.
+    enum Source { case file(URL), image(CGImage), subject(CGImage?, name: String), bytes(Data) }
     let id = UUID()
     let source: Source
     let vignette: NSImage
     let name: String
     let width: Int, height: Int
+    /// Taken from the history: its `i` ordinal — what a mirror sends instead of the bytes.
+    var ordinal: Int? = nil
 
     /// Decoded for display, upright, at `width × height` — the original under an edit's curtain.
     func displayed(width: Int, height: Int) -> CGImage? {
@@ -37,12 +40,11 @@ struct ReferenceImage: Identifiable, @unchecked Sendable {
         switch source {
         case .image(let cg): image = cg
         case .subject(let cg, _): image = cg
-        case .file(let url):
+        case .file, .bytes:
             let options: [CFString: Any] = [kCGImageSourceCreateThumbnailFromImageAlways: true,
                                             kCGImageSourceThumbnailMaxPixelSize: max(self.width, self.height),
                                             kCGImageSourceCreateThumbnailWithTransform: true]
-            image = CGImageSourceCreateWithURL(url as CFURL, nil)
-                .flatMap { CGImageSourceCreateThumbnailAtIndex($0, 0, options as CFDictionary) }
+            image = imageSource.flatMap { CGImageSourceCreateThumbnailAtIndex($0, 0, options as CFDictionary) }
         }
         guard let image, let c = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
                                            space: CGColorSpace(name: CGColorSpace.sRGB)!,
@@ -55,6 +57,7 @@ struct ReferenceImage: Identifiable, @unchecked Sendable {
     func imageRGB() throws -> ImageRGB {
         switch source {
         case .file(let url): return try ImageRGB(contentsOf: url)
+        case .bytes(let data): return try ImageRGB(data: data, name: name)
         case .image(let cg): return try ImageRGB(cgImage: cg)
         case .subject(let cg, let name):
             guard let cg else { throw EngineError.imageUnreadable(file: name) }
@@ -62,10 +65,25 @@ struct ReferenceImage: Identifiable, @unchecked Sendable {
         }
     }
 
+    private var imageSource: CGImageSource? {
+        switch source {
+        case .file(let url): CGImageSourceCreateWithURL(url as CFURL, nil)
+        case .bytes(let data): CGImageSourceCreateWithData(data as CFData, nil)
+        case .image, .subject: nil
+        }
+    }
+
     /// A file's size as it will be decoded, upright — or `nil` if ImageIO cannot read its header.
     static func size(of url: URL) -> (width: Int, height: Int)? {
-        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
-              let p = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
+        CGImageSourceCreateWithURL(url as CFURL, nil).flatMap(size)
+    }
+
+    static func size(of data: Data) -> (width: Int, height: Int)? {
+        CGImageSourceCreateWithData(data as CFData, nil).flatMap(size)
+    }
+
+    private static func size(_ source: CGImageSource) -> (width: Int, height: Int)? {
+        guard let p = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
               let w = p[kCGImagePropertyPixelWidth] as? Int, let h = p[kCGImagePropertyPixelHeight] as? Int,
               w > 0, h > 0 else { return nil }
         // Orientations 5 to 8 turn the image a quarter: the upright image has its sides swapped.

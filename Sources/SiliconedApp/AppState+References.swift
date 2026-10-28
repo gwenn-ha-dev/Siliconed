@@ -28,7 +28,7 @@ extension AppState {
         guard let cg = entry.image() else { return nil }
         return ReferenceImage(source: .image(cg), vignette: NSImage(cgImage: entry.vignette, size: .zero),
                              name: String(localized: "image from history (seed \(String(entry.seed)))"),
-                             width: entry.width, height: entry.height)
+                             width: entry.width, height: entry.height, ordinal: entry.ordinal)
     }
 
     /// The open panel: as many images as there are free slots, added after those already set.

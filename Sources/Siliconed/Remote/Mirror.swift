@@ -9,8 +9,12 @@ import Foundation
 ///                  queue       the job running and its progress, the jobs waiting — whenever it changes
 ///                  entry + PNG one history image, its PNG as the blob that follows; `removed` the reverse
 ///                  preview     the denoising's latent preview as a small PNG blob, once per step
+///                  quoted      the answer to a `quote`
 ///     Neo → mini   render      one job from the Neo's form; the mini checks it again (B, steps) before
-///                              queueing it — the Neo's judgment is never the last word
+///                              queueing it — the Neo's judgment is never the last word; an edit's images
+///                              go first as blobs, or by their history ordinal
+///                  quote       what an edit's format and a need with images are: the denoiser's rule
+///                              and the memory need come from maps only the mini holds
 ///                  cancel, removeJob, stopAll, clearQueue, deleteImages
 ///
 /// **No `Date` crosses**: the two clocks differ. What remains of a render is a duration.
@@ -19,6 +23,55 @@ package struct RemoteLoRA: Codable, Equatable, Sendable {
     package var path: String
     package var strength: Double
     package init(path: String, strength: Double) { self.path = path; self.strength = strength }
+}
+
+/// **An edit's image**, in a `render`: the mini decodes it to the pixels the Neo would have rendered.
+package struct RemoteReference: Codable, Equatable, Sendable {
+    package enum Origin: Codable, Equatable, Sendable {
+        /// An image of the mini's history, by its `i` ordinal: no byte crosses.
+        case history(Int)
+        /// A file's own bytes, the blob sent before the `render`, decoded as the file (`ImageRGB(data:)`).
+        case file(blob: UInt32)
+        /// An image held in memory on the Neo (pasted, a subject's picture), as a lossless PNG blob.
+        case image(blob: UInt32)
+    }
+    package var origin: Origin
+    package var name: String
+    package var width: Int, height: Int
+    package init(origin: Origin, name: String, width: Int, height: Int) {
+        self.origin = origin; self.name = name; self.width = width; self.height = height
+    }
+
+    package var blob: UInt32? {
+        switch origin {
+        case .history: nil
+        case .file(let b), .image(let b): b
+        }
+    }
+}
+
+/// **A question the Neo's form asks** — what it cannot compute without the maps' headers.
+package struct RemoteQuote: Codable, Hashable, Sendable {
+    package var model: String
+    /// The format chosen; with `first`, ignored: an edit's format follows image 1.
+    package var width: Int, height: Int
+    /// Image 1's upright size, when editing.
+    package var first: [Int]?
+    /// The images the render reads (the edit's and the named subjects').
+    package var images: Int
+    package init(model: String, width: Int, height: Int, first: [Int]?, images: Int) {
+        self.model = model; self.width = width; self.height = height; self.first = first; self.images = images
+    }
+}
+
+/// The mini's answer: the format the render will have, and its memory need there (`nil`: not computable).
+package struct RemoteQuoteAnswer: Codable, Equatable, Sendable {
+    package var quote: RemoteQuote
+    package var width: Int, height: Int
+    package var need: Int?
+    package init(quote: RemoteQuote, width: Int, height: Int, need: Int?) {
+        self.quote = quote; self.width = width; self.height = height; self.need = need
+    }
 }
 
 /// A job, as the queue shows it and as the Neo asks for it.
@@ -39,10 +92,13 @@ package struct RemoteJob: Codable, Equatable, Sendable {
     package var previews: Bool
     /// The Neural Engine as the rack chose it; `nil`: the mini's choice for the model.
     package var neuralEngine: Bool?
+    /// An edit's images, image 1 first.
+    package var references: [RemoteReference]
 
     package init(ordinal: Int, model: String, modelName: String, prompt: String, width: Int, height: Int, steps: Int,
                  defaultSteps: Int?, loras: [RemoteLoRA], seeds: [UInt64], detail: Detail, solver: Solver,
-                 schedule: SigmaSchedule, previews: Bool, neuralEngine: Bool?) {
+                 schedule: SigmaSchedule, previews: Bool, neuralEngine: Bool?, references: [RemoteReference] = []) {
+        self.references = references
         self.ordinal = ordinal; self.model = model; self.modelName = modelName; self.prompt = prompt
         self.width = width; self.height = height; self.steps = steps; self.defaultSteps = defaultSteps
         self.loras = loras; self.seeds = seeds; self.detail = detail; self.solver = solver

@@ -45,18 +45,29 @@ extension ImageRGB {
     ///   transparency, its straight RGBA (`rgba`), read from the full image: ImageIO's thumbnail comes
     ///   premultiplied, which would lose the colour of the transparent pixels.
     package init(contentsOf url: URL, maxSide: Int = ImageRGB.maximumDecodedSide) throws(EngineError) {
-        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
-              let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else { throw .imageUnreadable(file: url.path) }
+        try self.init(source: source, name: url.path, maxSide: maxSide)
+    }
+
+    /// **A file's bytes, read as the file would be** (`init(contentsOf:)`, the same ImageIO source):
+    /// a reference sent by another Mac decodes here to the pixels it had there.
+    package init(data: Data, name: String, maxSide: Int = ImageRGB.maximumDecodedSide) throws(EngineError) {
+        guard let source = CGImageSourceCreateWithData(data as CFData, nil) else { throw .imageUnreadable(file: name) }
+        try self.init(source: source, name: name, maxSide: maxSide)
+    }
+
+    private init(source: CGImageSource, name: String, maxSide: Int) throws(EngineError) {
+        guard let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
               let l = properties[kCGImagePropertyPixelWidth] as? Int,
               let h = properties[kCGImagePropertyPixelHeight] as? Int, l > 0, h > 0 else {
-            throw .imageUnreadable(file: url.path)
+            throw .imageUnreadable(file: name)
         }
         let options: [CFString: Any] = [kCGImageSourceCreateThumbnailFromImageAlways: true,
                                         kCGImageSourceCreateThumbnailWithTransform: true,
                                         kCGImageSourceThumbnailMaxPixelSize: min(max(l, h), max(1, maxSide)),
                                         kCGImageSourceShouldCacheImmediately: true]
         guard let image = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else {
-            throw .imageUnreadable(file: url.path)
+            throw .imageUnreadable(file: name)
         }
         // The straight bytes, as Pillow reads them, from the full image — when it is the one decoded:
         // upright (an EXIF rotation would need the bytes turned too) and not reduced.
@@ -64,7 +75,7 @@ extension ImageRGB {
         let full = ImageRGB.hasAlpha(image) && upright && image.width == l && image.height == h
             ? CGImageSourceCreateImageAtIndex(source, 0, nil) : nil
         // Already within `maxSide` (ImageIO reduced it): the bound is the thumbnail's, not a second one.
-        try self.init(cgImage: image, name: url.path, maxSide: max(image.width, image.height, maxSide), straight: full)
+        try self.init(cgImage: image, name: name, maxSide: max(image.width, image.height, maxSide), straight: full)
     }
 
     /// **An image already in memory** — drag-and-drop, pasteboard, `NSImage.cgImage(…)`:

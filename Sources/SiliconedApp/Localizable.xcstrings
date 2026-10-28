@@ -4797,6 +4797,34 @@
         }
       }
     },
+    "Asking “%@” for the edit’s size…" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "„%@“ wird nach der Größe der Bearbeitung gefragt …"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Preguntando a «%@» el tamaño de la edición…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "On demande à « %@ » la taille de l’édition…"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Si chiede a «%@» la dimensione della modifica…"
+          }
+        }
+      }
+    },
     "At 1024² and above, the first steps at half size: a quarter to a third faster, and a slightly different image. Not with a LoRA, Detail or an edit." : {
       "localizations" : {
         "de" : {
@@ -10664,6 +10692,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Encoder d’immagine"
+          }
+        }
+      }
+    },
+    "Image i%@ is no longer in the history." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bild i%@ ist nicht mehr im Verlauf."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La imagen i%@ ya no está en el historial."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’image i%@ n’est plus dans l’historique."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’immagine i%@ non è più nella cronologia."
           }
         }
       }

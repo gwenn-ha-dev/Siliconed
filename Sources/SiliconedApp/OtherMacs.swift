@@ -189,7 +189,9 @@ final class OtherMacs {
             server?.left(identity)
         case .message(let identity, let m):
             server?.handle(m, from: identity)
-        case .turnedAway, .blob:
+        case .blob(let identity, let id, let data):
+            server?.received(blob: id, data, from: identity)
+        case .turnedAway:
             break
         }
         hold()
@@ -309,6 +311,7 @@ final class OtherMacs {
     }
 
     func send(_ m: SessionMessage, to id: String) { linkObjects[id]?.send(m) }
+    func send(blob data: Data, id: UInt32, to mac: String) { linkObjects[mac]?.send(blob: data, id: id) }
 
     func connect(_ b: Pairings.Borrowed) {
         guard let p = pairings, linkObjects[b.id] == nil else { return }
