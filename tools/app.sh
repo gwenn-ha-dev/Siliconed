@@ -105,7 +105,7 @@ cat > "$app/Contents/Info.plist" <<PLIST
   <key>CFBundleExecutable</key><string>Siliconed</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleIconFile</key><string>Siliconed</string>
-  <key>CFBundleShortVersionString</key><string>0.16</string>
+  <key>CFBundleShortVersionString</key><string>0.17</string>
   <key>CFBundleVersion</key><string>$build</string>
   <key>SiliconedEngine</key><string>$engine</string>
   <key>CFBundleDevelopmentRegion</key><string>en</string>
