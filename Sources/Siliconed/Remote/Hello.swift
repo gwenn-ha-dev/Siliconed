@@ -14,9 +14,29 @@ package struct Hello: Codable, Equatable, Sendable {
     /// What the other side lists before choosing: chip, cores, memory, macOS, and the app's version
     /// (`Machine.version`, short version and build).
     package let machine: Diagnostic.Machine
+    /// **The lender's launch** (in its `welcome`): a number drawn once per process, so that a borrower
+    /// that finds another one knows the lender restarted — the ordinals it holds (`i7`, `t3`) were numbered
+    /// by a process that is gone, and the new one starts again from 1. `nil` where it does not apply.
+    package var launch: UInt64?
+    /// **What the borrower still holds of that lender** (in its `join`): lets a rejoin skip the images it
+    /// already has instead of sending the whole history again. `nil`: nothing, send everything.
+    package var held: Held?
 
-    package init(name: String, machine: Diagnostic.Machine, protocolVersion: Int = Hello.protocolVersion) {
+    package struct Held: Codable, Equatable, Sendable {
+        /// The `launch` the ordinals below were numbered under; the lender trusts them only if it is its own.
+        package var launch: UInt64
+        /// The `i` ordinals of the history images whose PNG came whole.
+        package var entries: [Int]
+        package init(launch: UInt64, entries: [Int]) { self.launch = launch; self.entries = entries }
+    }
+
+    /// Drawn once per process; `OtherMacs` puts it in the Hello it gives both roles.
+    package static let thisLaunch = UInt64.random(in: 1...UInt64.max)
+
+    package init(name: String, machine: Diagnostic.Machine, protocolVersion: Int = Hello.protocolVersion,
+                 launch: UInt64? = nil, held: Held? = nil) {
         self.protocolVersion = protocolVersion; self.name = name; self.machine = machine
+        self.launch = launch; self.held = held
     }
 
     package enum Mismatch: Error, Codable, Equatable, Sendable {

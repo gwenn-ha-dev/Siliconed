@@ -29,8 +29,13 @@ package enum Crop {
         package init(x: Int, y: Int, width: Int, height: Int) {
             self.x = x; self.y = y; self.width = width; self.height = height
         }
-        package var maxX: Int { x + width }
-        package var maxY: Int { y + height }
+        /// Saturating: a box can come from another Mac (a mirror's `crop`), and a sum that traps is not a refusal.
+        package var maxX: Int { Self.sum(x, width) }
+        package var maxY: Int { Self.sum(y, height) }
+        private static func sum(_ a: Int, _ b: Int) -> Int {
+            let (s, overflow) = a.addingReportingOverflow(b)
+            return overflow ? (b < 0 ? Int.min : Int.max) : s
+        }
     }
 
     /// **A proportion**, width : height. `step` is the grain of the widths that hold it exactly.

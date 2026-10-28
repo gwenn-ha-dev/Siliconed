@@ -5,10 +5,15 @@ import Network
 /// the pairing window. One serial queue for all; events go to the owner on it.
 ///
 ///     lend(keys:)      the session listener, one TLS-PSK key per paired Mac; restarted when the list
-///                      changes (a new pairing, a Mac forgotten) — a forgotten Mac's session is closed
+///                      changes (a new pairing, a Mac forgotten) — a forgotten Mac's session is closed —,
+///                      and when it fails, with a delay that grows (`relistenDelays`)
 ///     openPairing()    the pairing listener, plain TCP, for one attempt: the first Mac that comes in
 ///                      closes it to the others; the window ends with that attempt, or after `pairingTimeout`
 ///     accept/refuse    the user's answer, once both screens show the code
+///
+/// **A Mac is "connected" once and "disconnected" once**, whoever ends the session — it, the network, or
+/// this side (a key forgotten, `stop()`). A Mac that joins again while its old session is not yet known dead
+/// replaces it: the old one's end says nothing.
 ///
 /// Nothing is filed here: a pairing ends with `.paired`, and the owner stores the key (`Pairings`)
 /// and calls `lend(keys:)` again.
@@ -43,7 +48,7 @@ package final class RemoteHost: @unchecked Sendable {
 
     package static let pairingTimeout: TimeInterval = 120
 
-    private let queue = DispatchQueue(label: "siliconed.remote.host")
+    let queue = DispatchQueue(label: "siliconed.remote.host")
     private let hello: Hello
     /// The Bonjour name and TXT; `nil`: not advertised (the tests reach the port directly).
     private let service: (name: String, txt: [String: String])?
@@ -53,6 +58,9 @@ package final class RemoteHost: @unchecked Sendable {
 
     private var keys: [PairedKey] = []
     private var listener: NWListener?
+    /// Failures of the session listener since it last was ready: the delay before the next try grows with them.
+    private var listenerFailures = 0
+    private var relisten: DispatchWorkItem?
     private var sessions: [ObjectIdentifier: Session] = [:]
 
     private var pairingListener: NWListener?
@@ -91,41 +99,84 @@ package final class RemoteHost: @unchecked Sendable {
             let same = new == keys && listener != nil
             keys = new
             for (id, s) in sessions where s.identity.map({ i in !new.contains { $0.identity == i } }) ?? false {
-                s.channel.close()
-                sessions[id] = nil
+                drop(id)
             }
             guard !same else { return }
+            relisten?.cancel(); relisten = nil
+            listenerFailures = 0
             listener?.cancel()
             listener = nil
             guard !new.isEmpty else { handler?(.lending(port: nil)); return }
-            do {
-                let l = try makeListener(RemoteTransport.server(keys: new), type: RemoteTransport.sessionService)
-                listener = l
-                l.newConnectionHandler = { [weak self] c in self?.admit(c) }
-                l.stateUpdateHandler = { [weak self, weak l] state in
-                    guard let self, let l, l === listener else { return }
-                    switch state {
-                    case .ready: handler?(.lending(port: l.port?.rawValue))
-                    case .failed(let e):
-                        listener = nil
-                        handler?(.lendingFailed(e.debugDescription))
-                    default: break
-                    }
+            listen()
+        }
+    }
+
+    /// Opens the session listener for `keys`. On the queue.
+    private func listen() {
+        do {
+            let l = try makeListener(RemoteTransport.server(keys: keys), type: RemoteTransport.sessionService)
+            listener = l
+            l.newConnectionHandler = { [weak self] c in self?.admit(c) }
+            l.stateUpdateHandler = { [weak self, weak l] state in
+                guard let self, let l, l === listener else { return }
+                switch state {
+                case .ready:
+                    listenerFailures = 0
+                    handler?(.lending(port: l.port?.rawValue))
+                case .failed(let e): listenerFailed(e.debugDescription)
+                default: break
                 }
-                l.start(queue: queue)
-            } catch {
-                handler?(.lendingFailed("\(error)"))
             }
+            l.start(queue: queue)
+        } catch {
+            listenerFailed("\(error)")
+        }
+    }
+
+    /// The listener could not start or died (the network went down and up, the port was taken): said, then
+    /// tried again — a lender that stays off after a hiccup would look paired and be unreachable.
+    /// On the queue; the delay grows to `relistenDelays.last`.
+    func listenerFailed(_ why: String) {
+        listener?.cancel()
+        listener = nil
+        handler?(.lendingFailed(why))
+        guard !keys.isEmpty else { return }
+        let delay = Self.relistenDelay(afterFailures: listenerFailures)
+        listenerFailures += 1
+        relisten?.cancel()
+        let w = DispatchWorkItem { [weak self] in
+            guard let self, listener == nil, !keys.isEmpty else { return }
+            relisten = nil
+            listen()
+        }
+        relisten = w
+        queue.asyncAfter(deadline: .now() + delay, execute: w)
+    }
+
+    package static let relistenDelays: [TimeInterval] = [1, 2, 5, 10, 30]
+
+    /// The wait before the next try, after `failures` failures in a row (the first is 0).
+    package static func relistenDelay(afterFailures failures: Int) -> TimeInterval {
+        relistenDelays[min(max(failures, 0), relistenDelays.count - 1)]
+    }
+
+    /// A session ends from here — its key is gone, or lending stops. The owner is told as if the other side
+    /// had closed it, unless the same Mac holds another session; the channel's own `.closed` finds it gone.
+    private func drop(_ id: ObjectIdentifier) {
+        guard let s = sessions.removeValue(forKey: id) else { return }
+        s.channel.close()
+        if let identity = s.identity, !sessions.values.contains(where: { $0.identity == identity }) {
+            handler?(.disconnected(identity: identity))
         }
     }
 
     /// Stops both listeners and closes every session.
     package func stop() {
         queue.async { [self] in
+            relisten?.cancel(); relisten = nil
             listener?.cancel(); listener = nil
             keys = []
-            for s in sessions.values { s.channel.close() }
-            sessions = [:]
+            for id in Array(sessions.keys) { drop(id) }
             endPairing(.closed)
             handler?(.lending(port: nil))
         }
@@ -172,6 +223,12 @@ package final class RemoteHost: @unchecked Sendable {
                     channel.finish()
                     return
                 }
+                // The same Mac again while its old session is not yet known to be dead (half-open): the new
+                // one replaces it, and the old one's end must not say the Mac left.
+                for (other, o) in sessions where other != id && o.identity == identity {
+                    sessions[other] = nil
+                    o.channel.close()
+                }
                 s.identity = identity
                 sessions[id] = s
                 channel.send(SessionMessage.welcome(hello))
@@ -180,8 +237,11 @@ package final class RemoteHost: @unchecked Sendable {
                 guard let identity = sessions[id]?.identity else { channel.close(); return }
                 handler?(.blob(identity: identity, id: blob, data: data))
             case .closed:
-                if let identity = sessions[id]?.identity { handler?(.disconnected(identity: identity)) }
-                sessions[id] = nil
+                let identity = sessions.removeValue(forKey: id)?.identity
+                // Another session of the same Mac may have replaced this one.
+                if let identity, !sessions.values.contains(where: { $0.identity == identity }) {
+                    handler?(.disconnected(identity: identity))
+                }
             }
         }
     }

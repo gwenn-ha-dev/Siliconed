@@ -18,6 +18,8 @@ extension AppRefusal {
             String(localized: "This LoRA isn't installed on this Mac: \(name)")
         case .seedCount:
             String(localized: "A render takes 1 to 8 images.")
+        case .queueFull:
+            String(localized: "The queue is full.")
         case .enlargeModelDownload:
             String(localized: "The enlargement model could not be downloaded")
         case .enlargeFailed:

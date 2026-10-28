@@ -43505,6 +43505,38 @@
         }
       }
     },
+    "“%@” wants to install %@ (%@), which removes the %@ version first: until it is installed, %@ cannot render." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "“%1$@” wants to install %2$@ (%3$@), which removes the %4$@ version first: until it is installed, %5$@ cannot render."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "« %@ » veut installer %@ (%@), ce qui retire d’abord la version %@ : tant que l’installation n’est pas finie, %@ ne peut pas rendre."
+          }
+        }
+      }
+    },
+    "“%@” wants to install %@ (%@), which replaces the %@ version once it is ready." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "“%1$@” wants to install %2$@ (%3$@), which replaces the %4$@ version once it is ready."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "« %@ » veut installer %@ (%@), ce qui remplacera la version %@ une fois qu’elle sera prête."
+          }
+        }
+      }
+    },
     "“%@” wants to remove the LoRA %@." : {
       "localizations" : {
         "de" : {

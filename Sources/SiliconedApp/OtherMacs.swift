@@ -82,7 +82,7 @@ final class OtherMacs {
 
     let name: String
     /// Read on first need: the machine's description touches Metal and the executable.
-    @ObservationIgnored private lazy var hello = Hello(name: name, machine: Diagnostic.machine())
+    @ObservationIgnored private lazy var hello = Hello(name: name, machine: Diagnostic.machine(), launch: Hello.thisLaunch)
     private var host: RemoteHost?
     private var sessionBrowser: NWBrowser?
     private var pairingBrowser: NWBrowser?
@@ -155,6 +155,8 @@ final class OtherMacs {
         guard lending else {
             host?.stop()
             host = nil
+            // The clients go with the server: what each had under way (an import, a question) ends with it.
+            for identity in connected.keys { server?.left(identity) }
             server = nil
             connected = [:]
             window = nil
@@ -169,7 +171,13 @@ final class OtherMacs {
 
     private func makeHost() -> RemoteHost {
         let h = RemoteHost(hello: hello, service: (name, txt))
-        h.start { [weak self] e in DispatchQueue.main.async { MainActor.assumeIsolated { self?.handle(e) } } }
+        // Only the current host is heard: the events of one that was stopped (« Lend This Mac » off, then on)
+        // are queued behind it, and would reach the new server as its own clients leaving.
+        h.start { [weak self, weak h] e in
+            DispatchQueue.main.async {
+                MainActor.assumeIsolated { if let self, let h, self.host === h { self.handle(e) } }
+            }
+        }
         host = h
         server = MirrorServer(app: local, host: h) { [weak self] identity in
             self?.pairings?.lent.first { $0.identity == identity }?.name ?? self?.connected[identity]?.name
@@ -191,7 +199,7 @@ final class OtherMacs {
             }
         case .connected(let identity, let theirs):
             connected[identity] = theirs
-            server?.joined(identity)
+            server?.joined(identity, theirs)
         case .disconnected(let identity):
             connected[identity] = nil
             server?.left(identity)
@@ -224,16 +232,20 @@ final class OtherMacs {
     func forget(lent: Pairings.Lent) {
         save { $0.lent.removeAll { $0.identity == lent.identity } }
         connected[lent.identity] = nil
+        // The host closes that Mac's session and says nothing of it that this would not already have said.
+        server?.left(lent.identity)
         if lending, let p = pairings { host?.lend(keys: p.lendingKeys) }
+        hold()
     }
 
-    /// While a Mac is connected, this one does not go to sleep on it.
+    /// While a Mac is connected, this one does not go to sleep on it, and App Nap does not slow it: a lender
+    /// nobody sits at (its window hidden, its screen off) is the usual case, and would be napped.
     private func hold() {
         if connected.isEmpty {
             awake.map(ProcessInfo.processInfo.endActivity)
             awake = nil
         } else if awake == nil {
-            awake = ProcessInfo.processInfo.beginActivity(options: [.idleSystemSleepDisabled],
+            awake = ProcessInfo.processInfo.beginActivity(options: [.userInitiated, .idleSystemSleepDisabled],
                                                           reason: "Another Mac computes on this one")
         }
     }
@@ -311,7 +323,10 @@ final class OtherMacs {
     func show(_ b: Pairings.Borrowed?, in mirror: AppState?) {
         if let b, let mirror {
             mirrored = (b.id, mirror)
-            if linkObjects[b.id] == nil { connect(b) } else { linkObjects[b.id]?.retryNow() }
+            // A session kept from Settings joined before this mirror existed, and the join's catalog went
+            // nowhere: a new one, whose join is for this mirror.
+            if linkObjects[b.id] != nil { disconnect(b.id) }
+            connect(b, held: mirror.mirror?.held)
         } else {
             if let id = mirrored?.id { disconnect(id) }
             mirrored = nil
@@ -324,13 +339,14 @@ final class OtherMacs {
     func cancel(stream id: UInt32, to mac: String) { linkObjects[mac]?.cancel(stream: id) }
     func isJoined(_ mac: String) -> Bool { if case .connected? = links[mac] { true } else { false } }
 
-    func connect(_ b: Pairings.Borrowed) {
+    func connect(_ b: Pairings.Borrowed, held: HeldImages? = nil) {
         guard let p = pairings, linkObjects[b.id] == nil else { return }
         browseSessions()
         let id = b.id, book = book
         let l = RemoteLink(key: p.key(of: b), hello: hello) { book.endpoint(id) }
         linkObjects[id] = l
         links[id] = .connecting
+        if let held { l.resume { held.sorted } }
         l.listen(messages: { [weak self] m in
             DispatchQueue.main.async {
                 MainActor.assumeIsolated {

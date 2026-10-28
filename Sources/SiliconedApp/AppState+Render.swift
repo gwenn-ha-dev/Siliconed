@@ -209,6 +209,8 @@ extension AppState {
     func enqueue(_ jobs: [Job]) {
         guard !jobs.isEmpty else { return }
         if let mirror {
+            // The form is blocked while the link is down; what reaches here by another door is said, not dropped.
+            if let down = linkBlocker { problem = Problem(down); flash(down); return }
             do { for j in jobs { try mirror.render(j) } } catch { problem = Problem(error); flash(Problem(error).text) }
             return
         }

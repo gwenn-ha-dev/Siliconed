@@ -456,6 +456,9 @@ final class AppState {
     func unsubscribe(_ token: UUID) { subscribers[token] = nil }
     func signal(_ s: Signal) { for listener in subscribers.values { listener(s) } }
 
+    /// In a mirror whose lender restarted: the ends it told were numbered by a process that is gone.
+    func forgetCompletedJobs() { completed = [:] }
+
     func complete(_ t: Job, _ issue: Issue, images: [Int] = [], warnings: [String] = []) {
         completed[t.ordinal] = (t, issue, images, warnings.map(Library.withoutHome))
         signal(.finished(t, issue))
@@ -483,6 +486,10 @@ final class AppState {
     /// What the other Mac renders for others (itself, other Macs): how many, and for how long (`nil`: unknown).
     var othersQueued = 0
     var othersSeconds: Double?
+    /// **Why nothing can be sent now**, in a mirror: the session with the other Mac is not joined (connecting,
+    /// lost and tried again, refused). A request made then would be dropped without a word (`RemoteLink.send`),
+    /// so « Generate » waits for the link (`formBlocker`). `nil`: joined.
+    var linkBlocker: String?
     /// What the other Mac answered to the form's questions (`quoted`).
     var mirrorQuotes: [RemoteQuote: RemoteQuoteAnswer] = [:]
     /// What the other Mac estimates each waiting job of this Mac's takes, by ordinal (`RemoteStatistics`):
@@ -496,6 +503,9 @@ final class AppState {
         self.library = library
         self.subjects = subjects
         mirror = link
+        // Joined only when its `connected` comes (`linkChanged`).
+        linkBlocker = String(localized: "Connecting to “\(link.macName)”…")
+        link.down = linkBlocker
         cards = ModelCard.allCards
         identifier = defaultIdentifier
     }

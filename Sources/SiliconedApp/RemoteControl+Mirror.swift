@@ -59,6 +59,9 @@ extension RemoteControl {
     /// published, then asked of it — one job per alternative of the prompt, at the same seeds.
     func addOnMirror(_ mirror: MirrorLink, _ arguments: [String], cwd: String, _ c: Connection, grid: Bool = false) throws {
         let d = try parse(arguments)
+        // A request while the session is down would be dropped, and its command would wait for an answer
+        // that cannot come.
+        if let down = app.linkBlocker { throw Refusal("link", down) }
         // The same usage rules as here (`add`).
         if !grid, d.sketch {
             throw Refusal("usage", String(localized: "--sketch belongs to « silicontrol grid »"), help: "silicontrol help grid")

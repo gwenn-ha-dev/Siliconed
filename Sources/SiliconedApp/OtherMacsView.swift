@@ -132,7 +132,8 @@ private struct HostPairingSheet: View {
                 Text("Accept only if both screens show the same six digits.").font(.caption).foregroundStyle(.secondary)
                 HStack {
                     Button("Refuse") { macs.refusePairing() }.keyboardShortcut(.cancelAction)
-                    Button("Accept") { macs.acceptPairing() }.keyboardShortcut(.defaultAction)
+                    // No default key: a Return typed while the other Mac's code comes up must not accept it.
+                    Button("Accept") { macs.acceptPairing() }
                 }
             case .paired(_, let client)?:
                 Text("Paired with “\(client)”.").font(.headline)

@@ -130,6 +130,10 @@ package struct RemotePlan: Codable, Equatable, Sendable {
         self.added = added; self.freed = freed; self.peak = peak; self.removesFirst = removesFirst; self.fits = fits
     }
 
+    /// **The installation takes a version off the disk**, once the new one is ready or before its first byte:
+    /// the lender's user is asked, as for any removal (`RemoteLibraryRequest.deletes`).
+    package var deletes: Bool { replacing != nil || removesFirst }
+
     package init(_ p: Library.InstallPlan, baseDiT: Bool) {
         variant = p.variant; self.baseDiT = baseDiT; replacing = p.replacing
         added = p.added; freed = p.freed; peak = p.peak; removesFirst = p.removesFirst; fits = p.fits
