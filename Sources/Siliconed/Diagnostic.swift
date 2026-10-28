@@ -71,9 +71,11 @@ import Metal
 /// **Deliberately not measured**: the disk (no decision reads its speed); a model's step (its
 /// weights, its plan and the page cache decide it, and a render's own figures already say it); the
 /// memory (B is a function of the RAM alone, ¾ · RAM − 2 GiB); an SDPA in fp16 (P20: never under
-/// bf16, sums in fp32 — a precision the engine refuses is no capacity). The peak `phys_footprint` is 1.55 GB on the
-/// M1 Pro (18/10/2026, schema 9), the products' operands (~1.1 GB with the cuts' grid and the 8-bit weight,
-/// released before the attention) its larger part — under B on the smallest Mac (8 GB, B = 4 GiB).
+/// bf16, sums in fp32 — a precision the engine refuses is no capacity). The map is held under B like a render (`MemoryNeedDiagnostic.swift`): its need is
+/// computed from its shapes, its plan chosen before the first product, its peak `phys_footprint` read by step
+/// (`Report.memory`). Schemas 10–12 had put the Neural Engine's grid on one engine: 4.9 GB at the peak on the M1 Pro
+/// (28/10/2026; schema 9's 1.55 GB was never measured again), 1.56 GB of swap on a MacBook Neo. Cut in batches of
+/// shapes, an engine each: 3.5 GB under B = 4 GiB, the same decisions.
 ///
 /// **The engine reads it in the app, and only there**: the app measures before its first render when it
 /// holds no current map — none yet, or one of another `Fingerprint` (hardware, chip, macOS build, the
@@ -130,7 +132,7 @@ package enum Diagnostic {
         }
     }
 
-    /// **Runs the diagnostic**: ~1 min and 1.4 GB at the peak on the M1 Pro, no weights. Synchronous and
+    /// **Runs the diagnostic**: ~1 min on the M1 Pro, no weights, its peak under B (`Plan`). Synchronous and
     /// heavy: call it off the main thread, and never from the engine's queue.
     ///
     /// **It passes the doors a render passes**: it waits its turn on the engine's queue (`Engine.file`:
@@ -154,7 +156,13 @@ package enum Diagnostic {
         guard let device = MTLCreateSystemDefaultDevice(), let queue = device.makeCommandQueue() else {
             throw .internalFailure(component: "diagnostic", detail: "no Metal device")
         }
-        let bench = Bench(device: device, queue: queue, cancellation: cancellation)
+        // The frameworks' first use (Metal, MPSGraph, Core ML) is the process's base, as a render's (`OperatorFootprint.bringUp`).
+        OperatorFootprint.bringUp()
+        _ = NeuralEngine.bringUp
+        let gauge = Gauge()
+        // The plan, before the first computation: the map is held under B like a render (`MemoryNeedDiagnostic.swift`).
+        let plan = try Plan.choose(budget: MemoryBudget.machineCeiling(), base: gauge.base)
+        let bench = Bench(device: device, queue: queue, cancellation: cancellation, gauge: gauge)
         let before = conditions()
         var stages: [String: Double] = [:]
         func stage<T>(_ s: Stage, _ body: () throws -> T) rethrows -> T {
@@ -165,6 +173,7 @@ package enum Diagnostic {
         }
         do {
             // The products' operands (~1.1 GB) are released before the attention's peak.
+            gauge.mark("products", "operands")
             var operands: Operands? = Operands()
             let (products, cuts, aneCuts) = try stage(.products) { () throws -> ([Product], [Cut], [Cut]) in
                 // Its parts timed too (`products.…`): the minute's budget is read, not guessed.
@@ -172,20 +181,28 @@ package enum Diagnostic {
                 func lap(_ key: String) { stages["products." + key] = Date().timeIntervalSince(clock); clock = Date() }
                 let products = try measureProducts(operands!, bench)
                 lap("products")
+                gauge.mark("cuts")
                 let shares = products.compactMap(\.gpuShare).sorted()
                 let cuts = try measureCuts(operands!, bench, start: shares.isEmpty ? 0.631 : shares[shares.count / 2])
                 lap("cuts")
+                gauge.mark("aneCuts")
                 var three = 0.0
-                let aneCuts = try measureANECuts(operands!, bench, cuts: cuts, products: products, threeSeconds: &three)
+                let aneCuts = try measureANECuts(operands!, bench, cuts: cuts, products: products, batches: aneBatches(allotment: plan.aneAllotment),
+                                              threeSeconds: &three)
                 lap("aneCuts")
                 stages["products.aneCuts.three"] = three
                 return (products, cuts, aneCuts)
             }
+            gauge.mark("lowPrecision")
             let lowPrecision = try stage(.lowPrecision) { try measureLowPrecision(operands!, bench) }
             operands = nil
+            gauge.mark("attention")
             let attention = try stage(.attention) { try measureAttention(bench) }
+            gauge.mark("widening")
             let widening = try stage(.widening) { try measureWidening(bench) }
+            gauge.mark("witness")
             let witness = try stage(.witness) { try measureWitness(first: products[0], bench) }
+            gauge.finish()
             let settings = EngineSettings.effective
             var forced: [String: String] = [:]
             for row in settings.rows where row.source != .byDefault { forced[row.key] = "\(row.value) (\(row.source.rawValue))" }
@@ -193,7 +210,7 @@ package enum Diagnostic {
                           machine: machine(), cpuFeatures: cpuFeatures(), settings: forced, before: before,
                           after: conditions(), products: products, lowPrecision: lowPrecision, attention: attention,
                           widening: widening, witness: witness, stages: stages, cuts: cuts,
-                          aneCuts: aneCuts.isEmpty ? nil : aneCuts)
+                          aneCuts: aneCuts.isEmpty ? nil : aneCuts, memory: Memory(plan: plan, peaks: gauge.peaks))
         } catch {
             throw EngineError(error)
         }

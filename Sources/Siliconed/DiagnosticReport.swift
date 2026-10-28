@@ -351,6 +351,22 @@ extension Diagnostic {
         }
     }
 
+    /// **What the map was allowed, computed, and took** (`MemoryNeedDiagnostic.swift`): B, the process's base when
+    /// it started, the ANE engines it cut the grid into, each step's need (bytes, without the base) and its peak
+    /// `phys_footprint` (with it, the kernel's interval maximum). A peak above `base + need` is a defect of the code.
+    package struct Memory: Codable, Sendable, Equatable {
+        package var budget, base: Int
+        /// ANE engines the grid went through, one after the other.
+        package var aneBatches: Int
+        package var need: [String: Int]
+        package var peak: [String: Int]
+
+        package init(plan: Plan, peaks: [String: Int]) {
+            budget = plan.budget; base = plan.base; need = plan.need.steps; peak = peaks
+            aneBatches = Diagnostic.aneBatches(allotment: plan.aneAllotment).count
+        }
+    }
+
     package struct Report: Codable, Sendable, Equatable {
         package var schema: Int
         /// ISO 8601, UTC.
@@ -380,6 +396,8 @@ extension Diagnostic {
         /// **The seconds of each stage** (`Stage.key`), so the map's budget is read, not guessed;
         /// `nil` in a report of schema 5.
         package var stages: [String: Double]?
+        /// The map's own memory (`Memory`); `nil` in a report that predates it. No decision reads it.
+        package var memory: Memory?
         package var thresholds: Thresholds
         /// **What these measures make this Mac use** (`Diagnostic.decide`), written so a shared report says
         /// it; `nil` in a report that predates it. The engine never reads this field: it applies the
@@ -390,13 +408,14 @@ extension Diagnostic {
                     cpuFeatures: [String: Int], settings: [String: String] = [:], before: Conditions, after: Conditions,
                     products: [Product], lowPrecision: [LowPrecision], attention: [AttentionCapacity],
                     widening: [Widening], witness: Witness, thresholds: Thresholds = Thresholds(),
-                    stages: [String: Double]? = nil, cuts: [Cut]? = nil, aneCuts: [Cut]? = nil) {
+                    stages: [String: Double]? = nil, cuts: [Cut]? = nil, aneCuts: [Cut]? = nil,
+                    memory: Memory? = nil) {
             self.schema = schema; self.date = date; self.seconds = Diagnostic.significant(seconds, 3)
             self.thresholds = thresholds
             self.machine = machine; self.cpuFeatures = cpuFeatures; self.settings = settings
             self.before = before; self.after = after; self.products = products; self.lowPrecision = lowPrecision
             self.attention = attention; self.widening = widening; self.witness = witness; self.cuts = cuts
-            self.aneCuts = aneCuts
+            self.aneCuts = aneCuts; self.memory = memory
             self.stages = stages?.mapValues { Diagnostic.significant($0, 3) }
             self.decisions = Diagnostic.decide(products: products, attention: attention, widening: widening, witness: witness,
                                                cuts: cuts ?? [], aneCuts: aneCuts ?? [])

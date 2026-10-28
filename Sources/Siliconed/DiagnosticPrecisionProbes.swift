@@ -219,57 +219,65 @@ extension Diagnostic {
         var results: [AttentionCapacity] = []
         for block in blocks {
             for sequence in heights {
-                try bench.check()
-                let (h, d) = (block.heads, block.headDim)
-                let floats = sequence * h * d
-                let (q, k, v, out) = (Pages(bytes: floats * 4), Pages(bytes: floats * 4), Pages(bytes: floats * 4),
-                                      Pages(bytes: floats * 4))
-                fill(q.floats(), count: floats, scale: 3, seed: 11)
-                fill(k.floats(), count: floats, scale: 3, seed: 12)
-                fill(v.floats(), count: floats, scale: 1, seed: 13)
-                let (qb, kb, vb, ob) = (try bench.buffer(q), try bench.buffer(k), try bench.buffer(v), try bench.buffer(out))
-                let rows = sampleRows(sequence, count: sampledQueries)
-                let exact = exactAttention(q: q.floats(), k: k.floats(), v: v.floats(), sequence: sequence, heads: h,
-                                           headDim: d, rows: rows)
-                let o = out.floats(), vectors = rows.count * h
-                let flops = 4.0 * Double(sequence) * Double(sequence) * Double(h) * Double(d)
-                func measure(_ run: () -> Void) -> Measure {
-                    for row in rows { (o + row * h * d).update(repeating: .nan, count: h * d) }
-                    let t = seconds(run)
-                    var got = [Float](repeating: 0, count: vectors * d)
-                    for (i, row) in rows.enumerated() {
-                        for head in 0..<h { for x in 0..<d { got[x * vectors + i * h + head] = o[row * h * d + head * d + x] } }
-                    }
-                    return judge(got, exact, columns: vectors, rate: flops / t / 1e12, threshold: fp32Threshold)
-                }
-                let graph: Measure = try {
-                    let attention = Attention(device: bench.device, queue: bench.queue, heads: h, sequence: sequence, headDim: d)
+                // MPSGraph's autoreleased objects drain here, not at the end of the thread's block: an SDPA left one
+                // queries' copy per shape alive until the process ended (`Diagnostic.need` once counted it).
+                try autoreleasepool {
                     try bench.check()
-                    return measure { _ = attention.run(q: qb, k: kb, v: vb, into: ob) }
-                }()
-                try bench.check()
-                let flash = (try? FlashMatrix(device: bench.device, queue: bench.queue, heads: h, sequence: sequence,
-                                              headDim: d)).map { kernel in measure { kernel.run(q: qb, k: kb, v: vb, into: ob) } }
-                try bench.check()
-                // At the reference share, not at whatever the settings say: the map must measure the same cut
-                // whatever it decided last time.
-                var parts: AttentionCapacity.SplitParts?
-                let split = (try? HeadSplitAttention(device: bench.device, queue: bench.queue, heads: h, sequence: sequence,
-                                                     headDim: d, cpuFraction: HeadSplitAttention.referenceFraction)).map { cut in
-                    var best = (gpu: Double.infinity, cpu: Double.infinity, wall: Double.infinity)
-                    let measured = measure {
-                        let t = DispatchTime.now().uptimeNanoseconds
-                        let r = cut.run(q: qb, k: kb, v: vb, into: ob, q: q.floats(), k: k.floats(), v: v.floats(), out: o)
-                        let wall = Double(DispatchTime.now().uptimeNanoseconds - t) * 1e-9
-                        if wall < best.wall { best = (r.gpu, r.cpu, wall) }
+                    bench.gauge.mark("attention", "\(block.model) \(sequence)")
+                    let (h, d) = (block.heads, block.headDim)
+                    let floats = sequence * h * d
+                    let (q, k, v, out) = (Pages(bytes: floats * 4), Pages(bytes: floats * 4), Pages(bytes: floats * 4),
+                                          Pages(bytes: floats * 4))
+                    fill(q.floats(), count: floats, scale: 3, seed: 11)
+                    fill(k.floats(), count: floats, scale: 3, seed: 12)
+                    fill(v.floats(), count: floats, scale: 1, seed: 13)
+                    let (qb, kb, vb, ob) = (try bench.buffer(q), try bench.buffer(k), try bench.buffer(v), try bench.buffer(out))
+                    let rows = sampleRows(sequence, count: sampledQueries)
+                    let exact = exactAttention(q: q.floats(), k: k.floats(), v: v.floats(), sequence: sequence, heads: h,
+                                               headDim: d, rows: rows)
+                    let o = out.floats(), vectors = rows.count * h
+                    let flops = 4.0 * Double(sequence) * Double(sequence) * Double(h) * Double(d)
+                    func measure(_ run: () -> Void) -> Measure {
+                        for row in rows { (o + row * h * d).update(repeating: .nan, count: h * d) }
+                        let t = seconds(run)
+                        var got = [Float](repeating: 0, count: vectors * d)
+                        for (i, row) in rows.enumerated() {
+                            for head in 0..<h { for x in 0..<d { got[x * vectors + i * h + head] = o[row * h * d + head * d + x] } }
+                        }
+                        return judge(got, exact, columns: vectors, rate: flops / t / 1e12, threshold: fp32Threshold)
                     }
-                    if best.wall.isFinite, cut.cpuHeads > 0 {
-                        parts = .init(cpuHeads: cut.cpuHeads, gpuSeconds: best.gpu, cpuSeconds: best.cpu)
+                    bench.gauge.mark("attention", "\(block.model) \(sequence) graph")
+                    let graph: Measure = try {
+                        let attention = Attention(device: bench.device, queue: bench.queue, heads: h, sequence: sequence, headDim: d)
+                        try bench.check()
+                        return measure { _ = attention.run(q: qb, k: kb, v: vb, into: ob) }
+                    }()
+                    try bench.check()
+                    bench.gauge.mark("attention", "\(block.model) \(sequence) flash")
+                    let flash = (try? FlashMatrix(device: bench.device, queue: bench.queue, heads: h, sequence: sequence,
+                                                  headDim: d)).map { kernel in measure { kernel.run(q: qb, k: kb, v: vb, into: ob) } }
+                    try bench.check()
+                    // At the reference share, not at whatever the settings say: the map must measure the same cut
+                    // whatever it decided last time.
+                    bench.gauge.mark("attention", "\(block.model) \(sequence) split")
+                    var parts: AttentionCapacity.SplitParts?
+                    let split = (try? HeadSplitAttention(device: bench.device, queue: bench.queue, heads: h, sequence: sequence,
+                                                         headDim: d, cpuFraction: HeadSplitAttention.referenceFraction)).map { cut in
+                        var best = (gpu: Double.infinity, cpu: Double.infinity, wall: Double.infinity)
+                        let measured = measure {
+                            let t = DispatchTime.now().uptimeNanoseconds
+                            let r = cut.run(q: qb, k: kb, v: vb, into: ob, q: q.floats(), k: k.floats(), v: v.floats(), out: o)
+                            let wall = Double(DispatchTime.now().uptimeNanoseconds - t) * 1e-9
+                            if wall < best.wall { best = (r.gpu, r.cpu, wall) }
+                        }
+                        if best.wall.isFinite, cut.cpuHeads > 0 {
+                            parts = .init(cpuHeads: cut.cpuHeads, gpuSeconds: best.gpu, cpuSeconds: best.cpu)
+                        }
+                        return measured
                     }
-                    return measured
+                    results.append(AttentionCapacity(model: block.model, heads: h, headDim: d, sequence: sequence,
+                                                     graph: graph, flash: flash, headSplit: split, splitParts: parts))
                 }
-                results.append(AttentionCapacity(model: block.model, heads: h, headDim: d, sequence: sequence,
-                                                 graph: graph, flash: flash, headSplit: split, splitParts: parts))
             }
         }
         return results
