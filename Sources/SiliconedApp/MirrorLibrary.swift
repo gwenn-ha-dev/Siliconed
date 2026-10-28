@@ -12,6 +12,7 @@
 // - **The license** is accepted on the borrower's sheet, which shows the lender's words (one build on both
 //   Macs, `LicenseDigest`); the click goes with the digest and the lender accepts only its own text.
 
+import AppKit
 import Foundation
 import Siliconed
 
@@ -29,7 +30,7 @@ extension AppState {
     /// **May the library change now**: this Mac's (`managementPossible`), or the lender's — nothing of
     /// ours running, no installation under way there; the lender judges again.
     var libraryManageable: Bool {
-        mirror == nil ? managementPossible : remoteLibrary != nil && remoteForge == nil && !busy
+        mirror == nil ? managementPossible : remoteLibrary != nil && remoteForge == nil && !busy && !remoteConfirming
     }
 
     func askLibrary(_ r: RemoteLibraryRequest) { mirror?.send(.libraryAsk(r)) }
@@ -82,8 +83,15 @@ extension AppState {
             remoteForge = f
             // An upload of this Mac's holds the line until it ends (`endUpload` hands it back).
             guard mirror?.uploads.current == nil else { return }
+            // A queue that waits keeps its line (« Waiting for… ») until the lender's forge is over.
+            if mirror?.uploads.waiting == true {
+                if f == nil { lenderForgeEnded() }
+                return
+            }
             forgeInProgress = f.map { forgeTitle($0.task) }
             forgeJournal = []
+        case .confirming(let waiting):
+            remoteConfirming = waiting
         case .hubVerdict(let file, let v):
             guard hubOffer?.link.repository == file.repository,
                   let k = hubOffer?.files.firstIndex(where: { $0.file.path == file.path }) else { return }
@@ -112,7 +120,8 @@ extension AppState {
     func installRemotely(_ family: Family, variant: Variant, baseDiT: Bool) {
         guard libraryManageable else { return }
         askLibrary(.install(RemoteInstall(family: family, variant: variant, baseDiT: baseDiT,
-                                          digest: LicenseDigest.of(ModelCard.of(family), variant: variant))))
+                                          digest: LicenseDigest.of(ModelCard.of(family), variant: variant),
+                                          thenHub: installOffer?.thenHub)))
         installOffer = nil
     }
 
@@ -144,13 +153,14 @@ extension AppState {
     }
 
     /// « Import » in a mirror: the lender judges the file again and downloads it. A LoRA for a family
-    /// not installed there is not imported behind the user's back: the family's installation is offered.
+    /// not installed there is not imported behind the user's back: the family's installation is offered, and the
+    /// lender imports the LoRA itself once it is installed (`RemoteInstall.thenHub`), as `thenImport` does here.
     func importFromHubRemotely() {
         guard libraryManageable, let offer = hubOffer, let r = offer.repository, let (f, judged) = offer.choice,
               let verdict = judged, HubOffer.importable(verdict) else { return }
         hubOffer = nil
         if case .loraNeedsFamily(let family) = verdict, remoteLibrary?.part(family)?.isReady != true {
-            offerInstall(family)
+            offerInstall(family, thenHub: RemoteHubFile(repository: r.id, path: f.path))
             return
         }
         askLibrary(.hubInstall(RemoteHubFile(repository: r.id, path: f.path)))
@@ -196,6 +206,7 @@ extension ForgeProgress {
 final class MirrorLibraryHost {
     private let app: AppState
     private let host: RemoteHost
+    private let names: (Data) -> String?
     private var library: RemoteLibrary?
     private var forge: RemoteForge?
     private var libraryScheduled = false, forgeScheduled = false
@@ -203,13 +214,28 @@ final class MirrorLibraryHost {
     private var requester: Data?
     private var problemBefore: Problem?
     private var forging = false
+    /// A LoRA of the Hub that waits for its family's installation, and the client to tell (`RemoteInstall.thenHub`).
+    private var afterInstall: (file: RemoteHubFile, identity: Data)?
+    /// **The removal waiting for a click**: one alert at a time, in this Mac's window, for the client that asked.
+    /// Nothing is deleted without the click; no answer for `waitLimit` seconds is a refusal.
+    private struct Asking {
+        let token: Int
+        let identity: Data
+        let alert: NSAlert
+        var sheet: NSWindow?
+        var timeout: Task<Void, Never>?
+        let then: () -> Void
+    }
+    private var asking: Asking?
+    private var asked = 0
+    private static let waitLimit = 120
     /// The Hub repositories read lately, so that the files of one are not asked for 24 times.
     private var repositories: [String: HubRepository] = [:]
     /// The Hub files are judged one after the other: each reads a few hundred KB from the Hub.
     private var judging: Task<Void, Never>?
 
-    init(app: AppState, host: RemoteHost) {
-        self.app = app; self.host = host
+    init(app: AppState, host: RemoteHost, names: @escaping (Data) -> String?) {
+        self.app = app; self.host = host; self.names = names
         watchLibrary()
         watchForge()
     }
@@ -284,11 +310,73 @@ final class MirrorLibraryHost {
     }
 
     /// The installation that client asked for is over: if it failed, the client is told (the lender's own window shows it).
+    /// If a LoRA of the Hub waited for it, it follows — judged again, so a family that did not install refuses it by name.
     private func told() {
-        defer { requester = nil }
-        guard let who = requester, let p = app.problem, p != problemBefore, p.engine != nil else { return }
-        host.send(.refused(RemoteRefusal(p)), to: who)
+        let who = requester, next = afterInstall
+        requester = nil; afterInstall = nil
+        if let who, let p = app.problem, p != problemBefore, p.engine != nil {
+            host.send(.refused(RemoteRefusal(p)), to: who)
+            return
+        }
+        if let next { hubInstall(next.file, for: next.identity) }
     }
+
+    // MARK: Confirming a removal
+
+    /// A client is gone: its question goes with it.
+    func left(_ identity: Data) {
+        if asking?.identity == identity { resolve(asking!.token, nil) }
+    }
+
+    /// Asks this Mac's user before `then` deletes anything for `identity`. A second question while one waits is refused.
+    private func confirm(_ identity: Data, _ sentence: String, then: @escaping () -> Void) {
+        guard asking == nil else { refuse(.app(.removalPending), identity); return }
+        asked += 1
+        let token = asked
+        let alert = NSAlert()
+        alert.messageText = sentence
+        alert.informativeText = String(localized: "Nothing is removed without your click.")
+        alert.addButton(withTitle: String(localized: "Remove")).hasDestructiveAction = true
+        alert.addButton(withTitle: String(localized: "Decline"))
+        var a = Asking(token: token, identity: identity, alert: alert, then: then)
+        a.timeout = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(Self.waitLimit))
+            guard !Task.isCancelled else { return }
+            self?.resolve(token, .removalUnanswered)
+        }
+        let answered: (NSApplication.ModalResponse) -> Void = { [weak self] r in
+            MainActor.assumeIsolated { self?.resolve(token, r == .alertFirstButtonReturn ? .allowed : .removalDeclined) }
+        }
+        NSApp.activate()
+        if let w = NSApp.keyWindow ?? NSApp.mainWindow ?? NSApp.windows.first(where: { $0.isVisible && $0.canBecomeMain }) {
+            a.sheet = w
+            asking = a
+            alert.beginSheetModal(for: w, completionHandler: answered)
+        } else {
+            asking = a
+            Task { @MainActor in answered(alert.runModal()) }
+        }
+        host.send(.libraryNews(.confirming(true)), to: identity)
+    }
+
+    private enum Outcome { case allowed, removalDeclined, removalUnanswered }
+
+    /// The alert is over: by a click, the time, or the client leaving (`nil`: nobody to tell). Once only.
+    private func resolve(_ token: Int, _ outcome: Outcome?) {
+        guard let a = asking, a.token == token else { return }
+        asking = nil
+        a.timeout?.cancel()
+        if let w = a.sheet { if w.attachedSheet != nil { w.endSheet(a.alert.window) } } else { NSApp.abortModal() }
+        guard let outcome else { return }
+        host.send(.libraryNews(.confirming(false)), to: a.identity)
+        switch outcome {
+        case .allowed: a.then()
+        case .removalDeclined: refuse(.app(.removalDeclined), a.identity)
+        case .removalUnanswered: refuse(.app(.removalUnanswered), a.identity)
+        }
+    }
+
+    private func who(_ identity: Data) -> String { names(identity) ?? "" }
 
     // MARK: Requests
 
@@ -300,23 +388,33 @@ final class MirrorLibraryHost {
             install(i, from: identity)
         case .uninstall(let family):
             guard Family.offered.contains(family), manageable(identity) else { return }
-            changing(identity) { app.uninstall(family) }
+            confirm(identity, String(localized: "“\(who(identity))” wants to uninstall \(family.name).")) { [self] in
+                if manageable(identity) { changing(identity) { app.uninstall(family) } }
+            }
         case .removeModel(let id):
             guard let card = app.cards.first(where: { $0.id == id && $0.isImported }) else {
                 refuse(.app(.modelUnknown(id)), identity); return
             }
             guard manageable(identity) else { return }
-            changing(identity) { app.remove(card) }
+            confirm(identity, String(localized: "“\(who(identity))” wants to remove the model \(card.name).")) { [self] in
+                if manageable(identity) { changing(identity) { app.remove(card) } }
+            }
         case .removeLoRA(let path):
             guard let card = app.occupancy?.loras.first(where: { $0.card.path == path })?.card else {
                 refuse(.app(.loraNotInstalled(name: ((path as NSString).lastPathComponent as NSString).deletingPathExtension)), identity)
                 return
             }
             guard manageable(identity) else { return }
-            changing(identity) { app.remove(card) }
+            confirm(identity, String(localized: "“\(who(identity))” wants to remove the LoRA \(card.name).")) { [self] in
+                if manageable(identity) { changing(identity) { app.remove(card) } }
+            }
         case .discard:
             guard manageable(identity) else { return }
-            changing(identity) { app.emptyDownloads() }
+            // Nothing to empty deletes nothing: no question.
+            guard r.deletes(downloadsLeft: app.occupancy?.downloads ?? 0) else { changing(identity) { app.emptyDownloads() }; return }
+            confirm(identity, String(localized: "“\(who(identity))” wants to empty the interrupted downloads of this Mac.")) { [self] in
+                if manageable(identity) { changing(identity) { app.emptyDownloads() } }
+            }
         case .hubJudge(let file):
             judge(file, for: identity)
         case .hubInstall(let file):
@@ -361,6 +459,7 @@ final class MirrorLibraryHost {
             return
         }
         started(by: identity)
+        afterInstall = i.thenHub.map { ($0, identity) }
         app.acceptAndInstall(i.family, variant: i.variant, baseDiT: i.baseDiT, asked: true)
     }
 

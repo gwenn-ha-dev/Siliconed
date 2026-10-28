@@ -217,13 +217,17 @@ extension RemoteForge.Phase {
 
 /// A family installed from its publisher in a version. `digest`: the license text the Neo's sheet showed
 /// (`LicenseDigest.of(card, variant:)`); the lender accepts only its own.
+/// `thenHub`: a LoRA of the Hub that waited for this family (as `InstallOffer.thenImport` does here): the
+/// lender imports it itself once the family is installed — it holds the file's name, the Neo need not
+/// stay to click again, and a failed or stopped installation drops it with the installation.
 package struct RemoteInstall: Codable, Equatable, Sendable {
     package var family: Family
     package var variant: Variant
     package var baseDiT: Bool
     package var digest: Data
-    package init(family: Family, variant: Variant, baseDiT: Bool, digest: Data) {
-        self.family = family; self.variant = variant; self.baseDiT = baseDiT; self.digest = digest
+    package var thenHub: RemoteHubFile?
+    package init(family: Family, variant: Variant, baseDiT: Bool, digest: Data, thenHub: RemoteHubFile? = nil) {
+        self.family = family; self.variant = variant; self.baseDiT = baseDiT; self.digest = digest; self.thenHub = thenHub
     }
 }
 
@@ -265,6 +269,16 @@ package enum RemoteLibraryRequest: Codable, Equatable, Sendable {
     case discard
     case hubJudge(RemoteHubFile)
     case hubInstall(RemoteHubFile)
+
+    /// Deletes files on the lender: it asks its user before (`MirrorLibraryHost`), whatever the borrower's
+    /// own confirmation. Installing stays free. `downloadsLeft`: emptying nothing deletes nothing.
+    package func deletes(downloadsLeft: Int) -> Bool {
+        switch self {
+        case .uninstall, .removeModel, .removeLoRA: true
+        case .discard: downloadsLeft > 0
+        case .install, .cancel, .hubJudge, .hubInstall: false
+        }
+    }
 }
 
 /// What the lender says of its library (mini → Neo).
@@ -272,4 +286,6 @@ package enum RemoteLibraryNews: Codable, Equatable, Sendable {
     case library(RemoteLibrary)
     case forge(RemoteForge?)
     case hubVerdict(RemoteHubFile, RemoteHubVerdict)
+    /// To the client alone: its removal waits for a click on this Mac (`true`), or no longer does.
+    case confirming(Bool)
 }

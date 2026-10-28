@@ -135,11 +135,13 @@ extension AppState {
     /// `baseDiT` false (what an imported model lacks) never changes the version: the one installed is
     /// imposed, Standard if none, whatever `variant` says (`Library.installPlan`).
     /// `thenImport`: the files to import once installed (`perform`).
-    func offerInstall(_ family: Family, baseDiT: Bool = true, variant: Variant? = nil, thenImport: [URL] = []) {
+    /// `thenHub`: in a mirror, the Hub file the lender imports itself once the family is there.
+    func offerInstall(_ family: Family, baseDiT: Bool = true, variant: Variant? = nil, thenImport: [URL] = [],
+                      thenHub: RemoteHubFile? = nil) {
         let installed = installedVariant(of: family)
         installOffer = InstallOffer(family: family, baseDiT: baseDiT,
                                     variant: baseDiT ? variant ?? installed ?? preselectedVariant(of: family) : installed ?? .standard,
-                                    thenImport: thenImport)
+                                    thenImport: thenImport, thenHub: thenHub)
         managementOpen = true
     }
 
@@ -184,7 +186,10 @@ extension AppState {
     /// Stops the installation or import in progress; the files already downloaded are kept.
     func cancelForge() {
         // In a mirror, Stop stops this Mac's own upload if one runs (`MirrorUpload.swift`), else the lender's forge.
-        if let m = mirror, m.uploads.current == nil { askLibrary(.cancel); return }
+        if let m = mirror, m.uploads.current == nil {
+            if m.uploads.waiting { stopWaitingUploads() } else { askLibrary(.cancel) }
+            return
+        }
         cancellationForge?.cancel()
     }
 

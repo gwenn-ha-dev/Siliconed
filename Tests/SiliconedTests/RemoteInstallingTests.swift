@@ -35,6 +35,9 @@ final class RemoteInstallingTests: XCTestCase {
             .libraryNews(.hubVerdict(file, .refused(.text("not a LoRA")))),
             .libraryNews(.hubVerdict(file, .refused(.app(.hubFileUnknown("niji.safetensors"))))),
             .libraryAsk(.install(RemoteInstall(family: .qwenImage21, variant: .light, baseDiT: false, digest: digest))),
+            .libraryAsk(.install(RemoteInstall(family: .anima, variant: .compact, baseDiT: true, digest: digest, thenHub: file))),
+            .libraryNews(.confirming(true)), .libraryNews(.confirming(false)),
+            .refused(.app(.removalDeclined)), .refused(.app(.removalUnanswered)), .refused(.app(.removalPending)),
             .libraryAsk(.cancel), .libraryAsk(.uninstall(.mossImage)), .libraryAsk(.removeModel("z-image/my-checkpoint")),
             .libraryAsk(.removeLoRA("/Library/Siliconed/store/lora/niji.lora.silicon")), .libraryAsk(.discard),
             .libraryAsk(.hubJudge(file)), .libraryAsk(.hubInstall(file)),
@@ -42,6 +45,30 @@ final class RemoteInstallingTests: XCTestCase {
             .refused(.app(.modelUnknown("x/y"))), .refused(.app(.hubNeedsFamily(.krea2))), .refused(.app(.hubFileUnknown("p.gguf"))),
         ]
         for m in messages { try roundTrip(m) }
+    }
+
+    /// An install without a LoRA behind it, as an older Neo sent it, still reads; one with it keeps the file.
+    func testAnInstallMayCarryTheHubFileThatWaitsForIt() throws {
+        let digest = Data(repeating: 1, count: 32)
+        let old = Data(#"{"family":"anima","variant":"compact","baseDiT":true,"digest":"\#(digest.base64EncodedString())"}"#.utf8)
+        XCTAssertNil(try JSONDecoder().decode(RemoteInstall.self, from: old).thenHub)
+        let file = RemoteHubFile(repository: "someone/niji-lora", path: "niji.safetensors")
+        let i = RemoteInstall(family: .anima, variant: .compact, baseDiT: true, digest: digest, thenHub: file)
+        XCTAssertEqual(try JSONDecoder().decode(RemoteInstall.self, from: JSONEncoder().encode(i)).thenHub, file)
+    }
+
+    /// What the lender's user must confirm: every deletion, and an emptying only when something is there.
+    func testOnlyDeletionsAreConfirmed() {
+        let file = RemoteHubFile(repository: "a/b", path: "c.safetensors")
+        let install = RemoteInstall(family: .anima, variant: .compact, baseDiT: true, digest: Data())
+        for r in [RemoteLibraryRequest.uninstall(.anima), .removeModel("x/y"), .removeLoRA("/p")] {
+            XCTAssertTrue(r.deletes(downloadsLeft: 0))
+        }
+        XCTAssertTrue(RemoteLibraryRequest.discard.deletes(downloadsLeft: 3))
+        XCTAssertFalse(RemoteLibraryRequest.discard.deletes(downloadsLeft: 0))
+        for r in [RemoteLibraryRequest.install(install), .cancel, .hubJudge(file), .hubInstall(file)] {
+            XCTAssertFalse(r.deletes(downloadsLeft: 9))
+        }
     }
 
     /// What the Models sheet reads is rebuilt from what crossed, with nothing of the borrower's disk.

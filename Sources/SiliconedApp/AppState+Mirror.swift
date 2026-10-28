@@ -484,8 +484,8 @@ extension AppState {
             // Asked before a cut: asked again.
             mirror?.asked = []
         case .connecting, .off: break
-        case .waiting: uploadLinkChanged(s); noteCut(); problem = { var p = Problem(String(localized: "Lost “\(name)”: trying again…")); p.code = "remote"; return p }()
-        case .refused: uploadLinkChanged(s); problem = { var p = Problem(OtherMacsSection.state(s, found: true)); p.code = "remote"; return p }()
+        case .waiting: remoteConfirming = false; uploadLinkChanged(s); noteCut(); problem = { var p = Problem(String(localized: "Lost “\(name)”: trying again…")); p.code = "remote"; return p }()
+        case .refused: remoteConfirming = false; uploadLinkChanged(s); problem = { var p = Problem(OtherMacsSection.state(s, found: true)); p.code = "remote"; return p }()
         }
     }
 }

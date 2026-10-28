@@ -171,7 +171,9 @@ final class OtherMacs {
         let h = RemoteHost(hello: hello, service: (name, txt))
         h.start { [weak self] e in DispatchQueue.main.async { MainActor.assumeIsolated { self?.handle(e) } } }
         host = h
-        server = MirrorServer(app: local, host: h)
+        server = MirrorServer(app: local, host: h) { [weak self] identity in
+            self?.pairings?.lent.first { $0.identity == identity }?.name ?? self?.connected[identity]?.name
+        }
         return h
     }
 

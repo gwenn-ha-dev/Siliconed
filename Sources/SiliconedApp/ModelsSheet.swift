@@ -147,6 +147,10 @@ struct ModelManagement: View {
                 Spacer()
                 Button("Stop") { app.cancelForge() }
                     .help("Stops the installation: the files already downloaded are kept, the one in progress will start over")
+            } else if app.remoteConfirming {
+                ProgressView().controlSize(.small)
+                Text("Waiting for confirmation on “\(app.libraryTitle)”").font(.callout).foregroundStyle(.secondary)
+                Spacer()
             } else {
                 if let o = app.occupancy {
                     Text(summary(o)).font(.callout).foregroundStyle(.secondary).monospacedDigit()
@@ -206,6 +210,11 @@ struct ModelManagement: View {
             if !offer.thenImport.isEmpty {
                 Label("\(offer.thenImport.map(\.lastPathComponent).joined(separator: ", ")) will be imported once this is installed. Its image model is that file, under its author's license; the text encoder and the VAE below are \(card.name)'s.",
                       systemImage: "square.and.arrow.down")
+                    .font(.callout)
+                Divider()
+            }
+            if let file = offer.thenHub {
+                Label("\((file.path as NSString).lastPathComponent) will be imported once this is installed.", systemImage: "square.and.arrow.down")
                     .font(.callout)
                 Divider()
             }

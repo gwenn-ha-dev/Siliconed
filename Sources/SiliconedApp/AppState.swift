@@ -383,6 +383,8 @@ final class AppState {
         /// The files dropped before their family was there: imported once this installation is done.
         /// Cancelling the offer, or stopping the installation, forgets them with it.
         var thenImport: [URL] = []
+        /// In a mirror: the LoRA of the Hub the lender imports once the family is installed there.
+        var thenHub: RemoteHubFile?
     }
     /// **The « Use this model » link being answered** (`HubSheet`): the repository, its files judged.
     var hubOffer: HubOffer?
@@ -404,6 +406,8 @@ final class AppState {
     /// In a mirror: the other Mac's library and the installation under way there (`MirrorLibrary.swift`).
     var remoteLibrary: RemoteLibrary?
     var remoteForge: RemoteForge?
+    /// In a mirror: a removal asked waits for a click on the lender (`RemoteLibraryNews.confirming`).
+    var remoteConfirming = false
     /// The token of the forge in progress: "Stop" cuts a download in the middle.
     var cancellationForge: Cancellation?
     /// What the library occupies — the "Models" sheet; re-read with the catalog.

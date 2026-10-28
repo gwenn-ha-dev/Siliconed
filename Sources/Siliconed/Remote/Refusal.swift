@@ -43,6 +43,8 @@ package enum AppRefusal: Codable, Equatable, Sendable {
     case modelUnknown(String)
     /// A LoRA for a family not installed there: install it first, then import again.
     case hubNeedsFamily(Family)
+    /// A removal the lender's user declined, one nobody answered, and one asked while another waits there.
+    case removalDeclined, removalUnanswered, removalPending
     /// A file the Hub no longer lists in that repository.
     case hubFileUnknown(String)
 }

@@ -48,6 +48,12 @@ extension AppRefusal {
             String(localized: "This LoRA is for \(family.name), which isn't installed on that Mac yet: install it first.")
         case .hubFileUnknown(let path):
             String(localized: "Hugging Face doesn't list \(path) any more.")
+        case .removalDeclined:
+            String(localized: "That Mac declined the removal: nothing was removed.")
+        case .removalUnanswered:
+            String(localized: "Nobody answered on that Mac: nothing was removed.")
+        case .removalPending:
+            String(localized: "That Mac is already asking about another removal: try again once it is answered.")
         case .licenseMismatch(let model):
             String(localized: "The license shown is not this Mac's text for \(ModelCard.withID(model)?.name ?? model): nothing was accepted.")
         }

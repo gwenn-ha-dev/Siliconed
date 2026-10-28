@@ -85,10 +85,11 @@ final class MirrorServer {
     /// The files other Macs import here (`MirrorUpload.swift`).
     private lazy var importHub = UploadHub(app: app) { [weak self] m, identity in self?.host.send(m, to: identity) }
 
-    init(app: AppState, host: RemoteHost) {
+    /// `names`: the name a paired Mac was lent to under (`Pairings.Lent`), for the alerts that name it.
+    init(app: AppState, host: RemoteHost, names: @escaping (Data) -> String?) {
         self.app = app; self.host = host
         machine = MachinePublisher(app: app, host: host)
-        library = MirrorLibraryHost(app: app, host: host)
+        library = MirrorLibraryHost(app: app, host: host, names: names)
         let inbox = importHub.inbox
         host.receive(streams: { [weak self] identity, id, bytes, last in
             guard let (offer, step) = inbox.piece(identity: identity, id: id, bytes, last: last) else { return }
@@ -145,6 +146,7 @@ final class MirrorServer {
 
     func left(_ identity: Data) {
         importHub.abort(identity)
+        library.left(identity)
         seen[identity] = nil
         uploads[identity] = nil
         held.removeAll { $0.identity == identity }

@@ -5,6 +5,9 @@
 //   on this Mac, offers it, and — if the other Mac takes it — streams it from the disk as the network
 //   goes. One file at a time; the others of a selection follow once the one before is verified.
 //   Nothing resumes: a cut link ends it, and says so.
+//   **The queue survives a `busy`**: the other Mac still imports the file before (it takes the forge once
+//   verified), so the next is offered again when its forge is published as over — or, a render being the
+//   cause, every few seconds. « Stop » empties the queue, whatever it waits on.
 // - **Lending side** (`UploadHub`): judges the offer before the first byte (an import, a forge or a
 //   render under way refuses it: one big job at a time), receives the stream into a temporary folder of
 //   the library, and — verified — hands the file to `AppState.perform`, the very path of a local import
@@ -32,6 +35,7 @@ struct UploadPort {
 final class UploadBorrower {
     struct Current {
         let id: UInt32
+        let url: URL
         let name: String
         let size: Int64
         let source: UploadSource
@@ -41,6 +45,9 @@ final class UploadBorrower {
     let port: UploadPort?
     var queue: [URL] = []
     var current: Current?
+    /// The queue holds files and none is out: the lender is busy, they wait for it.
+    var waiting = false
+    var retry: Task<Void, Never>?
     private(set) var next: UInt32 = 1
 
     init(port: UploadPort?) { self.port = port }
@@ -66,6 +73,8 @@ extension AppState {
     private func uploadNext() {
         guard let link = mirror else { return }
         let u = link.uploads
+        u.waiting = false
+        u.retry?.cancel()
         while let url = u.queue.first {
             u.queue.removeFirst()
             guard let size = (try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize, size > 0 else {
@@ -82,7 +91,7 @@ extension AppState {
                 finished: { [weak self] result in
                     DispatchQueue.main.async { MainActor.assumeIsolated { self?.uploadSent(id, result) } }
                 })
-            u.current = .init(id: id, name: url.lastPathComponent, size: Int64(size), source: source, cancellation: cancellation)
+            u.current = .init(id: id, url: url, name: url.lastPathComponent, size: Int64(size), source: source, cancellation: cancellation)
             forgeInProgress = String(localized: "Importing on “\(link.macName)”")
             forgeJournal = ["⇡ \(url.lastPathComponent)"]
             cancellationForge = cancellation
@@ -102,13 +111,15 @@ extension AppState {
                 link.uploads.current?.answered = true
                 // « Stop » pressed while the offer was out: the first pull would say so, but nothing pulls yet.
                 if cur.cancellation.isCancelled { stopUpload(.cancelled) } else { link.uploads.port?.send(id, cur.source) }
+            case .refused(.busy):
+                waitForLender(cur)
             case .refused(let r):
                 endUpload(problem: Self.sentence(r, mac: link.macName))
             }
         case .uploadResult(let id, let result) where id == cur.id:
             switch result {
             case .verified:
-                endUpload(flash: String(localized: "“\(cur.name)” is on “\(link.macName)”: it is being imported there."))
+                endUpload(flash: String(localized: "“\(cur.name)” is on “\(link.macName)”: it is being imported there."), keepingQueue: true)
                 uploadNext()
             case .failed(let f):
                 endUpload(problem: Self.sentence(f, mac: link.macName))
@@ -142,10 +153,42 @@ extension AppState {
                   flash: f == .cancelled ? Self.sentence(f, mac: link.macName) : nil)
     }
 
-    private func endUpload(problem sentence: String? = nil, flash message: String? = nil) {
+    /// The lender refused this offer as busy: the file goes back to the head of the queue, and waits.
+    private func waitForLender(_ cur: UploadBorrower.Current) {
+        guard let link = mirror else { return }
+        let u = link.uploads
+        u.queue.insert(cur.url, at: 0)
+        endUpload(keepingQueue: true)
+        u.waiting = true
+        forgeInProgress = String(localized: "Waiting for “\(link.macName)” to finish before sending \(cur.name)")
+        u.retry?.cancel()
+        u.retry = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(5))
+                guard !Task.isCancelled, let self, let m = self.mirror, m.uploads.waiting, m.uploads.current == nil else { return }
+                self.uploadNext()
+            }
+        }
+    }
+
+    /// « Stop » on a queue that waits: the files are forgotten; the lender's own import, if any, goes on
+    /// (a second « Stop » reaches it).
+    func stopWaitingUploads() {
+        guard let link = mirror, link.uploads.waiting else { return }
+        endUpload()
+    }
+
+    /// The lender's forge is over: the file that waited for it may go.
+    func lenderForgeEnded() {
+        guard let link = mirror, link.uploads.waiting, link.uploads.current == nil else { return }
+        uploadNext()
+    }
+
+    private func endUpload(problem sentence: String? = nil, flash message: String? = nil, keepingQueue: Bool = false) {
         guard let link = mirror else { return }
         link.uploads.current = nil
-        if sentence != nil || message == nil { link.uploads.queue = [] }
+        link.uploads.retry?.cancel()
+        if !keepingQueue { link.uploads.queue = []; link.uploads.waiting = false }
         // The lender may be forging already — the file just sent, imported there: its line comes back.
         forgeInProgress = remoteForge.map { forgeTitle($0.task) }
         forgeJournal = []
@@ -156,8 +199,12 @@ extension AppState {
 
     /// The link left the joined state: nothing resumes.
     func uploadLinkChanged(_ s: RemoteLink.State) {
-        guard let link = mirror, let cur = link.uploads.current else { return }
+        guard let link = mirror else { return }
         if case .connected = s { return }
+        guard let cur = link.uploads.current else {
+            if link.uploads.waiting { endUpload() }
+            return
+        }
         link.uploads.port?.cancel(cur.id)
         cur.source.close()
         endUpload(problem: Self.sentence(.interrupted, mac: link.macName))
