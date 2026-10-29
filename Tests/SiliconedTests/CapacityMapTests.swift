@@ -201,6 +201,59 @@ final class CapacityMapTests: XCTestCase {
         XCTAssertEqual(plan, simulate(g, settings: settings).0)
     }
 
+    /// **The slowest Mac gets its ANE inside its minute.** The Neo's rates (A18 Pro, 5 GPU cores; TFLOP/s read in its maps):
+    /// the GPU at 1.35, the ANE beside it from 2.0 to 2.8 with the weight's size, losing at 2048²; the AMX hot at the end
+    /// (×1.76, the GPU ×1.2). About 25 s of timing are left of its minute once warm-ups, checks and balances are paid —
+    /// a first lap of the grid's routes takes more: the borrowed priors and the loss per second are what make it fit
+    /// (by loss alone, with N(0, 0.5²) for every unmeasured route, the ANE was timed nowhere and the loss was 0.34).
+    func testTheNeoGetsItsANEInsideItsMinute() {
+        func rate(_ e: CapacityMap.Entry, _ route: String) -> Double? {
+            switch e.work {
+            case let .product(k, n, m):
+                let w = k * n
+                switch route {
+                case "gpu": return 1.35
+                case "gpu+amx": return 1.55
+                case "gpu+ane": return w <= 4_200_000 ? 1.2 : w <= 17_000_000 ? 2.0 : 2.8
+                case "gpu+ane+amx": return w <= 4_200_000 ? 1.5 : w <= 17_000_000 ? 2.1 : 3.3
+                case "gpu/bf16": return 0.9
+                case "gpu/bf16act": return k == 16384 && m == 1024 ? 1.6 : 1.1
+                case "gpu/int8", "gpu+amx/int8": return 1.4
+                case "gpu/q8": return 0.95
+                case "gpu+amx/q8": return 1.05
+                default: return nil
+                }
+            case .attention:
+                return ["graph": 0.5, "flash": 0.3, "split": 1.0][route]
+            }
+        }
+        func seconds(_ e: CapacityMap.Entry, _ route: String) -> Double? {
+            let flop: Double
+            switch e.work {
+            case let .product(k, n, m): flop = 2 * Double(k) * Double(n) * Double(m)
+            case let .attention(s, h, d): flop = 4 * Double(s) * Double(s) * Double(h) * Double(d)
+            }
+            return rate(e, route).map { flop / ($0 * 1e12) }
+        }
+        let g = grid
+        let neo: CapacityMap.Preparation = [.bf16: (1 / 8.2e9, 1 / 13.6e9), .int8: (1 / 9.3e9, 1 / 37.9e9), .q8: (1 / 8.2e9, 1 / 27.8e9)]
+        let classes = g.map { $0.compute(preparation: neo) }
+        let hot = CM.Heat(["amx": 1.764, "gpu": 1.198, "ane": 0.89])
+        let sim = CapacityMeasureTests.Sim(base: g.map { e in e.routes.map { seconds(e, $0.id) } }, noise: 0.03)
+        var settings = CM.Settings(); settings.budget = 25
+        let plan = CM.plan(classes: classes, settings: settings, finalHeat: { hot }, clock: sim) { sim.probe($0, $1) }
+        XCTAssertLessThan(plan.residualLoss, settings.epsilon)
+        let views = zip(g, classes).flatMap { e, c in c.decisions.map { (e, $0) } }
+        var ane = 0
+        for ((e, v), d) in zip(views, plan.decisions) {
+            let t = v.routes.map { r in seconds(e, e.routes[r].id).map { $0 * hot.factor(e.routes[r]) + v.extra(r) } ?? .infinity }
+            let chosen = CM.rule(ratios: t.map { $0.isFinite ? $0 / t[0] : nil }, efficient: v.routes.map { e.routes[$0].efficient })!
+            XCTAssertEqual(d.chosen, e.routes[v.routes[chosen]].id, v.id)
+            if d.chosen?.contains("ane") == true { ane += 1 }
+        }
+        XCTAssertEqual(ane, 36, "the ANE at every product but 2048², at both heights and in the three forms")
+    }
+
     func testAWeightsFormChangesTheDecisionNotTheMeasurement() {
         // At 1 024 rows of 8192², the 8-bit weight copied and multiplied beside the AMX beats every widened route, the bf16 one
         // does not: one measurement, two routes.

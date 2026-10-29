@@ -17,8 +17,9 @@ import Foundation
 ///        ├─ the rule     per view: the first efficient route within 90 % of the best (and faster than ref), else
 ///        │               the simplest route that beats the one before it by more than `tie`
 ///        ├─ the loss     L(v) = w · Σᵣ E[(ln e_chosen − ln eᵣ − slack)⁺],  eᵣ ~ LogNormal   (closed form)
-///        └─ the budget   next step → the decision with the largest L, in it the route with the largest pair
-///                        loss (or the chosen one when its own SE is the larger); stop at ε or at the budget
+///        ├─ the prior    a route not measured at a point borrows its measures at the others (normal-normal)
+///        └─ the budget   next step → the decision with the largest L per second of its step, in it the route with
+///                        the largest pair loss (or the chosen one when its own SE is the larger); stop at ε or at the budget
 ///
 /// What sets it apart — what a version written by analogy with "median of three, then a margin" would get
 /// wrong:
@@ -44,8 +45,17 @@ import Foundation
 ///     sum) costs `X⁺`; its mean is `s φ(d/s) + d Φ(d/s)` — `≈ |gap| · P(wrong)` when the gap is clear
 ///     (d ≫ s: |d|·1), and `≈ 0.4 s` at a tie, where the gap is unknown but small. Weighted by `w` it is a
 ///     fraction of the render. Σ over the rival routes bounds the max (a union bound, safe side). A route
-///     never measured has the prior N(0, 0.5²): it is a rival, never a candidate — a hole vetoes
-///     nothing, and measuring it first is what the allocation does, heavy classes first.
+///     never measured at a point is a rival, never a candidate — a hole vetoes nothing.
+///   - **A route not measured at a point borrows from the points where it was** (`between`): the medians τⱼ of
+///     its log-ratios are draws of N(μ, β²), μ ~ N(0, 0.5²), β² shrunk to 0.2² with weight 2, and the
+///     prediction is N(μ̂, β² + var μ̂) — N(0, 0.5²) where it was measured nowhere. The q8 weight that loses
+///     ×1.4 at six points is no longer a 0.2 loss at the eighth; the ANE that wins at six is measured at the
+///     eighth. Without it a slow Mac never finished the first lap: the Neo (5 GPU cores) ran out of its minute
+///     with the ANE timed nowhere and a residual loss of 0.29.
+///   - **The allocation buys loss per second**: the step's cost is the pair's last two runs, else the
+///     reference's at the point. Equal weights, unequal costs (×64 between 2048²@1024 and 8192²@4096): by
+///     loss alone, the heavy points took the minute and the light ones kept their unmeasured rivals. A step
+///     that no longer fits the budget leaves room for a cheaper one.
 ///   - **A decision closes at ε / N** (N = classes with a rival), so the sum stays under ε (≈ 2 % of the
 ///     render): heavy classes need tight figures, a light one is closed by a rough one — this is what spends
 ///     the seconds where the weight is.
@@ -63,7 +73,7 @@ import Foundation
 ///   - **Out of budget, what is open falls back to the simplest route** unless the chosen one beats it
 ///     with `confidence` (95 %); the residual loss says what that costs.
 ///   - **A route judged wrong, or a hole (the probe says `nil`), is not a candidate for that class** — and for
-///     no other: classes are independent, a missing measure is never a global veto.
+///     no other: a missing measure is never a global veto (the others' priors only lose a source).
 ///   - Deterministic: the order of steps depends on the numbers only (ties by index).
 package enum CapacityMeasure {
     /// One way to run a class. The first of a class's routes is the simplest (GPU alone).
@@ -163,6 +173,8 @@ package enum CapacityMeasure {
         package var noiseWeight = 4.0
         /// Prior spread of a route never measured (log units).
         package var unmeasuredSigma = 0.5
+        /// Prior spread of a route's log-ratio from one point to another (log units), for a route not measured at a point.
+        package var between = 0.2
         package var confidence = 0.95
         /// Ratios per route: past it, a route is closed.
         package var maxRatios = 80
@@ -314,6 +326,34 @@ package enum CapacityMeasure {
         func forget(_ c: Int) {
             estimates[c] = estimates[c].map { _ in nil }
             referenceRuns[c] = nil
+            // The borrowed priors of every class move with this one's measures.
+            pooled = [:]
+            for c2 in classes.indices where c2 != c {
+                for r in classes[c2].routes.indices where pairs[c2][r].logRatios.isEmpty { estimates[c2][r] = nil }
+            }
+        }
+
+        // A route never measured here borrows from its measures at the other points: a normal-normal model, the points'
+        // medians τⱼ ~ N(μ, β²), μ ~ N(0, σ₀²), β² shrunk to `between` with weight 2; the prediction is N(μ̂, β² + var μ̂).
+        var pooled: [String: (mean: Double, sd: Double)] = [:]
+        func borrowed(_ id: String) -> (mean: Double, sd: Double) {
+            if let p = pooled[id] { return p }
+            var taus: [Double] = []
+            for c in classes.indices where refs[c] != nil {
+                for r in classes[c].routes.indices where classes[c].routes[r].id == id && r != refs[c] {
+                    let ls = pairs[c][r].logRatios
+                    if !ls.isEmpty { taus.append(median(ls)) }
+                }
+            }
+            let s0 = settings.unmeasuredSigma, b0 = settings.between
+            guard !taus.isEmpty else { pooled[id] = (0, s0); return (0, s0) }
+            let n = Double(taus.count), mean = taus.reduce(0, +) / n
+            let ss = taus.reduce(0) { $0 + ($1 - mean) * ($1 - mean) }
+            let beta2 = (2 * b0 * b0 + ss) / (2 + n - 1)
+            let precision = n / beta2 + 1 / (s0 * s0)
+            let p = (mean * n / beta2 / precision, (beta2 + 1 / precision).squareRoot())
+            pooled[id] = p
+            return p
         }
 
         func estimate(_ c: Int, _ r: Int) -> Estimate {
@@ -329,7 +369,10 @@ package enum CapacityMeasure {
             let lnHeat = log(heat.factor(route) / heat.factor(classes[c].routes[ref]))
             if r == ref { return Estimate(mean: 0, sd: 0, measured: true) }
             let ls = pairs[c][r].logRatios
-            guard !ls.isEmpty else { return Estimate(mean: lnHeat, sd: settings.unmeasuredSigma, measured: false) }
+            guard !ls.isEmpty else {
+                let (mean, sd) = borrowed(route.id)
+                return Estimate(mean: mean + lnHeat, sd: sd, measured: false)
+            }
             let n = Double(ls.count)
             let mid = median(ls)
             let mad = 1.4826 * median(ls.map { abs($0 - mid) })
@@ -418,11 +461,13 @@ package enum CapacityMeasure {
         }
         let threshold = settings.epsilon / Double(max(withRivals.count, 1))
 
-        /// Every route still in play has its `minRatios` (the chosen one, and the open rivals).
+        /// Every route measured and still in play has its `minRatios` (the chosen one, and the open rivals). A rival never
+        /// measured here is judged by its borrowed prior, through the loss.
         func thin(_ u: Int, chosen: Int) -> Bool {
             let c = units[u].c
             return (rivals(u, excluding: chosen) + [chosen]).contains { r in
-                r != refs[c] && pairs[c][r].state == .open && pairs[c][r].logRatios.count < settings.minRatios
+                let n = pairs[c][r].logRatios.count
+                return r != refs[c] && pairs[c][r].state == .open && n > 0 && n < settings.minRatios
             }
         }
 
@@ -430,6 +475,10 @@ package enum CapacityMeasure {
         func stepCost(_ c: Int, _ r: Int) -> Double {
             let p = pairs[c][r]
             if let a = p.a.last, let b = p.b.last { return a + b }
+            if let ref = refs[c], let t = pairs[c].flatMap(\.a).last {
+                let b = t * exp(estimate(c, r).mean - log(heat.factor(classes[c].routes[r]) / heat.factor(classes[c].routes[ref])))
+                return (p.a.isEmpty ? 2 * t : t) + b
+            }
             return 3 * longestRun
         }
 
@@ -469,10 +518,12 @@ package enum CapacityMeasure {
                 } else if pairs[c][chosen].state == .open {
                     target = chosen            // the reference is the only rival left: sharpen the chosen one
                 } else { continue }
-                if best == nil || loss > best!.loss { best = (c, loss, target) }
+                let cost = stepCost(c, target)
+                if clock.now() - start + cost > settings.budget { exhausted = true; continue }
+                let rate = loss / max(cost, 1e-9)
+                if best == nil || rate > best!.loss { best = (c, rate, target) }
             }
             guard let pick = best else { break }
-            if clock.now() - start + stepCost(pick.c, pick.r) > settings.budget { exhausted = true; break }
             step(pick.c, pick.r)
         }
 

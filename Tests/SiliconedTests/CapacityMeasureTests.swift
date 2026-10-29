@@ -118,16 +118,18 @@ final class CapacityMeasureTests: XCTestCase {
 
     // MARK: 3. a hole
 
-    /// A class with no ANE timing changes nothing for the others (same noise per run, whatever the order).
+    /// A class with no ANE timing changes no other class's decision (its figures move a little: a route not measured at a
+    /// point borrows from the others, and the allocation follows).
     func testAHoleVetoesNothing() {
+        func same(_ a: CM.Decision, _ b: CM.Decision) { XCTAssertEqual(a.chosen, b.chosen); XCTAssertEqual(a.status, b.status) }
         var base: [[Double?]] = [[0.1, 0.09, 0.06], [0.08, 0.06, 0.075], [0.07, 0.08, 0.05]]
         let cls = classes([0.4, 0.3, 0.3])
         var settings = CM.Settings(); settings.budget = 200
         let whole = plan(cls, Sim(base: base, noise: 0.02), settings: settings)
         base[1][2] = nil
         let holed = plan(cls, Sim(base: base, noise: 0.02), settings: settings)
-        XCTAssertEqual(whole.decisions[0], holed.decisions[0])
-        XCTAssertEqual(whole.decisions[2], holed.decisions[2])
+        same(whole.decisions[0], holed.decisions[0])
+        same(whole.decisions[2], holed.decisions[2])
         XCTAssertEqual(whole.decisions[0].chosen, "gpu+ane")
         XCTAssertEqual(holed.decisions[1].chosen, "gpu+amx", "the other route of the holed class still decides")
         XCTAssertNil(holed.decisions[1].hotRatios[2])
@@ -136,7 +138,7 @@ final class CapacityMeasureTests: XCTestCase {
         wrong[0].routes[2].correct = false
         let judged = plan(wrong, Sim(base: base, noise: 0.02), settings: settings)
         XCTAssertNotEqual(judged.decisions[0].chosen, "gpu+ane")
-        XCTAssertEqual(judged.decisions[2], holed.decisions[2])
+        same(judged.decisions[2], holed.decisions[2])
     }
 
     // MARK: 4. budget
