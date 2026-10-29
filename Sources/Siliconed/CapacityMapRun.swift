@@ -23,8 +23,15 @@ import MetalPerformanceShadersGraph
 /// What sets it apart — what a probe written by analogy with the old stages would get wrong:
 ///
 ///   - **A probe returns a duration it has already warmed**: the first call of a route on a class builds pipelines,
-///     compiles a Core ML program, wires pages. That call is an untimed run that is also the judged one; the ratio the
-///     plan sees is steady state. A route that comes after its ANE engine was released and rebuilt (`generation`) warms again.
+///     compiles a Core ML program, wires pages. That call runs untimed, and its run is the judged one; the ratio the
+///     plan sees is steady state. A product is steady after one run (its first timed run within 1 % of its later median,
+///     55 routes of a map); **an attention is not**: an MPSGraph graph at 1 024 rows still takes ×1.5–1.75 its steady
+///     time on the run after its first (10.0 then 5.7 ms), so an attention runs until a run is no longer `steadyGain`
+///     faster than the one before, and that steady run is its figure (`warm`; the same rule on the products cost a map
+///     8 of its 60 seconds, and an extra timed run after it 4.5 seconds of attentions). A route that
+///     comes after its ANE engine was released and rebuilt (`generation`), or an attention whose objects were dropped for
+///     another class's, warms again: a rebuilt graph timed cold read 25.8 ms against 11.6 steady, and a split at 0.41 of
+///     it where it is 0.67 (one map orange).
 ///   - **A product's time is its run plus its weight's preparation**: the widened routes (GPU, AMX, ANE, the three) pay
 ///     the widening of `k · n` values at the CPU's measured rate, the native ones (`gpu/bf16`, `gpu/int8`…) the copy —
 ///     today's rule ("tensor + copy against the better + widening") as one number per route. A constant, so it
@@ -54,6 +61,24 @@ extension Diagnostic {
         let ok = body()
         let wall = Double(DispatchTime.now().uptimeNanoseconds - begin) * 1e-9
         return ok ? wall : nil
+    }
+
+    /// What a warm-up run must no longer gain on the one before it to be steady, and the most runs it takes.
+    static let steadyGain = 0.10
+    static let warmRuns = 4
+
+    /// **Runs `body` until it is at its steady state** (`steadyGain`, at most `warmRuns` times): the seconds of the runs before
+    /// the last, and the last's when it gained less than `steadyGain` on the one before — a steady run, the probe's figure
+    /// (a warm-up that ends steady costs what one untimed run and a timed one did). `nil` when a run reports a refusal.
+    private static func warm(_ body: () -> Bool) -> (untimed: Double, steady: Double?)? {
+        var last = Double.infinity, spent = 0.0
+        for _ in 0..<warmRuns {
+            guard let t = timed(body) else { return nil }
+            if t >= last * (1 - steadyGain) { return (spent, t) }
+            spent += t
+            last = t
+        }
+        return (spent, nil)
     }
 
     /// **The median of `runs` timed executions after two warm-ups, and its relative standard error** (1.253 · σ / √n,
@@ -468,7 +493,8 @@ extension Diagnostic {
             bench.gauge.mark("routes", "\(entries[c].id) \(route)")
             return autoreleasepool { () -> Double? in
                 guard let buffers = try? attentionBuffersFor(maxFloats: s * h * d) else { return nil }
-                if attentionObjects?.c != c { attentionObjects = (c, nil, nil, nil) }
+                // Another class's objects are dropped: this class's are built again, and warmed again.
+                if attentionObjects?.c != c { attentionObjects = (c, nil, nil, nil); states[c].warmed = [:] }
                 let out = attentionPages!.out.floats()
                 let rows = sampleRows(s, count: sampledQueries)
                 let run: () -> Bool
@@ -500,9 +526,12 @@ extension Diagnostic {
                 let width = h * d
                 let judged = states[c].verdict[route]
                 let warmed = states[c].warmed[route] ?? 0
+                var steady: Double?
                 if warmed == 0 || judged == nil {
                     for row in rows { (out + row * width).update(repeating: .nan, count: width) }
-                    _ = run()
+                    let warm = Diagnostic.warm(run)
+                    warmSeconds += warm?.untimed ?? 0
+                    steady = warm?.steady
                     states[c].warmed[route] = generation
                     if judged == nil {
                         let began = DispatchTime.now().uptimeNanoseconds
@@ -523,7 +552,7 @@ extension Diagnostic {
                     }
                 }
                 if states[c].verdict[route] == false { return nil }
-                return Diagnostic.timed(run)
+                return steady ?? Diagnostic.timed(run)
             }
         }
 

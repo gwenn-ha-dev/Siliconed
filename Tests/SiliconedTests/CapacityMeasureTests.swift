@@ -165,6 +165,38 @@ final class CapacityMeasureTests: XCTestCase {
         XCTAssertEqual(starved.decisions.map(\.status), [.open, .unmeasured])
     }
 
+    /// **Out of budget, an open decision keeps the route of least expected loss** (29/10, a map orange): an attention whose
+    /// flash surely beats the graph (×0.78, quiet) and whose split is faster still but noisy (×0.4, ×1.1, ×0.75 in turn).
+    /// The split cannot be sure in a few pairs; falling back to the graph lost the whole gap the flash was known to win.
+    func testOutOfBudgetKeepsTheLeastLoss() {
+        final class Fixed: CM.Clock {
+            var t = 0.0, splits = 0
+            func now() -> Double { t }
+            func probe(_ r: Int) -> Double {
+                let d: Double
+                switch r {
+                case 0: d = 0.010
+                case 1: d = 0.0078
+                default: d = [0.004, 0.011, 0.0075][splits % 3]; splits += 1
+                }
+                t += d
+                return d
+            }
+        }
+        let graph = CM.Route("graph", engines: ["gpu"]), flash = CM.Route("flash", engines: ["gpu"])
+        let split = CM.Route("split", engines: ["gpu", "cpu"])
+        let cls = [CM.ComputeClass("attention", weight: 1, routes: [graph, flash, split])]
+        for budget in [0.12, 0.16, 0.2] {
+            var settings = CM.Settings(); settings.budget = budget
+            let clock = Fixed()
+            let d = CM.plan(classes: cls, settings: settings, clock: clock) { _, r in clock.probe(r) }.decisions[0]
+            XCTAssertEqual(d.status, .open, "budget \(budget)")
+            XCTAssertNotEqual(d.chosen, "graph", "budget \(budget): the flash is known to win ×0.78")
+            // The graph would lose the flash's sure 0.25 in log and most of the split's: about 0.5.
+            XCTAssertLessThan(d.loss, 0.15, "budget \(budget)")
+        }
+    }
+
     func testDeterministic() {
         let base: [[Double?]] = [[0.1, 0.09, 0.08], [0.07, 0.08, 0.06]]
         let cls = classes([0.6, 0.4])

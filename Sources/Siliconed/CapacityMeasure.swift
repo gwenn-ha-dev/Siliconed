@@ -70,8 +70,11 @@ import Foundation
 ///     regime would give less; that is the L3's to decide, with the cuts.)
 ///   - **A first lap that loses clearly closes the route** (`giveUp`, 1.5 × the reference's time: today's
 ///     `weightPathGiveUp`): one ratio is the figure, the budget goes on.
-///   - **Out of budget, what is open falls back to the simplest route** unless the chosen one beats it
-///     with `confidence` (95 %); the residual loss says what that costs.
+///   - **Out of budget, what is open takes the route of least expected loss** — the rule's choice, the simplest route or
+///     another candidate, the rule's choice on a tie; the residual loss says what that costs. Falling back to the simplest route
+///     unless the choice was sure (95 %) sent an attention whose flash surely beats the graph (0.783 ± 0.044) back to the
+///     graph because the split, faster still, was not sure (0.725 ± 0.26): 0.58 of the class's weight lost where keeping
+///     the choice lost 0.085, and the map orange.
 ///   - **A route judged wrong, or a hole (the probe says `nil`), is not a candidate for that class** — and for
 ///     no other: a missing measure is never a global veto (the others' priors only lose a source).
 ///   - Deterministic: the order of steps depends on the numbers only (ties by index).
@@ -175,7 +178,6 @@ package enum CapacityMeasure {
         package var unmeasuredSigma = 0.5
         /// Prior spread of a route's log-ratio from one point to another (log units), for a route not measured at a point.
         package var between = 0.2
-        package var confidence = 0.95
         /// Ratios per route: past it, a route is closed.
         package var maxRatios = 80
         /// A route is not closed on fewer ratios: one has no dispersion, and a lucky first lap is not a figure.
@@ -548,11 +550,11 @@ package enum CapacityMeasure {
             var status = Status.closed
             if withRivals.contains(u), loss > threshold || thin(u, chosen: rule) {
                 status = .open
-                // Sure enough to keep the rule's choice? P(it beats the reference by `tie`).
-                let est = viewEstimate(u, rule)
-                let sure = rule != ref && est.sd > 0
-                    && bigPhi((log(1 - settings.tie) - est.mean) / est.sd) >= settings.confidence
-                if !sure { chosen = ref; loss = decisionLoss(u, chosen: ref) }
+                // Out of measures: the candidate of least expected loss, the rule's choice on a tie.
+                for r in candidates(c) where r != rule && view.routes.contains(r) {
+                    let l = decisionLoss(u, chosen: r)
+                    if l < loss { chosen = r; loss = l }
+                }
             }
             let cand = Set(candidates(c)).intersection(view.routes)
             if !cand.contains(where: { $0 != ref }), withRivals.contains(u) { status = .unmeasured }
