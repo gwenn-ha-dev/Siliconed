@@ -196,18 +196,17 @@ private struct ReportView: View {
                 .textSelection(.enabled)
     }
 
-    /// **What the map decided** (schema 13): the share of a render each route takes — GPU alone, with the AMX, the Neural
+    /// **What the map decided** (schema 14): the share of the grid each route takes — GPU alone, with the AMX, the Neural
     /// Engine, the three, the weight read as published, the attention kernels —, then whether it is complete.
     @ViewBuilder private func routes(_ map: Diagnostic.MapResult) -> some View {
         let shares = Dictionary(map.classes.compactMap { c in c.chosen.map { ($0, c.weight) } }, uniquingKeysWith: +)
-        let covered = 1 - map.tail
         VStack(alignment: .leading, spacing: 6) {
             Text("What this Mac uses").font(.headline)
             Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 5) {
                 ForEach(shares.sorted { ($1.value, $0.key) < ($0.value, $1.key) }, id: \.key) { route, weight in
                     GridRow {
                         Text(verbatim: route).foregroundStyle(.secondary)
-                        Text(verbatim: String(format: "%.0f %%", 100 * weight / max(covered, 1e-9))).monospacedDigit()
+                        Text(verbatim: String(format: "%.0f %%", 100 * weight)).monospacedDigit()
                     }
                 }
             }

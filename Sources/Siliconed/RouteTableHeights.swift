@@ -99,11 +99,15 @@ extension RouteTable {
         package var paths: [Int: WeightPath]
     }
 
-    private struct WeightGroup: Hashable {
-        var phase: CapacityClasses.Phase
-        var kind: WeightKind
-        var k: Int
-        var n: Int
+    /// A weight prepared once: its phase, its form and its shape.
+    package struct WeightGroup: Hashable, Sendable {
+        package var phase: CapacityClasses.Phase
+        package var kind: WeightKind
+        package var k: Int
+        package var n: Int
+        package init(phase: CapacityClasses.Phase, kind: WeightKind, k: Int, n: Int) {
+            self.phase = phase; self.kind = kind; self.k = k; self.n = n
+        }
     }
 
     /// Per group: its heights and the FLOP each carries over all the families.
@@ -119,7 +123,12 @@ extension RouteTable {
 
     /// **The weights the table would read in two forms** at the heights of `classes`.
     package func weightPathConflicts(for classes: [CapacityClasses.Class]) -> [WeightPathConflict] {
-        Self.weightGroups(classes).compactMap { group, heights in
+        weightPathConflicts(groups: Self.weightGroups(classes))
+    }
+
+    /// The same, over groups given with the weight each height carries.
+    package func weightPathConflicts(groups: [WeightGroup: [Int: Double]]) -> [WeightPathConflict] {
+        groups.compactMap { group, heights in
             let paths = Dictionary(uniqueKeysWithValues: heights.keys.map {
                 ($0, products.weight(group.kind, k: group.k, n: group.n, m: $0).path)
             })
@@ -131,9 +140,13 @@ extension RouteTable {
     /// **Pins each conflicting weight to the path of its heaviest height** (ties: the taller), at every height of the
     /// group, keeping at each height the activation rounding the table gave when its path is the pinned one.
     package mutating func unifyWeightPaths(for classes: [CapacityClasses.Class]) {
-        let groups = Self.weightGroups(classes)
+        unifyWeightPaths(groups: Self.weightGroups(classes))
+    }
+
+    /// The same, over groups given with the weight each height carries (the capacity map's grid: its points' rows).
+    package mutating func unifyWeightPaths(groups: [WeightGroup: [Int: Double]]) {
         var pins: [WeightRule] = []
-        for conflict in weightPathConflicts(for: classes) {
+        for conflict in weightPathConflicts(groups: groups) {
             let group = WeightGroup(phase: conflict.phase, kind: conflict.kind, k: conflict.k, n: conflict.n)
             guard let heights = groups[group],
                   let heaviest = heights.max(by: { ($0.value, $0.key) < ($1.value, $1.key) })?.key,

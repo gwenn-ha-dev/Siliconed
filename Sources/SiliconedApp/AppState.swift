@@ -526,8 +526,7 @@ final class AppState {
         // with a current map: the app builds only one `AppState` (see `App.swift`). Without one (none yet,
         // or one of another Mac, macOS or build: an update), the settings stay unread until the measure
         // the first render starts (`next`).
-        // An orange map (not complete: its minute, its memory or a route judged wrong), one that misses an
-        // installed family, or one the last render doubted (`RenderLoop.launching`) is measured again at the
+        // An orange map (not complete: its minute, its memory or a route judged wrong), or one the last render doubted (`RenderLoop.launching`) is measured again at the
         // next launch, whatever the heat: a fanless Mac is never at rest after a minute of load, and the map
         // judges at the hot regime anyway. Once per orange map: one orange again for a lasting cause serves
         // until the next (`retriedMapKey`).
@@ -536,7 +535,7 @@ final class AppState {
         let doubted = Self.actOnRenderNote(&stored)
         storedMap = stored
         if let stored, stored.isCurrent {
-            let orange = !stored.isGreen || !stored.covers(Set(installedFamilies.map(\.rawValue)))
+            let orange = !stored.isGreen
             if doubted || (orange && stored.date != UserDefaults.standard.string(forKey: Self.retriedMapKey)) {
                 remeasuringOrange = true
             } else {
@@ -548,9 +547,6 @@ final class AppState {
     }
 
     // MARK: Capacity map
-
-    /// The families of the models installed (not the imported ones): what the map decides for.
-    var installedFamilies: Set<Family> { Set(cards.filter { readySet.contains($0.id) && !$0.isImported }.map(\.family)) }
 
     /// **The capacity map, in the app's preferences** (`Diagnostic.Report`, its JSON): what the engine
     /// branches on (`CapacityRules.swift`). **No render without one** (the user, 18/10/2026): the defaults

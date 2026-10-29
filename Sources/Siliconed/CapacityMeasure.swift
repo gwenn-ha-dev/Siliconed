@@ -12,10 +12,12 @@ import Foundation
 ///        │       τ̂ = median ℓᵢ,  σ̂ = 1.4826 · MAD(ℓ)  (shrunk to a prior),  SE = 1.253 σ̂ / √n  ⊕ drift residual
 ///        │       ln eᵣ = τ̂ + ln( heat(r) / heat(ref) )          e = hot time of r, ref = 1   (M4)
 ///        │
-///        ├─ the rule     the first efficient route within 90 % of the best (and faster than ref), else the
-///        │               simplest route that beats the one before it by more than `tie`
-///        ├─ the loss     L(c) = w · Σᵣ E[(ln e_chosen − ln eᵣ − slack)⁺],  eᵣ ~ LogNormal   (closed form)
-///        └─ the budget   next step → the class with the largest L, in it the route with the largest pair
+///        ├─ the views    a class decided several times on the same pairs (`View`): a subset of its routes, each with
+///        │               seconds added to a run — eᵥ = (eᵣ·T + pᵣ) / (T + p_ref), T the reference's hot run
+///        ├─ the rule     per view: the first efficient route within 90 % of the best (and faster than ref), else
+///        │               the simplest route that beats the one before it by more than `tie`
+///        ├─ the loss     L(v) = w · Σᵣ E[(ln e_chosen − ln eᵣ − slack)⁺],  eᵣ ~ LogNormal   (closed form)
+///        └─ the budget   next step → the decision with the largest L, in it the route with the largest pair
 ///                        loss (or the chosen one when its own SE is the larger); stop at ε or at the budget
 ///
 /// What sets it apart — what a version written by analogy with "median of three, then a margin" would get
@@ -86,9 +88,46 @@ package enum CapacityMeasure {
         /// Its expected share of the render time (any scale: normalised by the sum).
         package var weight: Double
         package var routes: [Route]
+        /// The decisions taken on its measurements (`View`); empty: one, over every route, under the class's id.
+        package var views: [View]
 
-        package init(_ id: String, weight: Double, routes: [Route]) {
-            self.id = id; self.weight = weight; self.routes = routes
+        package init(_ id: String, weight: Double, routes: [Route], views: [View] = []) {
+            self.id = id; self.weight = weight; self.routes = routes; self.views = views
+        }
+
+        /// Its decisions, the implicit one included.
+        package var decisions: [View] { views.isEmpty ? [View(id, routes: Array(routes.indices))] : views }
+
+        /// **Each decision as a class of its own**: its id, its share of the class's weight, its routes — what a plan's
+        /// decisions are read against (`RouteTable.init(plan:classes:…)`).
+        package var decisionClasses: [ComputeClass] {
+            let views = decisions
+            return views.map { v in ComputeClass(v.id, weight: weight / Double(views.count), routes: v.routes.map { routes[$0] }) }
+        }
+    }
+
+    /// **One decision over some of a class's routes, each with seconds of its own added to a run** — the same product
+    /// timed once on the engines, decided for each form its weight can be published in. A weight's form changes only what
+    /// is done before the engines (widened to fp32, or copied as published: `extra`), never what they compute; timing
+    /// the engines once per form measured the same hardware three times.
+    ///
+    /// Its ratio to the reference is the class's measured one with the extras added to both sides at the hot regime:
+    /// `(e·T + pᵣ) / (T + p_ref)`, `T` the reference's hot run, and its log spread the class's times `e·T / (e·T + pᵣ)` (a
+    /// constant added to a time dilutes its noise). With no extra it is the class's own ratio, unchanged.
+    package struct View: Sendable, Equatable {
+        package var id: String
+        /// Indices into the class's routes, in their order; the class's reference must be among them.
+        package var routes: [Int]
+        /// Seconds each of `routes` adds to a run (empty: none).
+        package var extra: [Double]
+
+        package init(_ id: String, routes: [Int], extra: [Double] = []) {
+            self.id = id; self.routes = routes; self.extra = extra
+        }
+
+        func extra(_ route: Int) -> Double {
+            guard let i = routes.firstIndex(of: route), extra.indices.contains(i) else { return 0 }
+            return extra[i]
         }
     }
 
@@ -241,16 +280,17 @@ package enum CapacityMeasure {
     /// witnesses can only be read then), and replaces `heat` for the decisions, the losses and the ratios of the plan:
     /// the pairs were measured cold-to-warm, the table is for the regime of a render of several minutes. The seconds
     /// it takes belong to the caller's reserve of the budget.
-    /// `extraWeight`: the weight of what the plan is not given (the classes under the cut), so that a loss is a
-    /// fraction of the whole render and not of the part decided here.
     package static func plan(classes: [ComputeClass], heat startHeat: Heat = Heat(), witness: Witness = Witness(),
-                             settings: Settings = Settings(), extraWeight: Double = 0, finalHeat: (() -> Heat)? = nil,
+                             settings: Settings = Settings(), finalHeat: (() -> Heat)? = nil,
                              clock: Clock, probe: Probe) -> Plan {
         let start = clock.now()
         var heat = startHeat
-        let total = max(classes.map(\.weight).reduce(0, +) + extraWeight, 1e-12)
-        let weights = classes.map { $0.weight / total }
+        let total = max(classes.map(\.weight).reduce(0, +), 1e-12)
         let refs: [Int?] = classes.map { $0.routes.firstIndex(where: \.correct) }
+        // The decisions: a class's measurements, decided once per view. A view without the class's reference decides nothing.
+        let units: [(c: Int, view: View)] = classes.indices.flatMap { c in classes[c].decisions.map { (c, $0) } }
+        let weights = units.map { classes[$0.c].weight / total / Double(classes[$0.c].decisions.count) }
+        let unitRef: [Int?] = units.map { u in refs[u.c].flatMap { u.view.routes.contains($0) ? $0 : nil } }
         var pairs: [[Pair]] = classes.map { Array(repeating: Pair(), count: $0.routes.count) }
         var runs = Array(repeating: 0, count: classes.count)
         var longestRun = 0.0
@@ -267,7 +307,23 @@ package enum CapacityMeasure {
             return t
         }
 
+        // The estimates move only when their class is measured or the regime changes: kept until then (the loop asks every
+        // decision's every rival at each step — recomputed, the medians cost a debug build seconds per simulated map).
+        var estimates: [[Estimate?]] = classes.map { $0.routes.map { _ in nil } }
+        var referenceRuns: [Double?] = classes.map { _ in nil }
+        func forget(_ c: Int) {
+            estimates[c] = estimates[c].map { _ in nil }
+            referenceRuns[c] = nil
+        }
+
         func estimate(_ c: Int, _ r: Int) -> Estimate {
+            if let e = estimates[c][r] { return e }
+            let e = measuredEstimate(c, r)
+            estimates[c][r] = e
+            return e
+        }
+
+        func measuredEstimate(_ c: Int, _ r: Int) -> Estimate {
             guard let ref = refs[c] else { return Estimate(mean: 0, sd: 0, measured: false) }
             let route = classes[c].routes[r]
             let lnHeat = log(heat.factor(route) / heat.factor(classes[c].routes[ref]))
@@ -300,24 +356,49 @@ package enum CapacityMeasure {
             }
         }
 
-        /// The rule, on the estimates' means.
-        func choose(_ c: Int) -> Int? {
-            guard refs[c] != nil else { return nil }
-            let cand = Set(candidates(c))
-            let ratios: [Double?] = classes[c].routes.indices.map { cand.contains($0) ? exp(estimate(c, $0).mean) : nil }
-            return CapacityMeasure.rule(ratios: ratios, efficient: classes[c].routes.map(\.efficient), settings: settings)
+        /// The reference's hot run, seconds: the median of its runs at the regime (`nil` before it ran).
+        func referenceHot(_ c: Int) -> Double? {
+            guard let ref = refs[c] else { return nil }
+            if referenceRuns[c] == nil {
+                let a = pairs[c].flatMap(\.a)
+                if !a.isEmpty { referenceRuns[c] = median(a) }
+            }
+            return referenceRuns[c].map { $0 * heat.factor(classes[c].routes[ref]) }
         }
 
-        /// The routes that can still be a rival: not wrong, not a hole, not lost (nor the reference).
-        func rivals(_ c: Int, excluding chosen: Int) -> [Int] {
-            classes[c].routes.indices.filter { r in
+        /// A route's estimate in a decision: the class's, with the view's extras added at the hot regime (`View`).
+        func viewEstimate(_ u: Int, _ r: Int) -> Estimate {
+            let (c, view) = units[u]
+            let e = estimate(c, r)
+            guard let ref = refs[c] else { return e }
+            let (pr, p0) = (view.extra(r), view.extra(ref))
+            guard pr != 0 || p0 != 0, let t = referenceHot(c) else { return e }
+            let time = exp(e.mean) * t
+            return Estimate(mean: log((time + pr) / (t + p0)), sd: e.sd * time / (time + pr), measured: e.measured)
+        }
+
+        /// The rule, on the estimates' means, among the decision's routes (a class's route index).
+        func choose(_ u: Int) -> Int? {
+            guard unitRef[u] != nil else { return nil }
+            let (c, view) = units[u]
+            let cand = Set(candidates(c))
+            let ratios: [Double?] = view.routes.map { cand.contains($0) ? exp(viewEstimate(u, $0).mean) : nil }
+            return CapacityMeasure.rule(ratios: ratios, efficient: view.routes.map { classes[c].routes[$0].efficient },
+                                        settings: settings).map { view.routes[$0] }
+        }
+
+        /// The routes of a decision that can still be a rival: not wrong, not a hole, not lost (nor the reference).
+        func rivals(_ u: Int, excluding chosen: Int) -> [Int] {
+            let (c, view) = units[u]
+            return view.routes.filter { r in
                 r != chosen && classes[c].routes[r].correct
                     && (r == refs[c] || (pairs[c][r].state == .open || pairs[c][r].state == .capped))
             }
         }
 
-        func pairLoss(_ c: Int, chosen: Int, rival r: Int) -> Double {
-            let ec = estimate(c, chosen), er = estimate(c, r)
+        func pairLoss(_ u: Int, chosen: Int, rival r: Int) -> Double {
+            let c = units[u].c
+            let ec = viewEstimate(u, chosen), er = viewEstimate(u, r)
             // The rule takes the first efficient route within the tolerance of the best — another efficient one included: the ANE
             // is kept against a three-engine route 5 % faster (the pair is the cooler of the two and the rule says so), so that gap
             // is no loss. Counting it as one left such a class open for the whole budget (a simulated map: 805 runs on one class).
@@ -326,19 +407,21 @@ package enum CapacityMeasure {
             return min(shortfall(mean: ec.mean - er.mean, sd: sd, slack: slack), 1)
         }
 
-        func classLoss(_ c: Int, chosen: Int?) -> Double {
+        func decisionLoss(_ u: Int, chosen: Int?) -> Double {
             guard let ch = chosen else { return 0 }
-            return weights[c] * rivals(c, excluding: ch).reduce(0) { $0 + pairLoss(c, chosen: ch, rival: $1) }
+            return weights[u] * rivals(u, excluding: ch).reduce(0) { $0 + pairLoss(u, chosen: ch, rival: $1) }
         }
 
-        let withRivals = classes.indices.filter { c in
-            refs[c] != nil && classes[c].routes.indices.contains { $0 != refs[c] && classes[c].routes[$0].correct }
+        let withRivals = units.indices.filter { u in
+            guard let ref = unitRef[u] else { return false }
+            return units[u].view.routes.contains { $0 != ref && classes[units[u].c].routes[$0].correct }
         }
         let threshold = settings.epsilon / Double(max(withRivals.count, 1))
 
         /// Every route still in play has its `minRatios` (the chosen one, and the open rivals).
-        func thin(_ c: Int, chosen: Int) -> Bool {
-            (rivals(c, excluding: chosen) + [chosen]).contains { r in
+        func thin(_ u: Int, chosen: Int) -> Bool {
+            let c = units[u].c
+            return (rivals(u, excluding: chosen) + [chosen]).contains { r in
                 r != refs[c] && pairs[c][r].state == .open && pairs[c][r].logRatios.count < settings.minRatios
             }
         }
@@ -352,6 +435,7 @@ package enum CapacityMeasure {
 
         func step(_ c: Int, _ r: Int) {
             guard let ref = refs[c] else { return }
+            defer { forget(c) }
             var p = pairs[c][r]
             if p.a.isEmpty {
                 guard let a = run(c, ref) else { for x in pairs[c].indices { pairs[c][x].state = .hole }; return }
@@ -361,6 +445,7 @@ package enum CapacityMeasure {
             guard let a = run(c, ref) else { p.state = .hole; pairs[c][r] = p; return }
             p.b.append(b); p.a.append(a)
             pairs[c][r] = p
+            forget(c)
             let e = estimate(c, r)
             if p.b.count == 1, exp(e.mean) > settings.giveUp { pairs[c][r].state = .lost }
             if p.b.count >= settings.maxRatios { pairs[c][r].state = .capped }
@@ -368,57 +453,62 @@ package enum CapacityMeasure {
 
         var exhausted = false
         while true {
-            // The open class with the largest expected loss.
-            var best: (c: Int, loss: Double, chosen: Int, r: Int)?
-            for c in withRivals {
-                guard let chosen = choose(c) else { continue }
-                let loss = classLoss(c, chosen: chosen)
-                if loss <= threshold, !thin(c, chosen: chosen) { continue }
+            // The open decision with the largest expected loss.
+            var best: (c: Int, loss: Double, r: Int)?
+            for u in withRivals {
+                guard let chosen = choose(u) else { continue }
+                let c = units[u].c
+                let loss = decisionLoss(u, chosen: chosen)
+                if loss <= threshold, !thin(u, chosen: chosen) { continue }
                 // In it, the rival with the largest pair loss; the chosen one when its own SE is larger.
-                let open = rivals(c, excluding: chosen).filter { pairs[c][$0].state == .open }
+                let open = rivals(u, excluding: chosen).filter { pairs[c][$0].state == .open }
                 var target: Int
-                if let rival = open.max(by: { pairLoss(c, chosen: chosen, rival: $0) < pairLoss(c, chosen: chosen, rival: $1) }) {
+                if let rival = open.max(by: { pairLoss(u, chosen: chosen, rival: $0) < pairLoss(u, chosen: chosen, rival: $1) }) {
                     target = rival
-                    if pairs[c][chosen].state == .open, estimate(c, chosen).sd > estimate(c, rival).sd { target = chosen }
+                    if pairs[c][chosen].state == .open, viewEstimate(u, chosen).sd > viewEstimate(u, rival).sd { target = chosen }
                 } else if pairs[c][chosen].state == .open {
                     target = chosen            // the reference is the only rival left: sharpen the chosen one
                 } else { continue }
-                if best == nil || loss > best!.loss { best = (c, loss, chosen, target) }
+                if best == nil || loss > best!.loss { best = (c, loss, target) }
             }
             guard let pick = best else { break }
             if clock.now() - start + stepCost(pick.c, pick.r) > settings.budget { exhausted = true; break }
             step(pick.c, pick.r)
         }
 
-        if let finalHeat { heat = finalHeat() }
+        if let finalHeat {
+            heat = finalHeat()
+            classes.indices.forEach(forget)
+        }
         var decisions: [Decision] = []
         var residual = 0.0
-        for (c, cls) in classes.enumerated() {
-            guard let ref = refs[c] else {
-                decisions.append(Decision(classID: cls.id, chosen: nil, status: .none, loss: 0,
-                                          hotRatios: cls.routes.map { _ in nil }, runs: runs[c],
-                                          spread: cls.routes.map { _ in nil }))
+        for u in units.indices {
+            let (c, view) = units[u]
+            let cls = classes[c]
+            guard let ref = unitRef[u] else {
+                decisions.append(Decision(classID: view.id, chosen: nil, status: .none, loss: 0,
+                                          hotRatios: view.routes.map { _ in nil }, runs: runs[c],
+                                          spread: view.routes.map { _ in nil }))
                 continue
             }
-            let rule = choose(c) ?? ref
+            let rule = choose(u) ?? ref
             var chosen = rule
-            var loss = classLoss(c, chosen: rule)
+            var loss = decisionLoss(u, chosen: rule)
             var status = Status.closed
-            if withRivals.contains(c), loss > threshold || thin(c, chosen: rule) {
+            if withRivals.contains(u), loss > threshold || thin(u, chosen: rule) {
                 status = .open
                 // Sure enough to keep the rule's choice? P(it beats the reference by `tie`).
-                let est = estimate(c, rule)
+                let est = viewEstimate(u, rule)
                 let sure = rule != ref && est.sd > 0
                     && bigPhi((log(1 - settings.tie) - est.mean) / est.sd) >= settings.confidence
-                if !sure { chosen = ref; loss = classLoss(c, chosen: ref) }
+                if !sure { chosen = ref; loss = decisionLoss(u, chosen: ref) }
             }
-            if !candidates(c).contains(where: { $0 != ref }), withRivals.contains(c) { status = .unmeasured }
-            let ratios: [Double?] = cls.routes.indices.map { r in
-                candidates(c).contains(r) ? exp(estimate(c, r).mean) : nil
-            }
+            let cand = Set(candidates(c)).intersection(view.routes)
+            if !cand.contains(where: { $0 != ref }), withRivals.contains(u) { status = .unmeasured }
+            let ratios: [Double?] = view.routes.map { r in cand.contains(r) ? exp(viewEstimate(u, r).mean) : nil }
             residual += loss
-            let spread: [Double?] = cls.routes.indices.map { r in candidates(c).contains(r) ? estimate(c, r).sd : nil }
-            decisions.append(Decision(classID: cls.id, chosen: cls.routes[chosen].id, status: status, loss: loss,
+            let spread: [Double?] = view.routes.map { r in cand.contains(r) ? viewEstimate(u, r).sd : nil }
+            decisions.append(Decision(classID: view.id, chosen: cls.routes[chosen].id, status: status, loss: loss,
                                       hotRatios: ratios, runs: runs[c], spread: spread))
         }
         return Plan(decisions: decisions, residualLoss: residual, spent: clock.now() - start, exhausted: exhausted)

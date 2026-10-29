@@ -55,8 +55,7 @@ extension AppState {
         guard let executable = Bundle.main.executableURL else { return }
         let process = Process()
         process.executableURL = executable
-        // The families installed: the minute goes to the classes of the models this Mac will render with (none installed: all five).
-        process.arguments = [CapacityMeasure.argument] + (installedFamilies.isEmpty ? [] : [installedFamilies.map(\.rawValue).sorted().joined(separator: ",")])
+        process.arguments = [CapacityMeasure.argument]
         let output = Pipe()
         process.standardOutput = output
         process.standardError = FileHandle.nullDevice
@@ -158,7 +157,7 @@ extension AppState {
 /// anything else (`SiliconedApplication.init`), says each stage and then the report on its standard
 /// output, one line each, and exits — no window, no Dock icon: it never reaches `NSApplication.run`.
 enum CapacityMeasure {
-    /// `--measure-capacity [family,family,…]`: the families the map decides for.
+    /// `--measure-capacity`: the map of this Mac, whatever models it holds.
     static let argument = "--measure-capacity"
 
     /// **The child's side**: does nothing unless the process was launched with `argument`; then never returns.
@@ -166,8 +165,7 @@ enum CapacityMeasure {
         guard CommandLine.arguments.dropFirst().first == argument else { return }
         setvbuf(stdout, nil, _IOLBF, 0)   // a stage line reaches the app as it is written
         do {
-            let named = CommandLine.arguments.dropFirst(2).first.map { $0.split(separator: ",").compactMap { Family(rawValue: String($0)) } } ?? []
-            let report = try Diagnostic.run(families: named.isEmpty ? Family.allCases : named) { stage in print("stage " + stage.key) }
+            let report = try Diagnostic.run { stage in print("stage " + stage.key) }
             let json = try report.json(pretty: false)
             print("report " + String(decoding: json, as: UTF8.self))
             exit(0)

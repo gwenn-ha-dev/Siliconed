@@ -74,7 +74,7 @@ package struct RouteTable: Codable, Sendable, Equatable {
     // MARK: - Products
 
     /// What a weight is, for the route: the form it is published in.
-    package enum WeightKind: String, Codable, Sendable { case bf16, int8, q8 }
+    package enum WeightKind: String, Codable, Sendable, CaseIterable { case bf16, int8, q8 }
 
     /// How a product reads its weight.
     package enum WeightPath: String, Codable, Sendable {
@@ -493,9 +493,10 @@ package struct RouteTable: Codable, Sendable, Equatable {
                     table.products.weights.insert(.init(kind: kind, path: path, roundsActivation: rounds, k: k, n: n,
                                                         minRows: m, maxRows: m), at: 0)
                 }
+                // Every decision pins its form, the widened one too: a shape no rule names borrows its nearest rule
+                // (`Nearest`), and a point left unpinned would lend a neighbour's form instead of its own.
                 switch form {
-                case nil:
-                    if table.products.weight(kind, k: k, n: n, m: m).path != .widened { pin(.widened) }
+                case nil: pin(.widened)
                 case "bf16": pin(.bf16)
                 case "bf16act": pin(.bf16, rounds: true)
                 default: pin(.native)

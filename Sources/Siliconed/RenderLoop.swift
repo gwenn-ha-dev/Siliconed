@@ -21,8 +21,9 @@ import Foundation
 ///     heaviest member's height. An attention is exact (S, heads, head dim), a self- and a cross-attention of Anima adding up.
 ///   - **The map stores ratios, not seconds.** A class's rate is the GPU witness's (the map's own, cold, at the start) divided
 ///     by the class's cold ratio to the GPU alone, which is the hot ratio the plan keeps undone of the regime
-///     (`hot · heat(reference) / heat(route)`); a height nobody measured takes the line through the two nearest measured
-///     ones, in `ln ratio` against `ln m` (what `RouteTable.interpolatedRoute` does for the choice), and a route nobody timed
+///     (`hot · heat(reference) / heat(route)`); a shape reads the heights of the nearest point of the map's grid within reach
+///     (`RouteTable.Nearest`, the point its route comes from), a height nobody measured takes the line through the two nearest
+///     measured ones, in `ln ratio` against `ln m` (what `RouteTable.interpolatedRoute` does for the choice), and a route nobody timed
 ///     takes the GPU alone's rate — each row says which (`Provenance`). The witness is one product (2 048×3 840×3 840): a
 ///     class whose GPU rate differs from it by shape (MPS runs 2.3 to 3.6 TFLOP/s over these shapes) carries that difference
 ///     into its row. The attention's reference rate is the map's reference ratio to a product's, not a measure of this Mac.
@@ -90,7 +91,9 @@ package enum RenderLoop {
                 let id = c.routeKey.id
                 guard measured[id] == nil else { continue }          // a self- and a cross-attention share one
                 let (group, x, ref) = Self.group(c.routeKey, c.weightKind ?? .bf16)
-                let anchors = groups[group] ?? []
+                // The map is a grid: a render's shape reads the nearest point's heights (`RouteTable.Nearest`), as its route does.
+                let near = groups[group] == nil ? Self.nearest(group, among: Array(groups.keys)) : group
+                let anchors = near.flatMap { groups[$0] } ?? []
                 var routes: Set<String> = [ref]
                 for a in anchors { routes.formUnion(a.cold.keys) }
                 let base: Double
@@ -99,13 +102,26 @@ package enum RenderLoop {
                 for r in routes {
                     let (ratio, provenance) = Self.ratio(of: r, at: x, in: anchors, reference: ref)
                     rates[r] = base / ratio
-                    how[r] = provenance
+                    how[r] = near == group ? provenance : max(provenance, .interpolated)
                 }
                 measured[id] = rates; sources[id] = how
             }
             self.sources = sources
             rates = CapacityClasses.Rates(product: [:], attention: Dictionary(uniqueKeysWithValues: CapacityClasses.attentionRoutes.map { ($0, attentionRate) }),
                                           measured: measured, fallback: gpuRate)
+        }
+
+        /// **The measured group nearest `group`**: the same kind (a product's weight form), the nearest shape within reach.
+        private static func nearest(_ group: String, among measured: [String]) -> String? {
+            func parse(_ g: String) -> (kind: String, a: Int, b: Int)? {
+                let parts = g.split(separator: "|").map(String.init)
+                guard parts.count >= 3, let b = Int(parts[parts.count - 1]), let a = Int(parts[parts.count - 2]) else { return nil }
+                return (parts.dropLast(2).joined(separator: "|"), a, b)
+            }
+            guard let own = parse(group) else { return nil }
+            let candidates = measured.compactMap { g in parse(g).flatMap { $0.kind == own.kind ? (g, $0.a, $0.b) : nil } }
+                .sorted { $0.0 < $1.0 }
+            return RouteTable.Nearest.rule(among: candidates, k: own.a, n: own.b, m: 0) { (($0.1, $0.2), 0, nil) }?.0
         }
 
         /// The group of classes whose heights interpolate (a product: weight kind, k, n; an attention: heads, head dim), the

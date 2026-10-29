@@ -23,17 +23,19 @@ English · [Français](RELEASE-NOTES.fr.md)
 ### The capacity map, rebuilt
 
 - **The map now chooses a route for each computation of a render**, not one switch for all: each
-  matrix product of each model at each height, each attention, on the GPU alone, beside the AMX,
-  beside the Neural Engine or the three, with the weights widened or read as published. On a Mac
-  where the Neural Engine wins, it is used where it wins.
+  matrix product at each height, each attention, on the GPU alone, beside the AMX, beside the Neural
+  Engine or the three, with the weights widened or read as published. On a Mac where the Neural
+  Engine wins, it is used where it wins.
+- **The map knows no model**: it measures a fixed grid of products and attentions that spans the
+  shapes every model is made of, the same on every Mac, whatever is installed. Installing, removing
+  or adding a model never asks for a new map, and a Mac with no model measures it whole.
 - **Any format, any shape**: a computation the map did not measure — a 1024×1536 image, an edit —
   takes the route of the nearest one it measured, and only a shape far from all of them stays on the
   GPU alone. Before, everything outside the measured formats ran on the GPU alone.
 - **Measured the way a render runs**: each route is timed against the simplest in alternation, so a
   Mac that heats up or runs on battery compares like with like; the routes are chosen at the warm
-  regime a render of a few minutes runs at, with one witness per engine. The minute goes first to the
-  computations that weigh most in your installed models' renders. Still no model needed, about a
-  minute.
+  regime a render of a few minutes runs at, with one witness per engine. A product is timed once on
+  the engines and decided for each form its weights can be published in. About a minute.
 - **Green when the measure is complete and right**, not when the Mac was at rest: heat, the battery
   and Low Power Mode are written beside the map, no longer a reason for it to be orange.
 - **Under the memory budget**: the map's own need is computed before its first product, as a

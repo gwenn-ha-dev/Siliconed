@@ -9,20 +9,20 @@ import Metal
 /// has (one report per user; `tools/aggregate_diagnostics.py` makes the table by chip), and, per machine, **which route each
 /// class of computation of a render takes** — the table the engine reads (`RouteTable`), nothing else of it is a switch.
 ///
-///     the classes of a render   CapacityMap.catalogue      every product k×n at its real height, every attention, of the families asked,
-///        │                                                  weight = share of the render, the maximum over the requests
+///     the grid                  CapacityMap.catalogue      seven products k×n and two attentions at 1 024 and 4 096 rows, the same on
+///        │                                                  every Mac and for every model; a product decided once per weight form
 ///        ├─ widening     the preparation rates: widen, copy — bf16, int8, Q8_0                                   (0.2 s)
 ///        ├─ witnesses    one fixed product on the GPU, the AMX and the ANE, median of five                       (1 s, twice)
 ///        ├─ the plan     CapacityMeasure.plan: pairs A B A B of two routes of a class, the seconds go to the class whose
 ///        │               decision costs most if it is wrong; a probe (`MapRun.probe`) runs a route once, judged against fp64
 ///        │               the first time, the cut of a pair balanced when the pair is first asked
-///        └─ the table    the choices as class rules over the grids of the cuts, completed to the heights nobody measured
+///        └─ the table    the choices as class rules over the grids of the cuts; a render's shape reads its nearest point
 ///
 /// What sets it apart — what a diagnostic written by analogy with the switches it replaces would get wrong:
 ///
-///   - **it judges the chip, never the weights.** The operands are synthetic, the same on every machine (xorshift by blocks of
-///     2¹⁶), and every product is a block's shape, read from the families' `Config` defaults (`CapacityClasses`). An 8-bit
-///     install could only fail a map that ran its model;
+///   - **it judges the chip, never the weights, and knows no model.** The operands are synthetic, the same on every machine
+///     (xorshift by blocks of 2¹⁶), and the shapes a lattice over the domain the models live in (`CapacityMap.gridShapes`):
+///     installing, removing or adding a model never changes the map, and a Mac with none measures it whole;
 ///   - **a route is decided per class, from pairs measured in turn** (`CapacityMeasure`): the drift of a Mac that heats cancels
 ///     in the ratio, and the table is decided at the regime of the map's end, read from a witness per engine
 ///     (`CapacityMap.EngineWitness`) — not at the cold start, and not through a margin taken from the drift;
@@ -47,7 +47,7 @@ import Metal
 ///
 /// **The engine reads it in the app, and only there**: the app measures before its first render when it holds no current map
 /// — none yet, one of another `Fingerprint` (hardware, chip, macOS build, the app's build: an update measures again), one
-/// that is not green or does not cover the families installed — and whenever the user asks (« Measure This Mac »). It keeps
+/// that is not green — and whenever the user asks (« Measure This Mac »). It keeps
 /// the report in its preferences and hands it to `EngineSettings.load(from:map:)`, which installs its table. The command line,
 /// the checks and the close-out never designate a map: today's defaults.
 package enum Diagnostic {
@@ -69,8 +69,10 @@ package enum Diagnostic {
     /// and their dispersion, the loss that stays, the seconds spent), `regime` (a witness per engine at the start and at
     /// the end, the heat that came out), `verdict` (green or orange and why), `memory` declared; the stages are
     /// `widening`, `witness`, `routes`, `regime`, and `products`, `cuts`, `aneCuts`, `lowPrecision`, `attention` are empty.
+    /// **14** (29/10/2026): the map knows no model — its classes are a fixed grid (`CapacityMap.catalogue`), a product's
+    /// decided once per weight form on the same pairs; `map.tail` and `map.families` are gone.
     /// A report of an older schema is not read by the engine (`isCurrent`).
-    package static let schema = 13
+    package static let schema = 14
     package static let repository = "https://github.com/gwenn-ha-dev/Siliconed"
 
     /// **The fp32 threshold**: the AMX check's (`siliconed-dev amx`), a row of an fp32 product or
@@ -110,14 +112,13 @@ package enum Diagnostic {
     /// another process refuses it: `renderAlreadyRunning`). `cancellation` is checked between two
     /// measurements (`cancelled`).
     ///
-    /// `families`: the families the map decides for (all five by default). The classes of what is not installed only
-    /// make the minute thinner for what is.
-    package static func run(families: [Family] = Family.allCases, cancellation: Cancellation? = nil,
+    /// It knows no model: the same grid on every Mac, whatever is installed (`CapacityMap`).
+    package static func run(cancellation: Cancellation? = nil,
                            onProgress: (@Sendable (_ stage: Stage) -> Void)? = nil) throws(EngineError) -> Report {
         dispatchPrecondition(condition: .notOnQueue(Engine.file))
         let result = Engine.file.sync {
             Result { () throws(EngineError) -> Report in
-                try runQueued(families: families, cancellation: cancellation, onProgress: onProgress)
+                try runQueued(cancellation: cancellation, onProgress: onProgress)
             }
         }
         return try result.get()

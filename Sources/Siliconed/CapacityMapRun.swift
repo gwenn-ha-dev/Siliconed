@@ -105,7 +105,7 @@ extension Diagnostic {
         var caps: CapacityMap.Capabilities
         var states: [State]
         /// Seconds per value: the weight's widening and its copy, by kind.
-        let widen: [RouteTable.WeightKind: (widened: Double, copied: Double)]
+        let preparation: CapacityMap.Preparation
 
         var workspace: Pages?
         var side: Side?
@@ -153,7 +153,7 @@ extension Diagnostic {
                 guard let r = widening.first(where: { $0.kind == kind })?.cpu.rate, r > 0 else { return 0 }
                 return 1e-9 / r
             }
-            widen = [.bf16: (per("bf16"), per("bf16 copy")), .int8: (per("int8 convrot"), per("int8 copy")),
+            preparation = [.bf16: (per("bf16"), per("bf16 copy")), .int8: (per("int8 convrot"), per("int8 copy")),
                      .q8: (per("q8_0"), per("q8_0 copy"))]
         }
 
@@ -331,12 +331,14 @@ extension Diagnostic {
             if cancelled { return nil }
             do { try bench.check() } catch { cancelled = true; return nil }
             switch entries[c].work {
-            case let .product(k, n, m, kind): return product(c, r, k: k, n: n, m: m, kind: kind)
+            case let .product(k, n, m): return product(c, r, k: k, n: n, m: m)
             case let .attention(s, heads, dim): return attention(c, r, sequence: s, heads: heads, headDim: dim)
             }
         }
 
-        private func product(_ c: Int, _ r: Int, k: Int, n: Int, m: Int, kind: RouteTable.WeightKind) -> Double? {
+        /// One run of a product's route, seconds — the engines' work alone: a weight's preparation is the view's
+        /// (`CapacityMap.Entry.compute(preparation:)`), added by the core.
+        private func product(_ c: Int, _ r: Int, k: Int, n: Int, m: Int) -> Double? {
             let route = entries[c].routes[r].id
             let parts = route.split(separator: "/").map(String.init)
             let engines = parts[0], form = parts.count > 1 ? parts[1] : nil
@@ -456,14 +458,7 @@ extension Diagnostic {
                 }
             }
             if states[c].verdict[route] == false { return nil }
-            guard let wall = Diagnostic.timed(run) else { return nil }
-            return wall + prepare(kind, form: form, values: k * n)
-        }
-
-        /// **A weight's preparation, seconds**: widened to fp32 for the engines that read it so, copied for the native forms.
-        private func prepare(_ kind: RouteTable.WeightKind, form: String?, values: Int) -> Double {
-            guard let rate = widen[kind] else { return 0 }
-            return Double(values) * (form == nil ? rate.widened : rate.copied)
+            return Diagnostic.timed(run)
         }
 
         // MARK: Attention
@@ -618,7 +613,7 @@ extension Diagnostic {
         }
     }
 
-    static func runQueued(families: [Family], cancellation: Cancellation?, onProgress: (@Sendable (_ stage: Stage) -> Void)?) throws(EngineError) -> Report {
+    static func runQueued(cancellation: Cancellation?, onProgress: (@Sendable (_ stage: Stage) -> Void)?) throws(EngineError) -> Report {
         let started = Date()
         let clock = WallClock()
         let t0 = clock.now()
@@ -634,13 +629,12 @@ extension Diagnostic {
         let settings = EngineSettings.effective
         let limits = CapacityMap.Limits(amxRows: settings.amxMinimumRows, aneRows: settings.aneMinimumRows,
                                         roundingRows: settings.bf16ActivationMinimumRows)
-        // The memory, before the first computation: the classes with every engine assumed present (the largest need).
+        // The memory, before the first computation: the grid with every engine assumed present (the largest need).
         let everything = CapacityMap.Capabilities(amx: true, ane: true, bf16Weights: true, bf16Rounding: true, int8Weights: true,
                                                   q8Weights: true, flash: true, headSplit: true)
-        let requests = CapacityMap.requests(families: families)
-        let widest = CapacityMap.catalogue(requests: requests, caps: everything, limits: limits)
+        let widest = CapacityMap.catalogue(caps: everything, limits: limits)
         let plan = try Plan.choose(budget: MemoryBudget.machineCeiling(), base: gauge.base) {
-            CapacityMap.need(entries: widest.entries, allotment: $0)
+            CapacityMap.need(entries: widest, allotment: $0)
         }
         let before = conditions()
         var stages: [String: Double] = [:]
@@ -660,19 +654,20 @@ extension Diagnostic {
             lap = clock.now()
             let alone = try GEMM(freezeCut: true, coexecution: false, tensorWeights: true, bf16Activations: true)
             let both = try GEMM(freezeCut: true, coexecution: true, tensorWeights: false, int8Weights: true, q8Weights: true)
-            let operands = Operands(Operands.sizes(products: CapacityMap.products(widest.entries)))
+            let operands = Operands(Operands.sizes(products: CapacityMap.products(widest)))
             let caps = CapacityMap.Capabilities(amx: both.conductor != nil, ane: true, bf16Weights: alone.tensorBF16,
                                                 bf16Rounding: alone.bf16Activations, int8Weights: both.tensorInt8, q8Weights: both.tensorQ8,
                                                 flash: flashAvailable(bench), headSplit: true)
-            let run = try MapRun(bench: bench, entries: widest.entries, operands: operands, allotment: plan.aneAllotment, caps: caps,
+            let run = try MapRun(bench: bench, entries: widest, operands: operands, allotment: plan.aneAllotment, caps: caps,
                                  alone: alone, both: both, widening: widening)
             gauge.mark("routes", "witness")
             let first = run.witnesses()
             let witnessSeconds = clock.now() - lap
             stages["witness"] = witnessSeconds
             // What exists here: the engines that answered, the kernels that were built.
-            let catalogue = CapacityMap.catalogue(requests: requests, caps: run.caps, limits: limits)
-            run.restrict(to: catalogue.entries)
+            let entries = CapacityMap.catalogue(caps: run.caps, limits: limits)
+            run.restrict(to: entries)
+            let classes = entries.map { $0.compute(preparation: run.preparation) }
 
             // ── the plan: 60 s of wall for everything, minus what the end needs ──
             var measuring = CapacityMeasure.Settings()
@@ -681,7 +676,7 @@ extension Diagnostic {
             var last: [String: (seconds: Double, error: Double)] = [:]
             onProgress?(.routes)
             lap = clock.now()
-            let result = CapacityMeasure.plan(classes: catalogue.entries.map(\.compute), settings: measuring, extraWeight: catalogue.tail, finalHeat: {
+            let result = CapacityMeasure.plan(classes: classes, settings: measuring, finalHeat: {
                 onProgress?(.regime)
                 run.releaseAttention()
                 gauge.mark("routes", "witness end")
@@ -698,26 +693,27 @@ extension Diagnostic {
             gauge.finish()
 
             // ── the table ──
-            let table = CapacityMap.table(plan: result, catalogue: catalogue,
+            let table = CapacityMap.table(plan: result, entries: entries, classes: classes,
                                           cuts: run.states.map { .init(amx: $0.amxShare, ane: $0.aneShare) }, limits: limits)
 
             // ── the report ──
-            let total = catalogue.total
-            let classes = zip(catalogue.entries, result.decisions).map { entry, d -> MapClass in
-                let timings = entry.routes.indices.compactMap { r -> MapClass.Timing? in
-                    guard let ratio = d.hotRatios[r], r != entry.routes.firstIndex(where: \.correct) else { return nil }
-                    return .init(route: entry.routes[r].id, ratio: ratio, error: d.spread.indices.contains(r) ? d.spread[r] ?? 0 : 0)
+            // One row per decision: a point of the grid, a product's once per weight form.
+            let decided = classes.flatMap(\.decisionClasses)
+            let total = max(decided.reduce(0) { $0 + $1.weight }, 1e-12)
+            let rows = zip(decided, result.decisions).map { c, d -> MapClass in
+                let timings = c.routes.indices.compactMap { r -> MapClass.Timing? in
+                    guard let ratio = d.hotRatios[r], r != c.routes.firstIndex(where: \.correct) else { return nil }
+                    return .init(route: c.routes[r].id, ratio: ratio, error: d.spread.indices.contains(r) ? d.spread[r] ?? 0 : 0)
                 }
-                return MapClass(id: entry.id, weight: entry.weight / total, chosen: d.chosen, loss: d.loss, runs: d.runs,
+                return MapClass(id: c.id, weight: c.weight / total, chosen: d.chosen, loss: d.loss, runs: d.runs,
                                 status: d.status, timings: timings)
             }
-            let map = MapResult(classes: classes, residualLoss: result.residualLoss, epsilon: measuring.epsilon, spent: result.spent,
-                                budget: measuring.budget, exhausted: result.exhausted, tail: catalogue.tail / total,
-                                judged: run.judgeSeconds, wrong: run.wrong, families: families.map(\.rawValue))
+            let map = MapResult(classes: rows, residualLoss: result.residualLoss, epsilon: measuring.epsilon, spent: result.spent,
+                                budget: measuring.budget, exhausted: result.exhausted, judged: run.judgeSeconds, wrong: run.wrong)
             let witnesses = engineWitnesses(start: first, end: last)
             let memory = Memory(plan: plan, peaks: gauge.peaks, aneBatches: run.sideBatches)
             let seconds = Date().timeIntervalSince(started)
-            let verdict = CapacityMap.Verdict(residualLoss: result.residualLoss, epsilon: measuring.epsilon, tailShare: catalogue.tailShare,
+            let verdict = CapacityMap.Verdict(residualLoss: result.residualLoss, epsilon: measuring.epsilon,
                                               statuses: result.decisions.map(\.status), wrongChosen: false, memoryHeld: memory.held,
                                               seconds: seconds)
             let flops = 2.0 * Double(CapacityMap.witnessShape.m * CapacityMap.witnessShape.k * CapacityMap.witnessShape.n) * 1e-12

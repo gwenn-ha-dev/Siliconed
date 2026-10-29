@@ -41,7 +41,7 @@ final class RenderLoopTests: XCTestCase {
                                  loss: 0.001, runs: 20, status: .closed, timings: timings))
         }
         let map = Diagnostic.MapResult(classes: entries, residualLoss: 0.005, epsilon: 0.02, spent: 50, budget: 52, exhausted: false,
-                                       tail: 0.01, judged: 2, wrong: [])
+                                       judged: 2, wrong: [])
         let flops = 2.0 * 2048 * 3840 * 3840
         func witness(_ engine: String, _ rate: Double) -> CapacityMap.EngineWitness {
             .init(engine: engine, before: flops / (rate * 1e12), after: flops / (rate * 1e12) * heat, errorBefore: 0.0005, errorAfter: 0.0005)

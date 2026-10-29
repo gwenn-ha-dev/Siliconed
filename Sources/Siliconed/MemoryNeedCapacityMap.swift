@@ -19,7 +19,7 @@ import Foundation
 ///     would measure another product — the GPU's rate and the ANE's share move with the height), so a Mac whose B
 ///     cannot hold the operands of the heaviest decision is refused (`insufficientMemory`), as it was;
 ///   - **the ANE bound is asked at the most rows it can take** (`Diagnostic.engineBytes`), over the points in the
-///     order of the *catalogue* (the order the plan will ask them is not known); a batch holds at least one point;
+///     order of the *grid* (the order the plan will ask them is not known); a batch holds at least one point;
 ///   - **the cache of truths is bounded** (`truthCache`): a truth is 64 rows of fp64 over the n columns, kept so that a
 ///     route first run after another is judged without widening B again; evicted first-in first-out.
 extension CapacityMap {
@@ -32,14 +32,16 @@ extension CapacityMap {
 
     package static func products(_ entries: [Entry]) -> [(m: Int, k: Int, n: Int, kind: RouteTable.WeightKind)] {
         entries.compactMap { e in
-            if case let .product(k, n, m, kind) = e.work { return (m, k, n, kind) } else { return nil }
+            // A point whose routes read an 8-bit form holds its staged weight and scales too.
+            guard case let .product(k, n, m) = e.work else { return nil }
+            return (m, k, n, e.routes.contains { Entry.form($0.id).map { $0 != "bf16" && $0 != "bf16act" } ?? false } ? .q8 : .bf16)
         } + [(witnessShape.m, witnessShape.k, witnessShape.n, .bf16)]
     }
 
     /// The ANE-eligible points of the entries (the witness's included, first).
     package static func anePoints(_ entries: [Entry]) -> [Diagnostic.GridPoint] {
         entries.compactMap { e in
-            if case let .product(k, n, m, _) = e.work, e.routes.contains(where: { $0.id == "gpu+ane" }) { return .init(m: m, k: k, n: n) }
+            if case let .product(k, n, m) = e.work, e.routes.contains(where: { $0.id == "gpu+ane" }) { return .init(m: m, k: k, n: n) }
             return nil
         }
     }

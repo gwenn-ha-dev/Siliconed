@@ -23,17 +23,21 @@
 ### La carte des capacités, refaite
 
 - **La carte choisit maintenant une route pour chaque calcul d'un rendu**, et non un interrupteur pour
-  tous : chaque produit matriciel de chaque modèle à chaque hauteur, chaque attention, sur le GPU seul,
-  à côté de l'AMX, à côté du Neural Engine ou des trois, avec les poids élargis ou lus tels que
-  publiés. Sur un Mac où le Neural Engine gagne, il sert là où il gagne.
+  tous : chaque produit matriciel à chaque hauteur, chaque attention, sur le GPU seul, à côté de
+  l'AMX, à côté du Neural Engine ou des trois, avec les poids élargis ou lus tels que publiés. Sur un
+  Mac où le Neural Engine gagne, il sert là où il gagne.
+- **La carte ne connaît aucun modèle** : elle mesure une grille fixe de produits et d'attentions qui
+  couvre les formes dont tout modèle est fait, la même sur tous les Mac, quoi qu'il soit installé.
+  Installer, retirer ou ajouter un modèle ne demande jamais de nouvelle carte, et un Mac sans aucun
+  modèle la mesure entière.
 - **Tout format, toute forme** : un calcul que la carte n'a pas mesuré (une image en 1024×1536, une
   édition) prend la route du plus proche qu'elle a mesuré, et seule une forme loin de toutes reste sur
   le GPU seul. Avant, tout ce qui sortait des formats mesurés tournait sur le GPU seul.
 - **Mesurée comme un rendu tourne** : chaque route est chronométrée contre la plus simple en
   alternance, si bien qu'un Mac qui chauffe ou tourne sur batterie compare à conditions égales ; les
-  routes sont choisies au régime chaud d'un rendu de quelques minutes, avec un témoin par moteur. La
-  minute va d'abord aux calculs qui pèsent le plus dans les rendus de vos modèles installés. Toujours
-  sans modèle, environ une minute.
+  routes sont choisies au régime chaud d'un rendu de quelques minutes, avec un témoin par moteur. Un
+  produit est chronométré une fois sur les moteurs et décidé pour chaque forme sous laquelle ses poids
+  peuvent être publiés. Environ une minute.
 - **Verte quand la mesure est complète et juste**, et non quand le Mac était au repos : la chaleur, la
   batterie et le mode Économie d'énergie sont écrits à côté de la carte, et ne la rendent plus orange.
 - **Sous le budget mémoire** : le besoin de la carte est calculé avant son premier produit, comme celui

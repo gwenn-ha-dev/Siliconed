@@ -3,103 +3,109 @@ import XCTest
 @testable import Siliconed
 
 /// **The capacity map end to end, without a machine** (`CapacityMapClasses.swift`, `CapacityMeasure.plan`, `RouteTable(plan:…)`,
-/// `Diagnostic.Report` of schema 13): the catalogue's weights and clusters, a simulated Mac whose engines have known rates
-/// producing the right table inside its budget, the regime read from the witnesses, green and orange.
+/// `Diagnostic.Report` of schema 14): the grid and its reach over every family, a product decided per weight form, a simulated
+/// Mac whose engines have known rates producing the right table inside its budget, the regime read from the witnesses, green
+/// and orange.
 final class CapacityMapTests: XCTestCase {
     typealias CM = CapacityMeasure
     typealias CC = CapacityClasses
 
     private let all = CapacityMap.Capabilities(amx: true, ane: true, bf16Weights: true, bf16Rounding: true, int8Weights: true,
                                                q8Weights: true, flash: true, headSplit: true)
-
-    /// Building the catalogue reads the five families' configs five-and-twenty times: once per size.
-    nonisolated(unsafe) private static var catalogues: [Int: CapacityMap.Catalogue] = [:]
-    private func cat(_ maxEntries: Int) -> CapacityMap.Catalogue {
-        if let c = Self.catalogues[maxEntries] { return c }
-        let c = CapacityMap.catalogue(caps: all, maxEntries: maxEntries)
-        Self.catalogues[maxEntries] = c
-        return c
+    private var grid: [CapacityMap.Entry] { CapacityMap.catalogue(caps: all) }
+    /// A quarter of the grid — its biggest points at both heights and an attention at each — for the quarter of the minute
+    /// the simulations of one property are given.
+    private var part: [CapacityMap.Entry] {
+        grid.filter { ["product:8192x8192@1024", "product:4096x16384@1024", "product:2048x2048@4096", "product:16384x4096@4096",
+                       "attention:1024/32x128", "attention:4096/16x128"].contains($0.id) }
     }
 
-    // MARK: the catalogue
+    /// A fictional Mac's preparation: seconds per value, widened and copied, by form — the 8-bit weights widen slower and copy
+    /// faster than bf16's.
+    private let preparation: CapacityMap.Preparation = [.bf16: (0.4e-9, 0.2e-9), .int8: (0.7e-9, 0.1e-9), .q8: (0.9e-9, 0.1e-9)]
 
-    func testWeightIsTheMaximumOfTheShares() {
-        // Z-Image and Qwen-Image-2.1 apart, then together: a family is never diluted — the class that measures for one of
-        // its classes weighs at least what that class weighs for it alone.
-        let z = CC.Request(family: .zImage), q = CC.Request(family: .qwenImage21)
-        let together = CapacityMap.catalogue(requests: [z, q], caps: all, coverage: 2, maxEntries: 1000)
-        func near(_ a: CapacityMap.Work, _ b: CapacityMap.Work) -> Bool {
-            let r = log(CapacityMap.shapeRatio)
-            func close(_ x: Int, _ y: Int) -> Bool { abs(log(Double(x) / Double(y))) <= r }
-            switch (a, b) {
-            case let (.product(k, n, m, kind), .product(k2, n2, m2, kind2)):
-                return kind == kind2 && close(k, k2) && close(n, n2) && abs(m - m2) <= CapacityMap.heightGap
-            case let (.attention(s, h, d), .attention(s2, h2, d2)):
-                return close(h, h2) && close(d, d2) && abs(s - s2) <= CapacityMap.heightGap
-            default: return false
+    // MARK: the grid
+
+    func testTheGridKnowsNoModel() {
+        let g = grid
+        XCTAssertEqual(g.count, CapacityMap.gridShapes.count * CapacityMap.gridHeights.count
+                                 + CapacityMap.gridAttention.count * CapacityMap.gridHeights.count)
+        XCTAssertEqual(Set(g.map(\.id)).count, g.count, "an id names one point")
+        XCTAssertTrue(g.allSatisfy { $0.weight == 1 })
+        XCTAssertEqual(g, CapacityMap.catalogue(caps: all), "deterministic")
+        // The same grid whatever the Mac holds: only the machine's capabilities change its routes, never its points.
+        XCTAssertEqual(CapacityMap.catalogue(caps: .init()).map(\.id), g.map(\.id))
+        for e in g { XCTAssertNotNil(RouteTable.ClassKey.parse(e.id), e.id) }
+    }
+
+    /// **Every product and attention that weighs in a render of any family, version and format falls within the grid's
+    /// reach** — the table's nearest rule (`RouteTable.Nearest`) finds a point for it, so no model renders its work on the
+    /// « GPU alone » left beyond reach. What is out of reach is the 64-wide embedders and the encoders' 1 024-wide
+    /// projections at a prompt's rows: under 0.02 % of a render each, the simplest route by design (64×3840 must not
+    /// borrow 3840×3840's three engines). A family added to the catalogue joins this test, not the grid.
+    func testEveryFamilyIsWithinTheGridsReach() {
+        let shapes = CapacityMap.gridShapes.map { (k: $0.k, n: $0.n) }
+        let heads = CapacityMap.gridAttention.map { (k: $0.heads, n: $0.headDim) }
+        var checked = 0
+        for family in Family.allCases {
+            for variant in Variant.allCases {
+                for (w, h) in [(512, 512), (1024, 1024), (1024, 1536), (1536, 1024)] {
+                    for faster in [true, false] {
+                        let r = CC.Request(family: family, variant: variant, width: w, height: h, fasterRendering: faster)
+                        guard let classes = CC.classes(for: r) else { continue }
+                        let shares = CC.weights(classes, family: family, rates: CapacityMap.referenceRates)
+                        var outside = 0.0
+                        for (c, share) in zip(classes, shares) {
+                            let reached: Bool
+                            switch c.shape {
+                            case let .product(k, n, _, _):
+                                reached = RouteTable.Nearest.rule(among: shapes, k: k, n: n, m: 0) { ($0, 0, nil) } != nil
+                            case let .attention(_, _, hs, _, dim, _):
+                                reached = RouteTable.Nearest.rule(among: heads, k: hs, n: dim, m: 0) { ($0, 0, nil) } != nil
+                            }
+                            if !reached { outside += share }
+                            XCTAssertTrue(reached || share < 0.001, "\(family) \(variant) \(w)×\(h): \(c.routeKey.id) (\(c.phase)) beyond the grid's reach")
+                            checked += 1
+                        }
+                        XCTAssertLessThan(outside, 0.001, "\(family) \(variant) \(w)×\(h): \(outside) of the render beyond reach")
+                    }
+                }
             }
         }
-        for family in [z, q] {
-            let alone = CapacityMap.catalogue(requests: [family], caps: all, coverage: 2, maxEntries: 1000)
-            for e in alone.entries where e.weight > 1e-3 {
-                let standing = together.entries.filter { near($0.work, e.work) }
-                XCTAssertFalse(standing.isEmpty, e.id)
-                XCTAssertGreaterThanOrEqual(standing.map(\.weight).max() ?? 0, e.weight * 0.999, "\(e.id): not diluted")
-            }
-        }
-        // Z-Image's and Qwen's neighbouring shapes are one measurement: 3840×10240 at 4 128 rows and 4096×12288 at 4 096.
-        XCTAssertLessThan(together.entries.count,
-                          CapacityMap.catalogue(requests: [z], caps: all, coverage: 2, maxEntries: 1000).entries.count
-                            + CapacityMap.catalogue(requests: [q], caps: all, coverage: 2, maxEntries: 1000).entries.count)
-        // The shares of a request sum to 1: the maximum over requests of a class is at most 1.
-        XCTAssertTrue(together.entries.allSatisfy { $0.weight <= 1.000001 })
+        XCTAssertGreaterThan(checked, 500)
     }
 
-    func testHeightsOfOneShapeAreOneMeasurement() {
-        let c = CapacityMap.catalogue(requests: [.init(family: .zImage)], caps: all, coverage: 2, maxEntries: 1000)
-        // Z-Image 1024²: 4096 and 4128 rows of the same k×n: one entry, both heights named.
-        let entries = c.entries.filter { if case .product(3840, 3840, _, .bf16) = $0.work { return true } else { return false } }
-        let tall = entries.filter { $0.heights.contains(4128) }
-        XCTAssertEqual(tall.count, 1)
-        XCTAssertTrue(tall[0].heights.contains(4096))
-        XCTAssertEqual(Set(entries.map(\.id)).count, entries.count)
-    }
-
-    func testTheCutAndTheTail() {
-        let c = cat(40)
-        XCTAssertLessThanOrEqual(c.entries.count, CapacityMap.maxEntries)
-        XCTAssertGreaterThan(c.entries.count, 15)
-        XCTAssertEqual(c.entries.map(\.weight), c.entries.map(\.weight).sorted(by: >), "heaviest first")
-        XCTAssertGreaterThan(c.tailShare, 0)
-        XCTAssertEqual(c.tailShare + c.entries.reduce(0) { $0 + $1.weight } / c.total, 1, accuracy: 1e-12)
-        XCTAssertEqual(Set(c.entries.map(\.id)).count, c.entries.count, "an id names one class")
-        // The whole catalogue is kept to complete the table over: more classes than the entries.
-        XCTAssertGreaterThan(c.render.count, c.entries.count)
-        XCTAssertEqual(c, CapacityMap.catalogue(caps: all), "deterministic")
-    }
-
-    func testKindsAreInTheIdAndLightFoldsIntoBF16() {
-        let c = CapacityMap.catalogue(requests: [.init(family: .qwenImage21, variant: .compact), .init(family: .qwenImage21, variant: .light)],
-                                      caps: all, coverage: 2, maxEntries: 1000)
-        XCTAssertTrue(c.entries.contains { $0.id.hasSuffix("~int8") })
-        XCTAssertTrue(c.entries.contains { !$0.id.contains("~") && $0.id.hasPrefix("product:") }, "the K-quants widen: bf16's id")
-        for e in c.entries { XCTAssertNotNil(RouteTable.ClassKey.parse(e.id), e.id) }
-        let p = RouteTable.ClassKey.parse("product:4096x12288@4096~int8")
+    func testAProductIsDecidedOncePerWeightForm() {
+        let e = grid.first { $0.id == "product:4096x4096@4096" }!
+        let c = e.compute(preparation: preparation)
+        XCTAssertEqual(c.decisions.map(\.id), ["product:4096x4096@4096", "product:4096x4096@4096~int8", "product:4096x4096@4096~q8"])
+        func ids(_ v: CM.View) -> [String] { v.routes.map { e.routes[$0].id } }
+        let engines = ["gpu", "gpu+amx", "gpu+ane", "gpu+ane+amx"]
+        XCTAssertEqual(ids(c.decisions[0]), engines + ["gpu/bf16", "gpu/bf16act"])
+        XCTAssertEqual(ids(c.decisions[1]), engines + ["gpu/int8", "gpu+amx/int8"])
+        XCTAssertEqual(ids(c.decisions[2]), engines + ["gpu/q8", "gpu+amx/q8"])
+        // The engines read the widened weight, the native forms copy it: their preparation, per value of the point's k×n.
+        let values = 4096.0 * 4096
+        XCTAssertEqual(c.decisions[1].extra[0], values * 0.7e-9, accuracy: 1e-15)
+        XCTAssertEqual(c.decisions[1].extra[4], values * 0.1e-9, accuracy: 1e-15)
+        // Each decision is a class of its own for the table, a third of the point's weight.
+        XCTAssertEqual(c.decisionClasses.map(\.id), c.decisions.map(\.id))
+        XCTAssertEqual(c.decisionClasses.map(\.weight), [1.0 / 3, 1.0 / 3, 1.0 / 3])
+        let p = RouteTable.ClassKey.parse("product:4096x16384@4096~int8")
         XCTAssertEqual(p?.kind, .int8)
-        XCTAssertEqual(p?.key, .product(k: 4096, n: 12288, m: 4096))
+        XCTAssertEqual(p?.key, .product(k: 4096, n: 16384, m: 4096))
+        // An attention has one decision, its own.
+        let a = grid.first { if case .attention = $0.work { return true } else { return false } }!.compute()
+        XCTAssertEqual(a.decisions.map(\.id), [a.id])
     }
 
     func testRoutesFollowTheMachineAndTheShape() {
-        let none = CapacityMap.Capabilities()
-        XCTAssertEqual(CapacityMap.productRoutes(kind: .bf16, m: 4096, denoising: true, caps: none).map(\.id), ["gpu"])
-        let ids = { (m: Int, d: Bool, k: RouteTable.WeightKind) in
-            CapacityMap.productRoutes(kind: k, m: m, denoising: d, caps: self.all).map(\.id) }
-        XCTAssertEqual(ids(4096, true, .bf16), ["gpu", "gpu+amx", "gpu+ane", "gpu+ane+amx", "gpu/bf16", "gpu/bf16act"])
-        XCTAssertEqual(ids(4096, false, .bf16), ["gpu", "gpu+amx", "gpu/bf16", "gpu/bf16act"], "the ANE serves the denoisers only")
-        XCTAssertEqual(ids(300, true, .int8), ["gpu", "gpu/int8"], "no AMX under 512 rows")
-        XCTAssertEqual(ids(1024, true, .q8), ["gpu", "gpu+amx", "gpu+ane", "gpu+ane+amx", "gpu/q8", "gpu+amx/q8"])
-        let route = CapacityMap.productRoutes(kind: .bf16, m: 4096, denoising: true, caps: all)
-        XCTAssertEqual(route.filter(\.efficient).map(\.id), ["gpu+ane", "gpu+ane+amx"])
+        XCTAssertEqual(CapacityMap.productRoutes(m: 4096, caps: .init()).map(\.id), ["gpu"])
+        let ids = { (m: Int) in CapacityMap.productRoutes(m: m, caps: self.all).map(\.id) }
+        XCTAssertEqual(ids(4096), ["gpu", "gpu+amx", "gpu+ane", "gpu+ane+amx", "gpu/bf16", "gpu/bf16act", "gpu/int8", "gpu+amx/int8",
+                                   "gpu/q8", "gpu+amx/q8"])
+        XCTAssertEqual(ids(300), ["gpu", "gpu/bf16", "gpu/bf16act", "gpu/int8", "gpu/q8"], "no AMX under 512 rows, no ANE under 1 024")
+        XCTAssertEqual(CapacityMap.productRoutes(m: 4096, caps: all).filter(\.efficient).map(\.id), ["gpu+ane", "gpu+ane+amx"])
         XCTAssertEqual(CapacityClasses.engines(ofRoute: "gpu+amx/int8"), ["gpu", "amx"])
         XCTAssertEqual(CapacityMap.attentionRoutes(sequence: 512, caps: all).map(\.id), ["graph", "flash"])
         XCTAssertEqual(CapacityMap.attentionRoutes(sequence: 4096, caps: all).map(\.id), ["graph", "flash", "split"])
@@ -108,11 +114,12 @@ final class CapacityMapTests: XCTestCase {
     // MARK: a simulated Mac
 
     /// The engines of a fictional Mac: TFLOP/s by route. The AMX helps everywhere, the ANE from 20 M weights, the three from 50 M,
-    /// the bf16 weight loses, the 8-bit ones win; flash and the split win on long sequences.
+    /// the bf16 weight loses, the 8-bit ones win; flash and the split win on long sequences. The engines' work alone: the
+    /// preparation is the views'.
     private func seconds(_ e: CapacityMap.Entry, _ route: String, heat: [String: Double] = [:]) -> Double? {
         var rate: Double
         switch e.work {
-        case let .product(k, n, m, _):
+        case let .product(k, n, m):
             let flop = 2 * Double(k) * Double(n) * Double(m), weights = k * n
             switch route {
             case "gpu": rate = 4.0
@@ -141,90 +148,109 @@ final class CapacityMapTests: XCTestCase {
         }
     }
 
-    /// A quarter of the minute is plenty for fourteen simulated classes, and keeps the suite short.
+    /// A quarter of the minute is plenty for a quarter of the grid, and keeps the suite short.
     private static var quarter: CM.Settings { var s = CM.Settings(); s.budget = 15; return s }
 
-    private func simulate(_ catalogue: CapacityMap.Catalogue, heat: [String: Double] = [:], noise: Double = 0.02,
-                          settings: CM.Settings = CapacityMapTests.quarter, finalHeat: [String: Double] = [:]) -> (CM.Plan, CapacityMeasureTests.Sim) {
-        let base = catalogue.entries.map { e in e.routes.map { seconds(e, $0.id, heat: heat) } }
-        let sim = CapacityMeasureTests.Sim(base: base, noise: noise)
-        let plan = CM.plan(classes: catalogue.entries.map(\.compute), settings: settings, extraWeight: catalogue.tail,
+    private func classes(_ entries: [CapacityMap.Entry]) -> [CM.ComputeClass] { entries.map { $0.compute(preparation: preparation) } }
+
+    private func simulate(_ entries: [CapacityMap.Entry], heat: [String: Double] = [:], noise: Double = 0.02,
+                          settings: CM.Settings = CapacityMapTests.quarter, finalHeat: [String: Double] = [:],
+                          drift: @escaping (Double) -> Double = { _ in 1 }) -> (CM.Plan, CapacityMeasureTests.Sim) {
+        let base = entries.map { e in e.routes.map { seconds(e, $0.id, heat: heat) } }
+        let sim = CapacityMeasureTests.Sim(base: base, noise: noise, drift: drift)
+        let plan = CM.plan(classes: classes(entries), settings: settings,
                            finalHeat: finalHeat.isEmpty ? nil : { CM.Heat(finalHeat) }, clock: sim) { sim.probe($0, $1) }
         return (plan, sim)
     }
 
-    /// What the rule chooses from the true hot times.
-    private func best(_ e: CapacityMap.Entry, heat: [String: Double] = [:]) -> String {
-        let t = e.routes.map { seconds(e, $0.id) ?? .infinity }
-        let ratios: [Double?] = e.routes.indices.map { r in t[r].isFinite ? t[r] * (CM.Heat(heat).factor(e.routes[r])) / t[0] : nil }
-        return e.routes[CM.rule(ratios: ratios, efficient: e.routes.map(\.efficient))!].id
+    /// Every decision of the grid: its point, its view.
+    private func decisions(_ entries: [CapacityMap.Entry]) -> [(entry: CapacityMap.Entry, view: CM.View)] {
+        zip(entries, classes(entries)).flatMap { e, c in c.decisions.map { (e, $0) } }
+    }
+
+    /// What the rule chooses from the true hot times of a decision (preparation included), and by how much the best route
+    /// leads the next.
+    private func best(_ e: CapacityMap.Entry, _ v: CM.View, heat: [String: Double] = [:]) -> (route: String, lead: Double) {
+        let t = v.routes.map { r in seconds(e, e.routes[r].id).map { $0 * CM.Heat(heat).factor(e.routes[r]) + v.extra(r) } ?? .infinity }
+        let ratios: [Double?] = t.indices.map { t[$0].isFinite ? t[$0] / t[0] : nil }
+        let chosen = CM.rule(ratios: ratios, efficient: v.routes.map { e.routes[$0].efficient })!
+        let others = t.indices.filter { $0 != chosen }.map { t[$0] }
+        return (e.routes[v.routes[chosen]].id, (others.min() ?? .infinity) / t[chosen])
     }
 
     func testTheSimulatedMacGetsItsTableInsideTheBudget() {
-        let c = cat(14)
+        let g = grid
         var settings = CM.Settings(); settings.budget = 60
-        let (plan, sim) = simulate(c, settings: settings)
-        print("MAPSIM spent \(plan.spent) residual \(plan.residualLoss) statuses \(Dictionary(grouping: plan.decisions, by: \.status).mapValues(\.count)) runs \(plan.decisions.map(\.runs).reduce(0, +)) tail \(c.tailShare)")
-        print("MAPSIM " + zip(c.entries, plan.decisions).prefix(12).map { "\($0.id) w\(String(format: "%.3f", $0.weight / c.total)) \($1.status) loss \(String(format: "%.5f", $1.loss)) runs \($1.runs)" }.joined(separator: "\n MAPSIM "))
+        let (plan, sim) = simulate(g, settings: settings)
+        print("MAPSIM spent \(plan.spent) residual \(plan.residualLoss) statuses \(Dictionary(grouping: plan.decisions, by: \.status).mapValues(\.count)) runs \(plan.decisions.map(\.runs).reduce(0, +))")
         XCTAssertLessThanOrEqual(plan.spent, 60 + 1, "the budget holds (one step over at most)")
         XCTAssertEqual(plan.spent, sim.t, accuracy: 1e-9)
-        // The heavy classes get the route the rule picks from the true times.
-        let total = c.total
+        let all = decisions(g)
+        XCTAssertEqual(plan.decisions.map(\.classID), all.map(\.view.id), "one decision per view, in order")
+        // The decisions get the route the rule picks from the true times where it leads by more than the noise.
         var checked = 0
-        for (e, d) in zip(c.entries, plan.decisions).prefix(6) {
-            XCTAssertEqual(d.chosen, best(e), e.id)
+        for ((e, v), d) in zip(all, plan.decisions) {
+            let (route, lead) = best(e, v)
+            guard lead > 1.05 else { continue }
+            XCTAssertEqual(d.chosen, route, v.id)
             checked += 1
         }
-        XCTAssertGreaterThan(total, 0)
-        XCTAssertEqual(checked, 6)
-        // The loss that stays is a fraction of the render under ε, though every class is "open" (a route not yet at its three
-        // ratios): the seconds went where the weight is.
+        XCTAssertGreaterThan(checked, all.count / 2)
         XCTAssertLessThan(plan.residualLoss, CM.Settings().epsilon)
-        // And no class burnt the budget alone: an efficient route kept against a faster efficient one is no loss.
-        XCTAssertLessThan(plan.decisions.map(\.runs).max() ?? 0, 400)
         // Deterministic: the same machine, the same plan.
-        XCTAssertEqual(plan, simulate(c, settings: settings).0)
+        XCTAssertEqual(plan, simulate(g, settings: settings).0)
+    }
+
+    func testAWeightsFormChangesTheDecisionNotTheMeasurement() {
+        // At 1 024 rows of 8192², the 8-bit weight copied and multiplied beside the AMX beats every widened route, the bf16 one
+        // does not: one measurement, two routes.
+        let g = part
+        let (plan, _) = simulate(g)
+        let bf16 = plan.decisions.first { $0.classID == "product:8192x8192@1024" }!
+        let int8 = plan.decisions.first { $0.classID == "product:8192x8192@1024~int8" }!
+        XCTAssertEqual(int8.chosen, "gpu+amx/int8")
+        XCTAssertFalse(bf16.chosen!.contains("/"), bf16.chosen!)
+        XCTAssertEqual(bf16.runs, int8.runs, "the same pairs")
     }
 
     func testTheTableMakesTheEngineTakeTheChosenRoutes() {
-        let c = cat(14)
-        let (plan, _) = simulate(c)
-        let table = CapacityMap.table(plan: plan, catalogue: c, cuts: c.entries.map { _ in .init() })
-        var named = Set<[Int]>()
-        for (e, d) in zip(c.entries, plan.decisions) {
-            guard case let .product(k, n, m, kind) = e.work, let chosen = d.chosen else { continue }
-            // One engine rule per height, the heaviest kind's: another kind of the same k×n@m shares its engines.
-            guard named.insert([k, n, m]).inserted else { continue }
-            let engines = chosen.split(separator: "/")[0]
-            XCTAssertEqual(table.products.route(k: k, n: n, m: m).engines.rawValue, String(engines), e.id)
-            let form = chosen.split(separator: "/").count > 1 ? String(chosen.split(separator: "/")[1]) : nil
+        let g = part
+        let (plan, _) = simulate(g)
+        let table = CapacityMap.table(plan: plan, entries: g, classes: classes(g), cuts: g.map { _ in .init() })
+        let all = decisions(g)
+        func chosen(_ id: String) -> String { plan.decisions.first { $0.classID == id }!.chosen! }
+        for (e, v) in all {
+            guard case let .product(k, n, m) = e.work, let kind = RouteTable.ClassKey.parse(v.id)?.kind else { continue }
+            // One engine rule per point, its bf16 view's: the engines are the same hardware for every form.
+            XCTAssertEqual(table.products.route(k: k, n: n, m: m).engines.rawValue, String(chosen(e.id).split(separator: "/")[0]), v.id)
+            // One form per weight at every height of its shape: the tallest's.
+            let top = g.compactMap { if case let .product(k2, n2, m2) = $0.work, k2 == k, n2 == n { return m2 } else { return nil } }.max()!
+            let tall = chosen(CapacityMap.Entry.id(.product(k: k, n: n, m: top)) + RouteTable.ClassKey.suffix(kind))
             let path = table.products.weight(kind, k: k, n: n, m: m).path
-            switch form {
-            case nil: XCTAssertEqual(path, .widened, e.id)
-            case "bf16", "bf16act": XCTAssertEqual(path, .bf16, e.id)
-            default: XCTAssertEqual(path, .native, e.id)
+            switch CapacityMap.Entry.form(tall) {
+            case nil: XCTAssertEqual(path, .widened, v.id)
+            case "bf16", "bf16act": XCTAssertEqual(path, .bf16, v.id)
+            default: XCTAssertEqual(path, .native, v.id)
             }
         }
-        // A class nobody measured at a height its cluster names takes its neighbour's route, the ANE falling back to the AMX's.
-        let tall = c.entries.first { $0.heights.count > 1 && $0.routes.count > 2 }!
-        guard case let .product(k, n, _, _) = tall.work else { return XCTFail() }
-        let chosen = plan.decisions[c.entries.firstIndex(of: tall)!].chosen!
-        for h in tall.heights.dropFirst() {
-            XCTAssertEqual(table.products.route(k: k, n: n, m: h).engines.rawValue, String(chosen.split(separator: "/")[0]), "\(tall.id) @ \(h)")
-        }
-        // A shape no measured class reaches is the simplest route.
+        // A model's shape reads its nearest point: Z-Image's 3840×10240 at 1 056 rows is 4096×16384 at 1 024.
+        XCTAssertEqual(table.products.route(k: 3840, n: 10240, m: 1056).engines.rawValue,
+                       String(chosen("product:4096x16384@1024").split(separator: "/")[0]))
+        XCTAssertEqual(table.products.weight(.int8, k: 3840, n: 10240, m: 1056),
+                       table.products.weight(.int8, k: 4096, n: 16384, m: 1024))
+        // A shape no point reaches is the simplest route.
         XCTAssertEqual(table.products.route(k: 7, n: 7, m: 4096).aneRows, 0)
     }
 
     func testAClassThatChoseTheANEKnowsItsRouteWithoutTheANE() {
-        let c = cat(14)
-        let (plan, _) = simulate(c)
-        let table = CapacityMap.table(plan: plan, catalogue: c, cuts: [])
+        let g = part
+        let (plan, _) = simulate(g)
+        let table = CapacityMap.table(plan: plan, entries: g, classes: classes(g), cuts: [])
         var seen = 0
-        for (e, d) in zip(c.entries, plan.decisions) where d.chosen?.hasPrefix("gpu+ane") == true {
-            guard case let .product(k, n, m, _) = e.work else { continue }
-            XCTAssertNotEqual(table.products.forced(k: k, n: n, m: m, aneBroughtUp: false), .ane, e.id)
-            XCTAssertNotEqual(table.products.forced(k: k, n: n, m: m, aneBroughtUp: false), .aneAMX, e.id)
+        for d in plan.decisions where d.chosen?.hasPrefix("gpu+ane") == true {
+            guard let (key, kind) = RouteTable.ClassKey.parse(d.classID), kind == .bf16, case let .product(k, n, m) = key else { continue }
+            XCTAssertNotEqual(table.products.forced(k: k, n: n, m: m, aneBroughtUp: false), .ane, d.classID)
+            XCTAssertNotEqual(table.products.forced(k: k, n: n, m: m, aneBroughtUp: false), .aneAMX, d.classID)
             XCTAssertEqual(table.products.forced(k: k, n: n, m: m), table.products.classes.first { $0.matches(k: k, n: n, m: m) }?.engines)
             seen += 1
         }
@@ -233,36 +259,33 @@ final class CapacityMapTests: XCTestCase {
 
     func testAHotAMXLosesItsRoutes() {
         // The end witnesses say the AMX takes 2.06× longer hot (the Neo's): the table is decided there.
-        let c = cat(14)
-        let (cold, _) = simulate(c)
-        let (hot, _) = simulate(c, finalHeat: ["amx": 2.06])
+        let g = part
+        let (cold, _) = simulate(g)
+        let (hot, _) = simulate(g, finalHeat: ["amx": 2.06])
         XCTAssertTrue(cold.decisions.contains { $0.chosen?.contains("amx") == true })
-        let total = c.total
-        for (e, d) in zip(c.entries, hot.decisions) where e.weight / total > 0.04 {
-            XCTAssertEqual(d.chosen, best(e, heat: ["amx": 2.06]), e.id)
-            XCTAssertFalse(d.chosen?.contains("amx") == true, "\(e.id): \(d.chosen ?? "-")")
+        for ((e, v), d) in zip(decisions(g), hot.decisions) {
+            let (route, lead) = best(e, v, heat: ["amx": 2.06])
+            guard lead > 1.05 else { continue }
+            XCTAssertEqual(d.chosen, route, v.id)
+            XCTAssertFalse(d.chosen?.contains("amx") == true, "\(v.id): \(d.chosen ?? "-")")
         }
     }
 
     func testADriftingMachineGivesTheSameTable() {
         // The whole Mac slows ×1.8 during the map: the pairs cancel it, the table does not move.
-        let c = cat(14)
-        let steady = simulate(c, noise: 0.02).0
-        let base = c.entries.map { e in e.routes.map { seconds(e, $0.id) } }
-        let sim = CapacityMeasureTests.Sim(base: base, noise: 0.02, drift: { 1 + 0.8 * min($0, 60) / 60 })
-        let drift = CM.plan(classes: c.entries.map(\.compute), settings: CapacityMapTests.quarter, extraWeight: c.tail, clock: sim) { sim.probe($0, $1) }
-        let total = c.total
-        for (i, e) in c.entries.enumerated() where e.weight / total > 0.04 {
-            XCTAssertEqual(steady.decisions[i].chosen, drift.decisions[i].chosen, e.id)
+        let g = part
+        let steady = simulate(g).0
+        let drift = simulate(g, drift: { 1 + 0.8 * min($0, 15) / 15 }).0
+        for (((e, v), a), b) in zip(zip(decisions(g), steady.decisions), drift.decisions) where best(e, v).lead > 1.05 {
+            XCTAssertEqual(a.chosen, b.chosen, v.id)
         }
     }
 
     func testThePlanSaysWhatItLeaves() {
-        let c = cat(14)
         var tight = CM.Settings(); tight.budget = 3
-        let (plan, _) = simulate(c, settings: tight)
+        let (plan, _) = simulate(grid, settings: tight)
         XCTAssertTrue(plan.exhausted)
-        XCTAssertGreaterThan(plan.residualLoss, CM.Settings().epsilon, "three seconds do not decide forty classes")
+        XCTAssertGreaterThan(plan.residualLoss, CM.Settings().epsilon, "three seconds do not decide the grid")
         XCTAssertTrue(plan.decisions.contains { $0.status == .open || $0.status == .unmeasured })
     }
 
@@ -286,13 +309,12 @@ final class CapacityMapTests: XCTestCase {
     // MARK: green and orange
 
     func testVerdict() {
-        func v(loss: Double = 0.01, tail: Double = 0.03, statuses: [CM.Status] = [.closed], wrong: Bool = false, held: Bool = true,
+        func v(loss: Double = 0.01, statuses: [CM.Status] = [.closed], wrong: Bool = false, held: Bool = true,
                seconds: Double = 58) -> CapacityMap.Verdict {
-            .init(residualLoss: loss, epsilon: 0.02, tailShare: tail, statuses: statuses, wrongChosen: wrong, memoryHeld: held, seconds: seconds)
+            .init(residualLoss: loss, epsilon: 0.02, statuses: statuses, wrongChosen: wrong, memoryHeld: held, seconds: seconds)
         }
         XCTAssertTrue(v().green)
         XCTAssertEqual(v(loss: 0.05).reasons, ["loss"])
-        XCTAssertEqual(v(tail: 0.2).reasons, ["tail"])
         XCTAssertEqual(v(statuses: [.closed, .none]).reasons, ["none"])
         XCTAssertEqual(v(wrong: true).reasons, ["wrong"])
         XCTAssertEqual(v(held: false).reasons, ["memory"])
@@ -318,23 +340,23 @@ final class CapacityMapTests: XCTestCase {
     }
 
     func testTheMapsNeedFitsTheNeoOnlyByCuttingTheANE() throws {
-        let c = cat(40)
-        let big = CapacityMap.need(entries: c.entries, allotment: nil).steps["routes"]!
-        let small = CapacityMap.need(entries: c.entries, allotment: 0).steps["routes"]!
+        let c = grid
+        let big = CapacityMap.need(entries: c, allotment: nil).steps["routes"]!
+        let small = CapacityMap.need(entries: c, allotment: 0).steps["routes"]!
         XCTAssertGreaterThan(big, small)
-        XCTAssertEqual(Set(CapacityMap.need(entries: c.entries, allotment: nil).steps.keys), Set(CapacityMap.needSteps))
+        XCTAssertEqual(Set(CapacityMap.need(entries: c, allotment: nil).steps.keys), Set(CapacityMap.needSteps))
         let gib = 1 << 30
-        let plan = try Diagnostic.Plan.choose(budget: 10 * gib, base: 16 << 20) { CapacityMap.need(entries: c.entries, allotment: $0) }
+        let plan = try Diagnostic.Plan.choose(budget: 10 * gib, base: 16 << 20) { CapacityMap.need(entries: c, allotment: $0) }
         XCTAssertLessThanOrEqual(plan.base + plan.need.peak, plan.budget)
         print("MAPNEED whole \(big >> 20) MiB, cut \(small >> 20) MiB, plan at 10 GiB allotment \(String(describing: plan.aneAllotment))")
         // An 8 GB Mac: B = 4 GiB. Either it fits with the engines cut, or it is refused before the first product.
         do {
-            let neo = try Diagnostic.Plan.choose(budget: 4 * gib, base: 600 << 20) { CapacityMap.need(entries: c.entries, allotment: $0) }
+            let neo = try Diagnostic.Plan.choose(budget: 4 * gib, base: 600 << 20) { CapacityMap.need(entries: c, allotment: $0) }
             XCTAssertLessThanOrEqual(neo.base + neo.need.peak, neo.budget)
         } catch { XCTAssertEqual((error as? EngineError)?.code, EngineError.insufficientMemory(needed: 0, budget: 0).code) }
     }
 
-    // MARK: the report of schema 13
+    // MARK: the report of schema 14
 
     nonisolated(unsafe) private static var base: Diagnostic.Report?
 
@@ -353,16 +375,18 @@ final class CapacityMapTests: XCTestCase {
                                          gpu: "Apple M1 Pro", gpuFamily: "apple7", gpuWorkingSetBytes: 11_453_251_584)
         let before = Diagnostic.Conditions(thermal: "nominal", lowPowerMode: false, onBattery: false, swapUsedBytes: 0)
         let after = before
-        let c = cat(40)
-        let (plan, _) = simulate(c)
-        let table = CapacityMap.table(plan: plan, catalogue: c, cuts: [])
-        let mapClasses = zip(c.entries, plan.decisions).prefix(40).map { e, d in
-            Diagnostic.MapClass(id: e.id, weight: e.weight / c.total, chosen: d.chosen, loss: d.loss, runs: d.runs, status: d.status,
-                                timings: e.routes.indices.dropFirst().compactMap { r in
-                                    d.hotRatios[r].map { .init(route: e.routes[r].id, ratio: $0, error: d.spread[r] ?? 0) } })
+        let g = grid
+        let (plan, _) = simulate(g)
+        let table = CapacityMap.table(plan: plan, entries: g, classes: classes(g), cuts: [])
+        let decided = classes(g).flatMap(\.decisionClasses)
+        let total = decided.reduce(0) { $0 + $1.weight }
+        let mapClasses = zip(decided, plan.decisions).map { c, d in
+            Diagnostic.MapClass(id: c.id, weight: c.weight / total, chosen: d.chosen, loss: d.loss, runs: d.runs, status: d.status,
+                                timings: c.routes.indices.dropFirst().compactMap { r in
+                                    d.hotRatios[r].map { .init(route: c.routes[r].id, ratio: $0, error: d.spread[r] ?? 0) } })
         }
-        let map = Diagnostic.MapResult(classes: Array(mapClasses), residualLoss: plan.residualLoss, epsilon: 0.02, spent: 51.2, budget: 52.4,
-                                       exhausted: plan.exhausted, tail: c.tailShare, judged: 3.1, wrong: [])
+        let map = Diagnostic.MapResult(classes: mapClasses, residualLoss: plan.residualLoss, epsilon: 0.02, spent: 51.2, budget: 52.4,
+                                       exhausted: plan.exhausted, judged: 3.1, wrong: [])
         let w = [CapacityMap.EngineWitness(engine: "gpu", before: 0.0123, after: 0.0125, errorBefore: 0.01, errorAfter: 0.01),
                  CapacityMap.EngineWitness(engine: "amx", before: 0.031, after: 0.032, errorBefore: 0.01, errorAfter: 0.01),
                  CapacityMap.EngineWitness(engine: "ane", before: 0.019, after: 0.0191, errorBefore: 0.01, errorAfter: 0.01)]
@@ -376,9 +400,9 @@ final class CapacityMapTests: XCTestCase {
                                  verdict: .init(green: true, reasons: []))
     }
 
-    func testReportOfSchema13RoundTripsAndKeepsItsLinkShort() throws {
+    func testReportOfSchema14RoundTripsAndKeepsItsLinkShort() throws {
         let r = report(green: true)
-        XCTAssertEqual(r.schema, 13)
+        XCTAssertEqual(r.schema, 14)
         XCTAssertNil(r.decisions, "the rules are for the older reports")
         let back = try JSONDecoder().decode(Diagnostic.Report.self, from: r.json())
         XCTAssertEqual(back, r)
@@ -394,7 +418,7 @@ final class CapacityMapTests: XCTestCase {
 
     func testAnOlderReportIsNotRead() {
         var old = report(green: true)
-        old.schema = 12
+        old.schema = 13
         old.routes = nil; old.map = nil; old.verdict = nil
         XCTAssertFalse(old.isCurrent)
         XCTAssertFalse(old.isGreen)
@@ -403,7 +427,7 @@ final class CapacityMapTests: XCTestCase {
         XCTAssertEqual(current.isCurrent, current.fingerprint == .current)
     }
 
-    func testTheEngineReadsTheTableOfASchema13Map() {
+    func testTheEngineReadsTheTableOfASchema14Map() {
         let r = report(green: true)
         let read = EngineSettings(applying: [:], map: r)
         XCTAssertEqual(read.routes, r.routes)
@@ -420,7 +444,7 @@ final class CapacityMapTests: XCTestCase {
     func testAFailedWeightFormFallsBackToTheNextRule() {
         // Int8 beside the AMX chosen for one class: engines and weight rule, in the table.
         let classes: [CM.ComputeClass] = [.init("product:4096x12288@4096~int8", weight: 1,
-                                                routes: CapacityMap.productRoutes(kind: .int8, m: 4096, denoising: true, caps: all))]
+                                                routes: CapacityMap.productRoutes(m: 4096, caps: all))]
         let routes = classes[0].routes.map(\.id)
         let plan = CM.Plan(decisions: [.init(classID: classes[0].id, chosen: "gpu+amx/int8", status: .closed, loss: 0, hotRatios: routes.map { _ in 1 }, runs: 6)],
                            residualLoss: 0, spent: 1, exhausted: false)
@@ -463,17 +487,6 @@ final class CapacityMapTests: XCTestCase {
         XCTAssertNil(cold.decisions[0].spread[2], "a hole has no dispersion")
     }
 
-    func testWhatTheMapDoesNotDecideIsStillPartOfTheRender() {
-        // The same measures, a class that weighs the same, and a tail as heavy as the class: its loss is half.
-        let base: [[Double?]] = [[0.1, 0.099, nil]]
-        func loss(_ tail: Double) -> Double {
-            var s = CM.Settings(); s.budget = 2
-            let sim = CapacityMeasureTests.Sim(base: base, noise: 0.03, seed: 7)
-            return CM.plan(classes: tinyClasses(), settings: s, extraWeight: tail, clock: sim) { sim.probe($0, $1) }.residualLoss
-        }
-        XCTAssertEqual(loss(1), loss(0) / 2, accuracy: loss(0) * 0.05)
-    }
-
     func testAnEfficientRouteKeptAgainstAFasterEfficientOneIsNoLoss() {
         // ANE 5.5, the three 5.8 TFLOP/s: within 90 %, the rule keeps the pair — and the plan stops measuring for it.
         let routes: [CM.Route] = [.init("gpu", engines: ["gpu"]), .init("gpu+ane", efficient: true, engines: ["gpu", "ane"]),
@@ -483,14 +496,5 @@ final class CapacityMapTests: XCTestCase {
         XCTAssertEqual(plan.decisions[0].chosen, "gpu+ane")
         XCTAssertLessThan(plan.decisions[0].loss, CM.Settings().epsilon)
         XCTAssertLessThan(plan.decisions[0].runs, 200, "it was 805 runs of a minute's budget before")
-    }
-
-    func testAMapCoversTheFamiliesItWasMadeFor() {
-        var r = report(green: true)
-        XCTAssertFalse(r.covers(["z-image"]), "a map without families covers none")
-        r.map?.families = ["z-image", "qwen-image-2.1"]
-        XCTAssertTrue(r.covers(["z-image"]))
-        XCTAssertTrue(r.covers([]))
-        XCTAssertFalse(r.covers(["z-image", "krea2"]))
     }
 }

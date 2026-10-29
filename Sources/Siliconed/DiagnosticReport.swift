@@ -431,9 +431,9 @@ extension Diagnostic {
         }
     }
 
-    /// **What the plan spent and what it leaves**: the classes, the residual loss against ε (fractions of the render), the
-    /// seconds of the plan against its budget, the share of the catalogue under the cut, the seconds of exactness checks,
-    /// and the routes judged wrong (`class route`) — excluded from their class only.
+    /// **What the plan spent and what it leaves**: the decisions (one per point of the grid and weight form), the residual loss
+    /// against ε, the seconds of the plan against its budget, the seconds of exactness checks, and the routes judged wrong
+    /// (`class route`) — excluded from their class only.
     package struct MapResult: Codable, Sendable, Equatable {
         package var classes: [MapClass]
         package var residualLoss: Double
@@ -441,19 +441,15 @@ extension Diagnostic {
         package var spent: Double
         package var budget: Double
         package var exhausted: Bool
-        package var tail: Double
         package var judged: Double
         package var wrong: [String]
-        /// The families the map decided for (`Family.rawValue`): a map made for the models installed does not speak of the others.
-        package var families: [String]
 
         package init(classes: [MapClass], residualLoss: Double, epsilon: Double, spent: Double, budget: Double, exhausted: Bool,
-                     tail: Double, judged: Double, wrong: [String], families: [String] = []) {
-            self.families = families
+                     judged: Double, wrong: [String]) {
             self.classes = classes
             self.residualLoss = Diagnostic.significant(residualLoss, 3); self.epsilon = epsilon
             self.spent = Diagnostic.significant(spent, 3); self.budget = Diagnostic.significant(budget, 3)
-            self.exhausted = exhausted; self.tail = Diagnostic.significant(tail, 2)
+            self.exhausted = exhausted
             self.judged = Diagnostic.significant(judged, 2); self.wrong = wrong
         }
     }
@@ -555,12 +551,6 @@ extension Diagnostic {
         /// facts of the regime (`before`, `after`, `regime`), and the pairs measure through them. A report of an
         /// older schema is never green: it is not read (`isCurrent`).
         package var isGreen: Bool { verdict?.green == true }
-
-        /// **The map speaks of these families** (it was made for them, or for more). An app that installs a model of a family the
-        /// map did not decide for measures again.
-        package func covers(_ families: Set<String>) -> Bool {
-            map.map { Set($0.families).isSuperset(of: families) } ?? false
-        }
 
         /// Every measure of the report, in its order.
         package var measures: [Measure] {

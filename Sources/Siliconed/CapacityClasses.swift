@@ -1,9 +1,10 @@
 import Foundation
 
 /// **The classes of computation of a render, their executions, their weights, and the time they are predicted to
-/// take** — the catalogue the capacity map decides over and the render's predicted-versus-measured check
-/// compares with. Pure: it reads the five families' `Config` defaults (no header, no weights), a version (the
-/// weights' format), a format (the pixels) and "Faster Rendering".
+/// take** — what the render's predicted-versus-measured check compares with (`RenderLoop`), and what the capacity map's
+/// grid is tested to reach (`CapacityMap.gridShapes`); the map itself never reads it. Pure: it reads the five families'
+/// `Config` defaults (no header, no weights), a version (the weights' format), a format (the pixels) and "Faster
+/// Rendering".
 ///
 ///     Request (family, version, W×H, Faster Rendering, prompt tokens, steps)
 ///        │
