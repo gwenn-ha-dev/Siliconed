@@ -19,7 +19,7 @@
 #   memory    physical memory, e.g. "16 GB"
 #   macos     macOS version and build
 #   version   app version and the engine's commit
-#   report    the JSON report (schema 11, the machine's capacity map), only
+#   report    the JSON report (schema 14, the machine's capacity map), only
 #             if the whole URL stays under ~8 000 characters
 #
 # Labels come from `labels:` below; a `labels=` parameter is ignored for users without triage

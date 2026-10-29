@@ -13,7 +13,10 @@ qu'elles ne puissent pas diverger.
 L'app ouverte tient la seule file de rendus de la machine. `silicontrol …` y ajoute, attend, arrête,
 relit l'historique : les mêmes fonctions que les boutons (`AppState.enqueue`, `cancel`, `remove`,
 `stopAll`). Les demandes de la commande apparaissent dans la fenêtre ; celles de la souris, la
-commande les voit. Il n'y a jamais deux moteurs dans les 16 Go.
+commande les voit. Il n'y a jamais deux moteurs dans les 16 Go. Quand la fenêtre calcule sur un autre Mac
+(Rendu › Calculer sur), les commandes la suivent : elles ne parlent toujours qu'au socket de ce Mac, mais agissent
+sur la file et l'historique de l'autre Mac, comme les boutons ; `install` y refuse, `diagnose` et
+`set faster-rendering` agissent sur l'autre Mac.
 
 **Une licence ne s'accepte que dans la fenêtre.** Un travail dont la bibliothèque n'a pas
 enregistré la licence du modèle est refusé par le moteur (`license_not_accepted`) et mis de côté,

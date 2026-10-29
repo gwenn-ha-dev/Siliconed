@@ -12,7 +12,9 @@ only explains how the thing is built; it does not repeat the help, so the two ca
 The open app holds the machine's only render queue. `silicontrol …` adds to it, waits, stops,
 reads the history: the same functions as the buttons (`AppState.enqueue`, `cancel`, `remove`,
 `stopAll`). What the command adds shows up in the window; what the mouse starts, the command sees.
-There are never two engines inside the 16 GB.
+There are never two engines inside the 16 GB. When the window computes on another Mac (Render › Compute On),
+the commands follow it: they still talk only to this Mac's socket, but act on the other Mac's queue and history,
+as the buttons do; `install` refuses there, `diagnose` and `set faster-rendering` act on the other Mac.
 
 **A license is accepted only in the window.** A job whose model's license the library does not
 record is refused by the engine (`license_not_accepted`) and set aside, out of the queue, while the

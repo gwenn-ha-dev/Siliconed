@@ -110,12 +110,6 @@ extension Diagnostic {
         return [first, once(), once()].sorted()[1]
     }
 
-    /// **How much slower than the GPU alone's fp32 product a weight path may run and still be timed in full**:
-    /// what it saves is the weight's widening, at most a few percent of a product of 1 024 rows or more (k · n
-    /// values against 2 · m · k · n flops: on the M1 Pro, 18/10/2026, 8 % at 1 024 rows). At half again the GPU's
-    /// time, the widening would have to cost half a product for the path to win.
-    package static let weightPathGiveUp = 1.5
-
     /// **Uniform in `[−scale, scale]`, the same on every machine**: xorshift by blocks of 2¹⁶ values,
     /// each seeded by its index — whatever the cores, the first `count` values of a longer fill are
     /// these.

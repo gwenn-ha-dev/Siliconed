@@ -86,7 +86,7 @@ package enum EngineError: Error, Equatable, Sendable, Codable, LocalizedError, C
     /// A prompt that spells a text the model's encoder reserves (`text`; Qwen-Image-2.1:
     /// `<|image_pad|>`, the place of a reference image), refused before any weight is read.
     case promptReservedText(text: String)
-    /// A prompt longer than the model reads: `tokens` counted, `max` at most (Qwen-Image-2.1: 512).
+    /// A prompt longer than the model reads: `tokens` counted, `max` at most (`Request.maximumPromptTokens`).
     case promptTooLong(tokens: Int, max: Int)
     /// An XY grid (`RenderGrid`) whose axes do not make a grid (see `GridRefusal`).
     case gridRefused(reason: GridRefusal)

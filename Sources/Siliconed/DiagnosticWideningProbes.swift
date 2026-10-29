@@ -1,5 +1,4 @@
-// The weight widening's measurements and the drift witness. Split from
-// `DiagnosticProbes.swift`.
+// The weight widening's measurements. Split from `DiagnosticProbes.swift`.
 
 import Accelerate
 internal import AMXLegacy
@@ -148,31 +147,5 @@ extension Diagnostic {
             w[j] = m
         }
         return (0..<jobs).map { w[$0] }.max() ?? 0
-    }
-
-    // ── the drift witness ───────────────────────────────────────────────────────────────────
-
-    /// **The first product again, GPU and AMX**, on fresh operands of the same values (the same
-    /// seeds): the ratio to `products[0]` is the machine's drift over the diagnostic.
-    static func measureWitness(first: Product, _ bench: Bench) throws -> Witness {
-        let s = shapes[0]
-        let (a, b, c) = (Pages(bytes: s.m * s.k * 4), Pages(bytes: s.k * s.n * 4), Pages(bytes: s.m * s.n * 4))
-        fill(a.floats(), count: s.m * s.k, scale: 1, seed: 1)
-        fill(b.floats(), count: s.k * s.n, scale: 1, seed: 2)
-        let gemm = try GEMM(freezeCut: true, coexecution: false)
-        let (ab, bb, cb) = (try gemm.wrap(a.base, bytes: a.capacity, name: "witness.a"),
-                            try gemm.wrap(b.base, bytes: b.capacity, name: "witness.b"),
-                            try gemm.wrap(c.base, bytes: c.capacity, name: "witness.c"))
-        let flops = 2.0 * Double(s.m) * Double(s.k) * Double(s.n)
-        let gpu = seconds { _ = gemm.linear(a: ab, b: bb, c: cb, m: s.m, k: s.k, n: s.n, weightIsTransposed: true) }
-        var amx: Double?
-        if first.amx != nil {
-            var workspace: Pages?
-            amx = flops / seconds {
-                _ = Conductor.multiply(a: a.base, b: b.base, c: c.base, rows: s.m, k: s.k, n: s.n, transposeWeight: false,
-                                       workspace: &workspace)
-            } / 1e12
-        }
-        return Witness(gpuBefore: first.gpu.rate, gpuAfter: flops / gpu / 1e12, amxBefore: first.amx?.rate, amxAfter: amx)
     }
 }

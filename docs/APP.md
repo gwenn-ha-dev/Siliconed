@@ -98,7 +98,7 @@ The other Compact versions use 8-bit weights published by third parties: [unslot
 
 ## Private by construction
 
-Rendering happens on your Mac. The only network traffic is the model download you accepted; the diagnostic copies its report and opens a GitHub issue form that you choose to submit or not. The render cache lasts one session: it is emptied at launch and at quit. Before each render the engine checks the model, its license, the format and the memory it needs, and refuses up front a render beyond this Mac's budget. The app censors no prompt and adds no content filter; each model's license still applies, and Krea 2 Community's asks whoever deploys the model for one.
+Rendering happens on your Mac. The only network traffic is the model download you accepted and, if you turn it on (Settings › Other Macs), the encrypted link to another Mac of your network; the diagnostic copies its report and opens a GitHub issue form that you choose to submit or not. The render cache lasts one session: it is emptied at launch and at quit. Before each render the engine checks the model, its license, the format and the memory it needs, and refuses up front a render beyond this Mac's budget. The app censors no prompt and adds no content filter; each model's license still applies, and Krea 2 Community's asks whoever deploys the model for one.
 
 ## For AI agents and scripts: silicontrol
 
