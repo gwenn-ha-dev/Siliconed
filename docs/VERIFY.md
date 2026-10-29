@@ -12,11 +12,11 @@ The figures here, and the checks, are those of the render at full size, Faster R
 
 ## Setting up
 
-You need the app (0.16 or later), Python 3.12, and this repository at the app's version (Siliconed → About Siliconed shows it). `siliconed` ships inside the app: it is the very engine the app renders with, and it runs without Xcode.
+You need the app (0.17 or later), Python 3.12, and this repository at the app's version (Siliconed → About Siliconed shows it). `siliconed` ships inside the app: it is the very engine the app renders with, and it runs without Xcode.
 
 ```sh
 alias siliconed=/Applications/Siliconed.app/Contents/Helpers/siliconed
-git clone --branch v0.16 https://github.com/gwenn-ha-dev/Siliconed && cd Siliconed
+git clone --branch v0.17 https://github.com/gwenn-ha-dev/Siliconed && cd Siliconed
 python3.12 -m venv oracle-env && oracle-env/bin/pip install -r tools/oracle/requirements.txt
 ```
 

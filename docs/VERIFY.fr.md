@@ -12,11 +12,11 @@ Les chiffres d'ici, et les contrôles, sont ceux du rendu à pleine taille, Rend
 
 ## Mise en place
 
-Il faut l'app (0.16 ou suivante), Python 3.12, et ce dépôt à la version de l'app (Siliconed → À propos de Siliconed l'affiche). `siliconed` est livré dans l'app : c'est le moteur même avec lequel l'app rend, et il tourne sans Xcode.
+Il faut l'app (0.17 ou suivante), Python 3.12, et ce dépôt à la version de l'app (Siliconed → À propos de Siliconed l'affiche). `siliconed` est livré dans l'app : c'est le moteur même avec lequel l'app rend, et il tourne sans Xcode.
 
 ```sh
 alias siliconed=/Applications/Siliconed.app/Contents/Helpers/siliconed
-git clone --branch v0.16 https://github.com/gwenn-ha-dev/Siliconed && cd Siliconed
+git clone --branch v0.17 https://github.com/gwenn-ha-dev/Siliconed && cd Siliconed
 python3.12 -m venv oracle-env && oracle-env/bin/pip install -r tools/oracle/requirements.txt
 ```
 
