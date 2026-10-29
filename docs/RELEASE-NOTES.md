@@ -32,6 +32,10 @@ English · [Français](RELEASE-NOTES.fr.md)
 - **Any format, any shape**: a computation the map did not measure — a 1024×1536 image, an edit —
   takes the route of the nearest one it measured, and only a shape far from all of them stays on the
   GPU alone. Before, everything outside the measured formats ran on the GPU alone.
+- **The slowest Mac fits its minute**: a route not yet timed at one shape is judged from its timings
+  at the others, and each second of the map goes where it settles the most. On a MacBook Neo the map
+  used to run out of time before it reached the Neural Engine; it now finds it at every product it
+  measures, 1.7 to 2.7 times as fast as the GPU alone.
 - **Measured the way a render runs**: each route is timed against the simplest in alternation, so a
   Mac that heats up or runs on battery compares like with like; the routes are chosen at the warm
   regime a render of a few minutes runs at, with one witness per engine. A product is timed once on

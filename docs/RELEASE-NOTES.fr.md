@@ -33,6 +33,10 @@
 - **Tout format, toute forme** : un calcul que la carte n'a pas mesuré (une image en 1024×1536, une
   édition) prend la route du plus proche qu'elle a mesuré, et seule une forme loin de toutes reste sur
   le GPU seul. Avant, tout ce qui sortait des formats mesurés tournait sur le GPU seul.
+- **Le Mac le plus lent tient sa minute** : une route pas encore chronométrée sur une forme se juge
+  sur ses temps aux autres, et chaque seconde de la carte va où elle tranche le plus. Sur un MacBook
+  Neo, la carte manquait de temps avant d'atteindre le Neural Engine ; elle le trouve désormais sur
+  tous les produits qu'elle mesure, 1,7 à 2,7 fois plus vite que le GPU seul.
 - **Mesurée comme un rendu tourne** : chaque route est chronométrée contre la plus simple en
   alternance, si bien qu'un Mac qui chauffe ou tourne sur batterie compare à conditions égales ; les
   routes sont choisies au régime chaud d'un rendu de quelques minutes, avec un témoin par moteur. Un
