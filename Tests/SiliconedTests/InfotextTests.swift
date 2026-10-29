@@ -41,6 +41,10 @@ final class InfotextTests: XCTestCase {
         // Krea 2: the page Civitai joins Comfy-Org's bf16 file to (19/10/2026).
         XCTAssertTrue(render(model: "krea2", name: "Krea 2 Turbo").parameters(version: nil).contains(
             #"Civitai resources: [{"type":"checkpoint","modelVersionId":3064584}]"#))
+        // MOSS-Image: CivitaiOfficial's SFT, which holds the Compact's two files, and the DMD LoRA its 8 steps
+        // run under (29/10/2026).
+        XCTAssertTrue(render(model: "moss-image", name: "MOSS-Image").parameters(version: nil).contains(
+            #"Civitai resources: [{"type":"checkpoint","modelVersionId":3409867},{"type":"lora","weight":1,"modelVersionId":3411385}], "#))
     }
 
     /// The weight goes in a prompt tag, the hash in `Lora hashes`, both under one sanitized name;

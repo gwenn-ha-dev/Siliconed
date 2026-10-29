@@ -30,7 +30,8 @@ import Foundation
 ///     `docs/image-resource-hash-matching.md`);
 ///   - **`Civitai resources: [{…}]`** names a model version directly, with no hash: the only way
 ///     for the base model, installed from Hugging Face in several files that no Civitai file
-///     equals. Its regex is non-greedy up to the first `}]`, and wants `, ` before it;
+///     equals — and for a family's own LoRA (`civitaiRecipeLoRA`), which the user never imported.
+///     Its regex is non-greedy up to the first `}]`, and wants `, ` before it;
 ///   - a value holding `,` `"` or a newline is JSON-quoted (A1111's `quote()`), or the pair
 ///     scanner splits it — but a quoted value that looks like `word: …` is read back as a nested
 ///     block (`KEY_VALUE_SHAPE` in `a1111-text.ts`): `Model: "Real: v2"` becomes `{Real: v2}`. A
@@ -63,15 +64,24 @@ package enum Infotext {
     /// the Compact's, is version 3091481 of the same page — checked 19/10/2026): Krea has no Civitai
     /// page and CivitaiOfficial's « Krea 2 » is the hosted API, so the page Civitai joins these files
     /// to is a user's upload of Comfy-Org's repository — the one every Krea 2 render there points at.
+    /// MOSS-Image "SFT" 3409867 (CivitaiOfficial, checked 29/10/2026): Comfy-Org's int8 convrot DiT
+    /// (`b4d1475bc7ee…`) and encoder (`32e3787472f7…`), the Compact's two files, are among its files.
     package static func civitaiModelVersion(model: String) -> Int? {
         switch model {
         case "z-image": return 2_442_439
         case "qwen-image-2.1": return 3_400_828
         case "anima": return 3_263_843
         case "krea2": return 3_064_584
+        case "moss-image": return 3_409_867
         default: return nil
         }
     }
+
+    /// **The LoRA a page's recipe runs under**, credited beside it at strength 1: MOSS-Image's 8 steps are
+    /// lodestones' DMD LoRA (`Installation.companion`), byte for byte tsolful's "Moss_SFT_8_steps_dmd_v0.1"
+    /// 3411385 (`4abb14e39c1a…`, checked 29/10/2026). Without it, a Remix runs the SFT alone at 8 steps
+    /// and CFG 1, and gets mush.
+    package static func civitaiRecipeLoRA(checkpoint: Int) -> Int? { checkpoint == 3_409_867 ? 3_411_385 : nil }
 
     /// A1111's sampler names, as Civitai lists them.
     package static func sampler(_ solver: Solver) -> String {
@@ -104,7 +114,11 @@ package enum Infotext {
         let hashes = named.compactMap { n in n.lora.sha256.map { "\(n.name): \($0.lowercased())" } }
         if !hashes.isEmpty { details.append("Lora hashes: \"\(hashes.joined(separator: ", "))\"") }
         if let id = civitaiModelVersion {
-            details.append("Civitai resources: [{\"type\":\"checkpoint\",\"modelVersionId\":\(id)}]")
+            var resources = ["{\"type\":\"checkpoint\",\"modelVersionId\":\(id)}"]
+            if let lora = civitaiRecipeLoRA(checkpoint: id) {
+                resources.append("{\"type\":\"lora\",\"weight\":1,\"modelVersionId\":\(lora)}")
+            }
+            details.append("Civitai resources: [\(resources.joined(separator: ","))]")
         }
         details.append("Version: " + value(version.map { "Siliconed \($0)" } ?? "Siliconed"))
         return ([prompt] + tags).joined(separator: " ") + "\n" + details.joined(separator: ", ")
