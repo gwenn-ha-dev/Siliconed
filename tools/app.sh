@@ -55,6 +55,9 @@ cp .build/release/SiliconedApp "$app/Contents/MacOS/Siliconed"
 cp .build/release/silicontrol "$app/Contents/Helpers/silicontrol"
 cp .build/release/siliconed "$app/Contents/Helpers/siliconed"
 (( dev )) && cp .build/release/siliconed-dev "$app/Contents/Helpers/siliconed-dev"
+# Local symbols serve only a debugger: without them each binary is about half its size (the app 20.9 → 10.3 MB),
+# the same code. Before the signature, which covers the stripped bytes.
+strip -x "$app/Contents/MacOS/Siliconed" "$app"/Contents/Helpers/*
 xcrun xcstringstool compile Sources/SiliconedApp/Localizable.xcstrings --output-directory "$app/Contents/Resources" >/dev/null
 xcrun xcstringstool compile Sources/SiliconedApp/InfoPlist.xcstrings --output-directory "$app/Contents/Resources" >/dev/null
 # English is the language of the keys: the compiler emits only what differs (the translations, and
