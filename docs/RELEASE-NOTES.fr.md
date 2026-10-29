@@ -52,6 +52,7 @@
 ### Aussi
 
 - **L'app en japonais et en chinois simplifié.**
+- **Deux fois plus légère** : les binaires de l'app ne portent plus leurs symboles de débogage ; le même code.
 - **Les Réglages en trois onglets** : Général, Autres Mac, Avancé.
 - **Un seul calendrier** : celui de ComfyUI disparaît ; l'officiel est le seul.
 

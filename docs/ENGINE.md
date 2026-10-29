@@ -8,17 +8,17 @@ How Siliconed measures your Mac, picks its kernels, stays within its memory budg
 
 **No two Macs compute alike, so Siliconed does not guess.** Before the first render after each install or update — and whenever the Mac or macOS changes — it measures the Mac it runs on, in about a minute and without any model. It times a fixed grid of matrix products spanning the shapes of every model's DiT blocks — the same grid whatever is installed — on the GPU, on the CPU's matrix unit (AMX), on the Neural Engine and on the GPU beside each, attention through three kernels, products read straight from published int8 and Q8_0 weights, and bf16 products on the GPU's tensor units, and checks every output against the exact result. That report becomes **this Mac's map**, and the map picks the kernels: a route is taken only if it computed right and wins. Two routes are timed in turn, A B A B, so that a Mac warming up slows both alike; the minute goes to the decisions whose error would cost a render most, and a more complex route must beat a simpler one by more than 1 %. No kernel is switched on by chip name.
 
-What the map decided on the M1 Pro of the numbers below, 16 GB, on 24/10/2026 (app 0.15):
+What the map chose on the M1 Pro of the numbers below, 16 GB, on 29/10/2026 (app 0.17), green in a minute; a speed is against the GPU alone, at 1 024 rows (an image of 1024², or less) and at 4 096 (larger images, edits):
 
-| Kernel | Decision | Against the default |
+| Computation | Route chosen | Against the GPU alone |
 |---|---|---|
-| GPU + CPU matrix unit (AMX) co-execution | **on** | ×1.25 |
-| the Neural Engine beside the GPU | **on** | ×1.39 |
-| attention split by heads between the GPU and the CPU | **on** | ×1.53 |
-| flash attention | off, inside the margin | ×1.10 |
-| products on published int8 weights | off | ×0.98 |
-| products on published Q8_0 weights | off | ×0.38 |
-| bf16 products on the GPU's tensor units | off | ×0.48 |
+| products on bf16 or Q8_0 weights, 1 024 rows (7 shapes) | the GPU beside the Neural Engine on 4, beside the CPU's matrix unit (AMX) on 2, the three on 1 | ×1.11 to ×1.31 |
+| the same, 4 096 rows | the GPU beside the Neural Engine on 6, beside the AMX on 1 | ×1.54 to ×1.62 |
+| products on published int8 weights, 1 024 rows | the weights read as published, the GPU beside the AMX, on 6 of 7 (the seventh beside the Neural Engine) | ×1.26 to ×1.87 |
+| the same, 4 096 rows | widened, the GPU beside the Neural Engine on 6; as published beside the AMX on 1 | ×1.51 to ×1.60 |
+| attention (16 and 32 heads, 1 024 and 4 096 tokens) | split by heads, 40 % of them on the CPU | ×1.54 to ×2.24 (flash: ×1.05 to ×1.35) |
+| Q8_0 weights read as published | never | ×0.40, ×0.55 beside the AMX |
+| bf16 products on the GPU's tensor units | never | ×0.68 to ×0.74 |
 
 The products on published int8 weights (the Compact of Krea 2 and Qwen-Image-2.1) won on this chip in the measurement made with 0.12 (18/10/2026); with 0.15 they tie with the default and stay off. The AMX and the Neural Engine share the products shape by shape: the Neural Engine takes a shape wherever it keeps 90 % of the AMX's speed there, because that saves energy, and where all three engines at once beat both pairs, the GPU, the AMX and the Neural Engine share the same product (on this M1 Pro, the square and widening products at 1024², 5 to 10 % faster than the best pair; never the narrowing ones, where the AMX slows the others down). This is one Mac: another chip measures its own and decides otherwise, and its report can fill a line of the [Community diagnostic](#community-diagnostic) table. The map buys speed and nothing else: it never changes the image beyond what the arithmetic it checked allows. The Neural Engine's fp16 is your choice, per model (below). Help → **Measure This Mac** shows the map and lets you share it.
 

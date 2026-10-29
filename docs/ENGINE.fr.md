@@ -8,17 +8,17 @@ Comment Siliconed mesure votre Mac, choisit ses noyaux, reste dans son budget de
 
 **Deux Mac ne calculent pas pareil, alors Siliconed ne devine pas.** Avant le premier rendu qui suit chaque installation ou mise à jour — et dès que le Mac ou macOS change —, il mesure le Mac sur lequel il tourne, en une minute environ et sans aucun modèle. Il chronomètre une grille fixe de produits matriciels qui couvre les formes des blocs de tous les DiT — la même grille quoi qu'il soit installé — sur le GPU, sur l'unité matricielle du CPU (AMX), sur le Neural Engine et sur le GPU à côté de chacun, l'attention par trois noyaux, des produits lus directement sur les poids int8 et Q8_0 publiés, et des produits bf16 sur les unités tensorielles du GPU, et vérifie chaque sortie contre le résultat exact. Ce rapport devient **la carte de ce Mac**, et la carte choisit les noyaux : une route n'est prise que si elle a calculé juste et gagne. Deux routes sont chronométrées tour à tour, A B A B, pour qu'un Mac qui chauffe les ralentisse autant l'une que l'autre ; la minute va aux décisions dont l'erreur coûterait le plus à un rendu, et une route plus complexe doit battre une plus simple de plus de 1 %. Aucun noyau ne s'allume d'après le nom de la puce.
 
-Ce que la carte a décidé sur le M1 Pro des chiffres plus bas, 16 Go, le 24/10/2026 (app 0.15) :
+Ce que la carte a choisi sur le M1 Pro des chiffres plus bas, 16 Go, le 29/10/2026 (app 0.17), verte en une minute ; une vitesse s'entend contre le GPU seul, à 1 024 lignes (une image de 1024², ou moins) et à 4 096 (images plus grandes, éditions) :
 
-| Noyau | Décision | Contre le défaut |
+| Calcul | Route choisie | Contre le GPU seul |
 |---|---|---|
-| co-exécution GPU + unité matricielle du CPU (AMX) | **allumée** | ×1,25 |
-| le Neural Engine à côté du GPU | **allumé** | ×1,39 |
-| attention partagée par têtes entre le GPU et le CPU | **allumée** | ×1,53 |
-| attention flash | éteinte, dans la marge | ×1,10 |
-| produits sur les poids int8 publiés | éteints | ×0,98 |
-| produits sur les poids Q8_0 publiés | éteints | ×0,38 |
-| produits bf16 sur les unités tensorielles du GPU | éteints | ×0,48 |
+| produits sur des poids bf16 ou Q8_0, 1 024 lignes (7 formes) | le GPU à côté du Neural Engine sur 4, à côté de l'unité matricielle du CPU (AMX) sur 2, les trois sur 1 | ×1,11 à ×1,31 |
+| les mêmes, 4 096 lignes | le GPU à côté du Neural Engine sur 6, à côté de l'AMX sur 1 | ×1,54 à ×1,62 |
+| produits sur les poids int8 publiés, 1 024 lignes | les poids lus tels que publiés, le GPU à côté de l'AMX, sur 6 des 7 (la septième à côté du Neural Engine) | ×1,26 à ×1,87 |
+| les mêmes, 4 096 lignes | élargis, le GPU à côté du Neural Engine sur 6 ; tels que publiés à côté de l'AMX sur 1 | ×1,51 à ×1,60 |
+| attention (16 et 32 têtes, 1 024 et 4 096 jetons) | partagée par têtes, 40 % d'entre elles sur le CPU | ×1,54 à ×2,24 (flash : ×1,05 à ×1,35) |
+| poids Q8_0 lus tels que publiés | jamais | ×0,40, ×0,55 à côté de l'AMX |
+| produits bf16 sur les unités tensorielles du GPU | jamais | ×0,68 à ×0,74 |
 
 Les produits sur les poids int8 publiés (la Compact de Krea 2 et de Qwen-Image-2.1) ont gagné sur cette puce à la mesure de la 0.12 (18/10/2026) ; avec la 0.15, ils font jeu égal avec le défaut et restent éteints. L'AMX et le Neural Engine se partagent les produits forme par forme : le Neural Engine prend une forme partout où il garde 90 % de la vitesse de l'AMX, pour l'énergie qu'il épargne, et là où les trois moteurs ensemble battent les deux paires, le GPU, l'AMX et le Neural Engine se partagent le même produit (sur ce M1 Pro, les produits carrés et ceux qui élargissent, en 1024², de 5 à 10 % plus vite que la meilleure paire ; jamais ceux qui rétrécissent, où l'AMX ralentit les autres). C'est un seul Mac : une autre puce mesure les siens et en décide autrement, et son rapport peut remplir une ligne du tableau du [diagnostic communautaire](#le-diagnostic-communautaire). La carte achète de la vitesse, jamais une autre image au-delà de l'arithmétique qu'elle a vérifiée ; le fp16 du Neural Engine, c'est vous qui le choisissez, par modèle (ci-dessous). Aide → **Mesurer ce Mac** montre la carte et permet de la partager.
 

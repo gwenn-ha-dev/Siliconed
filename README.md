@@ -26,6 +26,7 @@ The app ships as a `.dmg` on the [Releases](https://github.com/gwenn-ha-dev/Sili
 - **Explores before it commits.** A grid of quick sketches across seeds, steps, LoRA strengths or models; the cell you pick becomes the finished image.
 - **Takes your own models.** Import LoRAs and fine-tunes from Civitai or Hugging Face.
 - **Local and private.** Rendering happens on your Mac, with no content filter added by the app. It follows the system language (English, French, German, Spanish, Italian, Japanese or Simplified Chinese).
+- **Renders on another Mac.** A MacBook computes on the Mac mini of the next room, paired once with a code, encrypted ([how](docs/APP.md#render-on-another-mac)).
 - **Scriptable.** `silicontrol` drives the running app from a terminal, for scripts and AI agents ([details](docs/REMOTE-CONTROL.md)).
 
 More about the app: [docs/APP.md](docs/APP.md).
@@ -35,7 +36,7 @@ More about the app: [docs/APP.md](docs/APP.md).
 - **Fast, without cutting corners.** Z-Image Turbo at 1024² in 83 s on a MacBook Pro M1 Pro with 16 GB, with the 8 evaluations (passes of the model) its recipe calls for, by default the first three at half size, in the Compact the app recommends (the model in 8-bit weights, half the disk; [the three versions](docs/APP.md#model-management)). In full precision, the publisher's bf16 weights computed in fp32: 82 s. Full precision costs almost nothing. [All the numbers](docs/ENGINE.md#numbers).
 - **Large models on a 16 GB Mac.** 34 GB of model run on a 16 GB Mac: weights are read from disk as they are needed, and Siliconed never takes more than ¾ of the Mac's memory minus 2 GB. Each render works out what it needs before it starts; one beyond the budget is refused up front. [How it is measured](docs/ENGINE.md#memory-and-the-budget).
 - **Checked against the original models.** Every stage is compared, channel by channel, with the reference implementation (diffusers / transformers in fp32 on CPU), and what cannot be checked does not ship. Run the checks yourself: [VERIFY.md](docs/VERIFY.md). The CI runs the kernels' CPU stages each time the engine changes; its GPU is virtual, so the GPU stages run on your Mac.
-- **Tuned to your Mac.** Before the first render, in about a minute and without any model, it times its kernels on your chip and checks every result against the exact one; a kernel turns on only if it computed right and beat the default. [What it decided on an M1 Pro](docs/ENGINE.md#an-engine-measured-on-your-mac).
+- **Tuned to your Mac.** Before the first render, in about a minute and without any model, it times its kernels on your chip and checks every result against the exact one; each computation takes the route that computed right and was fastest there. [What it chose on an M1 Pro](docs/ENGINE.md#an-engine-measured-on-your-mac).
 - **Measured next to Draw Things' engine** on the same Mac, with the method and every figure: [Next to Draw Things](docs/ENGINE.md#next-to-draw-things).
 
 ## Documentation

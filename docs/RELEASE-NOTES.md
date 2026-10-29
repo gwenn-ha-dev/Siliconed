@@ -50,6 +50,7 @@ English · [Français](RELEASE-NOTES.fr.md)
 ### Also
 
 - **The app in Japanese and Simplified Chinese.**
+- **Half the size**: the app's binaries no longer carry their debugging symbols; the same code.
 - **Settings in three tabs**: General, Other Macs, Advanced.
 - **One schedule**: the ComfyUI sigma schedule is gone; the official one is the only one.
 
