@@ -1,4 +1,5 @@
-// The weight widening's measurements. Split from `DiagnosticProbes.swift`.
+// The weight widening's measurements: the seconds per value a weight pays to reach the form a kernel reads (`CapacityModel.preparation`),
+// each exact at the bit. Split from `DiagnosticProbes.swift`.
 
 import Accelerate
 internal import AMXLegacy
@@ -8,6 +9,17 @@ import MetalPerformanceShadersGraph
 
 extension Diagnostic {
     // ── the widening ────────────────────────────────────────────────────────────────────────
+
+    /// **One widening or copy**: what it was called, its values per second (G/s) and the worst bit it got wrong (0: exact).
+    struct Widening: Sendable, Equatable {
+        struct Rate: Sendable, Equatable {
+            var rate: Double
+            var error: Double
+        }
+        var kind: String
+        var values: Int
+        var cpu: Rate
+    }
 
     /// **A Z-Image w1 widened to fp32**, bf16 and int8 × bf16 scale per column, on the CPU: what the
     /// default path pays per weight, against which the copies of `gemm_tensor`, `gemm_int8` and `gemm_q8`
@@ -20,12 +32,12 @@ extension Diagnostic {
         let floats = destination.floats()
         var results: [Widening] = []
         /// One engine: poisoned output, timed, every value against `exact`.
-        func measure(_ exact: @escaping @Sendable (Int) -> Float, _ run: () throws -> Void) -> Measure {
+        func measure(_ exact: @escaping @Sendable (Int) -> Float, _ run: () throws -> Void) -> Widening.Rate {
             memset(destination.base, 0xFF, count * 4)
             var failed = false
             let t = seconds { do { try run() } catch { failed = true } }
             let error = failed ? Double.infinity : worstRelative(floats, count: count, exact: exact)
-            return Measure(rate: Double(count) / t / 1e9, error: error, threshold: 0)
+            return Widening.Rate(rate: Double(count) / t / 1e9, error: error)
         }
 
         // bf16 → fp32, a shift.
@@ -45,9 +57,8 @@ extension Diagnostic {
         memset(copy.base, 0xFF, count * 2)
         let tCopy = seconds { Widen.copyBfloat16(source: bf16.base, destination: copy.base, count: count) }
         results.append(Widening(kind: "bf16 copy", values: count,
-                                cpu: Measure(rate: Double(count) / tCopy / 1e9,
-                                             error: memcmp(copy.base, bf16.base, count * 2) == 0 ? 0 : .infinity,
-                                             threshold: 0)))
+                                cpu: Widening.Rate(rate: Double(count) / tCopy / 1e9,
+                                             error: memcmp(copy.base, bf16.base, count * 2) == 0 ? 0 : .infinity)))
 
         // int8 × bf16 scale per column, the layout of an 8-bit map's `[K, N]` weight.
         try bench.check()
@@ -96,14 +107,14 @@ extension Diagnostic {
             }
         }
         results.append(Widening(kind: "int8 convrot", values: count,
-                                cpu: Measure(rate: Double(count) / tRotated / 1e9, error: rotatedError, threshold: 0)))
+                                cpu: Widening.Rate(rate: Double(count) / tRotated / 1e9, error: rotatedError)))
         // int8 → int8, the copy `gemm_int8` makes instead (`Artifact.stageInt8`): a quarter of the writes.
         let copy8 = Pages(bytes: count)
         memset(copy8.base, 0x7F, count)
         let tCopy8 = seconds { Widen.copyBfloat16(source: int8.base, destination: copy8.base, count: count / 2) }
         results.append(Widening(kind: "int8 copy", values: count,
-                                cpu: Measure(rate: Double(count) / tCopy8 / 1e9,
-                                             error: memcmp(copy8.base, int8.base, count) == 0 ? 0 : .infinity, threshold: 0)))
+                                cpu: Widening.Rate(rate: Double(count) / tCopy8 / 1e9,
+                                                   error: memcmp(copy8.base, int8.base, count) == 0 ? 0 : .infinity)))
 
         // Q8_0: the same int8 × fp16 scales per 32 rows and column, what a GGUF Q8_0 map's default path widens
         // on the CPU — `gemm_q8` copies the bytes and widens the scales alone (`Artifact.stageInt8`).
@@ -127,9 +138,8 @@ extension Diagnostic {
         }
         let scalesRight = (0..<blockScales).allSatisfy { scales32.floats()[$0] == Float(h[$0]) }
         results.append(Widening(kind: "q8_0 copy", values: count,
-                                cpu: Measure(rate: Double(count) / tCopyQ8 / 1e9,
-                                             error: memcmp(copy8.base, int8.base, count) == 0 && scalesRight ? 0 : .infinity,
-                                             threshold: 0)))
+                                cpu: Widening.Rate(rate: Double(count) / tCopyQ8 / 1e9,
+                                             error: memcmp(copy8.base, int8.base, count) == 0 && scalesRight ? 0 : .infinity)))
         return results
     }
 

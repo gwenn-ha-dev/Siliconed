@@ -32,7 +32,7 @@ extension AppState {
         diagnosticOpen = true
     }
 
-    /// **Runs `Diagnostic.run`** in a child process (`CapacityMeasure`, ~1 min), the queue held meanwhile.
+    /// **Runs `Diagnostic.run`** in a child process (`CapacityMeasure`, under a minute), the queue held meanwhile.
     func startDiagnostic() {
         guard diagnosticBlocker == nil else { return }
         // In a mirror the lending Mac measures itself; the sheet shows it starting until its word comes.
@@ -45,10 +45,10 @@ extension AppState {
     }
 
     /// **The measure, in a child process**: this app's executable with `CapacityMeasure.argument`. The
-    /// diagnostic reads the engine's settings (`Conductor`'s split, its quantum), and the settings are read
-    /// once per process: measured here, before the first render, it would freeze this process on the
-    /// defaults and the map could no longer apply. The child measures on the defaults, whatever this
-    /// process uses — a measure taken again is not skewed by the map in use —, and frees its 1.4 GB on exit.
+    /// diagnostic reads the engine's settings, and the settings are read once per process: measured here, before the
+    /// first render, it would freeze this process on the defaults and the model could no longer apply. The child
+    /// measures on the defaults, whatever this process uses — a measure taken again is not skewed by the model in use —,
+    /// and frees its memory on exit.
     /// Its report applies at once when nothing read the settings yet (`keep`). `next` calls this past its
     /// own guards, a job waiting; the sheet and the remote control through `startDiagnostic`.
     func measure() {
@@ -115,7 +115,9 @@ extension AppState {
         switch stage {
         case .widening: String(localized: "weight preparation")
         case .witness: String(localized: "the engines' first measurement")
-        case .routes: String(localized: "compute routes")
+        case .engines: String(localized: "each engine alone")
+        case .sharing: String(localized: "the engines together")
+        case .forms: String(localized: "the weight forms")
         case .regime: String(localized: "the engines again")
         }
     }
@@ -128,7 +130,7 @@ extension AppState {
     func openIssue(_ report: Diagnostic.Report) -> String? {
         do {
             copyJSON(report)
-            NSWorkspace.shared.open(try report.with(render: renderNote).issueURL(includingReport: false))
+            NSWorkspace.shared.open(try report.with(render: renderNote).issueURL())
             return String(localized: "The report is in the clipboard: paste it into the form's “Report” field.")
         } catch {
             return Problem(error).text
@@ -157,7 +159,7 @@ extension AppState {
 /// anything else (`SiliconedApplication.init`), says each stage and then the report on its standard
 /// output, one line each, and exits — no window, no Dock icon: it never reaches `NSApplication.run`.
 enum CapacityMeasure {
-    /// `--measure-capacity`: the map of this Mac, whatever models it holds.
+    /// `--measure-capacity`: the capacity model of this Mac, whatever models it holds.
     static let argument = "--measure-capacity"
 
     /// **The child's side**: does nothing unless the process was launched with `argument`; then never returns.
@@ -165,7 +167,7 @@ enum CapacityMeasure {
         guard CommandLine.arguments.dropFirst().first == argument else { return }
         setvbuf(stdout, nil, _IOLBF, 0)   // a stage line reaches the app as it is written
         do {
-            let report = try Diagnostic.run { stage in print("stage " + stage.key) }
+            let report = try Diagnostic.run(onProgress: { stage in print("stage " + stage.key) })
             let json = try report.json(pretty: false)
             print("report " + String(decoding: json, as: UTF8.self))
             exit(0)
@@ -190,7 +192,7 @@ enum CapacityMeasure {
                 guard let stage = Diagnostic.Stage.allCases.first(where: { $0.key == rest }) else { return nil }
                 self = .stage(stage)
             case "report":
-                guard let report = try? JSONDecoder().decode(Diagnostic.Report.self, from: Data(rest.utf8)) else { return nil }
+                guard let report = Diagnostic.Report.read(Data(rest.utf8)) else { return nil }
                 self = .report(report)
             case "error":
                 // The one refusal the app says in its own words: another process renders.

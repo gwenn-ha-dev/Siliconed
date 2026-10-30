@@ -151,6 +151,18 @@ package enum CapacitySolver {
         ProductSolver(model: model, c: constraints).solve(key, flash: flash)
     }
 
+    /// **The seconds the model gives an assignment someone else chose** — the plan's, a forcing's: what the engine ran, timed as the solver
+    /// times its own candidates. `nil` when the model has no line for a kernel the assignment uses (it was excluded, or never measured).
+    package static func product(assigned a: ProductAssignment, key: ProductKey, model: CapacityModel, constraints: Constraints) -> ProductSolution? {
+        ProductSolver(model: model, c: constraints).evaluate(a, key)
+    }
+
+    /// The same for an attention.
+    package static func attention(assigned a: AttentionAssignment, key: AttentionKey, model: CapacityModel,
+                                  constraints: Constraints) -> AttentionSolution? {
+        ProductSolver(model: model, c: constraints).evaluate(a, key)
+    }
+
     /// **Whether a family's code tries the flash kernel** on an attention: the self-attentions of Z-Image and Anima, before the split.
     package static func triesFlash(family: Family, cross: Bool) -> Bool { !cross && (family == .zImage || family == .anima) }
 
@@ -175,15 +187,15 @@ package enum CapacitySolver {
             case let .product(k, nn, rows, format):
                 let key = ProductKey(k: k, n: nn, m: rows, weight: format, phase: cl.phase)
                 guard let s = solver.solve(key) else { unpredicted.append(key.description); continue }
-                blocks.append(.init(classID: cl.routeKey.id + RouteTable.ClassKey.suffix(format.kind ?? .bf16), phase: cl.phase,
+                blocks.append(.init(classID: cl.id, phase: cl.phase,
                                     executions: executions, route: s.route, rows: s.rows, product: s.assignment, attention: nil,
                                     preparation: n * s.preparation, compute: n * s.compute, busy: s.busy.mapValues { $0 * n }))
             case let .attention(s, keys, heads, kv, dim, cross):
                 let key = AttentionKey(sequence: s, keys: keys, heads: heads, kvHeads: kv, headDim: dim, cross: cross)
                 guard let a = solver.solve(key, flash: triesFlash(family: family, cross: cross)) else {
-                    unpredicted.append(cl.routeKey.id); continue
+                    unpredicted.append(cl.id); continue
                 }
-                blocks.append(.init(classID: cl.routeKey.id, phase: cl.phase, executions: executions, route: a.route, rows: a.rows,
+                blocks.append(.init(classID: cl.id, phase: cl.phase, executions: executions, route: a.route, rows: a.rows,
                                     product: nil, attention: a.assignment, preparation: 0, compute: n * a.compute,
                                     busy: a.busy.mapValues { $0 * n }))
             }
@@ -232,7 +244,9 @@ private struct ProductSolver {
     }
 
     func seconds(_ rows: [Kernel: Int], m: Int, k: Int, n: Int, swapped: Bool = false) -> Double? {
-        swapped ? model.seconds(m: n, k: k, n: m, rows: rows, sustained: c.sustained)
+        // A set of engines the probes never measured is no candidate: keep 1 is not a measure.
+        guard model.measures(rows.filter { $0.value > 0 }.map(\.key.engine)) else { return nil }
+        return swapped ? model.seconds(m: n, k: k, n: m, rows: rows, sustained: c.sustained)
                 : model.seconds(m: m, k: k, n: n, rows: rows, sustained: c.sustained)
     }
     func busy(_ rows: [Kernel: Int], m: Int, k: Int, n: Int, swapped: Bool = false) -> [Engine: Double] {
@@ -402,6 +416,38 @@ private struct ProductSolver {
                      compute: o.seconds, busy: busy(o.rows, m: m, k: k, n: n, swapped: o.swapped))
     }
 
+    /// **An assignment decided elsewhere, timed here**: the kernels it reads, the rows each takes, plus the weight's preparation.
+    func evaluate(_ a: ProductAssignment, _ key: ProductKey) -> CapacitySolver.ProductSolution? {
+        let (k, n, m) = (key.k, key.n, key.m)
+        var rows: [Kernel: Int] = [:]
+        var swapped = false
+        switch a.path {
+        case .widened:
+            if a.gpu > 0 { guard let g = line(.gpu, .fp32) else { return nil }; rows[g] = a.gpu }
+            if a.amx > 0 { guard let x = line(.amx, .fp32) else { return nil }; rows[x] = a.amx }
+            if a.ane > 0 { guard let e = line(.ane, .fp16) else { return nil }; rows[e] = a.ane }
+        case .bf16:
+            guard let g = line(.gpu, a.roundsActivation ? .bf16act : .bf16) else { return nil }
+            rows[g] = a.gpu
+        case .native:
+            let form: CapacityModel.Form = key.weight == .int8 ? .int8 : .q8
+            guard let g = line(.gpu, form) else { return nil }
+            if a.amxColumns > 0 {
+                guard let x = line(.amx, form) else { return nil }
+                rows = [g: n - a.amxColumns, x: a.amxColumns]; swapped = true
+            } else { rows[g] = a.gpu }
+        }
+        guard !rows.isEmpty, let t = seconds(rows, m: m, k: k, n: n, swapped: swapped) else { return nil }
+        let prep = preparation(format: key.weight, path: a.path, k: k, n: n)
+        return .init(assignment: a, route: a.route(weight: key.weight), rows: rows, preparation: prep, compute: t,
+                     busy: busy(rows, m: m, k: k, n: n, swapped: swapped))
+    }
+
+    func evaluate(_ a: AttentionAssignment, _ key: AttentionKey) -> CapacitySolver.AttentionSolution? {
+        guard a.isRunnable(for: key), let t = timed(key, a) else { return nil }
+        return .init(assignment: a, route: t.route, rows: t.rows, compute: t.seconds, busy: t.busy)
+    }
+
     // MARK: Attentions
 
     /// The time and rows of an attention under a kernel and a number of CPU heads (flash: the GPU's, whole).
@@ -416,7 +462,7 @@ private struct ProductSolver {
             guard let g = line(.gpu, .graph) else { return nil }
             rows = [g: key.heads]
         case .split:
-            guard let g = line(.gpu, .graph), let cpu = line(.cpu, .heads) else { return nil }
+            guard let g = line(.gpu, .graph), let cpu = line(.cpu, .heads), model.measures([.gpu, .cpu]) else { return nil }
             rows = [g: key.heads - a.cpuHeads, cpu: a.cpuHeads]
         }
         guard let t = model.seconds(m: key.heads, k: per, n: 1, rows: rows, sustained: c.sustained) else { return nil }
@@ -428,7 +474,8 @@ private struct ProductSolver {
         var options: [AttentionAssignment] = [.graph]
         if flash, line(.gpu, .flash) != nil { options.append(.flash) }
         let groups = key.kvHeads
-        if key.sequence >= HeadSplitAttention.minimumSequence, groups >= 2, line(.cpu, .heads) != nil, line(.gpu, .graph) != nil {
+        if key.sequence >= HeadSplitAttention.minimumSequence, groups >= 2, line(.cpu, .heads) != nil, line(.gpu, .graph) != nil,
+           model.measures([.gpu, .cpu]) {
             for cpu in 1..<groups { options.append(AttentionAssignment(kernel: .split, cpuHeads: cpu * key.group)) }
         }
         var best: (AttentionAssignment, (route: String, rows: [Kernel: Int], seconds: Double, busy: [Engine: Double]))?

@@ -2,7 +2,7 @@ import Foundation
 import Synchronization
 
 /// **What a render's denoising computed, by class, with the route each product and attention took and the wall
-/// seconds it cost** — the render's side of the capacity map's check (`RenderLoop`). The engine adds one line per
+/// seconds it cost** — the render's side of the check against the plan's prediction (`RenderLoop`). The engine adds one line per
 /// execution where it already knows what it runs (`WeightProducts.linear` for every product by a weight of the five
 /// DiTs, the three attention kernels' `run`), so no model keeps a copy of it and no census is parsed back.
 ///
@@ -16,12 +16,12 @@ import Synchronization
 ///   - **The class is the caller's, not the kernel's.** `GEMM.census` keys MPS submissions: a 4 117-row product is
 ///     there as a body of 4 096 rows and a tail of 64, and an int8 or Q8_0 product (`TensorGEMM`, straight from
 ///     `WeightProducts`) is not in it at all. The ledger is told the product's own `k × n @ m` and the weight's
-///     kind, at the call that chose how the weight is read — the one place that knows both and the route.
+///     format, at the call that chose how the weight is read — the one place that knows both and the route.
 ///   - **The route is the one taken, not the one planned**: `gpu`, `gpu+amx`, `gpu+ane`, `gpu+ane+amx` for a widened
 ///     weight (the ANE's refusal, the conductor's declining a short tail: what ran), `gpu/bf16`, `gpu/bf16act`,
 ///     `gpu/int8`, `gpu+amx/int8`, `gpu/q8`, `gpu+amx/q8` for a weight read as published; `graph`, `flash`, `split`
-///     for an attention. The route names of the map's plan, so a line compares with its prediction as it stands.
-///   - **Heights stay the render's** (4 117, not 4 096): merging within the map's gap is the comparison's, where the
+///     for an attention. The route names of the plan's assignments, so a line compares with its prediction as it stands.
+///   - **Heights stay the render's** (4 117, not 4 096): merging within the comparison's gap is its own, where the
 ///     catalogue's heights meet them (`RenderLoop`).
 ///   - **Armed for the denoising only**, around `DenoisingModule.denoise` and for one render at a time (the engine's
 ///     queue): the text encoder's and the decoder's products are not the check's, and a check, the diagnostic or a
@@ -30,9 +30,9 @@ import Synchronization
 ///     nanoseconds for a product of milliseconds) and changes neither the order of the work nor a route.
 ///   - **Attentions under 64 rows are no class** (`CapacityClasses`), so they are not recorded.
 package final class ProductLedger: Sendable {
-    /// What was computed: a product by a weight of a kind, or an attention over `sequence` query rows.
+    /// What was computed: a product by a weight of a format, or an attention over `sequence` query rows.
     package enum Work: Hashable, Sendable {
-        case product(k: Int, n: Int, m: Int, kind: RouteTable.WeightKind)
+        case product(k: Int, n: Int, m: Int, weight: CapacityClasses.WeightFormat)
         case attention(sequence: Int, heads: Int, headDim: Int)
     }
 

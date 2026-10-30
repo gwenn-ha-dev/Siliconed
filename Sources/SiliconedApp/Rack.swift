@@ -239,9 +239,9 @@ struct RackView: View {
 
     private var header: some View {
         HStack(alignment: .firstTextBaseline, spacing: 10) {
-            // The engine's settings come from this Mac's measure (`CapacityRules`): the title and its
+            // The engine's plan comes from this Mac's measure (`Diagnostic.Report`): the title and its
             // chip open it, orange until it is taken — the first render waits for it — or while the one
-            // kept is orange (incomplete, a route unjudged, its memory or its seconds beyond), a green chip once a green one is kept.
+            // kept is orange (a missing or aberrant figure, its memory, its swap or its seconds beyond), a green chip once a green one is kept.
             let measured = app.mapMeasured
             Button { app.openDiagnostic() } label: {
                 HStack(spacing: 6) {

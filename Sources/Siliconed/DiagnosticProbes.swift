@@ -4,8 +4,8 @@ import Foundation
 import Metal
 import MetalPerformanceShadersGraph
 
-/// **The diagnostic's measurements** (`Diagnostic.swift` says what each decides): the engine's own
-/// objects on synthetic operands, each output against an fp64 truth computed on the CPU.
+/// **The diagnostic's shared means** (`Diagnostic.swift`): the engine's own objects on synthetic operands, each output against an
+/// fp64 truth computed on the CPU.
 extension Diagnostic {
     /// What every measurement needs: the device, its queue, the token.
     final class Bench {
@@ -25,15 +25,6 @@ extension Diagnostic {
         }
     }
 
-    /// One product: a block's `[m, k] · [k, n]`.
-    package struct Shape: Sendable, Equatable {
-        package let model, product: String
-        package let m, k, n: Int
-    }
-
-    /// The heights of the products, and the sequences of the attention: a 512² and a 1024² image's
-    /// tokens — multiples of 64, so `GEMM` submits them whole (`rowSplit`).
-    package static let heights = [1024, 4096]
     /// Rows of each output compared with the exact: 64 for a product, 16 queries per head for an attention.
     package static let sampledRows = 64, sampledQueries = 16
     /// Beyond this warm-up, one timed run instead of three: an engine that slow (BNNS in a type it
@@ -41,52 +32,12 @@ extension Diagnostic {
     package static let longWarmUp = 0.4
 
     /// **The blocks measured**, from the models' `Config` defaults — the shapes a render computes:
-    /// Z-Image 3840 → 10 240, 30 heads; Qwen-Image-2.1 4096 → 12 288, 32 heads; heads of 128.
+    /// Z-Image 3840 → 10 240, 30 heads; Qwen-Image-2.1 4096 → 12 288, 32 heads; heads of 128. The widening probes size their
+    /// weight on the first.
     package static var blocks: [(model: String, dim: Int, hidden: Int, heads: Int, headDim: Int)] {
         let z = DiT.Config(header: [:]), q = QwenImage21DiT.Config(header: [:])
         return [(Family.zImage.rawValue, z.dim, z.hidden, z.heads, z.dim / z.heads),
                 (Family.qwenImage21.rawValue, q.dim, q.hidden, q.heads, q.headDim)]
-    }
-
-    /// Every fp32 product, the first being the drift witness's: per model, per height, up then down.
-    package static var shapes: [Shape] {
-        blocks.flatMap { b in
-            heights.flatMap { m in
-                [Shape(model: b.model, product: "up", m: m, k: b.dim, n: b.hidden),
-                 Shape(model: b.model, product: "down", m: m, k: b.hidden, n: b.dim)]
-            }
-        }
-    }
-
-    /// **The grid the AMX/GPU ratio is measured on** (`measureCuts`), two axes through one point: inner
-    /// dimensions `k` from 2 048 to 16 384 at `n` = 6 144, and widths `n` from 1 536 to 16 384 at `k` = 6 144 —
-    /// the span of every DiT's products today (Anima's 2 048 to Krea 2's 16 384), at both `heights`. Not a
-    /// model's shapes: `Conductor.Shares` reads any product's `k` and `n` along these axes.
-    package static let cutDepths = [2048, 3072, 4096, 6144, 8192, 12288, 16384]
-    package static let cutWidths = [1536, 3072, 12288, 16384]
-    package static let cutWidth = 6144
-    package static var cutShapes: [(k: Int, n: Int)] {
-        cutDepths.map { (k: $0, n: cutWidth) } + cutWidths.map { (k: cutWidth, n: $0) }
-    }
-
-    /// **The ANE's grid** (`measureANECuts` → `ane_shares`): every family's own products, from the `Config`
-    /// defaults — the square of its width, its MLP up and down, Krea 2's grouped K/V and Anima's text K/V —,
-    /// at both `heights`. Not the AMX's two axes: the ANE's rate jumps from one shape to the next (its share at
-    /// 4 096 rows: 0.47 at 4 096 × 6 144, 0.69 at 6 144², 0.85 at 8 192 × 6 144, 23/10/2026), and a share read
-    /// across those axes gave Z-Image's up projection 0.37 where it balances at 0.56: its renders 12 % slower
-    /// than the AMX's. A product of another shape takes its nearest (`Conductor.Shares`).
-    package static var aneShapes: [(k: Int, n: Int)] {
-        let z = DiT.Config(header: [:]), q = QwenImage21DiT.Config(header: [:])
-        let krea = Krea2DiT.Config(header: [:]), anima = AnimaDiT.Config(header: [:]), moss = MossImageDiT.Config(header: [:])
-        var shapes: [(k: Int, n: Int)] = []
-        for (dim, hidden) in [(z.dim, z.hidden), (q.dim, q.hidden), (krea.dim, krea.hidden), (anima.dim, anima.hidden)] {
-            shapes += [(dim, dim), (dim, hidden), (hidden, dim)]
-        }
-        // MOSS-Image's FFN is one fused Linear: up and gate together, `2 · hidden` wide.
-        shapes += [(moss.dim, moss.dim), (moss.dim, 2 * moss.hidden), (moss.hidden, moss.dim)]
-        shapes += [(krea.dim, krea.kvWidth), (anima.textDim, anima.dim)]
-        var seen = Set<[Int]>()
-        return shapes.filter { seen.insert([$0.k, $0.n]).inserted }
     }
 
     // ── the clock and the operands ──────────────────────────────────────────────────────────
@@ -94,20 +45,14 @@ extension Diagnostic {
     /// **Median wall seconds of three runs after a warm-up** (pipelines built, pages wired, clocks
     /// up); one run when the warm-up alone passed `longWarmUp`.
     ///
-    /// `giveUpAbove`: **a loser is not timed three times**. When the first run after the warm-up is already
-    /// slower than what the rule needs the route to beat, that run is the figure: the route loses whatever two
-    /// more runs say, and the map's minute goes to the routes that may win. One noisy run can only keep a
-    /// winner on the safe side (the route stays off), never make a loser win: a win is still a median of three.
-    package static func seconds(giveUpAbove limit: Double? = nil, _ body: () -> Void) -> Double {
+    package static func seconds(_ body: () -> Void) -> Double {
         func once() -> Double {
             let begin = DispatchTime.now().uptimeNanoseconds
             body()
             return Double(DispatchTime.now().uptimeNanoseconds - begin) * 1e-9
         }
         if once() > longWarmUp { return once() }
-        let first = once()
-        if let limit, first > limit { return first }
-        return [first, once(), once()].sorted()[1]
+        return [once(), once(), once()].sorted()[1]
     }
 
     /// **Uniform in `[−scale, scale]`, the same on every machine**: xorshift by blocks of 2¹⁶ values,
@@ -223,10 +168,11 @@ extension Diagnostic {
         for row in rows { (c + row * n).update(repeating: .nan, count: n) }
     }
 
-    /// The worst row of `got` against `exact`, both `[n, rows]`.
-    static func judge(_ got: [Float], _ exact: [Double], columns: Int, rate: Double, threshold: Double) -> Measure {
+    /// **The worst channel of `got` against `exact`**, both `[n, rows]`: its error, and whether it passes `threshold` — judged on the
+    /// error as it is, a NaN being infinite.
+    static func judge(_ got: [Float], _ exact: [Double], columns: Int, threshold: Double) -> (pass: Bool, error: Double) {
         let e = exact.withUnsafeBufferPointer { channelError(got, $0, columns: columns) }
-        return Measure(rate: rate, error: e.worst, threshold: threshold)
+        return (e.worst.isFinite && e.worst <= threshold, e.worst)
     }
 
     /// The fp32 operands of every product: `A` and `B` at the largest of the shapes, `C` likewise.
@@ -240,7 +186,7 @@ extension Diagnostic {
     /// fp16 scales per `q8Block` rows and column.
     final class Operands {
         let a, b, c, bf16, q, q8Scales: Pages
-        /// **The bytes each operand maps**, from the shapes alone (`Diagnostic.need` charges these):
+        /// **The bytes each operand maps**, from the shapes alone (`CapacityProbes.need` charges these):
         /// `a` and `b` at the largest of the shapes (`m · k`, `k · n`), `c` likewise, `bf16` half of `b`,
         /// `q` the int8 weight of the products' largest, `q8Scales` one fp32 per block of rows and column.
         struct Sizes: Equatable {
@@ -250,22 +196,14 @@ extension Diagnostic {
                     .map { Arena.capacity(for: max(1, $0)) }.reduce(0, +)
             }
         }
-        /// **The operands of the capacity map's classes** (`CapacityMap.Entry`) and of the witnesses: the largest of each.
-        static func sizes(products: [(m: Int, k: Int, n: Int, kind: RouteTable.WeightKind)]) -> Sizes {
+        /// **The operands of the probes' products**: the largest of each.
+        static func sizes(products: [(m: Int, k: Int, n: Int, kind: WeightKind)]) -> Sizes {
             let eightBit = products.filter { $0.kind != .bf16 }
             return Sizes(aFloats: products.map { $0.m * $0.k }.max() ?? 1, bFloats: products.map { $0.k * $0.n }.max() ?? 1,
                          cFloats: products.map { $0.m * $0.n }.max() ?? 1, qValues: max(1, eightBit.map { $0.k * $0.n }.max() ?? 1),
                          scaleCount: max(1, eightBit.map { ($0.k + Diagnostic.q8Block - 1) / Diagnostic.q8Block * $0.n }.max() ?? 1))
         }
-        static var sizes: Sizes {
-            let m = Diagnostic.heights.max()!
-            let shapes = Diagnostic.shapes.map { (m: $0.m, k: $0.k, n: $0.n) }
-                + (Diagnostic.cutShapes + Diagnostic.aneShapes).map { (m: m, k: $0.k, n: $0.n) }
-            return Sizes(aFloats: shapes.map { $0.m * $0.k }.max()!, bFloats: shapes.map { $0.k * $0.n }.max()!,
-                         cFloats: shapes.map { $0.m * $0.n }.max()!, qValues: Diagnostic.shapes.map { $0.k * $0.n }.max()!,
-                         scaleCount: Diagnostic.shapes.map { ($0.k + q8Block - 1) / q8Block * $0.n }.max()!)
-        }
-        init(_ size: Sizes = Operands.sizes) {
+        init(_ size: Sizes) {
             let (aFloats, bFloats) = (size.aFloats, size.bFloats)
             a = Pages(bytes: aFloats * 4); b = Pages(bytes: bFloats * 4); bf16 = Pages(bytes: bFloats * 2)
             c = Pages(bytes: size.cFloats * 4)

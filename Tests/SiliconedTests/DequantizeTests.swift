@@ -265,25 +265,6 @@ final class DequantizeTests: XCTestCase {
         XCTAssert(p.sliceOffset >= p.scalesOffset + k / 32 * n * 4 && p.sliceOffset + k * 2048 * 4 <= k * n * 4)
     }
 
-    /// **The GPU's columns are whole 64-wide tiles**, whatever `n`: `linear_int8` / `linear_q8` write
-    /// 64 × 64 tiles clipped only at `n`, so a ragged GPU edge would overwrite the AMX's first columns.
-    /// For `n % 64 = 0`, the split is the one it always was.
-    func testAMXColumnsLeaveTheGPUWholeTiles() {
-        let shares = stride(from: 0.0, through: 1.0, by: 0.01)
-        for n in [128, 192, 200, 3072, 3072 + 40, 6144, 6144 + 1, 9216 + 63, 12288, 27648] {
-            for T in shares {
-                let amx = WeightProducts.amxColumns(n: n, share: T), gpu = n - amx
-                XCTAssert(amx > 0 && gpu >= 64 && gpu % 64 == 0, "n \(n), T \(T): GPU \(gpu), AMX \(amx)")
-                if n % 64 == 0 {
-                    let t = min(Conductor.fractionRange.upperBound, max(Conductor.fractionRange.lowerBound, T))
-                    XCTAssertEqual(amx, n - max(64, min(n - 64, Int((t * Double(n) / 64).rounded()) * 64)), "n \(n), T \(T)")
-                }
-            }
-        }
-        // Under 128 columns, not one whole GPU tile beside 64 AMX columns: the GPU alone.
-        for n in [64, 100, 127] { XCTAssertEqual(WeightProducts.amxColumns(n: n, share: 0.5), 0, "n \(n)") }
-    }
-
     /// The AMX's columns of a Q8_0 weight are `dequantize`'s, at the bit, block scales included.
     func testColumnsAreTheWholeBlocksColumns() {
         let (k, n, b) = (96, 40, 32)

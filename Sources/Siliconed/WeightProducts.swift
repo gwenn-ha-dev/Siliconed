@@ -126,8 +126,8 @@ package final class WeightProducts {
             }
         }
         if let ledger {
-            let (kind, route) = classification(of: name, path)
-            ledger.add(.product(k: k, n: n, m: m, kind: kind), route: route,
+            let (weight, route) = classification(of: name, path)
+            ledger.add(.product(k: k, n: n, m: m, weight: weight), route: route,
                        seconds: Double(DispatchTime.now().uptimeNanoseconds - began) * 1e-9)
         }
         // A refused slice leaves its columns as they were: a plausible image, wrong exactly there.
@@ -141,18 +141,17 @@ package final class WeightProducts {
         }
     }
 
-    /// **The class of the product that just ran, as the plan's map names it**: the weight's kind (as published — a K-quant or
-    /// anything widened counts as bf16, which is how the map folds them) and the route taken: the engines the widened product ran
-    /// on (`GEMM.lastEngines`), or the weight's own form (`gpu/bf16`, `gpu/bf16act`, `gpu/int8`, `gpu+amx/int8`, `gpu/q8`,
-    /// `gpu+amx/q8`).
-    private func classification(of name: String, _ path: Path) -> (WeightKind, String) {
+    /// **The class of the product that just ran, as the plan names it**: the weight's format (as published) and the route taken: the
+    /// engines the widened product ran on (`GEMM.lastEngines`), or the weight's own form (`gpu/bf16`, `gpu/bf16act`, `gpu/int8`,
+    /// `gpu+amx/int8`, `gpu/q8`, `gpu+amx/q8`).
+    private func classification(of name: String, _ path: Path) -> (CapacityClasses.WeightFormat, String) {
         switch path {
         case .bf16(let rounding): return (.bf16, rounding == nil ? "gpu/bf16" : "gpu/bf16act")
         case .int8(let plan):
-            let kind: WeightKind = plan.block == nil ? .int8 : .q8
-            return (kind, (plan.amxColumns > 0 && gemm.conductor != nil ? "gpu+amx/" : "gpu/") + kind.rawValue)
+            let weight: CapacityClasses.WeightFormat = plan.block == nil ? .int8 : .q8
+            return (weight, (plan.amxColumns > 0 && gemm.conductor != nil ? "gpu+amx/" : "gpu/") + weight.rawValue)
         case .widened:
-            return (format(of: name).kind ?? .bf16, gemm.lastEngines)
+            return (format(of: name), gemm.lastEngines)
         }
     }
 

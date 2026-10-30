@@ -98,7 +98,7 @@ extension RemoteControl {
             }
             var o: [String: Any] = ["ok": true, "report": object]
             if issue {
-                o["issue_url_length"] = (try? report.issueURL(includingReport: false).absoluteString.count) ?? NSNull()
+                o["issue_url_length"] = (try? report.issueURL().absoluteString.count) ?? NSNull()
                 if let notice = self.app.openIssue(report) { o["message"] = notice }
             }
             self.finish(c, o)

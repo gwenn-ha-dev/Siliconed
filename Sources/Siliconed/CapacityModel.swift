@@ -90,6 +90,19 @@ package struct CapacityModel: Codable, Sendable, Equatable {
         package var overhead: Double
         package var keep: [Engine: Double]
         package init(overhead: Double = 0, keep: [Engine: Double] = [:]) { self.overhead = overhead; self.keep = keep }
+
+        private enum CodingKeys: String, CodingKey { case overhead, keep }
+        /// `keep` keyed by the engine's name (`{"gpu": 0.95}`), as a person reads it.
+        package init(from decoder: any Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            overhead = try c.decode(Double.self, forKey: .overhead)
+            keep = try CapacityModel.engines(try c.decode([String: Double].self, forKey: .keep), codingPath: c.codingPath + [CodingKeys.keep])
+        }
+        package func encode(to encoder: any Encoder) throws {
+            var c = encoder.container(keyedBy: CodingKeys.self)
+            try c.encode(overhead, forKey: .overhead)
+            try c.encode(Dictionary(uniqueKeysWithValues: keep.map { ($0.key.rawValue, $0.value) }), forKey: .keep)
+        }
     }
 
     package var crest: [Engine: Double] = [:]
@@ -100,15 +113,101 @@ package struct CapacityModel: Codable, Sendable, Equatable {
     package var heat: [Engine: Double] = [:]
     package var memoryBandwidth: Double?
     package var diskBandwidth: Double?
-    /// Seconds per value to bring a weight of `kind` to the form a kernel reads (`RouteTable.WeightPath`).
-    package var preparation: [RouteTable.WeightKind: [RouteTable.WeightPath: Double]] = [:]
+    /// Seconds per value to bring a weight of `kind` to the form a kernel reads (`WeightPath`).
+    package var preparation: [WeightKind: [WeightPath: Double]] = [:]
     /// Seconds per value to widen a K-quant (Q4_K to Q6_K) weight: it has no `WeightKind`, so `preparation` cannot say it,
     /// and a super-block's unpacking costs more than a bf16 shift. `nil`: the solver falls back on `preparation[.bf16]`.
     package var kquantPreparation: Double?
 
     package init() {}
 
+    // MARK: - JSON
+
+    private enum CodingKeys: String, CodingKey {
+        case crest, lines, aneRowUnit, sharing, heat, memoryBandwidth, diskBandwidth, preparation, kquantPreparation
+    }
+
+    /// The engines of a dictionary keyed by their names.
+    fileprivate static func engines(_ named: [String: Double], codingPath: [any CodingKey]) throws -> [Engine: Double] {
+        var out: [Engine: Double] = [:]
+        for (name, value) in named {
+            guard let e = Engine(rawValue: name) else {
+                throw DecodingError.dataCorrupted(.init(codingPath: codingPath, debugDescription: "engine « \(name) »"))
+            }
+            out[e] = value
+        }
+        return out
+    }
+
+    /// **Written as a person reads it**: every dictionary keyed by the name of what it holds (`"gpu/fp32": {"rate": …, "t0": …}`,
+    /// `"gpu+ane": {"keep": {"gpu": 0.87, "ane": 0.7}, "overhead": …}`) — a default encoding of a dictionary keyed by an enum is
+    /// a flat array of alternating keys and values, which a shared report would not be.
+    package init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        crest = try Self.engines(try c.decodeIfPresent([String: Double].self, forKey: .crest) ?? [:], codingPath: c.codingPath + [CodingKeys.crest])
+        let named = try c.decodeIfPresent([String: Line].self, forKey: .lines) ?? [:]
+        for (name, line) in named {
+            guard let kernel = Kernel(name) else {
+                throw DecodingError.dataCorruptedError(forKey: .lines, in: c, debugDescription: "kernel « \(name) »")
+            }
+            lines[kernel] = line
+        }
+        aneRowUnit = try c.decodeIfPresent(Int.self, forKey: .aneRowUnit) ?? 256
+        sharing = try c.decodeIfPresent([String: Sharing].self, forKey: .sharing) ?? [:]
+        heat = try Self.engines(try c.decodeIfPresent([String: Double].self, forKey: .heat) ?? [:], codingPath: c.codingPath + [CodingKeys.heat])
+        memoryBandwidth = try c.decodeIfPresent(Double.self, forKey: .memoryBandwidth)
+        diskBandwidth = try c.decodeIfPresent(Double.self, forKey: .diskBandwidth)
+        let prepared = try c.decodeIfPresent([String: [String: Double]].self, forKey: .preparation) ?? [:]
+        for (kindName, paths) in prepared {
+            guard let kind = WeightKind(rawValue: kindName) else {
+                throw DecodingError.dataCorruptedError(forKey: .preparation, in: c, debugDescription: "weight kind « \(kindName) »")
+            }
+            for (pathName, seconds) in paths {
+                guard let path = WeightPath(rawValue: pathName) else {
+                    throw DecodingError.dataCorruptedError(forKey: .preparation, in: c, debugDescription: "weight path « \(pathName) »")
+                }
+                preparation[kind, default: [:]][path] = seconds
+            }
+        }
+        kquantPreparation = try c.decodeIfPresent(Double.self, forKey: .kquantPreparation)
+    }
+
+    package func encode(to encoder: any Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(Dictionary(uniqueKeysWithValues: crest.map { ($0.key.rawValue, $0.value) }), forKey: .crest)
+        try c.encode(Dictionary(uniqueKeysWithValues: lines.map { ($0.key.description, $0.value) }), forKey: .lines)
+        try c.encode(aneRowUnit, forKey: .aneRowUnit)
+        try c.encode(sharing, forKey: .sharing)
+        try c.encode(Dictionary(uniqueKeysWithValues: heat.map { ($0.key.rawValue, $0.value) }), forKey: .heat)
+        try c.encodeIfPresent(memoryBandwidth, forKey: .memoryBandwidth)
+        try c.encodeIfPresent(diskBandwidth, forKey: .diskBandwidth)
+        try c.encode(Dictionary(uniqueKeysWithValues: preparation.map { kind, paths in
+            (kind.rawValue, Dictionary(uniqueKeysWithValues: paths.map { ($0.key.rawValue, $0.value) }))
+        }), forKey: .preparation)
+        try c.encodeIfPresent(kquantPreparation, forKey: .kquantPreparation)
+    }
+
+    /// **Every number to `digits` significant digits**: what a report keeps (`Diagnostic.significant`), so that a model read back
+    /// from a report is the one the engine planned with — the plan's fingerprint hashes the numbers, and two readings of one
+    /// report must be one plan.
+    package func rounded(_ digits: Int = 6) -> CapacityModel {
+        func r(_ x: Double) -> Double { Diagnostic.significant(x, digits) }
+        var m = self
+        m.crest = crest.mapValues(r)
+        m.lines = lines.mapValues { Line(t0: r($0.t0), rate: r($0.rate)) }
+        m.sharing = sharing.mapValues { Sharing(overhead: r($0.overhead), keep: $0.keep.mapValues(r)) }
+        m.heat = heat.mapValues(r)
+        m.memoryBandwidth = memoryBandwidth.map(r); m.diskBandwidth = diskBandwidth.map(r)
+        m.preparation = preparation.mapValues { $0.mapValues(r) }
+        m.kquantPreparation = kquantPreparation.map(r)
+        return m
+    }
+
     package static func key(_ engines: [Engine]) -> String { engines.sorted().map(\.rawValue).joined(separator: "+") }
+    /// **Whether a set of engines was measured**: an engine alone always; two or more only with a sharing fitted from their probes. The
+    /// solver offers no set that was not (`CapacitySolver`): taken at keep 1 it was the best plan, and cost a render a quarter more.
+    package func measures(_ engines: [Engine]) -> Bool { engines.count < 2 || sharing[Self.key(engines)] != nil }
+
     package func sharing(_ kernels: [Kernel]) -> Sharing {
         kernels.count < 2 ? Sharing() : sharing[Self.key(kernels.map(\.engine))] ?? Sharing()
     }

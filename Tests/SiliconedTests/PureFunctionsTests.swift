@@ -277,6 +277,7 @@ final class PureFunctionsTests: XCTestCase {
         var model = CapacityModel()
         model.lines[.init(.gpu, .fp32)] = .init(t0: 0, rate: 3e12)
         model.lines[.init(.amx, .fp32)] = .init(t0: 0, rate: 1e12)
+        model.sharing["gpu+amx"] = .init()          // measured, and free
         for m in [1024, 1056, 2048, 4128, 4117] {
             let key = ProductKey(k: 3840, n: 3840, m: m)
             let a = try XCTUnwrap(CapacitySolver.product(key, model: model, constraints: .init())).assignment

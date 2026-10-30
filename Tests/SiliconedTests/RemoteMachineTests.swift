@@ -4,15 +4,7 @@ import XCTest
 
 /// **What a lending Mac says of itself** (`Remote/Machine.swift`): the messages cross as JSON and come back equal.
 final class RemoteMachineTests: XCTestCase {
-    private func report() -> Diagnostic.Report {
-        let machine = Diagnostic.Machine(chip: "Apple M4", hardwareModel: "Mac16,10", performanceCores: 4, efficiencyCores: 6,
-                                         gpuCores: 10, memoryBytes: 17_179_869_184, macOS: "27.0.1 (26A434)",
-                                         version: "0.17 (170)", build: "x+y")
-        let conditions = Diagnostic.Conditions(thermal: "nominal", lowPowerMode: false, onBattery: false, swapUsedBytes: 0)
-        return Diagnostic.Report(date: "2026-10-28T10:00:00Z", seconds: 61.5, machine: machine, cpuFeatures: [:],
-                                 before: conditions, after: conditions, products: [], lowPrecision: [], attention: [],
-                                 widening: [], witness: .init(gpuBefore: 3.4, gpuAfter: 3.4, amxBefore: nil, amxAfter: nil))
-    }
+    private func report() -> Diagnostic.Report { ReportFixtures.report() }
 
     func testMachineAndItsAsksTravelAsJSON() throws {
         let map = RemoteMap(date: "2026-10-28T10:00:00Z", current: true, green: true)

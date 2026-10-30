@@ -14692,126 +14692,6 @@
         }
       }
     },
-    "Half precision, CPU matrix unit" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Halbe Genauigkeit, Matrixeinheit der CPU"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Media precisión, unidad matricial de la CPU"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Demi-précision, unité matricielle du CPU"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mezza precisione, unità matriciale della CPU"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "半精度、CPU行列ユニット"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "半精度，CPU 矩阵单元"
-          }
-        }
-      }
-    },
-    "Half precision, GPU" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Halbe Genauigkeit, GPU"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Media precisión, GPU"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Demi-précision, GPU"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mezza precisione, GPU"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "半精度、GPU"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "半精度，GPU"
-          }
-        }
-      }
-    },
-    "Half precision, GPU tensor units (Metal 4)" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Halbe Genauigkeit, Tensor-Einheiten der GPU (Metal 4)"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Media precisión, unidades tensoriales de la GPU (Metal 4)"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Demi-précision, unités tensorielles du GPU (Metal 4)"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mezza precisione, unità tensoriali della GPU (Metal 4)"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "半精度、GPUテンソルユニット（Metal 4）"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "半精度，GPU 张量单元（Metal 4）"
-          }
-        }
-      }
-    },
     "How each step moves to the next, with the same steps: Euler is the one this model was distilled for" : {
       "localizations" : {
         "de" : {
@@ -16054,86 +15934,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "在提示词中："
-          }
-        }
-      }
-    },
-    "In use from the next launch; a gain within this run's noise (±%@) does not count." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Verwendet ab dem nächsten Start; ein Gewinn innerhalb des Rauschens dieser Messung (±%@) zählt nicht."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "En uso desde el próximo inicio; una ganancia dentro del ruido de esta medición (±%@) no cuenta."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Utilisé au prochain lancement ; un gain dans le bruit de cette mesure (±%@) ne compte pas."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "In uso dal prossimo avvio; un guadagno entro il rumore di questa misura (±%@) non conta."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "次回の起動から使用されます。この測定のノイズ（±%@）以内の向上は数えません。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "下次启动起使用；落在本次测量噪声（±%@）之内的提升不计入。"
-          }
-        }
-      }
-    },
-    "In use in this session; a gain within this run's noise (±%@) does not count." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "In dieser Sitzung verwendet; ein Gewinn innerhalb des Rauschens dieser Messung (±%@) zählt nicht."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "En uso en esta sesión; una ganancia dentro del ruido de esta medición (±%@) no cuenta."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Utilisé dans cette session ; un gain dans le bruit de cette mesure (±%@) ne compte pas."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "In uso in questa sessione; un guadagno entro il rumore di questa misura (±%@) non conta."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "このセッションで使用されます。この測定のノイズ（±%@）以内の向上は数えません。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "本次会话中使用；落在本次测量噪声（±%@）之内的提升不计入。"
           }
         }
       }
@@ -18018,82 +17818,42 @@
         }
       }
     },
-    "Matrix products and attention on the GPU, the AMX and the Neural Engine, each route checked against the exact result, and the table of routes this Mac renders with. No model is needed, nothing is downloaded. Under a minute; the queue waits meanwhile." : {
+    "Matrix products and attention on the GPU, the AMX and the Neural Engine, alone and together, each checked against the exact result: the figures this Mac renders with. No model is needed, nothing is downloaded. Under a minute; the queue waits meanwhile." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Matrixprodukte und Attention auf der GPU, der AMX und der Neural Engine, jede Route gegen das exakte Ergebnis geprüft, und die Tabelle der Routen, mit der dieser Mac rendert. Kein Modell nötig, nichts wird geladen. Weniger als eine Minute; die Warteschlange wartet so lange."
+            "value" : "Matrixprodukte und Attention auf der GPU, der AMX und der Neural Engine, einzeln und zusammen, jedes gegen das exakte Ergebnis geprüft: die Zahlen, mit denen dieser Mac rendert. Kein Modell nötig, nichts wird geladen. Weniger als eine Minute; die Warteschlange wartet so lange."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Productos de matrices y atención en la GPU, el AMX y el Neural Engine, cada ruta comprobada frente al resultado exacto, y la tabla de rutas con la que este Mac genera sus imágenes. No hace falta ningún modelo, no se descarga nada. Menos de un minuto; mientras tanto, la cola espera."
+            "value" : "Productos de matrices y atención en la GPU, el AMX y el Neural Engine, por separado y juntos, cada uno comprobado frente al resultado exacto: las cifras con las que este Mac genera sus imágenes. No hace falta ningún modelo, no se descarga nada. Menos de un minuto; mientras tanto, la cola espera."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Produits matriciels et attention sur le GPU, l’AMX et le Neural Engine, chaque route vérifiée contre le résultat exact, et la table des routes avec laquelle ce Mac fait ses rendus. Aucun modèle n’est nécessaire, rien n’est téléchargé. Moins d’une minute ; la file attend pendant ce temps."
+            "value" : "Produits matriciels et attention sur le GPU, l’AMX et le Neural Engine, seuls et ensemble, chacun vérifié contre le résultat exact : les chiffres avec lesquels ce Mac fait ses rendus. Aucun modèle n’est nécessaire, rien n’est téléchargé. Moins d’une minute ; la file attend pendant ce temps."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Prodotti di matrici e attention sulla GPU, sull’AMX e sul Neural Engine, ogni percorso verificato rispetto al risultato esatto, e la tabella dei percorsi con cui questo Mac genera le immagini. Non serve alcun modello, non si scarica nulla. Meno di un minuto; nel frattempo la coda attende."
+            "value" : "Prodotti di matrici e attention sulla GPU, sull’AMX e sul Neural Engine, da soli e insieme, ciascuno verificato rispetto al risultato esatto: le cifre con cui questo Mac genera le immagini. Non serve alcun modello, non si scarica nulla. Meno di un minuto; nel frattempo la coda attende."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "GPU、AMX、Neural Engine での行列積とアテンション。各経路を厳密な結果と照合し、この Mac がレンダリングに使う経路の表を作ります。モデルは不要で、何もダウンロードしません。1分未満で終わり、その間キューは待機します。"
+            "value" : "GPU、AMX、Neural Engine での行列積とアテンション。単独と同時の両方で、それぞれを厳密な結果と照合し、この Mac がレンダリングに使う数値を求めます。モデルは不要で、何もダウンロードしません。1分未満で終わり、その間キューは待機します。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "在 GPU、AMX 和神经网络引擎上计算矩阵乘积和注意力，每条路径都与精确结果核对，并给出这台 Mac 生成时所用的路径表。无需任何模型，也不下载任何内容。不到一分钟；期间队列会等待。"
-          }
-        }
-      }
-    },
-    "Matrix products on the 8-bit weights, GPU and CPU together" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Matrixprodukte auf den 8-Bit-Gewichten, GPU und CPU gemeinsam"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Productos matriciales sobre los pesos de 8 bits, GPU y CPU juntas"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Produits matriciels sur les poids 8 bits, GPU et CPU ensemble"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Prodotti matriciali sui pesi a 8 bit, GPU e CPU insieme"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "8ビットの重みでの行列積、GPUとCPUを併用"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "8 位权重的矩阵乘积，GPU 与 CPU 协同"
+            "value" : "在 GPU、AMX 和神经网络引擎上计算矩阵乘积和注意力，分别单独运行和同时运行，每个结果都与精确结果核对，得出这台 Mac 生成时所用的数值。无需任何模型，也不下载任何内容。不到一分钟；期间队列会等待。"
           }
         }
       }
@@ -18134,46 +17894,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "8 位权重的矩阵乘积，按发布时的样子读取"
-          }
-        }
-      }
-    },
-    "Matrix products on the GGUF 8-bit weights, GPU and CPU together" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Matrixprodukte auf den GGUF-8-Bit-Gewichten, GPU und CPU gemeinsam"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Productos matriciales sobre los pesos GGUF de 8 bits, GPU y CPU juntas"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Produits matriciels sur les poids GGUF 8 bits, GPU et CPU ensemble"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Prodotti matriciali sui pesi GGUF a 8 bit, GPU e CPU insieme"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "GGUF 8ビットの重みでの行列積、GPUとCPUを併用"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "GGUF 8 位权重的矩阵乘积，GPU 与 CPU 协同"
           }
         }
       }
@@ -18298,46 +18018,6 @@
         }
       }
     },
-    "Matrix products, GPU and CPU together" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Matrixprodukte, GPU und CPU zusammen"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Productos matriciales, GPU y CPU juntas"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Produits matriciels, GPU et CPU ensemble"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Prodotti matriciali, GPU e CPU insieme"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "行列積、GPUとCPUを併用"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "矩阵乘积，GPU 与 CPU 协同"
-          }
-        }
-      }
-    },
     "Matrix products, GPU tensor units on the bf16 weights" : {
       "localizations" : {
         "de" : {
@@ -18374,6 +18054,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "矩阵乘积，使用 bf16 权重的 GPU 张量单元"
+          }
+        }
+      }
+    },
+    "Matrix products, Neural Engine" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Matrixprodukte, Neural Engine"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Productos matriciales, Neural Engine"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Produits matriciels, Neural Engine"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prodotti matriciali, Neural Engine"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "行列積、Neural Engine"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "矩阵乘积，神经网络引擎"
           }
         }
       }
@@ -20989,46 +20709,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "不支持——悬停查看原因"
-          }
-        }
-      }
-    },
-    "Not used" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Nicht verwendet"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "No usado"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Non utilisé"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Non usato"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "未使用"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "未使用"
           }
         }
       }
@@ -31399,42 +31079,42 @@
         }
       }
     },
-    "The measure of %@ was not complete (its minute, its memory or a route judged wrong): it is measured again before the next render." : {
+    "The measure of %@ was not complete (a missing or aberrant figure, its memory, its swap or its minute): it is measured again before the next render." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Die Messung vom %@ war nicht vollständig (ihre Minute, ihr Speicher oder eine als falsch beurteilte Route): Sie wird vor dem nächsten Rendern wiederholt."
+            "value" : "Die Messung vom %@ war nicht vollständig (eine fehlende oder unplausible Zahl, ihr Speicher, ihr Swap oder ihre Minute): Sie wird vor dem nächsten Rendern wiederholt."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "La medición del %@ no estaba completa (su minuto, su memoria o una ruta juzgada errónea): se repite antes de la próxima imagen."
+            "value" : "La medición del %@ no estaba completa (una cifra ausente o aberrante, su memoria, su swap o su minuto): se repite antes de la próxima imagen."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "La mesure du %@ n’était pas complète (sa minute, sa mémoire ou une route jugée fausse) : elle est refaite avant le prochain rendu."
+            "value" : "La mesure du %@ n’était pas complète (un chiffre manquant ou aberrant, sa mémoire, son swap ou sa minute) : elle est refaite avant le prochain rendu."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "La misura del %@ non era completa (il suo minuto, la sua memoria o un percorso giudicato errato): viene ripetuta prima della prossima immagine."
+            "value" : "La misura del %@ non era completa (una cifra mancante o anomala, la sua memoria, il suo swap o il suo minuto): viene ripetuta prima della prossima immagine."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@ の測定は完了していません（時間、メモリ、または誤りと判定された経路）。次のレンダリングの前に再測定します。"
+            "value" : "%@ の測定は完了していません（欠けている、または異常な数値、メモリ、スワップ、あるいは時間）。次のレンダリングの前に再測定します。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@ 的测量未完成（一分钟的时限、内存或某条被判定有误的路径）：将在下次生成之前重新测量。"
+            "value" : "%@ 的测量未完成（缺失或异常的数值、内存、交换空间或一分钟的时限）：将在下次生成之前重新测量。"
           }
         }
       }
@@ -34807,42 +34487,42 @@
         }
       }
     },
-    "This session uses the measure of %@, which was not complete (its minute, its memory or a route judged wrong): it is measured again at its next launch." : {
+    "This session uses the measure of %@, which was not complete (a missing or aberrant figure, its memory, its swap or its minute): it is measured again at its next launch." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Diese Sitzung verwendet die Messung vom %@, die nicht vollständig war (ihre Minute, ihr Speicher oder eine als falsch beurteilte Route): Sie wird beim nächsten Start wiederholt."
+            "value" : "Diese Sitzung verwendet die Messung vom %@, die nicht vollständig war (eine fehlende oder unplausible Zahl, ihr Speicher, ihr Swap oder ihre Minute): Sie wird beim nächsten Start wiederholt."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Esta sesión usa la medición del %@, que no estaba completa (su minuto, su memoria o una ruta juzgada errónea): se repite en el próximo arranque."
+            "value" : "Esta sesión usa la medición del %@, que no estaba completa (una cifra ausente o aberrante, su memoria, su swap o su minuto): se repite en el próximo arranque."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Cette session utilise la mesure du %@, qui n’était pas complète (sa minute, sa mémoire ou une route jugée fausse) : elle est refaite à son prochain lancement."
+            "value" : "Cette session utilise la mesure du %@, qui n’était pas complète (un chiffre manquant ou aberrant, sa mémoire, son swap ou sa minute) : elle est refaite à son prochain lancement."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Questa sessione usa la misura del %@, che non era completa (il suo minuto, la sua memoria o un percorso giudicato errato): viene ripetuta al prossimo avvio."
+            "value" : "Questa sessione usa la misura del %@, che non era completa (una cifra mancante o anomala, la sua memoria, il suo swap o il suo minuto): viene ripetuta al prossimo avvio."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "このセッションは %@ の測定を使用していますが、その測定は完了していません（時間、メモリ、または誤りと判定された経路）。次回の起動時に再測定します。"
+            "value" : "このセッションは %@ の測定を使用していますが、その測定は完了していません（欠けている、または異常な数値、メモリ、スワップ、あるいは時間）。次回の起動時に再測定します。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "本次会话使用 %@ 的测量结果，该结果未完成（一分钟的时限、内存或某条被判定有误的路径）：将在下次启动时重新测量。"
+            "value" : "本次会话使用 %@ 的测量结果，该结果未完成（缺失或异常的数值、内存、交换空间或一分钟的时限）：将在下次启动时重新测量。"
           }
         }
       }
@@ -35905,46 +35585,6 @@
         }
       }
     },
-    "Used" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Verwendet"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Usado"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Utilisé"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Usato"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "使用済み"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已用"
-          }
-        }
-      }
-    },
     "Uses a library that is already somewhere else, another disk's for instance. Nothing is moved" : {
       "localizations" : {
         "de" : {
@@ -36591,46 +36231,6 @@
         }
       }
     },
-    "Weight widening, CPU" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Aufweitung der Gewichte, CPU"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ampliación de los pesos, CPU"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Élargissement des poids, CPU"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ampliamento dei pesi, CPU"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "重みの展開、CPU"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "权重位宽扩展，CPU"
-          }
-        }
-      }
-    },
     "Welcome to Siliconed" : {
       "localizations" : {
         "de" : {
@@ -36667,6 +36267,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "欢迎使用 Siliconed"
+          }
+        }
+      }
+    },
+    "What each engine reaches" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Was jede Recheneinheit erreicht"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lo que alcanza cada motor"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce que chaque moteur atteint"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cosa raggiunge ogni motore"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "各演算装置の到達値"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "各引擎达到的性能"
           }
         }
       }
@@ -36747,46 +36387,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "模型读取的内容：改写后的提示词，每个主体都与其图像关联"
-          }
-        }
-      }
-    },
-    "What this Mac uses" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Was dieser Mac verwendet"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Lo que usa este Mac"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ce que ce Mac utilise"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cosa usa questo Mac"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "このMacが使うもの"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "这台 Mac 使用的内容"
           }
         }
       }
@@ -38157,46 +37757,6 @@
         }
       }
     },
-    "compute routes" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Rechenrouten"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "rutas de cálculo"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "routes de calcul"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "percorsi di calcolo"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "計算経路"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "计算路径"
-          }
-        }
-      }
-    },
     "connect the disk, then retry" : {
       "localizations" : {
         "de" : {
@@ -38353,6 +37913,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "拖入的图像"
+          }
+        }
+      }
+    },
+    "each engine alone" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "jede Recheneinheit einzeln"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "cada motor por separado"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "chaque moteur seul"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ogni motore da solo"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "演算装置の単独測定"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "各引擎单独测量"
           }
         }
       }
@@ -40607,46 +40207,6 @@
         }
       }
     },
-    "not available" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "nicht verfügbar"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "no disponible"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "non disponible"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "non disponibile"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "利用不可"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "不可用"
-          }
-        }
-      }
-    },
     "not connected" : {
       "localizations" : {
         "de" : {
@@ -42219,6 +41779,46 @@
         }
       }
     },
+    "the engines together" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "die Recheneinheiten zusammen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "los motores, juntos"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "les moteurs ensemble"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "i motori insieme"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "演算装置の同時測定"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "各引擎同时测量"
+          }
+        }
+      }
+    },
     "the engines' first measurement" : {
       "localizations" : {
         "de" : {
@@ -42415,6 +42015,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "无法打开套接字（%@）"
+          }
+        }
+      }
+    },
+    "the weight forms" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "die Gewichtsformen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "las formas de los pesos"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "les formes des poids"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "le forme dei pesi"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重みの形式"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "权重格式"
           }
         }
       }

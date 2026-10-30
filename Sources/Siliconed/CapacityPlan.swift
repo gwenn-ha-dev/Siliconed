@@ -302,7 +302,7 @@ package struct ProductAssignment: Equatable, Sendable, Codable, CustomStringConv
         return parts.joined(separator: "+")
     }
 
-    /// The route as the capacity map and the ledger name it: the engines for a widened weight, `gpu/bf16`, `gpu/bf16act`,
+    /// The route as the render's record (`ProductLedger`) names it: the engines for a widened weight, `gpu/bf16`, `gpu/bf16act`,
     /// `gpu/int8`, `gpu+amx/q8`… for a weight read as published.
     package func route(weight: CapacityClasses.WeightFormat) -> String {
         switch path {
