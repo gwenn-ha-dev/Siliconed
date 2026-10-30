@@ -49,10 +49,15 @@ package final class CapacityPlan: Sendable {
         package var int8Weights = false
         package var q8Weights = false
         package var roundedActivations = false
+        /// **The ANE's int8 program** may be asked for: the ANE reads a published int8 weight as it is (`dequantize`), beside the
+        /// GPU's int8 kernel. It needs both engines — the ANE built, and `TensorGEMM` with its int8 kernel, which reads the same
+        /// reserve — so it is never set without `ane` and `int8Weights` (the initializer enforces it).
+        package var aneInt8 = false
         package init(amx: Bool = false, ane: Bool = false, bf16Weights: Bool = false, int8Weights: Bool = false,
-                     q8Weights: Bool = false, roundedActivations: Bool = false) {
+                     q8Weights: Bool = false, roundedActivations: Bool = false, aneInt8: Bool = false) {
             self.amx = amx; self.ane = ane; self.bf16Weights = bf16Weights; self.int8Weights = int8Weights
             self.q8Weights = q8Weights; self.roundedActivations = roundedActivations
+            self.aneInt8 = aneInt8 && ane && int8Weights
         }
         /// `TensorGEMM` is built when any native form is.
         package var usesTensor: Bool { bf16Weights || int8Weights || q8Weights || roundedActivations }
@@ -119,7 +124,7 @@ package final class CapacityPlan: Sendable {
         self.allowsANE = allowsANE
         resources = Resources(amx: has(.amx, .fp32), ane: allowsANE && has(.ane, .fp16),
                               bf16Weights: has(.gpu, .bf16), int8Weights: has(.gpu, .int8), q8Weights: has(.gpu, .q8),
-                              roundedActivations: has(.gpu, .bf16act))
+                              roundedActivations: has(.gpu, .bf16act), aneInt8: allowsANE && has(.ane, .int8))
         override = nil; attentionOverride = nil
         identity = "model " + Self.fingerprint(model) + (allowsANE ? "" : " no-ane")
     }
@@ -146,7 +151,7 @@ package final class CapacityPlan: Sendable {
         if allowed || !allowsANE { return self }
         return withoutANE.withLock { kept in
             if let kept { return kept }
-            var r = resources; r.ane = false
+            var r = resources; r.ane = false; r.aneInt8 = false
             let made: CapacityPlan
             if let model {
                 made = CapacityPlan(model: model, limits: limits, sustained: sustained, excluded: excluded, allowsANE: false)
@@ -187,7 +192,11 @@ package final class CapacityPlan: Sendable {
         let known: ProductAssignment? = state.withLock { $0.pins[key] ?? $0.products[key] }
         if let known { return known }
         var a = override?(key) ?? CapacityPlan.solved(self, key)
-        if a.ane > 0 && !allowsANE { a.gpu += a.ane; a.ane = 0 }
+        // A forcing that names the ANE is told to do without: the rows to the GPU, and a weight the ANE would have read as published
+        // is the widened one again (the GPU's int8 kernel rounds in another order — not the route a process without the ANE ran).
+        if a.ane > 0 && !allowsANE {
+            if a.path == .native { a = .gpuAlone(key.m) } else { a.gpu += a.ane; a.ane = 0 }
+        }
         let kept = a
         state.withLock { $0.products[key] = kept }
         return kept
@@ -308,18 +317,23 @@ package struct ProductAssignment: Equatable, Sendable, Codable, CustomStringConv
         switch path {
         case .widened: return engines
         case .bf16: return roundsActivation ? "gpu/bf16act" : "gpu/bf16"
-        case .native: return (amxColumns > 0 ? "gpu+amx/" : "gpu/") + (weight == .int8 ? "int8" : "q8")
+        case .native:
+            // The ANE beside the GPU's int8 kernel reads the integers (`ane > 0`): `gpu+ane/int8`, `ane/int8` alone.
+            let engines = amxColumns > 0 ? "gpu+amx" : ane > 0 ? (gpu > 0 ? "gpu+ane" : "ane") : "gpu"
+            return engines + "/" + (weight == .int8 ? "int8" : "q8")
         }
     }
 
     /// **Whether the engines can run it for `key`** — the hardware and precision limits, nothing else: no negative rows, rows
     /// that add up to the height; the ANE's in units of 256 or the whole product, and never on an encoder; a bf16 weight read
-    /// as published whole on the GPU; a native 8-bit weight with no ANE, its AMX columns beside a GPU side of whole 64-column
-    /// tiles (the kernel writes whole tiles, an edge inside one would overwrite the AMX's first columns).
+    /// as published whole on the GPU; a native 8-bit weight with its AMX columns beside a GPU side of whole 64-column tiles (the
+    /// kernel writes whole tiles, an edge inside one would overwrite the AMX's first columns) — or, if it is int8 with a scale per
+    /// column or for the tensor, with the ANE's last rows beside the GPU's (the program reads the integers: `readsInt8`, no AMX).
     package func isRunnable(for key: ProductKey) -> Bool {
         guard gpu >= 0, amx >= 0, ane >= 0, amxColumns >= 0, rows == key.m, key.m > 0 else { return false }
         if ane > 0 {
-            guard ane % NeuralEngine.rowUnit == 0 || ane == key.m, key.phase == .denoising, path == .widened else { return false }
+            guard ane % NeuralEngine.rowUnit == 0 || ane == key.m, key.phase == .denoising, path == .widened || path == .native
+            else { return false }
         }
         if roundsActivation && (path == .widened || key.phase == .encoding) { return false }
         switch path {
@@ -328,7 +342,13 @@ package struct ProductAssignment: Equatable, Sendable, Codable, CustomStringConv
         case .bf16:
             return amx == 0 && ane == 0 && amxColumns == 0 && key.weight == .bf16
         case .native:
-            guard amx == 0, ane == 0, key.weight == .int8 || key.weight == .q8 else { return false }
+            guard amx == 0, key.weight == .int8 || key.weight == .q8 else { return false }
+            // The ANE beside the GPU's int8 kernel, both reading the integers: the program takes a scale per column or for the tensor
+            // (never Q8_0's blocks), no activation rounded, no AMX columns, and a weight whose rotation it can cut K for.
+            if ane > 0 {
+                return key.weight == .int8 && amxColumns == 0 && !roundsActivation
+                    && NeuralEngine.readsInt8(k: key.k, n: key.n, group: key.weight.rotationGroup)
+            }
             if amxColumns == 0 { return true }
             let gpuColumns = key.n - amxColumns
             return key.n >= 128 && gpuColumns >= 64 && gpuColumns % 64 == 0
@@ -406,9 +426,13 @@ extension CapacityPlan {
     ///   - `flash`: the flash kernel for every attention whose caller tries it (it falls back by itself on a length it does not
     ///     tile).
     package static func forcing(neuralEngine: Bool = false, bf16Activations: Bool = false, amx: Bool = false, flash: Bool = false,
-                                aneMinimumRows: Int = 2 * NeuralEngine.rowUnit, roundingMinimumRows: Int = 256) -> CapacityPlan {
-        let resources = Resources(amx: amx, ane: neuralEngine, bf16Weights: bf16Activations, roundedActivations: bf16Activations)
-        let label = "forcing" + (neuralEngine ? " ane≥\(aneMinimumRows)" : "") + (bf16Activations ? " bf16act≥\(roundingMinimumRows)" : "")
+                                aneInt8: Bool = false, int8: Bool = false, aneMinimumRows: Int = 2 * NeuralEngine.rowUnit,
+                                roundingMinimumRows: Int = 256) -> CapacityPlan {
+        let neuralEngine = neuralEngine || aneInt8
+        let resources = Resources(amx: amx, ane: neuralEngine, bf16Weights: bf16Activations, int8Weights: aneInt8 || int8,
+                                  roundedActivations: bf16Activations, aneInt8: aneInt8)
+        let label = "forcing" + (neuralEngine ? " ane≥\(aneMinimumRows)" : "") + (aneInt8 ? " aneint8" : "") + (int8 ? " int8" : "")
+            + (bf16Activations ? " bf16act≥\(roundingMinimumRows)" : "")
             + (amx ? " amx 0.631" : "") + (flash ? " flash" : "")
         var attention: AttentionOverride?
         if flash { attention = { (_: AttentionKey, tries: Bool) -> AttentionAssignment? in tries ? AttentionAssignment.flash : nil } }
@@ -420,9 +444,20 @@ extension CapacityPlan {
                 if neuralEngine, key.m >= aneMinimumRows {
                     let unit = NeuralEngine.rowUnit
                     let rows = Int((Double(key.m) * 0.5 / Double(unit)).rounded()) * unit
-                    if rows > 0 && rows < key.m { return ProductAssignment(gpu: key.m - rows, ane: rows) }
+                    if rows > 0 && rows < key.m {
+                        // `aneint8`: a published int8 weight is read as it is by both, the GPU's int8 kernel and the ANE's program,
+                        // where the engines can run it; the others keep the widened weight.
+                        if aneInt8, key.weight == .int8 {
+                            let native = ProductAssignment(path: .native, gpu: key.m - rows, ane: rows)
+                            if native.isRunnable(for: key) { return native }
+                        }
+                        return ProductAssignment(gpu: key.m - rows, ane: rows)
+                    }
                 }
             }
+            // `int8`: a published int8 weight is read as published by the GPU's kernel wherever the ANE takes none of its rows, in every
+            // phase (what the switch `gemm_int8` was) — the AMX leaves it.
+            if int8, key.weight == .int8 { return ProductAssignment(path: .native, gpu: key.m) }
             if amx, key.m >= CapacitySolver.Limits.defaultAMXRows {
                 let tile = 256
                 let gpu = max(tile, min(key.m - tile, Int((Double(key.m) * 0.631 / Double(tile)).rounded()) * tile))
@@ -432,12 +467,16 @@ extension CapacityPlan {
         }, attentionOverride: attention)
     }
 
-    /// **The forcing a developer names** (`SILICONED_PLAN`, a comma list of `amx`, `flash`, `ane`, `bf16act`): the previous switches
-    /// of the checks and the judges, in one place. `nil` for an empty list; a word it does not know makes the whole list unread.
+    /// **The forcing a developer names** (`SILICONED_PLAN`, a comma list of `amx`, `flash`, `ane`, `aneint8`, `int8`, `bf16act`): the
+    /// previous switches of the checks and the judges, in one place. `aneint8` is `ane` with the published int8 weights read as they
+    /// are by the ANE's int8 program beside the GPU's int8 kernel; `int8` reads them as published by the GPU's kernel everywhere
+    /// else (`aneint8,int8` is the integers' route at every height, as the former `gemm_int8` + `gemm_ane` + `ane_int8` ran it).
+    /// `nil` for an empty list; a word it does not know makes the whole list unread.
     package static func forcing(named list: String) -> CapacityPlan? {
         let words = Set(list.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces).lowercased() }.filter { !$0.isEmpty })
-        guard !words.isEmpty, words.isSubset(of: ["amx", "flash", "ane", "bf16act"]) else { return nil }
+        guard !words.isEmpty, words.isSubset(of: ["amx", "flash", "ane", "aneint8", "int8", "bf16act"]) else { return nil }
         return forcing(neuralEngine: words.contains("ane"), bf16Activations: words.contains("bf16act"),
-                       amx: words.contains("amx"), flash: words.contains("flash"))
+                       amx: words.contains("amx"), flash: words.contains("flash"), aneInt8: words.contains("aneint8"),
+                       int8: words.contains("int8"))
     }
 }

@@ -258,7 +258,8 @@ package struct MemoryNeed: Sendable, Equatable {
     ///   - the conductor's BNNS workspace, the largest it grows to over the products the plan gives AMX rows
     ///     (`Conductor.workspaceBytes` of the AMX's exact slice, either weight layout) or, beside an 8-bit weight, columns
     ///     (`Conductor.columnWorkspaceBytes`, larger: 151 against 109 MB at Krea 2's 4096 × 16384 × 6144);
-    ///   - the Neural Engine's fp16 operands and its rows (`NeuralEngine.bytes`) over the products it takes rows of.
+    ///   - the Neural Engine's fp16 operands and its rows (`NeuralEngine.bytes`) over the products it takes rows of — the int8 program's
+    ///     shapes for those whose weight it reads as published (a native path with ANE rows), the fp16 program's for the others.
     ///
     /// MPS's own state is not charged: no shape gives it (`OperatorFootprint`). `bounded`: the products whose height follows
     /// the prompt's tokens — a bound `m`, the height being any of `m − spread … m` (`spread`: the prompt's rows, the part of the
@@ -274,11 +275,15 @@ package struct MemoryNeed: Sendable, Equatable {
                              phase: CapacityClasses.Phase = .denoising) -> [Term] {
         var workspace = 0
         var aneProducts: [(rows: Int, k: Int, n: Int)] = []
+        // The products whose weight the ANE reads as published (a native path with ANE rows): the int8 program's shapes, with the
+        // weight's rotation group — the plan's exact answer by weight format, not a bound over both inputs.
+        var aneIntegers: [(rows: Int, k: Int, n: Int, group: Int?)] = []
         func charge(_ p: (m: Int, k: Int, n: Int), heights: ClosedRange<Int>, step: Int = 1) {
-            var (amx, columns, ane) = (0, 0, 0)
+            var (amx, columns, ane, integers) = (0, 0, 0, 0)
             for m in Swift.stride(from: heights.upperBound, through: heights.lowerBound, by: -step) {
                 let a = plan.assign(ProductKey(k: p.k, n: p.n, m: m, weight: weight, phase: phase))
-                (amx, columns, ane) = (max(amx, a.amx), max(columns, a.amxColumns), max(ane, a.ane))
+                (amx, columns) = (max(amx, a.amx), max(columns, a.amxColumns))
+                if a.path == .native { integers = max(integers, a.ane) } else { ane = max(ane, a.ane) }
             }
             if amx > 0 {
                 for transposed in [false, true] {
@@ -287,6 +292,7 @@ package struct MemoryNeed: Sendable, Equatable {
             }
             if columns > 0 { workspace = max(workspace, Conductor.columnWorkspaceBytes(m: heights.upperBound, k: p.k, n: p.n, width: columns)) }
             if ane > 0 { aneProducts.append((ane, p.k, p.n)) }
+            if integers > 0 { aneIntegers.append((integers, p.k, p.n, weight.rotationGroup)) }
         }
         // A plan that builds neither the AMX nor the ANE gives them no row, at any height: nothing to ask.
         if plan.resources.amx || plan.resources.ane {
@@ -296,7 +302,7 @@ package struct MemoryNeed: Sendable, Equatable {
             }
         }
         let tiers = GEMM.tierBytes(products: products, bounded: bounded, rank: rank)
-        let neural = NeuralEngine.bytes(products: aneProducts)
+        let neural = NeuralEngine.bytes(products: aneProducts, integers: aneIntegers)
         return (tiers > 0 ? [Term("\(name) GEMM tiers", tiers)] : [])
             + (workspace > 0 ? [Term("\(name) conductor workspace", Arena.capacity(for: workspace))] : [])
             + (neural > 0 ? [Term("\(name) Neural Engine", neural)] : [])

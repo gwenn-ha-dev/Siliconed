@@ -150,4 +150,25 @@ extension CapacityFitTests {
         #expect(r.preparation["int8"]?["widened"] == 1.3953e-10)
         #expect(r.rounded() == r)
     }
+
+    /// **A route over its bar on the massive activation is wrong, and a wrong route has no line**: the probes name it in `wrong`
+    /// (as for any product), the fit gives it none, and the plan of that model does not build the ANE's int8 program. The record of
+    /// the judge survives its text.
+    @Test func aRouteJudgedWrongOnTheMassiveActivationLeavesNoLineAndNoProgram() throws {
+        var m = F.Measurements()
+        let line = M.Line(t0: 0.001, rate: 3e12)
+        for kernel in ["gpu/fp32", "gpu/int8", "ane/fp16", "ane/int8"] {
+            for flop in [4.3e9, 30e9, 300e9] { m.solos.append(.init(kernel: kernel, shape: [1, 1, 1], flop: flop, seconds: line.seconds(flop))) }
+        }
+        #expect(CapacityPlan(model: F.model(from: m)).resources.aneInt8)
+        m.wrong = ["ane/int8"]
+        let model = F.model(from: m)
+        #expect(model.lines[M.Kernel(.ane, .int8)] == nil && model.lines[M.Kernel(.ane, .fp16)] != nil)
+        let plan = CapacityPlan(model: model)
+        #expect(plan.resources.ane && !plan.resources.aneInt8)
+        let massive = Diagnostic.CapacityProbes.Massive(kernel: "ane/int8", shape: [1024, 3840, 3840], columns: [548, 1280, 1925, 3829],
+                                                        rowError: 3.3e-4, rowFloor: 3.5e-3, columnError: 1.4e-3, columnFloor: 3.3e-3, pass: true)
+        let back = try JSONDecoder().decode(Diagnostic.CapacityProbes.Massive.self, from: JSONEncoder().encode(massive))
+        #expect(back.kernel == massive.kernel && back.columns == massive.columns && back.columnError == massive.columnError && back.pass)
+    }
 }

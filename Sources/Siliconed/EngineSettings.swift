@@ -320,7 +320,7 @@ package struct EngineSettings: Sendable {
         if let named = ProcessInfo.processInfo.environment["SILICONED_PLAN"] {
             if let forced = CapacityPlan.forcing(named: named) { self.plan = forced; chosen = true }
             else if !named.isEmpty {
-                warnings.append("⚠ SILICONED_PLAN=\(named) not read (amx, flash, ane, bf16act, comma-separated): the plan stays.")
+                warnings.append("⚠ SILICONED_PLAN=\(named) not read (amx, flash, ane, aneint8, int8, bf16act, comma-separated): the plan stays.")
             }
         }
         if let report {

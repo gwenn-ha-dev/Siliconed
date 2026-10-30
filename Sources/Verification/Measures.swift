@@ -144,8 +144,12 @@ package enum NeuralEngineRun {
             throw Skip("--neural-engine: the Neural Engine computed none of the DiT's products on this Mac"
                        + " (\(handed) handed, \(givenBack) given back to the GPU)")
         }
+        // Under `SILICONED_PLAN=aneint8` the integers of a published int8 weight are the program's input: the verdict says how many
+        // of the products read them so.
+        let integers = NeuralEngine.int8Tally.withLock { $0 }
         report.add(Judge.holds("Neural Engine", true,
                                note: "half the rows of \(handed - givenBack) products"
+                                   + (integers > 0 ? ", \(integers) of them on the weight's integers" : "")
                                    + (givenBack > 0 ? ", \(givenBack) given back to the GPU" : "")))
     }
 }

@@ -259,9 +259,110 @@ import Testing
         #expect(ProductAssignment(path: .native, gpu: 4096, amxColumns: 1280).isRunnable(for: int8), "2 560 GPU columns: whole tiles")
         #expect(!ProductAssignment(path: .native, gpu: 4096, amxColumns: 1000).isRunnable(for: int8), "a GPU edge inside a tile")
         #expect(!ProductAssignment(path: .native, gpu: 4096, amxColumns: 3840).isRunnable(for: int8), "the GPU keeps a tile")
-        #expect(!ProductAssignment(path: .native, gpu: 2048, ane: 2048).isRunnable(for: int8), "no ANE beside a native weight")
+        #expect(ProductAssignment(path: .native, gpu: 2048, ane: 2048).isRunnable(for: int8), "the ANE reads the integers beside the GPU's kernel")
         #expect(!ProductAssignment(path: .native, gpu: 4096, amxColumns: 64).isRunnable(for: key(3840, 100, 4096, .int8)))
         #expect(!ProductAssignment(path: .native, gpu: 4096).isRunnable(for: k), "a native path needs an 8-bit weight")
+    }
+
+    /// **The ANE reads a published int8 weight as it is** (`path: .native` with `ane > 0`): what the engines can run, and what they
+    /// cannot — an encoder (P20), Q8_0's blocks, the AMX beside it, a rounded activation, a K the program cannot cut on the rotation's
+    /// groups (4 864 = 19 × 256 would need two parts of 2 432, inside a group).
+    @Test func theANEReadsTheIntegersWhereTheProgramCanRunThem() {
+        let int8 = key(4096, 4096, 4096, .int8)
+        #expect(ProductAssignment(path: .native, gpu: 2048, ane: 2048).isRunnable(for: int8))
+        #expect(ProductAssignment(path: .native, gpu: 0, ane: 4096).isRunnable(for: int8), "the ANE alone")
+        #expect(ProductAssignment(path: .native, gpu: 1280, ane: 2816).isRunnable(for: int8), "the unit of 256")
+        #expect(!ProductAssignment(path: .native, gpu: 2000, ane: 2096).isRunnable(for: int8), "the ANE's rows come in units of 256")
+        #expect(!ProductAssignment(path: .native, gpu: 2048, ane: 2048).isRunnable(for: key(4096, 4096, 4096, .int8, phase: .encoding)),
+                "no ANE on an encoder: P20")
+        #expect(!ProductAssignment(path: .native, gpu: 2048, ane: 2048).isRunnable(for: key(4096, 4096, 4096, .q8)), "never Q8_0's blocks")
+        #expect(!ProductAssignment(path: .native, roundsActivation: true, gpu: 2048, ane: 2048).isRunnable(for: int8), "no rounded activation beside it")
+        #expect(!ProductAssignment(path: .native, gpu: 1024, amx: 1024, ane: 2048).isRunnable(for: int8), "no AMX rows beside a native weight")
+        #expect(ProductAssignment(path: .native, gpu: 4096, amxColumns: 1024).isRunnable(for: int8), "the AMX's columns alone still run")
+        #expect(!ProductAssignment(path: .native, gpu: 2048, ane: 2048, amxColumns: 1024).isRunnable(for: int8), "ANE rows and AMX columns")
+        // K the program cannot cut: 4 864 = 19 × 256 > 4 096 in two parts of 2 432, a rotation group straddling the bound
+        #expect(!NeuralEngine.readsInt8(k: 4864, n: 4096, group: 256))
+        #expect(!ProductAssignment(path: .native, gpu: 2048, ane: 2048).isRunnable(for: key(4864, 4096, 4096, .int8)), "K outside the program's limits")
+        #expect(!ProductAssignment(path: .native, gpu: 2048, ane: 2048).isRunnable(for: key(3904, 4096, 4096, .int8)), "K not a whole number of groups")
+        // the widened path keeps its own rule for every K
+        #expect(ProductAssignment(gpu: 2048, ane: 2048).isRunnable(for: key(4864, 4096, 4096, .int8)))
+        // the shapes of the three Compact maps all run
+        for (k, n) in [(4096, 4096), (4096, 12288), (12288, 4096), (6144, 6144), (6144, 1536), (6144, 16384), (16384, 6144),
+                       (3072, 3072), (8192, 3072), (3072, 16384)] {
+            #expect(ProductAssignment(path: .native, gpu: 2048, ane: 2048).isRunnable(for: key(k, n, 4096, .int8)), "\(k)×\(n)")
+        }
+    }
+
+    @Test func theANEsIntegersAreNamedAsTheLedgerNamesThem() {
+        #expect(ProductAssignment(path: .native, gpu: 2048, ane: 2048).route(weight: .int8) == "gpu+ane/int8")
+        #expect(ProductAssignment(path: .native, gpu: 0, ane: 4096).route(weight: .int8) == "ane/int8")
+        #expect(ProductAssignment(path: .native, gpu: 2048, ane: 2048).engines == "gpu+ane")
+    }
+
+    /// `aneint8` forces what `ane` forces — half the rows of a denoiser's product on the ANE — and has the published int8 weights
+    /// read as they are by both engines, where they can; the engines it needs are brought up, the int8 program among them.
+    @Test func aForcingNamesTheANEsIntegers() {
+        #expect(CapacityPlan.Resources(aneInt8: true) == .init(), "the program needs the ANE and the GPU's int8 kernel")
+        #expect(CapacityPlan.Resources(ane: true, aneInt8: true).aneInt8 == false)
+        let plan = try! #require(CapacityPlan.forcing(named: "aneint8"))
+        #expect(plan.resources == .init(ane: true, int8Weights: true, aneInt8: true))
+        #expect(plan.resources.halfPrecision && plan.resources.usesTensor)
+        #expect(plan.assign(key(4096, 4096, 4096, .int8)) == ProductAssignment(path: .native, gpu: 2048, ane: 2048))
+        #expect(plan.assign(key(4096, 4096, 4096, .int8)).route(weight: .int8) == "gpu+ane/int8")
+        #expect(plan.assign(key(4096, 4096, 1056, .int8)) == ProductAssignment(path: .native, gpu: 544, ane: 512))
+        #expect(plan.assign(key(4096, 4096, 4096, .bf16)) == ProductAssignment(gpu: 2048, ane: 2048), "a bf16 weight keeps the widened path")
+        #expect(plan.assign(key(4096, 4096, 4096, .q8)) == ProductAssignment(gpu: 2048, ane: 2048), "Q8_0 widens")
+        #expect(plan.assign(key(4864, 4096, 4096, .int8)) == ProductAssignment(gpu: 2048, ane: 2048), "a K the program cannot cut: widened")
+        #expect(plan.assign(key(4096, 4096, 4096, .int8, phase: .encoding)) == .gpuAlone(4096), "an encoder never")
+        #expect(plan.assign(key(4096, 4096, 500, .int8)) == .gpuAlone(500))
+        #expect(plan.restricted(allowingANE: false).assign(key(4096, 4096, 4096, .int8)) == .gpuAlone(4096), "the Standard's process: folded")
+        // the rows are the former cut's at its default share (the GPU's half, on the unit of 256, the ANE never the whole product)
+        func formerRows(_ m: Int) -> Int { let r = Int((Double(m) * 0.5 / 256).rounded()) * 256; return r > 0 && r < m ? r : 0 }
+        for m in [512, 640, 1024, 1056, 1536, 4096, 4117, 4128, 6176] {
+            #expect(plan.assign(key(4096, 4096, m, .int8)).ane == formerRows(m), "m = \(m)")
+            #expect(plan.assign(key(4096, 4096, m, .bf16)).ane == formerRows(m), "m = \(m)")
+        }
+        let ane = try! #require(CapacityPlan.forcing(named: "ane"))
+        #expect(ane.assign(key(4096, 4096, 4096, .int8)) == ProductAssignment(gpu: 2048, ane: 2048), "`ane` alone widens the integers")
+        #expect(ane.resources == .init(ane: true))
+    }
+
+    /// `int8` is the former `gemm_int8`: the published int8 weights as published by the GPU's kernel, in every phase and at every
+    /// height; with `aneint8` the ANE takes its rows of the denoiser's products where it takes any.
+    @Test func aForcingNamesTheGPUsIntegersEverywhere() {
+        let int8 = try! #require(CapacityPlan.forcing(named: "int8"))
+        #expect(int8.resources == .init(int8Weights: true))
+        for phase in CapacityClasses.Phase.allCases {
+            for m in [19, 512, 4096] {
+                #expect(int8.assign(key(4096, 4096, m, .int8, phase: phase)) == ProductAssignment(path: .native, gpu: m), "\(phase) \(m)")
+            }
+        }
+        #expect(int8.assign(key(4096, 4096, 4096, .bf16)) == .gpuAlone(4096) && int8.assign(key(4096, 4096, 4096, .q8)) == .gpuAlone(4096))
+        let both = try! #require(CapacityPlan.forcing(named: "aneint8,int8"))
+        #expect(both.resources == .init(ane: true, int8Weights: true, aneInt8: true))
+        #expect(both.assign(key(4096, 4096, 4096, .int8)) == ProductAssignment(path: .native, gpu: 2048, ane: 2048))
+        #expect(both.assign(key(4096, 4096, 19, .int8)) == ProductAssignment(path: .native, gpu: 19), "under the ANE's floor: the GPU's kernel")
+        #expect(both.assign(key(4096, 4096, 4096, .int8, phase: .encoding)) == ProductAssignment(path: .native, gpu: 4096), "the encoder's too")
+        #expect(both.assign(key(4096, 4096, 4096, .bf16)) == ProductAssignment(gpu: 2048, ane: 2048))
+        // a process that refused the ANE is told to do without it: the widened weight, as with `ane` alone
+        #expect(both.restricted(allowingANE: false).assign(key(4096, 4096, 4096, .int8)) == .gpuAlone(4096))
+        #expect(both.restricted(allowingANE: false).assign(key(4096, 4096, 19, .int8)) == ProductAssignment(path: .native, gpu: 19))
+    }
+
+    @Test func aModelPlanBringsUpTheANEsIntegersOnlyWhereItHasTheLine() {
+        let g8 = M.Kernel(.gpu, .int8), a8 = M.Kernel(.ane, .int8)
+        var m = machine()
+        m.lines[g8] = .init(t0: 0, rate: 3e12)
+        #expect(!CapacityPlan(model: m).resources.aneInt8)
+        m.lines[a8] = .init(t0: 0, rate: 9e12)
+        let plan = CapacityPlan(model: m)
+        #expect(plan.resources.aneInt8 && plan.resources.ane && plan.resources.int8Weights)
+        #expect(!CapacityPlan(model: m, excluded: [a8]).resources.aneInt8, "a route the judge refused is not built")
+        #expect(!CapacityPlan(model: m, allowsANE: false).resources.aneInt8)
+        #expect(!plan.restricted(allowingANE: false).resources.aneInt8)
+        // without the GPU's int8 kernel the program has nobody beside it
+        m.lines[g8] = nil
+        #expect(!CapacityPlan(model: m).resources.aneInt8)
     }
 
     @Test func anAttentionRunsWholeGroupsAndTheGPUKeepsOne() {
@@ -329,5 +430,22 @@ import Testing
         #expect(!encoder.contains { $0.name == "t Neural Engine" })
         // the same inputs, the same bytes
         #expect(MemoryNeed.gemm("t", products: products, plan: plan) == terms)
+    }
+
+    /// **The need is exact by the weight's form**: the products whose integers the ANE reads are charged the int8 program's
+    /// surfaces, the others the fp16 program's — and the same plan answers the engine and the need.
+    @Test func theNeedChargesTheProgramEachProductReads() {
+        let plan = CapacityPlan.forcing(named: "aneint8")!
+        let products = [(m: 4096, k: 4096, n: 12288), (m: 4096, k: 4096, n: 4096)]
+        let terms = MemoryNeed.gemm("t", products: products, plan: plan, weight: .int8)
+        let expected = NeuralEngine.bytes(products: [], integers: products.map { (2048, $0.k, $0.n, 256) })
+        #expect(terms.first { $0.name == "t Neural Engine" }?.bytes == expected)
+        #expect(expected > 0 && expected != NeuralEngine.bytes(products: products.map { (2048, $0.k, $0.n) }), "not the fp16 program's shapes")
+        // a bf16 weight under the same plan: widened, the fp16 program
+        let bf16 = MemoryNeed.gemm("t", products: products, plan: plan, weight: .bf16)
+        #expect(bf16.first { $0.name == "t Neural Engine" }?.bytes == NeuralEngine.bytes(products: products.map { (2048, $0.k, $0.n) }))
+        // a K the program cannot cut is widened, and charged so
+        let odd = MemoryNeed.gemm("t", products: [(m: 4096, k: 4864, n: 4096)], plan: plan, weight: .int8)
+        #expect(odd.first { $0.name == "t Neural Engine" }?.bytes == NeuralEngine.bytes(products: [(2048, 4864, 4096)]))
     }
 }

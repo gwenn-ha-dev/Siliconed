@@ -14,6 +14,8 @@ import Metal
 ///              │     or a GGUF Q8_0             (scales per 32 rows: q · s in threadgroup memory)
 ///              │     + the AMX's columns        widened alone, while the GPU               ─▶ BNNS on them
 ///              │                                computes the others
+///              │     + the ANE's last rows      the same integers and scales, read in place ─▶ the ANE's int8 program,
+///              │                                (`ProductAssignment.ane` on a native weight)   beside the GPU's rows
 ///              └─ path widened                 widened on the CPU (`Artifact.materialize`) ─▶ MPS (+ AMX, + ANE rows)
 ///          ─▶ C = A · W
 ///          ─▶ + the LoRA stack:  C += (A · down) · up          after the product, or
@@ -35,6 +37,9 @@ import Metal
 ///     scales, then the rotated activation by as many rows as the rest holds (`int8Plan`);
 ///   - **an int8 weight's rotation goes to the activation**: `W = R · q · s` (`Widen.dequantizeRotated`)
 ///     gives `x · W = (x · R) · q · s` — `R` is applied to `x` in fp32, the integers are never touched;
+///   - **the ANE reads the integers where the plan gives it rows of a native weight** (`aneInt8Rows`): nothing is widened, nothing
+///     copied for it but its surface; the GPU's rows run the int8 kernel on the same reserve, each row one engine's. A program the
+///     process cannot run for the weight (`NeuralEngine.accepts`: its rotation's groups, a refusal) hands its rows to the GPU;
 ///   - **a rounded activation rounds the operand of a product and nothing else** (`roundsActivations`, which a
 ///     DiT sets and a text encoder does not): the caller's activation stays fp32 — the LoRA stack reads it —,
 ///     the rounded copy lives in the reserve's tail beside the weight (`roundingPlan`), the sums and the
@@ -55,6 +60,8 @@ package final class WeightProducts {
     private let mergesLoRA: Bool
     /// The operand of a product is rounded to bf16 where the settings and the machine allow it (`gemm_bf16_act`).
     private let roundsActivations: Bool
+    /// The last int8 product had rows on the ANE, and it computed them (`classification`).
+    private var aneTook = false
 
     /// Per phase, accumulated since the last `resetTimings`.
     package private(set) var timings: [String: Double] = [:]
@@ -115,10 +122,20 @@ package final class WeightProducts {
                 timings["gemm GPU", default: 0] += gemm.linear(a: a, bf16: w, c: c, m: m, k: k, n: n,
                                                               weightIsTransposed: transposed)
             case .int8(let plan):
-                let r = Self.int8Product(gemm: gemm, plan: plan, reserve: w, a: a, c: c, m: m, k: k, n: n)
-                timings["gemm GPU", default: 0] += r.gpu
-                timings["widening", default: 0] += r.widening
-                if r.status != 0 { failure = "\(name): the AMX refused its columns (BNNS \(r.status))" }
+                // The ANE beside the GPU on the integers: the plan's last rows (`ProductAssignment.ane` on a native weight), read from
+                // the reserve beside the GPU's int8 kernel. The engine takes them only if it can run them (`aneInt8Rows`).
+                let aneRows = aneInt8Rows(planned, plan, m: m, k: k, n: n)
+                if aneRows > 0, let ane = gemm.neuralEngine {
+                    let r = Self.int8Product(gemm: gemm, plan: plan, reserve: w, a: a, c: c, m: m, k: k, n: n, ane: ane, aneRows: aneRows)
+                    timings["gemm GPU", default: 0] += r.gpu
+                    aneTook = r.computed
+                } else {
+                    aneTook = false
+                    let r = Self.int8Product(gemm: gemm, plan: plan, reserve: w, a: a, c: c, m: m, k: k, n: n)
+                    timings["gemm GPU", default: 0] += r.gpu
+                    timings["widening", default: 0] += r.widening
+                    if r.status != 0 { failure = "\(name): the AMX refused its columns (BNNS \(r.status))" }
+                }
             case .widened:
                 timings["gemm GPU", default: 0] += gemm.linear(a: a, b: w, c: c, m: m, k: k, n: n,
                                                               weightIsTransposed: transposed, weight: format(of: name),
@@ -149,6 +166,7 @@ package final class WeightProducts {
         case .bf16(let rounding): return (.bf16, rounding == nil ? "gpu/bf16" : "gpu/bf16act")
         case .int8(let plan):
             let weight: CapacityClasses.WeightFormat = plan.block == nil ? .int8 : .q8
+            if aneTook { return (weight, "gpu+ane/" + weight.rawValue) }
             return (weight, (plan.amxColumns > 0 && gemm.conductor != nil ? "gpu+amx/" : "gpu/") + weight.rawValue)
         case .widened:
             return (format(of: name), gemm.lastEngines)
@@ -262,6 +280,47 @@ package final class WeightProducts {
                                        first: g, width: plan.amxColumns)
         commands.waitUntilCompleted()
         return (Attention.verdict(commands, what: "matmul2d float × int8 \(m)×\(k)×\(n)"), widening, status)
+    }
+
+    /// **The ANE's rows of an int8 product read as published**: those the plan gave (`planned.ane`, the last ones), if this process
+    /// can run them — the ANE built, the weight the program's kind (scales per column or for the tensor, never Q8_0's blocks; no
+    /// activation rounded; no AMX columns), and a program that accepts its rotation's `group` — else 0, and the GPU takes the whole
+    /// product. The plan's own runnability (`ProductAssignment.isRunnable`) is the hardware's; this is the process's.
+    private func aneInt8Rows(_ planned: ProductAssignment, _ plan: Int8Plan, m: Int, k: Int, n: Int) -> Int {
+        guard planned.path == .native, planned.ane > 0, plan.block == nil, plan.amxColumns == 0, plan.roundedOffset == 0,
+              let ane = gemm.neuralEngine, planned.ane <= m,
+              ane.accepts(rows: planned.ane, k: k, n: n, int8Group: plan.group) else { return 0 }
+        return planned.ane
+    }
+
+    /// **The int8 product cut between the GPU and the ANE**, at the same time: the first `m − aneRows` rows on the GPU's int8
+    /// kernel (`int8Product`, the plan's rotation of its own rows in the reserve's tail), the last `aneRows` on the ANE's int8
+    /// program, which reads the integers and their scales from the same reserve — nothing widened, nothing copied for it but
+    /// the surface. Each row is one engine's. The ANE's rows refused or non-finite: the whole product again on the GPU alone.
+    /// `gpu`: the GPU's seconds (its kernel's, and the whole product's if it had to be redone); `gpuWall`, `aneWall`: each side's
+    /// wall from the start, as `GEMM.lastSides`; `computed`: the ANE's rows were its own.
+    package static func int8Product(gemm: GEMM, plan: Int8Plan, reserve w: MTLBuffer, a: MTLBuffer, c: MTLBuffer, m: Int, k: Int, n: Int,
+                                    ane: NeuralEngine, aneRows: Int) -> (gpu: Double, computed: Bool, gpuWall: Double, aneWall: Double) {
+        let first = m - aneRows
+        nonisolated(unsafe) let (pa, pc) = (a.contents().assumingMemoryBound(to: Float.self), c.contents().assumingMemoryBound(to: Float.self))
+        let raw = w.contents()
+        let weight = NeuralEngine.Int8Weight(values: raw.assumingMemoryBound(to: Int8.self),
+                                             scales: (raw + plan.scalesOffset).assumingMemoryBound(to: Float.self),
+                                             perColumn: plan.perColumn, group: plan.group)
+        nonisolated(unsafe) var computed = false
+        nonisolated(unsafe) var aneWall = 0.0
+        let began = DispatchTime.now().uptimeNanoseconds
+        let group = DispatchGroup()
+        DispatchQueue.global(qos: .userInitiated).async(group: group) {
+            computed = ane.product(a: pa, int8: weight, c: pc, first: first, rows: aneRows, k: k, n: n)
+            aneWall = Double(DispatchTime.now().uptimeNanoseconds - began) * 1e-9
+        }
+        var gpu = first > 0 ? int8Product(gemm: gemm, plan: plan, reserve: w, a: a, c: c, m: first, k: k, n: n).gpu : 0
+        let gpuWall = Double(DispatchTime.now().uptimeNanoseconds - began) * 1e-9
+        group.wait()
+        GEMM.neuralEngineTally.withLock { $0.handed += 1; if !computed { $0.givenBack += 1 } }
+        if !computed { gpu += int8Product(gemm: gemm, plan: plan, reserve: w, a: a, c: c, m: m, k: k, n: n).gpu }
+        return (gpu, computed, gpuWall, aneWall)
     }
 
     /// The weight into the reserve, by the path the plan assigned, and the assignment the widened product then runs under. A path

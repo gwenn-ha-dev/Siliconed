@@ -56,6 +56,12 @@ package enum CapacityClasses {
         /// Q4_K to Q6_K: a single route (widening on the CPU).
         case q4k
 
+        /// **The convrot group of the format's rotation**, `nil` for none: every int8 DiT of the catalogue is Comfy's `int8_tensorwise`
+        /// convrot of group 256 (the headers of the three Compact maps, checked), so the plan reasons on 256 — what the ANE's int8
+        /// program needs to know to cut K (`NeuralEngine.readsInt8`) and the memory need to size its rotated row. A tensor of
+        /// another group is not refused here: the engine reads the tensor's own and declines what its program cannot cut.
+        package var rotationGroup: Int? { self == .int8 ? Widen.largestRotationGroup : nil }
+
         /// The weight's kind, `nil` for the K-quants (no native form).
         package var kind: WeightKind? {
             switch self {

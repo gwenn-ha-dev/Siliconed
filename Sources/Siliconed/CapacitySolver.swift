@@ -354,7 +354,11 @@ private struct ProductSolver {
         return out
     }
 
-    /// **A native 8-bit weight**: the GPU alone, or beside the AMX on the last columns (the GPU's a multiple of 64).
+    /// **A native 8-bit weight**: the GPU alone, or beside the AMX on the last columns (the GPU's a multiple of 64) — and, for an
+    /// int8 weight whose scales the ANE's program takes (per column or for the tensor, never Q8_0's blocks), the ANE's last rows
+    /// beside the GPU's int8 kernel, both reading the integers: `[gpu/int8, ane/int8]`, a set with its own sharing in the model. It
+    /// is offered only to the denoiser (P20), from the ANE's floor, where the model has the line `ane/int8` (a route the probes'
+    /// judge refused has none) and `NeuralEngine.readsInt8` for the weight's rotation (`isRunnable`).
     func native(_ key: ProductKey) -> [Option] {
         let (k, n, m) = (key.k, key.n, key.m)
         let form: CapacityModel.Form = key.weight == .int8 ? .int8 : .q8
@@ -375,6 +379,21 @@ private struct ProductSolver {
            let seed = model.split(m: n, k: k, n: m, kernels: [gpu, amx], sustained: c.sustained), let g0 = seed.rows[gpu] {
             let cands = gpuColumns(n: n, balance: Double(g0)).compactMap { option(n - $0) }
             if let b = cands.min(by: { $0.seconds < $1.seconds }) { out.append(b) }
+        }
+        if key.weight == .int8, c.allowsANE, key.phase == .denoising, m >= c.limits.aneRows, let ane = line(.ane, .int8) {
+            func integers(_ rows: Int) -> Option? {
+                let assignment = ProductAssignment(path: .native, gpu: m - rows, ane: rows)
+                guard assignment.isRunnable(for: key) else { return nil }
+                var split: [Kernel: Int] = [ane: rows]
+                if rows < m { split[gpu] = m - rows }
+                guard let t = seconds(split, m: m, k: k, n: n) else { return nil }
+                return Option(assignment: assignment, rows: split, seconds: t)
+            }
+            if let seed = model.split(m: m, k: k, n: n, kernels: [gpu, ane], sustained: c.sustained), let r0 = seed.rows[ane],
+               let b = aneRows(m: m, balance: Double(r0)).compactMap(integers).min(by: { $0.seconds < $1.seconds }) {
+                out.append(b)
+            }
+            if let o = integers(m) { out.append(o) }
         }
         return out
     }

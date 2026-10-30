@@ -173,6 +173,63 @@ import Testing
         #expect((4096 - s.assignment.amxColumns) % 64 == 0)
     }
 
+    /// **The ANE beside the GPU's int8 kernel, both reading the integers**: offered where the model has the line `ane/int8`, chosen
+    /// when it is faster, with its own sharing (`gpu/int8+ane/int8`) and the integers the engines run.
+    @Test func theANEReadsTheIntegersWhenTheModelSaysItIsFaster() throws {
+        let g8 = M.Kernel(.gpu, .int8), a8 = M.Kernel(.ane, .int8)
+        var m = machine()
+        m.lines[g8] = .init(t0: 0, rate: 3e12)
+        m.preparation[.int8] = [.widened: 1e-9, .native: 1e-11]
+        let int8 = key(4096, 4096, 4096, .int8)
+        #expect(try solve(m, int8).route == "gpu/int8", "no line for the ANE's integers: the GPU's kernel alone")
+        m.lines[a8] = .init(t0: 0, rate: 9e12)
+        // 9 / (3 + 9) of 4 096 rows = 3 072 = 12 units
+        var s = try solve(m, int8)
+        #expect(s.assignment == ProductAssignment(path: .native, gpu: 1024, ane: 3072))
+        #expect(s.route == "gpu+ane/int8" && s.rows == [g8: 1024, a8: 3072])
+        #expect(abs(s.preparation - 4096 * 4096 * 1e-11) < 1e-9, "the integers are copied, not widened")
+        #expect(abs(s.compute - seconds(4096, 4096, rows: 1024, rate: 3e12)) < 1e-9)
+        // the pair's own sharing: the GPU keeps 0.6 of its rate beside the ANE, 1.8 against 9 → 0.833 of the rows = 3 413; the unit
+        // below it leaves the GPU 768 rows (14.3 ms), the unit above 512 (13.4 ms), the ANE alone 15.3 ms
+        m.sharing["gpu/int8+ane/int8"] = .init(overhead: 0, keep: [.gpu: 0.6, .ane: 1])
+        s = try solve(m, int8)
+        #expect(s.assignment == ProductAssignment(path: .native, gpu: 512, ane: 3584), "\(s.assignment)")
+        // the engines' key is not this pair's: an fp16 pair with a terrible keep changes nothing
+        m.sharing["gpu+ane"] = .init(overhead: 0, keep: [.gpu: 1, .ane: 0.01])
+        #expect(try solve(m, int8).assignment == s.assignment)
+        // slower than the GPU alone: it stays out
+        m.sharing = [:]
+        m.lines[a8] = .init(t0: 0, rate: 0.1e12)
+        #expect(try solve(m, int8).assignment.ane == 0)
+        // an engine the judge refused is no candidate whatever its line says
+        m.lines[a8] = .init(t0: 0, rate: 9e12)
+        let refused = try #require(CS.product(int8, model: m, constraints: .init(sustained: false, excluded: [a8], allowsANE: true)))
+        #expect(refused.route == "gpu/int8")
+        // never an encoder, never a process without the ANE, never under the model's floor
+        #expect(try solve(m, key(4096, 4096, 4096, .int8, phase: .encoding)).route == "gpu/int8")
+        #expect(try solve(m, int8, ane: false).route == "gpu/int8")
+        #expect(try solve(m, key(4096, 4096, 512, .int8)).route == "gpu/int8")
+        // never a K the program cannot cut, never Q8_0's blocks
+        #expect(try solve(m, key(3904, 4096, 4096, .int8)).route == "gpu/int8")
+        m.lines[M.Kernel(.gpu, .q8)] = .init(t0: 0, rate: 3e12)
+        m.preparation[.q8] = [.widened: 1e-9, .native: 1e-11]
+        #expect(try solve(m, key(4096, 4096, 4096, .q8)).route == "gpu/q8")
+        // the integers' answer is the one the plan gives
+        #expect(CapacityPlan(model: m).assign(int8) == (try solve(m, int8)).assignment)
+    }
+
+    @Test func theANEMayTakeTheWholeIntegersProductWhenTheGPUIsTheSlowEngine() throws {
+        let g8 = M.Kernel(.gpu, .int8), a8 = M.Kernel(.ane, .int8)
+        var m = machine(gpuRate: 0.5e12)
+        m.lines[g8] = .init(t0: 0, rate: 0.5e12)
+        m.lines[a8] = .init(t0: 0, rate: 12e12)
+        m.sharing["gpu/int8+ane/int8"] = .init(overhead: 0.01, keep: [.gpu: 0.5, .ane: 0.9])
+        m.preparation[.int8] = [.widened: 1e-9, .native: 1e-11]
+        let s = try solve(m, key(4096, 4096, 2048, .int8))
+        #expect(s.assignment == ProductAssignment(path: .native, gpu: 0, ane: 2048), "\(s.assignment)")
+        #expect(s.route == "ane/int8")
+    }
+
     @Test func theBF16WeightAsPublishedWinsWhenItsPreparationIsCheaper() throws {
         var m = machine()
         m.lines[M.Kernel(.gpu, .bf16)] = .init(t0: 0, rate: 3e12)
