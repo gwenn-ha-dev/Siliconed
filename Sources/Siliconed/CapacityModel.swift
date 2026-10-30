@@ -13,10 +13,11 @@ import Foundation
 ///                           preparation             seconds per value to bring a weight to the form a kernel reads
 ///
 ///     a product m×k×n on engines E, rows rᵢ (Σ rᵢ = m), W = 2·k·n·m:
-///         tᵢ = t₀ᵢ + 2·k·n·rᵢ / (rateᵢ · keepᵢ)          (rᵢ rounded up to `aneRowUnit` on the ANE)
-///         T  = max tᵢ + overhead(E)
-///     balanced (every side ends together), R′ᵢ = rateᵢ · keepᵢ:
-///         T* = (W + Σ t₀ᵢ R′ᵢ) / Σ R′ᵢ          rᵢ = (T* − t₀ᵢ) · R′ᵢ / (2·k·n)
+///         sᵢ = t₀ᵢ + wᵢ·k·n + 2·k·n·rᵢ / rateᵢ(k)       its seconds alone (rᵢ rounded up to `aneRowUnit` on the ANE)
+///         the engines run **overlapped**: while the set S is active, each progresses at κᵢˢ of its speed alone, and at 1 once
+///         it is alone; T = the end of the last + overhead(E)
+///     balanced (every side ends together), κᵢ the full set's:
+///         sᵢ = κᵢ · T*        T* = (W + Σ fᵢ Rᵢ) / Σ κᵢ Rᵢ        fᵢ = t₀ᵢ + wᵢ·k·n        rᵢ = (κᵢT* − fᵢ) · Rᵢ / (2·k·n)
 ///         an engine whose rᵢ ≤ 0 leaves the set, and the rest is solved again
 ///
 /// What sets it apart — what a model written by analogy with "add the engines' rates" would get wrong:
@@ -24,6 +25,15 @@ import Foundation
 ///   - **engines share, they do not add** (measured on nine Macs, six generations): GPU + AMX keep 0.74–0.88 of the sum of their solo
 ///     rates, GPU + ANE 0.49–0.72, the three 0.25–0.42. `keep` is per engine *within a set*: the GPU beside the ANE
 ///     is not the GPU beside the AMX. A set's time is never read off its members' solo lines.
+///   - **the loss lasts as long as the partner runs**: an engine that ends first frees the others, which go on at their full
+///     speed (a side's seconds past the balance are not its seconds inside the set). The `keep` of a side is its speed inside
+///     the set over its speed alone — taken on the *line's* seconds at the rows the chain gave it, so that the line's own
+///     bias at those rows is in the keep and not in the next product — and constant over the splits of one product
+///     (GPU + ANE: 0.92 and 0.75 at 2 048, 2 304 and 2 560 ANE rows alike), which a `keep` read as "seconds inside over seconds
+///     alone, all along" is not.
+///   - **a kernel's seconds are not `t₀ + W / rate` on every shape**: the ANE lifts the whole weight to its input at every call
+///     (`perWeight`, ∝ k·n: 2.6 of 15 ms at 3 840²), and the AMX's rate falls with k (`rateByK`: 2.3 TFLOP/s at 3 840, 1.8 at
+///     12 288), where a line through three products of one family reads t₀ off a shape that is not the next one's.
 ///   - **the loss is two things the model keeps apart**: what does not depend on the size (`overhead`: launching,
 ///     synchronizing, a weight's preparation counted in the route — our code, a fix holds on every Mac) and what does
 ///     (`keep`: power and memory this Mac shares between its engines — physics, taken as measured). The loss is larger
@@ -77,21 +87,78 @@ package struct CapacityModel: Codable, Sendable, Equatable {
         }
     }
 
-    /// `t(W) = t₀ + W / rate`: seconds for W FLOP. Affine holds a GPU alone within 1.7–2.9 % (median) from 4 to
-    /// 825 GFLOP on 28 shapes; a constant rate misses by 6–7 %.
+    /// **A kernel's seconds on a product `m×k×n`** (rows `r` of it): `t₀ + perWeight·k·n + 2·r·k·n / rate(k)`. `t(W) = t₀ + W / rate`
+    /// alone holds a GPU within 1.7–2.9 % (median) from 4 to 825 GFLOP on 28 shapes; the two terms added make the ANE (the lift of
+    /// the weight at every call) and the AMX (the rate by k) fit as well.
     package struct Line: Codable, Sendable, Equatable {
         package var t0: Double
         package var rate: Double
-        package init(t0: Double, rate: Double) { self.t0 = t0; self.rate = rate }
+        /// Seconds per weight value paid once per call, whatever the rows: the ANE's lift of the fp32 weight to its fp16 input.
+        package var perWeight: Double?
+        /// The rate by k (`RateAt`, ascending in k): linear in the seconds per FLOP against ln k between two knots, the nearest knot's
+        /// beyond the ends. `nil`: `rate` at every k.
+        package var rateByK: [RateAt]?
+        package struct RateAt: Codable, Sendable, Equatable {
+            package var k: Int
+            package var rate: Double
+            package init(k: Int, rate: Double) { self.k = k; self.rate = rate }
+        }
+        package init(t0: Double, rate: Double, perWeight: Double? = nil, rateByK: [RateAt]? = nil) {
+            self.t0 = t0; self.rate = rate; self.perWeight = perWeight; self.rateByK = rateByK
+        }
         package func seconds(_ flop: Double) -> Double { t0 + flop / rate }
+        /// The seconds a call pays whatever its rows: `t₀` and the weight's lift.
+        package func fixed(k: Int, n: Int) -> Double { t0 + (perWeight ?? 0) * Double(k) * Double(n) }
+        /// The rate at `k`.
+        package func rate(atK k: Int) -> Double {
+            guard let knots = rateByK, let first = knots.first, let last = knots.last else { return rate }
+            if k <= first.k { return first.rate }
+            if k >= last.k { return last.rate }
+            for (lo, hi) in zip(knots, knots.dropFirst()) where k <= hi.k {
+                let f = (log(Double(k)) - log(Double(lo.k))) / (log(Double(hi.k)) - log(Double(lo.k)))
+                return 1 / ((1 - f) / lo.rate + f / hi.rate)
+            }
+            return last.rate
+        }
+        /// Seconds of `rows` rows of a `k×n` weight (the caller rounds the ANE's up to its unit).
+        package func seconds(rows: Int, k: Int, n: Int) -> Double {
+            fixed(k: k, n: n) + 2 * Double(rows) * Double(k) * Double(n) / rate(atK: k)
+        }
     }
 
-    /// What engines lose when they run one block together: each keeps `keep[e]` of its solo rate, the set pays
-    /// `overhead` seconds once.
+    /// What engines lose when they run one block together: while the set is active each keeps `keep[e]` of its speed alone (κ), the
+    /// set pays `overhead` seconds once. `sustained`: the set's wall once it has run for tens of seconds over its wall in a chain of
+    /// half a second (≥ 1; nil is 1) — what the minute cannot read (the SoC's power settles after ≈ 10 s), carried so that a plan's
+    /// prediction can be asked at the regime of a render, and corrected by the render's own loop.
     package struct Sharing: Codable, Sendable, Equatable {
         package var overhead: Double
         package var keep: [Engine: Double]
-        package init(overhead: Double = 0, keep: [Engine: Double] = [:]) { self.overhead = overhead; self.keep = keep }
+        package var sustained: Double?
+        /// κ measured at other k's, ascending (`KeepAt`): what the weight's length does to the loss — the AMX beside the GPU keeps 0.9 at
+        /// k = 3 840 and half of that at 12 288, where both stream a weight of 200 MB. Between two knots the κ is linear in ln k, beyond the
+        /// ends the nearest knot's; `keep` is the value for an engine no knot gives.
+        package var keepByK: [KeepAt]?
+        package struct KeepAt: Codable, Sendable, Equatable {
+            package var k: Int
+            /// Keyed by the engine's name (`"gpu"`): a dictionary keyed by an enum does not survive JSON.
+            package var keep: [String: Double]
+            package init(k: Int, keep: [String: Double]) { self.k = k; self.keep = keep }
+        }
+        package init(overhead: Double = 0, keep: [Engine: Double] = [:], sustained: Double? = nil, keepByK: [KeepAt]? = nil) {
+            self.overhead = overhead; self.keep = keep; self.sustained = sustained; self.keepByK = keepByK
+        }
+        /// The κ of `engine` in this set on a weight of length `k`.
+        package func keep(_ engine: Engine, k: Int) -> Double {
+            let points = (keepByK ?? []).compactMap { p in p.keep[engine.rawValue].map { (k: p.k, keep: $0) } }
+            guard let first = points.first, let last = points.last else { return keep[engine] ?? 1 }
+            if k <= first.k { return first.keep }
+            if k >= last.k { return last.keep }
+            for (lo, hi) in zip(points, points.dropFirst()) where k <= hi.k {
+                let f = (log(Double(k)) - log(Double(lo.k))) / (log(Double(hi.k)) - log(Double(lo.k)))
+                return lo.keep * (1 - f) + hi.keep * f
+            }
+            return last.keep
+        }
     }
 
     package var crest: [Engine: Double] = [:]
@@ -122,14 +189,6 @@ package struct CapacityModel: Codable, Sendable, Equatable {
             : sharing[Self.key(kernels)] ?? sharing[Self.key(kernels.map(\.engine))] ?? Sharing()
     }
 
-    /// The rate a kernel keeps in a set, sustained (`heat`) when asked.
-    func rate(_ k: Kernel, in set: Sharing, sustained: Bool) -> Double? {
-        guard let line = lines[k], line.rate > 0 else { return nil }
-        let keep = set.keep[k.engine] ?? 1
-        let slow = sustained ? max(1, heat[k.engine] ?? 1) : 1
-        return line.rate * keep / slow
-    }
-
     // MARK: - A product
 
     /// One product's plan on a set of kernels: the rows each takes and the seconds.
@@ -138,45 +197,87 @@ package struct CapacityModel: Codable, Sendable, Equatable {
         package var seconds: Double
     }
 
-    /// **The time of `m×k×n` on `kernels` with these rows** (Σ = m), the ANE's rounded up to its unit.
+    /// **A kernel's seconds alone on `rows` rows of a `k×n` weight** (the ANE's rounded up to its unit), at the sustained rate
+    /// (`heat`, on the rate: the lift of the weight and the launch do not slow) when asked. `nil` where the kernel has no line.
+    package func alone(_ kernel: Kernel, rows: Int, k: Int, n: Int, sustained: Bool = false) -> Double? {
+        guard let line = lines[kernel], line.rate > 0, rows > 0 else { return nil }
+        var here = rows
+        if kernel.engine == .ane { here = (here + aneRowUnit - 1) / aneRowUnit * aneRowUnit }
+        let slow = sustained ? max(1, heat[kernel.engine] ?? 1) : 1
+        return line.fixed(k: k, n: n) + 2 * Double(here) * Double(k) * Double(n) / (line.rate(atK: k) / slow)
+    }
+
+    /// The speed of a kernel inside the set that is active, over its speed alone.
+    private func speed(_ kernel: Kernel, in set: Sharing, k: Int) -> Double { max(0.05, set.keep(kernel.engine, k: k)) }
+
+    /// **The overlap: when each kernel ends**, from its seconds alone. While the set of kernels still running is `S`, each goes at
+    /// the speed `sharing(S)` keeps it; the first to end frees the others, which go on as the smaller set they now are, and the last
+    /// at its full speed. The ends are the sides' own clocks.
+    package func overlap(_ solo: [Kernel: Double], k: Int) -> [Kernel: Double] {
+        var remaining = solo.filter { $0.value > 0 }
+        var ends: [Kernel: Double] = [:]
+        var now = 0.0
+        while remaining.count > 1 {
+            let set = sharing(Array(remaining.keys))
+            let (first, step) = remaining.map { ($0.key, $0.value / speed($0.key, in: set, k: k)) }.min { $0.1 < $1.1 }!
+            now += step
+            for (kernel, left) in remaining {
+                if kernel == first { ends[kernel] = now; remaining[kernel] = nil } else { remaining[kernel] = max(0, left - step * speed(kernel, in: set, k: k)) }
+            }
+        }
+        if let (kernel, left) = remaining.first { ends[kernel] = now + left }
+        return ends
+    }
+
+    /// **Seconds each kernel is busy** in a product `m×k×n` with these rows (the ANE's rounded up to its unit): the sides' clocks
+    /// of the overlap, before the set's overhead.
+    package func busy(m: Int, k: Int, n: Int, rows: [Kernel: Int], sustained: Bool = false) -> [Kernel: Double] {
+        var solo: [Kernel: Double] = [:]
+        for (kernel, r) in rows where r > 0 {
+            guard let t = alone(kernel, rows: r, k: k, n: n, sustained: sustained) else { return [:] }
+            solo[kernel] = t
+        }
+        return overlap(solo, k: k)
+    }
+
+    /// **The time of `m×k×n` on `kernels` with these rows** (Σ = m): the last end of the overlap, times the set's `sustained` factor
+    /// when asked, plus its overhead.
     package func seconds(m: Int, k: Int, n: Int, rows: [Kernel: Int], sustained: Bool = false) -> Double? {
         let kernels = rows.keys.filter { rows[$0]! > 0 }
         guard !kernels.isEmpty else { return nil }
+        let ends = busy(m: m, k: k, n: n, rows: rows, sustained: sustained)
+        guard ends.count == kernels.count, let last = ends.values.max() else { return nil }
+        guard kernels.count > 1 else { return last }
         let set = sharing(Array(kernels))
-        var worst = 0.0
-        for kernel in kernels {
-            guard let r = rate(kernel, in: set, sustained: sustained), let t0 = lines[kernel]?.t0 else { return nil }
-            var rowsHere = rows[kernel]!
-            if kernel.engine == .ane { rowsHere = (rowsHere + aneRowUnit - 1) / aneRowUnit * aneRowUnit }
-            worst = max(worst, t0 + 2 * Double(k) * Double(n) * Double(rowsHere) / r)
-        }
-        return worst + (kernels.count > 1 ? set.overhead : 0)
+        return last * (sustained ? max(1, set.sustained ?? 1) : 1) + set.overhead
     }
 
-    /// **The balanced split of `m×k×n` on `kernels`**: shares solved on the lines so that every side ends together,
-    /// an engine with no positive share left out, the ANE's rows tried at the units on both sides of the balance.
-    /// `nil` when a kernel has no line.
+    /// **The balanced split of `m×k×n` on `kernels`**: shares solved so that every side ends together — each alone seconds `sᵢ = κᵢ·T`,
+    /// `κ` the full set's —, an engine with no positive share left out, the ANE's rows tried at the units on both sides of the
+    /// balance, and the candidates timed by the overlap (`seconds`). `nil` when a kernel has no line.
     package func split(m: Int, k: Int, n: Int, kernels: [Kernel], sustained: Bool = false) -> Split? {
         var active = kernels
         let perRow = 2 * Double(k) * Double(n)
         while !active.isEmpty {
-            let set = sharing(active)
-            var rates: [Kernel: Double] = [:]
-            for kernel in active {
-                guard let r = rate(kernel, in: set, sustained: sustained) else { return nil }
-                rates[kernel] = r
-            }
-            let w = perRow * Double(m)
-            let total = rates.values.reduce(0, +)
-            let tStar = (w + active.reduce(0) { $0 + lines[$1]!.t0 * rates[$1]! }) / total
-            let share = Dictionary(uniqueKeysWithValues: active.map { ($0, (tStar - lines[$0]!.t0) * rates[$0]! / perRow) })
-            if let gone = active.first(where: { share[$0]! <= 0 }) {
-                active.removeAll { $0 == gone }
-                continue
-            }
             if active.count == 1 {
                 let only = active[0]
                 return seconds(m: m, k: k, n: n, rows: [only: m], sustained: sustained).map { Split(rows: [only: m], seconds: $0) }
+            }
+            let set = sharing(active)
+            var rate: [Kernel: Double] = [:], fixed: [Kernel: Double] = [:], kappa: [Kernel: Double] = [:]
+            for kernel in active {
+                guard let line = lines[kernel], line.rate > 0 else { return nil }
+                let slow = sustained ? max(1, heat[kernel.engine] ?? 1) : 1
+                rate[kernel] = line.rate(atK: k) / slow
+                fixed[kernel] = line.fixed(k: k, n: n)
+                kappa[kernel] = speed(kernel, in: set, k: k)
+            }
+            let w = perRow * Double(m)
+            let tStar = (w + active.reduce(0) { $0 + fixed[$1]! * rate[$1]! }) / active.reduce(0) { $0 + kappa[$1]! * rate[$1]! }
+            let share = Dictionary(uniqueKeysWithValues: active.map { ($0, (kappa[$0]! * tStar - fixed[$0]!) * rate[$0]! / perRow) })
+            if let gone = active.first(where: { share[$0]! <= 0 }) {
+                active.removeAll { $0 == gone }
+                continue
             }
             // Integer rows: the ANE's at the units around its share (or none: it may not pay its overhead), the rest
             // to the others by their shares.

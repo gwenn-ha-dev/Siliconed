@@ -167,10 +167,10 @@ package final class CapacityPlan: Sendable {
     /// A hash of every number of the model, in a fixed order (a dictionary keyed by a kernel or an engine encodes in no order).
     private static func fingerprint(_ model: CapacityModel) -> String {
         var parts: [String] = []
-        for (k, l) in model.lines.sorted(by: { $0.key.description < $1.key.description }) { parts.append("\(k) \(l.t0) \(l.rate)") }
+        for (k, l) in model.lines.sorted(by: { $0.key.description < $1.key.description }) { parts.append("\(k) \(l.t0) \(l.rate)" + (l.perWeight.map { " w\($0)" } ?? "") + (l.rateByK?.map { " \($0.k):\($0.rate)" }.joined() ?? "")) }
         parts.append("unit \(model.aneRowUnit)")
         for (k, s) in model.sharing.sorted(by: { $0.key < $1.key }) {
-            parts.append("\(k) \(s.overhead) " + s.keep.sorted { $0.key < $1.key }.map { "\($0.key.rawValue)=\($0.value)" }.joined(separator: ","))
+            parts.append("\(k) \(s.overhead) \(s.sustained.map { "\($0)" } ?? "-") " + s.keep.sorted { $0.key < $1.key }.map { "\($0.key.rawValue)=\($0.value)" }.joined(separator: ","))
         }
         for (e, h) in model.heat.sorted(by: { $0.key < $1.key }) { parts.append("heat \(e.rawValue) \(h)") }
         for (e, c) in model.crest.sorted(by: { $0.key < $1.key }) { parts.append("crest \(e.rawValue) \(c)") }

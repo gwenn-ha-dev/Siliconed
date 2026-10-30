@@ -55,11 +55,22 @@ extension Diagnostic {
 
         /// The three sizes of the solos: ≈ 4, 30 and 309 GFLOP, k and n of a DiT's order.
         package static let soloShapes: [(m: Int, k: Int, n: Int)] = [(512, 2048, 2048), (1024, 3840, 3840), (4096, 6144, 6144)]
+        /// The shapes of the fp32 solos (GPU, AMX, ANE), chosen to condition each term of a kernel's seconds (`CapacityFit.productLine`):
+        /// two k's at one weight size and three weight sizes (the ANE's lift of the weight, ∝ k·n, against its rows), three k's for the
+        /// AMX's rate by k (2 048, 3 840, 12 288); each between 34 and 121 GFLOP — no point under 10 (its fixed part is all of it).
+        package static let productShapes: [(m: Int, k: Int, n: Int)] = [(2048, 2048, 4096), (2048, 3840, 3840), (4096, 3840, 3840), (1024, 12288, 4096)]
         /// The ANE's staircase: one k × n, row counts that are odd and even multiples of 256, and two halves of a unit.
         package static let stairShape = (k: 3840, n: 3840)
         package static let stairRows = [768, 896, 1024, 1792, 1920, 2048, 2304, 4096]
-        /// The sets' sizes: 30, 60 and 121 GFLOP.
+        /// The sets' sizes: 30, 60 and 121 GFLOP (the old trials), and the chains' two: a short k and a long one (121 and 155 GFLOP).
         package static let sharingShapes: [(m: Int, k: Int, n: Int)] = [(1024, 3840, 3840), (2048, 3840, 3840), (4096, 3840, 3840)]
+        package static let chainShapes: [(m: Int, k: Int, n: Int)] = [(4096, 3840, 3840), (1536, 12288, 4096)]
+        /// **A chain**: the call back to back, the first `chainWarm` seconds and `chainWarmCalls` calls thrown away (the cluster that drives
+        /// the AMX and the ANE's host side ramps in a few hundred milliseconds: two similar calls after the first are the ramp, not the
+        /// engine), then the median over at least `chainWindow` seconds and `chainCalls` calls, at most `chainCap` in all — the length
+        /// is in calls and measured seconds, so a Mac whose calls are three times longer reads three times fewer of them, not three
+        /// times longer.
+        package static let chainWarm = 0.15, chainWarmCalls = 3, chainWindow = 0.4, chainCalls = 8, chainCap = 1.5
         package static let attentionSequences = [1024, 4096]
         package static let attentionHeads = 24, attentionHeadDim = 128
         /// The copy kernel's buffers, each.
@@ -161,8 +172,9 @@ extension Diagnostic {
                 }
                 details.stairs = Fit.stairs(m.stairs.map { ($0.rows, $0.seconds) })
                 for set in Set(m.trials.map(\.set)) {
-                    let last = m.trials.filter { $0.set == set }.map(\.pass).max().map { Set([$0]) }
-                    details.sharing[set] = Fit.sharing(set: set, trials: m.trials, lines: model.lines, using: last)
+                    let passes = Set(m.trials.filter { $0.set == set }.map(\.pass))
+                    let from = passes.contains(3) ? 2 : (passes.max() ?? 0)
+                    details.sharing[set] = Fit.overlap(set: set, trials: m.trials.filter { $0.pass >= from }, model: model)
                 }
                 details.aneCompile = context.aneCompile()
                 let g = Kernel(.gpu, .fp32), a = Kernel(.ane, .fp16)
@@ -195,7 +207,7 @@ extension Diagnostic {
 
         /// The sum of everything that may be alive at once, from the shapes alone.
         static func need(validating: Bool = false) -> Need {
-            let shapes = soloShapes + sharingShapes + (validating ? validationShapes : []) + stairRows.map { (m: $0, k: stairShape.k, n: stairShape.n) }
+            let shapes = soloShapes + productShapes + chainShapes + sharingShapes + (validating ? validationShapes : []) + stairRows.map { (m: $0, k: stairShape.k, n: stairShape.n) }
                 + [(m: witnessShape.m, k: witnessShape.k, n: witnessShape.n)]
             let operands = Operands.sizes(products: shapes.map { ($0.m, $0.k, $0.n, RouteTable.WeightKind.q8) }).bytes
             let ps = shapes.map { (m: $0.m, k: $0.k, n: $0.n) }
@@ -257,6 +269,24 @@ extension Diagnostic {
             return last
         }
 
+        /// **A chain's figure** (`chainWarm`…): the median call over the window after the ramp, and the calls it holds. `nil` when the body refuses.
+        private static func chain(_ body: () -> Bool) -> (seconds: Double, calls: Int)? {
+            let begin = now()
+            var times: [Double] = []
+            var calls = 0
+            while true {
+                let start = now()
+                guard body() else { return nil }
+                let t = now() - start
+                calls += 1
+                if calls > chainWarmCalls, start - begin >= chainWarm { times.append(t) }
+                let elapsed = now() - begin
+                if elapsed >= chainWarm + chainWindow, times.count >= chainCalls { break }
+                if elapsed >= chainCap, !times.isEmpty { break }
+            }
+            return (Fit.median(times), times.count)
+        }
+
         private final class Context {
             let bench: Bench
             let log: ((String) -> Void)?
@@ -273,7 +303,7 @@ extension Diagnostic {
             init(device: MTLDevice, queue: MTLCommandQueue, cancellation: Cancellation?, gauge: Gauge, validating: Bool, log: ((String) -> Void)?) throws {
                 bench = Bench(device: device, queue: queue, cancellation: cancellation, gauge: gauge)
                 self.log = log
-                let all = (CapacityProbes.soloShapes + CapacityProbes.sharingShapes + (validating ? CapacityProbes.validationShapes : [])
+                let all = (CapacityProbes.soloShapes + CapacityProbes.productShapes + CapacityProbes.chainShapes + CapacityProbes.sharingShapes + (validating ? CapacityProbes.validationShapes : [])
                     + CapacityProbes.stairRows.map { (m: $0, k: CapacityProbes.stairShape.k, n: CapacityProbes.stairShape.n) }
                     + [(m: CapacityProbes.witnessShape.m, k: CapacityProbes.witnessShape.k, n: CapacityProbes.witnessShape.n)])
                 operands = Operands(Operands.sizes(products: all.map { ($0.m, $0.k, $0.n, RouteTable.WeightKind.q8) }))
@@ -484,7 +514,7 @@ extension Diagnostic {
                 try stage("preparation") { m.preparation = try preparation() }
                 stage("witnesses start") { m.witnesses = witnesses().map { .init(engine: $0.key, before: $0.value, after: 0) } }
                 stage("bandwidth") { m.memoryBandwidth = bandwidth() }
-                stage("solos fp32") { solos([.gpu_fp32, .amx_fp32, .ane_fp16, .gpu_bf16], &m) }
+                stage("solos fp32") { solos([.gpu_fp32, .amx_fp32, .ane_fp16], &m, shapes: productShapes, chained: true); solos([.gpu_bf16], &m) }
                 stage("stairs") { stairs(&m) }
                 try stage("attention") { try attention(&m) }
                 stage("sharing") { sharing(&m) }
@@ -569,10 +599,10 @@ extension Diagnostic {
                 }
             }
 
-            func solos(_ probes: [Probe], _ m: inout Fit.Measurements) {
+            func solos(_ probes: [Probe], _ m: inout Fit.Measurements, shapes: [(m: Int, k: Int, n: Int)] = CapacityProbes.soloShapes, chained: Bool = false) {
                 for probe in probes {
-                    for (rows, k, n) in soloShapes.map({ ($0.m, $0.k, $0.n) }) {
-                        guard let s = solo(probe, m: rows, k: k, n: n) else { continue }
+                    for (rows, k, n) in shapes.map({ ($0.m, $0.k, $0.n) }) {
+                        guard let s = solo(probe, m: rows, k: k, n: n, chained: chained) else { continue }
                         if s.error != nil, s.seconds == 0 {
                             m.wrong.append(probe.kernel.description)
                             log?(String(format: "  %@ %dx%dx%d  WRONG, error %.3e", probe.kernel.description, rows, k, n, s.error ?? 0))
@@ -586,7 +616,7 @@ extension Diagnostic {
             }
 
             /// One kernel on one product: judged on its first run, then timed. A kernel that judged wrong returns seconds 0.
-            func solo(_ probe: Probe, m: Int, k: Int, n: Int) -> Fit.Measurements.Solo? {
+            func solo(_ probe: Probe, m: Int, k: Int, n: Int, chained: Bool = false) -> Fit.Measurements.Solo? {
                 let flop = 2.0 * Double(m) * Double(k) * Double(n)
                 let name = probe.kernel.description
                 let run: () -> Bool
@@ -647,11 +677,11 @@ extension Diagnostic {
                 guard verdict.pass else { return .init(kernel: name, shape: [m, k, n], flop: flop, seconds: 0, error: verdict.error) }
                 // An ANE route is judged again on a massive activation, at the middle size (the exact product of a few more rows costs
                 // what the solo does): over its bar there, the route is wrong on this Mac, as on any product.
-                if isANE, (m, k, n) == (soloShapes[1].m, soloShapes[1].k, soloShapes[1].n),
+                if isANE, (m, k, n) == (productShapes[1].m, productShapes[1].k, productShapes[1].n) || (m, k, n) == (soloShapes[1].m, soloShapes[1].k, soloShapes[1].n),
                    let massive = massive(truthKind, kernel: name, m: m, k: k, n: n, run), !massive.pass {
                     return .init(kernel: name, shape: [m, k, n], flop: flop, seconds: 0, error: max(massive.rowError, massive.columnError))
                 }
-                guard let t = CapacityProbes.steady(run) else { return nil }
+                guard let t = chained ? CapacityProbes.chain(run)?.seconds : CapacityProbes.steady(run) else { return nil }
                 return .init(kernel: name, shape: [m, k, n], flop: flop, seconds: t, error: verdict.error)
             }
 
@@ -768,9 +798,9 @@ extension Diagnostic {
                     }
                     for (kernel, body) in runs {
                         guard let line = model.lines[kernel], let t = long(body) else { continue }
-                        checks.append(Check(what: kernel.description, shape: [m, k, n], rows: [kernel.description: m], predicted: line.seconds(flop), measured: t))
+                        checks.append(Check(what: kernel.description, shape: [m, k, n], rows: [kernel.description: m], predicted: model.alone(kernel, rows: m, k: k, n: n) ?? line.seconds(flop), measured: t))
                         log?(String(format: "  validate %@ %dx%dx%d  model %.2f ms  long %.2f ms  %+.1f %%", kernel.description, m, k, n,
-                                    line.seconds(flop) * 1e3, t * 1e3, checks.last!.error * 100))
+                                    checks.last!.predicted * 1e3, t * 1e3, checks.last!.error * 100))
                     }
                 }
                 for (m, k, n) in validationShapes.map({ ($0.m, $0.k, $0.n) }) {
@@ -794,7 +824,7 @@ extension Diagnostic {
                         restoreB(); stageInt8(plan, k: k, n: n)
                         guard let t = long({ self.aneInt8(e, plan, rows: m, k, n) }) else { continue }
                         let flop = 2.0 * Double(m) * Double(k) * Double(n)
-                        checks.append(Check(what: a8.description, shape: [m, k, n], rows: [a8.description: m], predicted: line.seconds(flop), measured: t))
+                        checks.append(Check(what: a8.description, shape: [m, k, n], rows: [a8.description: m], predicted: model.alone(a8, rows: m, k: k, n: n) ?? line.seconds(flop), measured: t))
                         log?(String(format: "  validate %@ %dx%dx%d  model %.2f ms  long %.2f ms  %+.1f %%", a8.description, m, k, n,
                                     line.seconds(flop) * 1e3, t * 1e3, checks.last!.error * 100))
                     }
@@ -911,45 +941,30 @@ extension Diagnostic {
                 return s.rows
             }
 
+            /// **The sets, as chains.** Every set of two or more engines that have a line, the smallest first (a set's κ is read through the
+            /// sets that remain when its first side ends): the lines' balance (pass 1, κ = 1), then the balance of the κ it gave (pass 2,
+            /// the same short shape) and a long k (pass 3, on pass 2's κ). The fit reads the passes from the second.
             func sharing(_ measurements: inout Fit.Measurements) {
                 restoreB()
                 var model = Fit.model(from: measurements, allocationUnit: NeuralEngine.rowUnit)
                 let g = Kernel(.gpu, .fp32), x = Kernel(.amx, .fp32), a = Kernel(.ane, .fp16)
+                let have = [g, x, a].filter { model.lines[$0] != nil }
                 var sets: [[Kernel]] = []
-                if model.lines[g] != nil, model.lines[x] != nil { sets.append([g, x]) }
-                if model.lines[g] != nil, model.lines[a] != nil { sets.append([g, a]) }
-                if model.lines[g] != nil, model.lines[x] != nil, model.lines[a] != nil { sets.append([g, x, a]) }
+                for size in 2...max(2, have.count) {
+                    for mask in 1..<(1 << have.count) where mask.nonzeroBitCount == size {
+                        sets.append(have.indices.filter { mask & (1 << $0) != 0 }.map { have[$0] })
+                    }
+                }
                 for set in sets {
                     let key = CapacityModel.key(set.map(\.engine))
-                    // Pass 1 at the middle size on the solo lines; pass 2 at the three sizes on the keep it measured.
-                    var first = true
-                    for pass in [1, 2] {
-                        let shapes = pass == 1 ? [sharingShapes[1]] : sharingShapes
-                        for shape in shapes {
-                            if let trial = trial(set, key: key, shape: shape, model: model, pass: pass) {
-                                measurements.trials.append(trial)
-                                log?(String(format: "  %@ pass %d  %dx%dx%d  wall %.2f ms  sides %@", key, pass, shape.m, shape.k, shape.n,
-                                            trial.wall * 1e3, trial.sides.map { String(format: "%@ %d rows solo %.1f within %.1f", $0.kernel, $0.rows, $0.solo * 1e3, ($0.within ?? 0) * 1e3) }.joined(separator: " | ")))
-                            }
+                    for (pass, shape) in [(1, chainShapes[0]), (2, chainShapes[0]), (3, chainShapes[1])] {
+                        if let trial = trial(set, key: key, shape: shape, model: model, pass: pass) {
+                            measurements.trials.append(trial)
+                            log?(String(format: "  %@ pass %d  %dx%dx%d  wall %.2f ms  sides %@", key, pass, shape.m, shape.k, shape.n,
+                                        trial.wall * 1e3, trial.sides.map { String(format: "%@ %d rows line %.1f within %.1f", $0.kernel, $0.rows, $0.solo * 1e3, ($0.within ?? 0) * 1e3) }.joined(separator: " | ")))
                         }
-                        if first, let fit = Fit.sharing(set: key, trials: measurements.trials, lines: model.lines, using: [1]) {
-                            model.sharing[key] = fit.sharing
-                            first = false
-                        }
-                    }
-                    // The balance's neighbourhood: the pair at 4 096 rows, the ANE's rows around the balance (pass 0, never fitted).
-                    if set == [g, a] {
-                        let shape = sharingShapes[2]
-                        let at = rows(set, model: model, m: shape.m, k: shape.k, n: shape.n)?[a] ?? shape.m / 2
-                        let centre = at / 256 * 256
-                        for r in stride(from: centre - 512, through: centre + 768, by: 256) where r >= 256 && r < shape.m {
-                            if let t = trial(set, key: key, shape: shape, model: model, pass: 0, aneRows: r) {
-                                measurements.trials.append(t)
-                                log?(String(format: "  scan %@ %d ANE rows  wall %.2f ms  gpu %.2f ane %.2f", key, r, t.wall * 1e3,
-                                            (t.sides.first { $0.kernel == g.description }?.within ?? 0) * 1e3,
-                                            (t.sides.first { $0.kernel == a.description }?.within ?? 0) * 1e3))
-                            }
-                        }
+                        if pass == 1, let fit = Fit.overlap(set: key, trials: measurements.trials, model: model) { model.sharing[key] = fit.sharing }
+                        if pass == 2 || pass == 3, let fit = Fit.overlap(set: key, trials: measurements.trials.filter { $0.pass >= 2 }, model: model) { model.sharing[key] = fit.sharing }
                     }
                 }
             }
@@ -971,10 +986,14 @@ extension Diagnostic {
                 var gpuRows = plan[g] ?? first, amxRows = 0
                 var fraction = 1.0
                 if hasAMX {
-                    fraction = Double(plan[g]!) / Double(plan[g]! + plan[x]!)
-                    gpuRows = Conductor.cut(first, fraction)
-                    amxRows = first - gpuRows
-                    fraction = Double(gpuRows) / Double(first)
+                    if let planned = plan[g] {
+                        fraction = Double(planned) / Double(planned + (plan[x] ?? 0))
+                        gpuRows = Conductor.cut(first, fraction)
+                        amxRows = first - gpuRows
+                        fraction = Double(gpuRows) / Double(first)
+                    } else {
+                        gpuRows = 0; amxRows = first           // the AMX beside the ANE, no GPU in the set
+                    }
                 }
                 let key2 = "\(k)×\(n)"
                 // The set's one call, and the sides' own clocks it leaves.
@@ -1009,23 +1028,25 @@ extension Diagnostic {
                 // Judged once: the set's output on the sampled rows (every quantum of the cut is visited), then warmed.
                 guard let verdict = judged(.fp32, ane: hasANE, m: m, k: k, n: n, { once() != nil }) else { log?("  \(key) \(m)x\(k)x\(n) pass \(pass): the set refused (fallback)"); return nil }
                 guard verdict.pass else { log?("  \(key) \(m)x\(k)x\(n) pass \(pass): WRONG, error \(verdict.error)"); return .init(set: key, shape: [m, k, n], pass: pass, sides: [], wall: 0, error: verdict.error) }
+                // The chain: back to back, the ramp thrown away, the median of the window (`chain`); the set's clock per call.
                 var samples: [(wall: Double, within: [String: Double])] = []
-                var previous = Double.infinity
-                for i in 0..<6 {
+                let begin = CapacityProbes.now()
+                var calls = 0
+                while true {
+                    let start = CapacityProbes.now()
                     guard let s = once() else { return nil }
-                    if i >= 1, s.wall >= previous * 0.9 {
-                        samples.append(s)
-                        for _ in 0..<(s.wall < 0.15 ? 2 : 1) { if let t = once() { samples.append(t) } }
-                        break
-                    }
-                    previous = s.wall
+                    calls += 1
+                    if calls > chainWarmCalls, start - begin >= chainWarm { samples.append(s) }
+                    let elapsed = CapacityProbes.now() - begin
+                    if elapsed >= chainWarm + chainWindow, samples.count >= chainCalls { break }
+                    if elapsed >= chainCap, !samples.isEmpty { break }
                 }
-                guard !samples.isEmpty else { return nil }
                 let wall = Fit.median(samples.map(\.wall))
+                // `solo` is the line's seconds at the rows the side took: the reference of κ (the line's own bias at these rows is in κ).
                 var sides: [Fit.Measurements.Side] = []
                 for kernel in set {
                     let r = kernel == a ? aneRows : kernel == x ? amxRows : gpuRows
-                    guard let solo = soloSide(kernel, rows: r, k: k, n: n, engine: engine) else { return nil }
+                    guard let solo = model.alone(kernel, rows: r, k: k, n: n) else { return nil }
                     let within = samples.compactMap { $0.within[kernel.description] }
                     sides.append(.init(kernel: kernel.description, rows: r, solo: solo, within: within.isEmpty ? nil : Fit.median(within)))
                 }
