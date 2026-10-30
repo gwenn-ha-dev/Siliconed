@@ -178,7 +178,7 @@ extension Diagnostic {
                 + [(m: witnessShape.m, k: witnessShape.k, n: witnessShape.n)]
             let operands = Operands.sizes(products: shapes.map { ($0.m, $0.k, $0.n, RouteTable.WeightKind.q8) }).bytes
             let ps = shapes.map { (m: $0.m, k: $0.k, n: $0.n) }
-            let gemm = MemoryNeed.gemm("diagnostic", products: ps, amx: true, int8: true, ane: false).reduce(0) { $0 + $1.bytes }
+            let gemm = MemoryNeed.gemmBound("diagnostic", products: ps, int8: true).reduce(0) { $0 + $1.bytes }
             let multiply = ps.map { Arena.capacity(for: Conductor.workspaceBytes(rows: $0.m, k: $0.k, n: $0.n, weightIsTransposed: true)) }.max() ?? 0
             let exact = ps.map { p in
                 let r = Diagnostic.sampledRows
@@ -188,7 +188,7 @@ extension Diagnostic {
             let ane = engineBytes(points) + programCount(points) * programBytes
             let (h, d) = (attentionHeads, attentionHeadDim)
             let attention = attentionSequences.map { s -> Int in
-                let split = HeadSplitAttention.hostBytes(heads: h, sequence: s, headDim: d, cpuFraction: Double(h - 1) / Double(h))
+                let split = HeadSplitAttention.hostBytes(heads: h, sequence: s, headDim: d, cpuHeads: h - 1)
                     + OperatorFootprint.sdpaQueries(rows: s, heads: 1, headDim: d)
                 return 4 * Arena.capacity(for: s * h * d * 4) + max(split, OperatorFootprint.sdpaQueries(rows: s, heads: h, headDim: d))
                     + sampledQueries * h * d * 8 * 2
@@ -255,10 +255,10 @@ extension Diagnostic {
                     + CapacityProbes.stairRows.map { (m: $0, k: CapacityProbes.stairShape.k, n: CapacityProbes.stairShape.n) }
                     + [(m: CapacityProbes.witnessShape.m, k: CapacityProbes.witnessShape.k, n: CapacityProbes.witnessShape.n)])
                 operands = Operands(Operands.sizes(products: all.map { ($0.m, $0.k, $0.n, RouteTable.WeightKind.q8) }))
-                alone = try GEMM(freezeCut: true, coexecution: false, tensorWeights: true, bf16Activations: true)
-                both = try GEMM(freezeCut: true, coexecution: true, tensorWeights: false, int8Weights: true, q8Weights: true)
-                neural = try GEMM(freezeCut: true, coexecution: false, tensorWeights: false, neuralEngine: true, neuralEngineShare: 0.5)
-                three = try GEMM(freezeCut: true, coexecution: true, tensorWeights: false, neuralEngine: true, neuralEngineShare: 0.5)
+                alone = try GEMM(freezeCut: true, plan: .probing(bf16Weights: true, roundedActivations: true))
+                both = try GEMM(freezeCut: true, plan: .probing(amx: true, int8Weights: true, q8Weights: true))
+                neural = try GEMM(freezeCut: true, plan: .probing(ane: true))
+                three = try GEMM(freezeCut: true, plan: .probing(amx: true, ane: true))
                 func wrap(_ g: GEMM, _ o: Operands) throws -> Buffers {
                     Buffers(a: try g.wrap(o.a.base, bytes: o.a.capacity, name: "probe.a"), b: try g.wrap(o.b.base, bytes: o.b.capacity, name: "probe.b"),
                             c: try g.wrap(o.c.base, bytes: o.c.capacity, name: "probe.c"))
@@ -266,8 +266,6 @@ extension Diagnostic {
                 aloneB = try wrap(alone, operands); bothB = try wrap(both, operands)
                 neuralB = try wrap(neural, operands); threeB = try wrap(three, operands)
                 bf16 = try alone.wrap(operands.bf16.base, bytes: operands.bf16.capacity, name: "probe.bf16")
-                neural.neuralEngine?.shares = .none
-                three.neuralEngine?.shares = .none
             }
 
             func aneCompile() -> Double {
@@ -742,23 +740,14 @@ extension Diagnostic {
                 }
                 let key2 = "\(k)×\(n)"
                 // The set's one call, and the sides' own clocks it leaves.
+                // The plan answers this key with these exact rows until the next set is pinned.
                 func configure() -> Bool {
-                    if hasANE {
-                        guard let e = engine else { return false }
-                        e.shares = .none
-                        e.gpuShare = 1 - Double(aneRows) / Double(m)
-                        guard e.rows(m, k: k, n: n) == aneRows else { return false }
-                        if hasAMX {
-                            e.besideAMX = Conductor.Shares([.init(k: k, n: n, m: m, ratio: 1)])
-                            gemm.conductor?.shares = Conductor.Shares([.init(k: k, n: n, m: m, ratio: (1 - fraction) / fraction)])
-                        } else {
-                            e.besideAMX = .none
-                        }
-                    } else if let c = gemm.conductor {
-                        c.shares = .none
-                        c.initialFraction = Double(gpuRows) / Double(m)
-                        guard Conductor.cut(m, c.initialFraction) == gpuRows else { return false }
-                    }
+                    guard !hasANE || engine != nil else { return false }
+                    let key = ProductKey(k: k, n: n, m: m)
+                    let assignment = ProductAssignment(gpu: gpuRows, amx: amxRows, ane: aneRows)
+                    guard assignment.rows == m, assignment.isRunnable(for: key) else { return false }
+                    gemm.plan.unpinAll()
+                    gemm.plan.pin(key, assignment)
                     return true
                 }
                 guard configure() else { log?("  \(key) \(m)x\(k)x\(n) pass \(pass): rows \(aneRows)/\(gpuRows)/\(amxRows) not accepted by the engines"); return nil }
