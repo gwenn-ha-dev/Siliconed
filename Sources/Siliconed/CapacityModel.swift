@@ -102,6 +102,9 @@ package struct CapacityModel: Codable, Sendable, Equatable {
     package var diskBandwidth: Double?
     /// Seconds per value to bring a weight of `kind` to the form a kernel reads (`RouteTable.WeightPath`).
     package var preparation: [RouteTable.WeightKind: [RouteTable.WeightPath: Double]] = [:]
+    /// Seconds per value to widen a K-quant (Q4_K to Q6_K) weight: it has no `WeightKind`, so `preparation` cannot say it,
+    /// and a super-block's unpacking costs more than a bf16 shift. `nil`: the solver falls back on `preparation[.bf16]`.
+    package var kquantPreparation: Double?
 
     package init() {}
 
