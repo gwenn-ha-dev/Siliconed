@@ -66,9 +66,8 @@ package struct Invocation: Sendable {
         map = values["--map"]?.last
         profile = flags.contains("--profile")
         neuralEngine = flags.contains("--neural-engine")
-        if neuralEngine { try NeuralEngineRun.enable() }
         bf16Activations = flags.contains("--bf16-activations")
-        if bf16Activations { try BF16ActivationRun.enable() }
+        if neuralEngine || bf16Activations { try HalfPrecisionRun.enable(neuralEngine: neuralEngine, bf16Activations: bf16Activations) }
         long = flags.contains("--long")
         goldens = Goldens(directory: values["--goldens"]?.last)
         extras = values.compactMapValues(\.last).filter { !Self.known.contains($0.key) }

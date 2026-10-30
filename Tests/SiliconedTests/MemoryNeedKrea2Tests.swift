@@ -241,7 +241,7 @@ final class MemoryNeedKrea2Tests: XCTestCase {
         XCTAssertEqual(Attention.groupedSlices(heads: 48, rows: 4121, keys: 4121), 1)
         XCTAssertEqual(Attention.groupedSlices(heads: 48, rows: 4608, keys: 4608), 2)
         XCTAssertEqual(Attention.groupedSlices(heads: 48, rows: 6169, keys: 6169), 3)
-        XCTAssertEqual(HeadSplitAttention.partition(heads: 48, fraction: HeadSplitAttention.cpuFraction, group: 4).cpu, 28..<48)
+        XCTAssertEqual(HeadSplitAttention.partition(heads: 48, fraction: HeadSplitAttention.referenceFraction, group: 4).cpu, 28..<48)
         XCTAssertEqual(Attention.groupedSlices(heads: 28, rows: 4121, keys: 4121), 1)
         XCTAssertEqual(Attention.groupedSlices(heads: 28, rows: 6169, keys: 6169), 2)
         XCTAssertEqual(need(1024, 1024).phases[2].bytes("DiT SDPA concatenation"), 0)
@@ -249,7 +249,7 @@ final class MemoryNeedKrea2Tests: XCTestCase {
         XCTAssertEqual(tall.phases[2].bytes("DiT SDPA concatenation"), 6169 * 28 * 128 * 4)
         XCTAssertEqual(tall.phases[2].bytes("DiT SDPA queries"), 6169 * 28 * 128 * 4)
         XCTAssertEqual(tall.phases[2].bytes("DiT head split"),
-                       HeadSplitAttention.hostBytes(heads: 48, sequence: 6169, headDim: 128, group: 4,
+                       HeadSplitAttention.hostBytes(heads: 48, sequence: 6169, headDim: 128, cpuHeads: 20,
                                                     threads: MemoryFixtures.krea2Request(1024, 1536, tokens: 59, ranks: [], references: [], maps: MemoryFixtures.krea2Maps()).threads))
         // At 512² (1,024 image rows) the attention is not cut (`Krea2DiT.headSplitRows`): one SDPA, all 48 heads.
         let small = need(512, 512)

@@ -55,19 +55,16 @@ final class NeuralEngineTests: XCTestCase {
         XCTAssertEqual(NeuralEngine.parts(k: 4097, n: 64), 2, "no even split within reach: the fewest parts")
     }
 
-    func testRows() {
-        let ane = NeuralEngine(gpuShare: 0.5)
-        XCTAssertEqual(ane.rows(4096, k: 2048, n: 2048), 2048)
-        XCTAssertEqual(ane.rows(1024, k: 2048, n: 2048), 512)
-        XCTAssertEqual(ane.rows(512, k: 2048, n: 2048), 0, "under minimumRows: the GPU alone")
-        XCTAssertEqual(NeuralEngine(gpuShare: 0.375).rows(4096, k: 2048, n: 2048), 2560)
-        XCTAssertEqual(NeuralEngine(gpuShare: 0.99).rows(4096, k: 2048, n: 2048), 0, "under one unit: the GPU alone")
-        XCTAssertEqual(NeuralEngine(gpuShare: 0.01).rows(4096, k: 2048, n: 2048), 0, "the whole product: the GPU keeps a share")
-        // A grid replaces the scalar share: T = 1 / (1 + ρ), here ρ = 1 at 4096 rows (½), 1/3 at 1024 (¾).
-        let grid = NeuralEngine(gpuShare: 0.9, shares: Conductor.Shares([.init(k: 2048, n: 2048, m: 4096, ratio: 1),
-                                                                          .init(k: 2048, n: 2048, m: 1024, ratio: 1.0 / 3)]))
-        XCTAssertEqual(grid.rows(4096, k: 2048, n: 2048), 2048)
-        XCTAssertEqual(grid.rows(1024, k: 2048, n: 2048), 256)
+    /// The engine holds what the plan gave it: the surfaces of the shapes whose rows it takes, a sum over the shapes, and nothing
+    /// for a product it takes no row of.
+    func testBytesFollowTheRowsThePlanGave() {
+        XCTAssertEqual(NeuralEngine.bytes(products: []), 0)
+        XCTAssertEqual(NeuralEngine.bytes(products: [(0, 2048, 2048)]), 0, "no ANE row: nothing held")
+        let one = NeuralEngine.bytes(products: [(2048, 2048, 2048)])
+        XCTAssertGreaterThan(one, 0)
+        XCTAssertGreaterThan(NeuralEngine.bytes(products: [(2048, 2048, 2048), (1024, 2048, 2048)]), one, "a shape each: a sum")
+        XCTAssertEqual(NeuralEngine.bytes(products: [(2048, 2048, 2048), (2048, 2048, 2048)]), one, "the same shape twice: one program")
+        XCTAssertGreaterThan(NeuralEngine.bytes(products: [(4096, 2048, 2048)]), NeuralEngine.bytes(products: [(2048, 2048, 2048)]))
     }
 
     /// The Standard renders in fp32 unless asked, the 8- and 4-bit versions take the Neural Engine; the PNG
@@ -86,7 +83,7 @@ final class NeuralEngineTests: XCTestCase {
         let recipe = try XCTUnwrap(Engine.Render.Recipe(metadata: PNG.text(try render.png())))
         XCTAssertTrue(recipe.neuralEngine)
         XCTAssertEqual(recipe.unreadable, [])
-        XCTAssertFalse(EngineSettings.effective.gemmANE)
+        XCTAssertFalse(EngineSettings.effective.plan.usesANE)
         XCTAssertEqual(RenderCache.numerics(reproducible: true, neuralEngine: true), RenderCache.numerics(reproducible: true))
     }
 
@@ -133,20 +130,31 @@ final class NeuralEngineTests: XCTestCase {
         XCTAssertEqual(NeuralEngine.parts(k: 10240, n: 3840, int8: true, alignment: 256), 4, "three would be uneven: four of 2 560")
         XCTAssertEqual(NeuralEngine.parts(k: 4864, n: 64, int8: true, alignment: 256), 2, "no even cut on 256: the fewest parts (the engine declines)")
         XCTAssertFalse(NeuralEngine.readsInt8(k: 4864, n: 64, group: 256), "a part's bound inside a rotation group")
-        XCTAssertFalse(NeuralEngine(gpuShare: 0.5).accepts(rows: 256, k: 4864, n: 64, int8Group: 256))
+        XCTAssertFalse(NeuralEngine().accepts(rows: 256, k: 4864, n: 64, int8Group: 256))
         for (k, n) in [(4096, 4096), (4096, 12288), (12288, 4096), (6144, 6144), (6144, 16384), (16384, 6144), (3072, 3072), (8192, 3072), (3072, 16384)] {
             XCTAssertTrue(NeuralEngine.readsInt8(k: k, n: n, group: 256), "the Compact maps' \(k)×\(n)")
         }
-        XCTAssertTrue(NeuralEngine(gpuShare: 0.5).accepts(rows: 256, k: 4864, n: 64, int8Group: nil))
+        XCTAssertTrue(NeuralEngine().accepts(rows: 256, k: 4864, n: 64, int8Group: nil))
     }
 
-    /// The memory need holds the integers' shapes under `ane_int8`: more than the fp16 ones alone, never fewer.
-    func testBytesHoldTheInt8ShapesWhenAsked() {
-        let products = [(m: 4096, k: 4096, n: 12288), (m: 4096, k: 12288, n: 4096)]
-        let off = NeuralEngine.bytes(products: products, gpuShare: 0.5, int8: false)
-        let on = NeuralEngine.bytes(products: products, gpuShare: 0.5, int8: true)
-        XCTAssertGreaterThan(on, off)
-        XCTAssertEqual(NeuralEngine.bytes(products: products, gpuShare: 0.5), off, "off by default")
+    /// The memory need holds the integers' shapes for the products whose weight the ANE reads as published, and the fp16 ones for
+    /// the others — exactly, not a bound over both: the int8 program's weight surface is a byte a value, its input surface the
+    /// whole K when it is one part.
+    func testBytesHoldTheShapesOfTheFormEachProductReads() {
+        let rows = 2048, k = 4096, n = 12288
+        let fp16 = NeuralEngine.bytes(products: [(rows, k, n)])
+        let int8 = NeuralEngine.bytes(products: [], integers: [(rows, k, n, 256)])
+        XCTAssertGreaterThan(int8, 0)
+        XCTAssertNotEqual(int8, fp16, "two programs of different shapes")
+        // Both forms of one product (the fp16 program for one weight, the integers' for another of its shape): the surfaces of each,
+        // the per-column state once.
+        let both = NeuralEngine.bytes(products: [(rows, k, n)], integers: [(rows, k, n, 256)])
+        XCTAssertGreaterThan(both, max(fp16, int8))
+        XCTAssertLessThanOrEqual(both, fp16 + int8)
+        XCTAssertEqual(NeuralEngine.bytes(products: [], integers: [(0, k, n, 256)]), 0, "no ANE row: nothing held")
+        // The integers' weight is a byte a value in one surface where the fp16 program holds two parts of one shape: the weight surface
+        // is the same 50 MB, the input surface is the whole K — more by `rows · K/2 · 2` bytes, the rest equal.
+        XCTAssertEqual(int8 - fp16, Arena.capacity(for: rows * k * 2) - Arena.capacity(for: rows * (k / 2) * 2))
     }
 
     /// `x · R` is the rotation `Widen.dequantizeRotated` applies to the weight, moved to the activation: for random integers,
@@ -194,7 +202,7 @@ final class NeuralEngineTests: XCTestCase {
         let q = (0..<(k * n)).map { _ in Int8(max(-127, min(127, (gauss() * 34).rounded()))) }
         let scales = (0..<n).map { Float(1 + $0 % 7) / 1024 }
         let x = (0..<(rows * k)).map { _ in Float(gauss()) }
-        let engine = NeuralEngine(gpuShare: 0.5)
+        let engine = NeuralEngine()
         var c8 = [Float](repeating: .nan, count: rows * n), c16 = c8
         let ok8 = q.withUnsafeBufferPointer { qp in scales.withUnsafeBufferPointer { sp in x.withUnsafeBufferPointer { xp in c8.withUnsafeMutableBufferPointer { cp in
             engine.product(a: xp.baseAddress!, int8: .init(values: qp.baseAddress!, scales: sp.baseAddress!, perColumn: true, group: group),
@@ -233,7 +241,7 @@ final class NeuralEngineTests: XCTestCase {
         let (rows, k, n, group) = (256, 2048, 256, 256)
         let q = [Int8](repeating: 3, count: k * n), scales = [Float](repeating: 0.01, count: n)
         var x = [Float](repeating: 0.5, count: rows * k)
-        let engine = NeuralEngine(gpuShare: 0.5)
+        let engine = NeuralEngine()
         var c = [Float](repeating: 0, count: rows * n)
         func run() -> Bool {
             q.withUnsafeBufferPointer { qp in scales.withUnsafeBufferPointer { sp in x.withUnsafeBufferPointer { xp in c.withUnsafeMutableBufferPointer { cp in

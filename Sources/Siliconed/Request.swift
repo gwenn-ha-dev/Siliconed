@@ -100,7 +100,7 @@ package struct Request: Sendable, Equatable {
     /// the text, the images and the render cache's keys do not see it. In a batch, each seed is turned
     /// by the same variations.
     package var variations: [Variation] = []
-    /// **The Neural Engine beside the GPU in the denoiser**, where this Mac's map turned it on (`gemm_ane`):
+    /// **The Neural Engine beside the GPU in the denoiser**, where this Mac's plan gives it rows (`EngineSettings.plan.usesANE`):
     /// the products it takes run in fp16, each weight column and activation row lifted into fp16's range and
     /// undone in fp32 (`NeuralEngine`) — less energy, and another image than fp32's, close to it (at 1024²,
     /// Z-Image's and Qwen-Image-2.1's within a tenth of a level on average, Krea 2's finest details moved).

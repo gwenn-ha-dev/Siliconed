@@ -152,7 +152,7 @@ package final class TextEncoder {
     /// - Parameter sequence: the number of positions computed. **Not necessarily 512** — see
     ///   the note on causality at the top of this file.
     /// - Parameter freezeCut: the reproducible mode. **The encoder needs it as much as the
-    ///   DiT**: its blocks run at 512 tokens, hence above `amx_min`, hence the GPU/AMX split
+    ///   DiT**: its blocks run at 512 tokens, hence where a plan may give the AMX rows, the GPU/AMX split
     ///   applies there and is slaved to it. An engine that froze only the DiT would render
     ///   different captions on every run, and the image behind them too — it is
     ///   exactly the kind of half-fix that reads like a fix.
@@ -168,7 +168,7 @@ package final class TextEncoder {
         // seems to use only locals.
         // The Neural Engine serves the denoisers only (`Request.neuralEngine`): an encoder's rows are a prompt's
         // tokens, under its minimum, and its output enters the render cache's keys, which do not name it.
-        let gemm = try GEMM(freezeCut: freezeCut, neuralEngine: false)
+        let gemm = try GEMM(freezeCut: freezeCut, phase: .encoding)
         let s = sequence, h = config.hidden, a = config.attentionWidth
         let kv = config.kvWidth, i = config.intermediate
         let arena = try Arena(capacity: TextEncoder.arenaBytes(config: config, sequence: s))

@@ -115,27 +115,27 @@ extension Judge {
     }
 }
 
-/// **`--neural-engine`: the DiT's products shared with the Neural Engine**, half the rows of every widened product
-/// of 512 rows or more, whatever this Mac's map or profile says: the same split on every Mac, and more of the ANE than a
-/// map gives — the strictest case. The ANE computes in fp16, so the stage is judged against the reference
-/// run in bf16 (`HalfPrecisionReference`). Set through the environment, which has the last word over the
-/// profile, before anything reads the engine's settings; the tally then says what the ANE computed.
-package enum NeuralEngineRun {
-    package static func enable() throws {
-        setenv("SILICONED_GEMM_ANE", "1", 1)
-        setenv("SILICONED_ANE_FRACTION", "0.5", 1)
-        setenv("SILICONED_ANE_SHARES", "", 1)
-        setenv("SILICONED_ANE_AMX", "", 1)   // the GPU alone beside the ANE: the pair judged, not the three
-        // Every product of 512 rows or more, not only those the render's threshold takes (1024): the
-        // conditions of an edit (1 021 rows for a short prompt) and its steps (988 at 512²) included.
-        setenv("SILICONED_ANE_MIN", "\(2 * NeuralEngine.rowUnit)", 1)
-        let settings = EngineSettings.effective
-        guard settings.gemmANE, settings.aneFraction == 0.5, settings.aneShares.isEmpty, settings.aneAMX.isEmpty,
-              settings.aneMinimumRows == 2 * NeuralEngine.rowUnit else {
-            throw UsageError("--neural-engine: the engine's settings were read before it")
+/// **The strictest case of a half-precision route, on any Mac whatever its map says** — designated as the process's plan
+/// (`CapacityPlan.forcing`) before anything reads the engine's settings, so that the same rows run on every Mac:
+///
+///   - **`--neural-engine`**: half the rows of every widened product of 512 rows or more go to the Neural Engine, the GPU
+///     beside it alone (the pair judged, not the three). The ANE computes in fp16, so the stage is judged against the reference
+///     run in bf16 (`HalfPrecisionReference`); the tally then says what the ANE computed.
+///   - **`--bf16-activations`**: the DiT's products on an activation rounded to bf16, the weights as published, the sums and the
+///     output fp32, every product of 256 rows or more. Judged like the ANE's, against the reference run in bf16: invariant 3, no
+///     further from the fp64 witness than diffusers in bf16, + 25 %.
+package enum HalfPrecisionRun {
+    package static func enable(neuralEngine: Bool, bf16Activations: Bool) throws {
+        do {
+            try EngineSettings.designate(plan: .forcing(neuralEngine: neuralEngine, bf16Activations: bf16Activations))
+        } catch {
+            let flags = [neuralEngine ? "--neural-engine" : nil, bf16Activations ? "--bf16-activations" : nil].compactMap { $0 }
+            throw UsageError("\(flags.joined(separator: " ")): the engine's settings were read before it")
         }
     }
+}
 
+package enum NeuralEngineRun {
     /// How many of the DiT's products the ANE computed. None (no ANE on this Mac, every product refused):
     /// skipped, since what would be judged is the GPU's fp32 against a looser bar.
     package static func account(_ report: Report) throws {
@@ -144,8 +144,8 @@ package enum NeuralEngineRun {
             throw Skip("--neural-engine: the Neural Engine computed none of the DiT's products on this Mac"
                        + " (\(handed) handed, \(givenBack) given back to the GPU)")
         }
-        // Under `ane_int8` (with `gemm_int8`) the integers of a published int8 weight are the program's input: the verdict says how
-        // many of the products read them so.
+        // Under `SILICONED_PLAN=aneint8` the integers of a published int8 weight are the program's input: the verdict says how many
+        // of the products read them so.
         let integers = NeuralEngine.int8Tally.withLock { $0 }
         report.add(Judge.holds("Neural Engine", true,
                                note: "half the rows of \(handed - givenBack) products"
@@ -154,19 +154,7 @@ package enum NeuralEngineRun {
     }
 }
 
-/// **`--bf16-activations`: the DiT's products on an activation rounded to bf16**, the weights as published, the
-/// sums and the output fp32, every product of 256 rows or more (the engine's own rule). The strictest case of
-/// the map's setting: on any Mac, whatever its map says. Judged like the ANE's, against the reference run in
-/// bf16 (`HalfPrecisionReference`): invariant 3, no further from the fp64 witness than diffusers in bf16, + 25 %.
 package enum BF16ActivationRun {
-    package static func enable() throws {
-        setenv("SILICONED_GEMM_BF16_ACT", "1", 1)
-        setenv("SILICONED_BF16_ACT_MIN", "256", 1)
-        guard EngineSettings.effective.gemmBF16Activations else {
-            throw UsageError("--bf16-activations: the engine's settings were read before it")
-        }
-    }
-
     /// How many products rounded their activation. None (no Metal 4, a refused compiler): skipped, since what
     /// would be judged is the fp32 path against a looser bar.
     package static func account(_ report: Report) throws {
@@ -185,7 +173,7 @@ package struct HalfPrecisionReference {
     let tensors: Safetensors
 
     package init?(goldens: Goldens, file: String) {
-        guard EngineSettings.effective.gemmANE || EngineSettings.effective.gemmBF16Activations else { return nil }
+        guard EngineSettings.effective.plan.resources.halfPrecision else { return nil }
         // `witness-bf16-X`, or Qwen-Image-2.1's own name for it (`goldens-qwen21-dit-bf16-R`).
         let names = [file.replacingOccurrences(of: "goldens-", with: "witness-bf16-"),
                      file.replacingOccurrences(of: "-dit-", with: "-dit-bf16-")]

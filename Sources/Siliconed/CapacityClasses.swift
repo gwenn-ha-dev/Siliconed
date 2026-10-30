@@ -51,7 +51,7 @@ import Foundation
 ///     widening or reading (the table's `weights` rules say how a weight is read; the rates, once measured, carry what
 ///     it costs). Neutral rates give the FLOP ranking; the map's measured rates replace them class by class.
 package enum CapacityClasses {
-    package enum Phase: String, Sendable, Hashable, CaseIterable {
+    package enum Phase: String, Sendable, Hashable, CaseIterable, Codable {
         /// The text encoder, once per render.
         case encoding
         /// The DiT's evaluations, and what it computes once from the conditions.
@@ -59,10 +59,16 @@ package enum CapacityClasses {
     }
 
     /// The format a weight is published in, as the version carries it.
-    package enum WeightFormat: String, Sendable, Hashable, CaseIterable {
+    package enum WeightFormat: String, Sendable, Hashable, CaseIterable, Codable {
         case bf16, int8, q8
         /// Q4_K to Q6_K: a single route (widening on the CPU).
         case q4k
+
+        /// **The convrot group of the format's rotation**, `nil` for none: every int8 DiT of the catalogue is Comfy's `int8_tensorwise`
+        /// convrot of group 256 (the headers of the three Compact maps, checked), so the plan reasons on 256 — what the ANE's int8
+        /// program needs to know to cut K (`NeuralEngine.readsInt8`) and the memory need to size its rotated row. A tensor of
+        /// another group is not refused here: the engine reads the tensor's own and declines what its program cannot cut.
+        package var rotationGroup: Int? { self == .int8 ? Widen.largestRotationGroup : nil }
 
         /// The route table's kind, `nil` for the K-quants.
         package var kind: RouteTable.WeightKind? {
@@ -486,7 +492,7 @@ package enum CapacityClasses {
     /// bf16 weight, no AMX: `TensorGEMM` takes the product whole) —, which is what the rates of the map are keyed by and
     /// what the ledger records. Off by default: the engines alone.
     package static func route(of c: Class, family: Family, table: RouteTable,
-                              amxMinimumRows: Int = EngineSettings.defaultAMXMinimumRows,
+                              amxMinimumRows: Int = CapacitySolver.Limits.defaultAMXRows,
                               aneBroughtUp: Bool = true, weightForms: Bool = false) -> String {
         switch c.shape {
         case let .product(k, n, rows, _):
@@ -516,7 +522,7 @@ package enum CapacityClasses {
     /// decreasing in every rate, increasing in every heat factor.
     package static func predict(_ classes: [Class], family: Family, table: RouteTable, rates: Rates = .neutral,
                                 heat: CapacityMeasure.Heat = CapacityMeasure.Heat(), phases: Set<Phase> = [.denoising],
-                                amxMinimumRows: Int = EngineSettings.defaultAMXMinimumRows,
+                                amxMinimumRows: Int = CapacitySolver.Limits.defaultAMXRows,
                                 aneBroughtUp: Bool = true, weightForms: Bool = false) -> Prediction {
         var parts: [Prediction.Part] = []
         for c in classes where phases.contains(c.phase) && (c.executions[family] ?? 0) > 0 {

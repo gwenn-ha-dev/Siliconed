@@ -57,10 +57,14 @@ package struct MemoryNeed: Sendable, Equatable {
         package var minimumBands = false
         /// The update rule (`Solver.history`): the latents its walk keeps between two steps.
         package var solver: Solver = .euler
-        /// **The denoiser may take the Neural Engine** (`Request.neuralEngine` against the map's `gemm_ane`):
-        /// its surfaces are charged to the phases whose products it takes — the DiT's, Krea 2's fusion —, never
-        /// to an encoder's, which never takes it. The map's by default: what a render not yet chosen may do.
-        package var neuralEngine = EngineSettings.effective.gemmANE
+        /// **The plan the products and attentions are asked of** (`CapacityPlan`): the same questions, with the same keys, the engine
+        /// puts at each product — the rows each engine takes, hence the AMX's workspace and the ANE's surfaces, are the plan's answers,
+        /// computed here before the first computation. The process's by default (`EngineSettings.plan`); a test hands its own.
+        package var plan = EngineSettings.effective.plan
+        /// **The denoiser may take the Neural Engine** (`Request.neuralEngine` against the plan's): its surfaces are charged to the
+        /// phases whose products it takes — the DiT's, Krea 2's fusion —, never to an encoder's, which never takes it. The plan's by
+        /// default: what a render not yet chosen may do.
+        package var neuralEngine = EngineSettings.effective.plan.usesANE
         /// The images of the batch (`Engine.renderBatch`): every latent waits for the decodings, every
         /// image decoded waits for the batch's end.
         package var batch = 1
@@ -127,6 +131,11 @@ package struct MemoryNeed: Sendable, Equatable {
                            Qwen35Prompt.maxTokens)
             }
         }
+
+        /// The plan of the denoiser's products: the process's, without the ANE when the request refuses it.
+        package var ditPlan: CapacityPlan { plan.restricted(allowingANE: neuralEngine) }
+        /// The plan of an encoder's products: never the ANE.
+        package var encoderPlan: CapacityPlan { plan.restricted(allowingANE: false) }
 
         /// The prompt the app and the diagnostic assume before a prompt is known: 128 tokens of text.
         /// A figure for a display, never the render's own (the engine passes `promptTokens(_:…)`).
@@ -217,12 +226,14 @@ package struct MemoryNeed: Sendable, Equatable {
 
     /// **One cached attention**, as `Block`, `TextEncoder`, `QwenImage21DiT` and the vision tower build
     /// it: cut by heads (`HeadSplitAttention`: its host arena, ours, and MPSGraph's copy of the GPU
-    /// heads' queries) or in one MPSGraph SDPA (its queries' copy, and its causal mask in our pages).
+    /// heads' queries) or in one MPSGraph SDPA (its queries' copy, and its causal mask in our pages). `assignment`: the plan's
+    /// answer for the attention's class (its CPU heads exactly), `.graph` for one the plan does not speak of (an encoder's).
+    /// The flash kernel holds no more than the graph's terms.
     package static func attention(_ name: String, heads: Int, rows: Int, keys: Int, headDim: Int, causal: Bool,
-                                  split: Bool, threads: Int, group: Int = 1) -> [Term] {
+                                  assignment: AttentionAssignment = .graph, threads: Int, group: Int = 1) -> [Term] {
+        let split = assignment.splits
         // The GPU's heads: all of them in one MPSGraph SDPA, or what the head split leaves it.
-        let gpu = split ? HeadSplitAttention.partition(heads: heads, fraction: HeadSplitAttention.cpuFraction(sequence: rows, heads: heads, headDim: headDim), group: group).gpu.count
-            : heads
+        let gpu = split ? heads - assignment.cpuHeads : heads
         // Past `Attention.maxMatrix` the unmasked graph runs in query slices, which MPSGraph concatenates:
         // one more copy of the GPU heads' output (`Attention.init`, `HeadSplitAttention.init`). A causal
         // graph is never sliced (its mask is built whole).
@@ -230,7 +241,7 @@ package struct MemoryNeed: Sendable, Equatable {
         let concatenation = sliced ? [Term("\(name) SDPA concatenation", rows * gpu * headDim * 4, outside: true)] : []
         if split {
             return [Term("\(name) head split", HeadSplitAttention.hostBytes(heads: heads, sequence: rows, keys: keys,
-                                                                           headDim: headDim, group: group, threads: threads)),
+                                                                           headDim: headDim, cpuHeads: assignment.cpuHeads, threads: threads)),
                     Term("\(name) SDPA queries", OperatorFootprint.sdpaQueries(rows: rows, heads: gpu, headDim: headDim),
                          outside: true)] + concatenation
         }
@@ -241,49 +252,83 @@ package struct MemoryNeed: Sendable, Equatable {
 
     /// **One model's `GEMM` over a phase**: its padding tiers (`GEMM.tierBytes`: what a height of 8 to
     /// 32 rows, or one that is not a multiple of 64, sends through them, at the widest such product;
-    /// `rank`: a LoRA's, whose `mid` goes through them too), and the conductor's BNNS workspace — the
-    /// largest it can grow to over the products the phase runs (`Conductor.workspaceBytes` of the AMX
-    /// slice, either weight layout), when the cut applies. The slice is at most `m − cut(m, T)` with the
-    /// servo's `T` held in `Conductor.fractionRange`: the bound is its lower end (and the frozen cut's).
-    /// MPS's own state is not charged: no shape gives it (`OperatorFootprint`). `bounded`: the products
-    /// whose height follows the prompt's tokens — a bound, not the height (`GEMM.tierBytes`). Under
-    /// `int8` (`gemm_int8` or `gemm_q8`) the AMX may take a product's last columns instead, all `m` rows
-    /// (`Conductor.columnWorkspaceBytes`, larger: 151 against 109 MB at Krea 2's 4096 × 16384 × 6144),
-    /// at the same bound on the share — counted for every product, the map's dtype unknown here. Under
-    /// `ane` (`Request.neuralEngine`: a denoiser's phase only), the Neural Engine's fp16 operands and its rows
-    /// (`NeuralEngine.bytes`).
+    /// `rank`: a LoRA's, whose `mid` goes through them too), and what the plan gives the AMX and the ANE — **asked the plan's
+    /// questions, with the keys the engine asks them with, before the first computation**:
+    ///
+    ///   - the conductor's BNNS workspace, the largest it grows to over the products the plan gives AMX rows
+    ///     (`Conductor.workspaceBytes` of the AMX's exact slice, either weight layout) or, beside an 8-bit weight, columns
+    ///     (`Conductor.columnWorkspaceBytes`, larger: 151 against 109 MB at Krea 2's 4096 × 16384 × 6144);
+    ///   - the Neural Engine's fp16 operands and its rows (`NeuralEngine.bytes`) over the products it takes rows of — the int8 program's
+    ///     shapes for those whose weight it reads as published (a native path with ANE rows), the fp16 program's for the others.
+    ///
+    /// MPS's own state is not charged: no shape gives it (`OperatorFootprint`). `bounded`: the products whose height follows
+    /// the prompt's tokens — a bound `m`, the height being any of `m − spread … m` (`spread`: the prompt's rows, the part of the
+    /// height that is not known). **An exact answer for an unknown height is the worst of the plan's answers over the heights it
+    /// may take**: the solver's integers are not monotone in the height (an engine leaves the set, the ANE changes unit), so the plan
+    /// is asked at every height of the range and the largest AMX slice, ANE rows and AMX columns are charged — never under what the
+    /// engine will ask for (`GEMM.tierBytes` takes the bound). `step`: the heights are the bound less a multiple of it (Z-Image pads
+    /// its caption to 32 rows). The sweep starts no lower than where the plan gives an engine a row (`engineFloor`). `weight`, `phase`:
+    /// the class of the products, the DiT's or the encoder's; `plan`: that phase's (`Request.ditPlan`, `.encoderPlan`).
     package static func gemm(_ name: String, products: [(m: Int, k: Int, n: Int)] = [],
-                             bounded: [(m: Int, k: Int, n: Int)] = [], rank: Int = 0,
-                             amx: Bool = EngineSettings.effective.routes.products.usesAMX,
-                             int8: Bool = EngineSettings.effective.routes.products.usesInt8Weights
-                                 || EngineSettings.effective.routes.products.usesQ8Weights,
-                             ane: Bool = false) -> [Term] {
+                             bounded: [(m: Int, k: Int, n: Int)] = [], spread: Int = 0, step: Int = 1, rank: Int = 0,
+                             plan: CapacityPlan, weight: CapacityClasses.WeightFormat = .bf16,
+                             phase: CapacityClasses.Phase = .denoising) -> [Term] {
         var workspace = 0
-        if amx {
-            for p in products + bounded where p.m >= Conductor.minimumRows {
-                let slices = Set([p.m - Conductor.cut(p.m, Conductor.fractionRange.lowerBound),
-                                  p.m - Conductor.cut(p.m, EngineSettings.effective.amxFraction)])
-                for rows in slices where rows > 0 {
-                    for transposed in [false, true] {
-                        workspace = max(workspace, Conductor.workspaceBytes(rows: rows, k: p.k, n: p.n,
-                                                                            weightIsTransposed: transposed))
-                    }
+        var aneProducts: [(rows: Int, k: Int, n: Int)] = []
+        // The products whose weight the ANE reads as published (a native path with ANE rows): the int8 program's shapes, with the
+        // weight's rotation group — the plan's exact answer by weight format, not a bound over both inputs.
+        var aneIntegers: [(rows: Int, k: Int, n: Int, group: Int?)] = []
+        func charge(_ p: (m: Int, k: Int, n: Int), heights: ClosedRange<Int>, step: Int = 1) {
+            var (amx, columns, ane, integers) = (0, 0, 0, 0)
+            for m in Swift.stride(from: heights.upperBound, through: heights.lowerBound, by: -step) {
+                let a = plan.assign(ProductKey(k: p.k, n: p.n, m: m, weight: weight, phase: phase))
+                (amx, columns) = (max(amx, a.amx), max(columns, a.amxColumns))
+                if a.path == .native { integers = max(integers, a.ane) } else { ane = max(ane, a.ane) }
+            }
+            if amx > 0 {
+                for transposed in [false, true] {
+                    workspace = max(workspace, Conductor.workspaceBytes(rows: amx, k: p.k, n: p.n, weightIsTransposed: transposed))
                 }
-                if int8, p.n >= 128 {
-                    for T in [Conductor.fractionRange.lowerBound, EngineSettings.effective.amxFraction] {
-                        workspace = max(workspace, Conductor.columnWorkspaceBytes(
-                            m: p.m, k: p.k, n: p.n, width: WeightProducts.amxColumns(n: p.n, share: T)))
-                    }
-                }
+            }
+            if columns > 0 { workspace = max(workspace, Conductor.columnWorkspaceBytes(m: heights.upperBound, k: p.k, n: p.n, width: columns)) }
+            if ane > 0 { aneProducts.append((ane, p.k, p.n)) }
+            if integers > 0 { aneIntegers.append((integers, p.k, p.n, weight.rotationGroup)) }
+        }
+        // A plan that builds neither the AMX nor the ANE gives them no row, at any height: nothing to ask.
+        if plan.resources.amx || plan.resources.ane {
+            for p in products { charge(p, heights: p.m...p.m) }
+            for p in bounded where p.m >= plan.engineFloor {
+                charge(p, heights: max(plan.engineFloor, p.m - spread)...p.m, step: max(1, step))
             }
         }
         let tiers = GEMM.tierBytes(products: products, bounded: bounded, rank: rank)
-        let neural = ane ? NeuralEngine.bytes(products: products + bounded, gpuShare: EngineSettings.effective.routes.products.ane.gpuShare,
-                                                shares: EngineSettings.effective.routes.products.ane.grid.shares) : 0
+        let neural = NeuralEngine.bytes(products: aneProducts, integers: aneIntegers)
         return (tiers > 0 ? [Term("\(name) GEMM tiers", tiers)] : [])
             + (workspace > 0 ? [Term("\(name) conductor workspace", Arena.capacity(for: workspace))] : [])
             + (neural > 0 ? [Term("\(name) Neural Engine", neural)] : [])
     }
+
+    /// **The worst case of a probe's GEMM**: a probe pins the exact rows it measures, of its own choosing, so no plan answer bounds
+    /// it. The AMX's slice is taken at most `probeAMXShare` of a product's rows (the GPU keeps a third at least, as the previous
+    /// cut's band held it), beside a native 8-bit weight too (`int8`: its columns, the same share). The tiers as `gemm` charges them.
+    package static func gemmBound(_ name: String, products: [(m: Int, k: Int, n: Int)], int8: Bool = false, rank: Int = 0) -> [Term] {
+        var workspace = 0
+        for p in products where p.m >= CapacitySolver.Limits.defaultAMXRows {
+            let rows = Int((Double(p.m) * probeAMXShare).rounded(.up))
+            for transposed in [false, true] {
+                workspace = max(workspace, Conductor.workspaceBytes(rows: rows, k: p.k, n: p.n, weightIsTransposed: transposed))
+            }
+            if int8, p.n >= 128 {
+                let columns = max(64, Int((Double(p.n) * probeAMXShare).rounded(.up)) / 64 * 64 + 64)
+                workspace = max(workspace, Conductor.columnWorkspaceBytes(m: p.m, k: p.k, n: p.n, width: min(columns, p.n - 64)))
+            }
+        }
+        let tiers = GEMM.tierBytes(products: products, rank: rank)
+        return (tiers > 0 ? [Term("\(name) GEMM tiers", tiers)] : [])
+            + (workspace > 0 ? [Term("\(name) conductor workspace", Arena.capacity(for: workspace))] : [])
+    }
+    /// The most of a product's rows a probe gives the AMX.
+    package static let probeAMXShare = 0.70
 
     /// **A VAE's two heaps and its host copies** (`VAELayout.bytes`), and what its graphs still
     /// allocate beside them: MPSGraph's SDPA, the one pass left whole (`VAELayout.outside`).

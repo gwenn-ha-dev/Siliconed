@@ -34,7 +34,7 @@ final class DiagnosticMemoryTests: XCTestCase {
     /// share would hand the ANE all of the product, which `NeuralEngine.rows` refuses: that bound was 0).
     func testEngineBoundCountsEveryHeight() {
         let at1024 = Diagnostic.engineBytes([.init(m: 1024, k: 3840, n: 3840)])
-        let half = NeuralEngine.bytes(products: [(1024, 3840, 3840)], gpuShare: 0.5)
+        let half = NeuralEngine.bytes(products: [(512, 3840, 3840)])
         XCTAssertGreaterThan(at1024, half)
         XCTAssertGreaterThan(Diagnostic.engineBytes([.init(m: 4096, k: 3840, n: 3840)]), at1024)
     }

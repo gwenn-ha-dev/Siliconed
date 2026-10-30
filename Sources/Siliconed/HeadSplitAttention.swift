@@ -75,21 +75,6 @@ package final class HeadSplitAttention {
     /// microseconds and the rendezvous would dominate.
     package static let minimumSequence = 1024
 
-    /// **Whether an attention of `sequence` query rows (of `heads` of `headDim`) is cut by
-    /// heads** — the one condition the blocks, Qwen-Image-2.1's target and the memory formulas share: the route
-    /// table's (`RouteTable.Attention`; today's `head_split` setting and `minimumSequence` as its rules). Off,
-    /// the attention runs in one MPSGraph SDPA.
-    /// The class is required: a map's rules name it, and a call without it matches none of them.
-    package static func applies(sequence: Int, heads: Int, headDim: Int) -> Bool {
-        EngineSettings.effective.routes.attention.route(sequence: sequence, heads: heads, headDim: headDim).splits
-    }
-
-    /// **Whether the flash kernel is allowed for an attention of `sequence` rows** (the route table's; a model that
-    /// implements it takes it before the split).
-    package static func allowsFlash(sequence: Int, heads: Int, headDim: Int) -> Bool {
-        EngineSettings.effective.routes.attention.route(sequence: sequence, heads: heads, headDim: headDim).flash
-    }
-
     /// **Which heads go where, defined once.** `fraction` is the share of heads handed to the CPU,
     /// rounded to the nearest head — to the nearest `group` of heads under GQA; the GPU keeps at least one
     /// group, the CPU may get none.
@@ -150,28 +135,12 @@ package final class HeadSplitAttention {
         }
     }
 
-    /// **The share of heads handed to the CPU: 0.4, the M1 Pro's, unless the capacity map found another** (the
-    /// `head_split_fraction` setting, `balance`). Frozen, not servoed: a share decides which engine computes a
-    /// head, hence the bits. It was swept in the engine at S = 4128 — 12 of Z-Image's 30 heads, 18 GPU ahead
-    /// (155.7 → 95.9 ms) — and judged at threshold on every Z-Image golden, then adopted. Thread count, by
-    /// contrast, changes the speed and never the bits.
-    ///
-    /// **It does not depend on the sequence.** Swept again at 2,048 to 24,576 tokens (Anima's 16 heads, Z-Image's
-    /// 30): both sides cost `S²` per head — the GPU's `4·S²·Dh` FLOP at ~1.6 TFLOP/s, the CPU's the same through the
-    /// AMX plus `S²` exponentials —, so the ratio of the two per-head times, which sets the share, stays within
-    /// 1.7–2.4 and the best count of heads sits at 6 of 16 (5 at 12,288, ahead by 5 %) and 12 of 30 at every
-    /// length, the call time flat within a head either way. What moves with the length is the GPU's penalty
-    /// for the CPU running beside it (+5 % at 8,192 tokens, +15 % at 4,096, taken into `balance`).
-    package static var cpuFraction: Double { EngineSettings.effective.routes.attention.defaultSplitFraction }
-
-    /// The share of heads the CPU takes for an attention of this class: the route table's rule, the default
-    /// share where none splits.
-    package static func cpuFraction(sequence: Int, heads: Int? = nil, headDim: Int? = nil) -> Double {
-        EngineSettings.effective.routes.attention.route(sequence: sequence, heads: heads, headDim: headDim).splitFraction
-            ?? cpuFraction
-    }
-
-    /// The share the capacity map measures the cut at, and the default of `head_split_fraction`.
+    /// **The default share of heads handed to the CPU: 0.4, the M1 Pro's**, swept in the engine at S = 4128 — 12 of Z-Image's 30
+    /// heads, 18 GPU ahead (155.7 → 95.9 ms) — and judged at threshold on every Z-Image golden, then adopted: what a process with no
+    /// model runs (`AttentionAssignment.defaults`). A model's plan chooses its own number of heads, whole kv groups. Frozen, not
+    /// servoed: a share decides which engine computes a head, hence the bits. It does not depend on the sequence: both sides cost
+    /// `S²` per head, so the ratio of the two per-head times stays within 1.7–2.4 and the best count sits at 6 of 16 and 12 of 30 at
+    /// every length (what moves is the GPU's penalty for the CPU running beside it, +5 % at 8,192 tokens, +15 % at 4,096).
     package static let referenceFraction = 0.4
     /// The shares `balance` chooses among: what a map's memory need charges the split at, the most costly of them.
     package static let shares = stride(from: 0.1, through: 0.7, by: 0.05).map { $0 }
@@ -227,21 +196,24 @@ package final class HeadSplitAttention {
         return best.fraction
     }
 
-    /// - Parameter cpuFraction: the share of heads handed to the CPU; the product's is `cpuFraction`,
-    ///   other values serve the `sdpa` check's sweep.
+    /// - Parameter cpuHeads: the heads the CPU takes, whole kv groups — the plan's answer (`AttentionAssignment.cpuHeads`).
+    /// - Parameter cpuFraction: the share of heads handed to the CPU, when no count is given (`referenceFraction` otherwise):
+    ///   the `sdpa` check's sweep.
     /// - Parameter keys: the rows of `k`/`v`, `nil` for `sequence`.
     /// - Parameter kvHeads: the `k`/`v` heads under GQA, `nil` for `heads`.
     /// - Parameter matrixLimit: the bound the GPU heads' query slices keep under, `Attention.maxMatrix` —
     ///   lower only in the `sdpa` check, which slices a graph that fits whole to compare the two.
     package init(device: MTLDevice, queue: MTLCommandQueue, heads: Int, sequence: Int, headDim: Int,
-                 keys: Int? = nil, kvHeads: Int? = nil, cpuFraction: Double? = nil,
+                 keys: Int? = nil, kvHeads: Int? = nil, cpuHeads: Int? = nil, cpuFraction: Double? = nil,
                  threads: Int = EngineSettings.effective.machine.performanceCores,
                  matrixLimit: Int = Attention.maxMatrix) throws {
-        let cpuFraction = cpuFraction ?? HeadSplitAttention.cpuFraction(sequence: sequence, heads: heads, headDim: headDim)
         let kvHeads = kvHeads ?? heads
         precondition(heads % kvHeads == 0, "\(heads) heads over \(kvHeads) k/v heads")
         let group = heads / kvHeads
-        let (gpu, cpu) = HeadSplitAttention.partition(heads: heads, fraction: cpuFraction, group: group)
+        let cpuHeads = cpuHeads ?? HeadSplitAttention.partition(heads: heads, fraction: cpuFraction ?? HeadSplitAttention.referenceFraction,
+                                                                 group: group).cpu.count
+        precondition(cpuHeads >= 0 && cpuHeads % group == 0 && cpuHeads < heads, "\(cpuHeads) CPU heads of \(heads) in groups of \(group)")
+        let (gpu, cpu) = (0..<(heads - cpuHeads), (heads - cpuHeads)..<heads)
         self.queue = queue
         let keys = keys ?? sequence
         self.heads = heads; self.sequence = sequence; self.keys = keys; self.headDim = headDim; self.kvHeads = kvHeads
@@ -249,8 +221,7 @@ package final class HeadSplitAttention {
         self.threads = max(1, threads)
         work = HeadSplitAttention.items(cpu: cpu, sequence: sequence, rows: HeadSplitAttention.blockRows)
         let host = try Arena(capacity: HeadSplitAttention.hostBytes(heads: heads, sequence: sequence, keys: keys,
-                                                                    headDim: headDim, group: group,
-                                                                    cpuFraction: cpuFraction, threads: threads))
+                                                                    headDim: headDim, cpuHeads: cpuHeads, threads: threads))
         self.host = host
         spill = try host.reserve("spill", bytes: 4 * HeadSplitAttention.spillFloats(sequence: sequence, cpuHeads: cpu.count,
                                                                                     headDim: headDim))
@@ -338,11 +309,9 @@ package final class HeadSplitAttention {
     /// **The slices of the instance's arena, in the order `init` reserves them**, bytes — the spill,
     /// then per thread a `Scratch`: the scores block `[rows, K]`, its sums, the packed `Q_b`, `K_h`,
     /// `V_h`, and the BNNS workspace (`workspaceBytes`; no slice when BNNS asks for none).
-    package static func hostSlices(heads: Int, sequence: Int, keys: Int? = nil, headDim: Int, group: Int = 1,
-                                   cpuFraction: Double? = nil,
+    package static func hostSlices(heads: Int, sequence: Int, keys: Int? = nil, headDim: Int, cpuHeads cpu: Int,
                                    threads: Int = EngineSettings.effective.machine.performanceCores) -> [Int] {
-        let cpuFraction = cpuFraction ?? HeadSplitAttention.cpuFraction(sequence: sequence, heads: heads, headDim: headDim)
-        let cpu = partition(heads: heads, fraction: cpuFraction, group: group).cpu.count, k = keys ?? sequence, rows = blockRows
+        let k = keys ?? sequence, rows = blockRows
         let workspace = workspaceBytes(sequence: sequence, keys: k, headDim: headDim, cpuHeads: cpu)
         let perThread = [rows * k, rows, rows * headDim, k * headDim, k * headDim].map { $0 * 4 }
             + (workspace > 0 ? [workspace] : [])
@@ -353,11 +322,10 @@ package final class HeadSplitAttention {
     /// **The host memory one instance holds**: its arena, `hostSlices` each rounded to the page — all
     /// of it, mapped by `init` and unmapped by `deinit`. The memory need charges it whole, as the
     /// head split's term beside the GPU heads' query copy (`OperatorFootprint.sdpaQueries`).
-    package static func hostBytes(heads: Int, sequence: Int, keys: Int? = nil, headDim: Int, group: Int = 1,
-                                  cpuFraction: Double? = nil,
+    package static func hostBytes(heads: Int, sequence: Int, keys: Int? = nil, headDim: Int, cpuHeads: Int,
                                   threads: Int = EngineSettings.effective.machine.performanceCores) -> Int {
-        Arena.capacity(slices: hostSlices(heads: heads, sequence: sequence, keys: keys, headDim: headDim, group: group,
-                                          cpuFraction: cpuFraction, threads: threads))
+        Arena.capacity(slices: hostSlices(heads: heads, sequence: sequence, keys: keys, headDim: headDim, cpuHeads: cpuHeads,
+                                          threads: threads))
     }
 
     /// **One thread's BNNS workspace**: the largest `BNNSMatMul` asks for over the instance's products —

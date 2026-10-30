@@ -2,15 +2,15 @@ import Foundation
 import Metal
 
 /// **The product that reads the published weights as they are**: Metal 4's `matmul2d`, fp32
-/// activations × bf16 weights → fp32 — a setting (`gemm_tensor`), **off by default**, taken where the
-/// capacity map measures it faster than the path it replaces (`CapacityRules`).
+/// activations × bf16 weights → fp32 — a path of the plan (`WeightPath.bf16`, `.native`), **never the default**, assigned where
+/// the machine's model says it is faster than the path it replaces (`CapacitySolver`).
 ///
 ///     path            the weight before the product           the product
-///     default         bf16 → fp32 into the reserve (Widen)    MPS fp32, the AMX on its share of rows
-///     gemm_tensor     bf16 copied into the reserve's head     matmul2d  float × bfloat → float
-///     gemm_int8       int8 copied, its scales fp32 after it   matmul2d  float × int8_t → float, × s after;
+///     widened         bf16 → fp32 into the reserve (Widen)    MPS fp32, the AMX on its rows, the ANE on its
+///     bf16            bf16 copied into the reserve's head     matmul2d  float × bfloat → float
+///     native int8     int8 copied, its scales fp32 after it   matmul2d  float × int8_t → float, × s after;
 ///                                                             convrot: x · R first, on the GPU
-///     gemm_q8         Q8_0 copied, its block scales fp32      q · s per 64 rows of K into threadgroup memory,
+///     native q8       Q8_0 copied, its block scales fp32      q · s per 64 rows of K into threadgroup memory,
 ///                                                             matmul2d  float × float → float, accumulated
 ///
 /// **Nothing is rounded that the default path does not round**: the weights *are* bf16 values (P19,
@@ -24,8 +24,8 @@ import Metal
 ///
 ///   - **the speed is the machine's, never assumed**: on an M5 `matmul2d` runs on the GPU's neural
 ///     accelerators (6.0 TFLOP/s bf16 × bf16 against 2.9 for MPS fp32); on the M1 Pro, on the
-///     shader cores, slower than MPS (2.36 against 3.46). Hence a setting the map decides, not a path
-///     chosen by chip;
+///     shader cores, slower than MPS (2.36 against 3.46). Hence a path the plan assigns from the machine's
+///     own measure, not one chosen by chip;
 ///   - **the weight is copied, not wrapped**: the reserve keeps its fp32 size, the bf16 weight takes
 ///     its first half (`Artifact.stage`). `MemoryNeed` does not move, a streamed tensor goes the same
 ///     way, and the map's pages are wired by no one. The copy reads what the widening read and writes
@@ -34,19 +34,20 @@ import Metal
 ///     `static_slice`, `get_mask` and the header's other examples do not compile on every Metal 4
 ///     compiler; `slice` checks the edges, so any `m` and `n` are taken whole — no padding tier
 ///     (MPS's 8-to-32-row fault, `GEMM.poisonedRows`, is MPS's);
-///   - **bf16: no co-execution**: the AMX reads fp32 weights, which this path no longer makes. The rules
-///     compare this path to the better of MPS alone and MPS + AMX, and turn the AMX off when it wins;
+///   - **bf16: no co-execution**: the AMX reads fp32 weights, which this path no longer makes. The solver
+///     compares this path to the best of MPS alone and MPS + AMX (+ ANE), so the assignment of a bf16 weight read as published is
+///     the GPU's whole (`ProductAssignment.isRunnable`);
 ///   - **int8: the AMX by columns**: beside the GPU's columns the AMX takes the last ones, widened for
 ///     it alone while the GPU computes (`submit`, `WeightProducts`) — by rows it would need the whole
 ///     weight widened, the reserve's size again. The scale is a pass of its own on the GPU's columns
 ///     (the cooperative tensor's index API is not on every compiler): one more rounding, as the widened
 ///     weight's own;
-///   - **`gemm_bf16_act`: the activation rounded to bf16 just before the product** (`BFloatKernels`, a
+///   - **a rounded activation: the activation rounded to bf16 just before the product** (`BFloatKernels`, a
 ///     second library compiled only when asked): `matmul2d` `bfloat × bfloat → float` (and `bfloat × int8_t`,
 ///     `bfloat × float` for Q8_0), sums in fp32, output fp32. The operand is rounded to nearest-even into a
 ///     scratch in the reserve's tail, a chunk of rows at a time — one rounding, of the operand and nothing
 ///     else: the activation the caller holds stays fp32 (the LoRA stack, the residual and the next norm read
-///     it). P20 allows it (bf16 between two operations, fp32 accumulations); the map decides it by the
+///     it). P20 allows it (bf16 between two operations, fp32 accumulations); the plan assigns it by the
 ///     measured throughput, and the check judges it against diffusers in bf16;
 ///   - **the rotation moves to the activation**: `W = R · q · s` along K (`Widen.dequantizeRotated`),
 ///     `x · W = (x · R) · q · s`, `R = H/√G` — fp32 butterflies on `x`, the integers never touched.

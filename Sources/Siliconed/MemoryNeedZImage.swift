@@ -152,8 +152,9 @@ extension MemoryNeed {
             Term("encoder arena", TextEncoder.arenaBytes(config: encoder, sequence: tokens)),
             Term("encoder staging", TextEncoder.stagingSlots(granted: request.encoderSlots) * encoderLayer),
         ] + attention("encoder", heads: encoder.heads, rows: tokens, keys: tokens, headDim: encoder.headDim,
-                      causal: true, split: false, threads: request.threads)
-          + gemm("encoder", bounded: [(tokens, h, a), (tokens, h, kv), (tokens, a, h), (tokens, h, i), (tokens, i, h)]))
+                      causal: true, threads: request.threads)
+          + gemm("encoder", bounded: [(tokens, h, a), (tokens, h, kv), (tokens, a, h), (tokens, h, i), (tokens, i, h)], spread: tokens,
+                 plan: request.encoderPlan, weight: Artifact.weightFormat(header: maps.encoder), phase: .encoding))
 
         // ── img2img's starting image, encoded at the render's format (`fitted`: a copy when the size
         //    handed differs), one encoder at a time: its heaps and the latent it returns ─────────
@@ -170,14 +171,14 @@ extension MemoryNeed {
         let staging = !streamed ? 0 : TailStream.unitSlots * maps.ditUnitStaging(released..<dit.layers)
         // The attentions alive at the peak: one per block at its full length (image refiners at the
         // image's tokens, layers at the unified sequence, context refiners at the padded caption) —
-        // cut by heads where `HeadSplitAttention.applies`, MPSGraph otherwise.
+        // cut by heads where the plan assigns the split, MPSGraph otherwise.
         let headDim = dit.dim / dit.heads
         // The image's rows padded to 32 like the caption's (`x_pad_token`): 3 968 at 832×1216, not 3 952.
         let image = DiT.imagePadded(latentHeight: latentHeight, latentWidth: latentWidth, config: dit)
         let sequence = image + capPadded
         let attentions = [("image refiners", image), ("layers", sequence), ("context refiners", capPadded)].flatMap {
             attention($0.0, heads: dit.heads, rows: $0.1, keys: $0.1, headDim: headDim, causal: false,
-                      split: HeadSplitAttention.applies(sequence: $0.1, heads: dit.heads, headDim: headDim),
+                      assignment: request.ditPlan.assign(AttentionKey(sequence: $0.1, heads: dit.heads, headDim: headDim), flash: true),
                       threads: request.threads)
         }
         let (d, hidden) = (dit.dim, dit.hidden), inDim = dit.patch * dit.patch * dit.channels
@@ -198,7 +199,7 @@ extension MemoryNeed {
           + gemm("DiT", products: [(image, inDim, d)],
                  bounded: [(sequence, d, d), (sequence, d, hidden), (sequence, hidden, d), (capPadded, dit.capDim, d),
                            (sequence, d, inDim)],
-                 rank: rank, ane: request.neuralEngine))
+                 spread: capPadded, step: dit.seqMultiple, rank: rank, plan: request.ditPlan, weight: Artifact.weightFormat(header: maps.dit)))
 
         // ── decoding: the decoder's two heaps and the image it returns; the latent it reads crosses ──
         let band = request.minimumBands ? min(VAE.bandElements, MemoryPlan.fluxMinimumBand) : VAE.bandElements

@@ -99,10 +99,11 @@ package final class MossImageDiT {
     private var attentions: [Int: Attention] = [:]
     private var splits: [Int: HeadSplitAttention] = [:]
 
-    /// Where the SDPA is cut by heads between the GPU and the CPU: Krea 2's rule (`HeadSplitAttention.applies`,
-    /// from `headSplitRows` rows) — the memory need reads the same condition.
-    package static func headSplit(sequence: Int, heads: Int, headDim: Int) -> Bool {
-        HeadSplitAttention.applies(sequence: sequence, heads: heads, headDim: headDim) && sequence >= headSplitRows
+    /// Where the SDPA is cut by heads between the GPU and the CPU: Krea 2's rule (the plan's split, from `headSplitRows` rows — a
+    /// bound of precision) — the memory need reads the same function.
+    package static func attentionAssignment(_ plan: CapacityPlan, sequence: Int, heads: Int, headDim: Int) -> AttentionAssignment {
+        let a = plan.assign(AttentionKey(sequence: sequence, heads: heads, headDim: headDim))
+        return a.splits && sequence >= headSplitRows ? a : .graph
     }
     package static let headSplitRows = 2048
 
@@ -122,7 +123,7 @@ package final class MossImageDiT {
     ///   - expanded: the stack's expanded weights from a DiT given back, taken over rather than filled again (the
     ///     half-size start's, handed to the full one: the turbo LoRA's 1.19 GB of fp32 read once).
     package init(artifact: Artifact, gridHeight: Int, gridWidth: Int, maxText: Int = 512,
-                 freezeCut: Bool = EngineSettings.effective.frozenCut, neuralEngine: Bool = EngineSettings.effective.gemmANE,
+                 freezeCut: Bool = EngineSettings.effective.frozenCut, neuralEngine: Bool = EngineSettings.effective.plan.usesANE,
                  lora: LoRA? = nil, expanded: CacheLoRA? = nil) throws {
         guard artifact.header["kind"] as? String == MossImageDiT.kind else {
             throw Artifact.Failure.badHeader("map \(artifact.header["kind"] ?? "?"): \(MossImageDiT.kind) expected")
@@ -505,11 +506,12 @@ package final class MossImageDiT {
 
     private func attend(rows n: Int) throws {
         let qb = try slice(q), kb = try slice(k), vb = try slice(v), ob = try slice(merged)
-        if MossImageDiT.headSplit(sequence: n, heads: config.heads, headDim: config.headDim) {
+        let cut = MossImageDiT.attentionAssignment(gemm.plan, sequence: n, heads: config.heads, headDim: config.headDim)
+        if cut.splits {
             let split: HeadSplitAttention
             if let s = splits[n] { split = s } else {
                 split = try HeadSplitAttention(device: gemm.device, queue: gemm.queue, heads: config.heads, sequence: n,
-                                               headDim: config.headDim)
+                                               headDim: config.headDim, cpuHeads: cut.cpuHeads)
                 splits[n] = split
             }
             timed("sdpa wall") {

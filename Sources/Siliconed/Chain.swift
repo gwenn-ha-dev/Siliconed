@@ -241,7 +241,7 @@ package final class Context {
     package let reproducible: Bool
     /// **The denoiser's products may take the Neural Engine** (`Request.neuralEngine`), where this Mac's map
     /// turned it on: resolved at render time. The encoders never do.
-    package var neuralEngine = EngineSettings.effective.gemmANE
+    package var neuralEngine = EngineSettings.effective.plan.usesANE
     /// The render's token; the modules pass it to their DiTs and encoders (between layers).
     package let cancellation: Cancellation?
     /// Compute each step's preview (`Request.previews`).

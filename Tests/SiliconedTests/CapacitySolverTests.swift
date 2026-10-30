@@ -2,8 +2,8 @@ import Foundation
 import Testing
 @testable import Siliconed
 
-/// **The solver** (`CapacitySolver.swift`) on synthetic machines whose right answer is computed by hand, and its table read
-/// back as the engine reads it. No GPU, no weights, no chip name.
+/// **The solver** (`CapacitySolver.swift`) on synthetic machines whose right answer is computed by hand: one class in, the exact
+/// assignment out — whole rows, never a ratio. No GPU, no weights, no chip name.
 @Suite struct CapacitySolverTests {
     typealias M = CapacityModel
     typealias CC = CapacityClasses
@@ -18,30 +18,26 @@ import Testing
         return m
     }
 
-    func product(_ k: Int, _ n: Int, _ rows: Int, _ format: CC.WeightFormat = .bf16, phase: CC.Phase = .denoising,
-                 family: Family = .zImage, times: Int = 1) -> CC.Class {
-        .init(phase: phase, shape: .product(k: k, n: n, rows: rows, format: format), executions: [family: times])
+    func key(_ k: Int, _ n: Int, _ m: Int, _ weight: CC.WeightFormat = .bf16, phase: CC.Phase = .denoising) -> ProductKey {
+        .init(k: k, n: n, m: m, weight: weight, phase: phase)
     }
 
-    func attention(_ s: Int, heads: Int = 32, kv: Int? = nil, dim: Int = 128, cross: Bool = false,
-                   family: Family = .qwenImage21, keys: Int? = nil) -> CC.Class {
-        .init(phase: .denoising, shape: .attention(sequence: s, keys: keys ?? s, heads: heads, kvHeads: kv ?? heads, headDim: dim, cross: cross),
-              executions: [family: 1])
+    func attentionKey(_ s: Int, heads: Int = 32, kv: Int? = nil, dim: Int = 128, cross: Bool = false, keys: Int? = nil) -> AttentionKey {
+        .init(sequence: s, keys: keys, heads: heads, kvHeads: kv, headDim: dim, cross: cross)
     }
 
-    func caps(amx: Bool = false, ane: Bool = false, flash: Bool = false, split: Bool = false, bf16: Bool = false,
-              rounding: Bool = false, int8: Bool = false, q8: Bool = false) -> CapacityMap.Capabilities {
-        .init(amx: amx, ane: ane, bf16Weights: bf16, bf16Rounding: rounding, int8Weights: int8, q8Weights: q8, flash: flash, headSplit: split)
+    func constraints(ane: Bool = true) -> CS.Constraints { .init(sustained: false, allowsANE: ane) }
+
+    func solve(_ model: M, _ key: ProductKey, ane: Bool = true) throws -> CS.ProductSolution {
+        let s = try #require(CS.product(key, model: model, constraints: constraints(ane: ane)))
+        #expect(s.assignment.isRunnable(for: key), "\(key): \(s.assignment)")
+        return s
     }
 
-    func solve(_ model: M, _ classes: [CC.Class], family: Family = .zImage, variant: Variant = .compact,
-               caps: CapacityMap.Capabilities) throws -> CS.Plan {
-        try #require(CS.solve(model: model, classes: classes, constraints: .init(family: family, variant: variant, capabilities: caps, sustained: false)))
-    }
-
-    /// The route the engine names for a class under the plan's table.
-    func engineRoute(_ plan: CS.Plan, _ c: CC.Class, family: Family = .zImage, variant: Variant = .compact) -> String {
-        CC.route(of: c, family: family, table: plan.table, aneBroughtUp: variant != .standard, weightForms: true)
+    func solve(_ model: M, _ key: AttentionKey, flash: Bool = false) throws -> CS.AttentionSolution {
+        let s = try #require(CS.attention(key, flash: flash, model: model, constraints: constraints()))
+        #expect(s.assignment.isRunnable(for: key), "\(key): \(s.assignment)")
+        return s
     }
 
     func seconds(_ k: Int, _ n: Int, rows: Int, rate: Double) -> Double { 2 * Double(k) * Double(n) * Double(rows) / rate }
@@ -50,58 +46,59 @@ import Testing
 
     @Test func aMacWithoutTheANEBalancesTheAMXByHand() throws {
         // GPU 3, AMX 1 TFLOP/s, nothing lost in sharing: the GPU keeps 3/4 of 4096 rows.
-        let c = product(4096, 4096, 4096)
-        let plan = try solve(machine(amxRate: 1e12), [c], caps: caps(amx: true))
-        let block = try #require(plan.blocks.first)
-        #expect(block.route == "gpu+amx")
-        #expect(block.rows == [gpu: 3072, amx: 1024])
-        #expect(abs(block.compute - seconds(4096, 4096, rows: 3072, rate: 3e12)) < 1e-9)
-        #expect(plan.table.products.amx.enabled && !plan.table.products.ane.enabled)
-        #expect(engineRoute(plan, c) == "gpu+amx")
+        let s = try solve(machine(amxRate: 1e12), key(4096, 4096, 4096))
+        #expect(s.assignment == ProductAssignment(gpu: 3072, amx: 1024))
+        #expect(s.route == "gpu+amx")
+        #expect(s.rows == [gpu: 3072, amx: 1024])
+        #expect(abs(s.compute - seconds(4096, 4096, rows: 3072, rate: 3e12)) < 1e-9)
+    }
+
+    @Test func theRowsAreOnTheGPUsTileAndTheAMXKeepsTheRemainder() throws {
+        // 4117 rows: no multiple of 64 is the balance; the GPU's rows are one, the AMX's the ragged rest.
+        let s = try solve(machine(amxRate: 1e12), key(4096, 4096, 4117))
+        #expect(s.assignment.gpu % GEMM.rowQuantum == 0 && s.assignment.amx > 0)
+        #expect(s.assignment.gpu + s.assignment.amx == 4117)
+        // within one tile of the balance: no neighbouring cut does better
+        let model = machine(amxRate: 1e12)
+        func t(_ g: Int) -> Double { model.seconds(m: 4117, k: 4096, n: 4096, rows: [gpu: g, amx: 4117 - g])! }
+        #expect(t(s.assignment.gpu) <= t(s.assignment.gpu + 64) + 1e-12 && t(s.assignment.gpu) <= t(s.assignment.gpu - 64) + 1e-12)
     }
 
     @Test func anANEWorthFourGPUsIsServedWithoutChangingAnything() throws {
         // The same code, a machine whose ANE is 4× the GPU: it takes 4/5 of 5120 rows = 16 units of 256.
-        let c = product(4096, 4096, 5120)
-        let plan = try solve(machine(aneRate: 12e12), [c], caps: caps(ane: true))
-        let block = try #require(plan.blocks.first)
-        #expect(block.route == "gpu+ane")
-        #expect(block.rows == [gpu: 1024, ane: 4096])
-        #expect(abs(block.compute - seconds(4096, 4096, rows: 1024, rate: 3e12)) < 1e-9)
-        #expect(engineRoute(plan, c) == "gpu+ane")
-        // and the engine's own functions give the same rows from the table
-        let r = plan.table.products.route(k: 4096, n: 4096, m: 5120)
-        #expect(r.aneRows == 4096)
+        let s = try solve(machine(aneRate: 12e12), key(4096, 4096, 5120))
+        #expect(s.assignment == ProductAssignment(gpu: 1024, ane: 4096))
+        #expect(s.route == "gpu+ane")
+        #expect(abs(s.compute - seconds(4096, 4096, rows: 1024, rate: 3e12)) < 1e-9)
     }
 
-    @Test func theStandardNeverHasTheANEWhateverItIsWorth() throws {
-        let c = product(4096, 4096, 5120)
-        let plan = try solve(machine(aneRate: 12e12), [c], variant: .standard, caps: caps(ane: true))
-        #expect(plan.blocks[0].route == "gpu")
-        #expect(!plan.table.products.ane.enabled)
-        #expect(engineRoute(plan, c, variant: .standard) == "gpu")
+    @Test func aProcessWithoutTheANEIsSolvedWithoutIt() throws {
+        let m = machine(aneRate: 12e12)
+        let s = try solve(m, key(4096, 4096, 5120), ane: false)
+        #expect(s.assignment == .gpuAlone(5120) && s.route == "gpu")
+        // and the plan of such a process says the same, with no ANE to fall back from
+        let plan = CapacityPlan(model: m, allowsANE: false)
+        #expect(plan.assign(key(4096, 4096, 5120)) == .gpuAlone(5120))
+        #expect(!plan.usesANE)
     }
 
     @Test func anEncoderNeverHasTheANE() throws {
-        let c = product(4096, 4096, 5120, phase: .encoding)
-        let plan = try solve(machine(aneRate: 12e12), [c], caps: caps(ane: true))
-        #expect(plan.blocks[0].route == "gpu")
-        #expect(!plan.table.products.ane.enabled)
+        let s = try solve(machine(aneRate: 12e12), key(4096, 4096, 5120, phase: .encoding))
+        #expect(s.assignment == .gpuAlone(5120))
     }
 
     @Test func aTerribleSharingStaysOnOneEngine() throws {
         var m = machine(aneRate: 3e12)
         m.sharing["gpu+ane"] = .init(overhead: 0.5, keep: [.gpu: 0.2, .ane: 0.2])
-        let plan = try solve(m, [product(4096, 4096, 1024)], caps: caps(ane: true))
-        #expect(plan.blocks[0].route == "gpu")
-        #expect(plan.blocks[0].rows == [gpu: 1024])
+        let s = try solve(m, key(4096, 4096, 1024))
+        #expect(s.assignment == .gpuAlone(1024))
     }
 
     @Test func theANEOnlyTakesWholeUnitsAndPaysTheStaircase() throws {
         var m = machine(aneRate: 3e12)
         m.sharing["gpu+ane"] = .init(overhead: 0, keep: [.gpu: 0.9, .ane: 0.9])
-        let plan = try solve(m, [product(3840, 10240, 4096 + 128)], caps: caps(ane: true))
-        let rows = try #require(plan.blocks[0].rows[ane])
+        let s = try solve(m, key(3840, 10240, 4096 + 128))
+        let rows = s.assignment.ane
         #expect(rows % 256 == 0 && rows > 0)
         // no neighbouring unit does better than the one it took
         let model = m
@@ -109,17 +106,34 @@ import Testing
         #expect(t(rows) <= t(rows + 256) + 1e-12 && t(rows) <= t(rows - 256) + 1e-12)
     }
 
-    @Test func threeEnginesTakeTheAMXPointAtTheGPUsSide() throws {
+    @Test func threeEnginesShareTheRowsAsIntegers() throws {
         var m = machine(amxRate: 1e12, aneRate: 3e12)
         m.sharing["gpu+amx+ane"] = .init(overhead: 0, keep: [.gpu: 1, .amx: 1, .ane: 1])
-        let c = product(4096, 4096, 7168)
-        let plan = try solve(m, [c], caps: caps(amx: true, ane: true))
-        let block = plan.blocks[0]
-        #expect(block.route == "gpu+ane+amx")
-        #expect(block.rows[ane] == 3072 && block.rows[gpu] == 3072 && block.rows[amx] == 1024)
-        // the AMX's point is the GPU's side (7168 − 3072 = 4096 rows), not the whole product
-        #expect(plan.table.products.amx.grid.shares.points.contains { $0.m == 4096 })
-        #expect(engineRoute(plan, c) == "gpu+ane+amx")
+        let s = try solve(m, key(4096, 4096, 7168))
+        #expect(s.route == "gpu+ane+amx")
+        // GPU 3, ANE 3, AMX 1: 3072 + 1024 + 3072 rows
+        #expect(s.assignment == ProductAssignment(gpu: 3072, amx: 1024, ane: 3072))
+    }
+
+    @Test func anEngineMayBeAlone() throws {
+        // A Mac whose GPU is the slow engine: the AMX alone, then the ANE alone, with no GPU row.
+        var slow = machine(gpuRate: 0.2e12, amxRate: 4e12)
+        slow.sharing["gpu+amx"] = .init(overhead: 0.01, keep: [.gpu: 0.5, .amx: 0.5])
+        var s = try solve(slow, key(4096, 4096, 4096))
+        #expect(s.assignment == ProductAssignment(gpu: 0, amx: 4096) && s.route == "amx")
+        var fast = machine(gpuRate: 0.2e12, aneRate: 12e12)
+        fast.sharing["gpu+ane"] = .init(overhead: 0.01, keep: [.gpu: 0.5, .ane: 0.5])
+        s = try solve(fast, key(4096, 4096, 4096))
+        #expect(s.assignment == ProductAssignment(gpu: 0, ane: 4096) && s.route == "ane")
+        // an ANE alone on a height that is not a unit still runs the whole product (the model pays the rounded rows)
+        s = try solve(fast, key(4096, 4096, 4224))
+        #expect(s.assignment.ane == 4224 && s.assignment.gpu == 0)
+    }
+
+    @Test func theFloorsOfTheModelsDomainKeepSmallProductsOnTheGPU() throws {
+        let m = machine(amxRate: 3e12, aneRate: 12e12)
+        let s = try solve(m, key(4096, 4096, 256))
+        #expect(s.assignment == .gpuAlone(256), "under the AMX's and the ANE's floors: the GPU takes it")
     }
 
     // MARK: weights
@@ -127,25 +141,22 @@ import Testing
     @Test func aWeightIsPreparedAtEveryCallAndPaysForItsPath() throws {
         var m = machine()
         m.lines[M.Kernel(.gpu, .int8)] = .init(t0: 0, rate: 3e12)
-        let c = product(4096, 4096, 4096, .int8, times: 10)
         m.preparation[.int8] = [.widened: 1e-9, .native: 1e-11]
-        var plan = try solve(m, [c], caps: caps(int8: true))
-        #expect(plan.blocks[0].route == "gpu/int8")
-        #expect(abs(plan.blocks[0].preparation - 10 * 4096 * 4096 * 1e-11) < 1e-9)
+        var s = try solve(m, key(4096, 4096, 4096, .int8))
+        #expect(s.route == "gpu/int8" && s.assignment.path == .native)
+        #expect(abs(s.preparation - 4096 * 4096 * 1e-11) < 1e-9)
         m.preparation[.int8] = [.widened: 1e-12, .native: 1e-8]
-        plan = try solve(m, [c], caps: caps(int8: true))
-        #expect(plan.blocks[0].route == "gpu")
-        #expect(plan.table.products.weight(.int8, k: 4096, n: 4096, m: 4096).path == .widened)
+        s = try solve(m, key(4096, 4096, 4096, .int8))
+        #expect(s.route == "gpu" && s.assignment.path == .widened)
     }
 
     @Test func aKQuantHasItsOwnPreparation() throws {
         var m = machine()
         m.preparation[.bf16] = [.widened: 1e-11]
         m.kquantPreparation = 5e-10
-        let plan = try solve(m, [product(2048, 2048, 1024, .q4k, times: 3)], variant: .light, caps: caps())
-        #expect(abs(plan.blocks[0].preparation - 3 * 2048 * 2048 * 5e-10) < 1e-9)
-        // a K-quant has no weight rule: the tensor is none of the kinds
-        #expect(plan.table.products.weights.isEmpty)
+        let s = try solve(m, key(2048, 2048, 1024, .q4k))
+        #expect(abs(s.preparation - 2048 * 2048 * 5e-10) < 1e-9)
+        #expect(s.assignment == .gpuAlone(1024), "a K-quant widens: no native form")
     }
 
     @Test func theNativeInt8WeightGoesBesideTheAMXOnColumns() throws {
@@ -153,33 +164,88 @@ import Testing
         m.lines[M.Kernel(.gpu, .int8)] = .init(t0: 0, rate: 3e12)
         m.lines[M.Kernel(.amx, .int8)] = .init(t0: 0, rate: 1e12)
         m.preparation[.int8] = [.widened: 1e-9, .native: 1e-11]
-        let c = product(4096, 4096, 4096, .int8)
-        let plan = try solve(m, [c], caps: caps(amx: true, int8: true))
-        #expect(plan.blocks[0].route == "gpu+amx/int8")
-        let columns = plan.blocks[0].rows[M.Kernel(.amx, .int8)] ?? 0
-        #expect(columns == 1024)
-        #expect(engineRoute(plan, c) == "gpu+amx/int8")
+        let s = try solve(m, key(4096, 4096, 4096, .int8))
+        #expect(s.route == "gpu+amx/int8")
+        #expect(s.assignment == ProductAssignment(path: .native, gpu: 4096, amxColumns: 1024))
+        #expect(s.rows[M.Kernel(.amx, .int8)] == 1024)
+        // the GPU's columns are whole tiles: an edge inside one would overwrite the AMX's first columns
+        #expect((4096 - s.assignment.amxColumns) % 64 == 0)
+    }
+
+    /// **The ANE beside the GPU's int8 kernel, both reading the integers**: offered where the model has the line `ane/int8`, chosen
+    /// when it is faster, with its own sharing (`gpu/int8+ane/int8`) and the integers the engines run.
+    @Test func theANEReadsTheIntegersWhenTheModelSaysItIsFaster() throws {
+        let g8 = M.Kernel(.gpu, .int8), a8 = M.Kernel(.ane, .int8)
+        var m = machine()
+        m.lines[g8] = .init(t0: 0, rate: 3e12)
+        m.preparation[.int8] = [.widened: 1e-9, .native: 1e-11]
+        let int8 = key(4096, 4096, 4096, .int8)
+        #expect(try solve(m, int8).route == "gpu/int8", "no line for the ANE's integers: the GPU's kernel alone")
+        m.lines[a8] = .init(t0: 0, rate: 9e12)
+        // 9 / (3 + 9) of 4 096 rows = 3 072 = 12 units
+        var s = try solve(m, int8)
+        #expect(s.assignment == ProductAssignment(path: .native, gpu: 1024, ane: 3072))
+        #expect(s.route == "gpu+ane/int8" && s.rows == [g8: 1024, a8: 3072])
+        #expect(abs(s.preparation - 4096 * 4096 * 1e-11) < 1e-9, "the integers are copied, not widened")
+        #expect(abs(s.compute - seconds(4096, 4096, rows: 1024, rate: 3e12)) < 1e-9)
+        // the pair's own sharing: the GPU keeps 0.6 of its rate beside the ANE, 1.8 against 9 → 0.833 of the rows = 3 413; the unit
+        // below it leaves the GPU 768 rows (14.3 ms), the unit above 512 (13.4 ms), the ANE alone 15.3 ms
+        m.sharing["gpu/int8+ane/int8"] = .init(overhead: 0, keep: [.gpu: 0.6, .ane: 1])
+        s = try solve(m, int8)
+        #expect(s.assignment == ProductAssignment(path: .native, gpu: 512, ane: 3584), "\(s.assignment)")
+        // the engines' key is not this pair's: an fp16 pair with a terrible keep changes nothing
+        m.sharing["gpu+ane"] = .init(overhead: 0, keep: [.gpu: 1, .ane: 0.01])
+        #expect(try solve(m, int8).assignment == s.assignment)
+        // slower than the GPU alone: it stays out
+        m.sharing = [:]
+        m.lines[a8] = .init(t0: 0, rate: 0.1e12)
+        #expect(try solve(m, int8).assignment.ane == 0)
+        // an engine the judge refused is no candidate whatever its line says
+        m.lines[a8] = .init(t0: 0, rate: 9e12)
+        let refused = try #require(CS.product(int8, model: m, constraints: .init(sustained: false, excluded: [a8], allowsANE: true)))
+        #expect(refused.route == "gpu/int8")
+        // never an encoder, never a process without the ANE, never under the model's floor
+        #expect(try solve(m, key(4096, 4096, 4096, .int8, phase: .encoding)).route == "gpu/int8")
+        #expect(try solve(m, int8, ane: false).route == "gpu/int8")
+        #expect(try solve(m, key(4096, 4096, 512, .int8)).route == "gpu/int8")
+        // never a K the program cannot cut, never Q8_0's blocks
+        #expect(try solve(m, key(3904, 4096, 4096, .int8)).route == "gpu/int8")
+        m.lines[M.Kernel(.gpu, .q8)] = .init(t0: 0, rate: 3e12)
+        m.preparation[.q8] = [.widened: 1e-9, .native: 1e-11]
+        #expect(try solve(m, key(4096, 4096, 4096, .q8)).route == "gpu/q8")
+        // the integers' answer is the one the plan gives
+        #expect(CapacityPlan(model: m).assign(int8) == (try solve(m, int8)).assignment)
+    }
+
+    @Test func theANEMayTakeTheWholeIntegersProductWhenTheGPUIsTheSlowEngine() throws {
+        let g8 = M.Kernel(.gpu, .int8), a8 = M.Kernel(.ane, .int8)
+        var m = machine(gpuRate: 0.5e12)
+        m.lines[g8] = .init(t0: 0, rate: 0.5e12)
+        m.lines[a8] = .init(t0: 0, rate: 12e12)
+        m.sharing["gpu/int8+ane/int8"] = .init(overhead: 0.01, keep: [.gpu: 0.5, .ane: 0.9])
+        m.preparation[.int8] = [.widened: 1e-9, .native: 1e-11]
+        let s = try solve(m, key(4096, 4096, 2048, .int8))
+        #expect(s.assignment == ProductAssignment(path: .native, gpu: 0, ane: 2048), "\(s.assignment)")
+        #expect(s.route == "ane/int8")
     }
 
     @Test func theBF16WeightAsPublishedWinsWhenItsPreparationIsCheaper() throws {
         var m = machine()
         m.lines[M.Kernel(.gpu, .bf16)] = .init(t0: 0, rate: 3e12)
         m.preparation[.bf16] = [.widened: 1e-9, .bf16: 1e-11]
-        let c = product(4096, 4096, 4096, .bf16, times: 4)
-        let plan = try solve(m, [c], variant: .standard, caps: caps(bf16: true))
-        #expect(plan.blocks[0].route == "gpu/bf16")
-        #expect(engineRoute(plan, c, variant: .standard) == "gpu/bf16")
+        let s = try solve(m, key(4096, 4096, 4096, .bf16))
+        #expect(s.route == "gpu/bf16" && s.assignment.path == .bf16)
     }
 
-    @Test func aRoundedActivationIsNotTheEncodersAndItsMemberRunsWidened() throws {
+    @Test func aRoundedActivationIsTheDenoisersAndTheEncoderRunsWidened() throws {
         var m = machine()
         m.lines[M.Kernel(.gpu, .bf16act)] = .init(t0: 0, rate: 6e12)
         m.preparation[.bf16] = [.widened: 1e-10, .bf16: 0]
-        let dit = product(4096, 4096, 4096, .bf16), enc = product(4096, 4096, 4096, .bf16, phase: .encoding)
-        let plan = try solve(m, [dit, enc], variant: .standard, caps: caps(bf16: true, rounding: true))
-        #expect(plan.blocks[0].route == "gpu/bf16act")
-        #expect(plan.blocks[1].route == "gpu")
-        #expect(plan.blocks[1].preparation > 0)
+        let dit = try solve(m, key(4096, 4096, 4096, .bf16)), enc = try solve(m, key(4096, 4096, 4096, .bf16, phase: .encoding))
+        #expect(dit.route == "gpu/bf16act" && dit.assignment.roundsActivation)
+        #expect(enc.route == "gpu" && enc.preparation > 0)
+        // below the rounding's floor the activation keeps its fp32
+        #expect(try solve(m, key(64, 64, 128, .bf16)).assignment.roundsActivation == false)
     }
 
     // MARK: attention
@@ -188,69 +254,53 @@ import Testing
         var m = machine()
         m.lines[M.Kernel(.gpu, .graph)] = .init(t0: 0, rate: 1.5e12)
         m.lines[M.Kernel(.cpu, .heads)] = .init(t0: 0, rate: 0.5e12)
-        let a = attention(4096)
-        let plan = try solve(m, [a], family: .qwenImage21, caps: caps(split: true))
-        let rule = try #require(plan.table.attention.rules.first)
-        #expect(rule.splitFraction == 0.25 && !rule.flash)
-        #expect(plan.blocks[0].rows[M.Kernel(.cpu, .heads)] == 8)
-        #expect(CC.route(of: a, family: .qwenImage21, table: plan.table) == "split")
-        #expect(abs(plan.blocks[0].compute - 4.0 * 4096 * 4096 * 128 * 24 / 1.5e12) < 1e-9)
+        let s = try solve(m, attentionKey(4096))
+        #expect(s.assignment == AttentionAssignment(kernel: .split, cpuHeads: 8))
+        #expect(s.route == "split" && s.rows[M.Kernel(.cpu, .heads)] == 8)
+        #expect(abs(s.compute - 4.0 * 4096 * 4096 * 128 * 24 / 1.5e12) < 1e-9)
     }
 
     @Test func aGroupedAttentionIsCutByWholeGroups() throws {
         var m = machine()
         m.lines[M.Kernel(.gpu, .graph)] = .init(t0: 0, rate: 1.5e12)
         m.lines[M.Kernel(.cpu, .heads)] = .init(t0: 0, rate: 0.5e12)
-        let plan = try solve(m, [attention(4096, heads: 48, kv: 12, family: .krea2)], family: .krea2, caps: caps(split: true))
-        let cpu = plan.blocks[0].rows[M.Kernel(.cpu, .heads)] ?? 0
-        #expect(cpu > 0 && cpu % 4 == 0 && cpu < 48)
+        let s = try solve(m, attentionKey(4096, heads: 48, kv: 12))
+        #expect(s.assignment.cpuHeads > 0 && s.assignment.cpuHeads % 4 == 0 && s.assignment.cpuHeads < 48)
     }
 
-    @Test func flashIsTakenOnlyWhereTheFamilyTriesIt() throws {
+    @Test func flashIsTakenOnlyWhereTheCallerTriesIt() throws {
         var m = machine()
         m.lines[M.Kernel(.gpu, .graph)] = .init(t0: 0, rate: 1.5e12)
         m.lines[M.Kernel(.gpu, .flash)] = .init(t0: 0, rate: 3e12)
-        let a = attention(4096, family: .zImage)
-        let z = try solve(m, [a], family: .zImage, caps: caps(flash: true))
-        #expect(z.blocks[0].route == "flash")
-        let q = try solve(m, [attention(4096)], family: .qwenImage21, caps: caps(flash: true))
-        #expect(q.blocks[0].route == "graph")
-        #expect(!q.table.attention.rules.contains { $0.flash })
+        let tried = try solve(m, attentionKey(4096, heads: 30), flash: true)
+        #expect(tried.assignment == .flash && tried.route == "flash")
+        let untried = try solve(m, attentionKey(4096, heads: 30), flash: false)
+        #expect(untried.assignment == .graph)
     }
 
-    @Test func anAnimaCrossAttentionSharesTheRuleOfItsSelfAttention() throws {
+    @Test func aCrossAttentionIsItsOwnKey() throws {
         var m = machine()
         m.lines[M.Kernel(.gpu, .graph)] = .init(t0: 0, rate: 1.5e12)
-        m.lines[M.Kernel(.gpu, .flash)] = .init(t0: 0, rate: 3e12)
-        let own = attention(4096, family: .anima), cross = attention(4096, cross: true, family: .anima, keys: 512)
-        let plan = try solve(m, [own, cross], family: .anima, caps: caps(flash: true))
-        #expect(plan.table.attention.rules.count == 1)
-        #expect(plan.blocks.map(\.route) == ["flash", "graph"])
+        m.lines[M.Kernel(.cpu, .heads)] = .init(t0: 0, rate: 0.5e12)
+        let own = attentionKey(4096, heads: 16, dim: 128), cross = attentionKey(4096, heads: 16, dim: 128, cross: true, keys: 512)
+        #expect(own != cross)
+        let a = try solve(m, own), b = try solve(m, cross)
+        // eight times fewer keys: the same cut of heads, a tenth of the time
+        #expect(a.assignment.cpuHeads == b.assignment.cpuHeads)
+        #expect(b.compute < a.compute / 7)
     }
 
-    // MARK: the table
-
-    @Test func aMixedClassServesTheEncoderThroughWithoutANE() throws {
-        let dit = product(4096, 4096, 5120), enc = product(4096, 4096, 5120, phase: .encoding)
-        let plan = try solve(machine(aneRate: 12e12), [dit, enc], caps: caps(ane: true))
-        #expect(plan.blocks[0].route == "gpu+ane" && plan.blocks[1].route == "gpu")
-        let rule = try #require(plan.table.products.classes.first { $0.k == 4096 })
-        #expect(rule.engines == .ane && rule.withoutANE == .gpu)
+    @Test func theSplitStartsAtTheMinimumSequence() throws {
+        var m = machine()
+        m.lines[M.Kernel(.gpu, .graph)] = .init(t0: 0, rate: 1.5e12)
+        m.lines[M.Kernel(.cpu, .heads)] = .init(t0: 0, rate: 0.5e12)
+        #expect(try solve(m, attentionKey(HeadSplitAttention.minimumSequence - 1)).assignment == .graph)
+        #expect(try solve(m, attentionKey(HeadSplitAttention.minimumSequence)).assignment.splits)
     }
 
-    @Test func theANEGridSaysTheGPUsWholeForTheProductsItDoesNotTake() throws {
-        // memory counts the ANE's rows off this grid: a product it leaves must not read the default half
-        let on = product(4096, 4096, 5120), off = product(512, 512, 2048)
-        var m = machine(aneRate: 12e12)
-        m.lines[ane] = .init(t0: 0.05, rate: 12e12)        // too dear for a small product
-        let plan = try solve(m, [on, off], caps: caps(ane: true))
-        #expect(plan.blocks[0].route == "gpu+ane")
-        #expect(plan.blocks[1].route == "gpu")
-        #expect(plan.table.products.ane.grid.shares.ratio(k: 512, n: 512, m: 2048) == 0)
-        #expect(plan.table.products.ane.gpuShare == 1)
-    }
+    // MARK: a render
 
-    @Test func aRealRequestIsReadBackByTheEngineAndTheTableSurvivesJSON() throws {
+    @Test func aRealRequestIsSolvedClassByClassAndEveryAnswerRuns() throws {
         var m = machine(amxRate: 1e12, aneRate: 6e12)
         m.sharing["gpu+ane"] = .init(overhead: 0.0002, keep: [.gpu: 0.8, .ane: 0.7])
         m.sharing["gpu+amx"] = .init(overhead: 0.0001, keep: [.gpu: 0.9, .amx: 0.8])
@@ -260,23 +310,34 @@ import Testing
         m.lines[M.Kernel(.cpu, .heads)] = .init(t0: 0, rate: 0.3e12)
         m.sharing["gpu+cpu"] = .init(overhead: 0.0001, keep: [.gpu: 0.95, .cpu: 0.9])
         m.preparation[.bf16] = [.widened: 1e-10]
-        let all = caps(amx: true, ane: true, flash: true, split: true)
-        for (family, variant) in [(Family.zImage, Variant.compact), (.qwenImage21, .light), (.anima, .standard)] {
+        for (family, variant) in [(Family.zImage, Variant.compact), (.qwenImage21, .light), (.anima, .standard), (.krea2, .compact)] {
             let request = CC.Request(family: family, variant: variant, includesEncoder: true)
             let classes = try #require(CC.classes(for: request))
-            let plan = try #require(CS.solve(model: m, request: request, constraints: .init(request: request, capabilities: all, sustained: false)))
+            let plan = try #require(CS.solve(model: m, request: request, constraints: .init(request: request, sustained: false)))
             #expect(plan.unpredicted.isEmpty)
             let run = classes.filter { ($0.executions[family] ?? 0) > 0 }
             #expect(run.count == plan.blocks.count)
             for (c, b) in zip(run, plan.blocks) {
-                // the engine's own reading of the table: the encoders and the Standard take no ANE
-                let engine = CC.route(of: c, family: family, table: plan.table, aneBroughtUp: variant != .standard, weightForms: true)
-                #expect(b.route == engine, "\(family) \(variant) \(c.routeKey.id) \(c.phase)")
+                switch c.shape {
+                case let .product(k, n, rows, format):
+                    let key = ProductKey(k: k, n: n, m: rows, weight: format, phase: c.phase)
+                    let a = try #require(b.product, "\(key)")
+                    #expect(a.isRunnable(for: key), "\(family) \(variant) \(key): \(a)")
+                    #expect(b.route == a.route(weight: format))
+                    // the encoders and the Standard take no ANE
+                    if c.phase == .encoding || variant == .standard { #expect(!a.usesANE, "\(family) \(variant) \(key)") }
+                    // the same answer alone, as the plan of a process gives it
+                    #expect(CS.product(key, model: m, constraints: .init(request: request, sustained: false))?.assignment == a)
+                case let .attention(s, keys, heads, kv, dim, cross):
+                    let key = AttentionKey(sequence: s, keys: keys, heads: heads, kvHeads: kv, headDim: dim, cross: cross)
+                    let a = try #require(b.attention, "\(key)")
+                    #expect(a.isRunnable(for: key))
+                    if !CS.triesFlash(family: family, cross: cross) { #expect(!a.usesFlash, "\(family) \(key)") }
+                }
             }
-            let data = try JSONEncoder().encode(plan.table)
-            #expect(try JSONDecoder().decode(RouteTable.self, from: data) == plan.table)
             #expect(plan.seconds == plan.blocks.reduce(0) { $0 + $1.seconds })
-            if variant == .standard { #expect(!plan.table.products.ane.enabled) }
+            let data = try JSONEncoder().encode(plan.blocks.compactMap(\.product))
+            #expect(try JSONDecoder().decode([ProductAssignment].self, from: data) == plan.blocks.compactMap(\.product))
         }
     }
 
@@ -286,27 +347,28 @@ import Testing
         full.sharing["gpu+amx"] = .init(overhead: 0.0001, keep: [.gpu: 0.9, .amx: 0.8])
         full.sharing["gpu+amx+ane"] = .init(overhead: 0.0003, keep: [.gpu: 0.7, .amx: 0.6, .ane: 0.6])
         let request = CC.Request(family: .krea2, variant: .compact)
-        let withAll = try #require(CS.solve(model: full, request: request, constraints: .init(request: request, capabilities: caps(amx: true, ane: true), sustained: false)))
-        let alone = try #require(CS.solve(model: machine(), request: request, constraints: .init(request: request, capabilities: caps(), sustained: false)))
+        let withAll = try #require(CS.solve(model: full, request: request, constraints: .init(request: request, sustained: false)))
+        let alone = try #require(CS.solve(model: machine(), request: request, constraints: .init(request: request, sustained: false)))
         #expect(withAll.seconds <= alone.seconds)
         #expect(withAll.seconds < 0.8 * alone.seconds)
-        // what the memory need reads agrees with the table: the ANE's programs exist exactly where a block takes ANE rows
-        let aneProducts = withAll.blocks.contains { $0.rows[ane] != nil }
-        #expect(withAll.table.products.usesANE == aneProducts)
-        #expect(alone.table.products.usesANE == false && alone.table.products.usesAMX == false)
+        // what the memory need reads agrees with the plan: the ANE's programs exist exactly where a block takes ANE rows
+        let aneProducts = withAll.blocks.contains { ($0.product?.ane ?? 0) > 0 }
+        #expect(CapacityPlan(model: full).usesANE == true && aneProducts)
+        #expect(alone.blocks.allSatisfy { ($0.product?.ane ?? 0) == 0 && ($0.product?.amx ?? 0) == 0 })
     }
 
     @Test func theOverlapHookReplacesTheSum() throws {
         let longest: CS.Combine = { blocks in blocks.map(\.seconds).max() ?? 0 }
-        let solved = CS.solve(model: machine(), classes: [product(4096, 4096, 4096), product(2048, 2048, 4096)],
-                              constraints: .init(family: .zImage, variant: .standard, capabilities: caps(), sustained: false),
-                              combine: longest)
+        let classes: [CC.Class] = [
+            .init(phase: .denoising, shape: .product(k: 4096, n: 4096, rows: 4096, format: .bf16), executions: [.zImage: 1]),
+            .init(phase: .denoising, shape: .product(k: 2048, n: 2048, rows: 4096, format: .bf16), executions: [.zImage: 1])]
+        let solved = CS.solve(model: machine(), classes: classes, family: .zImage, constraints: .init(allowsANE: false), combine: longest)
         let plan = try #require(solved)
         #expect(plan.seconds == plan.blocks.map(\.seconds).max())
     }
 
     @Test func aModelWithoutAGPULineCannotBePlanned() {
-        #expect(CS.solve(model: M(), classes: [product(4096, 4096, 4096)],
-                         constraints: .init(family: .zImage, variant: .standard, capabilities: caps())) == nil)
+        #expect(CS.product(key(4096, 4096, 4096), model: M(), constraints: .init()) == nil)
+        #expect(CS.solve(model: M(), classes: [], family: .zImage, constraints: .init()) == nil)
     }
 }

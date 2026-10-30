@@ -16,18 +16,18 @@ import Synchronization
 ///                              C = Y / (σ · λ)      fp32, then checked finite    ─┘
 ///     L = max_j Σ_k |W_kj| λ_j, the largest lifted column's L1 norm: |Y_i·| ≤ max|A_i·| · σ_i · L ≤ 2¹⁵, under fp16's 65 504.
 ///
-///     **The same product on a published int8 weight** (`ane_int8`, `Int8Weight`): the integers are the program's input,
-///     read as they are — no fp32 widening, no fp16 copy of it:
+///     **The same product on a published int8 weight** (`ProductAssignment` with `path: .native` and `ane > 0`, `Int8Weight`): the
+///     integers are the program's input, read as they are — no fp32 widening, no fp16 copy of it:
 ///       q · 2⁻⁶ ─▶ fp16     MIL `dequantize`, a CONSTANT scale (the one scale per column is not allowed to be an input)
 ///       R · A  ─▶ σ · A ─▶ fp16      convrot: the weight's rotation moves to the activation, in fp32 (`Widen`'s butterflies)
 ///       Y = A₁₆ · (q · 2⁻⁶)  (fp16 out)
 ///       C = Y · (64 · s_j / √G) / σ_i     fp32, s_j the weight's scale per column or for the tensor
 ///     L = max_j Σ_k |q_kj| / 64, the largest column's L1 norm: the bound that keeps Y under 2¹⁵ is `max|R·A_i| · σ_i · L`.
 ///
-/// A branch the capacity map turns on (`gemm_ane`, `CapacityRules`), where it measures the pair faster
-/// than the GPU alone and the ANE's rows within the half-precision threshold; off by default, like
-/// every compute branch. A render may still refuse it (`Request.neuralEngine`: the app's default on a
-/// Standard version), and only the denoisers take it — never an encoder.
+/// **The rows are the plan's** (`CapacityPlan`, `ProductAssignment.ane`): the solver wrote how many the ANE takes — in units of
+/// 256, or the whole product when it runs alone — where the model measures it faster than the GPU alone and the ANE's rows hold
+/// the half-precision threshold; the defaults give it none. A render may still refuse it (`Request.neuralEngine`: the app's default
+/// on a Standard version), and only the denoisers take it — never an encoder.
 ///
 /// What sets it apart — what a port by analogy with the GPU/AMX cut would get wrong:
 ///
@@ -54,7 +54,7 @@ import Synchronization
 ///     into its own surfaces and frees the copies asynchronously, after the engine is gone. The surfaces
 ///     are the engine's, freed with it, and the memory need sums them over the shapes (`bytes`);
 ///   - **each output row is one engine's**: moving the cut never re-associates a sum, and the cut is
-///     frozen (`ane_fraction`): the same seed gives the same bits;
+///     the plan's, frozen: the same seed gives the same bits;
 ///   - **an int8 weight is an INPUT of the program, and it is `dequantize`, not `cast`**: with `cast` (+ `mul`) the ANE runs
 ///     4.6–6.3 TFLOP/s, with `dequantize` and a scalar scale 9.4–11.1 against the fp16 input's 3.4–6.5 (M1 Pro, 30/10/2026). The scale must
 ///     be a constant of the program (`dequantize` refuses an input one, `constexpr_blockwise_shift_scale` crashes the loader on
@@ -71,23 +71,6 @@ import Synchronization
 package final class NeuralEngine: @unchecked Sendable {
     /// The ANE's rows come in this unit: an odd multiple of 128 costs about the next multiple of 256.
     package static let rowUnit = 256
-    /// Below this height the GPU alone (`ane_min`, 1024 by default).
-    package static let minimumRows = EngineSettings.effective.aneMinimumRows
-
-    /// The GPU's share of the rows; the ANE takes the rest, rounded to `rowUnit`. Frozen in a render
-    /// (`ane_fraction`); the map moves it to find the share that balances both sides.
-    package var gpuShare: Double
-    /// The GPU's share per weight shape and height (`ane_shares`, measured by the map on the cuts' grid):
-    /// with a grid, it replaces `gpuShare`.
-    package var shares: Conductor.Shares
-    /// **The shapes where the AMX works beside the ANE** (`ane_amx`, ρ = 1 at the points the map gave the three
-    /// engines, 0 elsewhere): there the GPU's side of the rows goes through the conductor, GPU + AMX, instead of
-    /// the GPU alone. Engines are throughputs that add, not alternatives: the map says where they do.
-    package var besideAMX = Conductor.Shares.none
-    /// Whether the AMX takes part of the GPU's side of `m × k → n` (`besideAMX` read at the product, ≥ ½).
-    package func takesAMX(_ m: Int, k: Int, n: Int) -> Bool { (besideAMX.ratio(k: k, n: n, m: m) ?? 0) >= 0.5 }
-    /// The shares a grid may give: from the GPU alone (1) down to a twentieth of the rows.
-    package static let shareRange = 0.05...1.0
     /// Products whose ANE rows went back to the GPU (a non-finite output, or a program refused).
     package private(set) var fallbacks = 0
     /// Products the ANE took a share of.
@@ -158,33 +141,30 @@ package final class NeuralEngine: @unchecked Sendable {
         return (0..<p).map { Shape(rows: rows, k: ($0 + 1) * k / p - $0 * k / p, n: n, int8: int8) }
     }
 
-    /// **What it holds over a phase's `products`** (`MemoryNeed.gemm`): each program shape's three
-    /// surfaces, kept while the engine lives — a sum over the shapes, not a maximum —, and its per-column
-    /// state, per-chunk rows and per-row lifts, grown to the largest product.
+    /// **What it holds over a phase's `products`** (`MemoryNeed.gemm`), each given with the rows the ANE takes (the plan's): each
+    /// program shape's three surfaces, kept while the engine lives — a sum over the shapes, not a maximum —, and its per-column
+    /// state, per-chunk rows and per-row lifts, grown to the largest product. A product the ANE takes no row of holds nothing.
     ///
-    /// **Under `ane_int8` the int8 program's shapes are held too** (`int8: true`): which of a phase's products read an
-    /// int8 weight is not known here, so each is charged as it would be on either input — the fp16 shapes, plus the integers'
-    /// (a weight surface of one byte a value, one input surface of the whole K when it is one part, the rotated row of
-    /// `k` floats a chunk).
-    package static func bytes(products: [(m: Int, k: Int, n: Int)], gpuShare: Double, shares: Conductor.Shares = .none,
-                              int8: Bool = EngineSettings.effective.aneInt8) -> Int {
-        let engine = NeuralEngine(gpuShare: gpuShare, shares: shares)
+    /// **`integers`: the products whose weight the ANE reads as published** (`ProductAssignment.path == .native` with `ane > 0`),
+    /// each with its weight's rotation group: the int8 program's shapes — a weight surface of one byte a value, one input
+    /// surface of the whole K when it is one part, the rotated row of `k` floats a chunk. They are the plan's exact answers,
+    /// not a bound over both inputs: the fp16 shapes are held only for the products that read the widened weight.
+    package static func bytes(products: [(rows: Int, k: Int, n: Int)],
+                              integers: [(rows: Int, k: Int, n: Int, group: Int?)] = []) -> Int {
         var shapes = Set<Shape>(), (columns, scratch, lifts) = (0, 0, 0)
-        for p in products {
-            let rows = engine.rows(p.m, k: p.k, n: p.n)
-            guard rows > 0 else { continue }
-            let these = NeuralEngine.shapes(rows: rows, k: p.k, n: p.n)
+        for p in products where p.rows > 0 {
+            let these = NeuralEngine.shapes(rows: p.rows, k: p.k, n: p.n)
             shapes.formUnion(these)
             columns = max(columns, (2 + 2 * chunks) * p.n * 4)
-            lifts = max(lifts, 2 * rows * 4)
+            lifts = max(lifts, 2 * p.rows * 4)
             scratch = max(scratch, chunks * max(these.map(\.k).max()!, p.n) * 4)
-            if int8 {
-                // Parts cut to 64 and to a rotation's group (256 at most): both are the charge.
-                for alignment in [64, Widen.largestRotationGroup] {
-                    shapes.formUnion(NeuralEngine.shapes(rows: rows, k: p.k, n: p.n, int8: true, alignment: alignment))
-                }
-                scratch = max(scratch, chunks * max(p.k, p.n) * 4)
-            }
+        }
+        for p in integers where p.rows > 0 {
+            let these = NeuralEngine.shapes(rows: p.rows, k: p.k, n: p.n, int8: true, alignment: p.group ?? 64)
+            shapes.formUnion(these)
+            columns = max(columns, (2 + 2 * chunks) * p.n * 4)
+            lifts = max(lifts, 2 * p.rows * 4)
+            scratch = max(scratch, chunks * max(p.group != nil ? p.k : these.map(\.k).max()!, p.n) * 4)
         }
         return shapes.map { s in
             [s.rows * s.k * 2, s.k * s.n * (s.int8 ? 1 : 2), s.rows * s.n * 2].map { Arena.capacity(for: $0) }.reduce(0, +)
@@ -199,13 +179,12 @@ package final class NeuralEngine: @unchecked Sendable {
     package static let bringUp: NeuralEngine = autoreleasepool {
         let (rows, k, n) = (rowUnit, 64, 64)
         let a = Pages(bytes: rows * k * 4), w = Pages(bytes: k * n * 4), c = Pages(bytes: rows * n * 4)
-        let engine = NeuralEngine(gpuShare: 0.5)
+        let engine = NeuralEngine()
         _ = engine.product(a: a.floats(), w: w.floats(), c: c.floats(), first: 0, rows: rows, k: k, n: n)
         return engine
     }
 
-    package init(gpuShare: Double, shares: Conductor.Shares = .none) {
-        self.gpuShare = gpuShare; self.shares = shares
+    package init() {
         directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("siliconed-ane-\(ProcessInfo.processInfo.processIdentifier)-\(UUID().uuidString)", isDirectory: true)
     }
@@ -230,21 +209,6 @@ package final class NeuralEngine: @unchecked Sendable {
     /// The longest a released engine waits for its surfaces; beyond it, the render's memory check reports
     /// what is left.
     package static let releaseWait = 2.0
-
-    /// The ANE's rows of an `m`-row product `k → n`: `0` when the GPU keeps them all. The share is the grid's
-    /// at `(k, n, m)` when there is one, `gpuShare` otherwise.
-    package func rows(_ m: Int, k: Int, n: Int) -> Int {
-        NeuralEngine.rows(m, gpuShare: shares.share(k: k, n: n, m: m, range: NeuralEngine.shareRange) ?? gpuShare,
-                          minimum: NeuralEngine.minimumRows)
-    }
-
-    /// The same from a share already read: what the route table (`RouteTable.Products.route`) asks at each product.
-    package static func rows(_ m: Int, gpuShare share: Double, minimum: Int) -> Int {
-        guard m >= minimum else { return 0 }
-        let unit = Double(rowUnit)
-        let r = Int((Double(m) * (1 - share) / unit).rounded()) * rowUnit
-        return r > 0 && r < m ? r : 0
-    }
 
     /// `false` once a program of the product's was refused (a surface Core ML cannot read dense, a shape
     /// it does not compile): the GPU then takes the whole product from the start, not after its share.

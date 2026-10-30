@@ -53,10 +53,10 @@ package enum OperatorFootprint {
     /// base; the first found it nowhere, brought up in its text phase after the base was read, and
     /// carried it uncharged into every phase after. Brought up first, the base reads it.
     /// The same work a render did anyway, moved before it: no time added.
-    /// Under `gemm_ane`, Core ML's too (`NeuralEngine.bringUp`).
+    /// Under a plan with the ANE, Core ML's too (`NeuralEngine.bringUp`).
     package static func bringUp() {
         _ = frameworks
-        if EngineSettings.effective.gemmANE { _ = NeuralEngine.bringUp }
+        if EngineSettings.effective.plan.usesANE { _ = NeuralEngine.bringUp }
     }
 
     private static let frameworks: (MTLDevice, MTLCommandQueue)? = {

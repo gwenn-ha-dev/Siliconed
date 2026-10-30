@@ -573,7 +573,8 @@ final class CapacityRulesTests: XCTestCase {
         let shares = try XCTUnwrap(Conductor.Shares(text: try XCTUnwrap(d.aneShares)))
         XCTAssertEqual(shares.share(k: 3840, n: 10240, m: 4096, range: NeuralEngine.shareRange)!, 0.56, accuracy: 0.001)
         XCTAssertEqual(shares.share(k: 16384, n: 6144, m: 4096, range: NeuralEngine.shareRange)!, 1)
-        XCTAssertEqual(NeuralEngine(gpuShare: 0.5, shares: shares).rows(4096, k: 16384, n: 6144), 0, "the AMX's shape")
+        XCTAssertEqual(NeuralEngine.rows(4096, gpuShare: shares.share(k: 16384, n: 6144, m: 4096, range: NeuralEngine.shareRange) ?? 0.5,
+                                         minimum: 1024), 0, "the AMX's shape")
         // At 85 % of the AMX: the AMX's too — no shape left, the ANE off.
         r.aneCuts![0].ane = 71
         XCTAssertFalse(Diagnostic.decide(r).ane!.on)
@@ -610,11 +611,11 @@ final class CapacityRulesTests: XCTestCase {
         XCTAssertTrue(d.ane!.on); XCTAssertTrue(d.amx.on)
         let text = try XCTUnwrap(d.aneAMX)
         XCTAssertEqual(d.settings["ane_amx"] as? String, text)
-        let engine = NeuralEngine(gpuShare: 0.5, shares: try XCTUnwrap(Conductor.Shares(text: try XCTUnwrap(d.aneShares))))
-        engine.besideAMX = try XCTUnwrap(Conductor.Shares(text: text))
-        XCTAssertTrue(engine.takesAMX(4096, k: 3072, n: 16384))
-        XCTAssertFalse(engine.takesAMX(4096, k: 8192, n: 3072))
-        let shares = engine.shares
+        let shares = try XCTUnwrap(Conductor.Shares(text: try XCTUnwrap(d.aneShares)))
+        let beside = try XCTUnwrap(Conductor.Shares(text: text))
+        func takesAMX(_ m: Int, k: Int, n: Int) -> Bool { (beside.ratio(k: k, n: n, m: m) ?? 0) >= 0.5 }
+        XCTAssertTrue(takesAMX(4096, k: 3072, n: 16384))
+        XCTAssertFalse(takesAMX(4096, k: 8192, n: 3072))
         XCTAssertEqual(shares.share(k: 3072, n: 16384, m: 4096, range: NeuralEngine.shareRange)!,
                        Diagnostic.threeWayShare(ane: 0.45, amx: 0.65), accuracy: 0.001)
         XCTAssertEqual(shares.share(k: 8192, n: 3072, m: 4096, range: NeuralEngine.shareRange)!, 0.45, accuracy: 0.001)

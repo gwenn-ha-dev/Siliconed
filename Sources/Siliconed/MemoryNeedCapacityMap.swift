@@ -50,7 +50,7 @@ extension CapacityMap {
         let ps = products(entries).map { (m: $0.m, k: $0.k, n: $0.n) }
         let operands = Diagnostic.Operands.sizes(products: products(entries)).bytes
         func gemm(_ ps: [(m: Int, k: Int, n: Int)]) -> Int {
-            MemoryNeed.gemm("diagnostic", products: ps, amx: true, int8: true, ane: false).reduce(0) { $0 + $1.bytes }
+            MemoryNeed.gemmBound("diagnostic", products: ps, int8: true).reduce(0) { $0 + $1.bytes }
         }
         let multiply = ps.map {
             Arena.capacity(for: Conductor.workspaceBytes(rows: $0.m, k: $0.k, n: $0.n, weightIsTransposed: true))
@@ -71,7 +71,8 @@ extension CapacityMap {
             let floats = s * heads * dim
             // The share is balanced during the map (`balanceSplit`): any of `shares` may be built.
             let split = HeadSplitAttention.shares.map { f in
-                HeadSplitAttention.hostBytes(heads: heads, sequence: s, headDim: dim, cpuFraction: f)
+                HeadSplitAttention.hostBytes(heads: heads, sequence: s, headDim: dim,
+                                             cpuHeads: HeadSplitAttention.partition(heads: heads, fraction: f).cpu.count)
                     + OperatorFootprint.sdpaQueries(rows: s, heads: HeadSplitAttention.partition(heads: heads, fraction: f).gpu.count,
                                                     headDim: dim)
             }.max() ?? 0

@@ -198,6 +198,15 @@ extension Diagnostic {
             states = Array(repeating: State(), count: entries.count)
         }
 
+        // MARK: Pins
+
+        /// **The previous map's balance as exact rows**: the GPU `share` of the product `k×n@m` (the cut of the previous map's grid),
+        /// the AMX the rest — pinned on `gemm`'s plan, which then runs exactly these rows.
+        func pinPair(_ gemm: GEMM, k: Int, n: Int, m: Int, gpuShare share: Double) {
+            let gpuRows = Conductor.cut(m, share)
+            gemm.plan.pin(ProductKey(k: k, n: n, m: m), ProductAssignment(gpu: gpuRows, amx: m - gpuRows))
+        }
+
         // MARK: Operands
 
         /// `B` restored to the fp32 weight the engines multiply (the native routes stage their own form in it, over the first
@@ -212,11 +221,10 @@ extension Diagnostic {
         // MARK: The ANE side
 
         private func buildSide() -> Side? {
-            guard let neural = try? GEMM(freezeCut: true, coexecution: false, tensorWeights: false, neuralEngine: true, neuralEngineShare: 0.5),
+            guard let neural = try? GEMM(freezeCut: true, plan: .probing(ane: true)),
                   neural.neuralEngine != nil, let nb = try? wrap(neural) else { return nil }
-            neural.neuralEngine?.shares = .none
             var three: GEMM?, tb: Buffers?
-            if caps.amx, let g = try? GEMM(freezeCut: true, coexecution: true, tensorWeights: false, neuralEngine: true, neuralEngineShare: 0.5),
+            if caps.amx, let g = try? GEMM(freezeCut: true, plan: .probing(amx: true, ane: true)),
                let b = try? wrap(g) {
                 three = g; tb = b
             }
@@ -250,11 +258,10 @@ extension Diagnostic {
             let began = DispatchTime.now().uptimeNanoseconds
             defer { balanceSeconds += Double(DispatchTime.now().uptimeNanoseconds - began) * 1e-9 }
             restoreB()
-            conductor.shares = .none
             let key = "\(k)×\(n)"
             var share = amxStart
             func balanced() -> Double {
-                conductor.initialFraction = share
+                pinPair(both, k: k, n: n, m: m, gpuShare: share)
                 // As in a render: the weight was just widened by the CPU, the AMX finds it in the caches it left warm.
                 Widen.bfloat16ToFloat32(source: operands.bf16.base, destination: operands.b.base, count: k * n)
                 let before = conductor.perShape[key] ?? Conductor.ShapeRecord()
@@ -283,8 +290,8 @@ extension Diagnostic {
             if aneRefusedFor.contains([k, n, m]) { states[c].aneRefused = true; return nil }
             let began = DispatchTime.now().uptimeNanoseconds
             defer { balanceSeconds += Double(DispatchTime.now().uptimeNanoseconds - began) * 1e-9 }
-            guard caps.ane, let side = sideFor(.init(m: m, k: k, n: n)), let engine = side.neural.neuralEngine,
-                  engine.rows(m, k: k, n: n) > 0 else { states[c].aneRefused = true; return nil }
+            guard caps.ane, m >= CapacityMap.Limits().aneRows, let side = sideFor(.init(m: m, k: k, n: n)),
+                  side.neural.neuralEngine != nil else { states[c].aneRefused = true; return nil }
             restoreB()
             let nb = side.neuralBuffers
             let run = { _ = side.neural.linear(a: nb.a, b: nb.b, c: nb.c, m: m, k: k, n: n, weightIsTransposed: true) }
@@ -390,8 +397,7 @@ extension Diagnostic {
                 restoreB()
                 let g = both, b = bothBuffers
                 run = {
-                    conductor.shares = .none
-                    conductor.initialFraction = share
+                    self.pinPair(g, k: k, n: n, m: m, gpuShare: share)
                     _ = g.linear(a: b.a, b: b.b, c: b.c, m: m, k: k, n: n, weightIsTransposed: true)
                     return true
                 }
@@ -407,12 +413,13 @@ extension Diagnostic {
                 needsGeneration = true
                 run = {
                     if three, let amx {
-                        engine.gpuShare = Diagnostic.threeWayShare(ane: ane, amx: amx)
-                        engine.shares = .none
-                        engine.besideAMX = Conductor.Shares([.init(k: k, n: n, m: m, ratio: 1)])
-                        g.conductor?.shares = Conductor.Shares([.init(k: k, n: n, m: m, ratio: (1 - amx) / amx)])
+                        // The ANE's rows at the three-way share, the GPU and the AMX beside it on the rest at the AMX's.
+                        let rows = NeuralEngine.rows(m, gpuShare: Diagnostic.threeWayShare(ane: ane, amx: amx), minimum: 1)
+                        let first = m - rows, gpuRows = Conductor.cut(first, amx)
+                        g.plan.pin(ProductKey(k: k, n: n, m: m), ProductAssignment(gpu: gpuRows, amx: first - gpuRows, ane: rows))
                     } else {
-                        engine.gpuShare = ane
+                        let rows = NeuralEngine.rows(m, gpuShare: ane, minimum: 1)
+                        g.plan.pin(ProductKey(k: k, n: n, m: m), ProductAssignment(gpu: m - rows, ane: rows))
                     }
                     let before = engine.fallbacks
                     _ = g.linear(a: b.a, b: b.b, c: b.c, m: m, k: k, n: n, weightIsTransposed: true)
@@ -665,12 +672,14 @@ extension Diagnostic {
                 if let w, !refused { result["amx"] = w } else { caps.amx = false }
             }
             if caps.ane {
-                if witnessANE == nil, let g = try? GEMM(freezeCut: true, coexecution: false, tensorWeights: false, neuralEngine: true, neuralEngineShare: 0.5),
+                if witnessANE == nil, let g = try? GEMM(freezeCut: true, plan: .probing(ane: true)),
                    g.neuralEngine != nil, let buffers = try? wrap(g) {
-                    g.neuralEngine?.shares = .none
+                    // Half the rows to the ANE, the GPU the rest.
+                    let rows = NeuralEngine.rows(m, gpuShare: 0.5, minimum: 1)
+                    g.plan.pin(ProductKey(k: k, n: n, m: m), ProductAssignment(gpu: m - rows, ane: rows))
                     witnessANE = (g, buffers)
                 }
-                if let (g, buffers) = witnessANE, let engine = g.neuralEngine, engine.rows(m, k: k, n: n) > 0 {
+                if let (g, buffers) = witnessANE, let engine = g.neuralEngine {
                     var refused = false
                     let w = Diagnostic.witnessTime {
                         let before = engine.fallbacks
@@ -716,8 +725,7 @@ extension Diagnostic {
         _ = NeuralEngine.bringUp
         let gauge = Gauge()
         let settings = EngineSettings.effective
-        let limits = CapacityMap.Limits(amxRows: settings.amxMinimumRows, aneRows: settings.aneMinimumRows,
-                                        roundingRows: settings.bf16ActivationMinimumRows)
+        let limits = CapacityMap.Limits()
         // The memory, before the first computation: the grid with every engine assumed present (the largest need).
         let everything = CapacityMap.Capabilities(amx: true, ane: true, bf16Weights: true, bf16Rounding: true, int8Weights: true,
                                                   q8Weights: true, flash: true, headSplit: true)
@@ -741,8 +749,8 @@ extension Diagnostic {
             onProgress?(.witness)
             gauge.mark("routes", "operands")
             lap = clock.now()
-            let alone = try GEMM(freezeCut: true, coexecution: false, tensorWeights: true, bf16Activations: true)
-            let both = try GEMM(freezeCut: true, coexecution: true, tensorWeights: false, int8Weights: true, q8Weights: true)
+            let alone = try GEMM(freezeCut: true, plan: .probing(bf16Weights: true, roundedActivations: true))
+            let both = try GEMM(freezeCut: true, plan: .probing(amx: true, int8Weights: true, q8Weights: true))
             let operands = Operands(Operands.sizes(products: CapacityMap.products(widest)))
             let caps = CapacityMap.Capabilities(amx: both.conductor != nil, ane: true, bf16Weights: alone.tensorBF16,
                                                 bf16Rounding: alone.bf16Activations, int8Weights: both.tensorInt8, q8Weights: both.tensorQ8,
