@@ -275,13 +275,11 @@ final class CapacityMapTests: XCTestCase {
         func chosen(_ id: String) -> String { plan.decisions.first { $0.classID == id }!.chosen! }
         for (e, v) in all {
             guard case let .product(k, n, m) = e.work, let kind = RouteTable.ClassKey.parse(v.id)?.kind else { continue }
-            // One engine rule per point, its bf16 view's: the engines are the same hardware for every form.
-            XCTAssertEqual(table.products.route(k: k, n: n, m: m).engines.rawValue, String(chosen(e.id).split(separator: "/")[0]), v.id)
-            // One form per weight at every height of its shape: the tallest's.
-            let top = g.compactMap { if case let .product(k2, n2, m2) = $0.work, k2 == k, n2 == n { return m2 } else { return nil } }.max()!
-            let tall = chosen(CapacityMap.Entry.id(.product(k: k, n: n, m: top)) + RouteTable.ClassKey.suffix(kind))
+            // Each view of a point is its own decision: its engines and its weight's form, at its own height.
+            let own = chosen(v.id)
+            XCTAssertEqual(table.products.route(k: k, n: n, m: m, kind: kind).engines.rawValue, String(own.split(separator: "/")[0]), v.id)
             let path = table.products.weight(kind, k: k, n: n, m: m).path
-            switch CapacityMap.Entry.form(tall) {
+            switch CapacityMap.Entry.form(own) {
             case nil: XCTAssertEqual(path, .widened, v.id)
             case "bf16", "bf16act": XCTAssertEqual(path, .bf16, v.id)
             default: XCTAssertEqual(path, .native, v.id)
@@ -294,6 +292,33 @@ final class CapacityMapTests: XCTestCase {
                        table.products.weight(.int8, k: 4096, n: 16384, m: 1024))
         // A shape no point reaches is the simplest route.
         XCTAssertEqual(table.products.route(k: 7, n: 7, m: 4096).aneRows, 0)
+    }
+
+    /// **Each form keeps its own route at each height**, as the M1 Pro's maps decide: the int8 weight read as published
+    /// beside the AMX at 1 024 rows (0.59 of the GPU alone) and widened on the ANE at 4 096, the bf16 one on the ANE at
+    /// both. Pinned to one form and one engine rule per point, the int8 product at 1 024 ran widened on the ANE (0.83).
+    func testEachWeightFormKeepsItsOwnRouteAtEachHeight() {
+        let g = grid.filter { ["product:4096x4096@1024", "product:4096x4096@4096"].contains($0.id) }
+        let cs = classes(g)
+        let choice = ["product:4096x4096@1024": "gpu+ane", "product:4096x4096@1024~int8": "gpu+amx/int8",
+                      "product:4096x4096@4096": "gpu+ane", "product:4096x4096@4096~int8": "gpu+ane"]
+        let decisions = cs.flatMap(\.decisionClasses).map { c in
+            CM.Decision(classID: c.id, chosen: choice[c.id] ?? "gpu+ane", status: .closed, loss: 0,
+                        hotRatios: c.routes.map { _ in 1 }, runs: 0)
+        }
+        let plan = CM.Plan(decisions: decisions, residualLoss: 0, spent: 1, exhausted: false)
+        let table = CapacityMap.table(plan: plan, entries: g, classes: cs, cuts: g.map { _ in .init() })
+        let p = table.products
+        XCTAssertEqual(p.weight(.int8, k: 4096, n: 4096, m: 1024).path, .native)
+        XCTAssertEqual(p.forced(k: 4096, n: 4096, m: 1024, kind: .int8), .amx)
+        XCTAssertEqual(p.weight(.int8, k: 4096, n: 4096, m: 4096).path, .widened)
+        XCTAssertEqual(p.forced(k: 4096, n: 4096, m: 4096, kind: .int8), .ane)
+        XCTAssertEqual(p.weight(.bf16, k: 4096, n: 4096, m: 1024).path, .widened)
+        XCTAssertEqual(p.forced(k: 4096, n: 4096, m: 1024), .ane)
+        // A model's int8 shape near the point reads the int8 rule; beyond reach, the GPU alone for every kind.
+        XCTAssertEqual(p.forced(k: 3840, n: 3840, m: 1056, kind: .int8), .amx)
+        XCTAssertEqual(p.forced(k: 7, n: 7, m: 1024, kind: .int8), .gpu)
+        XCTAssertEqual(p.forced(k: 7, n: 7, m: 1024, kind: .q8), .gpu)
     }
 
     func testAnAttentionThatSplitsHandsTheCPUItsOwnBalancedShare() {

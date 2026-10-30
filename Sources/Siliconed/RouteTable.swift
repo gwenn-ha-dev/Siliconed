@@ -135,11 +135,14 @@ package struct RouteTable: Codable, Sendable, Equatable {
         /// products are bf16, the ANE computes in fp16): the best route of the map **without** the ANE's. `nil`: the
         /// engines named above, whatever the process holds.
         package var withoutANE: Engines?
+        /// The weights the rule is for (a map rules each form at its point: an int8 weight read as published beside the
+        /// AMX where the bf16 one is widened for the ANE); `nil`: every kind, as a rule of the settings.
+        package var kind: WeightKind?
 
         package init(engines: Engines, k: Int? = nil, n: Int? = nil, minRows: Int = 0, maxRows: Int? = nil,
-                     withoutANE: Engines? = nil) {
+                     withoutANE: Engines? = nil, kind: WeightKind? = nil) {
             self.engines = engines; self.k = k; self.n = n; self.minRows = minRows; self.maxRows = maxRows
-            self.withoutANE = withoutANE
+            self.withoutANE = withoutANE; self.kind = kind
         }
 
         func matches(k: Int, n: Int, m: Int) -> Bool {
@@ -253,7 +256,10 @@ package struct RouteTable: Codable, Sendable, Equatable {
         /// the map rules every class it measured, and a format or a model it did not see takes its measured neighbour's
         /// route — a route judged. A rule that names no shape (the map's « GPU alone ») is what is left beyond reach; the
         /// grids decide only where no rule speaks (the switches' tables have none).
-        package func forced(k: Int, n: Int, m: Int, aneBroughtUp: Bool = true) -> Engines? {
+        ///
+        /// `kind`: the weight's — the rules of its kind when the table has some (a map's), the kind-free ones otherwise.
+        package func forced(k: Int, n: Int, m: Int, kind: WeightKind = .bf16, aneBroughtUp: Bool = true) -> Engines? {
+            let classes = classes.contains { $0.kind == kind } ? classes.filter { $0.kind == kind } : classes.filter { $0.kind == nil }
             let shaped = classes.filter { $0.shape != nil }
             guard let rule = shaped.first(where: { $0.matches(k: k, n: n, m: m) })
                     ?? Nearest.rule(among: shaped, k: k, n: n, m: m, { ($0.shape!, $0.minRows, $0.maxRows) })
@@ -270,10 +276,10 @@ package struct RouteTable: Codable, Sendable, Equatable {
         ///
         /// `aneBroughtUp: false`: a process whose products do not take the ANE (the Standard's, the encoders'): a class
         /// rule that names it gives the route it keeps without it (`ClassRule.withoutANE`), as `GEMM.linear` does.
-        package func route(k: Int, n: Int, m: Int, aneBroughtUp: Bool = true) -> ProductRoute {
+        package func route(k: Int, n: Int, m: Int, kind: WeightKind = .bf16, aneBroughtUp: Bool = true) -> ProductRoute {
             var (aneOK, amxOK) = (ane.enabled && aneBroughtUp, amx.enabled)
             var beside: Bool?
-            if let engines = forced(k: k, n: n, m: m, aneBroughtUp: aneBroughtUp) {
+            if let engines = forced(k: k, n: n, m: m, kind: kind, aneBroughtUp: aneBroughtUp) {
                 switch engines {
                 case .gpu: (aneOK, amxOK) = (false, false)
                 case .amx: aneOK = false
@@ -484,11 +490,12 @@ package struct RouteTable: Codable, Sendable, Equatable {
                 let form = parts.count > 1 ? parts[1] : nil
                 if engines == .amx || engines == .aneAMX { table.products.amx.enabled = true }
                 if engines == .ane || engines == .aneAMX { table.products.ane.enabled = true }
-                // One engine rule per height, whatever the weight kind: the engines are the same hardware, the first
-                // class to name the height (the heaviest: the plan is in that order) names them.
-                if !table.products.classes.contains(where: { $0.k == k && $0.n == n && $0.minRows == m && $0.maxRows == m }) {
+                // One engine rule per point and weight kind: each form was decided on its own figures, and a form read
+                // as published beside the AMX (`gpu+amx/int8`) keeps the AMX where the bf16 view chose the ANE.
+                if !table.products.classes.contains(where: { $0.k == k && $0.n == n && $0.minRows == m && $0.maxRows == m && $0.kind == kind }) {
                     table.products.classes.append(.init(engines: engines, k: k, n: n, minRows: m, maxRows: m,
-                                                        withoutANE: withoutANE.flatMap { Engines(rawValue: String($0.split(separator: "/")[0])) }))
+                                                        withoutANE: withoutANE.flatMap { Engines(rawValue: String($0.split(separator: "/")[0])) },
+                                                        kind: kind))
                 }
                 func pin(_ path: WeightPath, rounds: Bool = false) {
                     table.products.weights.insert(.init(kind: kind, path: path, roundsActivation: rounds, k: k, n: n,

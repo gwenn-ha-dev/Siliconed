@@ -211,10 +211,14 @@ package enum CapacityMap {
     }
 
     /// **The table a plan makes**: its decisions as class rules over the grids the cuts give (`cuts[i]` for `entries[i]`,
-    /// `classes[i]` the class the plan measured for it), every decision pinning its weight's form at its point, and a weight
-    /// read in one form at both heights of a shape (`RouteTable.unifyWeightPaths`: the taller's, the heavier of a render). A
-    /// product of no point — every model's — takes the nearest point's rule within reach (`RouteTable.Nearest`), and only
-    /// beyond it the simplest route.
+    /// `classes[i]` the class the plan measured for it), every decision pinning its weight's form and its engines at its
+    /// point. A product of no point — every model's — takes the nearest point's rule within reach (`RouteTable.Nearest`),
+    /// and only beyond it the simplest route.
+    ///
+    /// **Each height keeps its own form**: a weight is prepared at every call into a reserve as large as its fp32 form
+    /// (`WeightProducts.prepare`), so nothing ties the form at 1 024 rows to the one at 4 096. Pinning the taller's at both
+    /// cost the half grid's 8-bit products ×1.4 on the M1 Pro: `gpu+amx/int8` chosen at 1 024 (0.59 of the GPU alone),
+    /// run widened on the ANE (0.83) because 4 096 had chosen it.
     package static func table(plan: CapacityMeasure.Plan, entries: [Entry], classes: [CapacityMeasure.ComputeClass], cuts: [Cut],
                               limits: Limits = Limits()) -> RouteTable {
         var amxPoints: [Conductor.Shares.Point] = [], anePoints: [Conductor.Shares.Point] = []
@@ -243,15 +247,7 @@ package enum CapacityMap {
                                   grid: .init(Conductor.Shares(amxPoints)))
         base.products.ane = .init(enabled: false, gpuShare: 0.5, minimumRows: limits.aneRows, grid: .init(Conductor.Shares(anePoints)))
         var table = RouteTable(plan: plan, classes: classes.flatMap(\.decisionClasses), base: base, splitFractions: splits)
-        var groups: [RouteTable.WeightGroup: [Int: Double]] = [:]
-        for entry in entries {
-            guard case let .product(k, n, m) = entry.work else { continue }
-            for kind in RouteTable.WeightKind.allCases {
-                groups[.init(phase: .denoising, kind: kind, k: k, n: n), default: [:]][m] = Double(m)
-            }
-        }
-        table.unifyWeightPaths(groups: groups)
-        table.products.classes.append(.init(engines: .gpu))
+        for kind in RouteTable.WeightKind.allCases { table.products.classes.append(.init(engines: .gpu, kind: kind)) }
         return table
     }
 

@@ -121,7 +121,7 @@ package final class WeightProducts {
                 if r.status != 0 { failure = "\(name): the AMX refused its columns (BNNS \(r.status))" }
             case .widened:
                 timings["gemm GPU", default: 0] += gemm.linear(a: a, b: w, c: c, m: m, k: k, n: n,
-                                                              weightIsTransposed: transposed)
+                                                              weightIsTransposed: transposed, kind: kind(of: name))
             }
         }
         if let ledger {
@@ -151,10 +151,15 @@ package final class WeightProducts {
             let kind: RouteTable.WeightKind = plan.block == nil ? .int8 : .q8
             return (kind, (plan.amxColumns > 0 && gemm.conductor != nil ? "gpu+amx/" : "gpu/") + kind.rawValue)
         case .widened:
-            var kind = RouteTable.WeightKind.bf16
-            if let tensor = artifact.tensors[name], tensor.dtype == .int8 { kind = tensor.scale?.block == nil ? .int8 : .q8 }
-            return (kind, gemm.lastEngines.rawValue)
+            return (kind(of: name), gemm.lastEngines.rawValue)
         }
+    }
+
+    /// The published weight's kind: an 8-bit one's (`int8`, or `q8` for blocks of scales), `bf16` for the rest — the
+    /// K-quants widen and are ruled as bf16.
+    private func kind(of name: String) -> RouteTable.WeightKind {
+        guard let tensor = artifact.tensors[name], tensor.dtype == .int8 else { return .bf16 }
+        return tensor.scale?.block == nil ? .int8 : .q8
     }
 
     /// How the weight lies in the reserve, hence which product reads it.
@@ -264,10 +269,10 @@ package final class WeightProducts {
 
     /// The AMX's columns: a multiple of 64 (the GPU's tile), 0 without a conductor or under its
     /// `minimumRows`.
-    private func amxColumns(k: Int, n: Int, m: Int) -> Int {
+    private func amxColumns(k: Int, n: Int, m: Int, kind: RouteTable.WeightKind) -> Int {
         guard n >= 128, let conductor = gemm.conductor, m >= Conductor.minimumRows else { return 0 }
         // A class the table keeps off the AMX (`gpu/int8`, or any engines but the AMX's) is the GPU's whole.
-        if let forced = gemm.routes.products.forced(k: k, n: n, m: m, aneBroughtUp: gemm.neuralEngine != nil),
+        if let forced = gemm.routes.products.forced(k: k, n: n, m: m, kind: kind, aneBroughtUp: gemm.neuralEngine != nil),
            forced != .amx, forced != .aneAMX { return 0 }
         let T = int8Share?(k, n, m) ?? conductor.shares.share(k: k, n: n, m: m) ?? conductor.initialFraction
         guard T < 1 else { return 0 }
@@ -320,7 +325,8 @@ package final class WeightProducts {
             guard let plan = (roundsHere ? Self.int8Plan(k: k, n: n, capacity: capacity, perColumn: perColumn, group: group,
                                                          amxColumns: 0, block: scale.block, rounded: true) : nil)
                     ?? Self.int8Plan(k: k, n: n, capacity: capacity, perColumn: perColumn, group: group,
-                                     amxColumns: amxColumns(k: k, n: n, m: m), block: scale.block)
+                                     amxColumns: amxColumns(k: k, n: n, m: m, kind: scale.block == nil ? .int8 : .q8),
+                                     block: scale.block)
                     ?? Self.int8Plan(k: k, n: n, capacity: capacity, perColumn: perColumn, group: group, amxColumns: 0,
                                      block: scale.block)
             else { return try widen(name, count: count) }

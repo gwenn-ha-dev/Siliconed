@@ -490,7 +490,7 @@ package enum CapacityClasses {
                               aneBroughtUp: Bool = true, weightForms: Bool = false) -> String {
         switch c.shape {
         case let .product(k, n, rows, _):
-            var route = table.products.route(k: k, n: n, m: rows, aneBroughtUp: aneBroughtUp)
+            var route = table.products.route(k: k, n: n, m: rows, kind: c.weightKind ?? .bf16, aneBroughtUp: aneBroughtUp)
             if c.phase == .encoding { route.aneRows = 0; route.amxBesideANE = false }
             if rows < amxMinimumRows, route.aneRows == 0 { route.amx = false }
             let engines = route.engines

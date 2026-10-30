@@ -270,15 +270,16 @@ package final class GEMM {
     /// - Parameter weightIsTransposed: the weight is stored `[input, output]` by the forge, so there
     ///   is nothing to transpose. `transposeRight` costs **2.26×** on `w2`'s `K=10240` shape
     ///   (1.578 against 3.564 TFLOP/s) and −23.6 % on a whole block.
+    /// - Parameter kind: the published weight's kind, widened into `b`: the table's engine rule is per kind.
     package func linear(a: MTLBuffer, b: MTLBuffer, c: MTLBuffer, m: Int, k: Int, n: Int,
-                       weightIsTransposed: Bool = false) -> Double {
+                       weightIsTransposed: Bool = false, kind: RouteTable.WeightKind = .bf16) -> Double {
         // The Neural Engine on the last rows, the GPU on the first — alone, or beside the AMX on the shapes the
         // map gave all three (`ane_amx`); the AMX alone beside the GPU on the shapes the ANE's grid does not take
         // (`ane_shares`): at the same time, each row one engine's. Its rows refused or non-finite: the whole product again on the GPU — the bits of the GPU
         // alone, never a half-computed output.
         // A class the table forces to one set of engines (`RouteTable.ClassRule`) is ahead of the grids the
         // engines hold.
-        let forced = routes.products.forced(k: k, n: n, m: m, aneBroughtUp: neuralEngine != nil)
+        let forced = routes.products.forced(k: k, n: n, m: m, kind: kind, aneBroughtUp: neuralEngine != nil)
         let aneAllowed = forced == nil || forced == .ane || forced == .aneAMX
         let amxAllowed = forced == nil || forced == .amx || forced == .aneAMX
         if aneAllowed, let ane = neuralEngine, weightIsTransposed, case let rows = ane.rows(m, k: k, n: n), rows > 0, ane.accepts(rows: rows, k: k, n: n) {

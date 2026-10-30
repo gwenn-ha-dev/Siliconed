@@ -462,8 +462,10 @@ final class CapacityClassesTests: XCTestCase {
         base.products.weights = [.init(kind: .int8, path: .native, minRows: 2048)]
         let cs = int8Classes(rowsAndCounts: [(1056, 3), (2048, 1), (4128, 5)])
         let table = RouteTable(plan: p, classes: [int8(computeClass(lo, routes)), int8(computeClass(hi, routes))], base: base, renderClasses: cs)
-        XCTAssertEqual(table.products.forced(k: 3840, n: 10240, m: 2048), .ane)
-        XCTAssertEqual(table.products.forced(k: 3840, n: 10240, m: 1056), .gpu)
+        // The engine rules are int8's: an int8 weight asks them, a bf16 one finds none of its kind.
+        XCTAssertEqual(table.products.forced(k: 3840, n: 10240, m: 2048, kind: .int8), .ane)
+        XCTAssertEqual(table.products.forced(k: 3840, n: 10240, m: 1056, kind: .int8), .gpu)
+        XCTAssertNil(table.products.forced(k: 3840, n: 10240, m: 2048))
         XCTAssertTrue(table.weightPathConflicts(for: cs).isEmpty)
         let data = try? JSONEncoder().encode(table)
         XCTAssertEqual(data.flatMap { try? JSONDecoder().decode(RouteTable.self, from: $0) }, table)
