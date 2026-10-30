@@ -1,14 +1,14 @@
-// **« Measure This Mac »: what this Mac computes, measured — the map the engine tunes itself to —, then
+// **« Measure This Mac »: what this Mac computes, measured — the model the engine plans with —, then
 // sent as a GitHub issue only if the user wants** (`Diagnostic.swift`). The sheet says the tuning first:
 // sharing is an option, not its purpose (the user, 19/10/2026).
 //
-// Three states in one sheet: what the diagnostic does and how long (~1 min, no model needed; it occupies
+// Three states in one sheet: what the diagnostic does and how long (under a minute, no model needed; it occupies
 // the GPU and the CPU, so it waits for an empty queue — and the queue waits for it); its progress; then
-// the report as a person reads it — the chip, the memory, and per capacity its throughput and ✓/✗, the
-// output computed right against the exact or not. « Open the issue » copies the report and opens GitHub's
-// form (`report.issueURL(includingReport: false)`), where the user pastes it; « Copy JSON » alone serves
-// whoever has no GitHub account. Nothing is sent without a click, and the issue is submitted in the
-// browser, by the user.
+// the report as a person reads it — the chip, the memory, and per engine what it reaches against the peak
+// the silicon announces and ✓/✗ (computed right against the exact or not), the verdict and the duration.
+// « Open the issue » copies the report and opens GitHub's form (`report.issueURL()`), where the user pastes
+// it; « Copy JSON » alone serves whoever has no GitHub account. Nothing is sent without a click, and the issue
+// is submitted in the browser, by the user.
 
 import AppKit
 import Siliconed
@@ -52,7 +52,7 @@ struct DiagnosticSheet: View {
 
     private var ready: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Matrix products and attention on the GPU, the AMX and the Neural Engine, each route checked against the exact result, and the table of routes this Mac renders with. No model is needed, nothing is downloaded. Under a minute; the queue waits meanwhile.")
+            Text("Matrix products and attention on the GPU, the AMX and the Neural Engine, alone and together, each checked against the exact result: the figures this Mac renders with. No model is needed, nothing is downloaded. Under a minute; the queue waits meanwhile.")
                 .font(.callout)
                 .fixedSize(horizontal: false, vertical: true)
             mapStatus
@@ -64,7 +64,7 @@ struct DiagnosticSheet: View {
         .padding(20)
     }
 
-    /// **Where this session stands against the map**: a map in use; a newer one waiting for the next
+    /// **Where this session stands against the model**: one in use; a newer one waiting for the next
     /// launch; none yet, or a stale one — the first render measures.
     @ViewBuilder private var mapStatus: some View {
         Text(Self.mapStatus(app)).font(.callout).foregroundStyle(.secondary)
@@ -76,14 +76,14 @@ struct DiagnosticSheet: View {
         let map = app.mapFacts
         if let used = map.inUse {
             if used == map.stored, !used.green {
-                return "This session uses the measure of \(day(used.date)), which was not complete (its minute, its memory or a route judged wrong): it is measured again at its next launch."
+                return "This session uses the measure of \(day(used.date)), which was not complete (a missing or aberrant figure, its memory, its swap or its minute): it is measured again at its next launch."
             }
             return used == map.stored
                 ? "This session uses the choices of this Mac's measure of \(day(used.date))."
                 : "This session uses the measure of \(day(used.date)); the newer one applies from the next launch."
         }
         if map.remeasuring, let stored = map.stored {
-            return "The measure of \(day(stored.date)) was not complete (its minute, its memory or a route judged wrong): it is measured again before the next render."
+            return "The measure of \(day(stored.date)) was not complete (a missing or aberrant figure, its memory, its swap or its minute): it is measured again before the next render."
         }
         if let stored = map.stored, !stored.current {
             return "The measure of \(day(stored.date)) was taken with another macOS or another version of Siliconed: this Mac is measured again before the next render."
@@ -150,20 +150,38 @@ struct DiagnosticSheet: View {
     }
 }
 
-/// **The report, as a person reads it** — one line per capacity: the median throughput of its
-/// measures, and ✓ when every one of them computed right. The JSON says each measure.
+/// **The report, as a person reads it** — the machine, then one line per kernel: what it reaches (TFLOP/s, and against the peak the
+/// inventory read where there is one) and ✓ when it computed right, ✗ when the judge left it out; the verdict; the duration. The JSON
+/// says the rest.
 private struct ReportView: View {
     let report: Diagnostic.Report
     /// This report is the map this session's settings were read with.
     var inUse = false
 
+    /// The label of a kernel's row, in the order the sheet shows them.
+    private static let rows: [(kernel: CapacityModel.Kernel, label: LocalizedStringKey)] = [
+        (.init(.gpu, .fp32), "Matrix products, GPU"),
+        (.init(.amx, .fp32), "Matrix products, CPU matrix unit"),
+        (.init(.ane, .fp16), "Matrix products, Neural Engine"),
+        (.init(.gpu, .bf16), "Matrix products, GPU tensor units on the bf16 weights"),
+        (.init(.gpu, .int8), "Matrix products on the 8-bit weights, read as published"),
+        (.init(.gpu, .q8), "Matrix products on the GGUF 8-bit weights, read as published"),
+        (.init(.gpu, .graph), "Attention, system kernel"),
+        (.init(.gpu, .flash), "Attention, Siliconed kernel"),
+        (.init(.cpu, .heads), "Attention, split between GPU and CPU"),
+    ]
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 machine
-                if let map = report.map { routes(map) }
-                if report.map == nil { legacyMeasures }
-                if let d = report.decisions { decisions(d) }
+                reached
+                if report.verdict.green {
+                    Text("The measure is complete.").font(.caption).foregroundStyle(.secondary)
+                } else {
+                    Text("The measure is not complete: \(report.verdict.reasons.joined(separator: ", ")).")
+                        .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                }
                 Text("\(Figures.duration(report.seconds)) in all")
                     .font(.caption).foregroundStyle(.secondary)
             }
@@ -171,124 +189,38 @@ private struct ReportView: View {
         }
     }
 
-    /// The measures of a report before schema 13: one line per capacity.
-    @ViewBuilder private var legacyMeasures: some View {
-                Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 5) {
-                    let products = report.products
-                    row("Matrix products, GPU", products.map(\.gpu), unit: "TFLOP/s")
-                    row("Matrix products, CPU matrix unit", products.compactMap(\.amx), unit: "TFLOP/s")
-                    row("Matrix products, GPU and CPU together", products.compactMap(\.coexecution), unit: "TFLOP/s")
-                    row("Matrix products, GPU tensor units on the bf16 weights", products.compactMap(\.tensor), unit: "TFLOP/s")
-                    row("Matrix products on the 8-bit weights, GPU and CPU together", products.compactMap(\.int8Coexecution), unit: "TFLOP/s")
-                    row("Matrix products on the GGUF 8-bit weights, GPU and CPU together", products.compactMap(\.q8Coexecution), unit: "TFLOP/s")
-                    Divider().gridCellUnsizedAxes(.horizontal)
-                    row("Attention, system kernel", report.attention.compactMap(\.graph), unit: "TFLOP/s")
-                    row("Attention, Siliconed kernel", report.attention.compactMap(\.flash), unit: "TFLOP/s")
-                    row("Attention, split between GPU and CPU", report.attention.compactMap(\.headSplit), unit: "TFLOP/s")
-                    Divider().gridCellUnsizedAxes(.horizontal)
-                    row("Weight widening, CPU", report.widening.map(\.cpu), unit: "G/s")
-                    Divider().gridCellUnsizedAxes(.horizontal)
-                    row("Half precision, GPU", engine: "mpsgraph")
-                    row("Half precision, CPU matrix unit", engine: "bnns")
-                    row("Half precision, GPU tensor units (Metal 4)", engine: "matmul2d")
-                }
-                .font(.callout)
-                .textSelection(.enabled)
-    }
-
-    /// **What the map decided** (schema 14): the share of the grid each route takes — GPU alone, with the AMX, the Neural
-    /// Engine, the three, the weight read as published, the attention kernels —, then whether it is complete.
-    @ViewBuilder private func routes(_ map: Diagnostic.MapResult) -> some View {
-        let shares = Dictionary(map.classes.compactMap { c in c.chosen.map { ($0, c.weight) } }, uniquingKeysWith: +)
+    /// **What each engine reaches**, against the peak read: `3.53 / 4.65 TFLOP/s · 76 %`; a kernel the judge left out, ✗.
+    @ViewBuilder private var reached: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("What this Mac uses").font(.headline)
+            Text("What each engine reaches").font(.headline)
             Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 5) {
-                ForEach(shares.sorted { ($1.value, $0.key) < ($0.value, $1.key) }, id: \.key) { route, weight in
-                    GridRow {
-                        Text(verbatim: route).foregroundStyle(.secondary)
-                        Text(verbatim: String(format: "%.0f %%", 100 * weight)).monospacedDigit()
+                ForEach(Self.rows, id: \.kernel.description) { row in
+                    let line = report.reached.first { $0.kernel == row.kernel }
+                    let excluded = report.judge[row.kernel.description]?.excluded == true
+                    if line != nil || excluded {
+                        GridRow {
+                            Text(row.label).foregroundStyle(.secondary)
+                            if let line, !excluded {
+                                Text(verbatim: Self.figure(line)).monospacedDigit()
+                                verdict(true)
+                            } else {
+                                Text(verbatim: "—").foregroundStyle(.secondary)
+                                verdict(false)
+                            }
+                        }
                     }
                 }
             }
             .font(.callout)
             .textSelection(.enabled)
-            if let verdict = report.verdict {
-                Text(verdict.green ? "The measure is complete."
-                     : "The measure is not complete: \(verdict.reasons.joined(separator: ", ")).")
-                    .font(.caption).foregroundStyle(.secondary)
-            }
         }
     }
 
-    /// One capacity: the median rate of its measures, ✓ when all pass; "not available" without any.
-    @ViewBuilder private func row(_ label: LocalizedStringKey, _ measures: [Diagnostic.Measure], unit: String) -> some View {
-        GridRow {
-            Text(label).foregroundStyle(.secondary)
-            if measures.isEmpty {
-                Text("not available").foregroundStyle(.secondary)
-                Text(verbatim: "")
-            } else {
-                let rates = measures.map(\.rate).sorted()
-                Text(verbatim: String(format: "%.2f ", rates[rates.count / 2]) + unit).monospacedDigit()
-                verdict(measures.allSatisfy(\.pass))
-            }
-        }
-    }
-
-    /// Half precision: fp16 and bf16 side by side, one engine.
-    @ViewBuilder private func row(_ label: LocalizedStringKey, engine: String) -> some View {
-        let items = report.lowPrecision.filter { $0.engine == engine }
-        let measured = items.compactMap { item in item.measure.map { (item.type, $0) } }
-        GridRow {
-            Text(label).foregroundStyle(.secondary)
-            if measured.isEmpty {
-                Text("not available").foregroundStyle(.secondary)
-                Text(verbatim: "")
-            } else {
-                Text(verbatim: measured.map { String(format: "%@ %.2f", $0.0 as NSString, $0.1.rate) }.joined(separator: " · ")
-                     + " TFLOP/s").monospacedDigit()
-                verdict(measured.allSatisfy { $0.1.pass })
-            }
-        }
-    }
-
-    /// **What these measures make this Mac use** (`Diagnostic.decide`): each branch, used or not, and the
-    /// gain behind it — what a shared report says the machine chose.
-    @ViewBuilder private func decisions(_ d: Diagnostic.Decisions) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("What this Mac uses").font(.headline)
-            Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 5) {
-                // The bf16 path has no AMX: when it is taken, co-execution is not, whatever it measured.
-                let tensorOn = d.tensor?.on == true
-                decision("Matrix products, GPU and CPU together", d.amx, on: d.amx.on && !tensorOn,
-                         detail: d.amx.on && !tensorOn ? d.amxFraction.map { String(format: " · GPU %.0f %%", $0 * 100) } ?? "" : "")
-                if let tensor = d.tensor { decision("Matrix products, GPU tensor units on the bf16 weights", tensor) }
-                if let int8 = d.int8 { decision("Matrix products on the 8-bit weights, read as published", int8) }
-                if let q8 = d.q8 { decision("Matrix products on the GGUF 8-bit weights, read as published", q8) }
-                decision("Attention, Siliconed kernel", d.flash)
-                decision("Attention, split between GPU and CPU", d.headSplit)
-            }
-            .font(.callout)
-            .textSelection(.enabled)
-            let noise = String(format: "%.0f %%", d.margin * 100)
-            Text(inUse ? "In use in this session; a gain within this run's noise (±\(noise)) does not count."
-                       : "In use from the next launch; a gain within this run's noise (±\(noise)) does not count.")
-                .font(.caption).foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-    }
-
-    @ViewBuilder private func decision(_ label: LocalizedStringKey, _ x: Diagnostic.Decision, on: Bool? = nil,
-                                       detail: String = "") -> some View {
-        GridRow {
-            Text(label).foregroundStyle(.secondary)
-            Text(on ?? x.on ? "Used" : "Not used")
-            if x.passed {
-                Text(verbatim: String(format: "×%.2f", x.gain) + detail).monospacedDigit()
-            } else {
-                verdict(false)
-            }
-        }
+    /// `3.53 TFLOP/s`, then ` · 76 % of 4.65` — the share of the peak the inventory read for that engine, if it read one.
+    static func figure(_ line: Diagnostic.Report.Reach) -> String {
+        let rate = line.rate * 1e-12
+        guard let crest = line.crest, let fraction = line.fraction else { return String(format: "%.2f TFLOP/s", rate) }
+        return String(format: "%.2f / %.2f TFLOP/s · %.0f %%", rate, crest * 1e-12, 100 * fraction)
     }
 
     @ViewBuilder private func verdict(_ pass: Bool) -> some View {

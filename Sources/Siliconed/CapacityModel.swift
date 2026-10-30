@@ -98,13 +98,17 @@ package struct CapacityModel: Codable, Sendable, Equatable {
         /// The rate by k (`RateAt`, ascending in k): linear in the seconds per FLOP against ln k between two knots, the nearest knot's
         /// beyond the ends. `nil`: `rate` at every k.
         package var rateByK: [RateAt]?
+        /// **The line's domain in rows**: the fewest rows the kernel is asked for — half of the smallest the probes measured it at. Below it the line is an
+        /// extrapolation, and a plan that relies on it is a guess (the AMX at 288 rows ran 11 % under the line fitted from 1 024 rows up, and its κ
+        /// followed): the model gives no seconds there, and the solver offers no assignment that gives the kernel fewer. `nil`: no bound.
+        package var rowsFrom: Int?
         package struct RateAt: Codable, Sendable, Equatable {
             package var k: Int
             package var rate: Double
             package init(k: Int, rate: Double) { self.k = k; self.rate = rate }
         }
-        package init(t0: Double, rate: Double, perWeight: Double? = nil, rateByK: [RateAt]? = nil) {
-            self.t0 = t0; self.rate = rate; self.perWeight = perWeight; self.rateByK = rateByK
+        package init(t0: Double, rate: Double, perWeight: Double? = nil, rateByK: [RateAt]? = nil, rowsFrom: Int? = nil) {
+            self.t0 = t0; self.rate = rate; self.perWeight = perWeight; self.rateByK = rateByK; self.rowsFrom = rowsFrom
         }
         package func seconds(_ flop: Double) -> Double { t0 + flop / rate }
         /// The seconds a call pays whatever its rows: `t₀` and the weight's lift.
@@ -138,15 +142,21 @@ package struct CapacityModel: Codable, Sendable, Equatable {
         /// k = 3 840 and half of that at 12 288, where both stream a weight of 200 MB. Between two knots the κ is linear in ln k, beyond the
         /// ends the nearest knot's; `keep` is the value for an engine no knot gives.
         package var keepByK: [KeepAt]?
+        /// **The set's domain in k**: half of the smallest k and twice the largest the chains came at. Beyond it the κ would be an extrapolation (the
+        /// triple's AMX keeps 0.73 at k = 3 840 and a third of it at 12 288: a κ read at one k and clamped over the next class chose a set that ran 20 %
+        /// over its seconds), so the model gives no seconds to the set there. `nil`: no bound.
+        package var kFrom: Int?, kTo: Int?
         package struct KeepAt: Codable, Sendable, Equatable {
             package var k: Int
-            /// Keyed by the engine's name (`"gpu"`): a dictionary keyed by an enum does not survive JSON.
+            /// Keyed by the engine's name (`"gpu"`).
             package var keep: [String: Double]
             package init(k: Int, keep: [String: Double]) { self.k = k; self.keep = keep }
         }
-        package init(overhead: Double = 0, keep: [Engine: Double] = [:], sustained: Double? = nil, keepByK: [KeepAt]? = nil) {
-            self.overhead = overhead; self.keep = keep; self.sustained = sustained; self.keepByK = keepByK
+        package init(overhead: Double = 0, keep: [Engine: Double] = [:], sustained: Double? = nil, keepByK: [KeepAt]? = nil, kFrom: Int? = nil, kTo: Int? = nil) {
+            self.overhead = overhead; self.keep = keep; self.sustained = sustained; self.keepByK = keepByK; self.kFrom = kFrom; self.kTo = kTo
         }
+        /// Whether a weight of length `k` is inside the set's domain.
+        package func covers(k: Int) -> Bool { k >= (kFrom ?? 0) && k <= (kTo ?? Int.max) }
         /// The κ of `engine` in this set on a weight of length `k`.
         package func keep(_ engine: Engine, k: Int) -> Double {
             let points = (keepByK ?? []).compactMap { p in p.keep[engine.rawValue].map { (k: p.k, keep: $0) } }
@@ -159,6 +169,27 @@ package struct CapacityModel: Codable, Sendable, Equatable {
             }
             return last.keep
         }
+
+        private enum CodingKeys: String, CodingKey { case overhead, keep, sustained, keepByK, kFrom, kTo }
+        /// `keep` keyed by the engine's name (`{"gpu": 0.95}`), as a person reads it.
+        package init(from decoder: any Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            overhead = try c.decode(Double.self, forKey: .overhead)
+            keep = try CapacityModel.engines(try c.decode([String: Double].self, forKey: .keep), codingPath: c.codingPath + [CodingKeys.keep])
+            sustained = try c.decodeIfPresent(Double.self, forKey: .sustained)
+            keepByK = try c.decodeIfPresent([KeepAt].self, forKey: .keepByK)
+            kFrom = try c.decodeIfPresent(Int.self, forKey: .kFrom)
+            kTo = try c.decodeIfPresent(Int.self, forKey: .kTo)
+        }
+        package func encode(to encoder: any Encoder) throws {
+            var c = encoder.container(keyedBy: CodingKeys.self)
+            try c.encode(overhead, forKey: .overhead)
+            try c.encode(Dictionary(uniqueKeysWithValues: keep.map { ($0.key.rawValue, $0.value) }), forKey: .keep)
+            try c.encodeIfPresent(sustained, forKey: .sustained)
+            try c.encodeIfPresent(keepByK, forKey: .keepByK)
+            try c.encodeIfPresent(kFrom, forKey: .kFrom)
+            try c.encodeIfPresent(kTo, forKey: .kTo)
+        }
     }
 
     package var crest: [Engine: Double] = [:]
@@ -170,15 +201,101 @@ package struct CapacityModel: Codable, Sendable, Equatable {
     package var heat: [Engine: Double] = [:]
     package var memoryBandwidth: Double?
     package var diskBandwidth: Double?
-    /// Seconds per value to bring a weight of `kind` to the form a kernel reads (`RouteTable.WeightPath`).
-    package var preparation: [RouteTable.WeightKind: [RouteTable.WeightPath: Double]] = [:]
+    /// Seconds per value to bring a weight of `kind` to the form a kernel reads (`WeightPath`).
+    package var preparation: [WeightKind: [WeightPath: Double]] = [:]
     /// Seconds per value to widen a K-quant (Q4_K to Q6_K) weight: it has no `WeightKind`, so `preparation` cannot say it,
     /// and a super-block's unpacking costs more than a bf16 shift. `nil`: the solver falls back on `preparation[.bf16]`.
     package var kquantPreparation: Double?
 
     package init() {}
 
+    // MARK: - JSON
+
+    private enum CodingKeys: String, CodingKey {
+        case crest, lines, aneRowUnit, sharing, heat, memoryBandwidth, diskBandwidth, preparation, kquantPreparation
+    }
+
+    /// The engines of a dictionary keyed by their names.
+    fileprivate static func engines(_ named: [String: Double], codingPath: [any CodingKey]) throws -> [Engine: Double] {
+        var out: [Engine: Double] = [:]
+        for (name, value) in named {
+            guard let e = Engine(rawValue: name) else {
+                throw DecodingError.dataCorrupted(.init(codingPath: codingPath, debugDescription: "engine « \(name) »"))
+            }
+            out[e] = value
+        }
+        return out
+    }
+
+    /// **Written as a person reads it**: every dictionary keyed by the name of what it holds (`"gpu/fp32": {"rate": …, "t0": …}`,
+    /// `"gpu+ane": {"keep": {"gpu": 0.87, "ane": 0.7}, "overhead": …}`) — a default encoding of a dictionary keyed by an enum is
+    /// a flat array of alternating keys and values, which a shared report would not be.
+    package init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        crest = try Self.engines(try c.decodeIfPresent([String: Double].self, forKey: .crest) ?? [:], codingPath: c.codingPath + [CodingKeys.crest])
+        let named = try c.decodeIfPresent([String: Line].self, forKey: .lines) ?? [:]
+        for (name, line) in named {
+            guard let kernel = Kernel(name) else {
+                throw DecodingError.dataCorruptedError(forKey: .lines, in: c, debugDescription: "kernel « \(name) »")
+            }
+            lines[kernel] = line
+        }
+        aneRowUnit = try c.decodeIfPresent(Int.self, forKey: .aneRowUnit) ?? 256
+        sharing = try c.decodeIfPresent([String: Sharing].self, forKey: .sharing) ?? [:]
+        heat = try Self.engines(try c.decodeIfPresent([String: Double].self, forKey: .heat) ?? [:], codingPath: c.codingPath + [CodingKeys.heat])
+        memoryBandwidth = try c.decodeIfPresent(Double.self, forKey: .memoryBandwidth)
+        diskBandwidth = try c.decodeIfPresent(Double.self, forKey: .diskBandwidth)
+        let prepared = try c.decodeIfPresent([String: [String: Double]].self, forKey: .preparation) ?? [:]
+        for (kindName, paths) in prepared {
+            guard let kind = WeightKind(rawValue: kindName) else {
+                throw DecodingError.dataCorruptedError(forKey: .preparation, in: c, debugDescription: "weight kind « \(kindName) »")
+            }
+            for (pathName, seconds) in paths {
+                guard let path = WeightPath(rawValue: pathName) else {
+                    throw DecodingError.dataCorruptedError(forKey: .preparation, in: c, debugDescription: "weight path « \(pathName) »")
+                }
+                preparation[kind, default: [:]][path] = seconds
+            }
+        }
+        kquantPreparation = try c.decodeIfPresent(Double.self, forKey: .kquantPreparation)
+    }
+
+    package func encode(to encoder: any Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(Dictionary(uniqueKeysWithValues: crest.map { ($0.key.rawValue, $0.value) }), forKey: .crest)
+        try c.encode(Dictionary(uniqueKeysWithValues: lines.map { ($0.key.description, $0.value) }), forKey: .lines)
+        try c.encode(aneRowUnit, forKey: .aneRowUnit)
+        try c.encode(sharing, forKey: .sharing)
+        try c.encode(Dictionary(uniqueKeysWithValues: heat.map { ($0.key.rawValue, $0.value) }), forKey: .heat)
+        try c.encodeIfPresent(memoryBandwidth, forKey: .memoryBandwidth)
+        try c.encodeIfPresent(diskBandwidth, forKey: .diskBandwidth)
+        try c.encode(Dictionary(uniqueKeysWithValues: preparation.map { kind, paths in
+            (kind.rawValue, Dictionary(uniqueKeysWithValues: paths.map { ($0.key.rawValue, $0.value) }))
+        }), forKey: .preparation)
+        try c.encodeIfPresent(kquantPreparation, forKey: .kquantPreparation)
+    }
+
+    /// **Every number to `digits` significant digits**: what a report keeps (`Diagnostic.significant`), so that a model read back
+    /// from a report is the one the engine planned with — the plan's fingerprint hashes the numbers, and two readings of one
+    /// report must be one plan.
+    package func rounded(_ digits: Int = 6) -> CapacityModel {
+        func r(_ x: Double) -> Double { Diagnostic.significant(x, digits) }
+        var m = self
+        m.crest = crest.mapValues(r)
+        m.lines = lines.mapValues { Line(t0: r($0.t0), rate: r($0.rate), perWeight: $0.perWeight.map(r), rateByK: $0.rateByK?.map { .init(k: $0.k, rate: r($0.rate)) }, rowsFrom: $0.rowsFrom) }
+        m.sharing = sharing.mapValues { Sharing(overhead: r($0.overhead), keep: $0.keep.mapValues(r), sustained: $0.sustained.map(r), keepByK: $0.keepByK?.map { .init(k: $0.k, keep: $0.keep.mapValues(r)) }, kFrom: $0.kFrom, kTo: $0.kTo) }
+        m.heat = heat.mapValues(r)
+        m.memoryBandwidth = memoryBandwidth.map(r); m.diskBandwidth = diskBandwidth.map(r)
+        m.preparation = preparation.mapValues { $0.mapValues(r) }
+        m.kquantPreparation = kquantPreparation.map(r)
+        return m
+    }
+
     package static func key(_ engines: [Engine]) -> String { engines.sorted().map(\.rawValue).joined(separator: "+") }
+    /// **Whether a set of engines was measured**: an engine alone always; two or more only with a sharing fitted from their probes. The
+    /// solver offers no set that was not (`CapacitySolver`): taken at keep 1 it was the best plan, and cost a render a quarter more.
+    package func measures(_ engines: [Engine]) -> Bool { engines.count < 2 || sharing[Self.key(engines)] != nil }
+
     /// **The key of a set of kernels** (`gpu/int8+ane/int8`): a set whose kernels read another form than the pair's usual
     /// (`gpu/fp32`, `ane/fp16`) keeps its own sharing, measured on its own trials — the ANE reading the integers costs the GPU
     /// beside it what the fp16 program does not, and the other way round.
@@ -200,7 +317,7 @@ package struct CapacityModel: Codable, Sendable, Equatable {
     /// **A kernel's seconds alone on `rows` rows of a `k×n` weight** (the ANE's rounded up to its unit), at the sustained rate
     /// (`heat`, on the rate: the lift of the weight and the launch do not slow) when asked. `nil` where the kernel has no line.
     package func alone(_ kernel: Kernel, rows: Int, k: Int, n: Int, sustained: Bool = false) -> Double? {
-        guard let line = lines[kernel], line.rate > 0, rows > 0 else { return nil }
+        guard let line = lines[kernel], line.rate > 0, rows > 0, rows >= (line.rowsFrom ?? 0) else { return nil }
         var here = rows
         if kernel.engine == .ane { here = (here + aneRowUnit - 1) / aneRowUnit * aneRowUnit }
         let slow = sustained ? max(1, heat[kernel.engine] ?? 1) : 1
@@ -232,6 +349,8 @@ package struct CapacityModel: Codable, Sendable, Equatable {
     /// **Seconds each kernel is busy** in a product `m×k×n` with these rows (the ANE's rounded up to its unit): the sides' clocks
     /// of the overlap, before the set's overhead.
     package func busy(m: Int, k: Int, n: Int, rows: [Kernel: Int], sustained: Bool = false) -> [Kernel: Double] {
+        let running = rows.filter { $0.value > 0 }.map(\.key)
+        if running.count > 1, !sharing(running).covers(k: k) { return [:] }
         var solo: [Kernel: Double] = [:]
         for (kernel, r) in rows where r > 0 {
             guard let t = alone(kernel, rows: r, k: k, n: n, sustained: sustained) else { return [:] }

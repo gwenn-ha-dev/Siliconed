@@ -15,7 +15,8 @@ import Testing
         m.lines[gpu] = .init(t0: 0, rate: gpuRate)
         if let amxRate { m.lines[amx] = .init(t0: 0, rate: amxRate) }
         if let aneRate { m.lines[ane] = .init(t0: 0, rate: aneRate) }
-        return m
+        // The sets share nothing here: measured, and free (a set never measured is no candidate, `anUnmeasuredSetIsNeverACandidate`).
+        return m.withFreeSharing()
     }
 
     func key(_ k: Int, _ n: Int, _ m: Int, _ weight: CC.WeightFormat = .bf16, phase: CC.Phase = .denoising) -> ProductKey {
@@ -365,6 +366,66 @@ import Testing
         let solved = CS.solve(model: machine(), classes: classes, family: .zImage, constraints: .init(allowsANE: false), combine: longest)
         let plan = try #require(solved)
         #expect(plan.seconds == plan.blocks.map(\.seconds).max())
+    }
+
+    // MARK: a set nobody measured
+
+    /// **A set of two engines or more with no sharing fitted is never a candidate** — not taken at keep 1, the best plan on paper: a bench saw the
+    /// solver pick the AMX beside the ANE (no GPU) for a Qwen-Image-2.1 step, predicted 8.0 s, measured 10.3 (the pair keeps 0.77–0.88 and 0.91–0.95).
+    @Test func anUnmeasuredSetIsNeverACandidate() throws {
+        // A slow GPU, a fast AMX and a fast ANE: the AMX beside the ANE is the best set on paper.
+        var m = M()
+        m.lines[gpu] = .init(t0: 0, rate: 0.5e12)
+        m.lines[amx] = .init(t0: 0, rate: 3e12)
+        m.lines[ane] = .init(t0: 0, rate: 4e12)
+        let k = key(4096, 4096, 4096)
+        // Nothing measured but the lines: an engine alone (always measured — here the ANE, the fastest), never two for free.
+        #expect(!m.measures([.gpu, .amx]) && !m.measures([.amx, .ane]) && m.measures([.gpu]) && m.measures([]))
+        let alone = try solve(m, k)
+        #expect(alone.assignment == ProductAssignment(gpu: 0, ane: 4096), "\(alone.assignment)")
+        // The pairs with the GPU measured: the AMX beside the ANE is still not offered, nor is the triple.
+        m.sharing["gpu+amx"] = .init(overhead: 0, keep: [.gpu: 1, .amx: 1])
+        m.sharing["gpu+ane"] = .init(overhead: 0, keep: [.gpu: 1, .ane: 1])
+        let pairs = try solve(m, k)
+        #expect(pairs.assignment.gpu > 0, "the GPU is in every set that was measured: \(pairs.assignment)")
+        #expect(!(pairs.assignment.amx > 0 && pairs.assignment.ane > 0), "\(pairs.assignment)")
+        // Measured, the set is a candidate like another — and wins here, with the GPU out of it (the triple is still not measured).
+        m.sharing["amx+ane"] = .init(overhead: 0, keep: [.amx: 0.8, .ane: 0.93])
+        let measured = try solve(m, k)
+        #expect(measured.assignment.gpu == 0 && measured.assignment.amx > 0 && measured.assignment.ane > 0, "\(measured.assignment)")
+        // Whatever the machine, no answer of the solver names a set the model did not measure.
+        var partial = machine(amxRate: 3e12, aneRate: 4e12)
+        partial.sharing["gpu+amx"] = nil; partial.sharing["gpu+amx+ane"] = nil; partial.sharing["amx+ane"] = nil
+        for rows in [1024, 1056, 2048, 4096, 4128, 6176] {
+            for (kk, nn) in [(3840, 3840), (3840, 10240), (4096, 12288)] {
+                let s = try solve(partial, key(kk, nn, rows))
+                let engines = s.rows.keys.map(\.engine)
+                #expect(partial.measures(engines), "\(rows): \(s.route)")
+            }
+        }
+    }
+
+    /// An assignment someone else chose is timed only on sets that were measured: the render's check says « not predicted », not a guess at keep 1.
+    @Test func anAssignmentOnAnUnmeasuredSetIsNotPredicted() {
+        var m = machine(amxRate: 3e12, aneRate: 4e12)
+        m.sharing["amx+ane"] = nil
+        let k = key(4096, 4096, 4096)
+        #expect(CS.product(assigned: ProductAssignment(gpu: 0, amx: 2048, ane: 2048), key: k, model: m, constraints: constraints()) == nil)
+        #expect(CS.product(assigned: ProductAssignment(gpu: 0, amx: 4096), key: k, model: m, constraints: constraints()) != nil, "an engine alone is always measured")
+        m.sharing["amx+ane"] = .init(overhead: 0, keep: [.amx: 0.8, .ane: 0.93])
+        #expect(CS.product(assigned: ProductAssignment(gpu: 0, amx: 2048, ane: 2048), key: k, model: m, constraints: constraints()) != nil)
+    }
+
+    /// The head split of an attention is the set of the graph and the CPU's heads: offered only once measured (`attentionSet`).
+    @Test func theHeadSplitNeedsItsSharing() throws {
+        var m = machine()
+        m.lines[M.Kernel(.gpu, .graph)] = .init(t0: 0, rate: 1.5e12)
+        m.lines[M.Kernel(.cpu, .heads)] = .init(t0: 0, rate: 0.5e12)
+        m.sharing["gpu+cpu"] = nil
+        #expect(try solve(m, attentionKey(4096)).assignment == .graph)
+        #expect(CS.attention(assigned: AttentionAssignment(kernel: .split, cpuHeads: 8), key: attentionKey(4096), model: m, constraints: constraints()) == nil)
+        m.sharing["gpu+cpu"] = .init(overhead: 0, keep: [.gpu: 0.95, .cpu: 0.9])
+        #expect(try solve(m, attentionKey(4096)).assignment.splits)
     }
 
     @Test func aModelWithoutAGPULineCannotBePlanned() {

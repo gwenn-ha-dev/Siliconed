@@ -1,10 +1,8 @@
 import Foundation
 
-/// **The classes of computation of a render, their executions, their weights, and the time they are predicted to
-/// take** — what the render's predicted-versus-measured check compares with (`RenderLoop`), and what the capacity map's
-/// grid is tested to reach (`CapacityMap.gridShapes`); the map itself never reads it. Pure: it reads the five families'
-/// `Config` defaults (no header, no weights), a version (the weights' format), a format (the pixels) and "Faster
-/// Rendering".
+/// **The classes of computation of a render, their executions and their FLOP** — what the solver is given to plan (`CapacitySolver.solve`)
+/// and what the render's predicted-versus-measured check compares with (`RenderLoop`). Pure: it reads the five families' `Config`
+/// defaults (no header, no weights), a version (the weights' format), a format (the pixels) and "Faster Rendering".
 ///
 ///     Request (family, version, W×H, Faster Rendering, prompt tokens, steps)
 ///        │
@@ -19,27 +17,21 @@ import Foundation
 ///     class = (phase, shape)          shape = product(k, n, rows, weight format) | attention(S, keys, heads, kv, dim, cross)
 ///     executions[family]              how many times a render of that family runs it
 ///     FLOP                            product 2·k·n·m ;  attention 4·S·keys·heads·dim  (QKᵀ and PV)
-///     weight[family] (c)              executions · FLOP / rate(c, reference route)   ÷   Σ over the family's classes
-///     time[family] (c, route)         executions · FLOP / rate(c, route) · heat(route)        (seconds)
-///     prediction(family, table)       Σ over the phases asked (the denoising by default) of time(c, table's route for c)
 ///
 /// What sets it apart — what a catalogue written by analogy with "one product per layer" would get wrong:
 ///
-///   - **The heights are the render's, not the map's two**: the image rows plus each family's own text rows —
+///   - **The heights are the render's, not a grid's**: the image rows plus each family's own text rows —
 ///     Z-Image 19 template + prompt tokens rounded up to 32 (1 056 · 4 128 · 6 176 at 512² · 1024² · 1024×1536),
 ///     Krea 2 +16 (1 040 · 4 112 · 6 160), MOSS-Image +21 (1 045 · 4 117 · 6 165), Qwen-Image-2.1 and Anima the
 ///     image alone (the text is a prefix of the keys, or a cross-attention). Faster Rendering adds the half grid's
 ///     (about 1 050 · 1 560 rows), at the family's own count of evaluations (Z-Image, Qwen, Anima 3; Krea 2 4; MOSS 1).
 ///   - **Qwen-Image-2.1's MLP runs by row chunks** (`QwenImage21DiT.mlpRows`): a 1024×1536 target is two products of
 ///     3 072 rows, not one of 6 144 — the class is the chunk's.
-///   - **A class has the key of the table**: `routeKey` is the `RouteTable.ClassKey` a plan names (`product:kxn@m`,
-///     `attention:S/headsxdim`); a self- and a cross-attention of the same S, heads and dim share one — the table
-///     cannot tell them apart, and the catalogue keeps both so that their weights add.
 ///   - **A weight format is part of a product's shape**: the same k×n in bf16 (Standard) and in int8 (Compact) are two
 ///     classes, so a merge across families of different versions never adds what no route could treat alike. K-quants
-///     (Light) have a single route, the widening: they carry no `RouteTable.WeightKind`.
-///   - **Merged across families, weights stay per family**: a class common to two families (the same k×n at the same
-///     height) is one class with two executions counts; its weight is asked for a family, and sums to 1 over that family.
+///     (Light) have a single route, the widening: they carry no `WeightKind`.
+///   - **Merged across families, executions stay per family**: a class common to two families (the same k×n at the same
+///     height) is one class with two executions counts.
 ///   - **What is not a class**: the modulation and time-embedding gemv (m = 1, the CPU), the norms and elementwise
 ///     kernels, the VAE (one route), the weights' widening and reading, attentions over fewer than 64 rows (no route
 ///     decides them), the encoder's attention and DeltaNet recurrence (m < 64), MOSS's LoRA (rank 128, fp32, applied
@@ -47,9 +39,9 @@ import Foundation
 ///     MOSS encoder. They are small (each under 1 % of a render), or have no route to choose among.
 ///   - **Unread from code**: Krea 2's text encoder runs up to its last tap (36 layers is the Qwen3-VL-4B text model's
 ///     count, an upper bound); MOSS's encoder FFN width (12 288) is the Qwen3.5-9B card's, not read in the code.
-///   - **The prediction is cold rates times a heat factor**, and nothing else: no overlap between phases, no cost for
-///     widening or reading (the table's `weights` rules say how a weight is read; the rates, once measured, carry what
-///     it costs). Neutral rates give the FLOP ranking; the map's measured rates replace them class by class.
+///   - **The id of a class is the render's and the ledger's** (`product:K×N@M`, `~int8`, `~q8`, `~q4k` for the weight's form;
+///     `attention:S/H×D`): a self- and a cross-attention of the same S, heads and head dim share one — what the ledger can tell
+///     them by — and the catalogue keeps both so that their executions add.
 package enum CapacityClasses {
     package enum Phase: String, Sendable, Hashable, CaseIterable, Codable {
         /// The text encoder, once per render.
@@ -70,8 +62,8 @@ package enum CapacityClasses {
         /// another group is not refused here: the engine reads the tensor's own and declines what its program cannot cut.
         package var rotationGroup: Int? { self == .int8 ? Widen.largestRotationGroup : nil }
 
-        /// The route table's kind, `nil` for the K-quants.
-        package var kind: RouteTable.WeightKind? {
+        /// The weight's kind, `nil` for the K-quants (no native form).
+        package var kind: WeightKind? {
             switch self {
             case .bf16: return .bf16
             case .int8: return .int8
@@ -131,6 +123,14 @@ package enum CapacityClasses {
 
     // MARK: - Classes
 
+    /// `product:KxN@M`, then `~int8`, `~q8`, `~q4k` for a weight not in bf16.
+    package static func productID(k: Int, n: Int, m: Int, format: WeightFormat) -> String {
+        "product:\(k)x\(n)@\(m)" + (format == .bf16 ? "" : "~" + format.rawValue)
+    }
+
+    /// `attention:S/HxD`.
+    package static func attentionID(sequence: Int, heads: Int, headDim: Int) -> String { "attention:\(sequence)/\(heads)x\(headDim)" }
+
     package enum Shape: Hashable, Sendable {
         case product(k: Int, n: Int, rows: Int, format: WeightFormat)
         case attention(sequence: Int, keys: Int, heads: Int, kvHeads: Int, headDim: Int, cross: Bool)
@@ -156,22 +156,13 @@ package enum CapacityClasses {
 
         package var flop: Double { shape.flop }
 
-        /// The name a plan gives the class and the table reads (`RouteTable.ClassKey`).
-        package var routeKey: RouteTable.ClassKey {
+        /// The class's name in a render's record and its prediction.
+        package var id: String {
             switch shape {
-            case let .product(k, n, rows, _): return .product(k: k, n: n, m: rows)
-            case let .attention(s, _, heads, _, dim, _): return .attention(sequence: s, heads: heads, headDim: dim)
+            case let .product(k, n, rows, format): return CapacityClasses.productID(k: k, n: n, m: rows, format: format)
+            case let .attention(s, _, heads, _, dim, _): return CapacityClasses.attentionID(sequence: s, heads: heads, headDim: dim)
             }
         }
-
-        /// The weight's kind (products only; `nil`: a K-quant, or an attention).
-        package var weightKind: RouteTable.WeightKind? {
-            if case let .product(_, _, _, format) = shape { return format.kind }
-            return nil
-        }
-
-        /// FLOP of all the executions of a render of `family`.
-        package func totalFLOP(_ family: Family) -> Double { Double(executions[family] ?? 0) * flop }
     }
 
     private struct Key: Hashable { var phase: Phase; var shape: Shape }
@@ -392,146 +383,7 @@ package enum CapacityClasses {
         return classes.sorted { a, b in
             if a.phase != b.phase { return a.phase == .encoding }
             if total(a) != total(b) { return total(a) > total(b) }
-            return a.routeKey.id + String(describing: a.shape) < b.routeKey.id + String(describing: b.shape)
+            return a.id + String(describing: a.shape) < b.id + String(describing: b.shape)
         }
-    }
-
-    // MARK: - Rates and weights
-
-    /// The route names of a class: engines for a product, kernels for an attention.
-    package static let productRoutes = ["gpu", "gpu+amx", "gpu+ane", "gpu+ane+amx"]
-    package static let attentionRoutes = ["graph", "flash", "split"]
-
-    /// The engines a route keeps busy (the keys of `CapacityMeasure.Heat.factors`): `gpu+ane+amx` → gpu, ane, amx;
-    /// `split` → gpu, cpu (the heads' share on the CPU); `graph` and `flash`, the GPU's kernels → gpu (as `CapacityMap.attentionRoutes`
-    /// declares them); the weight's form after a `/` (`gpu+amx/int8`) is no engine.
-    package static func engines(ofRoute id: String) -> [String] {
-        switch id {
-        case "split": return ["gpu", "cpu"]
-        case "graph", "flash": return ["gpu"]
-        default: return id.split(separator: "/")[0].split(separator: "+").map(String.init)
-        }
-    }
-
-    /// **Cold rates, FLOP per second, by route**: a default per route and kind of class, and the figures measured
-    /// per class (keyed by `routeKey.id`, then by route). Neutral: one rate for every route — the weights are then
-    /// the FLOP shares and the prediction cannot tell routes apart.
-    package struct Rates: Sendable, Equatable {
-        package var product: [String: Double]
-        package var attention: [String: Double]
-        package var measured: [String: [String: Double]]
-        package var fallback: Double
-
-        package init(product: [String: Double] = [:], attention: [String: Double] = [:],
-                     measured: [String: [String: Double]] = [:], fallback: Double = 1e12) {
-            self.product = product; self.attention = attention; self.measured = measured; self.fallback = fallback
-        }
-
-        package static let neutral = Rates()
-
-        package func rate(_ c: Class, route: String) -> Double {
-            if let r = measured[c.routeKey.id]?[route], r > 0 { return r }
-            switch c.shape {
-            case .product: return product[route] ?? fallback
-            case .attention: return attention[route] ?? fallback
-            }
-        }
-
-        /// The route a weight is computed on: the simplest (GPU alone, the graph).
-        func reference(_ c: Class) -> String {
-            switch c.shape {
-            case .product: return CapacityClasses.productRoutes[0]
-            case .attention: return CapacityClasses.attentionRoutes[0]
-            }
-        }
-    }
-
-    /// **The weight of each class for `family`**: its share of the family's render, `executions · FLOP / rate` on the
-    /// reference route, over the sum on the classes of the family (all phases, or `phases`). Zero for a class the
-    /// family does not run; the weights of a family sum to 1.
-    package static func weights(_ classes: [Class], family: Family, rates: Rates = .neutral,
-                                phases: Set<Phase> = Set(Phase.allCases)) -> [Double] {
-        let raw = classes.map { c -> Double in
-            guard phases.contains(c.phase) else { return 0 }
-            return c.totalFLOP(family) / rates.rate(c, route: rates.reference(c))
-        }
-        let total = raw.reduce(0, +)
-        return total > 0 ? raw.map { $0 / total } : raw
-    }
-
-    /// The same, per family: `weights[class][family]`, only the families that run the class.
-    package static func weights(_ classes: [Class], rates: Rates = .neutral) -> [[Family: Double]] {
-        var result = classes.map { _ in [Family: Double]() }
-        for family in Family.allCases {
-            let w = weights(classes, family: family, rates: rates)
-            for i in classes.indices where classes[i].executions[family] != nil { result[i][family] = w[i] }
-        }
-        return result
-    }
-
-    // MARK: - The prediction
-
-    package struct Prediction: Sendable, Equatable {
-        package struct Part: Sendable, Equatable {
-            package var classID: String
-            package var phase: Phase
-            package var route: String
-            package var seconds: Double
-        }
-        package var seconds: Double
-        package var parts: [Part]
-    }
-
-    /// **The route the table gives a class** for `family`: a product's engines (`RouteTable.Products.route`, the AMX only
-    /// from `amxMinimumRows` — the engine's `amx_min` —, never the ANE on an encoder, nor in a process that did not bring
-    /// it up: `aneBroughtUp`), an attention's kernel (`flash` where the family's code tries it before the split — Z-Image
-    /// and Anima's self-attention, not Anima's cross-attention —, `split` where the table splits, else `graph`).
-    ///
-    /// `weightForms`: the route as the map names it for a weight read as published — the weight rule of the table for the
-    /// class's kind says `gpu/bf16`, `gpu/bf16act`, `gpu/int8`, `gpu+amx/int8`, `gpu/q8`, `gpu+amx/q8` (no ANE and, for a
-    /// bf16 weight, no AMX: `TensorGEMM` takes the product whole) —, which is what the rates of the map are keyed by and
-    /// what the ledger records. Off by default: the engines alone.
-    package static func route(of c: Class, family: Family, table: RouteTable,
-                              amxMinimumRows: Int = CapacitySolver.Limits.defaultAMXRows,
-                              aneBroughtUp: Bool = true, weightForms: Bool = false) -> String {
-        switch c.shape {
-        case let .product(k, n, rows, _):
-            var route = table.products.route(k: k, n: n, m: rows, kind: c.weightKind ?? .bf16, aneBroughtUp: aneBroughtUp)
-            if c.phase == .encoding { route.aneRows = 0; route.amxBesideANE = false }
-            if rows < amxMinimumRows, route.aneRows == 0 { route.amx = false }
-            let engines = route.engines
-            // A K-quant has no native form (`weightKind` nil): it widens.
-            guard weightForms, let kind = c.weightKind else { return engines.rawValue }
-            let weight = table.products.weight(kind, k: k, n: n, m: rows)
-            switch weight.path {
-            case .widened: return engines.rawValue
-            case .bf16: return weight.roundsActivation ? "gpu/bf16act" : "gpu/bf16"
-            case .native:
-                let withAMX = (engines == .amx || engines == .aneAMX) && n >= 128 && rows >= amxMinimumRows
-                return (withAMX ? "gpu+amx/" : "gpu/") + kind.rawValue
-            }
-        case let .attention(s, _, heads, _, dim, cross):
-            let a = table.attention.route(sequence: s, heads: heads, headDim: dim)
-            if a.flash, !cross, family == .zImage || family == .anima { return "flash" }
-            return a.splits ? "split" : "graph"
-        }
-    }
-
-    /// **The predicted seconds of a render of `family`** over `phases` (the denoising by default): for each class,
-    /// `executions · FLOP / rate(route) · heat(route)` with the route the table gives it, summed. Additive over classes,
-    /// decreasing in every rate, increasing in every heat factor.
-    package static func predict(_ classes: [Class], family: Family, table: RouteTable, rates: Rates = .neutral,
-                                heat: CapacityMeasure.Heat = CapacityMeasure.Heat(), phases: Set<Phase> = [.denoising],
-                                amxMinimumRows: Int = CapacitySolver.Limits.defaultAMXRows,
-                                aneBroughtUp: Bool = true, weightForms: Bool = false) -> Prediction {
-        var parts: [Prediction.Part] = []
-        for c in classes where phases.contains(c.phase) && (c.executions[family] ?? 0) > 0 {
-            let id = route(of: c, family: family, table: table, amxMinimumRows: amxMinimumRows,
-                           aneBroughtUp: aneBroughtUp, weightForms: weightForms)
-            let factor = heat.factor(CapacityMeasure.Route(id, engines: engines(ofRoute: id)))
-            parts.append(.init(classID: c.routeKey.id, phase: c.phase, route: id,
-                               seconds: c.totalFLOP(family) / rates.rate(c, route: id) * factor))
-        }
-        return Prediction(seconds: parts.reduce(0) { $0 + $1.seconds }, parts: parts)
     }
 }

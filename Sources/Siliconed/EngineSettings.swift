@@ -18,12 +18,13 @@ import Synchronization
 ///    to stay, and is removed.
 /// 2. **The default is the engine's own**, so that nothing moves unless asked: with no profile, no environment variable and no
 ///    model, the plan is `CapacityPlan.defaults` — the GPU alone on the widened weights, the attention cut by heads from 1 024 rows.
-/// 3. **The priority is: default → profile → environment**, the plan apart: a model of this Mac is designated by an app
-///    (`designate(plan:)`, before the first read); a profile is what a bench measured here (the developer's bench writes it); the
-///    environment keeps the last word, because a measurement is taken by forcing a setting, never by editing a file.
+/// 3. **The priority is: default → profile → environment**, the plan apart: the model of this Mac is the plan of the report an app keeps
+///    (`load(from:map:)`, before the first read, a report of this Mac and this build only), or a check's strictest case
+///    (`designate(plan:)`); a profile is what a bench measured here (the developer's bench writes it); the environment keeps the last
+///    word, because a measurement is taken by forcing a setting, never by editing a file.
 /// 4. **Outside an app a plan is designated only when asked** — a developer's timing, which must be the app's: the command line,
 ///    the checks and the close-out otherwise run on the defaults, so their bits and the md5 judges do not depend on a
-///    measurement of the day.
+///    measurement of the day. `SILICONED_MAP=<report.json>` names a report for a timing, and takes the app's path.
 ///
 /// The profile carries the fingerprint of the machine that produced it. **It is refused if it does not match** — a profile
 /// measured on an M4 Pro applied here would pass its constants off as ours, and that is exactly the confusion this file exists
@@ -131,7 +132,7 @@ package struct EngineSettings: Sendable {
     package private(set) var profileRead: String? = nil
     /// What the profile says about the machine that measured it, if it mentions it.
     package private(set) var machineProfile: String? = nil
-    /// The date of the capacity map applied, if one was (`load(from:map:)`).
+    /// The date of the report whose model is the plan, if one was designated and is this Mac's, this build's (`load(from:map:)`).
     package private(set) var mapRead: String? = nil
     /// **What the reading refused** — a profile from another machine, a setting a profile is not
     /// allowed to write. The library writes nothing to standard error: the caller displays them
@@ -204,7 +205,7 @@ package struct EngineSettings: Sendable {
     package static let forbiddenReads = Atomic<Int>(0)
     #endif
 
-    /// What an app or a check designated before the first access (`load(from:map:)`, `designate(plan:)`): its profile, its map,
+    /// What an app or a check designated before the first access (`load(from:map:)`, `designate(plan:)`): its profile, its report,
     /// the plan the process runs under.
     private struct Designation { var profile: String?; var map: Diagnostic.Report?; var plan: CapacityPlan? }
     private static let designated = Mutex(Designation())
@@ -231,7 +232,7 @@ package struct EngineSettings: Sendable {
         }
     }
 
-    /// **For an app: read the machine's profile from ITS library, and its capacity map.**
+    /// **For an app: read the machine's profile from ITS library, and run on the model its report holds.**
     ///
     /// The settings are a property of the machine, read once for the whole process (`effective`) —
     /// there is no sense in changing them along the way, and the engine reads them deep in its
@@ -243,9 +244,10 @@ package struct EngineSettings: Sendable {
     /// sought is `Library.processWide`'s, which the CLI follows and a sandboxed app would not find.
     ///
     /// `map`: the diagnostic's report this app kept (`Diagnostic.run`). **Refused with a warning when it is not
-    /// `isCurrent`** (another machine, another macOS, another build): the defaults then apply, and the
-    /// app measures again. **It never changes settings already read**: an app without a current map defers this
-    /// call until its measure — taken in another process, so that nothing here reads the settings before it.
+    /// `isCurrent`** (an older schema, another machine, another macOS, another build): the defaults then apply, and the
+    /// app measures again. Taken, its `model` is the plan of the process (`Report.plan`); a process without the ANE restricts it
+    /// (`CapacityPlan.restricted(allowingANE:)`). **It never changes settings already read**: an app without a current report
+    /// defers this call until its measure — taken in another process, so that nothing here reads the settings before it.
     package static func load(from library: Library, map: Diagnostic.Report? = nil) throws(EngineError) {
         let path = library.profile
         // Designate and read under the same lock: a render that read `effective` between the two
@@ -290,6 +292,14 @@ package struct EngineSettings: Sendable {
     /// Set on the first read of `effective`: after it, designating a profile no longer serves any purpose.
     private static let alreadyRead = Atomic<Bool>(false)
 
+    /// **What a report designates**: the plan of its model when it is a report of this Mac and this build (`Report.isCurrent`), else a
+    /// warning and nothing — the defaults apply. Pure: no process state.
+    static func designation(of report: Diagnostic.Report) -> (plan: CapacityPlan?, warning: String?) {
+        if report.isCurrent { return (report.plan(), nil) }
+        return (nil, "⚠ the capacity model of \(report.date) (schema \(report.schema)) was measured on \(report.fingerprint), this is "
+                     + "\(Diagnostic.Fingerprint.current) — ignored, the defaults apply.")
+    }
+
     private init() {
         EngineSettings.alreadyRead.store(true, ordering: .releasing)
         machine = Machine.detected()
@@ -297,20 +307,29 @@ package struct EngineSettings: Sendable {
 
         // ── the capacity map, if an app designated one and it is this machine's, this build's ────────
         let designation = EngineSettings.designated.withLock { $0 }
+        var chosen = designation.plan != nil          // a plan was designated, or the environment forces one: a model does not replace it
         if let plan = designation.plan { self.plan = plan }
+        var report = designation.map
+        // A developer's timing names a report: the app's path, a file instead of its preferences (`SILICONED_MAP=1` is the command line's
+        // own way to measure and keep one, `CapacityMapCLI.swift`).
+        if let named = ProcessInfo.processInfo.environment["SILICONED_MAP"], named != "1", !named.isEmpty {
+            if let data = FileManager.default.contents(atPath: named), let read = Diagnostic.Report.read(data) { report = read }
+            else { warnings.append("⚠ SILICONED_MAP=\(named) is not a report of schema \(Diagnostic.schema) — the defaults apply.") }
+        }
         // The environment keeps the last word: a developer's check or judge names the route it forces.
         if let named = ProcessInfo.processInfo.environment["SILICONED_PLAN"] {
-            if let forced = CapacityPlan.forcing(named: named) { self.plan = forced }
+            if let forced = CapacityPlan.forcing(named: named) { self.plan = forced; chosen = true }
             else if !named.isEmpty {
                 warnings.append("⚠ SILICONED_PLAN=\(named) not read (amx, flash, ane, aneint8, int8, bf16act, comma-separated): the plan stays.")
             }
         }
-        if let map = designation.map {
-            if map.isCurrent {
-                mapRead = map.date
-            } else {
-                warnings.append("⚠ the capacity map of \(map.date) was measured on \(map.fingerprint), this is "
-                                + "\(Diagnostic.Fingerprint.current) — map ignored, the defaults apply.")
+        if let report {
+            let taken = EngineSettings.designation(of: report)
+            if let warning = taken.warning { warnings.append(warning) }
+            if let plan = taken.plan {
+                mapRead = report.date
+                // The model's plan, unless a check designated or forced its own (which is stricter).
+                if !chosen { self.plan = plan }
             }
         }
 

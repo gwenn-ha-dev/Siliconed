@@ -167,10 +167,10 @@ package final class CapacityPlan: Sendable {
     /// A hash of every number of the model, in a fixed order (a dictionary keyed by a kernel or an engine encodes in no order).
     private static func fingerprint(_ model: CapacityModel) -> String {
         var parts: [String] = []
-        for (k, l) in model.lines.sorted(by: { $0.key.description < $1.key.description }) { parts.append("\(k) \(l.t0) \(l.rate)" + (l.perWeight.map { " w\($0)" } ?? "") + (l.rateByK?.map { " \($0.k):\($0.rate)" }.joined() ?? "")) }
+        for (k, l) in model.lines.sorted(by: { $0.key.description < $1.key.description }) { parts.append("\(k) \(l.t0) \(l.rate)" + (l.perWeight.map { " w\($0)" } ?? "") + (l.rateByK?.map { " \($0.k):\($0.rate)" }.joined() ?? "") + (l.rowsFrom.map { " r\($0)" } ?? "")) }
         parts.append("unit \(model.aneRowUnit)")
         for (k, s) in model.sharing.sorted(by: { $0.key < $1.key }) {
-            parts.append("\(k) \(s.overhead) \(s.sustained.map { "\($0)" } ?? "-") " + s.keep.sorted { $0.key < $1.key }.map { "\($0.key.rawValue)=\($0.value)" }.joined(separator: ","))
+            parts.append("\(k) \(s.overhead) \(s.sustained.map { "\($0)" } ?? "-") \(s.kFrom ?? 0)-\(s.kTo ?? 0) " + (s.keepByK?.map { "\($0.k):" + $0.keep.sorted { $0.key < $1.key }.map { "\($0.key)=\($0.value)" }.joined(separator: ",") }.joined(separator: ";") ?? "") + " " + s.keep.sorted { $0.key < $1.key }.map { "\($0.key.rawValue)=\($0.value)" }.joined(separator: ","))
         }
         for (e, h) in model.heat.sorted(by: { $0.key < $1.key }) { parts.append("heat \(e.rawValue) \(h)") }
         for (e, c) in model.crest.sorted(by: { $0.key < $1.key }) { parts.append("crest \(e.rawValue) \(c)") }
@@ -311,7 +311,7 @@ package struct ProductAssignment: Equatable, Sendable, Codable, CustomStringConv
         return parts.joined(separator: "+")
     }
 
-    /// The route as the capacity map and the ledger name it: the engines for a widened weight, `gpu/bf16`, `gpu/bf16act`,
+    /// The route as the render's record (`ProductLedger`) names it: the engines for a widened weight, `gpu/bf16`, `gpu/bf16act`,
     /// `gpu/int8`, `gpu+amx/q8`… for a weight read as published.
     package func route(weight: CapacityClasses.WeightFormat) -> String {
         switch path {

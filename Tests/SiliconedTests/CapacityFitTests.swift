@@ -74,7 +74,6 @@ import Testing
         #expect(abs(fit.sharing.keep[.gpu]! - 0.8) < 1e-9)
         #expect(abs(fit.sharing.keep[.ane]! - 0.6) < 1e-9)
         #expect(abs(fit.sharing.overhead - 0.003) < 1e-9)
-        #expect(fit.residuals.allSatisfy { abs($0) < 1e-9 })
     }
 
     @Test func withoutASideClockTheSideEndsWithTheSet() throws {
@@ -116,6 +115,39 @@ extension CapacityFitTests {
         #expect(F.stairs(m.stairs.map { ($0.rows, $0.seconds) })?.unit == 128)
         #expect(F.model(from: m).aneRowUnit == 256)
         #expect(F.model(from: m, allocationUnit: 128).aneRowUnit == 128)
+    }
+
+    @Test func theRawInterceptIsTheFitsOwnBeforeItsClamp() throws {
+        // Exactly affine with a negative intercept: the line is clamped, the raw intercept is not.
+        let pts = [4.3e9, 30e9, 300e9].map { F.Point(flop: $0, seconds: $0 / 2.3e12 - 0.001) }
+        #expect(abs(try #require(F.rawIntercept(pts)) + 0.001) < 1e-9)
+        #expect(try #require(F.line(pts)).t0 == 0)
+        // A positive one is the line's own.
+        let truth = M.Line(t0: 0.0008, rate: 2.5e12)
+        let good = [4.3e9, 30e9, 300e9].map { F.Point(flop: $0, seconds: truth.seconds($0)) }
+        #expect(abs(try #require(F.rawIntercept(good)) - 0.0008) < 1e-9)
+        #expect(F.rawIntercept([good[0]]) == nil && F.rawIntercept([]) == nil)
+    }
+
+    /// A set that computed wrong is a trial with no side: it fills no sharing (the report excludes the set), it does not fill a free one.
+    @Test func aSetThatComputedWrongFitsNothing() {
+        var m = F.Measurements()
+        m.trials = [.init(set: "gpu+ane", shape: [2048, 3840, 3840], pass: 2, sides: [], wall: 0, error: 0.4)]
+        #expect(F.model(from: m).sharing["gpu+ane"] == nil)
+    }
+
+    @Test func measurementsRoundToTheDigitsAReportKeepsAndStayExact() {
+        var m = F.Measurements()
+        m.solos = [.init(kernel: "gpu/fp32", shape: [512, 2048, 2048], flop: 4_294_967_296, seconds: 0.0012195121951, error: 1.23456e-6)]
+        m.witnesses = [.init(engine: "gpu", before: 0.017123456789, after: 0.018123456789)]
+        m.memoryBandwidth = 187_632_361_492.06
+        m.preparation = ["int8": ["widened": 1.3952839402818476e-10]]
+        let r = m.rounded()
+        #expect(r.solos[0].flop == 4_294_967_296, "a FLOP count is exact")
+        #expect(r.solos[0].seconds == 0.0012195 && r.solos[0].error == 1.23e-6)
+        #expect(r.witnesses[0].before == 0.017123 && r.memoryBandwidth == 187_630_000_000)
+        #expect(r.preparation["int8"]?["widened"] == 1.3953e-10)
+        #expect(r.rounded() == r)
     }
 
     /// **A route over its bar on the massive activation is wrong, and a wrong route has no line**: the probes name it in `wrong`

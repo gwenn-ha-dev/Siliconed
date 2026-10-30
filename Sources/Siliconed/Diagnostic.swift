@@ -4,76 +4,60 @@ import IOKit
 import IOKit.ps
 import Metal
 
-/// **The diagnostic — a capacity map of the machine**: one minute of wall on any Mac (`CapacityMap.budget`, settings and
-/// witnesses included), voluntary, not one byte of weights, a JSON a user can share. It answers two things: what the fleet
-/// has (one report per user; `tools/aggregate_diagnostics.py` makes the table by chip), and, per machine, **which route each
-/// class of computation of a render takes** — the table the engine reads (`RouteTable`), nothing else of it is a switch.
+/// **The diagnostic — the Mac's capacity model, measured in a minute**: voluntary, not one byte of weights, a JSON a user can
+/// share. It reads what the silicon announces, measures only what the system does not say, and writes the numbers the engine
+/// plans with (`CapacityModel`): the engine reads **no table of routes**, it asks the plan for exact rows
+/// at every product and every attention (`CapacityPlan`), solved from this model.
 ///
-///     the grid                  CapacityMap.catalogue      seven products k×n and two attentions at 1 024 and 4 096 rows, the same on
-///        │                                                  every Mac and for every model; a product decided once per weight form
-///        ├─ widening     the preparation rates: widen, copy — bf16, int8, Q8_0                                   (0.2 s)
-///        ├─ witnesses    one fixed product on the GPU, the AMX and the ANE, median of five                       (1 s, twice)
-///        ├─ the plan     CapacityMeasure.plan: pairs A B A B of two routes of a class, the seconds go to the class whose
-///        │               decision costs most if it is wrong; a probe (`MapRun.probe`) runs a route once, judged against fp64
-///        │               the first time, the cut of a pair balanced when the pair is first asked
-///        └─ the table    the choices as class rules over the grids of the cuts; a render's shape reads its nearest point
+///     inventory      DiagnosticInventory     GPU cores and clock, CPU levels and clusters, the Neural Engine's generation:
+///        │                                   read, and the denominator of "reached / peak" — never a decision
+///        ├─ probes     CapacityProbes         each engine alone at three sizes, the ANE's rows, attention, the engines in sets,
+///        │                                   the weights' preparation, the heat, the memory plan — each route judged against
+///        │                                   the exact result (fp64) by the checks' rule
+///        ├─ fit        CapacityFit            lines t(W) = t₀ + W / rate, the sets' keep and overhead (pure, replayable offline)
+///        └─ verdict    DiagnosticVerdict      green or orange, and what exactly is missing or aberrant
 ///
-/// What sets it apart — what a diagnostic written by analogy with the switches it replaces would get wrong:
+/// What sets it apart — what a diagnostic written by analogy with a table of routes timed against each other would get wrong:
 ///
-///   - **it judges the chip, never the weights, and knows no model.** The operands are synthetic, the same on every machine
-///     (xorshift by blocks of 2¹⁶), and the shapes a lattice over the domain the models live in (`CapacityMap.gridShapes`):
-///     installing, removing or adding a model never changes the map, and a Mac with none measures it whole;
-///   - **a route is decided per class, from pairs measured in turn** (`CapacityMeasure`): the drift of a Mac that heats cancels
-///     in the ratio, and the table is decided at the regime of the map's end, read from a witness per engine
-///     (`CapacityMap.EngineWitness`) — not at the cold start, and not through a margin taken from the drift;
-///   - **the AMX is the engine's BNNS, not `cblas`** (`Conductor.multiply`, the call the cut makes on its worker thread);
-///   - **against fp64, never against another fp32**: `cblas` fp32 has its own error, of the size of the GPU's. A route that
-///     computes wrong is excluded from its class (`MapResult.wrong`), nothing more;
-///   - **a half-precision output is judged against its own rounding**: the ANE within 1.25 × the bf16 rounding of the exact
-///     (invariant 3), never under the fp32 threshold;
-///   - **every output is poisoned before each engine** (NaN on the sampled rows): a submission that fails silently leaves the
+///   - **It judges the chip, never the weights, and knows no model.** The operands are synthetic, the same on every machine
+///     (xorshift by blocks of 2¹⁶): installing, removing or adding a model never changes the report, and a Mac with none
+///     measures it whole;
+///   - **It measures parameters, not winners.** No route is timed against another to decide a class: the model gives the time of
+///     any block on any set of engines, and the solver (`CapacitySolver`) chooses at the shape of each product the render
+///     really makes. The Mac need not be at rest for the lines to be right, and a Mac nobody has measured is served by the same
+///     lines;
+///   - **A route that computes wrong is excluded, not a reason for orange**: against fp64, never against another fp32, with the
+///     checks' rule (the fp32 threshold; the ANE within 1.25 × bf16's own rounding — invariant 3). `excluded` names it, the plan
+///     never offers it, and the report says which and by how much;
+///   - **Every output is poisoned before each engine** (NaN on the sampled rows): a submission that fails silently leaves the
 ///     previous engine's right answer, which would pass;
-///   - **the minute holds the whole map, and the memory holds B**: the plan of the map's memory is chosen from its classes
-///     before the first product (`MemoryNeedCapacityMap.swift`), its peak is read by step (`Report.memory`), and green
-///     (`CapacityMap.Verdict`) says the map is complete, judged, within its seconds and its memory — never that the Mac was
-///     at rest;
-///   - **it holds the machine's render lock** (`RenderLock.machine`) and runs on the engine's queue: never beside a render, of
+///   - **The sizes follow the machine, not its name** (`CapacityProbes.Sizes`): chosen from the inventory's peak, then from the
+///     first witnesses' own rates, so that the slowest Mac of the fleet holds the minute; each stage's projection is written
+///     beside its seconds (`stages`);
+///   - **Green is a property of the measure, not of the hour**: every engine the inventory announces has its lines, every set
+///     its sharing, nothing aberrant, the peak under the need under B, no swap, the minute held. Heat, the battery, Low Power
+///     Mode and another process's swap are facts of the regime, written beside the model, never a reason for orange;
+///   - **It holds the machine's render lock** (`RenderLock.machine`) and runs on the engine's queue: never beside a render, of
 ///     this process or another.
 ///
-/// **Deliberately not measured**: the disk (no decision reads its speed); a model's step (its weights, its plan and the page
-/// cache decide it, and a render's own figures already say it); the memory (B is a function of the RAM alone, ¾ · RAM − 2 GiB);
-/// an SDPA in fp16 (P20: never under bf16, sums in fp32 — a precision the engine refuses is no capacity); the half-precision
-/// products of a fleet question (dropped from schema 13); a taller image than 1024² (the table extrapolates the heights).
+/// **Deliberately not measured**: the disk (no decision reads it); a model's step (its weights, its plan and the page cache decide
+/// it, and a render's own figures already say it); the memory (B is a function of the RAM alone, ¾ · RAM − 2 GiB); an SDPA in fp16
+/// (P20: never under bf16, sums in fp32 — a precision the engine refuses is no capacity).
 ///
-/// **The engine reads it in the app, and only there**: the app measures before its first render when it holds no current map
-/// — none yet, one of another `Fingerprint` (hardware, chip, macOS build, the app's build: an update measures again), one
-/// that is not green — and whenever the user asks (« Measure This Mac »). It keeps
-/// the report in its preferences and hands it to `EngineSettings.load(from:map:)`, which installs its table. The command line,
-/// the checks and the close-out never designate a map: today's defaults.
+/// **The engine reads it in the app, and only there**: the app measures before its first render when it holds no current report
+/// — none yet, one of another `Fingerprint` (hardware, chip, macOS build, the app's build: an update measures again), one that
+/// is not green — and whenever the user asks (« Measure This Mac »). It keeps the report in its preferences and hands it to
+/// `EngineSettings.load(from:map:)`, which designates the plan of its model. The command line, the checks and the close-out
+/// never designate one unless a developer names it (`SILICONED_MAP`): today's defaults.
 package enum Diagnostic {
-    /// The JSON's version: the script that aggregates the reports reads it. **5** (14/10/2026): the
-    /// capacity map; 4 and before rendered the installed models. `decisions` came into 5 later the same
-    /// day, optional: a report without it is the same measures. **6** (17/10/2026): the bf16-weight
-    /// products (`products[].tensor`), the `bf16 copy` widening and `stages`; the decisions add `tensor`.
-    /// **7** (18/10/2026): `cuts`, the GPU's balanced share on a grid of shapes (`k` and `n` axes, both
-    /// heights); the decisions add `amxShares`. **8** (18/10/2026): the int8-weight products
-    /// (`products[].int8`, `int8Coexecution`, `int8GPUColumns`), the `int8 convrot` and `int8 copy`
-    /// widenings; the decisions add `int8`. **9** (18/10/2026): the Q8_0-weight products (`products[].q8`,
-    /// `q8Coexecution`, `q8GPUColumns`), the `q8_0` and `q8_0 copy` widenings; the decisions add `q8`.
-    /// **10** (22/10/2026): the Neural Engine beside the GPU (`products[].ane`, `aneGPUShare`, and `aneCuts` on
-    /// the cuts' grid); the decisions add `ane`, `aneFraction` and `aneShares`.
-    /// **11** (25/10/2026): the products on an activation rounded to bf16 (`products[].bf16Act`); the decisions
-    /// add `bf16Act`. **12** (26/10/2026): the three engines at once on the ANE's grid (`aneCuts`' eighth figure,
-    /// `three`), and MOSS-Image's shapes in it; the decisions add `aneAMX`. **13** (29/10/2026): the map decides by
-    /// classes, not by switches — `routes` (the table the engine reads), `map` (per class: the route chosen, its ratios
-    /// and their dispersion, the loss that stays, the seconds spent), `regime` (a witness per engine at the start and at
-    /// the end, the heat that came out), `verdict` (green or orange and why), `memory` declared; the stages are
-    /// `widening`, `witness`, `routes`, `regime`, and `products`, `cuts`, `aneCuts`, `lowPrecision`, `attention` are empty.
-    /// **14** (29/10/2026): the map knows no model — its classes are a fixed grid (`CapacityMap.catalogue`), a product's
-    /// decided once per weight form on the same pairs; `map.tail` and `map.families` are gone.
-    /// A report of an older schema is not read by the engine (`isCurrent`).
-    package static let schema = 14
+    /// The JSON's version: the script that aggregates the reports reads it. **15** (30/10/2026): the capacity model — inventory,
+    /// the probes' raw measurements, the model they fit, the judge per kernel, the memory, the stages and a verdict of defects;
+    /// 14 and before were a table of routes timed against each other (grid of classes, pairs A B A B), which the engine no longer
+    /// reads. A report of a schema under 15 is not a map: the app measures again (`isCurrent`).
+    package static let schema = 15
     package static let repository = "https://github.com/gwenn-ha-dev/Siliconed"
+    /// Wall seconds the whole diagnostic promises, inventory and witnesses included, on any Mac.
+    package static let minute = 60.0
 
     /// **The fp32 threshold**: the AMX check's (`siliconed-dev amx`), a row of an fp32 product or
     /// attention no further than 10⁻⁵ from the exact. Measured on the M1 Pro (14/10/2026): the
@@ -90,21 +74,25 @@ package enum Diagnostic {
     package enum Stage: String, Sendable, CaseIterable, CustomStringConvertible {
         case widening = "weight preparation"
         case witness = "the engines' first measurement"
-        case routes = "compute routes"
+        case engines = "each engine alone"
+        case sharing = "the engines together"
+        case forms = "the weight forms"
         case regime = "the engines again"
         package var description: String { rawValue }
-        /// Its key in the report's `stages`: short, the issue link's bytes are counted.
+        /// Its key on the child process's standard output: short.
         package var key: String {
             switch self {
             case .widening: return "widening"
             case .witness: return "witness"
-            case .routes: return "routes"
+            case .engines: return "engines"
+            case .sharing: return "sharing"
+            case .forms: return "forms"
             case .regime: return "regime"
             }
         }
     }
 
-    /// **Runs the diagnostic**: ~1 min on the M1 Pro, no weights, its peak under B (`Plan`). Synchronous and
+    /// **Runs the diagnostic**: under a minute on any Mac, no weights, its peak under B (`Plan`). Synchronous and
     /// heavy: call it off the main thread, and never from the engine's queue.
     ///
     /// **It passes the doors a render passes**: it waits its turn on the engine's queue (`Engine.file`:
@@ -112,15 +100,39 @@ package enum Diagnostic {
     /// another process refuses it: `renderAlreadyRunning`). `cancellation` is checked between two
     /// measurements (`cancelled`).
     ///
-    /// It knows no model: the same grid on every Mac, whatever is installed (`CapacityMap`).
-    package static func run(cancellation: Cancellation? = nil,
+    /// It knows no model: the same probes on every Mac, whatever is installed. `validate` (a developer's, outside the minute) adds the
+    /// model's seconds on products it never saw, against a long measure — in `measure`'s probes, not in the report.
+    package static func run(cancellation: Cancellation? = nil, validate: Bool = false, log: ((String) -> Void)? = nil,
                            onProgress: (@Sendable (_ stage: Stage) -> Void)? = nil) throws(EngineError) -> Report {
+        try measure(cancellation: cancellation, validate: validate, log: log, onProgress: onProgress).report
+    }
+
+    /// The same, with the probes' own result beside the report (the fits' details and the validation, which a report does not carry).
+    package static func measure(cancellation: Cancellation? = nil, validate: Bool = false, log: ((String) -> Void)? = nil,
+                                onProgress: (@Sendable (_ stage: Stage) -> Void)? = nil)
+        throws(EngineError) -> (report: Report, probes: CapacityProbes.Result) {
         dispatchPrecondition(condition: .notOnQueue(Engine.file))
         let result = Engine.file.sync {
-            Result { () throws(EngineError) -> Report in
-                try runQueued(cancellation: cancellation, onProgress: onProgress)
+            Result { () throws(EngineError) -> (report: Report, probes: CapacityProbes.Result) in
+                try runQueued(cancellation: cancellation, validate: validate, log: log, onProgress: onProgress)
             }
         }
         return try result.get()
+    }
+
+    private static func runQueued(cancellation: Cancellation?, validate: Bool, log: ((String) -> Void)?,
+                                  onProgress: (@Sendable (_ stage: Stage) -> Void)?)
+        throws(EngineError) -> (report: Report, probes: CapacityProbes.Result) {
+        let started = Date()
+        let machine = machine()
+        let before = conditions()
+        let probes = try CapacityProbes.run(machine: machine, cancellation: cancellation, validate: validate, log: log,
+                                            onStage: { onProgress?($0) })
+        let after = conditions()
+        var forced: [String: String] = [:]
+        for row in EngineSettings.effective.rows where row.source != .byDefault { forced[row.key] = "\(row.value) (\(row.source.rawValue))" }
+        let report = Report(date: ISO8601DateFormatter().string(from: started), seconds: Date().timeIntervalSince(started),
+                            machine: machine, cpuFeatures: cpuFeatures(), settings: forced, before: before, after: after, probes: probes)
+        return (report, probes)
     }
 }

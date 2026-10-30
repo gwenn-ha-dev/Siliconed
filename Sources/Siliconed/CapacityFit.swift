@@ -69,6 +69,26 @@ package enum CapacityFit {
         affine(points.map { ($0.flop, $0.seconds) }).map { .init(t0: $0.a, rate: 1 / $0.b) }
     }
 
+    /// **The intercept the points give before it is clamped at 0**: the fit's own, on the same weights. A line through two points
+    /// of a kernel that is nearly proportional to W comes out a hair under 0 (the system graph, the CPU's heads: −0.6 to 0 ms against
+    /// points of 9 to 12 ms); a line whose intercept is a quarter of its smallest point below 0 is not a line the points sit on.
+    /// `nil` under two points.
+    package static func rawIntercept(_ points: [Point]) -> Double? {
+        let p = points.filter { $0.seconds > 0 && $0.flop > 0 }
+        guard p.count >= 2 else { return nil }
+        var (s0, sx, sy, sxx) = (0.0, 0.0, 0.0, 0.0)
+        for q in p {
+            let w = 1 / (q.seconds * q.seconds)
+            s0 += w; sx += w * q.flop; sy += w * q.seconds; sxx += w * q.flop * q.flop
+        }
+        var sxy = 0.0
+        for q in p { sxy += q.flop * q.seconds / (q.seconds * q.seconds) }
+        let d = s0 * sxx - sx * sx
+        guard d.magnitude > 1e-300 else { return nil }
+        let b = (s0 * sxy - sx * sy) / d
+        return (sy - b * sx) / s0
+    }
+
     /// The line's relative error on its own points: median and worst.
     package static func relativeError(_ line: CapacityModel.Line, _ points: [Point]) -> (median: Double, worst: Double) {
         let e = points.map { abs(line.seconds($0.flop) - $0.seconds) / $0.seconds }
@@ -156,12 +176,30 @@ package enum CapacityFit {
         package var trials: [Trial] = []
         package var witnesses: [Witness] = []
         package var memoryBandwidth: Double?
-        package var preparation: [RouteTable.WeightKind: [RouteTable.WeightPath: Double]] = [:]
+        /// Seconds per value to bring a weight to the form a kernel reads, by kind then by path (`"int8": {"widened": …}`).
+        package var preparation: [String: [String: Double]] = [:]
         /// Kernels the judge refused (a wrong route fills nothing).
         package var wrong: [String] = []
-        /// Seconds of each probe.
-        package var budget: [String: Double] = [:]
         package init() {}
+
+        /// **The same numbers to `digits` significant digits** — what a report keeps (an exact FLOP count stays exact). The model of a
+        /// report is fitted on these, so that anyone replaying the fit offline obtains it to the last digit (`Report.refit`).
+        package func rounded(_ digits: Int = 5) -> Measurements {
+            func r(_ x: Double) -> Double { Diagnostic.significant(x, digits) }
+            var m = self
+            m.solos = solos.map { Solo(kernel: $0.kernel, shape: $0.shape, flop: $0.flop, seconds: r($0.seconds),
+                                       error: $0.error.map { Diagnostic.significant($0, 3) }) }
+            m.stairs = stairs.map { Stair(rows: $0.rows, seconds: r($0.seconds)) }
+            m.trials = trials.map { t in
+                Trial(set: t.set, shape: t.shape, pass: t.pass,
+                      sides: t.sides.map { Side(kernel: $0.kernel, rows: $0.rows, solo: r($0.solo), within: $0.within.map(r)) },
+                      wall: r(t.wall), error: t.error.map { Diagnostic.significant($0, 3) })
+            }
+            m.witnesses = witnesses.map { Witness(engine: $0.engine, before: r($0.before), after: r($0.after)) }
+            m.memoryBandwidth = memoryBandwidth.map(r)
+            m.preparation = preparation.mapValues { $0.mapValues(r) }
+            return m
+        }
     }
 
     // MARK: - Sharing
@@ -177,7 +215,7 @@ package enum CapacityFit {
     /// Keeps and overhead of one set from its trials, on `lines` (the solo lines, whose t₀ the sides' fixed part comes from).
     package static func sharing(set: String, trials: [Measurements.Trial], lines: [Kernel: CapacityModel.Line],
                                 using passes: Set<Int>? = nil) -> SharingFit? {
-        let used = trials.filter { $0.set == set && (passes?.contains($0.pass) ?? true) }
+        let used = trials.filter { $0.set == set && !$0.sides.isEmpty && (passes?.contains($0.pass) ?? true) }
         guard !used.isEmpty else { return nil }
         var keepsByEngine: [CapacityModel.Engine: [Double]] = [:]
         var keeps: [[Double?]] = [], overheads: [Double] = []
@@ -253,6 +291,15 @@ package enum CapacityFit {
     /// the seconds per FLOP linear in ln k between the k's the solos came at). A fit with a negative term, or too few distinct shapes
     /// to tell the terms apart, is the plain line.
     package static func productLine(kernel: Kernel, solos: [Measurements.Solo]) -> CapacityModel.Line? {
+        var line = shapedLine(kernel: kernel, solos: solos)
+        // The domain in rows (`Line.rowsFrom`): the AMX and the ANE are measured from the rows of the smallest solo, and asked for no fewer than half.
+        if kernel.engine == .amx || kernel.engine == .ane, let smallest = solos.filter({ $0.shape.count == 3 && $0.seconds > 0 }).map({ $0.shape[0] }).min() {
+            line?.rowsFrom = max(1, smallest / 2)
+        }
+        return line
+    }
+
+    private static func shapedLine(kernel: Kernel, solos: [Measurements.Solo]) -> CapacityModel.Line? {
         let used = solos.filter { $0.shape.count == 3 && $0.seconds > 0 && $0.flop > 0 }
         let plain = line(used.map { Point(flop: $0.flop, seconds: $0.seconds) })
         guard used.count >= 3 else { return plain }
@@ -311,7 +358,7 @@ package enum CapacityFit {
             }
             keeps[side.kernel] = (side.solo - done) / first
         }
-        return keeps.mapValues { min(1.3, max(0.2, $0)) }
+        return keeps.mapValues { min(1.5, max(0.05, $0)) }
     }
 
     /// **The sharing of a set from its chains**, on the model's lines (`model.lines`, the ANE's unit): κ per engine the median over the
@@ -338,6 +385,7 @@ package enum CapacityFit {
         var fit = CapacityModel.Sharing(overhead: median(overheads), keep: byEngine.mapValues(median))
         fit.overhead = fit.overhead.isFinite ? fit.overhead : 0
         // κ by k where the chains came at more than one: each engine's median at each k.
+        if let low = byK.keys.min(), let high = byK.keys.max() { fit.kFrom = max(1, low / 2); fit.kTo = high * 2 }
         if byK.count >= 2 {
             fit.keepByK = byK.keys.sorted().map { k in
                 .init(k: k, keep: Dictionary(uniqueKeysWithValues: byK[k]!.map { ($0.key.rawValue, median($0.value)) }))
@@ -387,7 +435,10 @@ package enum CapacityFit {
             if let e = CapacityModel.Engine(rawValue: w.engine), w.before > 0, w.after > 0 { model.heat[e] = max(1, w.after / w.before) }
         }
         model.memoryBandwidth = m.memoryBandwidth
-        model.preparation = m.preparation
+        for (kindName, paths) in m.preparation {
+            guard let kind = WeightKind(rawValue: kindName) else { continue }
+            for (pathName, seconds) in paths { if let path = WeightPath(rawValue: pathName) { model.preparation[kind, default: [:]][path] = seconds } }
+        }
         return model
     }
 }
