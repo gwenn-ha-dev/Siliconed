@@ -9,6 +9,8 @@ import Foundation
 ///     trials     a set of engines on one product: each side alone at the rows it takes, then the set
 ///                                                                       →  keep[engine], overhead
 ///     witnesses  the same product before and after                      →  heat = after / before
+///     chains     a set of engines back to back on one product, each side's own clock, the lines as the reference
+///                                                                       →  κ per engine (the speed inside the set over alone), overhead
 ///
 /// What sets it apart — what a fit written by analogy with "a line through the points" would get wrong:
 ///
@@ -251,6 +253,154 @@ package enum CapacityFit {
         return SharingFit(sharing: fit, keeps: keeps, overheads: overheads, residuals: residuals)
     }
 
+    // MARK: - Lines with a shape
+
+    /// Solves `A x = b` (normal equations, Gaussian elimination with partial pivoting); `nil` when singular.
+    private static func solve(_ a: [[Double]], _ b: [Double]) -> [Double]? {
+        var m = zip(a, b).map { $0 + [$1] }
+        let n = b.count
+        for c in 0..<n {
+            guard let p = (c..<n).max(by: { abs(m[$0][c]) < abs(m[$1][c]) }), abs(m[p][c]) > 1e-300 else { return nil }
+            m.swapAt(c, p)
+            for r in (c + 1)..<max(c + 1, n) {
+                let f = m[r][c] / m[c][c]
+                for j in c...n { m[r][j] -= f * m[c][j] }
+            }
+        }
+        var x = [Double](repeating: 0, count: n)
+        for r in stride(from: n - 1, through: 0, by: -1) {
+            x[r] = (m[r][n] - ((r + 1)..<max(r + 1, n)).reduce(0) { $0 + m[r][$1] * x[$1] }) / m[r][r]
+        }
+        return x
+    }
+
+    /// Weighted least squares of `t ≈ Σ xⱼ·fⱼ`, the weights `1/t²` (the relative error, as `affine`).
+    private static func regress(_ rows: [(features: [Double], seconds: Double)]) -> [Double]? {
+        guard let width = rows.first?.features.count, rows.count >= width else { return nil }
+        var a = [[Double]](repeating: [Double](repeating: 0, count: width), count: width), b = [Double](repeating: 0, count: width)
+        for (f, t) in rows where t > 0 {
+            let w = 1 / (t * t)
+            for i in 0..<width { b[i] += w * f[i] * t; for j in 0..<width { a[i][j] += w * f[i] * f[j] } }
+        }
+        return solve(a, b)
+    }
+
+    /// **The line of a kernel that reads a product, with the shapes the solos were taken at.** Alone, `t₀ + W / rate` is blind to the two
+    /// things a family's shapes change: the ANE pays the weight's lift at every call (`perWeight`: `t = t₀ + w·k·n + W / rate`, which
+    /// takes 3 products of different weight sizes at a given W apart where a line cannot), and the AMX's rate falls with k (`rateByK`:
+    /// the seconds per FLOP linear in ln k between the k's the solos came at). A fit with a negative term, or too few distinct shapes
+    /// to tell the terms apart, is the plain line.
+    package static func productLine(kernel: Kernel, solos: [Measurements.Solo]) -> CapacityModel.Line? {
+        var line = shapedLine(kernel: kernel, solos: solos)
+        // The domain in rows (`Line.rowsFrom`): the AMX and the ANE are measured from the rows of the smallest solo, and asked for no fewer than half.
+        if kernel.engine == .amx || kernel.engine == .ane, let smallest = solos.filter({ $0.shape.count == 3 && $0.seconds > 0 }).map({ $0.shape[0] }).min() {
+            line?.rowsFrom = max(1, smallest / 2)
+        }
+        return line
+    }
+
+    private static func shapedLine(kernel: Kernel, solos: [Measurements.Solo]) -> CapacityModel.Line? {
+        let used = solos.filter { $0.shape.count == 3 && $0.seconds > 0 && $0.flop > 0 }
+        let plain = line(used.map { Point(flop: $0.flop, seconds: $0.seconds) })
+        guard used.count >= 3 else { return plain }
+        switch kernel.engine {
+        case .ane:
+            let weights = Set(used.map { $0.shape[1] * $0.shape[2] })
+            guard weights.count >= 2,
+                  let x = regress(used.map { ([1, Double($0.shape[1] * $0.shape[2]) * 1e-9, $0.flop * 1e-12], $0.seconds) }),
+                  x[0] >= 0, x[1] > 0, x[2] > 0 else { return plain }
+            return .init(t0: x[0], rate: 1e12 / x[2], perWeight: x[1] * 1e-9)
+        case .amx:
+            let knots = Array(Set(used.map { $0.shape[1] })).sorted()
+            guard knots.count >= 2 else { return plain }
+            // Hat functions of ln k at the knots: the seconds per FLOP between two are the two knots' blend.
+            func basis(_ k: Int) -> [Double] {
+                var h = [Double](repeating: 0, count: knots.count)
+                if k <= knots[0] { h[0] = 1 } else if k >= knots[knots.count - 1] { h[knots.count - 1] = 1 } else {
+                    for i in 0..<(knots.count - 1) where knots[i] <= k && k <= knots[i + 1] {
+                        let f = (log(Double(k)) - log(Double(knots[i]))) / (log(Double(knots[i + 1])) - log(Double(knots[i])))
+                        h[i] = 1 - f; h[i + 1] = f
+                    }
+                }
+                return h
+            }
+            guard let x = regress(used.map { solo in ([1] + basis(solo.shape[1]).map { $0 * solo.flop * 1e-12 }, solo.seconds) }),
+                  x[0] >= 0, x.dropFirst().allSatisfy({ $0 > 0 }) else { return plain }
+            let rates = x.dropFirst().map { 1e12 / $0 }
+            return .init(t0: x[0], rate: rates[0], rateByK: zip(knots, rates).map { .init(k: $0, rate: $1) })
+        default:
+            return plain
+        }
+    }
+
+    // MARK: - Sharing as an overlap
+
+    /// **Each engine's κ in a set from one chain** (the speed inside the set over its speed alone, the speed alone read off the line at
+    /// the rows it took): the first side to end overlapped the whole time, `κ = s / w`; each later one did the work its line says in
+    /// `κ·w₁` plus, phase after phase, what the smaller set it was left in gave it, and the rest alone at speed 1. `sub` answers
+    /// for the sets that remain (their κ were fitted first). `nil` when a side has no clock or no line.
+    package static func overlapKeeps(sides: [(kernel: Kernel, solo: Double, within: Double)], k: Int,
+                                     sub: (_ remaining: [Kernel]) -> CapacityModel.Sharing?) -> [Kernel: Double]? {
+        let sorted = sides.sorted { $0.within < $1.within }
+        guard sorted.count >= 2, sorted.allSatisfy({ $0.solo > 0 && $0.within > 0 }) else { return nil }
+        let first = sorted[0].within
+        var keeps: [Kernel: Double] = [sorted[0].kernel: sorted[0].solo / first]
+        for (j, side) in sorted.enumerated() where j > 0 {
+            // Phases 2…: from the end of side p−1 to the end of side p, the sides p … remain.
+            var done = 0.0
+            for p in 1...j {
+                let remaining = sorted[p...].map(\.kernel)
+                let duration = sorted[p].within - sorted[p - 1].within
+                if p <= j {
+                    let speed = remaining.count == 1 ? 1 : (sub(remaining)?.keep(side.kernel.engine, k: k) ?? 1)
+                    done += speed * duration
+                }
+            }
+            keeps[side.kernel] = (side.solo - done) / first
+        }
+        return keeps.mapValues { min(1.5, max(0.05, $0)) }
+    }
+
+    /// **The sharing of a set from its chains**, on the model's lines (`model.lines`, the ANE's unit): κ per engine the median over the
+    /// trials, the overhead what the wall adds beyond the last side. The sub-sets' fits are read in `model.sharing`.
+    package static func overlap(set: String, trials: [Measurements.Trial], model: CapacityModel) -> SharingFit? {
+        let used = trials.filter { $0.set == set && $0.sides.count >= 2 && $0.shape.count == 3 && $0.wall > 0 }
+        guard !used.isEmpty else { return nil }
+        var byEngine: [CapacityModel.Engine: [Double]] = [:]
+        var byK: [Int: [CapacityModel.Engine: [Double]]] = [:]
+        var keeps: [[Double?]] = [], overheads: [Double] = [], residuals: [Double] = []
+        for trial in used {
+            let (m, k, n) = (trial.shape[0], trial.shape[1], trial.shape[2])
+            var sides: [(kernel: Kernel, solo: Double, within: Double)] = []
+            for side in trial.sides {
+                guard let kernel = Kernel(side.kernel), let s = model.alone(kernel, rows: side.rows, k: k, n: n) else { continue }
+                sides.append((kernel, s, side.within ?? trial.wall))
+            }
+            guard sides.count == trial.sides.count, let ks = overlapKeeps(sides: sides, k: k, sub: { model.sharing($0) }) else { keeps.append([]); continue }
+            keeps.append(trial.sides.map { Kernel($0.kernel).flatMap { ks[$0] } })
+            for (kernel, keep) in ks { byEngine[kernel.engine, default: []].append(keep); byK[k, default: [:]][kernel.engine, default: []].append(keep) }
+            overheads.append(max(0, trial.wall - (sides.map(\.within).max() ?? trial.wall)))
+        }
+        guard !byEngine.isEmpty else { return nil }
+        var fit = CapacityModel.Sharing(overhead: median(overheads), keep: byEngine.mapValues(median))
+        fit.overhead = fit.overhead.isFinite ? fit.overhead : 0
+        // κ by k where the chains came at more than one: each engine's median at each k.
+        if let low = byK.keys.min(), let high = byK.keys.max() { fit.kFrom = max(1, low / 2); fit.kTo = high * 2 }
+        if byK.count >= 2 {
+            fit.keepByK = byK.keys.sorted().map { k in
+                .init(k: k, keep: Dictionary(uniqueKeysWithValues: byK[k]!.map { ($0.key.rawValue, median($0.value)) }))
+            }
+        }
+        var check = model
+        check.sharing[set] = fit
+        for trial in used {
+            var rows: [Kernel: Int] = [:]
+            for side in trial.sides { if let kernel = Kernel(side.kernel) { rows[kernel] = side.rows } }
+            if let t = check.seconds(m: trial.shape[0], k: trial.shape[1], n: trial.shape[2], rows: rows) { residuals.append((t - trial.wall) / trial.wall) }
+        }
+        return SharingFit(sharing: fit, keeps: keeps, overheads: overheads, residuals: residuals)
+    }
+
     // MARK: - The model
 
     /// **The `CapacityModel` the measurements give** (`allocationUnit`: the rows an engine takes come in whole units of it, `NeuralEngine.rowUnit`): the lines, the ANE's unit, the sets' sharing (from the second pass
@@ -262,14 +412,24 @@ package enum CapacityFit {
             guard !m.wrong.contains(s.kernel), let k = Kernel(s.kernel), s.seconds > 0 else { continue }
             points[k, default: []].append(Point(flop: s.flop, seconds: s.seconds))
         }
-        for (k, p) in points { if let l = line(p) { model.lines[k] = l } }
+        let products: Set<CapacityModel.Form> = [.fp32, .bf16, .bf16act, .int8, .q8, .fp16]
+        for (k, p) in points {
+            if products.contains(k.form), let l = productLine(kernel: k, solos: m.solos.filter { $0.kernel == k.description && !m.wrong.contains($0.kernel) }) {
+                model.lines[k] = l
+            } else if let l = line(p) { model.lines[k] = l }
+        }
         // The unit the ANE *charges* can be finer than the one an engine *allocates* (rows are given in whole
         // `allocationUnit`s): the model's rounding is the larger.
         if let st = stairs(m.stairs.map { ($0.rows, $0.seconds) }) { model.aneRowUnit = max(st.unit, allocationUnit) }
-        for set in Set(m.trials.map(\.set)) {
+        // The sets from the smallest: a set's κ is read through the sets that remain when its first side has ended.
+        func size(_ set: String) -> Int { set.split(separator: "+").count }
+        let order: [String] = Set(m.trials.map(\.set)).sorted { (a: String, b: String) -> Bool in size(a) != size(b) ? size(a) < size(b) : a < b }
+        for set in order {
+            // The passes from the second were balanced on a κ measured (the first, on the lines, only gives it); a set with two passes only
+            // is read on the second.
             let passes = Set(m.trials.filter { $0.set == set }.map(\.pass))
-            let last = passes.max().map { Set([$0]) }
-            if let f = sharing(set: set, trials: m.trials, lines: model.lines, using: last) { model.sharing[set] = f.sharing }
+            let from = passes.contains(3) ? 2 : (passes.max() ?? 0)
+            if let f = overlap(set: set, trials: m.trials.filter { $0.pass >= from }, model: model) { model.sharing[set] = f.sharing }
         }
         for w in m.witnesses {
             if let e = CapacityModel.Engine(rawValue: w.engine), w.before > 0, w.after > 0 { model.heat[e] = max(1, w.after / w.before) }

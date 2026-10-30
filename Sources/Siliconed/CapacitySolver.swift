@@ -204,25 +204,6 @@ package enum CapacitySolver {
     }
 }
 
-// MARK: - The model's per-kernel time
-
-extension CapacityModel {
-    /// **Seconds each kernel is busy** in a product `m×k×n` with these rows (the ANE's rounded up to its unit): the sides of
-    /// `seconds`, before the maximum and the set's overhead.
-    package func busy(m: Int, k: Int, n: Int, rows: [Kernel: Int], sustained: Bool = false) -> [Kernel: Double] {
-        let kernels = rows.keys.filter { rows[$0]! > 0 }
-        let set = sharing(Array(kernels))
-        var result: [Kernel: Double] = [:]
-        for kernel in kernels {
-            guard let r = rate(kernel, in: set, sustained: sustained), let t0 = lines[kernel]?.t0 else { continue }
-            var here = rows[kernel]!
-            if kernel.engine == .ane { here = (here + aneRowUnit - 1) / aneRowUnit * aneRowUnit }
-            result[kernel] = t0 + 2 * Double(k) * Double(n) * Double(here) / r
-        }
-        return result
-    }
-}
-
 // MARK: - The solver proper
 
 private struct ProductSolver {

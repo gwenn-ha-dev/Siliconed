@@ -46,7 +46,13 @@ extension Diagnostic.CapacityProbes {
         /// The solos' products: ≈ 4, 30, 309 GFLOP at tier 0 — k and n of a DiT's order, three different products, because an
         /// engine's rate depends on k and n as much as on W: the line is the machine's, not a shape's.
         package var solo: [Shape]
-        /// The sets' products: 30, 60 and 121 GFLOP at tier 0.
+        /// The fp32 solos (GPU, AMX, ANE), taken as chains: 34 to 121 GFLOP at tier 0, chosen to condition each term of a kernel's seconds
+        /// (`CapacityFit.productLine`) — two k's at one weight size and three weight sizes (the ANE's lift of the weight against its rows), three
+        /// k's for the AMX's rate by k (2 048, 3 840, 12 288) —, no point under 10 GFLOP (its fixed part is all of it).
+        package var product: [Shape]
+        /// The sets' chains (`CapacityFit.overlap`): a short k and, where the tier allows, a long one — κ by k.
+        package var chains: [Shape]
+        /// The pair of 8-bit kernels' products: 30, 60 and 121 GFLOP at tier 0.
         package var sharing: [Shape]
         package var attention: [Int]
         package var stairRows: [Int]
@@ -60,12 +66,17 @@ extension Diagnostic.CapacityProbes {
 
         package static let tiers: [Sizes] = [
             Sizes(tier: 0, solo: [(512, 2048, 2048), (1024, 3840, 3840), (4096, 6144, 6144)],
+                  product: [(2048, 2048, 4096), (2048, 3840, 3840), (4096, 3840, 3840), (1024, 12288, 4096)],
+                  chains: [(4096, 3840, 3840), (4096, 12288, 4096)],
                   sharing: [(1024, 3840, 3840), (2048, 3840, 3840), (4096, 3840, 3840)], attention: [1024, 4096],
                   stairRows: [768, 896, 1024, 1792, 1920, 2048, 2304, 4096]),
             Sizes(tier: 1, solo: [(512, 2048, 2048), (1024, 3840, 3840), (2048, 4096, 4096)],
+                  product: [(1024, 2048, 4096), (2048, 3840, 3840), (1024, 12288, 4096)],
+                  chains: [(2048, 3840, 3840), (2048, 12288, 4096)],
                   sharing: [(1024, 3840, 3840), (2048, 3840, 3840)], attention: [1024, 2048],
                   stairRows: [768, 1024, 1792, 2048, 2304]),
-            Sizes(tier: 2, solo: [(512, 2048, 2048), (1024, 3840, 3840)], sharing: [(1024, 3840, 3840)], attention: [1024],
+            Sizes(tier: 2, solo: [(512, 2048, 2048), (1024, 3840, 3840)],
+                  product: [(1024, 2048, 4096), (1024, 3840, 3840), (2048, 3840, 3840)], chains: [(2048, 3840, 3840)], sharing: [(1024, 3840, 3840)], attention: [1024],
                   stairRows: [768, 1024, 1792, 2048]),
         ]
         package static let full = tiers[0]
@@ -74,7 +85,7 @@ extension Diagnostic.CapacityProbes {
 
         /// Every product the tier runs through the engines (the witness's included): what the operands and the engines' surfaces are sized to.
         package var products: [Shape] {
-            solo + sharing + stairRows.map { (m: $0, k: Self.stair.k, n: Self.stair.n) } + [Self.witness]
+            solo + product + chains + sharing + stairRows.map { (m: $0, k: Self.stair.k, n: Self.stair.n) } + [Self.witness]
         }
 
         /// A lower tier's operands are inside the allocated ones: every dimension of `a`, `b`, `c` is no larger.
@@ -114,8 +125,16 @@ extension Diagnostic.CapacityProbes {
             p["witnesses start"] = witnessTime
             p["witnesses end"] = witnessTime
             p["bandwidth"] = 0.02
-            p["solos fp32"] = Self.runs * soloFlop * (1 / g + (x.map { 1 / $0 } ?? 0) + (a.map { 1 / $0 } ?? 0) + 1 / (g * Self.formRatio["bf16"]!))
-                + truth(solo, kinds: a == nil ? 1 : 2)
+            // A chain's seconds: the ramp, the window, at most the cap — or the calls it needs where they are long (`chainCalls` after `chainWarmCalls`).
+            func chain(_ flop: Double, rate: Double) -> Double {
+                typealias P = Diagnostic.CapacityProbes
+                return min(P.chainCap, max(P.chainWarm + P.chainWindow, Double(P.chainWarmCalls + P.chainCalls) * flop / rate))
+            }
+            // The GPU's fp32 solos are steady figures (it has no ramp), the AMX's and the ANE's chains.
+            let productTime = product.reduce(0) { sum, s in
+                sum + Self.runs * flop(s) / g + (x.map { chain(flop(s), rate: $0) } ?? 0) + (a.map { chain(flop(s), rate: $0) } ?? 0) + 0.1
+            }
+            p["solos fp32"] = productTime + Self.runs * soloFlop / (g * Self.formRatio["bf16"]!) + truth(product + solo, kinds: a == nil ? 1 : 2)
             let stairFlop = stairRows.reduce(0) { $0 + 2 * Double($1) * Double(Self.stair.k) * Double(Self.stair.n) }
             p["stairs"] = a.map { Self.runs * stairFlop / $0 + Double(stairRows.count) * (0.03 + truth([(1, Self.stair.k, Self.stair.n)])) } ?? 0
             let (h, d) = (Double(Self.attentionHeads), Double(Self.attentionHeadDim))
@@ -123,12 +142,11 @@ extension Diagnostic.CapacityProbes {
             // The three kernels alone, then the graph beside the CPU's heads at their balance.
             p["attention"] = Self.runs * attentionFlop * (1 / (g * Self.graphRatio) + 1 / (g * Self.flashRatio) + 1 / rates.cpu
                                                           + 1 / (g * Self.graphRatio + rates.cpu)) + Double(attention.count) * 0.08
-            // A trial: the set's walls (a judged run, then the steady ones), then each side alone at its rows.
+            // A chain per set and pass (the pairs with the GPU, the three, the AMX beside the ANE; a pass 3 where a long k is run), at the sets' rate.
             let setRate = 0.75 * (g + (x ?? 0) + (a ?? 0))
-            let sets = (x != nil ? 1 : 0) + (a != nil ? 1 : 0) + ((x != nil && a != nil) ? 2 : 0)     // the pairs with the GPU, the three, the AMX beside the ANE
-            let trials = Double(sets) * Double(1 + sharing.count) + (a != nil ? 6 : 0)
-            let meanFlop = sharing.isEmpty ? 0 : sharing.reduce(0) { $0 + flop($1) } / Double(sharing.count)
-            p["sharing"] = trials * (Self.runs * meanFlop / setRate * 3.5 + 0.06) + truth(sharing, kinds: 2)
+            let sets = (x != nil ? 1 : 0) + (a != nil ? 1 : 0) + ((x != nil && a != nil) ? 2 : 0)
+            let passes = [chains.first].compactMap { $0 } + [chains.first].compactMap { $0 } + (chains.count > 1 ? [chains[1]] : [])
+            p["sharing"] = Double(sets) * passes.reduce(0) { $0 + chain(flop($1), rate: setRate) + 0.15 } + truth(chains, kinds: 2)
             p["solos 8-bit and rounded"] = Self.runs * soloFlop * (1 / (g * Self.formRatio["bf16act"]!) + 1 / (g * Self.formRatio["int8"]!)
                                                                        + 1 / (g * Self.formRatio["q8"]!)) + truth(solo, kinds: 3)
             return p

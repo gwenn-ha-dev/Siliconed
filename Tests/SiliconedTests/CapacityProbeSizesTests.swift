@@ -10,8 +10,8 @@ import Testing
     typealias Rates = Diagnostic.CapacityProbes.Rates
 
     /// What the probes measured on the M1 Pro in two quiet runs of the report's version (seconds per stage), against which the projection is checked.
-    static let measured: [String: Double] = ["preparation": 0.19, "witnesses start": 0.48, "bandwidth": 0.03, "solos fp32": 2.32, "stairs": 0.95,
-                                              "attention": 2.72, "sharing": 3.30, "solos 8-bit and rounded": 2.35, "witnesses end": 0.43]
+    static let measured: [String: Double] = ["preparation": 0.19, "witnesses start": 0.5, "bandwidth": 0.03, "solos fp32": 6.5, "stairs": 0.89,
+                                              "attention": 2.68, "sharing": 7.4, "solos 8-bit and rounded": 2.72, "witnesses end": 0.43]
     /// The engines alone on the witness (2 048 × 3 840²: 60.4 GFLOP in 17.2, 26.2 and 12.4 ms): TFLOP/s.
     static let m1Pro = Rates(gpu: 3.51e12, amx: 2.30e12, ane: 4.87e12, cpu: 1.0e12)
     /// A Neo's order: a 5-core GPU, the AMX and the ANE of its generation (the fleet's: 1.43 · 1.52 (0.83 hot) · 4.13 TFLOP/s).
@@ -83,13 +83,13 @@ import Testing
     /// peak, the other engines below it) would have under-estimated threefold for its AMX and Neural Engine, keep the whole first tier.
     @Test func theWitnessesStepTheTierDownAndNeverUp() throws {
         #expect(Sizes.tier(for: Self.neo).tier == 0)
-        // The same Neo, a third of its speed: the second tier.
-        #expect(Sizes.tier(for: Rates(gpu: 0.477e12, amx: 0.5e12, ane: 1.38e12, cpu: 0.17e12)).tier == 1)
+        // The same Neo, a third of its speed: the smallest tier (the first, with its chains of 121 and 412 GFLOP, projects 71 s there; the second 36 s).
+        #expect(Sizes.tier(for: Rates(gpu: 0.477e12, amx: 0.5e12, ane: 1.38e12, cpu: 0.17e12)).tier == 2)
         // …and from the tier the memory allowed, never above it.
         #expect(Sizes.tier(for: Self.m1Pro, startingAt: 2).tier == 2)
         // The memory plan takes the largest tier B holds, whatever the machine is called.
         let plan = try Diagnostic.Plan.choose(budget: 4 << 30, base: 600 << 20) { Diagnostic.CapacityProbes.need(sizes: Sizes.tiers[$0]) }
-        #expect(plan.tier == 0, "a Neo's B holds the first tier")
+        #expect(plan.tier == 1, "a Neo's B holds the second tier: the first needs 4.3 GB for the chains' long k (a weight of 201 MB, its copies and truths)")
         // A hot Neo (SME ÷1.9, GPU ÷1.2) still holds the minute at the first tier.
         let hot = Rates(gpu: 1.19e12, amx: 0.83e12, ane: 4.13e12, cpu: 0.4e12)
         let tier = Sizes.tier(for: hot)

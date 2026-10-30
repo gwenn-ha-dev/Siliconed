@@ -12,15 +12,15 @@ import Testing
         let needs = Probes.Sizes.tiers.map { Probes.need(sizes: $0) }
         for (big, small) in zip(needs, needs.dropFirst()) { #expect(small.peak < big.peak) }
         for need in needs { #expect(Set(need.steps.keys) == ["widening", "routes"] && need.steps.values.allSatisfy { $0 >= Diagnostic.frameworks }) }
-        // The widest tier is what the probes needed on the M1 Pro: ~3 GB, 3.6 with the validation's products.
-        #expect((2.5e9...3.5e9).contains(Double(needs[0].peak)), "\(needs[0].peak)")
+        // The widest tier holds the chains' long k at 4 096 rows (a weight of 201 MB, its copies and truths): ~4.3 GB; the second ~2.8, the third ~1.6.
+        #expect((3.8e9...4.8e9).contains(Double(needs[0].peak)), "\(needs[0].peak)")
         #expect(Probes.need(sizes: .full, validating: true).peak > needs[0].peak)
     }
 
     /// A weight's operands are the largest of every shape: cutting a product to make it fit would measure another product.
     @Test func theOperandsAreTheLargestOfTheTiersShapes() {
         let s = Diagnostic.Operands.sizes(products: Probes.Sizes.full.products.map { ($0.m, $0.k, $0.n, WeightKind.q8) })
-        #expect(s.aFloats == 4096 * 6144 && s.bFloats == 6144 * 6144 && s.cFloats == 4096 * 6144)
+        #expect(s.aFloats == 4096 * 12288 && s.bFloats == 12288 * 4096 && s.cFloats == 4096 * 6144)
         let small = Diagnostic.Operands.sizes(products: Probes.Sizes.tiers[2].products.map { ($0.m, $0.k, $0.n, WeightKind.q8) })
         #expect(small.bytes < s.bytes)
     }

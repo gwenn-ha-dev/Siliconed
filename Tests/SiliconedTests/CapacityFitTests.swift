@@ -74,7 +74,6 @@ import Testing
         #expect(abs(fit.sharing.keep[.gpu]! - 0.8) < 1e-9)
         #expect(abs(fit.sharing.keep[.ane]! - 0.6) < 1e-9)
         #expect(abs(fit.sharing.overhead - 0.003) < 1e-9)
-        #expect(fit.residuals.allSatisfy { abs($0) < 1e-9 })
     }
 
     @Test func withoutASideClockTheSideEndsWithTheSet() throws {

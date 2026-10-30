@@ -125,7 +125,8 @@ import Testing
         #expect(defects(slow).contains { $0.hasPrefix("aberrant gpu/int8 reaches 0.03 of the peak read (under 0.05)") }, "\(defects(slow))")
         // The engines that read no peak have no bound: the ANE reached 1.06 × the GPU's fp32 peak here.
         #expect(with("ane/fp16", rate: 30e12).verdict.green)
-        #expect(with("amx/fp32", rate: 0.05e12).verdict.green)
+        // (the sets are read on the lines: a line 40 times slower makes the AMX's sides keep more than 1, which is another rule's)
+        #expect(!defects(with("amx/fp32", rate: 0.05e12)).contains { $0.hasPrefix("aberrant amx/fp32 reaches") })
         // Without an inventory there is no peak to read it against.
         var m = R.measurements()
         for i in m.solos.indices where m.solos[i].kernel == "gpu/fp32" { m.solos[i].seconds = m.solos[i].flop / (5 * peak) }
