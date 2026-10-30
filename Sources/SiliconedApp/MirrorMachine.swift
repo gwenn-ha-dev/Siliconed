@@ -124,11 +124,12 @@ extension AppState {
         if mirror != nil {
             return MapFacts(inUse: mirrorMachine?.inUse, stored: mirrorMachine?.stored, remeasuring: mirrorMachine?.remeasuring ?? false)
         }
-        return MapFacts(inUse: mapInUse.map(RemoteMap.init), stored: storedMap.map(RemoteMap.init), remeasuring: remeasuringOrange)
+        return MapFacts(inUse: mapInUse.map(RemoteMap.init), stored: storedMap.map(RemoteMap.init), remeasuring: remeasuringOrange,
+                        drift: drift)
     }
 
-    /// A current map taken at rest is kept (the chip of « Chain » is green).
-    var mapMeasured: Bool { mapFacts.stored.map { $0.current && $0.green } == true }
+    /// A current map taken at rest is kept, and the last render did not run off it (the chip of « Chain » is green).
+    var mapMeasured: Bool { mapFacts.stored.map { $0.current && $0.green } == true && mapFacts.drift == nil }
 
     /// **« Faster Rendering »** as the window shows it: this Mac's, or the lender's in a mirror.
     var fasterRenderingShown: Bool { mirror != nil ? mirrorCatalog?.fasterRendering ?? true : fasterRendering }
@@ -141,6 +142,8 @@ struct MapFacts: Equatable {
     var inUse: RemoteMap?
     var stored: RemoteMap?
     var remeasuring: Bool
+    /// The last render ran off the model in use (`RenderLoop.Verdict.drift`): this Mac's own, never a lender's.
+    var drift: RenderLoop.Note?
 }
 
 extension RemoteDiagnostic {

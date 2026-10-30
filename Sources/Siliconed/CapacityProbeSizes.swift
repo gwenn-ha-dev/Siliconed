@@ -157,6 +157,9 @@ extension Diagnostic.CapacityProbes {
         /// The heat a run adds beyond what its start shows, and the noise of the projection: a tier is kept only while this much
         /// of the minute is left (the fanless Neo lost 1.9 × of the AMX over a minute).
         package static let margin = 1.6
+        /// **What the guard may spend** measuring a step again (`CapacityProbes.Context.guarded`): the seconds the minute leaves beyond the
+        /// run as projected with `expectation` (the projection is within 5–10 % of the seconds the stages take here), at most `retryCap`.
+        package static let expectation = 1.3, retryCap = 15.0
         /// Seconds the inventory, the fit and the report take beyond the probes.
         package static let reserve = 2.0
 

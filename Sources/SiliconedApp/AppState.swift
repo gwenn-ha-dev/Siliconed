@@ -391,8 +391,8 @@ final class AppState {
     /// The diagnostic sheet, and where the diagnostic stands.
     var diagnosticOpen = false
     var diagnostic = DiagnosticPhase.ready
-    /// The measuring child (`CapacityMeasure`), while it runs; `diagnosticStopped` when Stop ended it.
-    var diagnosticProcess: Process?
+    /// The supervisor of the measuring child (`Diagnostic.Child`), while it runs; `diagnosticStopped` when Stop ended it.
+    var diagnosticSupervisor: Diagnostic.Child.Supervisor?
     var diagnosticStopped = false
     var diagnosticRunning: Bool { if case .running = diagnostic { true } else { false } }
     /// The chosen image full screen, in the window (never a file opened elsewhere).
@@ -578,7 +578,29 @@ final class AppState {
                                            references: references, plan: EngineSettings.effective.plan, mapDate: map.date) else { return }
         renderNote = check.note
         if let data = try? JSONEncoder().encode(check.note) { UserDefaults.standard.set(data, forKey: Self.renderNoteKey) }
+        noteDrift(check.verdict, check.note)
     }
+
+    /// **A render ran off the model by more than the loop's tolerance** (`RenderLoop.Verdict.drift`): the footer says it and proposes to
+    /// measure again. It says nothing else — the plan of this session stays what it is, and so do the bits of the images —, and only
+    /// once for a given measure: a render that held clears it, a new measure clears it, and a measure already told about is not
+    /// told about again at the next launch (the proposal would be repeated at every render of a Mac whose model is off by its own
+    /// structure, not by the hour).
+    private func noteDrift(_ verdict: RenderLoop.Verdict, _ note: RenderLoop.Note) {
+        guard verdict == .drift else {
+            if verdict == .held { drift = nil }
+            return
+        }
+        let told = UserDefaults.standard.string(forKey: Self.driftToldKey)
+        guard drift != nil || told != note.map else { return }
+        drift = note
+        UserDefaults.standard.set(note.map, forKey: Self.driftToldKey)
+    }
+
+    /// The date of the measure the user was last told renders ran off.
+    private static let driftToldKey = "capacityMapDriftTold"
+    /// The last render's note when it ran off the model, until a render holds or a measure replaces the model; the footer reads it.
+    private(set) var drift: RenderLoop.Note?
 
     /// The map kept in the preferences, current or not.
     private(set) var storedMap: Diagnostic.Report?
@@ -600,6 +622,7 @@ final class AppState {
         guard let data = try? report.json(pretty: false) else { return }
         UserDefaults.standard.set(data, forKey: Self.capacityMapKey)
         if report.date != renderNote?.map { renderNote = nil; UserDefaults.standard.removeObject(forKey: Self.renderNoteKey) }
+        drift = nil
         if remeasuringOrange, !report.isGreen {
             UserDefaults.standard.set(report.date, forKey: Self.retriedMapKey)
         }

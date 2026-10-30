@@ -32,7 +32,7 @@ extension AppState {
         diagnosticOpen = true
     }
 
-    /// **Runs `Diagnostic.run`** in a child process (`CapacityMeasure`, under a minute), the queue held meanwhile.
+    /// **Runs `Diagnostic.run`** in a child process (`Diagnostic.Child`, under a minute), the queue held meanwhile.
     func startDiagnostic() {
         guard diagnosticBlocker == nil else { return }
         // In a mirror the lending Mac measures itself; the sheet shows it starting until its word comes.
@@ -44,65 +44,63 @@ extension AppState {
         measure()
     }
 
-    /// **The measure, in a child process**: this app's executable with `CapacityMeasure.argument`. The
+    /// **The measure, in a child process**: this app's executable with `Diagnostic.Child.argument`. The
     /// diagnostic reads the engine's settings, and the settings are read once per process: measured here, before the
     /// first render, it would freeze this process on the defaults and the model could no longer apply. The child
     /// measures on the defaults, whatever this process uses — a measure taken again is not skewed by the model in use —,
-    /// and frees its memory on exit.
+    /// and frees its memory on exit. **A route that kills the child is left out and the measure starts again**
+    /// (`Diagnostic.Child.Supervisor`): the report says which route and why, and no render loads a route the report has not seen load.
     /// Its report applies at once when nothing read the settings yet (`keep`). `next` calls this past its
     /// own guards, a job waiting; the sheet and the remote control through `startDiagnostic`.
     func measure() {
         guard let executable = Bundle.main.executableURL else { return }
-        let process = Process()
-        process.executableURL = executable
-        process.arguments = [CapacityMeasure.argument]
-        let output = Pipe()
-        process.standardOutput = output
-        process.standardError = FileHandle.nullDevice
-        diagnosticProcess = process
+        let supervisor = Diagnostic.Child.Supervisor(executable: executable)
+        diagnosticSupervisor = supervisor
         diagnosticStopped = false
         diagnostic = .running(done: 0, total: Diagnostic.Stage.allCases.count, line: String(localized: "Preparing…"))
-        Task { [weak self] in
-            var report: Diagnostic.Report?, failure: Problem?
-            do {
-                try process.run()
-                for try await line in output.fileHandleForReading.bytes.lines {
-                    switch CapacityMeasure.Line(line) {
-                    case .stage(let stage): self?.diagnosticProgress(stage)
-                    case .report(let r): report = r
-                    case .failure(let p): failure = p
-                    case nil: break
-                    }
-                }
-                while process.isRunning { try? await Task.sleep(for: .milliseconds(20)) }
-            } catch {
-                failure = Problem(error)
-            }
-            guard let self else { return }
-            self.diagnosticProcess = nil
-            if self.diagnosticStopped {
-                self.diagnostic = .ready
-                self.fallBackOnStoredMap()
-            } else if let report, process.terminationStatus == 0 {
-                self.diagnostic = .finished(report)
-                self.keep(report)   // what this Mac uses: from now if nothing read the settings yet, else from the next launch
-            } else {
-                let problem = failure ?? Problem(EngineError.internalFailure(
-                    component: "diagnostic", detail: "the measuring process ended with status \(process.terminationStatus)"))
-                self.diagnostic = .failed(problem)
-                self.fallBackOnStoredMap()
-                // A job waits for this measure: the failure is said where the render's would be.
-                if !self.settingsRead, !self.file.isEmpty { self.problem = problem }
-            }
-            self.next()
+        // A thread of its own: the supervisor waits on the child's pipe for the whole measure, which a task of the pool should not.
+        Thread.detachNewThread { [weak self] in
+            let outcome = supervisor.run(
+                onStage: { stage in Task { @MainActor in self?.diagnosticProgress(stage) } },
+                onRestart: { _ in Task { @MainActor in self?.diagnosticRestarted() } })
+            Task { @MainActor in self?.diagnosticFinished(outcome) }
         }
+    }
+
+    /// The child's word came: the report, a failure, or the stop.
+    private func diagnosticFinished(_ outcome: Diagnostic.Child.Outcome) {
+        diagnosticSupervisor = nil
+        if diagnosticStopped || outcome.stopped {
+            diagnostic = .ready
+            fallBackOnStoredMap()
+        } else if let report = outcome.report {
+            diagnostic = .finished(report)
+            keep(report)   // what this Mac uses: from now if nothing read the settings yet, else from the next launch
+        } else {
+            // The one refusal the app says in its own words: another process renders.
+            let failure = outcome.failure ?? ("internal", "the measuring process did not finish")
+            let problem = failure.code == EngineError.renderAlreadyRunning.code
+                ? Problem(EngineError.renderAlreadyRunning)
+                : Problem(EngineError.internalFailure(component: "diagnostic", detail: failure.detail))
+            diagnostic = .failed(problem)
+            fallBackOnStoredMap()
+            // A job waits for this measure: the failure is said where the render's would be.
+            if !settingsRead, !file.isEmpty { self.problem = problem }
+        }
+        next()
+    }
+
+    /// A route killed the child: the measure starts again, and the progress with it.
+    private func diagnosticRestarted() {
+        guard case .running = diagnostic else { return }
+        diagnostic = .running(done: 0, total: Diagnostic.Stage.allCases.count, line: String(localized: "Preparing…"))
     }
 
     func cancelDiagnostic() {
         if let mirror { if diagnosticRunning { mirror.send(.stopMeasure) }; return }
-        guard let process = diagnosticProcess else { return }
+        guard let supervisor = diagnosticSupervisor else { return }
         diagnosticStopped = true
-        process.terminate()
+        supervisor.stop()
     }
 
     /// The library names the stage (`Diagnostic.Stage`): the app says it in the user's language.
@@ -158,57 +156,5 @@ extension AppState {
         task?.cancel()
         // A mirror's window closing does not stop the measure of the Mac it shows.
         if mirror == nil { cancelDiagnostic() }
-    }
-}
-
-/// **The capacity measure's child process**: `Siliconed --measure-capacity` runs `Diagnostic.run` before
-/// anything else (`SiliconedApplication.init`), says each stage and then the report on its standard
-/// output, one line each, and exits — no window, no Dock icon: it never reaches `NSApplication.run`.
-enum CapacityMeasure {
-    /// `--measure-capacity`: the capacity model of this Mac, whatever models it holds.
-    static let argument = "--measure-capacity"
-
-    /// **The child's side**: does nothing unless the process was launched with `argument`; then never returns.
-    static func runIfAsked() {
-        guard CommandLine.arguments.dropFirst().first == argument else { return }
-        setvbuf(stdout, nil, _IOLBF, 0)   // a stage line reaches the app as it is written
-        do {
-            let report = try Diagnostic.run(onProgress: { stage in print("stage " + stage.key) })
-            let json = try report.json(pretty: false)
-            print("report " + String(decoding: json, as: UTF8.self))
-            exit(0)
-        } catch {
-            let e = EngineError(error)
-            print("error \(e.code) " + e.description.replacingOccurrences(of: "\n", with: " "))
-            exit(1)
-        }
-    }
-
-    /// One line of the child, read by the app.
-    enum Line {
-        case stage(Diagnostic.Stage)
-        case report(Diagnostic.Report)
-        case failure(Problem)
-
-        init?(_ line: String) {
-            let (word, rest) = line.firstIndex(of: " ").map { (line[..<$0], String(line[line.index(after: $0)...])) }
-                ?? (line[...], "")
-            switch word {
-            case "stage":
-                guard let stage = Diagnostic.Stage.allCases.first(where: { $0.key == rest }) else { return nil }
-                self = .stage(stage)
-            case "report":
-                guard let report = Diagnostic.Report.read(Data(rest.utf8)) else { return nil }
-                self = .report(report)
-            case "error":
-                // The one refusal the app says in its own words: another process renders.
-                let code = rest.prefix { $0 != " " }
-                let detail = String(rest.dropFirst(code.count)).trimmingCharacters(in: .whitespaces)
-                self = .failure(code == EngineError.renderAlreadyRunning.code
-                    ? Problem(EngineError.renderAlreadyRunning)
-                    : Problem(EngineError.internalFailure(component: "diagnostic", detail: detail)))
-            default: return nil
-            }
-        }
     }
 }

@@ -24,6 +24,9 @@ import MetalPerformanceShadersGraph
 ///      ├─ sharing int8             the GPU's int8 kernel beside the ANE's, both reading the integers staged in the reserve
 ///      └─ witnesses, end
 ///
+///     every timed step goes through `Context.guarded`: measured, then a pulse (`Regime`), and again after a wait while the pulse or the
+///     chain's own calls say the Mac was busy and `retryBudget` has seconds
+///
 /// What sets it apart — what a probe written by analogy with the old map's route timings would get wrong:
 ///
 ///   - **a route is timed alone, not against another**: the map's ratios had no absolute second; a line needs seconds at
@@ -133,6 +136,8 @@ extension Diagnostic {
             package var memory: Diagnostic.Memory
             package var stages: [String: Diagnostic.StageTime]
             package var details: Details
+            /// What the run says of the Mac it ran on (`Diagnostic.Regime`).
+            package var regime: Diagnostic.Regime = Diagnostic.Regime()
         }
 
         // MARK: - The run
@@ -140,8 +145,11 @@ extension Diagnostic {
         /// **Runs the probes** on `machine` (read once by the caller: its inventory sizes them). Takes the machine's render lock and
         /// runs on whatever queue called: `Diagnostic.run` brings it the engine's.
         package static func run(machine: Diagnostic.Machine, cancellation: Cancellation? = nil, validate: Bool = false,
-                                log: ((String) -> Void)? = nil,
+                                skipping requested: Set<Kernel> = [], log: ((String) -> Void)? = nil,
                                 onStage: ((Diagnostic.Stage) -> Void)? = nil) throws(EngineError) -> Result {
+            // The integers' route rides on the half-precision one (`CapacityPlan.Resources`): without the one, nothing of the other.
+            var skipped = requested
+            if skipped.contains(Kernel(.ane, .fp16)) { skipped.insert(Kernel(.ane, .int8)) }
             let started = Date()
             let lock = try RenderLock.acquire(RenderLock.machine)
             defer { withExtendedLifetime(lock) {} }
@@ -149,7 +157,7 @@ extension Diagnostic {
                 throw .internalFailure(component: "capacity probes", detail: "no Metal device")
             }
             OperatorFootprint.bringUp()
-            _ = NeuralEngine.bringUp
+            if !skipped.contains(Kernel(.ane, .fp16)) { _ = NeuralEngine.bringUp }
             let gauge = Gauge()
             let clock = now()
             // The largest tier whose need fits B; the witnesses step it down if the minute does not hold.
@@ -158,7 +166,7 @@ extension Diagnostic {
             }
             do {
                 let context = try Context(device: device, queue: queue, cancellation: cancellation, gauge: gauge, validating: validate,
-                                          sizes: Sizes.tiers[plan.tier], machine: machine, started: clock, log: log, onStage: onStage)
+                                          sizes: Sizes.tiers[plan.tier], machine: machine, started: clock, skipped: skipped, log: log, onStage: onStage)
                 context.setup = now() - clock
                 var details = Details()
                 var m = Fit.Measurements()
@@ -198,9 +206,10 @@ extension Diagnostic {
                 let memory = Diagnostic.Memory(budget: plan.budget, base: plan.base, need: plan.need.peak, peak: FootprintInterval.peak())
                 gauge.finish()
                 let stages = context.stageTimes(fit: now() - fitting)
+                context.watch.finish(into: &context.regime)
                 return Result(date: ISO8601DateFormatter().string(from: started), seconds: Date().timeIntervalSince(started),
                               tier: context.sizes.tier, measurements: m, model: model, judge: context.judgements(m.wrong),
-                              memory: memory, stages: stages, details: details)
+                              memory: memory, stages: stages, details: details, regime: context.regime.rounded())
             } catch {
                 throw EngineError(error)
             }
@@ -276,7 +285,7 @@ extension Diagnostic {
         }
 
         /// **A chain's figure** (`chainWarm`…): the median call over the window after the ramp, and the calls it holds. `nil` when the body refuses.
-        private static func chain(_ body: () -> Bool) -> (seconds: Double, calls: Int)? {
+        private static func chain(_ body: () -> Bool) -> (seconds: Double, calls: Int, spread: Double)? {
             let begin = now()
             var times: [Double] = []
             var calls = 0
@@ -290,8 +299,12 @@ extension Diagnostic {
                 if elapsed >= chainWarm + chainWindow, times.count >= chainCalls { break }
                 if elapsed >= chainCap, !times.isEmpty { break }
             }
-            return (Fit.median(times), times.count)
+            lastSpread = max(lastSpread, spread(times))
+            return (Fit.median(times), times.count, spread(times))
         }
+
+        /// The dispersion of the figure the last `steady` or `chain` returned: what the guard reads beside the pulse. One thread measures.
+        nonisolated(unsafe) static var lastSpread = 0.0
 
         private final class Context {
             let bench: Bench
@@ -311,18 +324,24 @@ extension Diagnostic {
             /// When the run began, the stage under way (for the progress), each stage's seconds and projection.
             let started: Double
             let validating: Bool
+            /// The routes this measure leaves out: a process died on them (`Diagnostic.Child`). Never touched, never announced.
+            let skipped: Set<Kernel>
             let onStage: ((Diagnostic.Stage) -> Void)?
             var announced: Diagnostic.Stage?
             var setup = 0.0
+            let watch = LoadWatch()
+            var regime = Diagnostic.Regime()
             var seconds: [String: Double] = [:]
             var projected: [String: Double] = [:]
             /// What the judge saw, per kernel (or set): the worst error against its threshold, and whether it computed wrong.
             private var seen: [String: (error: Double, threshold: Double, wrong: Bool)] = [:]
 
             init(device: MTLDevice, queue: MTLCommandQueue, cancellation: Cancellation?, gauge: Gauge, validating: Bool, sizes: Sizes,
-                 machine: Diagnostic.Machine, started: Double, log: ((String) -> Void)?, onStage: ((Diagnostic.Stage) -> Void)?) throws {
+                 machine: Diagnostic.Machine, started: Double, skipped: Set<Kernel>, log: ((String) -> Void)?,
+                 onStage: ((Diagnostic.Stage) -> Void)?) throws {
                 bench = Bench(device: device, queue: queue, cancellation: cancellation, gauge: gauge)
                 self.log = log; self.sizes = sizes; self.machine = machine; self.started = started; self.onStage = onStage
+                self.skipped = skipped
                 self.validating = validating
                 let all = sizes.products + (validating ? CapacityProbes.validationShapes : [])
                 operands = Operands(Operands.sizes(products: all.map { ($0.m, $0.k, $0.n, WeightKind.q8) }))
@@ -427,6 +446,7 @@ extension Diagnostic {
             func judgements(_ wrong: [String]) -> [String: Diagnostic.Judge] {
                 var out: [String: Diagnostic.Judge] = [:]
                 for (name, v) in seen { out[name] = Diagnostic.Judge(error: v.error, threshold: v.threshold, excluded: v.wrong || wrong.contains(name)) }
+                for kernel in skipped { out[kernel.description] = Diagnostic.Judge(error: 0, threshold: 0, excluded: true, reason: .died) }
                 return out
             }
 
@@ -554,7 +574,9 @@ extension Diagnostic {
                     try bench.check()
                     if let group = groups[name], group != announced { announced = group; onStage?(group) }
                     _ = lap()
+                    watch.begin(name)
                     try body()
+                    watch.end(name)
                     seconds[name] = lap()
                     log?(String(format: "%@ %.2f s", name, seconds[name]!) + (projected[name].map { String(format: " (projected %.2f)", $0) } ?? ""))
                 }
@@ -576,6 +598,73 @@ extension Diagnostic {
                 }
             }
 
+            // MARK: The Mac while it measures
+
+            /// The pulse's instruments, made when the first step asks (a few tens of milliseconds, once).
+            private lazy var pulser = Pulser(threads: machine.performanceCores, device: bench.device, queue: bench.queue)
+            /// The pulse that closed the step before.
+            private var lastPulse: Diagnostic.Regime.Pulse?
+            /// Seconds the guard may still spend measuring again and waiting for the Mac to be quiet (`project`).
+            var retryBudget = 0.0
+            /// The most times a step is measured.
+            static let attempts = 3
+
+            /// **A pulse**: how the Mac is just now. Recorded in the report when it closes a step.
+            private func takePulse(step: String, attempt: Int, record: Bool) -> Diagnostic.Regime.Pulse {
+                let w = pulser.wait()
+                let c = pulser.crowdAndAlone()
+                let pulse = Diagnostic.Regime.Pulse(at: CapacityProbes.now() - started, step: step, attempt: attempt, crowd: c.crowd, alone: c.alone,
+                                                    wait: w.median, late: w.longest)
+                if record { regime.pulses.append(pulse) }
+                return pulse
+            }
+
+            /// **A step measured when the Mac is free, or as free as the minute allows.** `body` is the step's timing: the figure it
+            /// returns is kept when the pulse that closes it says the threads still had their cores and the GPU its promptness, and
+            /// the calls inside it agreed (`Regime.Rules`). Otherwise it waits — for a quiet pulse, at most two seconds — and measures
+            /// it again, three times at most and while `retryBudget` has seconds. What it could not redo is kept as it was and said by the
+            /// verdict (`Regime.disturbances`): a figure taken on a busy Mac is never passed for the Mac's.
+            func guarded<T>(_ step: String, _ body: () -> T?) -> T? {
+                if lastPulse == nil { lastPulse = takePulse(step: "start", attempt: 0, record: true) }
+                if let last = lastPulse, regime.busy(last), retryBudget > 0 { waitForQuiet(step) }
+                var attempt = 0
+                while true {
+                    attempt += 1
+                    let began = CapacityProbes.now()
+                    CapacityProbes.lastSpread = 0
+                    let result = body()
+                    let spread = CapacityProbes.lastSpread
+                    let end = takePulse(step: step, attempt: attempt, record: true)
+                    lastPulse = end
+                    regime.spreads[step] = spread
+                    guard regime.busy(end) || spread > Diagnostic.Regime.Rules.spread else {
+                        if attempt > 1 { regime.repeated += 1 }
+                        return result
+                    }
+                    let cost = CapacityProbes.now() - began
+                    guard attempt < Self.attempts, retryBudget > cost else { return result }
+                    retryBudget -= cost
+                    regime.repeatedSeconds += cost
+                    log?(String(format: "  %@: the Mac was busy (crowd %.2f, wait %.2f ms, spread %.2f): measured again", step, end.crowd, end.wait * 1e3, spread))
+                    waitForQuiet(step)
+                }
+            }
+
+            /// Polls the pulse every quarter of a second until it is quiet, at most two seconds and what the budget has left.
+            private func waitForQuiet(_ step: String) {
+                let began = CapacityProbes.now()
+                let limit = min(2.0, retryBudget)
+                while CapacityProbes.now() - began < limit {
+                    Thread.sleep(forTimeInterval: 0.25)
+                    let pulse = takePulse(step: step, attempt: 0, record: false)
+                    lastPulse = pulse
+                    if !regime.busy(pulse) { break }
+                }
+                let spent = CapacityProbes.now() - began
+                retryBudget -= spent
+                regime.repeatedSeconds += spent
+            }
+
             /// **Projects the rest of the run from what the engines did on the witness**, and steps the tier down while the minute does not hold.
             /// The sizes only shrink here: the operands were planned for the tier the inventory allowed, and a lower tier's are inside them.
             func project(_ witnesses: [Fit.Measurements.Witness]) {
@@ -592,6 +681,8 @@ extension Diagnostic {
                 }
                 // Preparation and the first witnesses have run: they were not projected.
                 projected = sizes.projection(rates).filter { $0.key != "preparation" && $0.key != "witnesses start" }
+                // What the minute leaves beyond the run as projected is what the guard may spend: none on a Mac that fills it.
+                retryBudget = max(0, min(Sizes.retryCap, left - sizes.projectedSeconds(rates) * Sizes.expectation))
             }
 
             /// Each stage's seconds with its projection, and the fixed costs beside them.
@@ -631,7 +722,7 @@ extension Diagnostic {
                 restoreB()
                 if let t = median({ self.gpu(m, k, n) }) { result["gpu"] = t }
                 if let t = median({ self.amx(m, k, n) }) { result["amx"] = t }
-                if let e = neural.neuralEngine, let t = median({ self.ane(e, rows: m, k, n) }) { result["ane"] = t }
+                if !skipped.contains(Kernel(.ane, .fp16)), let e = neural.neuralEngine, let t = median({ self.ane(e, rows: m, k, n) }) { result["ane"] = t }
                 return result
             }
 
@@ -696,8 +787,10 @@ extension Diagnostic {
 
             /// One kernel on one product: judged on its first run, then timed. A kernel that judged wrong returns seconds 0.
             func solo(_ probe: Probe, m: Int, k: Int, n: Int, chained: Bool = false) -> Fit.Measurements.Solo? {
+                guard !skipped.contains(probe.kernel) else { return nil }
                 let flop = 2.0 * Double(m) * Double(k) * Double(n)
                 let name = probe.kernel.description
+                RouteBeacon.announce(name)
                 let run: () -> Bool
                 var truthKind = Truth.fp32
                 var isANE = false
@@ -762,14 +855,17 @@ extension Diagnostic {
                    let massive = massive(truthKind, kernel: name, m: m, k: k, n: n, run), !massive.pass {
                     return .init(kernel: name, shape: [m, k, n], flop: flop, seconds: 0, error: max(massive.rowError, massive.columnError))
                 }
-                guard let t = chained ? CapacityProbes.chain(run)?.seconds : CapacityProbes.steady(run) else { return nil }
+                guard let t = guarded("\(name) \(m)x\(k)x\(n)", { () -> Double? in
+                    chained ? CapacityProbes.chain(run)?.seconds : CapacityProbes.steady(run)
+                }) else { return nil }
                 return .init(kernel: name, shape: [m, k, n], flop: flop, seconds: t, error: verdict.error)
             }
 
             // MARK: The ANE's staircase
 
             func stairs(_ m: inout Fit.Measurements) {
-                guard let engine = neural.neuralEngine else { return }
+                guard !skipped.contains(Kernel(.ane, .fp16)), let engine = neural.neuralEngine else { return }
+                RouteBeacon.announce("ane/fp16")
                 restoreB()
                 m.stairShape = [Sizes.stair.k, Sizes.stair.n]
                 for rows in sizes.stairRows {
@@ -777,7 +873,7 @@ extension Diagnostic {
                     let run = { self.ane(engine, rows: rows, k, n) }
                     guard let v = judged("ane/fp16", .fp32, ane: true, m: rows, k: k, n: n, run) else { continue }
                     guard v.pass else { m.wrong.append("ane/fp16"); continue }
-                    guard let t = CapacityProbes.steady(run) else { continue }
+                    guard let t = guarded("stair \(rows)", { CapacityProbes.steady(run) }) else { continue }
                     m.stairs.append(.init(rows: rows, seconds: t))
                     log?(String(format: "  stair %d rows  %.2f ms", rows, t * 1e3))
                 }
@@ -815,17 +911,20 @@ extension Diagnostic {
                             guard run() else { return }
                             let v = verdict(kernel.description)
                             guard v.pass else { measurements.wrong.append(kernel.description); return }
-                            guard let t = CapacityProbes.steady(run) else { return }
+                            guard let t = guarded("\(kernel.description) S=\(s)", { CapacityProbes.steady(run) }) else { return }
                             measurements.solos.append(.init(kernel: kernel.description, shape: shape, flop: flop, seconds: t, error: v.error))
                             log?(String(format: "  %@ S=%d  %.2f ms  %.2f TFLOP/s", kernel.description, s, t * 1e3, flop / t * 1e-12))
                         }
                         let graph = Attention(device: bench.device, queue: bench.queue, heads: h, sequence: s, headDim: d)
+                        RouteBeacon.announce("gpu/graph")
                         record(Kernel(.gpu, .graph), flop: flop, run: { _ = graph.run(q: buffers.q, k: buffers.k, v: buffers.v, into: buffers.out); return true }, shape: [s, h, d])
-                        if let flash = try? FlashMatrix(device: bench.device, queue: bench.queue, heads: h, sequence: s, headDim: d) {
+                        RouteBeacon.announce("gpu/flash")
+                        if !skipped.contains(Kernel(.gpu, .flash)), let flash = try? FlashMatrix(device: bench.device, queue: bench.queue, heads: h, sequence: s, headDim: d) {
                             record(Kernel(.gpu, .flash), flop: flop, run: { _ = flash.run(q: buffers.q, k: buffers.k, v: buffers.v, into: buffers.out); return true }, shape: [s, h, d])
                         }
                         // The CPU's heads: all but one of them, the figure being the CPU part's own wall.
-                        if let split = try? HeadSplitAttention(device: bench.device, queue: bench.queue, heads: h, sequence: s, headDim: d,
+                        RouteBeacon.announce("cpu/heads")
+                        if !skipped.contains(Kernel(.cpu, .heads)), let split = try? HeadSplitAttention(device: bench.device, queue: bench.queue, heads: h, sequence: s, headDim: d,
                                                                cpuFraction: Double(h - 1) / Double(h)) {
                             nonisolated(unsafe) let (qp, kp, vp, op) = (pages.q.floats(), pages.k.floats(), pages.v.floats(), out)
                             var cpuSeconds = 0.0
@@ -838,16 +937,19 @@ extension Diagnostic {
                             if run() {
                                 let v = verdict("cpu/heads")
                                 if !v.pass { measurements.wrong.append("cpu/heads") } else {
-                                    var times: [Double] = []
-                                    var previous = Double.infinity
-                                    for i in 0..<5 {
-                                        _ = run()
-                                        if i >= 1 { times.append(cpuSeconds) }
-                                        if i >= 1, cpuSeconds >= previous * 0.9, times.count >= 2 { break }
-                                        previous = cpuSeconds
+                                    let heads = guarded("cpu/heads S=\(s)") { () -> Double? in
+                                        var times: [Double] = []
+                                        var previous = Double.infinity
+                                        for i in 0..<5 {
+                                            _ = run()
+                                            if i >= 1 { times.append(cpuSeconds) }
+                                            if i >= 1, cpuSeconds >= previous * 0.9, times.count >= 2 { break }
+                                            previous = cpuSeconds
+                                        }
+                                        return Fit.median(Array(times.suffix(3)))
                                     }
+                                    guard let t = heads else { return }
                                     let cpuFlop = 4.0 * Double(s) * Double(s) * Double(d) * Double(split.cpuHeads)
-                                    let t = Fit.median(Array(times.suffix(3)))
                                     measurements.solos.append(.init(kernel: Kernel(.cpu, .heads).description, shape: [s, h, d, split.cpuHeads],
                                                                     flop: cpuFlop, seconds: t, error: v.error))
                                     log?(String(format: "  cpu/heads S=%d (%d heads)  %.2f ms  %.2f TFLOP/s", s, split.cpuHeads, t * 1e3, cpuFlop / t * 1e-12))
@@ -892,12 +994,16 @@ extension Diagnostic {
                     return
                 }
                 var walls: [Double] = [], gpu: [Double] = [], cpu: [Double] = []
-                var previous = Double.infinity
-                for i in 0..<6 {
-                    guard let wall = CapacityProbes.timed(run) else { return }
-                    if i >= 1 { walls.append(wall); gpu.append(sides.gpu); cpu.append(sides.cpu) }
-                    if i >= 2, wall >= previous * 0.9 { break }
-                    previous = wall
+                _ = guarded("\(key) S=\(s)") { () -> Bool? in
+                    walls = []; gpu = []; cpu = []
+                    var previous = Double.infinity
+                    for i in 0..<6 {
+                        guard let wall = CapacityProbes.timed(run) else { return nil }
+                        if i >= 1 { walls.append(wall); gpu.append(sides.gpu); cpu.append(sides.cpu) }
+                        if i >= 2, wall >= previous * 0.9 { break }
+                        previous = wall
+                    }
+                    return true
                 }
                 guard !walls.isEmpty else { return }
                 let gpuAlone = graph * Double(split.gpuHeads) / Double(h), cpuAlone = cpuSolo.seconds * Double(split.cpuHeads) / Double(cpuSolo.heads)
@@ -1018,6 +1124,7 @@ extension Diagnostic {
                 }
                 prime(.int8, ane: true, m: m, k: k, n: n)
                 stageInt8(plan, k: k, n: n)
+                RouteBeacon.announce(g.description); RouteBeacon.announce(a.description)
                 let buffers = bothB
                 func once() -> (wall: Double, within: [String: Double])? {
                     var result: (gpu: Double, computed: Bool, gpuWall: Double, aneWall: Double)?
@@ -1033,17 +1140,20 @@ extension Diagnostic {
                 }
                 guard verdict.pass else { log?("  \(key) \(m)x\(k)x\(n) pass \(pass): WRONG, error \(verdict.error)"); return .init(set: key, shape: [m, k, n], pass: pass, sides: [], wall: 0, error: verdict.error) }
                 var samples: [(wall: Double, within: [String: Double])] = []
-                var previous = Double.infinity
-                for i in 0..<6 {
-                    guard let s = once() else { return nil }
-                    if i >= 1, s.wall >= previous * 0.9 {
-                        samples.append(s)
-                        for _ in 0..<(s.wall < 0.15 ? 2 : 1) { if let t = once() { samples.append(t) } }
-                        break
+                guard guarded("\(key) \(m)x\(k)x\(n) pass \(pass)", { () -> Bool? in
+                    samples = []
+                    var previous = Double.infinity
+                    for i in 0..<6 {
+                        guard let s = once() else { return nil }
+                        if i >= 1, s.wall >= previous * 0.9 {
+                            samples.append(s)
+                            for _ in 0..<(s.wall < 0.15 ? 2 : 1) { if let t = once() { samples.append(t) } }
+                            break
+                        }
+                        previous = s.wall
                     }
-                    previous = s.wall
-                }
-                guard !samples.isEmpty else { return nil }
+                    return samples.isEmpty ? nil : true
+                }) != nil else { return nil }
                 let wall = Fit.median(samples.map(\.wall))
                 var sides: [Fit.Measurements.Side] = []
                 for (kernel, rows) in [(g, gpuRows), (a, aneRows)] {
@@ -1147,6 +1257,7 @@ extension Diagnostic {
                     return true
                 }
                 guard configure() else { log?("  \(key) \(m)x\(k)x\(n) pass \(pass): rows \(aneRows)/\(gpuRows)/\(amxRows) not accepted by the engines"); return nil }
+                for kernel in set { RouteBeacon.announce(kernel.description) }
                 func once() -> (wall: Double, within: [String: Double])? {
                     let before = gemm.conductor?.perShape[key2] ?? Conductor.ShapeRecord()
                     let fallbacks = engine?.fallbacks ?? 0
@@ -1169,17 +1280,22 @@ extension Diagnostic {
                 guard verdict.pass else { log?("  \(key) \(m)x\(k)x\(n) pass \(pass): WRONG, error \(verdict.error)"); return .init(set: key, shape: [m, k, n], pass: pass, sides: [], wall: 0, error: verdict.error) }
                 // The chain: back to back, the ramp thrown away, the median of the window (`chain`); the set's clock per call.
                 var samples: [(wall: Double, within: [String: Double])] = []
-                let begin = CapacityProbes.now()
-                var calls = 0
-                while true {
-                    let start = CapacityProbes.now()
-                    guard let s = once() else { return nil }
-                    calls += 1
-                    if calls > chainWarmCalls, start - begin >= chainWarm { samples.append(s) }
-                    let elapsed = CapacityProbes.now() - begin
-                    if elapsed >= chainWarm + chainWindow, samples.count >= chainCalls { break }
-                    if elapsed >= chainCap, !samples.isEmpty { break }
-                }
+                guard guarded("\(key) \(m)x\(k)x\(n) pass \(pass)", { () -> Bool? in
+                    samples = []
+                    let begin = CapacityProbes.now()
+                    var calls = 0
+                    while true {
+                        let start = CapacityProbes.now()
+                        guard let s = once() else { return nil }
+                        calls += 1
+                        if calls > chainWarmCalls, start - begin >= chainWarm { samples.append(s) }
+                        let elapsed = CapacityProbes.now() - begin
+                        if elapsed >= chainWarm + chainWindow, samples.count >= chainCalls { break }
+                        if elapsed >= chainCap, !samples.isEmpty { break }
+                    }
+                    CapacityProbes.lastSpread = max(CapacityProbes.lastSpread, CapacityProbes.spread(samples.map(\.wall)))
+                    return true
+                }) != nil else { return nil }
                 let wall = Fit.median(samples.map(\.wall))
                 // `solo` is the line's seconds at the rows the side took: the reference of κ (the line's own bias at these rows is in κ).
                 var sides: [Fit.Measurements.Side] = []

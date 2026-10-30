@@ -92,8 +92,15 @@ extension Diagnostic {
         package var error: Double
         package var threshold: Double
         package var excluded: Bool
-        package init(error: Double, threshold: Double, excluded: Bool) {
+        /// Why it is left out, when the judge did not compute a wrong result: `died`, the process was gone on it.
+        package var reason: Reason?
+        package enum Reason: String, Codable, Sendable {
+            /// The process that loaded this route died, by a signal; the measure was taken again without it (`Child`).
+            case died
+        }
+        package init(error: Double, threshold: Double, excluded: Bool, reason: Reason? = nil) {
             self.error = Diagnostic.significant(error, 3); self.threshold = Diagnostic.significant(threshold, 3); self.excluded = excluded
+            self.reason = reason
         }
     }
 
@@ -160,15 +167,17 @@ extension Diagnostic {
         /// **The last render against this model's prediction** (`RenderLoop.Note`): the report an app sends carries it; the
         /// model itself is kept without it.
         package var render: RenderLoop.Note?
+        /// **What the measure says of the Mac it ran on** (`Regime`): the others' CPU, the witnesses along the way, the dispersion of the chains.
+        package var regime: Regime?
 
         package init(schema: Int = Diagnostic.schema, date: String, seconds: Double, machine: Machine, cpuFeatures: [String: Int],
                     settings: [String: String] = [:], before: Conditions, after: Conditions, model: CapacityModel,
                     measurements: CapacityFit.Measurements, judge: [String: Judge], memory: Memory, stages: [String: StageTime],
-                    verdict: Verdict, render: RenderLoop.Note? = nil) {
+                    verdict: Verdict, render: RenderLoop.Note? = nil, regime: Regime? = nil) {
             self.schema = schema; self.date = date; self.seconds = Diagnostic.significant(seconds, 3)
             self.machine = machine; self.cpuFeatures = cpuFeatures; self.settings = settings; self.before = before; self.after = after
             self.model = model; self.measurements = measurements; self.judge = judge; self.memory = memory; self.stages = stages
-            self.verdict = verdict; self.render = render
+            self.verdict = verdict; self.render = render; self.regime = regime
         }
 
         /// **A report from the probes' run**: the measurements rounded, the model fitted on them (so that `refit` gives it back), the
@@ -178,10 +187,10 @@ extension Diagnostic {
             let measurements = probes.measurements.rounded()
             let model = Self.fit(measurements, machine: machine)
             let verdict = Verdict(model: model, measurements: measurements, judge: probes.judge, machine: machine,
-                                  memory: probes.memory, before: before, after: after, seconds: seconds)
+                                  memory: probes.memory, before: before, after: after, seconds: seconds, regime: probes.regime)
             self.init(date: date, seconds: seconds, machine: machine, cpuFeatures: cpuFeatures, settings: settings, before: before,
                       after: after, model: model, measurements: measurements, judge: probes.judge, memory: probes.memory,
-                      stages: probes.stages, verdict: verdict)
+                      stages: probes.stages, verdict: verdict, regime: probes.regime)
         }
 
         /// The model a set of measurements gives on this machine: the fit, the peak the inventory read, to six digits.
@@ -282,6 +291,8 @@ extension Diagnostic {
         case memoryOverBudget
         case swapGrew
         case tookTooLong
+        /// Something else used the Mac while it was measured, and the minute could not measure the steps again.
+        case disturbed
     }
 
     /// The URL of a new issue with `fields` as its query, **every byte that delimits a field escaped**:
@@ -327,6 +338,7 @@ extension Diagnostic.Verdict.Defect {
         case .memory: return subject == "peak" ? .memoryOverNeed : .memoryOverBudget
         case .swap: return .swapGrew
         case .time: return .tookTooLong
+        case .disturbed: return .disturbed
         }
     }
 }
