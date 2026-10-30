@@ -146,7 +146,7 @@ package final class Qwen35Encoder {
     /// - Parameter sequence: the number of positions computed (the prompt's tokens, ≤ 4096).
     package init(artifact: Artifact, sequence: Int, freezeCut: Bool = EngineSettings.effective.frozenCut) throws {
         let config = try Config(header: artifact.header)
-        let gemm = try GEMM(freezeCut: freezeCut, neuralEngine: false)
+        let gemm = try GEMM(freezeCut: freezeCut, phase: .encoding)
         let s = sequence, h = config.hidden, i = config.intermediate
         let a = config.attentionWidth, kv = config.kvWidth
         let arena = try Arena(capacity: Qwen35Encoder.arenaBytes(config: config, sequence: s))

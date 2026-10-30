@@ -147,7 +147,7 @@ package final class Qwen3VLVision {
         let o = config.output
         let largest = Qwen3VLVision.reserves(config).largest
         // The Neural Engine serves the denoisers only: the encoders' output enters the render cache's keys.
-        let gemm = try GEMM(freezeCut: freezeCut, neuralEngine: false)
+        let gemm = try GEMM(freezeCut: freezeCut, phase: .encoding)
         let arena = try Arena(capacity: Qwen3VLVision.arenaBytes(config: config, patches: n))
         var slices: [String: UnsafeMutablePointer<Float>] = [:]
         for (name, count) in Qwen3VLVision.slices(config: config, patches: n) {

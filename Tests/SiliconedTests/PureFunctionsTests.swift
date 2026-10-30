@@ -222,35 +222,31 @@ final class PureFunctionsTests: XCTestCase {
 
     // ── the GPU/AMX cut ──────────────────────────────────────────────────────────────────
 
-    func testTheCutIsQuantizedAndBounded() {
-        let q = Conductor.quantum
-        // The quantum exists so that the MPS operator cache stays small: a different `gpuRows`
-        // on each call made them drop from 3.35 to 1.46 TFLOP/s.
-        for m in [1024, 2048, 4128, 8192] {
-            for T in stride(from: 0.05, through: 0.95, by: 0.05) {
-                let c = Conductor.cut(m, T)
-                XCTAssertEqual(c % q, 0, "unquantized cut: m=\(m) T=\(T) → \(c)")
-                XCTAssertGreaterThanOrEqual(c, q, "both engines must have work")
-                XCTAssertLessThanOrEqual(c, m - q)
+    /// The servo only gives the GPU more rows than the plan did — the AMX's slice, which the memory need charges from the plan, is
+    /// its ceiling — and on the GPU's tile (the quantum exists so that the MPS operator cache stays small: a different `gpuRows` on
+    /// each call made them drop from 3.35 to 1.46 TFLOP/s).
+    func testTheServoOnlyMovesRowsTowardTheGPUOnItsTile() {
+        let q = GEMM.rowQuantum
+        for (planned, m) in [(640, 1024), (2048, 4128), (3072, 4096), (0, 1024)] {
+            XCTAssertEqual(Conductor.servoRows(planned: planned, total: m, learned: nil), planned, "nothing learned: the plan's")
+            var previous = planned
+            for learned in stride(from: 0.0, through: 1.0, by: 0.05) {
+                let rows = Conductor.servoRows(planned: planned, total: m, learned: learned)
+                XCTAssertGreaterThanOrEqual(rows, planned, "never fewer than the plan's: m=\(m) learned=\(learned)")
+                XCTAssertLessThanOrEqual(rows, m)
+                XCTAssertTrue(rows == planned || rows == m || rows % q == 0, "off the tile: \(rows)")
+                XCTAssertGreaterThanOrEqual(rows, previous, "a larger share gives the GPU more rows")
+                previous = rows
             }
         }
+        XCTAssertEqual(Conductor.servoRows(planned: 1024, total: 1024, learned: 0.5), 1024, "no AMX rows: nothing to move")
     }
 
-    func testTheCutIsMonotonicInT() {
-        let m = 4128
-        var previous = 0
-        for T in stride(from: 0.30, through: 0.95, by: 0.01) {
-            let c = Conductor.cut(m, T)
-            XCTAssertGreaterThanOrEqual(c, previous, "increasing T must give the GPU more rows")
-            previous = c
-        }
-    }
-
-    func testTheCutIsAPureFunction() {
-        // This is **the whole reproducibility contract**: with `T` frozen, the cut depends only on
-        // the shape, so two renders of the same seed yield the same bits.
+    func testTheServoIsAPureFunction() {
+        // This is **the whole reproducibility contract**: frozen, the rows are the plan's and nothing else, so two renders of the
+        // same seed yield the same bits.
         for _ in 0..<100 {
-            XCTAssertEqual(Conductor.cut(4128, 0.631), Conductor.cut(4128, 0.631))
+            XCTAssertEqual(Conductor.servoRows(planned: 2560, total: 4128, learned: 0.7), Conductor.servoRows(planned: 2560, total: 4128, learned: 0.7))
         }
     }
 
@@ -275,12 +271,18 @@ final class PureFunctionsTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(GEMM.submittedRows, q - 1)
     }
 
-    func testCutHeightsNeedNoSplit() {
-        // The GPU/AMX cut already hands the GPU multiples of its quantum: the split must not
-        // add a submission there.
-        XCTAssertEqual(Conductor.quantum % GEMM.rowQuantum, 0)
-        for m in [1024, 2048, 4128] {
-            XCTAssertEqual(GEMM.rowSplit(Conductor.cut(m, 0.631)).tail, 0)
+    func testTheSolversCutsNeedNoSplit() throws {
+        // The solver hands the GPU multiples of MPS's tile (the AMX keeps the ragged remainder): the split must not add a
+        // submission there.
+        var model = CapacityModel()
+        model.lines[.init(.gpu, .fp32)] = .init(t0: 0, rate: 3e12)
+        model.lines[.init(.amx, .fp32)] = .init(t0: 0, rate: 1e12)
+        for m in [1024, 1056, 2048, 4128, 4117] {
+            let key = ProductKey(k: 3840, n: 3840, m: m)
+            let a = try XCTUnwrap(CapacitySolver.product(key, model: model, constraints: .init())).assignment
+            XCTAssertTrue(a.amx > 0)
+            XCTAssertEqual(a.gpu % GEMM.rowQuantum, 0, "m=\(m): \(a)")
+            XCTAssertEqual(GEMM.rowSplit(a.gpu).tail, 0)
         }
     }
 
@@ -473,7 +475,7 @@ final class PureFunctionsTests: XCTestCase {
             }
         }
         // The product's fraction is frozen: Z-Image's 30 heads, 18 on the GPU, 12 on the CPU.
-        XCTAssertEqual(HeadSplitAttention.partition(heads: 30, fraction: HeadSplitAttention.cpuFraction).cpu, 18..<30)
+        XCTAssertEqual(HeadSplitAttention.partition(heads: 30, fraction: HeadSplitAttention.referenceFraction).cpu, 18..<30)
     }
 
     func testTheMachineIsReadInsteadOfQuoted() {

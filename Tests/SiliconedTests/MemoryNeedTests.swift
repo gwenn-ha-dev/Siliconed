@@ -217,7 +217,8 @@ final class MemoryNeedTests: XCTestCase {
                             + Attention.maskBytes(sequence: tokens, keys: tokens)
                             + tokens * 32 * 128 * 4
                             + sum(MemoryNeed.gemm("", bounded: [(tokens, h, a), (tokens, h, kv), (tokens, a, h),
-                                                                (tokens, h, i), (tokens, i, h)])), "\(tokens) tokens")
+                                                                (tokens, h, i), (tokens, i, h)], plan: .defaults,
+                                                  phase: .encoding)), "\(tokens) tokens")
             XCTAssertEqual(text.bytes("encoder causal mask"), Arena.capacity(for: tokens * tokens * 4))
         }
     }
@@ -231,19 +232,20 @@ final class MemoryNeedTests: XCTestCase {
         let released = MemoryPlan.Tail(fraction: 0.5, streamed: true).released(layers: dit.layers)
         let staging = TailStream.unitSlots * Artifact.largestRun(header: maps.dit, prefixes: (released..<dit.layers).map(DiT.layerPrefix),
                                                                  fileSize: maps.ditSize)
-        let gpuHeads = HeadSplitAttention.partition(heads: dit.heads, fraction: HeadSplitAttention.cpuFraction).gpu.count
+        let cpuHeads = HeadSplitAttention.partition(heads: dit.heads, fraction: HeadSplitAttention.referenceFraction).cpu.count
+        let gpuHeads = dit.heads - cpuHeads
         for (w, h) in [(512, 512), (1024, 1024), (1024, 1536)] {
             let n = try need(w, h)
             let latent = 16 * (h / 8) * (w / 8) * 4
             let image = (h / 16) * (w / 16), cap = 64, s = image + cap
             func split(_ rows: Int) -> Int {
-                HeadSplitAttention.hostBytes(heads: 30, sequence: rows, headDim: 128, threads: 6) + rows * gpuHeads * 128 * 4
+                HeadSplitAttention.hostBytes(heads: 30, sequence: rows, headDim: 128, cpuHeads: cpuHeads, threads: 6) + rows * gpuHeads * 128 * 4
             }
             let attentions = [image, s].map(split).reduce(0, +) + cap * 30 * 128 * 4
             // The caption's rows and the sequence's follow the tokens' bound (the tiers charged for them).
             let gemm = sum(MemoryNeed.gemm("", products: [(image, 64, 3840)],
                                            bounded: [(s, 3840, 3840), (s, 3840, 10240), (s, 10240, 3840),
-                                                     (cap, 2560, 3840), (s, 3840, 64)]))
+                                                     (cap, 2560, 3840), (s, 3840, 64)], plan: .defaults))
             XCTAssertEqual(GEMM.tierBytes(products: [], bounded: [(s, 3840, 10240), (s, 10240, 3840)]),
                            2 * Arena.capacity(for: 64 * 10240 * 4))
             XCTAssertEqual(phase(n, .denoising)!.bytes,
@@ -361,6 +363,8 @@ final class MemoryNeedTests: XCTestCase {
     func testNeuralEngineIsChargedToTheDenoiserItServes() throws {
         for on in [false, true] {
             var request = Self.zRequest(width: 1024, height: 1024, promptTokens: 1100)
+            // A plan that gives the ANE rows of the DiT's products (a check's strictest case, on any Mac).
+            request.plan = .forcing(neuralEngine: true, bf16Activations: false)
             request.neuralEngine = on
             let n = try XCTUnwrap(MemoryNeed.zImage(request, maps: Self.zImageMaps()))
             func charged(_ kind: MemoryNeed.Phase.Kind) -> Bool {

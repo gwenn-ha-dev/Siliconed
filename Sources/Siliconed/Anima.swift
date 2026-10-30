@@ -135,7 +135,7 @@ package final class AnimaDiT {
     ///   padding its output with zeros up to that. The zeros **count**: the reference does not
     ///   mask cross-attention, so each zero row takes its share of the softmax.
     package init(artifact: Artifact, latentHeight: Int, latentWidth: Int, textLength: Int = 512,
-                freezeCut: Bool = EngineSettings.effective.frozenCut, neuralEngine: Bool = EngineSettings.effective.gemmANE, lora: LoRA? = nil) throws {
+                freezeCut: Bool = EngineSettings.effective.frozenCut, neuralEngine: Bool = EngineSettings.effective.plan.usesANE, lora: LoRA? = nil) throws {
         guard artifact.header["kind"] as? String == "anima-turbo-dit" else {
             throw Artifact.Failure.badHeader("map \(artifact.header["kind"] ?? "?"): anima-turbo-dit expected")
         }
@@ -353,8 +353,8 @@ package final class AnimaDiT {
     }
 
     /// One attention path, chosen once per DiT: the matrix flash kernel (`flash`, self-attention only),
-    /// the cut by heads (`HeadSplitAttention.applies`), or one MPSGraph SDPA — as `Block` chooses, so the
-    /// capacity map's `flash` and `head_split` (`CapacityRules`) decide Anima's attention as Z-Image's.
+    /// the cut by heads, or one MPSGraph SDPA — as `Block` chooses, so the plan's answer for the
+    /// attention (`GEMM.assignment`) decides Anima's as Z-Image's.
     ///
     /// **The cut by heads, self and cross** (measured on the M1 Pro): 6 of the 16 heads on the CPU (`cpuFraction` 0.4, the
     /// shared one — 7 measured the same, 5 slower), the cross-attention's 512 text keys included. At 1024²
@@ -373,20 +373,22 @@ package final class AnimaDiT {
         if let p = selfPath { return p }
         let p: AttentionPath
         var flash: FlashMatrix?
-        if HeadSplitAttention.allowsFlash(sequence: s, heads: config.heads, headDim: config.headDim) {
+        // The plan's answer for the self-attention, which tries flash before the split.
+        let assigned = gemm.assignment(AttentionKey(sequence: s, heads: config.heads, headDim: config.headDim), flash: true)
+        if assigned.usesFlash {
             do {
                 flash = try FlashMatrix(device: gemm.device, queue: gemm.queue, heads: config.heads, sequence: s,
                                         headDim: config.headDim, rowsPerSimdgroup: 8, dimsPerSimdgroup: 64,
                                         keysPerTile: 16, blocksPerGroup: 8)
             } catch {
-                Warnings.emit("⚠ SILICONED_FLASH: falling back at S=\(s) — \(error)")
+                Warnings.emit("⚠ flash kernel: falling back at S=\(s) — \(error)")
             }
         }
         if let flash {
             p = .flash(flash)
-        } else if HeadSplitAttention.applies(sequence: s, heads: config.heads, headDim: config.headDim) {
+        } else if assigned.splits {
             p = .split(try HeadSplitAttention(device: gemm.device, queue: gemm.queue, heads: config.heads,
-                                              sequence: s, headDim: config.headDim))
+                                              sequence: s, headDim: config.headDim, cpuHeads: assigned.cpuHeads))
         } else {
             p = .graph(Attention(device: gemm.device, queue: gemm.queue, heads: config.heads,
                                  sequence: s, headDim: config.headDim))
@@ -398,9 +400,11 @@ package final class AnimaDiT {
     private func crossAttention(_ s: Int) throws -> AttentionPath {
         if let p = crossPath { return p }
         let p: AttentionPath
-        if HeadSplitAttention.applies(sequence: s, heads: config.heads, headDim: config.headDim) {
+        // The cross-attention reads the text's keys: its own class, no flash.
+        let assigned = gemm.assignment(AttentionKey(sequence: s, keys: textLength, heads: config.heads, headDim: config.headDim, cross: true))
+        if assigned.splits {
             p = .split(try HeadSplitAttention(device: gemm.device, queue: gemm.queue, heads: config.heads,
-                                              sequence: s, headDim: config.headDim, keys: textLength))
+                                              sequence: s, headDim: config.headDim, keys: textLength, cpuHeads: assigned.cpuHeads))
         } else {
             p = .graph(Attention(device: gemm.device, queue: gemm.queue, heads: config.heads,
                                  sequence: s, headDim: config.headDim, keySequence: textLength))

@@ -123,7 +123,7 @@ package final class GEMM {
     /// hypothesis: 0.32 · 2²⁵ already fails), and it does not reproduce outside the engine —
     /// not with `bytesNoCopy`, untouched pages, the block's arena layout, nor after the slow
     /// kernel. What triggers it is not isolated; what avoids it is measured. The AMX's cut never
-    /// saw it because it hands the GPU multiples of `amx_quantum` (256).
+    /// saw it because it hands the GPU multiples of its tile (the solver's lattice, `rowQuantum`).
     ///
     /// So the rows split into a body, a multiple of 64 submitted as it is, and a tail of fewer
     /// than 64 rows that goes through the padding tier at 64. **Same bits**: an output row depends
@@ -140,93 +140,68 @@ package final class GEMM {
         return body == 0 ? (m, 0) : (body, m - body)
     }
 
-    /// The conductor of GPU + AMX co-execution, if requested.
+    /// The conductor of GPU + AMX co-execution, if the plan brings the AMX up.
     package private(set) var conductor: Conductor?
 
-    /// **The product on bf16 weights** (`gemm_tensor`, `TensorGEMM`), if requested and if this macOS
-    /// compiles it; `nil` otherwise, and every product widens as before. A caller asks
-    /// `Artifact.stage` for the bf16 weight and, given one, calls `linear(a:bf16:…)`.
+    /// **The product on bf16 weights** (`TensorGEMM`), if the plan brings it up and this macOS compiles it; `nil` otherwise, and
+    /// every product widens as before. A caller asks `Artifact.stage` for the bf16 weight and, given an assignment of the path,
+    /// calls `linear(a:bf16:…)`.
     package private(set) var tensor: TensorGEMM?
-    /// The Neural Engine on the last rows of a widened product (`gemm_ane`); `nil` when off.
+    /// The Neural Engine on the last rows of a widened product; `nil` when the plan does not bring it up (or this process does not).
     package private(set) var neuralEngine: NeuralEngine?
-    /// **The route table this GEMM runs under** (`RouteTable`): the process's (`EngineSettings.routes`), with the
-    /// engines and weight branches the init's arguments force. A class rule is asked at every product.
-    package let routes: RouteTable
-    /// The last product cut with the ANE: each side's wall seconds and rows, from which the map reads the
-    /// share that would have ended both together.
+    /// **The plan this GEMM runs under** (`CapacityPlan`): the process's (`EngineSettings.plan`), without the ANE for an encoder or
+    /// a process that did not bring it up — computed for it, not a fallback behind a rule that names it. Asked at every product.
+    package let plan: CapacityPlan
+    /// The phase of the products this GEMM runs: part of the class the plan is asked about.
+    package let phase: CapacityClasses.Phase
+    /// The last product cut with the ANE: each side's wall seconds and rows, from which a probe reads the share that
+    /// would have ended both together.
     package private(set) var lastSides: (gpu: Double, gpuRows: Int, ane: Double, aneRows: Int)?
-    /// **The engines the last widened product (`linear(a:b:…)`) ran on**: what the render's check records
-    /// (`ProductLedger`), the route taken and not the one the table planned — the ANE's refusal gives the
-    /// product back to the GPU, the conductor declines a short slice.
-    package private(set) var lastEngines = RouteTable.Engines.gpu
+    /// **The engines the last widened product (`linear(a:b:…)`) ran on** (`gpu`, `gpu+amx`, `gpu+ane`, `gpu+ane+amx`, `amx`, `ane`):
+    /// what the render's check records (`ProductLedger`), the route taken and not the one the plan assigned — the ANE's refusal
+    /// gives its rows to the GPU.
+    package private(set) var lastEngines = "gpu"
     private var conductorTookRows = false
     /// Every product of this process the ANE was handed, and how many of them it gave back (refused or
     /// non-finite, recomputed on the GPU alone): a check run on the ANE says what the ANE actually computed.
     package static let neuralEngineTally = Mutex<(handed: Int, givenBack: Int)>((0, 0))
-    /// What `tensor` takes: bf16 weights (`gemm_tensor`), published int8 ones (`gemm_int8`), GGUF Q8_0
-    /// ones (`gemm_q8`).
+    /// What `tensor` takes: bf16 weights, published int8 ones, GGUF Q8_0 ones.
     package let tensorBF16, tensorInt8, tensorQ8: Bool
-    /// The products may take their activation rounded to bf16 (`gemm_bf16_act`, `BFloatKernels`): the
-    /// library compiled. Which products do is `WeightProducts`'s to say.
+    /// The products may take their activation rounded to bf16 (`BFloatKernels`): the
+    /// library compiled. Which products do is the plan's to say.
     package let bf16Activations: Bool
     /// Products that went through the bf16 activation path in this process: a check says what ran.
     package static let roundedProducts = Mutex<Int>(0)
 
     /// - Parameter freezeCut: the GPU/AMX cut is not servo-controlled. This is the reproducible mode:
-    ///   `T` stays the profile's, so `cut` is a pure function and two renders of the same
-    ///   seed return the same bits. No effect when co-execution is off.
-    /// - Parameter coexecution: the GPU/AMX conductor, the route table's (`usesAMX`) by default. The diagnostic
-    ///   asks for both on any chip: the GPU alone and the cut, measured on the same product.
-    /// - Parameter tensorWeights: the bf16-weight product (`gemm_tensor`); the diagnostic asks for it on
-    ///   any chip that has it, to measure it. `int8Weights`: the published-int8 one (`gemm_int8`);
-    ///   `q8Weights`: the Q8_0 one (`gemm_q8`).
-    ///
-    /// Each argument defaults to what the process's route table brings up (`RouteTable.Products.usesAMX`…); one
-    /// that differs forces the engine or the branch on this GEMM's own copy of the table — the checks and the
-    /// diagnostic measure a path on any chip.
+    ///   the rows stay the plan's, so the cut is a pure function and two renders of the same
+    ///   seed return the same bits. No effect without the AMX.
+    /// - Parameter plan: the engines it brings up are built (`CapacityPlan.Resources`: the conductor, `TensorGEMM`, the Neural
+    ///   Engine), and it answers each product. The process's by default; a probe or a check passes its own.
+    /// - Parameter phase: the encoders' products (`.encoding`) never take the ANE or a rounded activation.
+    /// - Parameter neuralEngine: this process may bring the ANE up (the Standard's and a refusing request's may not).
     package init(freezeCut: Bool = EngineSettings.effective.frozenCut,
-                 coexecution: Bool = EngineSettings.effective.routes.products.usesAMX,
-                 tensorWeights: Bool = EngineSettings.effective.routes.products.usesBF16Weights,
-                 int8Weights: Bool = EngineSettings.effective.routes.products.usesInt8Weights,
-                 q8Weights: Bool = EngineSettings.effective.routes.products.usesQ8Weights,
-                 bf16Activations: Bool = EngineSettings.effective.routes.products.roundsActivations,
-                 neuralEngine: Bool = EngineSettings.effective.routes.products.usesANE,
-                 neuralEngineShare: Double = EngineSettings.effective.routes.products.ane.gpuShare,
-                 routes base: RouteTable = EngineSettings.effective.routes) throws {
+                 plan base: CapacityPlan = EngineSettings.effective.plan,
+                 phase: CapacityClasses.Phase = .denoising,
+                 neuralEngine allowed: Bool = true) throws {
         guard let device = MTLCreateSystemDefaultDevice(), let queue = device.makeCommandQueue() else {
             throw Failure.noDevice
         }
         self.device = device
         self.queue = queue
-        var table = base
-        table.products.amx.enabled = coexecution
-        table.products.ane.enabled = neuralEngine
-        table.products.ane.gpuShare = neuralEngineShare
-        let p = base.products
-        if (tensorWeights, int8Weights, q8Weights, bf16Activations)
-            != (p.usesBF16Weights, p.usesInt8Weights, p.usesQ8Weights, p.roundsActivations) {
-            let settings = EngineSettings.effective
-            table.products.weights = RouteTable.Products.weightRules(
-                bf16: tensorWeights, int8: int8Weights, q8: q8Weights, rounded: bf16Activations,
-                minRows: settings.bf16ActivationMinimumRows, eightBit: settings.bf16ActivationEightBit)
-        }
-        routes = table
-        if coexecution {
-            conductor = Conductor(queue: queue, driven: !freezeCut)
-            conductor?.shares = table.products.amx.grid.shares
-            conductor?.initialFraction = table.products.amx.gpuShare
-        }
-        if tensorWeights || int8Weights || q8Weights || bf16Activations {
-            tensor = TensorGEMM(device: device, queue: queue, roundingActivations: bf16Activations)
+        let plan = base.restricted(allowingANE: allowed && phase == .denoising)
+        self.plan = plan
+        self.phase = phase
+        let r = plan.resources
+        if r.amx { conductor = Conductor(queue: queue, driven: !freezeCut) }
+        if r.usesTensor {
+            tensor = TensorGEMM(device: device, queue: queue, roundingActivations: r.roundedActivations)
         }
         self.bf16Activations = tensor?.roundsActivations == true
-        tensorBF16 = tensor != nil && tensorWeights
-        tensorInt8 = tensor != nil && int8Weights
-        tensorQ8 = tensor?.readsBlocks == true && q8Weights
-        if neuralEngine {
-            self.neuralEngine = NeuralEngine(gpuShare: neuralEngineShare, shares: table.products.ane.grid.shares)
-            self.neuralEngine?.besideAMX = table.products.ane.besideAMX.shares
-        }
+        tensorBF16 = tensor != nil && r.bf16Weights
+        tensorInt8 = tensor != nil && r.int8Weights
+        tensorQ8 = tensor?.readsBlocks == true && r.q8Weights
+        if r.ane { self.neuralEngine = NeuralEngine() }
     }
 
     package enum Failure: Error, CustomStringConvertible {
@@ -259,9 +234,23 @@ package final class GEMM {
         return buffer
     }
 
+    /// **The plan's answer for a product** of this GEMM's phase: what `WeightProducts` and `linear` read.
+    package func assignment(k: Int, n: Int, m: Int, weight: CapacityClasses.WeightFormat = .bf16) -> ProductAssignment {
+        plan.assign(ProductKey(k: k, n: n, m: m, weight: weight, phase: phase))
+    }
+
+    /// **The plan's answer for an attention**; `flash`: the caller's code tries the flash kernel first.
+    package func assignment(_ key: AttentionKey, flash: Bool = false) -> AttentionAssignment {
+        plan.assign(key, flash: flash)
+    }
+
     /// `C = A × Bᵀ`, the shape an `nn.Linear` really has: the weights are stored `[output,
     /// input]`, so it is the right side that gets transposed, and MPS does it without materializing
     /// the transpose.
+    ///
+    /// The rows go where the plan assigned them: the first to the GPU, the next to the AMX (beside it, at the same time), the last
+    /// to the ANE — each row one engine's. The ANE's rows refused or non-finite: the whole product again on the GPU alone — the
+    /// bits of the GPU alone, never a half-computed output.
     ///
     /// - Parameters:
     ///   - a: `[m, k]` fp32, row-major
@@ -270,20 +259,21 @@ package final class GEMM {
     /// - Parameter weightIsTransposed: the weight is stored `[input, output]` by the forge, so there
     ///   is nothing to transpose. `transposeRight` costs **2.26×** on `w2`'s `K=10240` shape
     ///   (1.578 against 3.564 TFLOP/s) and −23.6 % on a whole block.
-    /// - Parameter kind: the published weight's kind, widened into `b`: the table's engine rule is per kind.
+    /// - Parameter weight: the published weight's format, widened into `b`: the plan's class is per format.
+    /// - Parameter assignment: the plan's answer, when the caller has asked it already (`WeightProducts`); `nil`: asked here.
     package func linear(a: MTLBuffer, b: MTLBuffer, c: MTLBuffer, m: Int, k: Int, n: Int,
-                       weightIsTransposed: Bool = false, kind: RouteTable.WeightKind = .bf16) -> Double {
-        // The Neural Engine on the last rows, the GPU on the first — alone, or beside the AMX on the shapes the
-        // map gave all three (`ane_amx`); the AMX alone beside the GPU on the shapes the ANE's grid does not take
-        // (`ane_shares`): at the same time, each row one engine's. Its rows refused or non-finite: the whole product again on the GPU — the bits of the GPU
-        // alone, never a half-computed output.
-        // A class the table forces to one set of engines (`RouteTable.ClassRule`) is ahead of the grids the
-        // engines hold.
-        let forced = routes.products.forced(k: k, n: n, m: m, kind: kind, aneBroughtUp: neuralEngine != nil)
-        let aneAllowed = forced == nil || forced == .ane || forced == .aneAMX
-        let amxAllowed = forced == nil || forced == .amx || forced == .aneAMX
-        if aneAllowed, let ane = neuralEngine, weightIsTransposed, case let rows = ane.rows(m, k: k, n: n), rows > 0, ane.accepts(rows: rows, k: k, n: n) {
-            let first = m - rows
+                       weightIsTransposed: Bool = false, weight: CapacityClasses.WeightFormat = .bf16,
+                       assignment given: ProductAssignment? = nil) -> Double {
+        var plan = given ?? assignment(k: k, n: n, m: m, weight: weight)
+        // A weight read as published has its own entry points; arriving here widened, the GPU takes it whole.
+        if plan.path != .widened || plan.rows != m { plan = .gpuAlone(m) }
+        // The engines this process did not bring up take none of the rows: the GPU does.
+        if plan.amx > 0 && conductor == nil { plan.gpu += plan.amx; plan.amx = 0 }
+        let wantsANE = plan.ane > 0
+        if wantsANE && (neuralEngine == nil || !weightIsTransposed) { plan.gpu += plan.ane; plan.ane = 0 }
+
+        if plan.ane > 0, let ane = neuralEngine, ane.accepts(rows: plan.ane, k: k, n: n) {
+            let rows = plan.ane, first = m - rows
             nonisolated(unsafe) let (pa, pb, pc) = (a.contents().assumingMemoryBound(to: Float.self),
                                                     b.contents().assumingMemoryBound(to: Float.self),
                                                     c.contents().assumingMemoryBound(to: Float.self))
@@ -295,63 +285,49 @@ package final class GEMM {
                 computed = ane.product(a: pa, w: pb, c: pc, first: first, rows: rows, k: k, n: n)
                 aneWall = Double(DispatchTime.now().uptimeNanoseconds - began) * 1e-9
             }
-            // The GPU's side alone, or beside the AMX where the map gave the shape all three (`ane_amx`).
-            _ = gpuLinear(a: a, b: b, c: c, m: first, k: k, n: n, weightIsTransposed: weightIsTransposed,
-                          conductor: forced.map { $0 == .aneAMX } ?? ane.takesAMX(m, k: k, n: n))
+            // The GPU's side alone, or beside the AMX where the plan gave the product all three.
+            if first > 0 {
+                _ = gpuLinear(a: a, b: b, c: c, gpu: plan.gpu, amx: plan.amx, k: k, n: n, weightIsTransposed: weightIsTransposed)
+            } else {
+                conductorTookRows = false
+            }
             let besideAMX = conductorTookRows
             let gpuWall = Double(DispatchTime.now().uptimeNanoseconds - began) * 1e-9
             group.wait()
-            lastSides = (gpuWall, first, aneWall, rows)
+            lastSides = (first > 0 ? gpuWall : 0, first, aneWall, rows)
             Self.neuralEngineTally.withLock { $0.handed += 1; if !computed { $0.givenBack += 1 } }
             let key = "\(m)×\(k)×\(n)ᵀ ane \(rows)"
-            record(key + " GPU side", gpuWall)
-            if !computed { _ = gpuLinear(a: a, b: b, c: c, m: m, k: k, n: n, weightIsTransposed: weightIsTransposed, conductor: false) }
-            lastEngines = computed ? (besideAMX ? .aneAMX : .ane) : .gpu
+            if first > 0 { record(key + " GPU side", gpuWall) }
+            if !computed { _ = gpuLinear(a: a, b: b, c: c, gpu: m, amx: 0, k: k, n: n, weightIsTransposed: weightIsTransposed) }
+            lastEngines = computed ? Self.engines(gpu: plan.gpu, amx: besideAMX ? plan.amx : 0, ane: rows) : "gpu"
             let wall = Double(DispatchTime.now().uptimeNanoseconds - began) * 1e-9
             record(key, wall)
             return wall
         }
-        let wall = gpuLinear(a: a, b: b, c: c, m: m, k: k, n: n, weightIsTransposed: weightIsTransposed, conductor: amxAllowed)
-        lastEngines = conductorTookRows ? .amx : .gpu
+        // The ANE refused its program before the first row: its rows go to the GPU.
+        if plan.ane > 0 { plan.gpu += plan.ane; plan.ane = 0 }
+        let wall = gpuLinear(a: a, b: b, c: c, gpu: plan.gpu, amx: plan.amx, k: k, n: n, weightIsTransposed: weightIsTransposed)
+        lastEngines = Self.engines(gpu: plan.gpu, amx: conductorTookRows ? plan.amx : 0, ane: 0)
         return wall
     }
 
-    /// **How a product of `kind` weights, `k × n` at `m` rows, reads its weight on this GEMM**: the table's rule,
-    /// among those this process can run — `TensorGEMM` built, its Q8_0 reading and its rounding kernels
-    /// present, the caller (`rounding`) willing to round. A rule it cannot run is skipped, not refused: the one
-    /// below applies, down to the widened path.
-    package func weightRoute(_ kind: RouteTable.WeightKind, k: Int, n: Int, m: Int, rounding: Bool) -> RouteTable.WeightRoute {
-        routes.products.weight(kind, k: k, n: n, m: m) { rule in
-            if rule.path == .widened { return true }
-            guard let tensor else { return false }
-            if kind == .q8 && !tensor.readsBlocks { return false }
-            if rule.roundsActivation {
-                guard rounding && bf16Activations else { return false }
-                if kind == .q8 && !tensor.roundsBlocks { return false }
-            }
-            return true
-        }
+    private static func engines(gpu: Int, amx: Int, ane: Int) -> String {
+        ProductAssignment(gpu: gpu, amx: amx, ane: ane).engines
     }
 
-    /// `linear` on the GPU (and the AMX's cut, unless `conductor` is false): what every product ran before
-    /// the Neural Engine.
-    private func gpuLinear(a: MTLBuffer, b: MTLBuffer, c: MTLBuffer, m: Int, k: Int, n: Int,
-                           weightIsTransposed: Bool, conductor allowed: Bool = true) -> Double {
+    /// `linear` on `gpu` rows of the GPU and `amx` rows of the AMX beside it, the first `gpu + amx` rows of the product — what every
+    /// product ran before the Neural Engine.
+    private func gpuLinear(a: MTLBuffer, b: MTLBuffer, c: MTLBuffer, gpu: Int, amx: Int, k: Int, n: Int,
+                           weightIsTransposed: Bool) -> Double {
         conductorTookRows = false
-        // From 8 to 32 rows, the GEMM goes through the padding tiers (see `poisonedRows`). The
-        // GPU/AMX cut never applies there (`amx_min` = 512).
-        if GEMM.poisonedRows.contains(m) {
-            return padded(a: a, b: b, c: c, first: 0, rows: m, k: k, n: n,
-                          weightIsTransposed: weightIsTransposed)
-        }
-        // The per-token cut, if the conductor takes it. It returns `nil` when it does not
-        // apply — too few rows — and the original path resumes, unchanged.
-        if allowed, let conductor, let wall = conductor.linear(a: a, b: b, c: c, m: m, k: k, n: n,
-                                                      weightIsTransposed: weightIsTransposed,
-                                                      multiply: { rows in
-            submitRows(a: a, b: b, c: c, m: rows, k: k, n: n,
-                       weightIsTransposed: weightIsTransposed)
-        }) {
+        let m = gpu + amx
+        // The conductor takes the rows the plan gave the AMX, the GPU's through `multiply`.
+        if amx > 0, let conductor {
+            let wall = conductor.linear(a: a, b: b, c: c, gpuRows: gpu, amxRows: amx, k: k, n: n,
+                                        weightIsTransposed: weightIsTransposed,
+                                        multiply: { rows in
+                gpuRows(a: a, b: b, c: c, rows: rows, k: k, n: n, weightIsTransposed: weightIsTransposed)
+            })
             // Under a separate key: **wall time, not GPU time**. Mixing them would make a
             // census that compares neither with itself nor with previous sessions.
             let key = "\(m)×\(k)×\(n)\(weightIsTransposed ? "ᵀ" : "")‖"
@@ -359,8 +335,16 @@ package final class GEMM {
             conductorTookRows = true
             return wall
         }
-        return submitRows(a: a, b: b, c: c, m: m, k: k, n: n,
-                          weightIsTransposed: weightIsTransposed)
+        return gpuRows(a: a, b: b, c: c, rows: m, k: k, n: n, weightIsTransposed: weightIsTransposed)
+    }
+
+    /// `rows` rows on the GPU alone. From 8 to 32 rows, the GEMM goes through the padding tiers (see `poisonedRows`).
+    private func gpuRows(a: MTLBuffer, b: MTLBuffer, c: MTLBuffer, rows: Int, k: Int, n: Int,
+                         weightIsTransposed: Bool) -> Double {
+        if GEMM.poisonedRows.contains(rows) {
+            return padded(a: a, b: b, c: c, first: 0, rows: rows, k: k, n: n, weightIsTransposed: weightIsTransposed)
+        }
+        return submitRows(a: a, b: b, c: c, m: rows, k: k, n: n, weightIsTransposed: weightIsTransposed)
     }
 
     /// **`C = A · W` with `W` in bf16** (`tensor`, which the caller checked): `wb` holds the weight as

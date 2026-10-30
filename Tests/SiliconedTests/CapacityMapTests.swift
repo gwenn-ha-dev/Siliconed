@@ -524,16 +524,13 @@ final class CapacityMapTests: XCTestCase {
         XCTAssertEqual(current.isCurrent, current.fingerprint == .current)
     }
 
-    func testTheEngineReadsTheTableOfASchema14Map() {
-        let r = report(green: true)
-        let read = EngineSettings(applying: [:], map: r)
-        XCTAssertEqual(read.routes, r.routes)
-        XCTAssertEqual(read.amx, r.routes!.products.usesAMX)
-        XCTAssertEqual(read.gemmANE, r.routes!.products.usesANE)
-        XCTAssertEqual(read.flash, r.routes!.attention.usesFlash)
-        XCTAssertEqual(read.provenance["amx"], .map)
-        // Without a table, the switches' (the defaults here).
-        XCTAssertEqual(EngineSettings(applying: [:]).routes, RouteTable(settings: EngineSettings(applying: [:])))
+    /// The previous map's table no longer reaches the engine (E4a): the settings read a map for its date and its fingerprint,
+    /// and the plan is the engine's defaults until a model of this Mac is designated.
+    func testThePreviousMapsTableDoesNotReachTheEngine() {
+        let read = EngineSettings(applying: [:])
+        XCTAssertEqual(read.plan.identity, CapacityPlan.defaults.identity)
+        XCTAssertFalse(read.plan.usesAMX)
+        XCTAssertFalse(read.plan.usesANE)
     }
 
     // MARK: the pieces

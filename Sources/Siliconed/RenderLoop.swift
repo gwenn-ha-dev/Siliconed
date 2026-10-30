@@ -176,7 +176,7 @@ package enum RenderLoop {
     /// engine's `amx_min` (`Conductor.minimumRows`); `aneBroughtUp`: the render's products could take the ANE
     /// (`Render.neuralEngine`). `nil` when the version does not exist for the family.
     package static func predictions(for request: CapacityClasses.Request, table: RouteTable, report: Diagnostic.Report,
-                                    amxMinimumRows: Int = EngineSettings.defaultAMXMinimumRows,
+                                    amxMinimumRows: Int = CapacitySolver.Limits.defaultAMXRows,
                                     aneBroughtUp: Bool = true) -> [Predicted]? {
         guard let classes = CapacityClasses.classes(for: request) else { return nil }
         let basis = Basis(classes: classes, report: report)

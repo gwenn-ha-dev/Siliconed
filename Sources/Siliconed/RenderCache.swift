@@ -110,14 +110,13 @@ package struct RenderCache: Sendable {
     /// CLI or the app) does not read what another one wrote.
     package static let build: String = Bundle.main.executableURL.map { stamp($0.resolvingSymlinksInPath().path) } ?? "unknown"
 
-    /// **The settings that change a computation's bits** (AMX co-execution and its split, the flash
-    /// kernel, the head split), plus the render's `reproducible`.
+    /// **What changes a computation's bits**: the plan the engine runs under (which engine takes which rows, which kernel runs
+    /// each attention), plus the render's `reproducible` and the thread count.
     package static func numerics(reproducible: Bool, neuralEngine: Bool = false) -> String {
         let s = EngineSettings.effective
         // The Neural Engine computes in fp16: a K/V the DiT wrote with it is not one written without.
-        let ane = neuralEngine && s.gemmANE ? " ane \(s.aneFraction) \(s.aneShares)" + (s.aneAMX.isEmpty || !s.amx ? "" : " amx \(s.aneAMX)") : ""
-        return "amx \(s.amx) \(s.amxFraction) \(s.amxShares) \(s.amxQuantum) \(s.amxMinimumRows) "
-            + "frozen \(reproducible) flash \(s.flash) split \(s.headSplit) \(s.headSplitFraction) parallel \(s.parallel)" + ane
+        let plan = s.plan.restricted(allowingANE: neuralEngine)
+        return "plan \(plan.identity) frozen \(reproducible) parallel \(s.parallel)"
     }
 
     /// The key of a text stage's output: the module, the prompt, the images it sees.

@@ -245,7 +245,7 @@ final class DiagnosticTests: XCTestCase {
         for s in shapes {
             XCTAssertEqual(GEMM.rowSplit(s.m).tail, 0, "\(s)")
             XCTAssertFalse(GEMM.goesThroughTiers(s.m))
-            XCTAssertGreaterThanOrEqual(s.m, Conductor.minimumRows)
+            XCTAssertGreaterThanOrEqual(s.m, CapacitySolver.Limits.defaultAMXRows)
         }
         XCTAssertEqual(Diagnostic.blocks.map(\.heads), [30, 32])
         XCTAssertEqual(Diagnostic.blocks.map(\.headDim), [128, 128])
@@ -257,7 +257,7 @@ final class DiagnosticTests: XCTestCase {
             let rows = Diagnostic.sampleRows(m, count: Diagnostic.sampledRows)
             XCTAssertEqual(Set(rows).count, rows.count)
             XCTAssertTrue(rows.allSatisfy { (0..<m).contains($0) })
-            XCTAssertEqual(Set(rows.map { $0 / Conductor.quantum }).count, m / Conductor.quantum)
+            XCTAssertEqual(Set(rows.map { $0 / 256 }).count, m / 256)
         }
     }
 

@@ -377,12 +377,13 @@ final class MemoryNeedQwenTests: XCTestCase {
             }
             let need = Self.shapes(Self.request(1024, 1024, references: [(1024, 1024)], threads: threads))
             let target = need.sequence.target
-            let gpu = HeadSplitAttention.partition(heads: 32, fraction: HeadSplitAttention.cpuFraction).gpu.count
+            let cpu = HeadSplitAttention.partition(heads: 32, fraction: HeadSplitAttention.referenceFraction).cpu.count
+            let gpu = 32 - cpu
             let split = MemoryNeed.attention("t", heads: 32, rows: target, keys: need.sequence.count, headDim: 128,
-                                             causal: false, split: true, threads: threads)
+                                             causal: false, assignment: .init(kernel: .split, cpuHeads: cpu), threads: threads)
             XCTAssertEqual(split, [.init("t head split", HeadSplitAttention.hostBytes(heads: 32, sequence: target,
                                                                                     keys: need.sequence.count, headDim: 128,
-                                                                                    threads: threads)),
+                                                                                    cpuHeads: cpu, threads: threads)),
                                    .init("t SDPA queries", target * gpu * 128 * 4, outside: true)])
             // The need's own head splits are those, at this thread count — never the machine's.
             let charged = need.denoisingPhase.terms.filter { $0.name.hasSuffix("head split") }

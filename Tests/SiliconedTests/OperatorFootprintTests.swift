@@ -20,8 +20,7 @@ final class OperatorFootprintTests: XCTestCase {
 
     /// **The causal mask is ours now** (in `Pages`, one fp32 copy), not MPSGraph's three.
     func testTheCausalMaskIsOurs() {
-        let terms = MemoryNeed.attention("t", heads: 32, rows: 3400, keys: 3400, headDim: 128, causal: true,
-                                         split: false, threads: 6)
+        let terms = MemoryNeed.attention("t", heads: 32, rows: 3400, keys: 3400, headDim: 128, causal: true, threads: 6)
         XCTAssertEqual(terms.first { $0.name == "t causal mask" }, .init("t causal mask", Arena.capacity(for: 3400 * 3400 * 4)))
         XCTAssertEqual(terms.filter(\.outside).map(\.bytes), [3400 * 32 * 128 * 4])
     }
@@ -29,31 +28,39 @@ final class OperatorFootprintTests: XCTestCase {
     /// **The head split is its host arena and the GPU heads' copy** — `HeadSplitAttention.hostBytes`
     /// is ours, the copy is MPSGraph's for the GPU heads only.
     func testTheHeadSplitIsItsArena() {
-        let gpu = HeadSplitAttention.partition(heads: 32, fraction: HeadSplitAttention.cpuFraction).gpu.count
+        let cpu = HeadSplitAttention.partition(heads: 32, fraction: HeadSplitAttention.referenceFraction).cpu.count
+        let gpu = 32 - cpu
         let terms = MemoryNeed.attention("s", heads: 32, rows: 1229, keys: 18_732, headDim: 128, causal: false,
-                                         split: true, threads: 6)
+                                         assignment: .init(kernel: .split, cpuHeads: cpu), threads: 6)
         XCTAssertEqual(terms, [.init("s head split", HeadSplitAttention.hostBytes(heads: 32, sequence: 1229, keys: 18_732,
-                                                                                headDim: 128, threads: 6)),
+                                                                                headDim: 128, cpuHeads: cpu, threads: 6)),
                                .init("s SDPA queries", 1229 * gpu * 128 * 4, outside: true)])
         // Its arena grows with the keys and the threads (per thread: scores and packed K_h, V_h).
-        let few = HeadSplitAttention.hostBytes(heads: 32, sequence: 1229, keys: 8_000, headDim: 128, threads: 6)
-        let many = HeadSplitAttention.hostBytes(heads: 32, sequence: 1229, keys: 18_732, headDim: 128, threads: 6)
+        let few = HeadSplitAttention.hostBytes(heads: 32, sequence: 1229, keys: 8_000, headDim: 128, cpuHeads: cpu, threads: 6)
+        let many = HeadSplitAttention.hostBytes(heads: 32, sequence: 1229, keys: 18_732, headDim: 128, cpuHeads: cpu, threads: 6)
         XCTAssertLessThan(few, many)
-        XCTAssertLessThan(many, HeadSplitAttention.hostBytes(heads: 32, sequence: 1229, keys: 18_732, headDim: 128, threads: 8))
+        XCTAssertLessThan(many, HeadSplitAttention.hostBytes(heads: 32, sequence: 1229, keys: 18_732, headDim: 128, cpuHeads: cpu, threads: 8))
     }
 
     /// **One GEMM per phase**: its padding tiers (`GEMM.tierBytes`) when a height goes through them,
-    /// and the conductor's workspace from BNNS's own answer (`Conductor.workspaceBytes`) only when the
-    /// cut applies. MPS's own state is a constant no shape gives: not charged.
+    /// and the conductor's workspace from BNNS's own answer (`Conductor.workspaceBytes`) for the rows the plan gave the AMX,
+    /// asked the plan's question. MPS's own state is a constant no shape gives: not charged.
     func testTheGEMMIsItsTiersAndItsWorkspace() {
-        let off = MemoryNeed.gemm("g", products: [(4096, 3840, 10240)], amx: false)
-        XCTAssertEqual(off, [])   // a multiple of 64: nothing through the tiers, no state charged
-        let small = MemoryNeed.gemm("g", products: [(Conductor.minimumRows - 1, 3840, 10240)], amx: true)
-        XCTAssertEqual(small, [.init("g GEMM tiers", GEMM.tierBytes(products: [(Conductor.minimumRows - 1, 3840, 10240)]))])
-        let on = MemoryNeed.gemm("g", products: [(4096, 3840, 10240)], amx: true)
-        let slice = 4096 - Conductor.cut(4096, Conductor.fractionRange.lowerBound)
-        let expected = [false, true].map { Conductor.workspaceBytes(rows: slice, k: 3840, n: 10240, weightIsTransposed: $0) }.max()!
-        XCTAssertGreaterThanOrEqual(on.first { $0.name == "g conductor workspace" }?.bytes ?? 0, Arena.capacity(for: expected))
+        let off = MemoryNeed.gemm("g", products: [(4096, 3840, 10240)], plan: .defaults)
+        XCTAssertEqual(off, [])   // a multiple of 64: nothing through the tiers, the GPU alone, no state charged
+        let plan = CapacityPlan.probing(amx: true)
+        plan.pin(ProductKey(k: 3840, n: 10240, m: 4096), ProductAssignment(gpu: 3072, amx: 1024))
+        let small = MemoryNeed.gemm("g", products: [(511, 3840, 10240)], plan: plan)
+        XCTAssertEqual(small, [.init("g GEMM tiers", GEMM.tierBytes(products: [(511, 3840, 10240)]))], "the plan gave the AMX no row here")
+        let on = MemoryNeed.gemm("g", products: [(4096, 3840, 10240)], plan: plan)
+        let expected = [false, true].map { Conductor.workspaceBytes(rows: 1024, k: 3840, n: 10240, weightIsTransposed: $0) }.max()!
+        XCTAssertEqual(on, [.init("g conductor workspace", Arena.capacity(for: expected))], "exactly the AMX's 1 024 rows")
+        // Beside an 8-bit weight the AMX takes columns: BNNS's answer for them.
+        let native = CapacityPlan.probing(amx: true, int8Weights: true)
+        native.pin(ProductKey(k: 3840, n: 10240, m: 4096, weight: .int8), ProductAssignment(path: .native, gpu: 4096, amxColumns: 2560))
+        let columns = MemoryNeed.gemm("g", products: [(4096, 3840, 10240)], plan: native, weight: .int8)
+        XCTAssertEqual(columns, [.init("g conductor workspace",
+                                       Arena.capacity(for: Conductor.columnWorkspaceBytes(m: 4096, k: 3840, n: 10240, width: 2560)))])
     }
 
     /// **The padding tiers are what `GEMM` sends through them**: 8 to 32 rows, or a tail under 64

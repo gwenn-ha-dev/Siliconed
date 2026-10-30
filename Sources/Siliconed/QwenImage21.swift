@@ -290,7 +290,7 @@ package final class QwenImage21DiT {
     package init(artifact: Artifact, sequence: QwenImage21Sequence, lora: LoRA? = nil, fullPass: Bool = false,
                  storage: CacheStorage = .memory, kept: (path: String, key: String, reserve: Int64)? = nil,
                  freezeCut: Bool = EngineSettings.effective.frozenCut,
-                 neuralEngine: Bool = EngineSettings.effective.gemmANE) throws {
+                 neuralEngine: Bool = EngineSettings.effective.plan.usesANE) throws {
         guard let kind = artifact.header["kind"] as? String, Family(ditKind: kind) == .qwenImage21 else {
             if artifact.header["kind"] as? String == Family.supersededQwenImage21Kind {
                 throw Artifact.Failure.badHeader("map \(artifact.path): forged from the base model of Qwen-Image-2.1, which "
@@ -827,13 +827,19 @@ package final class QwenImage21DiT {
         }
     }
 
+    /// The plan's answer for an attention of the target's queries: the split or the graph (no flash). The memory need reads the same.
+    package static func attentionAssignment(_ plan: CapacityPlan, rows: Int, keys: Int, heads: Int, headDim: Int) -> AttentionAssignment {
+        let a = plan.assign(AttentionKey(sequence: rows, keys: keys, heads: heads, headDim: headDim))
+        return a.splits ? a : .graph
+    }
+
     /// Queries `[queries, queries + count)` of the joint sequence (held from `first`) against the keys
     /// `[0, keys)` — causal: the queries are the last of those keys. Split into query slices only
     /// beyond `Attention.maxMatrix` (exact: the softmax is per row; a causal slice keeps its own keys).
     /// A lower ceiling was measured and refuted: 1 GB or 512 MB per call cost 3 to 6 % of the SDPA at
     /// 1024² and left the Metal peak of the 1-reference edit where it was (2.7–3.3 GB either way).
     ///
-    /// **The target's call is cut by heads** (`HeadSplitAttention`, as Z-Image's blocks): 13 of the 32
+    /// **The target's call is cut by heads** (`HeadSplitAttention`, as Z-Image's blocks): by default 13 of the 32
     /// heads on the AMX and the P cores, which sleep during the SDPA. Not the prefix segments: a causal text
     /// triangle has no CPU path, and the conditions run once per render.
     private func attend(queries: Int, count: Int, keys keyCount: Int, causal: Bool, first: Int,
@@ -848,11 +854,12 @@ package final class QwenImage21DiT {
             let key = "\(rows)×\(visible)\(causal ? "c" : "")"
             let local = queries + begin - first
             let (qb, ob) = (try slice(q + local * d), try slice(merged + local * d))
-            if target, HeadSplitAttention.applies(sequence: rows, heads: heads, headDim: config.headDim) {
+            let cut = target ? Self.attentionAssignment(gemm.plan, rows: rows, keys: visible, heads: heads, headDim: config.headDim) : .graph
+            if cut.splits {
                 let split: HeadSplitAttention
                 if let existing = headSplits[key] { split = existing } else {
                     split = try HeadSplitAttention(device: gemm.device, queue: gemm.queue, heads: heads, sequence: rows,
-                                               headDim: config.headDim, keys: visible)
+                                               headDim: config.headDim, keys: visible, cpuHeads: cut.cpuHeads)
                     headSplits[key] = split
                 }
                 timed("sdpa wall") {
@@ -888,7 +895,7 @@ package final class QwenImage21DiT {
     /// GEMM: the next call, at other rows, decides again (the prefill's text rows stay applied). Measured:
     /// at 1024² a rank-256 stack applied after the GEMM cost 2.0 s per evaluation, ∝ rows; the merge, a constant.
     ///
-    /// Under `gemm_tensor` a bf16 weight goes into the reserve as it is (`Artifact.stage`) and the product
+    /// Under a plan that reads the bf16 weight as published, it goes into the reserve as it is (`Artifact.stage`) and the product
     /// is `TensorGEMM`'s: the stack is then always added after it — merging would widen the weight again.
     private func linearGPU(_ name: String, a: UnsafeMutablePointer<Float>, into c: UnsafeMutablePointer<Float>,
                            m: Int, k: Int, n: Int) throws {

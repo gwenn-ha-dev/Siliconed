@@ -86,6 +86,8 @@ package struct QwenImage21Maps: Sendable {
     /// What widening the largest rotated (int8 convrot) weight allocates beside the arenas
     /// (`Widen.rotationScratchBytes`): the Compact's DiT and encoder, the Light's encoder; 0 otherwise.
     package let encoderRotationScratch: Int, ditRotationScratch: Int
+    /// The formats the two maps' products are published in (`Artifact.weightFormat`): the plan's keys.
+    package let ditFormat: CapacityClasses.WeightFormat, encoderFormat: CapacityClasses.WeightFormat
 
     /// From the headers and the tokenizer's count — pure: the tests hand it headers written in memory.
     /// `nil` when a config does not parse or a map has no tensor table.
@@ -105,6 +107,7 @@ package struct QwenImage21Maps: Sendable {
         ditLayerStaging = ditStaging; encoderLayerStaging = encoderStaging; self.tokenizerTables = tokenizerTables
         encoderRotationScratch = Widen.rotationScratchBytes(header: encoder)
         ditRotationScratch = Widen.rotationScratchBytes(header: dit, prefixes: (0..<ditConfig.layers).map(QwenImage21DiT.layerPrefix))
+        ditFormat = Artifact.weightFormat(header: dit); encoderFormat = Artifact.weightFormat(header: encoder)
     }
 
     /// The maps this card renders with: its own DiT (an imported one) or the library's installed
@@ -233,9 +236,10 @@ package struct QwenImage21Need {
             Term("tokenizer tables", maps.tokenizerTables),
             Term("encoder rotation scratch", maps.encoderRotationScratch),
         ] + MemoryNeed.attention("vision", heads: vision.heads, rows: largest, keys: largest, headDim: vision.headDim,
-                                 causal: false, split: false, threads: threads)
+                                 causal: false, threads: threads)
           + MemoryNeed.gemm("vision", products: [(largest, vision.patchValues, d), (largest, d, 3 * d), (largest, d, d),
-                                                 (largest, d, i), (largest, i, d), (largest / 4, m, m), (largest / 4, m, o)]))
+                                                 (largest, d, i), (largest, i, d), (largest / 4, m, m), (largest / 4, m, o)],
+                            plan: request.encoderPlan, weight: maps.encoderFormat, phase: .encoding))
     }
 
     /// The language model on the whole sequence, with its staging layers (`Request.encoderSlots`).
@@ -248,9 +252,9 @@ package struct QwenImage21Need {
             Term("pixel_values", pixelValues), Term("vision features", features),
             Term("tokenizer tables", maps.tokenizerTables),
             Term("encoder rotation scratch", maps.encoderRotationScratch),
-        ] + MemoryNeed.attention("encoder", heads: e.heads, rows: s, keys: s, headDim: e.headDim, causal: true,
-                                 split: false, threads: threads)
-          + MemoryNeed.gemm("encoder", bounded: [(s, h, a), (s, h, kv), (s, a, h), (s, h, i), (s, i, h)]))
+        ] + MemoryNeed.attention("encoder", heads: e.heads, rows: s, keys: s, headDim: e.headDim, causal: true, threads: threads)
+          + MemoryNeed.gemm("encoder", bounded: [(s, h, a), (s, h, kv), (s, a, h), (s, h, i), (s, i, h)], spread: s,
+                            plan: request.encoderPlan, weight: maps.encoderFormat, phase: .encoding))
     }
 
     /// The pixels of the largest prepared reference: what the encoder is planned for.
@@ -340,7 +344,7 @@ package struct QwenImage21Need {
         let running = attentions + MemoryNeed.gemm("DiT", products: [(largestImage, dit.channels, d)],
                                                    bounded: [(scratch, d, d), (mlpRows, d, h), (mlpRows, h, d),
                                                              (textRows, dit.context, d)],
-                                                   rank: rank, ane: request.neuralEngine)
+                                                   spread: textRows, rank: rank, plan: request.ditPlan, weight: maps.ditFormat)
         let widened = Krea2Exact.widenedBytes(inputs: d, outputs: 4 * d)
             + (rank > 0 ? Arena.capacity(for: d * rank * 4) + Arena.capacity(for: rank * 4 * d * 4) : 0)
         let runningBytes = running.reduce(0) { $0 + $1.bytes }
@@ -409,12 +413,12 @@ package struct QwenImage21Need {
             for piece in 0..<slices {
                 let end = (piece + 1) * count / slices, rows = end - piece * count / slices
                 let visible = causal ? keys - count + end : keys
-                let split = target && HeadSplitAttention.applies(sequence: rows, heads: heads, headDim: headDim)
+                let cut = target ? QwenImage21DiT.attentionAssignment(request.ditPlan, rows: rows, keys: visible, heads: heads, headDim: headDim) : .graph
                 // `attentions` and `headSplits` are two dictionaries: the same key may live in both.
                 let key = "\(rows)×\(visible)\(causal ? "c" : "")"
-                guard built.insert((split ? "s" : "a") + key).inserted else { continue }
+                guard built.insert((cut.splits ? "s" : "a") + key).inserted else { continue }
                 terms += MemoryNeed.attention("DiT \(key)", heads: heads, rows: rows, keys: visible, headDim: headDim,
-                                              causal: causal, split: split, threads: threads)
+                                              causal: causal, assignment: cut, threads: threads)
             }
         }
         for segment in sequence.segments {

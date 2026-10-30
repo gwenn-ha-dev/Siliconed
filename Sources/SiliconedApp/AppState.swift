@@ -129,7 +129,7 @@ final class AppState {
     /// This Mac's map turned the Neural Engine on: otherwise there is nothing to choose, the denoiser is fp32.
     /// Not before the settings are read: `effective` read at launch would freeze the defaults, and the measure
     /// the first render starts would apply only at the next launch (`EngineSettings.load` refuses it).
-    var neuralEngineOffered: Bool { settingsRead && EngineSettings.effective.gemmANE }
+    var neuralEngineOffered: Bool { settingsRead && EngineSettings.effective.plan.usesANE }
     /// The key of a choice: the model and its installed version — another version starts from its own default.
     private func neuralEngineKey(_ card: ModelCard) -> String {
         card.isImported ? card.id : "\(card.id) \(library.variant(of: card.family).rawValue)"
@@ -583,8 +583,7 @@ final class AppState {
     func checkMap(_ render: Engine.Render, model: Model, references: Int) {
         guard let map = mapInUse,
               let check = RenderLoop.check(render, variant: model.library?.variant(of: model.family) ?? .standard,
-                                           references: references, report: map, table: EngineSettings.effective.routes,
-                                           amxMinimumRows: Conductor.minimumRows) else { return }
+                                           references: references, report: map) else { return }
         renderNote = check.note
         if let data = try? JSONEncoder().encode(check.note) { UserDefaults.standard.set(data, forKey: Self.renderNoteKey) }
     }

@@ -69,6 +69,8 @@ extension MemoryNeed {
         /// What widening the DiT's largest int8 convrot weight allocates outside every arena
         /// (`Widen.rotationScratchBytes`): an imported Comfy-style convrot DiT; 0 otherwise.
         package let ditRotationScratch: Int
+        /// The formats the two maps' products are published in (`Artifact.weightFormat`): the plan's keys.
+        package let ditFormat: CapacityClasses.WeightFormat, encoderFormat: CapacityClasses.WeightFormat
 
         /// From the headers — pure: the tests hand it headers written in memory. `nil` when the
         /// encoder's config does not parse or its map has no tensor table.
@@ -79,6 +81,7 @@ extension MemoryNeed {
             guard staging > 0 else { return nil }
             self.dit = AnimaDiT.Config(header: dit); self.encoder = config; encoderLayerStaging = staging
             ditRotationScratch = Widen.rotationScratchBytes(header: dit)
+            ditFormat = Artifact.weightFormat(header: dit); encoderFormat = Artifact.weightFormat(header: encoder)
         }
 
         /// The maps this card renders with: its own DiT (an imported one) or the library's installed
@@ -138,8 +141,9 @@ extension MemoryNeed {
             Term("encoder staging", TextEncoder.stagingSlots(granted: request.encoderSlots) * maps.encoderLayerStaging),
             Term("conditioner arena", AnimaConditioner.arenaBytes(t5: t5, qwen: tokens)),
         ] + attention("encoder", heads: encoder.heads, rows: tokens, keys: tokens, headDim: encoder.headDim,
-                      causal: true, split: false, threads: request.threads)
-          + gemm("encoder", bounded: [(tokens, h, a), (tokens, h, kv), (tokens, a, h), (tokens, h, i), (tokens, i, h)]))
+                      causal: true, threads: request.threads)
+          + gemm("encoder", bounded: [(tokens, h, a), (tokens, h, kv), (tokens, a, h), (tokens, h, i), (tokens, i, h)], spread: tokens,
+                 plan: request.encoderPlan, weight: maps.encoderFormat, phase: .encoding))
 
         // ── img2img's starting image, encoded at the render's format (`fitted`: a copy when the size
         //    handed differs), one encoder at a time: its heaps and the latent it returns ─────────
@@ -166,13 +170,16 @@ extension MemoryNeed {
             Term("sampler", latent + request.solver.historyBytes(count: latent / f)),
             Term("DiT rotation scratch", maps.ditRotationScratch),
         ] + attention("self-attention", heads: dit.heads, rows: s, keys: s, headDim: dit.headDim, causal: false,
-                      split: HeadSplitAttention.applies(sequence: s, heads: dit.heads, headDim: dit.headDim), threads: request.threads)
+                      assignment: request.ditPlan.assign(AttentionKey(sequence: s, heads: dit.heads, headDim: dit.headDim), flash: true),
+                      threads: request.threads)
           + attention("cross-attention", heads: dit.heads, rows: s, keys: textRows, headDim: dit.headDim, causal: false,
-                      split: HeadSplitAttention.applies(sequence: s, heads: dit.heads, headDim: dit.headDim), threads: request.threads)
+                      assignment: request.ditPlan.assign(AttentionKey(sequence: s, keys: textRows, heads: dit.heads, headDim: dit.headDim,
+                                                                      cross: true)),
+                      threads: request.threads)
           // Every height is exact: the image's tokens, and the text's `L`.
           + gemm("DiT", products: [(s, inDim, d), (s, d, d), (s, d, hidden), (s, hidden, d), (s, d, outDim),
                                    (textRows, dit.textDim, d)],
-                 rank: rank, ane: request.neuralEngine))
+                 rank: rank, plan: request.ditPlan, weight: maps.ditFormat))
 
         // ── decoding: the decoder's two heaps and the image it returns; the latent it reads crosses ──
         let plan = animaDecoderPlans([latentHeight, latentWidth]) {

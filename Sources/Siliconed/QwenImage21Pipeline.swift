@@ -268,7 +268,7 @@ package struct QwenImage21Sampler {
     package var keptReserve: Int64 = RenderCache.defaultKeptReserve
     package var freezeCut = EngineSettings.effective.frozenCut
     /// The DiT's products may take the Neural Engine (`Request.neuralEngine`).
-    package var neuralEngine = EngineSettings.effective.gemmANE
+    package var neuralEngine = EngineSettings.effective.plan.usesANE
     package var cancellation: Cancellation?
     /// Seconds: `prefill`, `steps`, and the DiT's own breakdown (`dit …`).
     package private(set) var timings: [String: Double] = [:]

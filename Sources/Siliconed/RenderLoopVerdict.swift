@@ -252,12 +252,16 @@ extension RenderLoop {
     /// **The whole check of a render**, from its record to its note: the request it stands for, the prediction under `table`,
     /// the comparison, the verdict. `nil` for a render the catalogue does not describe (an unknown family, a version that does not
     /// exist, a sketch, a render with references or a LoRA: classes the catalogue does not carry).
-    package static func check(_ render: Engine.Render, variant: Variant, references: Int = 0, report: Diagnostic.Report, table: RouteTable,
-                              amxMinimumRows: Int = EngineSettings.defaultAMXMinimumRows,
+    package static func check(_ render: Engine.Render, variant: Variant, references: Int = 0, report: Diagnostic.Report,
+                              plan: CapacityPlan = EngineSettings.effective.plan,
+                              amxMinimumRows: Int = CapacitySolver.Limits.defaultAMXRows,
                               thresholds: Thresholds = Thresholds()) -> (comparison: Comparison, verdict: Verdict, note: Note)? {
         guard !render.classes.isEmpty, render.sketch == nil, render.loras.isEmpty, references == 0,
               let request = request(of: render, variant: variant),
-              let predicted = predictions(for: request, table: table, report: report, amxMinimumRows: amxMinimumRows,
+              let classes = CapacityClasses.classes(for: request) else { return nil }
+        // The routes the engine ran under: the plan's answers for these classes, by the table the previous check reads.
+        let table = RouteTable(answers: plan.restricted(allowingANE: render.neuralEngine), classes: classes)
+        guard let predicted = predictions(for: request, table: table, report: report, amxMinimumRows: amxMinimumRows,
                                           aneBroughtUp: render.neuralEngine) else { return nil }
         let comparison = compare(render.classes, predicted: predicted)
         let verdict = verdict(comparison, report: report, table: table, thresholds: thresholds)

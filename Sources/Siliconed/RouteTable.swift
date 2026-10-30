@@ -1,46 +1,13 @@
 import Foundation
 
-/// **The route table: which route each class of computation takes on this Mac** — the engine consults it at
-/// the moment it runs a product or an attention, instead of reading one global switch for the whole render.
-/// Pure data: no Metal, no weights; the capacity map produces it (`init(decisions:)` today, a
-/// `CapacityMeasure.Plan` through `init(plan:…)`), `EngineSettings.routes` holds it, the report shows it.
+/// **LEGACY — the previous capacity map's output format; the engine reads none of it.** The engine asks the plan
+/// (`CapacityPlan`) for exact rows at every product and every attention. This table survives only as what the previous map
+/// (`CapacityMeasure`, `CapacityMapRun`, `CapacityRules`) writes into its report and what `RenderLoop` predicts routes from, and goes
+/// with it (E4b). Nothing here is consulted by `GEMM`, `WeightProducts`, `MemoryNeed` or the attentions.
 ///
-///     RouteTable
-///        ├─ products     a product k×n at m rows — a class is its shape and its height
-///        │    ├─ weights   [WeightRule]   which form of the weight the product reads: widened to fp32,
-///        │    │                           the bf16 / int8 / Q8_0 weight as published (+ its activation
-///        │    │                           rounded to bf16), by weight kind and shape, first match wins
-///        │    ├─ amx       GPU + AMX      the GPU's share: a scalar and a grid (k, n, m) interpolated in log
-///        │    ├─ ane       GPU + ANE      idem, a grid of its own, the rows' unit, the height under which it sleeps
-///        │    │    └─ beside AMX          the shapes where the three engines take the product at once
-///        │    └─ classes   [ClassRule]    a class forced to one set of engines, ahead of the grids
-///        └─ attention    an attention of S query rows, `heads` of `headDim`
-///             └─ rules   [AttentionRule]  flash allowed, head split allowed (+ the CPU's share of heads)
-///
-/// What sets it apart — what a table written by analogy with the switches it replaces would get wrong:
-///
-///   - **a route is looked up where the work runs, not where the engine is built.** `route(k:n:m:)` is
-///     asked at every product (`GEMM.linear`, `WeightProducts.prepare`); a switch read once at launch
-///     (`static let enabled`) cannot say "the ANE for this shape, not for that one". What stays global
-///     is what exists *once per process*: the engines brought up (a conductor, a `TensorGEMM`, a
-///     `NeuralEngine`: `usesAMX`, `usesANE`, `usesBF16Weights`…, derived — an engine is built iff some
-///     class may use it) and the format of a *prepared* weight, which is a property of the weight's
-///     kind (bf16, int8, Q8_0) and shape, never of one call: a weight is prepared once for every
-///     evaluation that reads it, so its rule is looked up at the height of its first use and its
-///     class is `(kind, k, n)` plus the height range the rule names;
-///   - **the grids are the same functions as before**: `Conductor.Shares` (ρ at measured points,
-///     composed along two axes, linear in `log` between heights, the nearest point outside the
-///     measured range). The table changes who asks, not the arithmetic — the same table gives the same
-///     routes as the switches did, bit for bit, and the pure test says so on every kept map;
-///   - **a class rule is ahead of the grids** and may only choose among the engines the table
-///     brought up: a plan that rules a shape "GPU alone" says so without touching the grid that
-///     serves the others;
-///   - **the attention keeps the two allowances apart** (`flash`, `split`): a model's code says which
-///     it implements (Z-Image and Anima take flash before the split; Qwen-Image-2.1's target, Krea 2
-///     and MOSS-Image only the split), the table says which are allowed — one `flash` flag read
-///     as "the route" would take the split from Qwen the day flash went on;
-///   - **Codable, one string per grid**: the table goes in a report, and the grids keep the text they
-///     had in the settings (`amx_shares`, `ane_shares`, `ane_amx`), three decimals.
+/// It was: which route each class takes on this Mac — products by a class rule over the AMX's and the ANE's grids of ρ (interpolated
+/// in log, the nearest measured point beyond), the weights' forms by rule, the attentions by (S, heads, head dim); a ratio the
+/// engine rounded to its quantum and clamped to a band.
 package struct RouteTable: Codable, Sendable, Equatable {
     package static let schema = 1
 
@@ -73,18 +40,11 @@ package struct RouteTable: Codable, Sendable, Equatable {
 
     // MARK: - Products
 
-    /// What a weight is, for the route: the form it is published in.
-    package enum WeightKind: String, Codable, Sendable, CaseIterable { case bf16, int8, q8 }
+    /// What a weight is, for the route: the form it is published in (now `WeightKind`, `CapacityPlan.swift`).
+    package typealias WeightKind = Siliconed.WeightKind
 
-    /// How a product reads its weight.
-    package enum WeightPath: String, Codable, Sendable {
-        /// Widened to fp32 on the CPU (the default path: MPS, the AMX, the ANE read it).
-        case widened
-        /// The bf16 weight as published (`TensorGEMM`).
-        case bf16
-        /// The 8-bit weight as published (int8 convrot, Q8_0).
-        case native
-    }
+    /// How a product reads its weight (now `WeightPath`, `CapacityPlan.swift`).
+    package typealias WeightPath = Siliconed.WeightPath
 
     /// The form a weight is read in at a product, resolved.
     package struct WeightRoute: Sendable, Equatable {
@@ -392,33 +352,6 @@ package struct RouteTable: Codable, Sendable, Equatable {
         package var defaultSplitFraction: Double {
             rules.lazy.compactMap(\.splitFraction).first ?? HeadSplitAttention.referenceFraction
         }
-    }
-
-    // MARK: - From today's decisions
-
-    /// **The table today's settings are**: every switch and grid of `settings`, as the classes they decide.
-    /// Reads nothing but `settings`: a forced setting (`SILICONED_*`, a profile, a check) is a setting, hence
-    /// a table; the table of a process is the settings' as they stand after the last override.
-    package init(settings s: EngineSettings) {
-        let weights = Products.weightRules(bf16: s.gemmTensor, int8: s.gemmInt8, q8: s.gemmQ8, rounded: s.gemmBF16Activations,
-                                           minRows: s.bf16ActivationMinimumRows, eightBit: s.bf16ActivationEightBit)
-        products = Products(weights: weights,
-                            amx: AMX(enabled: s.amx, gpuShare: s.amxFraction, grid: Grid(s.amxShares)),
-                            ane: ANE(enabled: s.gemmANE, gpuShare: s.aneFraction, minimumRows: s.aneMinimumRows,
-                                     grid: Grid(s.aneShares), besideAMX: Grid(s.aneAMX)))
-        // Flash everywhere (the kernel falls back by itself on a length it does not tile); the split from
-        // `HeadSplitAttention.minimumSequence` rows.
-        let fraction: Double? = s.headSplit ? s.headSplitFraction : nil
-        attention = s.flash || fraction != nil
-            ? Attention(rules: [.init(minSequence: HeadSplitAttention.minimumSequence, flash: s.flash, splitFraction: fraction),
-                                .init(flash: s.flash)])
-            : Attention()
-    }
-
-    /// **The table a capacity map's decisions are**: the settings they write (`Decisions.settings`), as a table.
-    /// Hermetic: no environment, no profile.
-    package init(decisions: Diagnostic.Decisions) {
-        self.init(settings: EngineSettings(applying: decisions.settings))
     }
 
     // MARK: - A plan, as a table
