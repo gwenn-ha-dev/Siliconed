@@ -59,7 +59,8 @@ package enum RenderLoop {
     package static func request(of render: Engine.Render, variant: Variant) -> CapacityClasses.Request? {
         guard let family = Family(rawValue: render.model) else { return nil }
         return CapacityClasses.Request(family: family, variant: variant, width: render.image.width, height: render.image.height,
-                                       fasterRendering: render.spectral > 0, promptTokens: render.tokens,
+                                       fasterRendering: render.spectral > 0,
+                                       promptTokens: CapacityClasses.promptTokens(family, renderTokens: render.tokens),
                                        steps: render.evaluations, includesEncoder: false,
                                        halfSteps: render.spectral > 0 ? render.spectral : nil)
     }

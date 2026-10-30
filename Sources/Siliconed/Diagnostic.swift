@@ -130,6 +130,18 @@ package enum Diagnostic {
         return try result.get()
     }
 
+    /// **The probes' kernels chained at the shapes asked** (`CapacityProbes.measureKernels`), on the engine's queue: a bench's entry.
+    package static func measureKernels(_ kernels: [String], shapes: [CapacityProbes.Sizes.Shape], chained: Bool = true,
+                                       log: ((String) -> Void)? = nil) throws(EngineError) -> [CapacityFit.Measurements.Solo] {
+        dispatchPrecondition(condition: .notOnQueue(Engine.file))
+        let result = Engine.file.sync {
+            Result { () throws(EngineError) -> [CapacityFit.Measurements.Solo] in
+                try CapacityProbes.measureKernels(machine: machine(), kernels: kernels, shapes: shapes, chained: chained, log: log)
+            }
+        }
+        return try result.get()
+    }
+
     private static func runQueued(cancellation: Cancellation?, validate: Bool, skipping: Set<CapacityModel.Kernel>, log: ((String) -> Void)?,
                                   onProgress: (@Sendable (_ stage: Stage) -> Void)?)
         throws(EngineError) -> (report: Report, probes: CapacityProbes.Result) {

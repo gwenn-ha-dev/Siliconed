@@ -45,6 +45,65 @@ import Testing
         #expect(abs(line.seconds(rows: 512, k: 2048, n: 2048) - line.seconds(2 * 512.0 * 2048 * 2048)) < 1e-15)
     }
 
+    // MARK: The host's passes of the ANE
+
+    /// The ANE's seconds with a known truth: `t₀ + w·k·n + h·rows·(k·r + n·parts) + 2·rows·k·n / R`, `parts` the engine's own cut of K.
+    func hosted(_ shape: Shape, int8: Bool, t0: Double = 0.0011, w: Double = 2e-11, h: Double = 2.4e-10, rate: Double = 9e12) -> Double {
+        let p = NeuralEngine.parts(k: shape.k, n: shape.n, int8: int8, alignment: int8 ? Widen.largestRotationGroup : 64)
+        let elements = Double(shape.m) * (Double(shape.k) * (int8 && p > 1 ? 2 : 1) + Double(shape.n) * Double(p))
+        return t0 + w * Double(shape.k * shape.n) + h * elements + 2 * Double(shape.m) * Double(shape.k) * Double(shape.n) / rate
+    }
+
+    @Test func aThinProductCostsMoreThanItsFlopSay() {
+        let line = M.Line(t0: 0.001, rate: 9e12, perRow: 2.4e-10)
+        let plain = M.Line(t0: 0.001, rate: 9e12)
+        // Rows of 4 096 on a wide weight (n = 12 288) and a thin one (n = 1 536): the same rate pays the same per FLOP, the host's passes do not.
+        let wide = line.rate(atK: 4096, n: 12288), thin = line.rate(atK: 4096, n: 1536)
+        #expect(thin < 0.75 * wide && wide < plain.rate)
+        // Where K is cut and the rows rotated (an int8 weight), the activation pass is paid twice.
+        #expect(line.rate(atK: 8192, n: 3072, parts: 2, rotated: true) < line.rate(atK: 8192, n: 3072, parts: 2, rotated: false))
+        #expect(plain.rate(atK: 4096, n: 1536, parts: 3, rotated: true) == plain.rate)
+    }
+
+    @Test func theModelReadsTheCutOfKFromTheEnginesOwn() {
+        var m = M()
+        let a8 = M.Kernel(.ane, .int8)
+        m.lines[a8] = .init(t0: 0.0011, rate: 9e12, perRow: 2.4e-10)
+        // 8 192 × 3 072 of integers: two parts of 4 096, the rows rotated twice.
+        let t = m.alone(a8, rows: 2048, k: 8192, n: 3072)!
+        let p = NeuralEngine.parts(k: 8192, n: 3072, int8: true, alignment: 256)
+        #expect(p == 2)
+        let elements = 2048.0 * (8192.0 * 2 + 3072.0 * Double(p))
+        #expect(abs(t - (0.0011 + 2.4e-10 * elements + 2 * 2048.0 * 8192 * 3072 / 9e12)) < 1e-9)
+    }
+
+    @Test func theHostPassesAreToldFromTheLiftAndTheRateByThinAndCutProducts() throws {
+        for int8 in [false, true] {
+            let kernel = M.Kernel(.ane, int8 ? .int8 : .fp16)
+            // Four shapes tell the host passes and the rate from the fixed cost (the weight's lift is left to them); six tell the lift too.
+            let four: [Shape] = [(2048, 2048, 4096), (2048, 3840, 3840), (1024, 12288, 4096), (2048, 8192, 1536)]
+            let six = four + [(4096, 3840, 3840), (1024, 6144, 1536)]
+            for (shapes, lift) in [(four, 0.0), (six, 2e-11)] {
+                let line = try #require(F.productLine(kernel: kernel, solos: solos(kernel, shapes) { hosted($0, int8: int8, w: lift) }))
+                let h = try #require(line.perRow)
+                #expect(abs(h / 2.4e-10 - 1) < 0.01 && abs(line.rate / 9e12 - 1) < 0.01 && abs(line.t0 / 0.0011 - 1) < 0.01, "\(kernel): \(line)")
+                #expect((line.perWeight == nil) == (lift == 0) || abs((line.perWeight ?? 0) / lift - 1) < 0.01)
+                // A product it never saw, thin and cut: the form predicts it where a plain line would be 30 % off.
+                let unseen: Shape = (4096, 6144, 1536)
+                let truth = hosted(unseen, int8: int8, w: lift)
+                var m = M(); m.lines[kernel] = line
+                #expect(abs(m.alone(kernel, rows: unseen.m, k: unseen.k, n: unseen.n)! / truth - 1) < 0.01)
+            }
+        }
+    }
+
+    @Test func fewerThanFourShapesFallBackOnTheThreeTermLine() throws {
+        let kernel = ane
+        let shapes: [Shape] = [(2048, 2048, 4096), (2048, 3840, 3840), (1024, 12288, 4096)]
+        let line = try #require(F.productLine(kernel: kernel, solos: solos(kernel, shapes) { hosted($0, int8: false) }))
+        #expect(line.perRow == nil)
+    }
+
     @Test func theKeepByKIsInterpolatedAndClamped() {
         let s = M.Sharing(keep: [.amx: 0.9], keepByK: [.init(k: 3840, keep: ["amx": 0.9, "gpu": 0.97]), .init(k: 12288, keep: ["amx": 0.5])])
         #expect(s.keep(.amx, k: 2048) == 0.9 && s.keep(.amx, k: 16384) == 0.5)

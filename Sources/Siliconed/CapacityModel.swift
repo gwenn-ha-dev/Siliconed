@@ -14,6 +14,8 @@ import Foundation
 ///
 ///     a product m×k×n on engines E, rows rᵢ (Σ rᵢ = m), W = 2·k·n·m:
 ///         sᵢ = t₀ᵢ + wᵢ·k·n + 2·k·n·rᵢ / rateᵢ(k)       its seconds alone (rᵢ rounded up to `aneRowUnit` on the ANE)
+///                                                      the ANE's rate carries the host's passes over the rows (`Line.perRow`):
+///                                                      1/rate = 1/R + h·(k·r + n·parts) / (2·k·n)
 ///         the engines run **overlapped**: while the set S is active, each progresses at κᵢˢ of its speed alone, and at 1 once
 ///         it is alone; T = the end of the last + overhead(E)
 ///     balanced (every side ends together), κᵢ the full set's:
@@ -102,13 +104,19 @@ package struct CapacityModel: Codable, Sendable, Equatable {
         /// extrapolation, and a plan that relies on it is a guess (the AMX at 288 rows ran 11 % under the line fitted from 1 024 rows up, and its κ
         /// followed): the model gives no seconds there, and the solver offers no assignment that gives the kernel fewer. `nil`: no bound.
         package var rowsFrom: Int?
+        /// **The ANE's host passes, per row**: seconds per element the host runs over for each row it hands the engine — the activation (`k`
+        /// values, converted to fp16, and rotated first for a convrot weight: twice where K is cut in parts, once for the peak and once per part)
+        /// and the output (`n` values a part, scaled and summed in fp32). `nil`: none, and the rate carries them. Thin products (n = 1 536,
+        /// 3 072) spend more of their call there than their FLOP say: Krea 2's k and v, MOSS-Image's `3072×3072` ran 50–60 % over a line fitted
+        /// on wide ones.
+        package var perRow: Double?
         package struct RateAt: Codable, Sendable, Equatable {
             package var k: Int
             package var rate: Double
             package init(k: Int, rate: Double) { self.k = k; self.rate = rate }
         }
-        package init(t0: Double, rate: Double, perWeight: Double? = nil, rateByK: [RateAt]? = nil, rowsFrom: Int? = nil) {
-            self.t0 = t0; self.rate = rate; self.perWeight = perWeight; self.rateByK = rateByK; self.rowsFrom = rowsFrom
+        package init(t0: Double, rate: Double, perWeight: Double? = nil, rateByK: [RateAt]? = nil, rowsFrom: Int? = nil, perRow: Double? = nil) {
+            self.t0 = t0; self.rate = rate; self.perWeight = perWeight; self.rateByK = rateByK; self.rowsFrom = rowsFrom; self.perRow = perRow
         }
         package func seconds(_ flop: Double) -> Double { t0 + flop / rate }
         /// The seconds a call pays whatever its rows: `t₀` and the weight's lift.
@@ -124,9 +132,16 @@ package struct CapacityModel: Codable, Sendable, Equatable {
             }
             return last.rate
         }
+        /// The rate at `k` with the host's passes added to the engine's time: `1 / rate` plus the passes' seconds per FLOP (`parts`: the ANE's cut of
+        /// K, `rotated`: the activation is rotated before it, as a convrot weight's is).
+        package func rate(atK k: Int, n: Int, parts: Int = 1, rotated: Bool = false) -> Double {
+            guard let perRow else { return rate(atK: k) }
+            let elements = Double(k) * (rotated && parts > 1 ? 2 : 1) + Double(n) * Double(parts)
+            return 1 / (1 / rate(atK: k) + perRow * elements / (2 * Double(k) * Double(n)))
+        }
         /// Seconds of `rows` rows of a `k×n` weight (the caller rounds the ANE's up to its unit).
-        package func seconds(rows: Int, k: Int, n: Int) -> Double {
-            fixed(k: k, n: n) + 2 * Double(rows) * Double(k) * Double(n) / rate(atK: k)
+        package func seconds(rows: Int, k: Int, n: Int, parts: Int = 1, rotated: Bool = false) -> Double {
+            fixed(k: k, n: n) + 2 * Double(rows) * Double(k) * Double(n) / rate(atK: k, n: n, parts: parts, rotated: rotated)
         }
     }
 
@@ -282,7 +297,7 @@ package struct CapacityModel: Codable, Sendable, Equatable {
         func r(_ x: Double) -> Double { Diagnostic.significant(x, digits) }
         var m = self
         m.crest = crest.mapValues(r)
-        m.lines = lines.mapValues { Line(t0: r($0.t0), rate: r($0.rate), perWeight: $0.perWeight.map(r), rateByK: $0.rateByK?.map { .init(k: $0.k, rate: r($0.rate)) }, rowsFrom: $0.rowsFrom) }
+        m.lines = lines.mapValues { Line(t0: r($0.t0), rate: r($0.rate), perWeight: $0.perWeight.map(r), rateByK: $0.rateByK?.map { .init(k: $0.k, rate: r($0.rate)) }, rowsFrom: $0.rowsFrom, perRow: $0.perRow.map(r)) }
         m.sharing = sharing.mapValues { Sharing(overhead: r($0.overhead), keep: $0.keep.mapValues(r), sustained: $0.sustained.map(r), keepByK: $0.keepByK?.map { .init(k: $0.k, keep: $0.keep.mapValues(r)) }, kFrom: $0.kFrom, kTo: $0.kTo) }
         m.heat = heat.mapValues(r)
         m.memoryBandwidth = memoryBandwidth.map(r); m.diskBandwidth = diskBandwidth.map(r)
@@ -314,6 +329,14 @@ package struct CapacityModel: Codable, Sendable, Equatable {
         package var seconds: Double
     }
 
+    /// **The rate of `kernel` on a `k×n` weight** with the host's passes in it (`Line.perRow`): the ANE's parts of K are the engine's own cut
+    /// (`NeuralEngine.parts`), its int8 program reading convrot groups of 256 and rotating the activation.
+    package func rate(_ kernel: Kernel, line: Line, k: Int, n: Int) -> Double {
+        guard line.perRow != nil, kernel.engine == .ane else { return line.rate(atK: k) }
+        let int8 = kernel.form == .int8
+        return line.rate(atK: k, n: n, parts: NeuralEngine.parts(k: k, n: n, int8: int8, alignment: int8 ? Widen.largestRotationGroup : 64), rotated: int8)
+    }
+
     /// **A kernel's seconds alone on `rows` rows of a `k×n` weight** (the ANE's rounded up to its unit), at the sustained rate
     /// (`heat`, on the rate: the lift of the weight and the launch do not slow) when asked. `nil` where the kernel has no line.
     package func alone(_ kernel: Kernel, rows: Int, k: Int, n: Int, sustained: Bool = false) -> Double? {
@@ -321,7 +344,7 @@ package struct CapacityModel: Codable, Sendable, Equatable {
         var here = rows
         if kernel.engine == .ane { here = (here + aneRowUnit - 1) / aneRowUnit * aneRowUnit }
         let slow = sustained ? max(1, heat[kernel.engine] ?? 1) : 1
-        return line.fixed(k: k, n: n) + 2 * Double(here) * Double(k) * Double(n) / (line.rate(atK: k) / slow)
+        return line.fixed(k: k, n: n) + 2 * Double(here) * Double(k) * Double(n) / (rate(kernel, line: line, k: k, n: n) / slow)
     }
 
     /// The speed of a kernel inside the set that is active, over its speed alone.
@@ -387,7 +410,7 @@ package struct CapacityModel: Codable, Sendable, Equatable {
             for kernel in active {
                 guard let line = lines[kernel], line.rate > 0 else { return nil }
                 let slow = sustained ? max(1, heat[kernel.engine] ?? 1) : 1
-                rate[kernel] = line.rate(atK: k) / slow
+                rate[kernel] = self.rate(kernel, line: line, k: k, n: n) / slow
                 fixed[kernel] = line.fixed(k: k, n: n)
                 kappa[kernel] = speed(kernel, in: set, k: k)
             }

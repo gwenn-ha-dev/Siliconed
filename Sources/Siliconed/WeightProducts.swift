@@ -62,6 +62,8 @@ package final class WeightProducts {
     private let roundsActivations: Bool
     /// The last int8 product had rows on the ANE, and it computed them (`classification`).
     private var aneTook = false
+    /// ... and it took every row of the product: the ledger names the route `ane/int8`, as the plan does (`ProductAssignment.route`).
+    private var aneAlone = false
 
     /// Per phase, accumulated since the last `resetTimings`.
     package private(set) var timings: [String: Double] = [:]
@@ -129,8 +131,9 @@ package final class WeightProducts {
                     let r = Self.int8Product(gemm: gemm, plan: plan, reserve: w, a: a, c: c, m: m, k: k, n: n, ane: ane, aneRows: aneRows)
                     timings["gemm GPU", default: 0] += r.gpu
                     aneTook = r.computed
+                    aneAlone = r.computed && aneRows == m
                 } else {
-                    aneTook = false
+                    aneTook = false; aneAlone = false
                     let r = Self.int8Product(gemm: gemm, plan: plan, reserve: w, a: a, c: c, m: m, k: k, n: n)
                     timings["gemm GPU", default: 0] += r.gpu
                     timings["widening", default: 0] += r.widening
@@ -166,7 +169,7 @@ package final class WeightProducts {
         case .bf16(let rounding): return (.bf16, rounding == nil ? "gpu/bf16" : "gpu/bf16act")
         case .int8(let plan):
             let weight: CapacityClasses.WeightFormat = plan.block == nil ? .int8 : .q8
-            if aneTook { return (weight, "gpu+ane/" + weight.rawValue) }
+            if aneTook { return (weight, (aneAlone ? "ane/" : "gpu+ane/") + weight.rawValue) }
             return (weight, (plan.amxColumns > 0 && gemm.conductor != nil ? "gpu+amx/" : "gpu/") + weight.rawValue)
         case .widened:
             return (format(of: name), gemm.lastEngines)

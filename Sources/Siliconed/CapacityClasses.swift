@@ -25,6 +25,17 @@ import Foundation
 ///     Krea 2 +16 (1 040 · 4 112 · 6 160), MOSS-Image +21 (1 045 · 4 117 · 6 165), Qwen-Image-2.1 and Anima the
 ///     image alone (the text is a prefix of the keys, or a cross-attention). Faster Rendering adds the half grid's
 ///     (about 1 050 · 1 560 rows), at the family's own count of evaluations (Z-Image, Qwen, Anima 3; Krea 2 4; MOSS 1).
+///   - **The 8-bit blocks are not the whole DiT**: a Compact quantizes the layers' projections, and leaves as published (bf16, or fp32: the engine's record
+///     says `bf16` for both) the embedders, Z-Image's two refiners and context refiners, Krea 2's text fusion, MOSS-Image's text blocks. Those are
+///     classes of the Standard's format inside a Compact render — 4 % of Z-Image's seconds, which a catalogue that reads the version's format everywhere
+///     sees as « not carried ».
+///   - **MOSS-Image's layers run q, k, v and o apart** (four products of 3 072², not a fused QKV of 9 216 — that one is the text blocks'), its gate and
+///     up fused (3 072 × 16 384), the text blocks' up and gate apart.
+///   - **What a DiT computes from the conditions runs once per grid**, not once per render: each grid has its own DiT, built and run apart, so Anima's
+///     cross k/v and Qwen-Image-2.1's prefill (19 rows through the 32 layers, `txt_in` first) run twice under Faster Rendering. Krea 2's text
+///     fusion (twelve hidden states per token, then `txt_in`) runs once.
+///   - **`Render.tokens` is the family's own count** (`promptTokens(_:renderTokens:)`): the rows joined to the image for Z-Image and Qwen-Image-2.1, the
+///     rows once the template is removed for Krea 2, the prompt's for the others.
 ///   - **Qwen-Image-2.1's MLP runs by row chunks** (`QwenImage21DiT.mlpRows`): a 1024×1536 target is two products of
 ///     3 072 rows, not one of 6 144 — the class is the chunk's.
 ///   - **A weight format is part of a product's shape**: the same k×n in bf16 (Standard) and in int8 (Compact) are two
@@ -38,7 +49,8 @@ import Foundation
 ///     after the product), the embedders other than Z-Image's, Anima's adapter and Krea 2's text fusion, W_b/W_a of the
 ///     MOSS encoder. They are small (each under 1 % of a render), or have no route to choose among.
 ///   - **Unread from code**: Krea 2's text encoder runs up to its last tap (36 layers is the Qwen3-VL-4B text model's
-///     count, an upper bound); MOSS's encoder FFN width (12 288) is the Qwen3.5-9B card's, not read in the code.
+///     count, an upper bound); MOSS's encoder FFN width (12 288) is the Qwen3.5-9B card's, not read in the code. Which weights a Light leaves
+///     as published is not read either: the Light keeps its version's format everywhere.
 ///   - **The id of a class is the render's and the ledger's** (`product:K×N@M`, `~int8`, `~q8`, `~q4k` for the weight's form;
 ///     `attention:S/H×D`): a self- and a cross-attention of the same S, heads and head dim share one — what the ledger can tell
 ///     them by — and the catalogue keeps both so that their executions add.
@@ -235,6 +247,18 @@ package enum CapacityClasses {
         }
     }
 
+    /// **The prompt's tokens as this catalogue counts them, from a render's `Render.tokens`** — which each family's text module reports in its
+    /// own sense (« for display »): Z-Image's and Qwen-Image-2.1's are the rows the DiT joins (template included, `p + 8`), Krea 2's the rows
+    /// once the template's are removed (`p + 5`), MOSS-Image's and Anima's the prompt's. Asked as the render's own, the catalogue put Krea 2's
+    /// attention at 4 117 rows when the engine ran it at 4 112.
+    package static func promptTokens(_ family: Family, renderTokens t: Int) -> Int {
+        switch family {
+        case .zImage, .qwenImage21: return max(1, t - 8)
+        case .krea2: return max(1, t - 5)
+        case .anima, .mossImage: return t
+        }
+    }
+
     // MARK: - Encoders
 
     /// A text encoder's dimensions (published; the maps carry them in their headers).
@@ -277,19 +301,32 @@ package enum CapacityClasses {
 
     // MARK: - DiTs
 
+    /// The format of the weights a version leaves as published, beside the 8-bit blocks (the embedders, the refiners, Krea 2's text
+    /// fusion, MOSS-Image's text blocks: bf16 or fp32 in the Compact maps, read as `bf16` by the engine's record). Read from the five
+    /// Compact maps' headers; a Light's (Q4_K from a GGUF) is not read and stays the version's own.
+    private static func plainFormat(_ r: Request, _ f: WeightFormat) -> WeightFormat { r.variant == .compact ? .bf16 : f }
+
     /// One evaluation's classes at `tokens` image rows, `times` evaluations.
     private static func evaluation(_ b: inout Builder, _ r: Request, _ f: WeightFormat, tokens t: Int, times: Int) {
         let text = textRows(r.family, promptTokens: r.promptTokens)
+        let plain = plainFormat(r, f)
+        /// A product of the version's 8-bit blocks.
         func p(_ k: Int, _ n: Int, _ rows: Int, _ count: Int) { b.product(.denoising, k, n, rows, f, times: count * times) }
+        /// A product by a weight the version leaves as published.
+        func q(_ k: Int, _ n: Int, _ rows: Int, _ count: Int) { b.product(.denoising, k, n, rows, plain, times: count * times) }
         switch r.family {
         case .zImage:
             let c = DiT.Config(header: [:]), m = t + text, hd = c.dim / c.heads
-            func block(_ rows: Int, _ layers: Int) {
-                p(c.dim, c.dim, rows, 4 * layers); p(c.dim, c.hidden, rows, 2 * layers); p(c.hidden, c.dim, rows, layers)
+            func block(_ rows: Int, _ layers: Int, quantized: Bool) {
+                let format = quantized ? f : plain
+                b.product(.denoising, c.dim, c.dim, rows, format, times: 4 * layers * times)
+                b.product(.denoising, c.dim, c.hidden, rows, format, times: 2 * layers * times)
+                b.product(.denoising, c.hidden, c.dim, rows, format, times: layers * times)
             }
-            block(m, c.layers); block(t, c.refiners); block(text, c.refiners)   // layers, noise refiner, context refiner
+            block(m, c.layers, quantized: true)                                  // the layers
+            block(t, c.refiners, quantized: false); block(text, c.refiners, quantized: false)   // noise and context refiners
             let latent = c.patch * c.patch * c.channels
-            p(latent, c.dim, t, 1); p(c.capDim, c.dim, text, 1); p(c.dim, latent, t, 1)
+            q(latent, c.dim, t, 1); q(c.capDim, c.dim, text, 1); q(c.dim, latent, m, 1)   // x_embedder, cap_embedder, the final linear
             b.attention(m, keys: m, heads: c.heads, kv: c.heads, dim: hd, times: c.layers * times)
             b.attention(t, keys: t, heads: c.heads, kv: c.heads, dim: hd, times: c.refiners * times)
         case .qwenImage21:
@@ -301,26 +338,29 @@ package enum CapacityClasses {
                 let rows = min(chunk, left); left -= rows
                 p(c.dim, c.hidden, rows, 2 * c.layers); p(c.hidden, c.dim, rows, c.layers)
             }
+            q(c.channels, c.dim, t, 1); q(c.dim, c.channels, t, 1)               // img_in, proj_out
             b.attention(t, keys: t + text, heads: c.heads, kv: c.heads, dim: c.headDim, times: c.layers * times)
         case .anima:
             let c = AnimaDiT.Config(header: [:])
             p(c.dim, c.dim, t, 6 * c.layers)                                   // self q k v o, cross q o
             p(c.dim, c.hidden, t, c.layers); p(c.hidden, c.dim, t, c.layers)
+            q((c.channels + 1) * c.patch * c.patch, c.dim, t, 1); q(c.dim, c.channels * c.patch * c.patch, t, 1)   // patch_embed, proj_out
             b.attention(t, keys: t, heads: c.heads, kv: c.heads, dim: c.headDim, times: c.layers * times)
             b.attention(t, keys: Self.animaTextRows, heads: c.heads, kv: c.heads, dim: c.headDim, cross: true, times: c.layers * times)
         case .krea2:
             let c = Krea2DiT.Config(header: [:]), m = t + text
-            p(c.dim, c.dim, m, 3 * c.layers); p(c.dim, c.kvWidth, m, 2 * c.layers)
+            p(c.dim, c.dim, m, 3 * c.layers); p(c.dim, c.kvWidth, m, 2 * c.layers)   // q, gate, out ; k, v
             p(c.dim, c.hidden, m, 2 * c.layers); p(c.hidden, c.dim, m, c.layers)
+            q(c.channels, c.dim, t, 1); q(c.dim, c.channels, t, 1)               // img_in, final_layer
             b.attention(m, keys: m, heads: c.heads, kv: c.kvHeads, dim: c.headDim, times: c.layers * times)
         case .mossImage:
             let c = MossImageDiT.Config(header: [:]), m = t + text
-            func block(_ rows: Int, _ layers: Int) {
-                p(c.dim, 3 * c.dim, rows, layers); p(c.dim, c.dim, rows, layers)
-                p(c.dim, 2 * c.hidden, rows, layers); p(c.hidden, c.dim, rows, layers)
-            }
-            block(m, c.layers); block(text, c.textBlocks)
-            p(c.textDim, c.dim, text, 1)
+            p(c.dim, c.dim, m, 4 * c.layers)                                   // q, k, v, o: four products, not one fused QKV
+            p(c.dim, 2 * c.hidden, m, c.layers); p(c.hidden, c.dim, m, c.layers)
+            // The two text blocks (bf16): fused QKV, the output, up and gate apart, down — and the embedders.
+            q(c.dim, 3 * c.dim, text, c.textBlocks); q(c.dim, c.dim, text, c.textBlocks)
+            q(c.dim, c.hidden, text, 2 * c.textBlocks); q(c.hidden, c.dim, text, c.textBlocks)
+            q(c.textDim, c.dim, text, 1); q(c.channels, c.dim, t, 1); q(c.dim, c.channels, t, 1)
             b.attention(m, keys: m, heads: c.heads, kv: c.heads, dim: c.headDim, times: c.layers * times)
         }
     }
@@ -328,24 +368,39 @@ package enum CapacityClasses {
     /// Anima's text, padded to 512 rows: the cross-attention's keys, and its k/v products' height.
     static let animaTextRows = 512
 
-    /// What the DiT computes once from the conditions, per render.
-    private static func conditions(_ b: inout Builder, _ r: Request, _ f: WeightFormat) {
+    /// **What the DiT computes from the conditions**, once per pass (each grid has its own DiT, built and run apart): Anima's cross k/v
+    /// and Qwen-Image-2.1's prefill. Krea 2's text fusion runs once per render.
+    private static func conditions(_ b: inout Builder, _ r: Request, _ f: WeightFormat, passes: Int) {
+        let plain = plainFormat(r, f)
         switch r.family {
         case .anima:
             let c = AnimaDiT.Config(header: [:])
-            b.product(.denoising, c.textDim, c.dim, animaTextRows, f, times: 2 * c.layers)
+            b.product(.denoising, c.textDim, c.dim, animaTextRows, f, times: 2 * c.layers * passes)
         case .qwenImage21:
-            // The prefill: the conditions through every layer, the last one only for its keys and values.
+            // The prefill: the conditions through every layer, the last one only for its keys and values; txt_in's two products first.
             let c = QwenImage21DiT.Config(header: [:]), rows = textRows(.qwenImage21, promptTokens: r.promptTokens)
             let chunk = QwenImage21DiT.mlpRows(scratch: rows, hidden: c.hidden)
             let full = c.layers - 1
-            b.product(.denoising, c.dim, c.dim, rows, f, times: 4 * full + 2)
+            b.product(.denoising, c.context, c.dim, rows, plain, times: passes)
+            b.product(.denoising, c.dim, c.dim, rows, plain, times: passes)
+            b.product(.denoising, c.dim, c.dim, rows, f, times: (4 * full + 2) * passes)
             var left = rows
             while left > 0 {
                 let n = min(chunk, left); left -= n
-                b.product(.denoising, c.dim, c.hidden, n, f, times: 2 * full)
-                b.product(.denoising, c.hidden, c.dim, n, f, times: full)
+                b.product(.denoising, c.dim, c.hidden, n, f, times: 2 * full * passes)
+                b.product(.denoising, c.hidden, c.dim, n, f, times: full * passes)
             }
+        case .krea2:
+            // The fusion (bf16): two blocks over 12 hidden states per token, two over the tokens, then txt_in. Once per render.
+            let d = Krea2TextFusion.Shape.dim, h = Krea2TextFusion.Shape.hidden, t = textRows(.krea2, promptTokens: r.promptTokens)
+            let c = Krea2DiT.Config(header: [:])
+            for rows in [12 * t, t] {
+                b.product(.denoising, d, d, rows, plain, times: 2 * 5)
+                b.product(.denoising, d, h, rows, plain, times: 2 * 2)
+                b.product(.denoising, h, d, rows, plain, times: 2)
+            }
+            b.product(.denoising, d, c.dim, t, plain, times: 1)
+            b.product(.denoising, c.dim, c.dim, t, plain, times: 1)
         default: break
         }
     }
@@ -358,8 +413,9 @@ package enum CapacityClasses {
         guard let format = weightFormat(r.family, r.variant), let encoderFormat = encoderFormat(r.family, r.variant) else { return nil }
         var b = Builder()
         if r.includesEncoder { encoding(&b, r, encoderFormat) }
-        for pass in passes(r) { evaluation(&b, r, format, tokens: pass.tokens, times: pass.evaluations) }
-        conditions(&b, r, format)
+        let passes = passes(r)
+        for pass in passes { evaluation(&b, r, format, tokens: pass.tokens, times: pass.evaluations) }
+        conditions(&b, r, format, passes: passes.count)
         return sorted(b.order.map { Class(phase: $0.phase, shape: $0.shape, executions: [r.family: b.counts[$0]!]) })
     }
 
