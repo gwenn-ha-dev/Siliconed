@@ -659,30 +659,44 @@ enum SilicontrolCommand {
 /// **The Dock follows the render**: a bar under the icon while it runs, and the number of renders
 /// still waiting as a badge — a 2-minute render is followed from another app. The icon never bounces:
 /// the bar is enough, and the app sends no notification of any kind.
+///
+/// The bar is drawn by the tile's own view, not an `NSProgressIndicator`: the Dock draws the tile's
+/// view into an image on `display()`, and the indicator, drawn so, shows an earlier value than the one
+/// it was just given (0.5 for 0.9, its own animation) — in the Dock the bar never moved.
 @MainActor
 enum DockTile {
-    private static var bar: NSProgressIndicator?
+    private final class Tile: NSView {
+        var fraction = 0.0
+        override func draw(_ dirtyRect: NSRect) {
+            NSApp.applicationIconImage.draw(in: bounds)
+            let track = NSRect(x: bounds.width * 0.1, y: bounds.height * 0.07, width: bounds.width * 0.8, height: bounds.height * 0.1)
+            let radius = track.height / 2
+            NSColor.black.withAlphaComponent(0.6).setFill()
+            NSBezierPath(roundedRect: track, xRadius: radius, yRadius: radius).fill()
+            let inner = track.insetBy(dx: 2, dy: 2)
+            let done = NSRect(x: inner.minX, y: inner.minY, width: max(inner.height, inner.width * min(1, max(0, fraction))), height: inner.height)
+            NSColor.controlAccentColor.setFill()
+            NSBezierPath(roundedRect: done, xRadius: done.height / 2, yRadius: done.height / 2).fill()
+        }
+    }
+
+    private static var tile: Tile?
 
     static func show(fraction: Double?, waiting: Int) {
-        let tile = NSApp.dockTile
-        tile.badgeLabel = waiting > 0 ? "\(waiting)" : nil
+        let dock = NSApp.dockTile
+        dock.badgeLabel = waiting > 0 ? "\(waiting)" : nil
         if let fraction {
-            if bar == nil {
-                let icon = NSImageView(image: NSApp.applicationIconImage)
-                let p = NSProgressIndicator(frame: NSRect(x: 12, y: 8, width: tile.size.width - 24, height: 14))
-                p.style = .bar
-                p.isIndeterminate = false
-                p.minValue = 0; p.maxValue = 1
-                icon.addSubview(p)
-                tile.contentView = icon
-                bar = p
+            if tile == nil {
+                let view = Tile(frame: NSRect(origin: .zero, size: dock.size))
+                dock.contentView = view
+                tile = view
             }
-            bar?.doubleValue = fraction
-        } else if bar != nil {
-            tile.contentView = nil
-            bar = nil
+            tile?.fraction = fraction
+        } else if tile != nil {
+            dock.contentView = nil
+            tile = nil
         }
-        tile.display()
+        dock.display()
     }
 
     static func finished() {
