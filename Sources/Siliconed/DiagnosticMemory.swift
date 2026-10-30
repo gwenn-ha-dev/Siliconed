@@ -44,6 +44,13 @@ extension Diagnostic {
             Dictionary(marks.map { ($0.group, $0.peak) }, uniquingKeysWith: max)
         }
 
+        /// The detail of the mark each group's maximum was reached in (the first, on a tie).
+        var peakAt: [String: String] {
+            var at: [String: Mark] = [:]
+            for m in marks where m.peak > (at[m.group]?.peak ?? -1) { at[m.group] = m }
+            return at.mapValues(\.detail)
+        }
+
         func finish() { close(); FootprintInterval.stop() }
     }
 }

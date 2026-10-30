@@ -360,9 +360,12 @@ extension Diagnostic {
         package var aneBatches: Int
         package var need: [String: Int]
         package var peak: [String: Int]
+        /// Per step, the computation under way when its peak was reached (a class and a route): what a Mac far from
+        /// here says about where its memory went, when its peak strays from another Mac's on the same grid.
+        package var peakAt: [String: String]?
 
-        package init(plan: Plan, peaks: [String: Int], aneBatches: Int? = nil) {
-            budget = plan.budget; base = plan.base; need = plan.need.steps; peak = peaks
+        package init(plan: Plan, peaks: [String: Int], peakAt: [String: String]? = nil, aneBatches: Int? = nil) {
+            budget = plan.budget; base = plan.base; need = plan.need.steps; peak = peaks; self.peakAt = peakAt
             self.aneBatches = aneBatches ?? Diagnostic.aneBatches(allotment: plan.aneAllotment).count
         }
 

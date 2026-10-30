@@ -740,7 +740,7 @@ extension Diagnostic {
             let map = MapResult(classes: rows, residualLoss: result.residualLoss, epsilon: measuring.epsilon, spent: result.spent,
                                 budget: measuring.budget, exhausted: result.exhausted, judged: run.judgeSeconds, wrong: run.wrong)
             let witnesses = engineWitnesses(start: first, end: last)
-            let memory = Memory(plan: plan, peaks: gauge.peaks, aneBatches: run.sideBatches)
+            let memory = Memory(plan: plan, peaks: gauge.peaks, peakAt: gauge.peakAt, aneBatches: run.sideBatches)
             let seconds = Date().timeIntervalSince(started)
             let verdict = CapacityMap.Verdict(residualLoss: result.residualLoss, epsilon: measuring.epsilon,
                                               statuses: result.decisions.map(\.status), wrongChosen: false, memoryHeld: memory.held,
