@@ -287,7 +287,9 @@ final class MirrorServer {
         guard q.isSane else { return RemoteQuoteAnswer(quote: q, width: q.width, height: q.height, need: nil) }
         var f = RecommendedFormat(q.width, q.height)
         var need: Int?
-        if app.readySet.contains(q.model), let card = app.cards.first(where: { $0.id == q.model }) {
+        // A need reads the engine's settings (`EngineSettings.effective`): none before the app loads them
+        // with the map, or that load refuses and the session renders without its map.
+        if app.settingsRead, app.readySet.contains(q.model), let card = app.cards.first(where: { $0.id == q.model }) {
             if let first = q.first, first.count == 2, let m = app.model(q.model) {
                 let e = m.chain.denoising.editFormat(referenceWidth: first[0], referenceHeight: first[1])
                 f = AppState.cappedForEditing(RecommendedFormat(e.width, e.height))
@@ -530,7 +532,7 @@ final class MirrorServer {
                                           text: m.chain.text.name, encoding: m.chain.encoding?.name,
                                           decoding: m.chain.decoding.name)
             }
-            if let card = app.cards.first(where: { $0.id == id }) {
+            if app.settingsRead, let card = app.cards.first(where: { $0.id == id }) {   // see `answer`
                 for f in card.formats {
                     needs[id, default: [:]][MirrorCatalog.key(f.width, f.height)] = card.memoryNeed(width: f.width, height: f.height)
                 }
