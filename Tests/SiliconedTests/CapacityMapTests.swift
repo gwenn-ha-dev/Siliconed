@@ -296,6 +296,20 @@ final class CapacityMapTests: XCTestCase {
         XCTAssertEqual(table.products.route(k: 7, n: 7, m: 4096).aneRows, 0)
     }
 
+    func testAnAttentionThatSplitsHandsTheCPUItsOwnBalancedShare() {
+        let g = part
+        let (plan, _) = simulate(g)
+        let id = "attention:4096/16x128"
+        XCTAssertEqual(plan.decisions.first { $0.classID == id }?.chosen, "split")
+        let cuts = g.map { CapacityMap.Cut(split: $0.id == id ? 0.25 : nil) }
+        let table = CapacityMap.table(plan: plan, entries: g, classes: classes(g), cuts: cuts)
+        XCTAssertEqual(table.attention.route(sequence: 4096, heads: 16, headDim: 128).splitFraction, 0.25)
+        // A class whose share was never balanced keeps the reference.
+        let unbalanced = CapacityMap.table(plan: plan, entries: g, classes: classes(g), cuts: g.map { _ in .init() })
+        XCTAssertEqual(unbalanced.attention.route(sequence: 4096, heads: 16, headDim: 128).splitFraction,
+                       HeadSplitAttention.referenceFraction)
+    }
+
     func testAClassThatChoseTheANEKnowsItsRouteWithoutTheANE() {
         let g = part
         let (plan, _) = simulate(g)

@@ -460,7 +460,8 @@ package struct RouteTable: Codable, Sendable, Equatable {
     /// product class whose chosen route names its engines, one `AttentionRule` per attention class. A class the
     /// plan left open (`chosen == nil`) or does not know keeps what `base` gives it. The engines a rule names
     /// but `base` did not bring up are brought up with `base`'s defaults — the plan never chose an engine
-    /// that was not measured.
+    /// that was not measured. An attention that splits hands the CPU the share its class was balanced at
+    /// (`splitFractions`, by class id), the reference share where none was.
     ///
     /// `renderClasses` (the classes a render runs, `CapacityClasses`) completes the table to the heights nobody
     /// measured and fixes the weights' forms:
@@ -471,7 +472,7 @@ package struct RouteTable: Codable, Sendable, Equatable {
     ///     line, then the map's rule (`CapacityMeasure.rule`) on them — not the last measured height's route;
     ///   - a weight prepared once is read in **one form at every height it is used** (`unifyingWeightPaths`).
     package init(plan: CapacityMeasure.Plan, classes: [CapacityMeasure.ComputeClass], base: RouteTable = RouteTable(),
-                 splitFraction: Double = HeadSplitAttention.referenceFraction,
+                 splitFractions: [String: Double] = [:],
                  renderClasses: [CapacityClasses.Class] = []) {
         var table = base
         /// `chosen`: a route id, `engines` or `engines/form`; `withoutANE`: the best route of the class that does not use the ANE.
@@ -504,7 +505,8 @@ package struct RouteTable: Codable, Sendable, Equatable {
             case let .attention(s, heads, headDim):
                 table.attention.rules.insert(.init(minSequence: s, maxSequence: s, heads: heads, headDim: headDim,
                                                    flash: chosen == "flash",
-                                                   splitFraction: chosen == "split" ? splitFraction : nil), at: 0)
+                                                   splitFraction: chosen == "split"
+                                                       ? splitFractions[key.id] ?? HeadSplitAttention.referenceFraction : nil), at: 0)
             }
         }
         /// The best route of a decision that does not use the ANE (the rule on its ratios with the ANE's removed).

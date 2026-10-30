@@ -173,6 +173,8 @@ package final class HeadSplitAttention {
 
     /// The share the capacity map measures the cut at, and the default of `head_split_fraction`.
     package static let referenceFraction = 0.4
+    /// The shares `balance` chooses among: what a map's memory need charges the split at, the most costly of them.
+    package static let shares = stride(from: 0.1, through: 0.7, by: 0.05).map { $0 }
 
     /// **One attention's cut call, as the map measured it** (`Diagnostic.AttentionCapacity`).
     package struct Balance: Sendable {
@@ -209,8 +211,7 @@ package final class HeadSplitAttention {
     /// `candidates` that minimizes the summed predicted time, if it beats the reference share's by more than
     /// `margin` — otherwise `nil`, the reference stays (a gain inside the noise is not worth moving every
     /// bit). Only the attention's cost shapes enter: the optimum does not depend on the sequence.
-    package static func balance(_ items: [Balance], margin: Double,
-                                candidates: [Double] = stride(from: 0.1, through: 0.7, by: 0.05).map { $0 }) -> Double? {
+    package static func balance(_ items: [Balance], margin: Double, candidates: [Double] = shares) -> Double? {
         guard !items.isEmpty else { return nil }
         func total(_ fraction: Double) -> Double? {
             var sum = 0.0

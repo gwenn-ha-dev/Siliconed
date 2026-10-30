@@ -36,9 +36,11 @@ import MetalPerformanceShadersGraph
 ///     the widening of `k · n` values at the CPU's measured rate, the native ones (`gpu/bf16`, `gpu/int8`…) the copy —
 ///     today's rule ("tensor + copy against the better + widening") as one number per route. A constant, so it
 ///     weighs on ratios only through the product's own seconds, never through the dispersion.
-///   - **The cuts are parameters of a route, balanced when the route is first asked** (`amxShare`, `aneBalance`), kept for
-///     the class and written into the table's grids: the shares are measured where the plan decided a pair was worth a
-///     measure, not on a grid nobody reads. Each balancing is time of the plan's clock.
+///   - **The cuts are parameters of a route, balanced when the route is first asked** (`amxShare`, `aneBalance`,
+///     `balanceSplit`), kept for the class and written into the table — the products' shares into its grids, an attention's
+///     share of heads for the CPU into its rule: the shares are measured where the plan decided a route was worth a
+///     measure, not on a grid nobody reads, and not frozen at one share for every Mac (a split the M1 Max refused at
+///     4 096 rows at 0.4 of its heads). Each balancing is time of the plan's clock.
 ///   - **The ANE's engine holds its surfaces until it is released**, so it is released and rebuilt before it would pass
 ///     the plan's allotment (`MemoryNeedCapacityMap`); the shares survive, the programs do not (`generation`).
 ///   - **An attention class holds one set of objects at a time** (the last class asked): MPSGraph keeps a copy of the
@@ -116,6 +118,8 @@ extension Diagnostic {
             /// Per route id: the generation it was warmed in (0: never).
             var warmed: [String: Int] = [:]
             var verdict: [String: Bool] = [:]
+            /// An attention's: the share of heads its split hands the CPU, balanced once (`balanceSplit`).
+            var splitFraction: Double?
         }
 
         enum Truth: Hashable { case fp32, rounded, int8, q8 }
@@ -513,8 +517,12 @@ extension Diagnostic {
                     run = { _ = f.run(q: buffers.q, k: buffers.k, v: buffers.v, into: buffers.out); return true }
                 case "split":
                     if attentionObjects?.split == nil {
-                        attentionObjects?.split = try? HeadSplitAttention(device: bench.device, queue: bench.queue, heads: h, sequence: s,
-                                                                         headDim: d, cpuFraction: HeadSplitAttention.referenceFraction)
+                        if let f = states[c].splitFraction {
+                            attentionObjects?.split = try? HeadSplitAttention(device: bench.device, queue: bench.queue, heads: h,
+                                                                             sequence: s, headDim: d, cpuFraction: f)
+                        } else {
+                            states[c].splitFraction = balanceSplit(sequence: s, heads: h, headDim: d, buffers: buffers)
+                        }
                     }
                     guard let cut = attentionObjects?.split, let p = attentionPages else { return nil }
                     let (q, k, v) = (p.q.floats(), p.k.floats(), p.v.floats())
@@ -554,6 +562,58 @@ extension Diagnostic {
                 if states[c].verdict[route] == false { return nil }
                 return steady ?? Diagnostic.timed(run)
             }
+        }
+
+        /// What a share the model predicts must gain on the reference's: the map's ε, a loss it would not count.
+        static let splitMargin = 0.01
+
+        /// **The share of heads this class's split hands the CPU, balanced at its point** (`HeadSplitAttention.balance`),
+        /// leaving the split built at it in `attentionObjects`. The graph alone and the split at the reference share, each
+        /// steady, give the model its three figures; the share it predicts is kept only if its split, steady too, runs
+        /// faster than the reference's did — a share fitted on one point is checked against that point (invariant 1).
+        /// Charged to the balancing's seconds, as the products' cuts are.
+        private func balanceSplit(sequence s: Int, heads h: Int, headDim d: Int,
+                                  buffers: (q: MTLBuffer, k: MTLBuffer, v: MTLBuffer, out: MTLBuffer)) -> Double {
+            let reference = HeadSplitAttention.referenceFraction
+            let began = DispatchTime.now().uptimeNanoseconds
+            defer { balanceSeconds += Double(DispatchTime.now().uptimeNanoseconds - began) * 1e-9 }
+            guard let p = attentionPages else { return reference }
+            nonisolated(unsafe) let (qp, kp, vp, op) = (p.q.floats(), p.k.floats(), p.v.floats(), p.out.floats())
+            func build(_ f: Double) -> HeadSplitAttention? {
+                try? HeadSplitAttention(device: bench.device, queue: bench.queue, heads: h, sequence: s, headDim: d, cpuFraction: f)
+            }
+            func now() -> Double { Double(DispatchTime.now().uptimeNanoseconds) * 1e-9 }
+            /// Three runs after the warm-up: the median wall time, and each part's median.
+            func steady(_ body: () -> (gpu: Double, cpu: Double)) -> (wall: Double, gpu: Double, cpu: Double)? {
+                guard Diagnostic.warm({ _ = body(); return true }) != nil else { return nil }
+                var wall: [Double] = [], gpu: [Double] = [], cpu: [Double] = []
+                for _ in 0..<3 {
+                    let t = now(), parts = body()
+                    wall.append(now() - t); gpu.append(parts.gpu); cpu.append(parts.cpu)
+                }
+                return (CapacityMeasure.median(wall), CapacityMeasure.median(gpu), CapacityMeasure.median(cpu))
+            }
+            func split(_ cut: HeadSplitAttention) -> (wall: Double, gpu: Double, cpu: Double)? {
+                steady { cut.run(q: buffers.q, k: buffers.k, v: buffers.v, into: buffers.out, q: qp, k: kp, v: vp, out: op) }
+            }
+            if attentionObjects?.graph == nil {
+                attentionObjects?.graph = Attention(device: bench.device, queue: bench.queue, heads: h, sequence: s, headDim: d)
+            }
+            attentionObjects?.split = build(reference)
+            guard let graph = attentionObjects?.graph, let probe = attentionObjects?.split,
+                  let alone = steady({ _ = graph.run(q: buffers.q, k: buffers.k, v: buffers.v, into: buffers.out); return (0, 0) }),
+                  let at = split(probe) else { return reference }
+            let item = HeadSplitAttention.Balance(heads: h, graphSeconds: alone.wall,
+                                                  cpuHeads: HeadSplitAttention.partition(heads: h, fraction: reference).cpu.count,
+                                                  gpuSeconds: at.gpu, cpuSeconds: at.cpu)
+            guard let f = HeadSplitAttention.balance([item], margin: Self.splitMargin) else { return reference }
+            autoreleasepool { attentionObjects?.split = nil }
+            var kept = reference
+            autoreleasepool {
+                if let moved = build(f), let t = split(moved), t.wall < at.wall { attentionObjects?.split = moved; kept = f }
+            }
+            if kept == reference { attentionObjects?.split = build(reference) }
+            return kept
         }
 
         private func attentionBuffersFor(maxFloats: Int) throws -> (q: MTLBuffer, k: MTLBuffer, v: MTLBuffer, out: MTLBuffer) {
@@ -723,7 +783,8 @@ extension Diagnostic {
 
             // ── the table ──
             let table = CapacityMap.table(plan: result, entries: entries, classes: classes,
-                                          cuts: run.states.map { .init(amx: $0.amxShare, ane: $0.aneShare) }, limits: limits)
+                                          cuts: run.states.map { .init(amx: $0.amxShare, ane: $0.aneShare, split: $0.splitFraction) },
+                                          limits: limits)
 
             // ── the report ──
             // One row per decision: a point of the grid, a product's once per weight form.

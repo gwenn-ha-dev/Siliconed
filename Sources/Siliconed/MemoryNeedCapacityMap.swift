@@ -69,9 +69,12 @@ extension CapacityMap {
         let attention = entries.compactMap { e -> Int? in
             guard case let .attention(s, heads, dim) = e.work else { return nil }
             let floats = s * heads * dim
-            let gpuHeads = HeadSplitAttention.partition(heads: heads, fraction: HeadSplitAttention.referenceFraction).gpu.count
-            let split = HeadSplitAttention.hostBytes(heads: heads, sequence: s, headDim: dim, cpuFraction: HeadSplitAttention.referenceFraction)
-                + OperatorFootprint.sdpaQueries(rows: s, heads: gpuHeads, headDim: dim)
+            // The share is balanced during the map (`balanceSplit`): any of `shares` may be built.
+            let split = HeadSplitAttention.shares.map { f in
+                HeadSplitAttention.hostBytes(heads: heads, sequence: s, headDim: dim, cpuFraction: f)
+                    + OperatorFootprint.sdpaQueries(rows: s, heads: HeadSplitAttention.partition(heads: heads, fraction: f).gpu.count,
+                                                    headDim: dim)
+            }.max() ?? 0
             let graph = OperatorFootprint.sdpaQueries(rows: s, heads: heads, headDim: dim)
             return 4 * Arena.capacity(for: floats * 4) + max(split, graph) + Diagnostic.sampledQueries * heads * dim * 8 * 2
         }.max() ?? 0

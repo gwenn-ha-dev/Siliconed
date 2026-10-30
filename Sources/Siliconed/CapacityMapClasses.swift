@@ -205,7 +205,9 @@ package enum CapacityMap {
     package struct Cut: Sendable, Equatable {
         package var amx: Double?
         package var ane: Double?
-        package init(amx: Double? = nil, ane: Double? = nil) { self.amx = amx; self.ane = ane }
+        /// An attention's: the share of heads its head split hands the CPU, as balanced at its point.
+        package var split: Double?
+        package init(amx: Double? = nil, ane: Double? = nil, split: Double? = nil) { self.amx = amx; self.ane = ane; self.split = split }
     }
 
     /// **The table a plan makes**: its decisions as class rules over the grids the cuts give (`cuts[i]` for `entries[i]`,
@@ -217,9 +219,13 @@ package enum CapacityMap {
                               limits: Limits = Limits()) -> RouteTable {
         var amxPoints: [Conductor.Shares.Point] = [], anePoints: [Conductor.Shares.Point] = []
         var seenAMX = Set<[Int]>(), seenANE = Set<[Int]>()
+        var splits: [String: Double] = [:]
         var first = 0                         // the entry's first decision (its bf16 view, for a product)
         for (i, entry) in entries.enumerated() {
             defer { first += classes.indices.contains(i) ? classes[i].decisions.count : 1 }
+            if cuts.indices.contains(i), case let .attention(s, h, d) = entry.work, let f = cuts[i].split {
+                splits[RouteTable.ClassKey.attention(sequence: s, heads: h, headDim: d).id] = f
+            }
             guard cuts.indices.contains(i), case let .product(k, n, m) = entry.work else { continue }
             if let s = cuts[i].amx, seenAMX.insert([k, n, m]).inserted { amxPoints.append(.init(k: k, n: n, m: m, ratio: (1 - s) / s)) }
             if let a = cuts[i].ane, seenANE.insert([k, n, m]).inserted {
@@ -236,7 +242,7 @@ package enum CapacityMap {
         base.products.amx = .init(enabled: false, gpuShare: shares.isEmpty ? 0.631 : shares[shares.count / 2],
                                   grid: .init(Conductor.Shares(amxPoints)))
         base.products.ane = .init(enabled: false, gpuShare: 0.5, minimumRows: limits.aneRows, grid: .init(Conductor.Shares(anePoints)))
-        var table = RouteTable(plan: plan, classes: classes.flatMap(\.decisionClasses), base: base)
+        var table = RouteTable(plan: plan, classes: classes.flatMap(\.decisionClasses), base: base, splitFractions: splits)
         var groups: [RouteTable.WeightGroup: [Int: Double]] = [:]
         for entry in entries {
             guard case let .product(k, n, m) = entry.work else { continue }
