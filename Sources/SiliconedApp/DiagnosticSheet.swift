@@ -52,7 +52,7 @@ struct DiagnosticSheet: View {
 
     private var ready: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Matrix products and attention on the GPU, the AMX and the Neural Engine, each route checked against the exact result, and the table of routes this Mac renders with. No model is needed, nothing is downloaded. About a minute; the queue waits meanwhile.")
+            Text("Matrix products and attention on the GPU, the AMX and the Neural Engine, each route checked against the exact result, and the table of routes this Mac renders with. No model is needed, nothing is downloaded. Under a minute; the queue waits meanwhile.")
                 .font(.callout)
                 .fixedSize(horizontal: false, vertical: true)
             mapStatus

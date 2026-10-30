@@ -5497,46 +5497,6 @@
         }
       }
     },
-    "About a minute; done before the first render and after each update. A new measure applies from the next launch." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Etwa eine Minute; vor dem ersten Rendering und nach jedem Update. Eine neue Messung gilt ab dem nächsten Start."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Alrededor de un minuto; se hace antes del primer render y tras cada actualización. Una nueva medición se aplica en el próximo arranque."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Environ une minute ; faite avant le premier rendu et après chaque mise à jour. Une nouvelle mesure s’applique au prochain lancement."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Circa un minuto; eseguita prima del primo rendering e dopo ogni aggiornamento. Una nuova misura vale dal prossimo avvio."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "約1分。最初の生成の前と各アップデートの後に行われます。新しい測定は次回の起動から適用されます。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "约一分钟；在首次生成之前以及每次更新之后进行。新的测量结果将在下次启动时生效。"
-          }
-        }
-      }
-    },
     "Accept" : {
       "localizations" : {
         "de" : {
@@ -18058,42 +18018,42 @@
         }
       }
     },
-    "Matrix products and attention on the GPU, the AMX and the Neural Engine, each route checked against the exact result, and the table of routes this Mac renders with. No model is needed, nothing is downloaded. About a minute; the queue waits meanwhile." : {
+    "Matrix products and attention on the GPU, the AMX and the Neural Engine, each route checked against the exact result, and the table of routes this Mac renders with. No model is needed, nothing is downloaded. Under a minute; the queue waits meanwhile." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Matrixprodukte und Attention auf der GPU, der AMX und der Neural Engine, jede Route gegen das exakte Ergebnis geprüft, und die Tabelle der Routen, mit der dieser Mac rendert. Kein Modell nötig, nichts wird geladen. Etwa eine Minute; die Warteschlange wartet so lange."
+            "value" : "Matrixprodukte und Attention auf der GPU, der AMX und der Neural Engine, jede Route gegen das exakte Ergebnis geprüft, und die Tabelle der Routen, mit der dieser Mac rendert. Kein Modell nötig, nichts wird geladen. Weniger als eine Minute; die Warteschlange wartet so lange."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Productos de matrices y atención en la GPU, el AMX y el Neural Engine, cada ruta comprobada frente al resultado exacto, y la tabla de rutas con la que este Mac genera sus imágenes. No hace falta ningún modelo, no se descarga nada. Alrededor de un minuto; mientras tanto, la cola espera."
+            "value" : "Productos de matrices y atención en la GPU, el AMX y el Neural Engine, cada ruta comprobada frente al resultado exacto, y la tabla de rutas con la que este Mac genera sus imágenes. No hace falta ningún modelo, no se descarga nada. Menos de un minuto; mientras tanto, la cola espera."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Produits matriciels et attention sur le GPU, l’AMX et le Neural Engine, chaque route vérifiée contre le résultat exact, et la table des routes avec laquelle ce Mac fait ses rendus. Aucun modèle n’est nécessaire, rien n’est téléchargé. Environ une minute ; la file attend pendant ce temps."
+            "value" : "Produits matriciels et attention sur le GPU, l’AMX et le Neural Engine, chaque route vérifiée contre le résultat exact, et la table des routes avec laquelle ce Mac fait ses rendus. Aucun modèle n’est nécessaire, rien n’est téléchargé. Moins d’une minute ; la file attend pendant ce temps."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Prodotti di matrici e attention sulla GPU, sull’AMX e sul Neural Engine, ogni percorso verificato rispetto al risultato esatto, e la tabella dei percorsi con cui questo Mac genera le immagini. Non serve alcun modello, non si scarica nulla. Circa un minuto; nel frattempo la coda attende."
+            "value" : "Prodotti di matrici e attention sulla GPU, sull’AMX e sul Neural Engine, ogni percorso verificato rispetto al risultato esatto, e la tabella dei percorsi con cui questo Mac genera le immagini. Non serve alcun modello, non si scarica nulla. Meno di un minuto; nel frattempo la coda attende."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "GPU、AMX、Neural Engine での行列積とアテンション。各経路を厳密な結果と照合し、この Mac がレンダリングに使う経路の表を作ります。モデルは不要で、何もダウンロードしません。約1分かかり、その間キューは待機します。"
+            "value" : "GPU、AMX、Neural Engine での行列積とアテンション。各経路を厳密な結果と照合し、この Mac がレンダリングに使う経路の表を作ります。モデルは不要で、何もダウンロードしません。1分未満で終わり、その間キューは待機します。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "在 GPU、AMX 和神经网络引擎上计算矩阵乘积和注意力，每条路径都与精确结果核对，并给出这台 Mac 生成时所用的路径表。无需任何模型，也不下载任何内容。约一分钟；期间队列会等待。"
+            "value" : "在 GPU、AMX 和神经网络引擎上计算矩阵乘积和注意力，每条路径都与精确结果核对，并给出这台 Mac 生成时所用的路径表。无需任何模型，也不下载任何内容。不到一分钟；期间队列会等待。"
           }
         }
       }
@@ -26712,7 +26672,7 @@
         }
       }
     },
-    "Siliconed measures this Mac before its first render — about a minute." : {
+    "Siliconed measures this Mac before its first render — under a minute." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -26741,13 +26701,13 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Siliconedは最初の生成の前にこのMacを測定します — 約1分です。"
+            "value" : "Siliconedは最初の生成の前にこのMacを測定します — 1分未満です。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Siliconed 会在首次生成之前测量这台 Mac——约一分钟。"
+            "value" : "Siliconed 会在首次生成之前测量这台 Mac——不到一分钟。"
           }
         }
       }
@@ -35615,6 +35575,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "输入尺寸（宽 × 高）"
+          }
+        }
+      }
+    },
+    "Under a minute; done before the first render and after each update. A new measure applies from the next launch." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Weniger als eine Minute; vor dem ersten Rendering und nach jedem Update. Eine neue Messung gilt ab dem nächsten Start."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Menos de un minuto; se hace antes del primer render y tras cada actualización. Una nueva medición se aplica en el próximo arranque."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Moins d’une minute ; faite avant le premier rendu et après chaque mise à jour. Une nouvelle mesure s’applique au prochain lancement."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Meno di un minuto; eseguita prima del primo rendering e dopo ogni aggiornamento. Una nuova misura vale dal prossimo avvio."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1分未満。最初の生成の前と各アップデートの後に行われます。新しい測定は次回の起動から適用されます。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "不到一分钟；在首次生成之前以及每次更新之后进行。新的测量结果将在下次启动时生效。"
           }
         }
       }

@@ -196,7 +196,7 @@ private struct Footer: View {
             } else if case let .running(done, total, line) = app.diagnostic {
                 // Before the first render, the measure it waits for: why nothing starts yet, and how far.
                 Text(app.settingsRead ? "The diagnostic is running: renders wait for it."
-                                      : "Siliconed measures this Mac before its first render — about a minute.")
+                                      : "Siliconed measures this Mac before its first render — under a minute.")
                     .font(.callout)
                 Text(verbatim: "\(line) · \(done + 1)/\(total)").font(.caption).foregroundStyle(.secondary)
             }
