@@ -34,15 +34,22 @@ extension Diagnostic {
         package var gpuFamily: String
         /// `MTLDevice.recommendedMaxWorkingSetSize`: what Metal lets the process keep resident.
         package var gpuWorkingSetBytes: Int
+        /// **What the registry and the kernel say about the silicon** (`Inventory`), read, never decided on;
+        /// `nil` in a report that predates it (the schema stays: nothing reads it to decide).
+        package var inventory: Inventory?
 
         package init(chip: String, hardwareModel: String, performanceCores: Int, efficiencyCores: Int,
                     gpuCores: Int, memoryBytes: Int, macOS: String, version: String, build: String,
-                    gpu: String = "", gpuFamily: String = "", gpuWorkingSetBytes: Int = 0) {
+                    gpu: String = "", gpuFamily: String = "", gpuWorkingSetBytes: Int = 0, inventory: Inventory? = nil) {
             self.chip = chip; self.hardwareModel = hardwareModel; self.performanceCores = performanceCores
             self.efficiencyCores = efficiencyCores; self.gpuCores = gpuCores; self.memoryBytes = memoryBytes
             self.macOS = macOS; self.version = version; self.build = build
             self.gpu = gpu; self.gpuFamily = gpuFamily; self.gpuWorkingSetBytes = gpuWorkingSetBytes
+            self.inventory = inventory
         }
+
+        /// The GPU's nominal fp32 peak, FLOP/s (`Inventory.gpuFP32Peak`); `nil` without a clock.
+        package var gpuFP32Peak: Double? { inventory?.gpuFP32Peak(enabledCores: gpuCores) }
 
         /// "16 GB": the spec sheet's figure (2³⁰), what a reader of the table compares.
         package var memoryLabel: String { "\(Int((Double(memoryBytes) / 1_073_741_824).rounded())) GB" }
