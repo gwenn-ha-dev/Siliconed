@@ -160,7 +160,8 @@ extension RenderLoop {
                 ratio * (routeHeat(route, after) / routeHeat(route, map)) / (routeHeat(ref, after) / routeHeat(ref, map))
             }
             let efficient = routes.map { $0.hasPrefix("gpu+ane") }
-            guard let best = CapacityMeasure.rule(ratios: ratios, efficient: efficient), routes[best] != chosen,
+            guard let best = CapacityMeasure.rule(ratios: ratios, efficient: efficient, brutal: routes.map(CapacityMeasure.Route.brutal)),
+                  routes[best] != chosen,
                   let at = routes.firstIndex(of: chosen), let kept = ratios[at], let better = ratios[best], better > 0 else { continue }
             loss += entry.weight * max(0, kept / better - 1)
         }

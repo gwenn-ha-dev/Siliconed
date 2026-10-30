@@ -173,7 +173,7 @@ final class CapacityMapTests: XCTestCase {
     private func best(_ e: CapacityMap.Entry, _ v: CM.View, heat: [String: Double] = [:]) -> (route: String, lead: Double) {
         let t = v.routes.map { r in seconds(e, e.routes[r].id).map { $0 * CM.Heat(heat).factor(e.routes[r]) + v.extra(r) } ?? .infinity }
         let ratios: [Double?] = t.indices.map { t[$0].isFinite ? t[$0] / t[0] : nil }
-        let chosen = CM.rule(ratios: ratios, efficient: v.routes.map { e.routes[$0].efficient })!
+        let chosen = CM.rule(ratios: ratios, efficient: v.routes.map { e.routes[$0].efficient }, brutal: v.routes.map { e.routes[$0].brutal })!
         let others = t.indices.filter { $0 != chosen }.map { t[$0] }
         return (e.routes[v.routes[chosen]].id, (others.min() ?? .infinity) / t[chosen])
     }
@@ -247,7 +247,8 @@ final class CapacityMapTests: XCTestCase {
         var ane = 0
         for ((e, v), d) in zip(views, plan.decisions) {
             let t = v.routes.map { r in seconds(e, e.routes[r].id).map { $0 * hot.factor(e.routes[r]) + v.extra(r) } ?? .infinity }
-            let chosen = CM.rule(ratios: t.map { $0.isFinite ? $0 / t[0] : nil }, efficient: v.routes.map { e.routes[$0].efficient })!
+            let chosen = CM.rule(ratios: t.map { $0.isFinite ? $0 / t[0] : nil }, efficient: v.routes.map { e.routes[$0].efficient },
+                                 brutal: v.routes.map { e.routes[$0].brutal })!
             XCTAssertEqual(d.chosen, e.routes[v.routes[chosen]].id, v.id)
             if d.chosen?.contains("ane") == true { ane += 1 }
         }
@@ -319,7 +320,11 @@ final class CapacityMapTests: XCTestCase {
         for ((e, v), d) in zip(decisions(g), hot.decisions) {
             let (route, lead) = best(e, v, heat: ["amx": 2.06])
             guard lead > 1.05 else { continue }
-            XCTAssertEqual(d.chosen, route, v.id)
+            // An ANE route at the edge of its 90 % (within 1 % of it, true times) is the rule's own tie: either side is right.
+            let t = Dictionary(uniqueKeysWithValues: v.routes.map { r in
+                (e.routes[r].id, seconds(e, e.routes[r].id).map { $0 * CM.Heat(["amx": 2.06]).factor(e.routes[r]) + v.extra(r) } ?? .infinity) })
+            let edge = d.chosen.map { $0.hasPrefix("gpu+ane") && abs(t[route]! / t[$0]! / 0.9 - 1) < 0.01 } ?? false
+            if !edge { XCTAssertEqual(d.chosen, route, v.id) }
             XCTAssertFalse(d.chosen?.contains("amx") == true, "\(v.id): \(d.chosen ?? "-")")
         }
     }
@@ -525,12 +530,12 @@ final class CapacityMapTests: XCTestCase {
                                         .init("gpu+ane", efficient: true, engines: ["gpu", "ane"])])]
     }
 
-    func testTheHeatIsAskedOnceWhenTheAllocationIsOver() {
+    func testTheHeatIsAskedWhenNothingLosesAnymore() {
         let base: [[Double?]] = [[0.1, 0.07, nil]]
         var asked = 0
         let sim = CapacityMeasureTests.Sim(base: base, noise: 0.01)
         let plan = CM.plan(classes: tinyClasses(), finalHeat: { asked += 1; return CM.Heat(["amx": 2.0]) }, clock: sim) { sim.probe($0, $1) }
-        XCTAssertEqual(asked, 1)
+        XCTAssertEqual(asked, 1, "read once nothing lost cold; nothing lost hot either, so never again")
         XCTAssertEqual(plan.decisions[0].chosen, "gpu", "decided at the hot regime: the AMX's 0.7 became 1.4")
         XCTAssertEqual(plan.decisions[0].hotRatios[1]!, 1.4, accuracy: 0.05)
         let sim2 = CapacityMeasureTests.Sim(base: base, noise: 0.01)

@@ -514,7 +514,8 @@ package struct RouteTable: Codable, Sendable, Equatable {
             let ratios = zip(compute.routes, decision.hotRatios).map { route, ratio in
                 route.id.hasPrefix("gpu+ane") ? nil : ratio
             }
-            return CapacityMeasure.rule(ratios: ratios, efficient: compute.routes.map(\.efficient)).map { compute.routes[$0].id }
+            return CapacityMeasure.rule(ratios: ratios, efficient: compute.routes.map(\.efficient),
+                                        brutal: compute.routes.map(\.brutal)).map { compute.routes[$0].id }
         }
         var decided = Set<String>()
         for decision in plan.decisions {

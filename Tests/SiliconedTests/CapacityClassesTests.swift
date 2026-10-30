@@ -324,12 +324,12 @@ final class CapacityClassesTests: XCTestCase {
     }
 
     func testTheLineGoesPastTheLastHeightInsteadOfStoppingThere() {
-        // The AMX wins at both measured heights (×0.8, ×0.95) by a shrinking margin: its line reaches 1 at ~6 144 rows,
-        // where a clamp at 4 096 would still send it to the AMX.
+        // The AMX wins at both measured heights (×0.76, ×0.88) by a shrinking margin: its line reaches 0.89 (its malus and
+        // the tie) at ~5 000 rows, where a clamp at 4 096 would still send it to the AMX.
         let routes = [CM.Route("gpu"), CM.Route("gpu+amx", engines: ["gpu", "amx"])]
         let lo = product(3840, 10240, 1024), hi = product(3840, 10240, 4096)
         let compute = [computeClass(lo, routes), computeClass(hi, routes)]
-        let p = plan([decision(lo, "gpu+amx", [1, 0.8]), decision(hi, "gpu+amx", [1, 0.95])])
+        let p = plan([decision(lo, "gpu+amx", [1, 0.76]), decision(hi, "gpu+amx", [1, 0.88])])
         let table = RouteTable(plan: p, classes: compute, renderClasses: render([2048, 3000, 6144].map { product(3840, 10240, $0) }))
         XCTAssertEqual(table.products.forced(k: 3840, n: 10240, m: 2048), .amx)
         XCTAssertEqual(table.products.forced(k: 3840, n: 10240, m: 3000), .amx)
@@ -350,7 +350,7 @@ final class CapacityClassesTests: XCTestCase {
     func testAHoleAtOneAnchorIsNotACandidateBetween() {
         let routes = [CM.Route("gpu"), CM.Route("gpu+amx", engines: ["gpu", "amx"]), CM.Route("gpu+ane", efficient: true, engines: ["gpu", "ane"])]
         let lo = product(3840, 3840, 1024), hi = product(3840, 3840, 4096)
-        let p = plan([decision(lo, "gpu+amx", [1, 0.9, nil]), decision(hi, "gpu+ane", [1, 0.9, 0.5])])
+        let p = plan([decision(lo, "gpu+amx", [1, 0.8, nil]), decision(hi, "gpu+ane", [1, 0.9, 0.5])])
         let table = RouteTable(plan: p, classes: [computeClass(lo, routes), computeClass(hi, routes)],
                                renderClasses: render([product(3840, 3840, 2048)]))
         XCTAssertEqual(table.products.forced(k: 3840, n: 3840, m: 2048), .amx)
@@ -386,6 +386,16 @@ final class CapacityClassesTests: XCTestCase {
         XCTAssertEqual(CM.rule(ratios: [1, 0.8, 0.95], efficient: routes.map(\.efficient)), 1)
         XCTAssertEqual(CM.rule(ratios: [1, 0.995, nil], efficient: routes.map(\.efficient)), 0, "a tie goes to the simplest")
         XCTAssertNil(CM.rule(ratios: [nil, nil], efficient: [false, false]))
+        // The AMX's malus: it must win by 10 %, and the ANE within 90 % of the AMX read with it.
+        let brutal = routes.map(\.brutal)
+        XCTAssertEqual(brutal, [false, true, false])
+        XCTAssertEqual(CM.rule(ratios: [1, 0.92, nil], efficient: routes.map(\.efficient), brutal: brutal), 0, "8 % is not enough")
+        XCTAssertEqual(CM.rule(ratios: [1, 0.85, nil], efficient: routes.map(\.efficient), brutal: brutal), 1)
+        XCTAssertEqual(CM.rule(ratios: [1, 0.7, 0.85], efficient: routes.map(\.efficient), brutal: brutal), 2,
+                       "0.7 read 0.78: the ANE at 0.85 is within 90 % of it")
+        XCTAssertEqual(CM.rule(ratios: [1, 0.7, 0.85], efficient: routes.map(\.efficient)), 1, "without the malus, 0.7 / 0.85 < 0.9")
+        XCTAssertTrue(CM.Route.brutal("gpu+amx/int8"))
+        XCTAssertFalse(CM.Route.brutal("split"))
     }
 
     // MARK: one form per prepared weight

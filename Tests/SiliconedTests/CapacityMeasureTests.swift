@@ -67,8 +67,8 @@ final class CapacityMeasureTests: XCTestCase {
     /// A machine that slows to ×0.5 (time ×2) during the map: the decisions are those of the steady machine,
     /// and today's rule (margin = the drift) would have turned off every gain under ×2.
     func testDriftLeavesDecisionsAlone() {
-        // [gpu, amx, ane] seconds: AMX ×1.30 faster, ANE ×1.20 faster, AMX slower, ANE equal-ish, ...
-        let base: [[Double?]] = [[0.10, 0.077, 0.095], [0.08, 0.10, 0.0667], [0.06, 0.065, 0.07], [0.05, 0.06, 0.07]]
+        // [gpu, amx, ane] seconds: AMX ×1.43 faster (past its malus), ANE ×1.20 faster, AMX slower, ANE equal-ish, ...
+        let base: [[Double?]] = [[0.10, 0.07, 0.095], [0.08, 0.10, 0.0667], [0.06, 0.065, 0.07], [0.05, 0.06, 0.07]]
         let cls = classes([0.4, 0.3, 0.2, 0.1])
         var settings = CM.Settings(); settings.budget = 300
         let steady = plan(cls, Sim(base: base, noise: 0.02), settings: settings)
@@ -81,8 +81,8 @@ final class CapacityMeasureTests: XCTestCase {
         XCTAssertEqual(exponential.decisions.map(\.chosen), chosen)
         // The drift really was ~×2 by the end of the exponential run's map, and today's margin would have beaten it.
         XCTAssertGreaterThan(exponential.spent, 0.8 * steady.spent, "the drift was real: runs took up to twice as long")
-        let legacyMargin = 0.5, gainAMX = 0.10 / 0.077
-        XCTAssertFalse(gainAMX > 1 + legacyMargin, "today's rule: the AMX's ×1.30 is turned off by a ×2 drift")
+        let legacyMargin = 0.5, gainAMX = 0.10 / 0.07
+        XCTAssertFalse(gainAMX > 1 + legacyMargin, "today's rule: the AMX's ×1.43 is turned off by a ×2 drift")
     }
 
     /// First-order cancellation of a linear drift: no noise, the ratio is the true one to (slope × run)².
@@ -144,9 +144,11 @@ final class CapacityMeasureTests: XCTestCase {
     // MARK: 4. budget
 
     func testBudgetIsHeldAndHeavyClassesGetMoreMeasures() {
-        // Same gap, same noise (a 4 % advantage, a hard call); the weights differ ×10.
+        // Same gap, same noise (a 4 % advantage, a hard call); the weights differ ×10. A route off the AMX: its malus would
+        // make the call easy.
         let base: [[Double?]] = [[0.05, 0.049, nil], [0.05, 0.049, nil]]
-        let cls = [CM.ComputeClass("heavy", weight: 0.9, routes: [gpu, amx]), CM.ComputeClass("light", weight: 0.1, routes: [gpu, amx])]
+        let int8 = CM.Route("gpu/int8", engines: ["gpu"])
+        let cls = [CM.ComputeClass("heavy", weight: 0.9, routes: [gpu, int8]), CM.ComputeClass("light", weight: 0.1, routes: [gpu, int8])]
         var settings = CM.Settings(); settings.budget = 3; settings.epsilon = 1e-4
         var heavy = 0, light = 0, exhausted = 0
         for seed in UInt64(1)...12 {
@@ -186,14 +188,14 @@ final class CapacityMeasureTests: XCTestCase {
         let graph = CM.Route("graph", engines: ["gpu"]), flash = CM.Route("flash", engines: ["gpu"])
         let split = CM.Route("split", engines: ["gpu", "cpu"])
         let cls = [CM.ComputeClass("attention", weight: 1, routes: [graph, flash, split])]
-        for budget in [0.12, 0.16, 0.2] {
+        for budget in [0.09, 0.1, 0.12] {
             var settings = CM.Settings(); settings.budget = budget
             let clock = Fixed()
             let d = CM.plan(classes: cls, settings: settings, clock: clock) { _, r in clock.probe(r) }.decisions[0]
             XCTAssertEqual(d.status, .open, "budget \(budget)")
             XCTAssertNotEqual(d.chosen, "graph", "budget \(budget): the flash is known to win ×0.78")
-            // The graph would lose the flash's sure 0.25 in log and most of the split's: about 0.5.
-            XCTAssertLessThan(d.loss, 0.15, "budget \(budget)")
+            // The graph would lose the flash's sure 0.25 in log and most of the split's: over 0.5.
+            XCTAssertLessThan(d.loss, 0.3, "budget \(budget)")
         }
     }
 

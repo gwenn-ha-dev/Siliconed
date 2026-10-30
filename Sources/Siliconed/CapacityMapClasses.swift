@@ -133,7 +133,7 @@ package enum CapacityMap {
         /// **The class the core measures**: an attention as it is; a product with one view per weight form — the engines and
         /// that form's own routes, each run plus its preparation (`CapacityMeasure.View`), named `id` + the form's suffix.
         package func compute(preparation: Preparation = [:]) -> CapacityMeasure.ComputeClass {
-            guard case let .product(k, n, _) = work else { return .init(id, weight: weight, routes: routes) }
+            guard case let .product(k, n, _) = work else { return .init(id, weight: weight, routes: routes, position: position) }
             let values = Double(k * n)
             let views = RouteTable.WeightKind.allCases.map { kind -> CapacityMeasure.View in
                 let own = routes.indices.filter { Self.form(routes[$0].id).map { $0.hasPrefix(kind.rawValue) } ?? true }
@@ -141,7 +141,15 @@ package enum CapacityMap {
                 let extra = own.map { r in values * (Self.form(routes[r].id) == nil ? rate?.widened ?? 0 : rate?.copied ?? 0) }
                 return .init(id + RouteTable.ClassKey.suffix(kind), routes: own, extra: extra)
             }
-            return .init(id, weight: weight, routes: routes, views: views)
+            return .init(id, weight: weight, routes: routes, views: views, position: position)
+        }
+
+        /// Its place on the grid for the core's borrowed priors: log₂ of k, n and m, or of S, heads and head dim.
+        package var position: [Double] {
+            switch work {
+            case let .product(k, n, m): return [k, n, m].map { log2(Double($0)) }
+            case let .attention(s, h, d): return [s, h, d].map { log2(Double($0)) }
+            }
         }
     }
 

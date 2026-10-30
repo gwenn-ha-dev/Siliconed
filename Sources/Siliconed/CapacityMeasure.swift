@@ -1,7 +1,7 @@
 import Foundation
 
-/// **The capacity map's measuring core: comparisons in interleaved pairs, decisions by expected loss, one
-/// budget of wall seconds.** Pure: no Metal, no real clock, no weights. A probe (a closure that runs one
+/// **The capacity map's measuring core: comparisons in interleaved pairs, decisions by expected loss, a stop
+/// when every decision is known — a budget of wall seconds as a ceiling, not a target.** Pure: no Metal, no real clock, no weights. A probe (a closure that runs one
 /// route of one class and says how long it took) and a clock are injected; the plan comes out.
 ///
 ///     classes (weight w = share of a render, ordered routes, route 0 the simplest)
@@ -15,11 +15,13 @@ import Foundation
 ///        ├─ the views    a class decided several times on the same pairs (`View`): a subset of its routes, each with
 ///        │               seconds added to a run — eᵥ = (eᵣ·T + pᵣ) / (T + p_ref), T the reference's hot run
 ///        ├─ the rule     per view: the first efficient route within 90 % of the best (and faster than ref), else
-///        │               the simplest route that beats the one before it by more than `tie`
+///        │               the simplest route that beats the one before it by more than `tie`; the AMX read ×1/0.9
 ///        ├─ the loss     L(v) = w · Σᵣ E[(ln e_chosen − ln eᵣ − slack)⁺],  eᵣ ~ LogNormal   (closed form)
-///        ├─ the prior    a route not measured at a point borrows its measures at the others (normal-normal)
-///        └─ the budget   next step → the decision with the largest L per second of its step, in it the route with
-///                        the largest pair loss (or the chosen one when its own SE is the larger); stop at ε or at the budget
+///        ├─ the prior    a route not measured at a point borrows its measures at the others, the nearer the more
+///        ├─ the steps    next step → the decision with the largest L per second of its step, in it the route with
+///        │               the largest pair loss (or the chosen one when its own SE is the larger)
+///        └─ the stop     every decision under ε / N → read the end regime → go on with what it opens (≤ 3 reads);
+///                        the budget only if that never comes
 ///
 /// What sets it apart — what a version written by analogy with "median of three, then a margin" would get
 /// wrong:
@@ -40,30 +42,46 @@ import Foundation
 ///     about 1.253 σ/√n. Consecutive ratios share an A, which only lowers the variance of their mean
 ///     (`(4n − 2)/(4n²)` σ² against σ²/n), so SE is a little conservative. With n < 8 the dispersion is
 ///     shrunk to a prior (`noise`, 5 %) with weight 4: one ratio has no dispersion.
+///   - **A ratio or two may be a burst**: with fewer than `minRatios`, the SE adds `burst / n` (0.5 in log: the ANE's
+///     2 048² runs at 1 024 rows go 2.3 ↔ 5.1 ms). That is what a lucky or unlucky first lap costs, and the loss weighs it: a
+///     route a hair from the chosen one is measured again, one ×2 slower is not. Counting ratios instead (three for every
+///     route) spent 36 of a map's 57 seconds timing routes ×1.5–2 slower at 4 096 rows, the loss flat at 1.4·10⁻³.
 ///   - **The expected loss is the value of the information, not a probability of being wrong.** Choosing
 ///     route c while route r is better by X (log-time, X ~ N(d, s²), d = ln e_c − ln e_r, s² the two SEs'
 ///     sum) costs `X⁺`; its mean is `s φ(d/s) + d Φ(d/s)` — `≈ |gap| · P(wrong)` when the gap is clear
 ///     (d ≫ s: |d|·1), and `≈ 0.4 s` at a tie, where the gap is unknown but small. Weighted by `w` it is a
 ///     fraction of the render. Σ over the rival routes bounds the max (a union bound, safe side). A route
 ///     never measured at a point is a rival, never a candidate — a hole vetoes nothing.
-///   - **A route not measured at a point borrows from the points where it was** (`between`): the medians τⱼ of
-///     its log-ratios are draws of N(μ, β²), μ ~ N(0, 0.5²), β² shrunk to 0.2² with weight 2, and the
-///     prediction is N(μ̂, β² + var μ̂) — N(0, 0.5²) where it was measured nowhere. The q8 weight that loses
-///     ×1.4 at six points is no longer a 0.2 loss at the eighth; the ANE that wins at six is measured at the
-///     eighth. Without it a slow Mac never finished the first lap: the Neo (5 GPU cores) ran out of its minute
-///     with the ANE timed nowhere and a residual loss of 0.29.
+///   - **A route not measured at a point borrows from the points where it was, the nearer the more** (`between`,
+///     `neighbourhood`): the medians τⱼ of its log-ratios, weighted by exp(−d²/2ℓ²) with d the distance in log₂ of the
+///     shapes (ℓ = 1.5), are draws of N(μ, β²), μ ~ N(0, 0.5²), β² shrunk to 0.2² with weight 2, and the prediction is
+///     N(μ̂, β² + var μ̂) with n = Σw — N(0, 0.5²) where it was measured nowhere near. The q8 weight that loses ×1.4 at
+///     six points is no longer a 0.2 loss at the eighth; the ANE that wins at six is measured at the eighth. Without it
+///     a slow Mac never finished the first lap (the Neo ran out of its minute with the ANE timed nowhere, loss 0.29).
+///     Pooled over the whole grid, it averaged a trend: the ANE's ratio moves ×2.3 with the weight's size on the Neo, and
+///     the mean of the small points closed 8192²@1024 on the three-engine route at 0.61 where the ANE ran at 0.51. Near,
+///     a smooth route (bf16 at ×1.45 everywhere) needs no measure where it was not taken, a trending one is predicted by
+///     its neighbours of the same size, and a lonely one keeps a wide prior the loss asks to measure.
 ///   - **The allocation buys loss per second**: the step's cost is the pair's last two runs, else the
 ///     reference's at the point. Equal weights, unequal costs (×64 between 2048²@1024 and 8192²@4096): by
 ///     loss alone, the heavy points took the minute and the light ones kept their unmeasured rivals. A step
 ///     that no longer fits the budget leaves room for a cheaper one.
-///   - **A decision closes at ε / N** (N = classes with a rival), so the sum stays under ε (≈ 2 % of the
-///     render): heavy classes need tight figures, a light one is closed by a rough one — this is what spends
-///     the seconds where the weight is.
+///   - **A decision closes at ε / N** (N = classes with a rival), so the sum stays under ε (1 % of the render: the
+///     99 % the engine claims): heavy classes need tight figures, a light one is closed by a rough one — this is what
+///     spends the seconds where the weight is. **The map stops when every decision is closed**: it used to run its whole
+///     minute (57.8 s every time) because a rule of three ratios per route held decisions open that only those routes'
+///     pairs could close, and the allocation never measured them; the M1 Pro is known at 34–41 s.
+///   - **The regime is read when nothing loses any more**, and the allocation goes on with what it opens: a decision
+///     closed cold may open hot (the Neo's AMX ×1.76 at the end). Stopping as soon as everything was closed cold sent the
+///     Neo's heavy products to the three-engine route the hot AMX makes the slower.
 ///   - **The ANE keeps its favour**: an efficient route is taken as soon as it reaches 90 % of the best
 ///     speed (`efficientTolerance`) **and beats the simplest route** (today's rule: "where its pair beats the
 ///     GPU alone and keeps 90 % of the AMX's speed"); its 10 % slack is not a loss either (`slack`) — against any
 ///     rival, an efficient one too. Among
 ///     routes at a tie the simplest wins: a route must beat the one before it by `tie` (1 %).
+///   - **The AMX pays a malus**, the mirror of the ANE's favour (the user, 30/10: it heats, it is brute force): a route that
+///     keeps it busy is read 1 / `brutalTolerance` slower by the rule — it must win by 10 % to be taken —, and a rival on
+///     the AMX less than 10 % faster than the chosen route is no loss.
 ///   - **The heat factor is a time multiplier per engine** (hot / cold, from witnesses; 1 when none). A
 ///     route runs at the speed of its slowest engine: the cuts are frozen in the map, and the engine that
 ///     slows down makes the others wait — `heat(route) = max` over its engines. (Re-cutting at the hot
@@ -93,6 +111,11 @@ package enum CapacityMeasure {
         package init(_ id: String, efficient: Bool = false, engines: [String] = [], correct: Bool = true) {
             self.id = id; self.efficient = efficient; self.engines = engines; self.correct = correct
         }
+
+        /// It keeps the AMX busy: the rule's malus (`brutalTolerance`).
+        package var brutal: Bool { engines.contains("amx") }
+        /// The same, from a route's id alone.
+        package static func brutal(_ id: String) -> Bool { CapacityClasses.engines(ofRoute: id).contains("amx") }
     }
 
     /// A kind of computation (a product k×n at m rows, an attention…) and its share of the render.
@@ -103,9 +126,12 @@ package enum CapacityMeasure {
         package var routes: [Route]
         /// The decisions taken on its measurements (`View`); empty: one, over every route, under the class's id.
         package var views: [View]
+        /// Where it sits among the others, in log₂ of its dimensions (`CapacityMap.Entry`): what a route not measured here
+        /// borrows from (`neighbourhood`). Empty: every point is as near as any.
+        package var position: [Double]
 
-        package init(_ id: String, weight: Double, routes: [Route], views: [View] = []) {
-            self.id = id; self.weight = weight; self.routes = routes; self.views = views
+        package init(_ id: String, weight: Double, routes: [Route], views: [View] = [], position: [Double] = []) {
+            self.id = id; self.weight = weight; self.routes = routes; self.views = views; self.position = position
         }
 
         /// Its decisions, the implicit one included.
@@ -163,10 +189,12 @@ package enum CapacityMeasure {
 
     package struct Settings: Sendable, Equatable {
         /// Total acceptable expected loss, as a fraction of the render.
-        package var epsilon = 0.02
+        package var epsilon = 0.01
         /// Wall seconds the map may spend (the clock's).
         package var budget = 60.0
         package var efficientTolerance = 0.9
+        /// A route on the AMX is taken only where it is this much of the time it would need otherwise (`Route.brutal`).
+        package var brutalTolerance = 0.9
         /// A complex route must beat a simpler one by this fraction of time.
         package var tie = 0.01
         /// A first ratio above this closes the route.
@@ -178,10 +206,15 @@ package enum CapacityMeasure {
         package var unmeasuredSigma = 0.5
         /// Prior spread of a route's log-ratio from one point to another (log units), for a route not measured at a point.
         package var between = 0.2
+        /// How far a point lends its measures (log₂ units of `position`): weight exp(−d² / 2ℓ²).
+        package var neighbourhood = 1.5
         /// Ratios per route: past it, a route is closed.
         package var maxRatios = 80
-        /// A route is not closed on fewer ratios: one has no dispersion, and a lucky first lap is not a figure.
+        /// Under this many ratios a route may be a burst: its SE adds `burst / n` (log units).
         package var minRatios = 3
+        package var burst = 0.5
+        /// Reads of the end regime while the allocation goes on (`finalHeat`).
+        package var regimeReads = 3
         package init() {}
     }
 
@@ -249,9 +282,14 @@ package enum CapacityMeasure {
     /// **The choice among routes, on hot-time ratios** (`ratios[r]` = route r's time over the reference's, `nil`: not a
     /// candidate; the reference is the first candidate and reads 1): the first efficient route within
     /// `efficientTolerance` of the best speed that also beats the reference by `tie`, else the simplest route
-    /// that beats the one before it by `tie`. What the plan applies on its estimates and what the route table
-    /// applies on ratios interpolated to a height nobody measured: one rule, one place.
-    package static func rule(ratios: [Double?], efficient: [Bool], settings: Settings = Settings()) -> Int? {
+    /// that beats the one before it by `tie` — a route on the AMX read `1 / brutalTolerance` slower throughout. What the
+    /// plan applies on its estimates and what the route table applies on ratios interpolated to a height nobody measured:
+    /// one rule, one place.
+    package static func rule(ratios measured: [Double?], efficient: [Bool], brutal: [Bool] = [],
+                             settings: Settings = Settings()) -> Int? {
+        let ratios = measured.indices.map { r in
+            measured[r].map { brutal.indices.contains(r) && brutal[r] ? $0 / settings.brutalTolerance : $0 }
+        }
         guard let ref = ratios.firstIndex(where: { $0 != nil }) else { return nil }
         let cand = ratios.indices.filter { ratios[$0] != nil }
         let best = cand.compactMap { ratios[$0] }.min() ?? 1
@@ -290,10 +328,12 @@ package enum CapacityMeasure {
     // MARK: - Planning
 
     ///
-    /// `finalHeat`: the regime the table is decided at. It is asked **once, when the allocation is over** (the end
-    /// witnesses can only be read then), and replaces `heat` for the decisions, the losses and the ratios of the plan:
-    /// the pairs were measured cold-to-warm, the table is for the regime of a render of several minutes. The seconds
-    /// it takes belong to the caller's reserve of the budget.
+    /// `finalHeat`: the regime the table is decided at. It is asked **when the allocation has nothing left to do** (the
+    /// end witnesses can only be read then), and replaces `heat` for the decisions, the losses and the ratios of the plan:
+    /// the pairs were measured cold-to-warm, the table is for the regime of a render of several minutes. A decision closed
+    /// cold may open hot (the Neo's AMX takes ×1.76 longer at the end): the allocation then goes on at that regime, and
+    /// the regime is asked again when it is done — at most `regimeReads` times, and once when the budget runs out. The
+    /// seconds of the first read belong to the caller's reserve of the budget, those of the others to the budget.
     package static func plan(classes: [ComputeClass], heat startHeat: Heat = Heat(), witness: Witness = Witness(),
                              settings: Settings = Settings(), finalHeat: (() -> Heat)? = nil,
                              clock: Clock, probe: Probe) -> Plan {
@@ -335,26 +375,37 @@ package enum CapacityMeasure {
             }
         }
 
-        // A route never measured here borrows from its measures at the other points: a normal-normal model, the points'
-        // medians τⱼ ~ N(μ, β²), μ ~ N(0, σ₀²), β² shrunk to `between` with weight 2; the prediction is N(μ̂, β² + var μ̂).
-        var pooled: [String: (mean: Double, sd: Double)] = [:]
-        func borrowed(_ id: String) -> (mean: Double, sd: Double) {
-            if let p = pooled[id] { return p }
-            var taus: [Double] = []
-            for c in classes.indices where refs[c] != nil {
+        // A route never measured here borrows from its measures at the other points, the nearer the more: a normal-normal
+        // model over the points' medians τⱼ weighted by wⱼ = exp(−d²/2ℓ²) (d in log₂ of the shapes), τⱼ ~ N(μ, β²), μ ~ N(0, σ₀²),
+        // β² shrunk to `between` with weight 2; the prediction is N(μ̂, β² + var μ̂) with n = Σw. Few or far points: a wide
+        // prior, and the loss asks for the measure.
+        var pooled: [Int: [String: (mean: Double, sd: Double)]] = [:]
+        func borrowed(_ id: String, at here: Int) -> (mean: Double, sd: Double) {
+            if let p = pooled[here]?[id] { return p }
+            var taus: [(tau: Double, w: Double)] = []
+            let at = classes[here].position, l2 = 2 * settings.neighbourhood * settings.neighbourhood
+            for c in classes.indices where refs[c] != nil && c != here {
+                let from = classes[c].position
+                let w: Double
+                if at.isEmpty || from.isEmpty { w = 1 } else if at.count != from.count { continue } else {
+                    w = exp(-zip(at, from).reduce(0) { $0 + ($1.0 - $1.1) * ($1.0 - $1.1) } / l2)
+                }
                 for r in classes[c].routes.indices where classes[c].routes[r].id == id && r != refs[c] {
                     let ls = pairs[c][r].logRatios
-                    if !ls.isEmpty { taus.append(median(ls)) }
+                    if !ls.isEmpty { taus.append((median(ls), w)) }
                 }
             }
             let s0 = settings.unmeasuredSigma, b0 = settings.between
-            guard !taus.isEmpty else { pooled[id] = (0, s0); return (0, s0) }
-            let n = Double(taus.count), mean = taus.reduce(0, +) / n
-            let ss = taus.reduce(0) { $0 + ($1 - mean) * ($1 - mean) }
-            let beta2 = (2 * b0 * b0 + ss) / (2 + n - 1)
-            let precision = n / beta2 + 1 / (s0 * s0)
-            let p = (mean * n / beta2 / precision, (beta2 + 1 / precision).squareRoot())
-            pooled[id] = p
+            let n = taus.reduce(0) { $0 + $1.w }
+            var p = (mean: 0.0, sd: s0)
+            if n > 1e-9 {
+                let mean = taus.reduce(0) { $0 + $1.tau * $1.w } / n
+                let ss = taus.reduce(0) { $0 + $1.w * ($1.tau - mean) * ($1.tau - mean) }
+                let beta2 = (2 * b0 * b0 + ss) / (1 + n)
+                let precision = n / beta2 + 1 / (s0 * s0)
+                p = (mean * n / beta2 / precision, (beta2 + 1 / precision).squareRoot())
+            }
+            pooled[here, default: [:]][id] = p
             return p
         }
 
@@ -372,7 +423,7 @@ package enum CapacityMeasure {
             if r == ref { return Estimate(mean: 0, sd: 0, measured: true) }
             let ls = pairs[c][r].logRatios
             guard !ls.isEmpty else {
-                let (mean, sd) = borrowed(route.id)
+                let (mean, sd) = borrowed(route.id, at: c)
                 return Estimate(mean: mean + lnHeat, sd: sd, measured: false)
             }
             let n = Double(ls.count)
@@ -381,6 +432,7 @@ package enum CapacityMeasure {
             let w = settings.noiseWeight
             let sigma = ((w * settings.noise * settings.noise + n * mad * mad) / (w + n)).squareRoot()
             var variance = pow(1.253 * sigma / n.squareRoot(), 2)
+            if ls.count < settings.minRatios { variance += pow(settings.burst / n, 2) }
             // The second-order residue of a drift, bounded by the witnesses of the two routes' engines.
             let engines = route.engines + classes[c].routes[ref].engines
             let d = engines.map { witness.drift[$0] ?? 0 }.max() ?? 0
@@ -429,6 +481,7 @@ package enum CapacityMeasure {
             let cand = Set(candidates(c))
             let ratios: [Double?] = view.routes.map { cand.contains($0) ? exp(viewEstimate(u, $0).mean) : nil }
             return CapacityMeasure.rule(ratios: ratios, efficient: view.routes.map { classes[c].routes[$0].efficient },
+                                        brutal: view.routes.map { classes[c].routes[$0].brutal },
                                         settings: settings).map { view.routes[$0] }
         }
 
@@ -447,7 +500,9 @@ package enum CapacityMeasure {
             // The rule takes the first efficient route within the tolerance of the best — another efficient one included: the ANE
             // is kept against a three-engine route 5 % faster (the pair is the cooler of the two and the rule says so), so that gap
             // is no loss. Counting it as one left such a class open for the whole budget (a simulated map: 805 runs on one class).
-            let slack = classes[c].routes[chosen].efficient ? log(1 / settings.efficientTolerance) : 0
+            let favour = classes[c].routes[chosen].efficient ? log(1 / settings.efficientTolerance) : 0
+            let malus = classes[c].routes[r].brutal && !classes[c].routes[chosen].brutal ? log(1 / settings.brutalTolerance) : 0
+            let slack = favour + malus
             let sd = (ec.sd * ec.sd + er.sd * er.sd).squareRoot()
             return min(shortfall(mean: ec.mean - er.mean, sd: sd, slack: slack), 1)
         }
@@ -463,15 +518,6 @@ package enum CapacityMeasure {
         }
         let threshold = settings.epsilon / Double(max(withRivals.count, 1))
 
-        /// Every route measured and still in play has its `minRatios` (the chosen one, and the open rivals). A rival never
-        /// measured here is judged by its borrowed prior, through the loss.
-        func thin(_ u: Int, chosen: Int) -> Bool {
-            let c = units[u].c
-            return (rivals(u, excluding: chosen) + [chosen]).contains { r in
-                let n = pairs[c][r].logRatios.count
-                return r != refs[c] && pairs[c][r].state == .open && n > 0 && n < settings.minRatios
-            }
-        }
 
         // The estimated cost of the next step on a pair: what the pair has taken, else the longest run seen.
         func stepCost(_ c: Int, _ r: Int) -> Double {
@@ -503,14 +549,15 @@ package enum CapacityMeasure {
         }
 
         var exhausted = false
+        var reads = 0, stepsSinceRead = 1
         while true {
-            // The open decision with the largest expected loss.
+            // The open decision with the largest expected loss per second.
             var best: (c: Int, loss: Double, r: Int)?
             for u in withRivals {
                 guard let chosen = choose(u) else { continue }
                 let c = units[u].c
                 let loss = decisionLoss(u, chosen: chosen)
-                if loss <= threshold, !thin(u, chosen: chosen) { continue }
+                if loss <= threshold { continue }
                 // In it, the rival with the largest pair loss; the chosen one when its own SE is larger.
                 let open = rivals(u, excluding: chosen).filter { pairs[c][$0].state == .open }
                 var target: Int
@@ -525,11 +572,19 @@ package enum CapacityMeasure {
                 let rate = loss / max(cost, 1e-9)
                 if best == nil || rate > best!.loss { best = (c, rate, target) }
             }
+            if best == nil, let finalHeat, !exhausted, reads < settings.regimeReads, stepsSinceRead > 0 {
+                // Nothing loses at this regime: read the table's (a decision closed cold may open hot), and go on.
+                heat = finalHeat()
+                classes.indices.forEach(forget)
+                reads += 1; stepsSinceRead = 0
+                continue
+            }
             guard let pick = best else { break }
+            stepsSinceRead += 1
             step(pick.c, pick.r)
         }
 
-        if let finalHeat {
+        if let finalHeat, reads == 0 || stepsSinceRead > 0 {
             heat = finalHeat()
             classes.indices.forEach(forget)
         }
@@ -548,7 +603,7 @@ package enum CapacityMeasure {
             var chosen = rule
             var loss = decisionLoss(u, chosen: rule)
             var status = Status.closed
-            if withRivals.contains(u), loss > threshold || thin(u, chosen: rule) {
+            if withRivals.contains(u), loss > threshold {
                 status = .open
                 // Out of measures: the candidate of least expected loss, the rule's choice on a tie.
                 for r in candidates(c) where r != rule && view.routes.contains(r) {

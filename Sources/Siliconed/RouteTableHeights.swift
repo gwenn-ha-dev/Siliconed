@@ -34,6 +34,7 @@ extension RouteTable {
         var x: Double
         var ids: [String]
         var efficient: [Bool]
+        var brutal: [Bool]
         var ratios: [Double?]
     }
 
@@ -59,6 +60,7 @@ extension RouteTable {
             default: continue
             }
             anchors.append(Anchor(x: x, ids: compute.routes.map(\.id), efficient: compute.routes.map(\.efficient),
+                                  brutal: compute.routes.map(\.brutal),
                                   ratios: zip(compute.routes, decision.hotRatios).map { route, ratio in
                                       excludingANE && route.id.hasPrefix("gpu+ane") ? nil : ratio.flatMap { $0 > 0 ? $0 : nil }
                                   }))
@@ -80,10 +82,10 @@ extension RouteTable {
                 guard let ra = a.ratios[i], let j = b.ids.firstIndex(of: a.ids[i]), let rb = b.ratios[j] else { return nil }
                 return exp((1 - t) * log(ra) + t * log(rb))
             }
-            guard let index = CapacityMeasure.rule(ratios: ratios, efficient: a.efficient) else { return nil }
+            guard let index = CapacityMeasure.rule(ratios: ratios, efficient: a.efficient, brutal: a.brutal) else { return nil }
             return a.ids[index]
         }
-        guard let index = CapacityMeasure.rule(ratios: ratios, efficient: first.efficient) else { return nil }
+        guard let index = CapacityMeasure.rule(ratios: ratios, efficient: first.efficient, brutal: first.brutal) else { return nil }
         return first.ids[index]
     }
 
