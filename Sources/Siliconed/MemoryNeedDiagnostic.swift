@@ -68,7 +68,7 @@ extension Diagnostic {
     static func engineBytes(_ points: [GridPoint]) -> Int {
         Dictionary(grouping: points, by: \.m).map { m, group in
             let rows = (m - 1) / NeuralEngine.rowUnit * NeuralEngine.rowUnit
-            return NeuralEngine.bytes(products: group.map { ($0.m, $0.k, $0.n) }, gpuShare: 1 - Double(rows) / Double(m))
+            return NeuralEngine.bytes(products: group.map { (rows, $0.k, $0.n) })
         }.reduce(0, +)
     }
 
@@ -100,7 +100,7 @@ extension Diagnostic {
         let products = shapes.map { (m: $0.m, k: $0.k, n: $0.n) }
         let grid = (cutShapes + aneShapes).map { s in heights.map { (m: $0, k: s.k, n: s.n) } }.flatMap { $0 }
         func gemm(_ products: [(m: Int, k: Int, n: Int)], int8: Bool) -> Int {
-            MemoryNeed.gemm("diagnostic", products: products, amx: true, int8: int8, ane: false).reduce(0) { $0 + $1.bytes }
+            MemoryNeed.gemmBound("diagnostic", products: products, int8: int8).reduce(0) { $0 + $1.bytes }
         }
         func multiply(_ products: [(m: Int, k: Int, n: Int)]) -> Int {
             products.map { Arena.capacity(for: Conductor.workspaceBytes(rows: $0.m, k: $0.k, n: $0.n, weightIsTransposed: true)) }.max() ?? 0
@@ -134,7 +134,7 @@ extension Diagnostic {
             let floats = s * b.heads * b.headDim
             let gpuHeads = HeadSplitAttention.partition(heads: b.heads, fraction: HeadSplitAttention.referenceFraction).gpu.count
             let split = HeadSplitAttention.hostBytes(heads: b.heads, sequence: s, headDim: b.headDim,
-                                                     cpuFraction: HeadSplitAttention.referenceFraction)
+                                                     cpuHeads: HeadSplitAttention.partition(heads: b.heads, fraction: HeadSplitAttention.referenceFraction).cpu.count)
                 + OperatorFootprint.sdpaQueries(rows: s, heads: gpuHeads, headDim: b.headDim)
             let graph = OperatorFootprint.sdpaQueries(rows: s, heads: b.heads, headDim: b.headDim)
             let exactBytes = sampledQueries * b.heads * b.headDim * 8 * 2

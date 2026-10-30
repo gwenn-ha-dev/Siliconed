@@ -12,7 +12,9 @@ extension Diagnostic {
     static func aneBalance(_ neural: GEMM, run: () -> Void, m: Int, k: Int, n: Int) -> (share: Double, alone: Double)? {
         guard let engine = neural.neuralEngine else { return nil }
         func sides(_ share: Double) -> (gpu: Double, gpuRows: Double, ane: Double, aneRows: Double)? {
-            engine.gpuShare = share
+            let planned = NeuralEngine.rows(m, gpuShare: share, minimum: 1)
+            guard planned > 0 else { return nil }
+            neural.plan.pin(ProductKey(k: k, n: n, m: m), ProductAssignment(gpu: m - planned, ane: planned))
             run()
             var walls: [(gpu: Double, ane: Double)] = []
             for _ in 0..<3 {
@@ -21,7 +23,7 @@ extension Diagnostic {
                 guard let last = neural.lastSides, engine.fallbacks == before else { return nil }
                 walls.append((last.gpu, last.ane))
             }
-            let rows = engine.rows(m, k: k, n: n)
+            let rows = planned
             return (walls.map(\.gpu).sorted()[1], Double(m - rows), walls.map(\.ane).sorted()[1], Double(rows))
         }
         guard let half = sides(0.5), let quarter = sides(0.75), half.aneRows != quarter.aneRows else { return nil }

@@ -108,13 +108,14 @@ package final class Krea2DiT {
     /// ahead, SDPA 7.04–7.17 → 4.59–4.76 s an evaluation; no constant of Krea 2's own.
     private var splits: [Int: HeadSplitAttention] = [:]
 
-    /// **Where Krea 2 cuts its attention by heads**: where `HeadSplitAttention.applies`, from
-    /// `headSplitRows` rows. At 512² (1,024 image rows) the cut saves 0.18 s of 7.6 an evaluation and
+    /// **Where Krea 2 cuts its attention by heads**: where the plan assigns the split, from `headSplitRows` rows — **a bound of
+    /// precision, not a setting**: at 512² (1,024 image rows) the cut saves 0.18 s of 7.6 an evaluation and
     /// tips the ill-conditioned step 3 of the 512² trajectory past its clouds' bar (median 5.47·10⁻⁴
-    /// against 5.38); at 1024² it saves ~2.5 s of 29 and the trajectory holds. The memory need reads
-    /// the same condition.
-    package static func headSplit(sequence: Int, heads: Int, headDim: Int) -> Bool {
-        HeadSplitAttention.applies(sequence: sequence, heads: heads, headDim: headDim) && sequence >= headSplitRows
+    /// against 5.38); at 1024² it saves ~2.5 s of 29 and the trajectory holds. Krea 2 does not try the flash kernel. The memory need
+    /// reads the same function.
+    package static func attentionAssignment(_ plan: CapacityPlan, sequence: Int, heads: Int, kvHeads: Int, headDim: Int) -> AttentionAssignment {
+        let a = plan.assign(AttentionKey(sequence: sequence, heads: heads, kvHeads: kvHeads, headDim: headDim))
+        return a.splits && sequence >= headSplitRows ? a : .graph
     }
     package static let headSplitRows = 2048
 
@@ -136,7 +137,7 @@ package final class Krea2DiT {
     private let products: WeightProducts
 
     package init(artifact: Artifact, latentHeight: Int, latentWidth: Int, maxText: Int = 512,
-                freezeCut: Bool = EngineSettings.effective.frozenCut, neuralEngine: Bool = EngineSettings.effective.gemmANE, lora: LoRA? = nil) throws {
+                freezeCut: Bool = EngineSettings.effective.frozenCut, neuralEngine: Bool = EngineSettings.effective.plan.usesANE, lora: LoRA? = nil) throws {
         guard artifact.header["kind"] as? String == "krea2-turbo-dit" else {
             throw Artifact.Failure.badHeader("map \(artifact.header["kind"] ?? "?"): krea2-turbo-dit expected")
         }
@@ -488,11 +489,12 @@ package final class Krea2DiT {
 
     private func attend(rows n: Int) throws {
         let d = config.dim, kv = config.kvWidth
-        if Krea2DiT.headSplit(sequence: n, heads: config.heads, headDim: config.headDim) {
+        let cut = Krea2DiT.attentionAssignment(gemm.plan, sequence: n, heads: config.heads, kvHeads: config.kvHeads, headDim: config.headDim)
+        if cut.splits {
             let split: HeadSplitAttention
             if let s = splits[n] { split = s } else {
                 split = try HeadSplitAttention(device: gemm.device, queue: gemm.queue, heads: config.heads, sequence: n,
-                                               headDim: config.headDim, kvHeads: config.kvHeads)
+                                               headDim: config.headDim, kvHeads: config.kvHeads, cpuHeads: cut.cpuHeads)
                 splits[n] = split
             }
             let qb = try gemm.wrap(UnsafeMutableRawPointer(q), bytes: maxRows * d * 4, name: "q")
@@ -569,7 +571,7 @@ package final class Krea2TextFusion {
     private let products: WeightProducts
 
     package init(artifact: Artifact, maxTokens: Int, freezeCut: Bool = EngineSettings.effective.frozenCut,
-                neuralEngine: Bool = EngineSettings.effective.gemmANE, lora: LoRA? = nil) throws {
+                neuralEngine: Bool = EngineSettings.effective.plan.usesANE, lora: LoRA? = nil) throws {
         guard artifact.header["kind"] as? String == "krea2-turbo-dit" else {
             throw Artifact.Failure.badHeader("the text fusion lives in the Krea 2 DiT map")
         }

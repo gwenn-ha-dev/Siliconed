@@ -75,7 +75,7 @@ extension Engine {
             promptTokens: MemoryNeed.Request.promptTokens(request.prompt, family: model.card.family,
                                                            references: request.references.count))
         memoryRequest.solver = request.solver
-        memoryRequest.neuralEngine = request.neuralEngine && EngineSettings.effective.gemmANE
+        memoryRequest.neuralEngine = request.neuralEngine && EngineSettings.effective.plan.usesANE
         memoryRequest.batch = seeds.count
         memoryRequest.library = model.library ?? .processWide
         // **The request's own refusals first, before any computation and before the memory is judged**:
@@ -143,7 +143,7 @@ extension Engine {
         let context = Context(reproducible: reproducible, cancellation: cancellation,
                                 previews: request.previews, onProgress: onProgress)
         context.cache = cache
-        context.neuralEngine = request.neuralEngine && EngineSettings.effective.gemmANE
+        context.neuralEngine = request.neuralEngine && EngineSettings.effective.plan.usesANE
         // A sketch that reaches the plan's last evaluation is the whole render: no stop, no estimate.
         let sketch = request.sketch.map { max(1, $0) }.flatMap { $0 < plan.evaluations ? $0 : nil }
         context.stopAfter = sketch

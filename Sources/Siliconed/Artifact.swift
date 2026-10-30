@@ -755,6 +755,18 @@ extension Artifact {
                        sequential: true, buffer: cap)
     }
 
+    /// **The format a map's products are published in**: that of its largest two-dimensional tensor — `int8` (`q8` when its scales
+    /// are per block of rows), a GGUF-packed type (`q4k`: it widens), `bf16` for the rest. What the memory need asks the plan about
+    /// (`ProductKey.weight`) before any tensor is read by name.
+    package static func weightFormat(header: [String: Any]) -> CapacityClasses.WeightFormat {
+        guard let table = header["tensors"] as? [String: [String: Any]] else { return .bf16 }
+        let largest = table.values.filter { ($0["shape"] as? [Int])?.count == 2 }
+            .max { ($0["bytes"] as? Int ?? 0) < ($1["bytes"] as? Int ?? 0) }
+        guard let entry = largest, let raw = entry["dtype"] as? String, let dtype = DType(rawValue: raw) else { return .bf16 }
+        if dtype == .int8 { return ((entry["scale"] as? [String: Any])?["block"] as? Int) == nil ? .int8 : .q8 }
+        return dtype.isPacked ? .q4k : .bf16
+    }
+
     /// **The largest tensor's staging length** among the tensors whose name starts with one of the prefixes —
     /// from the header alone (the memory need) — the size of a stream's buffer. 0 without a tensor table.
     package static func largestRun(header: [String: Any], prefixes: [String], fileSize: Int) -> Int {

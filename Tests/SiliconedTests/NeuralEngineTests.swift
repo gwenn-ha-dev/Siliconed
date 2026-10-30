@@ -54,19 +54,16 @@ final class NeuralEngineTests: XCTestCase {
         XCTAssertEqual(NeuralEngine.parts(k: 4097, n: 64), 2, "no even split within reach: the fewest parts")
     }
 
-    func testRows() {
-        let ane = NeuralEngine(gpuShare: 0.5)
-        XCTAssertEqual(ane.rows(4096, k: 2048, n: 2048), 2048)
-        XCTAssertEqual(ane.rows(1024, k: 2048, n: 2048), 512)
-        XCTAssertEqual(ane.rows(512, k: 2048, n: 2048), 0, "under minimumRows: the GPU alone")
-        XCTAssertEqual(NeuralEngine(gpuShare: 0.375).rows(4096, k: 2048, n: 2048), 2560)
-        XCTAssertEqual(NeuralEngine(gpuShare: 0.99).rows(4096, k: 2048, n: 2048), 0, "under one unit: the GPU alone")
-        XCTAssertEqual(NeuralEngine(gpuShare: 0.01).rows(4096, k: 2048, n: 2048), 0, "the whole product: the GPU keeps a share")
-        // A grid replaces the scalar share: T = 1 / (1 + ρ), here ρ = 1 at 4096 rows (½), 1/3 at 1024 (¾).
-        let grid = NeuralEngine(gpuShare: 0.9, shares: Conductor.Shares([.init(k: 2048, n: 2048, m: 4096, ratio: 1),
-                                                                          .init(k: 2048, n: 2048, m: 1024, ratio: 1.0 / 3)]))
-        XCTAssertEqual(grid.rows(4096, k: 2048, n: 2048), 2048)
-        XCTAssertEqual(grid.rows(1024, k: 2048, n: 2048), 256)
+    /// The engine holds what the plan gave it: the surfaces of the shapes whose rows it takes, a sum over the shapes, and nothing
+    /// for a product it takes no row of.
+    func testBytesFollowTheRowsThePlanGave() {
+        XCTAssertEqual(NeuralEngine.bytes(products: []), 0)
+        XCTAssertEqual(NeuralEngine.bytes(products: [(0, 2048, 2048)]), 0, "no ANE row: nothing held")
+        let one = NeuralEngine.bytes(products: [(2048, 2048, 2048)])
+        XCTAssertGreaterThan(one, 0)
+        XCTAssertGreaterThan(NeuralEngine.bytes(products: [(2048, 2048, 2048), (1024, 2048, 2048)]), one, "a shape each: a sum")
+        XCTAssertEqual(NeuralEngine.bytes(products: [(2048, 2048, 2048), (2048, 2048, 2048)]), one, "the same shape twice: one program")
+        XCTAssertGreaterThan(NeuralEngine.bytes(products: [(4096, 2048, 2048)]), NeuralEngine.bytes(products: [(2048, 2048, 2048)]))
     }
 
     /// The Standard renders in fp32 unless asked, the 8- and 4-bit versions take the Neural Engine; the PNG
@@ -85,7 +82,7 @@ final class NeuralEngineTests: XCTestCase {
         let recipe = try XCTUnwrap(Engine.Render.Recipe(metadata: PNG.text(try render.png())))
         XCTAssertTrue(recipe.neuralEngine)
         XCTAssertEqual(recipe.unreadable, [])
-        XCTAssertFalse(EngineSettings.effective.gemmANE)
+        XCTAssertFalse(EngineSettings.effective.plan.usesANE)
         XCTAssertEqual(RenderCache.numerics(reproducible: true, neuralEngine: true), RenderCache.numerics(reproducible: true))
     }
 }

@@ -60,13 +60,13 @@ package final class Block {
     /// **The block's attention, built on first use** at its one length (`shapes.sequence`): the
     /// `MPSGraph` graph freezes its shapes at construction.
     private var builtAttention: Attention?
-    /// The matrix flash kernel, when `SILICONED_FLASH=1` asks for it. It is not the default: in
+    /// The matrix flash kernel, when the plan assigns it (`SILICONED_PLAN=flash`, or a model that measures it faster). It is not the default: in
     /// isolation it is on a par with `MPSGraph`, and what decides is what it returns *inside the
     /// engine*, where it removes 6.1 GB of traffic per call.
     private var builtFlash: FlashMatrix?
     /// The SDPA cut by heads between the GPU and the AMX. Not taken under `flash`, nor where
-    /// `HeadSplitAttention.applies` says no (`head_split` off, half precision, below
-    /// `minimumSequence`, where the text blocks run at 32 tokens): MPSGraph there.
+    /// the plan assigns no split (below `HeadSplitAttention.minimumSequence`, where the text blocks run at 32 tokens, or a
+    /// model that measures it slower): MPSGraph there.
     private var builtHeadSplit: HeadSplitAttention?
     private let arena: Arena
     private let artifact: Artifact
@@ -199,12 +199,18 @@ package final class Block {
         boundaries[name] = Array(UnsafeBufferPointer(start: pointer, count: count))
     }
 
+    /// **The plan's answer for this block's attention** (the self-attention of the sizing length; the block tries flash before the
+    /// split): the kernel it runs and, for the split, the heads the CPU takes.
+    private var attentionAssignment: AttentionAssignment {
+        gemm.assignment(AttentionKey(sequence: shapes.sequence, heads: shapes.heads, headDim: shapes.headDim), flash: true)
+    }
+
     /// The flash kernel, or `nil` if it does not apply — too short for its
     /// tiling, `Dh` other than 128, or simply not requested. *A path that silently decides
     /// not to apply is a path of which we will not know later whether it was used*: the fallback
     /// is reported once, through the warnings.
     private func flash() -> FlashMatrix? {
-        guard HeadSplitAttention.allowsFlash(sequence: shapes.sequence, heads: shapes.heads, headDim: shapes.headDim) else { return nil }
+        guard attentionAssignment.usesFlash else { return nil }
         if let existing = builtFlash { return existing }
         let sequence = shapes.sequence
         do {
@@ -215,7 +221,7 @@ package final class Block {
             builtFlash = built
             return built
         } catch {
-            Warnings.emit("⚠ SILICONED_FLASH: falling back to MPSGraph at S=\(sequence) — \(error)")
+            Warnings.emit("⚠ flash kernel: falling back to MPSGraph at S=\(sequence) — \(error)")
             return nil
         }
     }
@@ -223,10 +229,10 @@ package final class Block {
     /// The head split, or `nil` when it does not apply.
     private func headSplit() throws -> HeadSplitAttention? {
         let sequence = shapes.sequence
-        guard HeadSplitAttention.applies(sequence: sequence, heads: shapes.heads, headDim: shapes.headDim) else { return nil }
+        guard attentionAssignment.splits else { return nil }
         if let existing = builtHeadSplit { return existing }
         let built = try HeadSplitAttention(device: gemm.device, queue: gemm.queue, heads: shapes.heads,
-                                       sequence: sequence, headDim: shapes.headDim)
+                                       sequence: sequence, headDim: shapes.headDim, cpuHeads: attentionAssignment.cpuHeads)
         builtHeadSplit = built
         return built
     }

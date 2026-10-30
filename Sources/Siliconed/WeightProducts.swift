@@ -2,26 +2,26 @@ import Metal
 
 /// **A product by a published weight, whatever the model**: `C[m, n] = A[m, k] · W`, plus the weight's
 /// LoRA stack — the one place where the engine chooses how a weight is read and multiplied. A model
-/// says what it computes (the weight's name, the shapes, its buffers); the settings, which the capacity
-/// map decides (`CapacityRules`), say how.
+/// says what it computes (the weight's name, the shapes, its buffers); the plan (`CapacityPlan`, asked at every call with the
+/// product's exact class) says how: the form the weight is read in, the rows each engine takes.
 ///
 ///     name ─▶ the weight into the reserve, by the shortest path the settings allow
-///              ├─ gemm_tensor, a bf16 weight   copied as it is (`Artifact.stage`)       ─▶ TensorGEMM
-///              │     gemm_bf16_act             the same, the activation rounded to bf16 first ─▶ TensorGEMM
+///              ├─ path bf16, a bf16 weight     copied as it is (`Artifact.stage`)       ─▶ TensorGEMM
+///              │     rounding                  the same, the activation rounded to bf16 first ─▶ TensorGEMM
 ///              │                               (`roundsActivations`, `BFloatKernels`)
-///              ├─ gemm_int8, a published int8  copied as it is, scale fp32 after it     ─▶ TensorGEMM, × s after the
+///              ├─ path native, a published int8  copied as it is, scale fp32 after it   ─▶ TensorGEMM, × s after the
 ///              │                                (convrot: x · R by chunks of rows in the reserve's tail)  sums
-///              │     gemm_q8, a GGUF Q8_0       (scales per 32 rows: q · s in threadgroup memory)
-///              │     + the AMX                  its columns widened alone, while the GPU   ─▶ BNNS on them
+///              │     or a GGUF Q8_0             (scales per 32 rows: q · s in threadgroup memory)
+///              │     + the AMX's columns        widened alone, while the GPU               ─▶ BNNS on them
 ///              │                                computes the others
-///              └─ otherwise                    widened on the CPU (`Artifact.materialize`) ─▶ MPS (+ AMX)
+///              └─ path widened                 widened on the CPU (`Artifact.materialize`) ─▶ MPS (+ AMX, + ANE rows)
 ///          ─▶ C = A · W
 ///          ─▶ + the LoRA stack:  C += (A · down) · up          after the product, or
 ///                                W += down · up, then C = A · W  merged, where it costs fewer FLOPs
 ///
 /// Every path computes in fp32 from the published values (a bf16 widening is a shift, an 8-bit one a
 /// single multiplication): they differ in the order of the sums, hence the last bits, never in what is
-/// computed. The default path is the one every model ran before this module, bit for bit.
+/// computed. The default plan's path is the one every model ran before this module, bit for bit.
 ///
 /// What sets it apart — what a model writing its own product would get wrong:
 ///
@@ -35,10 +35,10 @@ import Metal
 ///     scales, then the rotated activation by as many rows as the rest holds (`int8Plan`);
 ///   - **an int8 weight's rotation goes to the activation**: `W = R · q · s` (`Widen.dequantizeRotated`)
 ///     gives `x · W = (x · R) · q · s` — `R` is applied to `x` in fp32, the integers are never touched;
-///   - **`gemm_bf16_act` rounds the operand of a product and nothing else** (`roundsActivations`, which a
+///   - **a rounded activation rounds the operand of a product and nothing else** (`roundsActivations`, which a
 ///     DiT sets and a text encoder does not): the caller's activation stays fp32 — the LoRA stack reads it —,
 ///     the rounded copy lives in the reserve's tail beside the weight (`roundingPlan`), the sums and the
-///     output are fp32. Under `bf16ActivationMinimumRows` rows (the modulation, the embedders) the product
+///     output are fp32. Under the plan's rows (the modulation, the embedders) the product
 ///     keeps its fp32 operand: nothing to win there, and the most amplified error;
 ///   - **the timings keep their names** (`staging`, `widening`, `gemm wall`, `gemm GPU`, `lora weights`,
 ///     `lora wall`, `lora GPU`): the models add them to theirs, so a budget reads the same as before.
@@ -86,7 +86,7 @@ package final class WeightProducts {
     package func linear(_ name: String, a: MTLBuffer, c: MTLBuffer, m: Int, k: Int, n: Int,
                         target: String? = nil) throws {
         let w = try gemm.wrap(UnsafeMutableRawPointer(reserve), bytes: capacity * 4, name: "w")
-        let path = try prepare(name, count: k * n, m: m, n: n)
+        let (path, planned) = try prepare(name, count: k * n, m: m, n: n)
         let staged = path != .widened
         let target = target ?? String(name.dropLast(".weight".count))
         var stack: (down: MTLBuffer, up: MTLBuffer, rank: Int)?
@@ -121,7 +121,8 @@ package final class WeightProducts {
                 if r.status != 0 { failure = "\(name): the AMX refused its columns (BNNS \(r.status))" }
             case .widened:
                 timings["gemm GPU", default: 0] += gemm.linear(a: a, b: w, c: c, m: m, k: k, n: n,
-                                                              weightIsTransposed: transposed, kind: kind(of: name))
+                                                              weightIsTransposed: transposed, weight: format(of: name),
+                                                              assignment: planned)
             }
         }
         if let ledger {
@@ -140,26 +141,27 @@ package final class WeightProducts {
         }
     }
 
-    /// **The class of the product that just ran, as the capacity map names it**: the weight's kind (as published —
-    /// a K-quant or anything widened counts as bf16, which is how the map folds them) and the route taken: the engines
-    /// the widened product ran on (`GEMM.lastEngines`), or the weight's own form (`gpu/bf16`, `gpu/bf16act`,
-    /// `gpu/int8`, `gpu+amx/int8`, `gpu/q8`, `gpu+amx/q8`).
-    private func classification(of name: String, _ path: Path) -> (RouteTable.WeightKind, String) {
+    /// **The class of the product that just ran, as the plan's map names it**: the weight's kind (as published — a K-quant or
+    /// anything widened counts as bf16, which is how the map folds them) and the route taken: the engines the widened product ran
+    /// on (`GEMM.lastEngines`), or the weight's own form (`gpu/bf16`, `gpu/bf16act`, `gpu/int8`, `gpu+amx/int8`, `gpu/q8`,
+    /// `gpu+amx/q8`).
+    private func classification(of name: String, _ path: Path) -> (WeightKind, String) {
         switch path {
         case .bf16(let rounding): return (.bf16, rounding == nil ? "gpu/bf16" : "gpu/bf16act")
         case .int8(let plan):
-            let kind: RouteTable.WeightKind = plan.block == nil ? .int8 : .q8
+            let kind: WeightKind = plan.block == nil ? .int8 : .q8
             return (kind, (plan.amxColumns > 0 && gemm.conductor != nil ? "gpu+amx/" : "gpu/") + kind.rawValue)
         case .widened:
-            return (kind(of: name), gemm.lastEngines.rawValue)
+            return (format(of: name).kind ?? .bf16, gemm.lastEngines)
         }
     }
 
-    /// The published weight's kind: an 8-bit one's (`int8`, or `q8` for blocks of scales), `bf16` for the rest — the
-    /// K-quants widen and are ruled as bf16.
-    private func kind(of name: String) -> RouteTable.WeightKind {
-        guard let tensor = artifact.tensors[name], tensor.dtype == .int8 else { return .bf16 }
-        return tensor.scale?.block == nil ? .int8 : .q8
+    /// The published weight's format: an 8-bit one's (`int8`, or `q8` for blocks of scales), `q4k` for a GGUF-packed one (they
+    /// widen), `bf16` for the rest.
+    private func format(of name: String) -> CapacityClasses.WeightFormat {
+        guard let tensor = artifact.tensors[name] else { return .bf16 }
+        if tensor.dtype == .int8 { return tensor.scale?.block == nil ? .int8 : .q8 }
+        return tensor.dtype.isPacked ? .q4k : .bf16
     }
 
     /// How the weight lies in the reserve, hence which product reads it.
@@ -229,10 +231,6 @@ package final class WeightProducts {
                         chunk: rows, amxColumns: amxColumns, perColumn: perColumn, group: group, block: block)
     }
 
-    /// **The GPU's share of a convrot int8 product's columns** beside the AMX, `nil` for the GPU alone.
-    /// The check sweeps it; otherwise the conductor's share of rows for the shape.
-    package var int8Share: ((_ k: Int, _ n: Int, _ m: Int) -> Double)?
-
     /// **The int8 product of a plan, the weight already in `reserve`** (`q`, its fp32 scales): the GPU on
     /// the first columns — all of them without a conductor or AMX columns —, the CPU widening the last ones
     /// meanwhile, the AMX on them. What the map measures (`Diagnostic`) is this function. Returns the GPU
@@ -267,75 +265,52 @@ package final class WeightProducts {
         return (Attention.verdict(commands, what: "matmul2d float × int8 \(m)×\(k)×\(n)"), widening, status)
     }
 
-    /// The AMX's columns: a multiple of 64 (the GPU's tile), 0 without a conductor or under its
-    /// `minimumRows`.
-    private func amxColumns(k: Int, n: Int, m: Int, kind: RouteTable.WeightKind) -> Int {
-        guard n >= 128, let conductor = gemm.conductor, m >= Conductor.minimumRows else { return 0 }
-        // A class the table keeps off the AMX (`gpu/int8`, or any engines but the AMX's) is the GPU's whole.
-        if let forced = gemm.routes.products.forced(k: k, n: n, m: m, kind: kind, aneBroughtUp: gemm.neuralEngine != nil),
-           forced != .amx, forced != .aneAMX { return 0 }
-        let T = int8Share?(k, n, m) ?? conductor.shares.share(k: k, n: n, m: m) ?? conductor.initialFraction
-        guard T < 1 else { return 0 }
-        return Self.amxColumns(n: n, share: T)
-    }
-
-    /// The AMX's columns of `n` at the GPU's share `T`, held in `Conductor.fractionRange` as the rows' —
-    /// what `MemoryNeed.gemm` bounds the BNNS workspace by. **The GPU's columns `n − amx` are a
-    /// multiple of 64**, not the AMX's: `linear_int8` / `linear_q8` write whole 64 × 64 tiles clipped
-    /// only at `n`, so a GPU edge inside a tile would overwrite the AMX's first columns. When
-    /// `n % 64 ≠ 0` the AMX takes the ragged remainder; under 128 columns, nothing.
-    package static func amxColumns(n: Int, share T: Double) -> Int {
-        let ceiling = (n - 64) / 64 * 64                 // the GPU's most, leaving the AMX ≥ 64
-        guard ceiling >= 64 else { return 0 }
-        let T = min(Conductor.fractionRange.upperBound, max(Conductor.fractionRange.lowerBound, T))
-        return n - max(64, min(ceiling, Int((T * Double(n) / 64).rounded()) * 64))
-    }
-
-    /// The weight into the reserve, by the path the settings allow.
-    private func prepare(_ name: String, count: Int, m: Int, n: Int) throws -> Path {
+    /// The weight into the reserve, by the path the plan assigned, and the assignment the widened product then runs under. A path
+    /// this process cannot run (no `TensorGEMM`, no Q8_0 reading, no rounding kernels, a reserve too small for the rounding) is
+    /// skipped, not refused: the plain form of the same weight, down to the widened one on the GPU.
+    private func prepare(_ name: String, count: Int, m: Int, n: Int) throws -> (Path, ProductAssignment) {
         func expect(_ got: Int) throws {
             guard got == count else { throw Artifact.Failure.badHeader("\(name): \(got) values, \(count) expected") }
         }
-        // The route table says how this product reads its weight (`GEMM.weightRoute`): the bf16 weight as
-        // published, its operand rounded to bf16 where the product is tall enough to gain (`gemm_bf16_act`),
-        // the 8-bit weight as published, or widened.
-        if let tensor = artifact.tensors[name], tensor.dtype == .bfloat16 {
-            var route = gemm.weightRoute(.bf16, k: count / n, n: n, m: m, rounding: roundsActivations)
+        let k = count / n
+        let planned = gemm.assignment(k: k, n: n, m: m, weight: format(of: name))
+        // How this product reads its weight (the plan's): the bf16 weight as published, its operand rounded to bf16 where the
+        // plan says it gains, the 8-bit weight as published, or widened.
+        if planned.path == .bf16, let tensor = artifact.tensors[name], tensor.dtype == .bfloat16, gemm.tensorBF16 || (planned.roundsActivation && gemm.bf16Activations) {
             var rounding: Rounding?
-            if route.path == .bf16 && route.roundsActivation {
-                rounding = Self.roundingPlan(k: count / n, n: n, capacity: capacity)
-                // The rounding does not fit the reserve: the rule below it (the plain bf16 weight, if any).
-                if rounding == nil { route = gemm.weightRoute(.bf16, k: count / n, n: n, m: m, rounding: false) }
+            if planned.roundsActivation && roundsActivations && gemm.bf16Activations {
+                rounding = Self.roundingPlan(k: k, n: n, capacity: capacity)
             }
-            if route.path == .bf16, let got = try timed("staging", {
-                try artifact.stage(name, into: UnsafeMutableRawPointer(reserve), capacity: 2 * capacity)
-            }) {
+            // The rounding does not fit the reserve, or this caller does not round: the plain bf16 weight, if the process reads it.
+            if (rounding != nil || gemm.tensorBF16),
+               let got = try timed("staging", { try artifact.stage(name, into: UnsafeMutableRawPointer(reserve), capacity: 2 * capacity) }) {
                 try expect(got)
-                return .bf16(rounding)
+                return (.bf16(rounding), planned)
             }
         }
-        if transposed, let tensor = artifact.tensors[name], tensor.dtype == .int8,
-           let scale = tensor.scale, tensor.shape == [count / n, n],
+        if planned.path == .native, transposed, let tensor = artifact.tensors[name], tensor.dtype == .int8,
+           let scale = tensor.scale, tensor.shape == [k, n],
            scale.block == nil ? scale.shape.count <= 1 : scale.shape.count == 2,
-           case let route = gemm.weightRoute(scale.block == nil ? .int8 : .q8, k: count / n, n: n, m: m, rounding: roundsActivations),
-           route.path == .native {
-            let (k, perColumn, group) = (count / n, scale.shape.count == 1, tensor.rotation?.group)
-            let roundsHere = route.roundsActivation
-            // Rounded, the GPU alone: the AMX reads the fp32 activation, one rounding for some columns only.
+           gemm.tensor != nil, scale.block == nil ? gemm.tensorInt8 : gemm.tensorQ8 {
+            let (perColumn, group) = (scale.shape.count == 1, tensor.rotation?.group)
+            let roundsHere = planned.roundsActivation && roundsActivations && gemm.bf16Activations
+                && (scale.block == nil || gemm.tensor?.roundsBlocks == true)
+            // The AMX's columns the plan gave: widened alone beside the GPU's. Rounded, the GPU alone: the AMX reads the fp32
+            // activation, one rounding for some columns only.
+            let amxColumns = gemm.conductor == nil ? 0 : planned.amxColumns
             guard let plan = (roundsHere ? Self.int8Plan(k: k, n: n, capacity: capacity, perColumn: perColumn, group: group,
                                                          amxColumns: 0, block: scale.block, rounded: true) : nil)
                     ?? Self.int8Plan(k: k, n: n, capacity: capacity, perColumn: perColumn, group: group,
-                                     amxColumns: amxColumns(k: k, n: n, m: m, kind: scale.block == nil ? .int8 : .q8),
-                                     block: scale.block)
+                                     amxColumns: roundsHere ? 0 : amxColumns, block: scale.block)
                     ?? Self.int8Plan(k: k, n: n, capacity: capacity, perColumn: perColumn, group: group, amxColumns: 0,
                                      block: scale.block)
-            else { return try widen(name, count: count) }
+            else { return (try widen(name, count: count), planned.path == .widened ? planned : .gpuAlone(m)) }
             try expect(tensor.count)
             try timed("staging") { try artifact.stageInt8(name, into: UnsafeMutableRawPointer(reserve),
                                                           scalesAt: plan.scalesOffset) }
-            return .int8(plan)
+            return (.int8(plan), planned)
         }
-        return try widen(name, count: count)
+        return (try widen(name, count: count), planned.path == .widened ? planned : .gpuAlone(m))
     }
 
     /// The weight widened to fp32 into the reserve, on the CPU.

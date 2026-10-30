@@ -11,76 +11,40 @@ import Synchronization
 ///
 /// Hence four rules:
 ///
-/// 1. **These settings are compute branches kept for other chips** (M2–M5) that the reference
-///    machine could not decide between: each one has its default measured here, and the other
-///    branch stays because another chip may reverse the verdict. A path that is dead (read by
-///    nothing) or wrong (a probe that renders a false image) has no such reason, and is removed.
-/// 2. **The default is the reference machine's**, so that nothing moves unless asked: with no
-///    profile and no environment variable, the engine takes the paths measured on the M1 Pro —
-///    except `amx`, off everywhere: the GPU/AMX balance is the one thing a Mac's measure must say.
-/// 3. **The priority is: default → map → profile → environment.** The map is the diagnostic's
-///    capacity map of *this* machine, which only an app designates (`load(from:map:)`) and the rules
-///    of `CapacityRules.swift` turn into `amx`, `amx_fraction`, `flash`, `head_split`, `gemm_tensor`; the profile is
-///    what a bench measured here (the developer's bench writes it); the environment keeps the last
-///    word, because a measurement is taken by forcing a setting, never by editing a file.
-/// 4. **Outside an app a map is designated only when asked** — a developer's timing, which must be the
-///    app's: the command line, the checks and the close-out otherwise run on the defaults, so their bits and
-///    the md5 judges do not depend on a measurement of the day.
+/// 1. **These settings are what a Mac's measure cannot say**: the cut's reproducibility, the spinning flag's fault injector,
+///    the spectral schedule, the tiles, the page cache. Every *route* — which engine takes which rows of which product, which
+///    kernel runs which attention — is the plan's (`plan`, `CapacityPlan`): exact rows asked at every product, never a
+///    switch read once. A path that is dead (read by nothing) or wrong (a probe that renders a false image) has no reason
+///    to stay, and is removed.
+/// 2. **The default is the engine's own**, so that nothing moves unless asked: with no profile, no environment variable and no
+///    model, the plan is `CapacityPlan.defaults` — the GPU alone on the widened weights, the attention cut by heads from 1 024 rows.
+/// 3. **The priority is: default → profile → environment**, the plan apart: a model of this Mac is designated by an app
+///    (`designate(plan:)`, before the first read); a profile is what a bench measured here (the developer's bench writes it); the
+///    environment keeps the last word, because a measurement is taken by forcing a setting, never by editing a file.
+/// 4. **Outside an app a plan is designated only when asked** — a developer's timing, which must be the app's: the command line,
+///    the checks and the close-out otherwise run on the defaults, so their bits and the md5 judges do not depend on a
+///    measurement of the day.
 ///
-/// The profile carries the fingerprint of the machine that produced it, the map a finer one
-/// (`Diagnostic.Fingerprint`). **Each is refused if it does not match** — a profile measured on an
-/// M4 Pro applied here would pass its constants off as ours, and that is exactly the confusion this
-/// file exists to prevent.
+/// The profile carries the fingerprint of the machine that produced it. **It is refused if it does not match** — a profile
+/// measured on an M4 Pro applied here would pass its constants off as ours, and that is exactly the confusion this file exists
+/// to prevent.
 package struct EngineSettings: Sendable {
 
     // ── what is tunable ────────────────────────────────────────────────────────────────────
 
-    /// GPU + AMX co-execution (`SILICONED_AMX`). It gains 22 % on the M1 Pro — 512² 41.3 → 31.0 s —
-    /// and **it is off by default on every chip, the M1 Pro included**: whether it pays is the GPU's
-    /// throughput against the AMX's, which only a measure of the Mac says — in the app the capacity map
-    /// (`CapacityRules.swift`, which also sets `amxFraction`), taken before the first render; for a
-    /// developer `SILICONED_AMX=1` or the bench's profile. Never a chip's name: a frozen split measured
-    /// on one GPU makes a larger one wait on the AMX. It changes the last bits, so the developer checks
-    /// force it off.
-    package var amx = false
     /// The spinning flag, which returns **wrong** results. It serves only to make the check
     /// fail, and it has no place in a profile.
     package var amxSpin = false
-    /// The split's step in tokens. 256 leaves sixteen servo points at 4,128 rows. Under a map's grid
-    /// (`amxShares`) the map sets 64, MPS's row tile: at a 512² image's ~1 040 rows, 256 only offers the GPU
-    /// 0.49 or 0.74 of the rows, and the computed shares fall between.
-    package var amxQuantum = 256
-    /// Below that, the split costs more than the computation handed over (the text blocks run at m = 32).
-    package var amxMinimumRows = EngineSettings.defaultAMXMinimumRows
-    /// The default of `amx_min`, where the pure side (the catalogue's routes, the map's limits, the render's check) reads it
-    /// instead of copying it.
-    package static let defaultAMXMinimumRows = 512
-    /// **The fraction of rows handed to the GPU** — the servo's starting point, and the **frozen**
-    /// value when the split is not servo-controlled (`frozenCut`, or a render's `reproducible`).
-    ///
-    /// 0.631 is the measured throughput ratio (3.364 / 5.333). It is a *machine* setting — it says
-    /// where the split falls between this GPU and this AMX —, so a profile may write it. What it
-    /// never changes is **the image**: each row of the output is computed entirely by a single
-    /// engine, so moving the split redistributes the work without ever re-associating a sum. That
-    /// is what makes the reproducible mode possible without turning the AMX off.
-    package var amxFraction = 0.631
-    /// **The frozen cut computed per product** (`Conductor.Shares`: `T = 1 / (1 + ρ(k, n, m))`, `ρ` measured by
-    /// the map on this Mac); none by default — no machine's figures in the code —, and then `amxFraction`.
-    /// `SILICONED_AMX_SHARES=<k×n@m=ρ,…>` hands the command line a map's grid.
-    package var amxShares = Conductor.Shares.none
-    /// **The frozen split** (`SILICONED_REPRODUCIBLE`): no more servo, `T = amxFraction` from the
-    /// first GEMM to the last. Two renders of the same seed then yield the same bits.
+    /// **The frozen cut** (`SILICONED_REPRODUCIBLE`): the GPU/AMX rows are the plan's, from the first GEMM to the last. Two renders
+    /// of the same seed then yield the same bits.
     ///
     /// **And it is a profile setting, which calls for a justification** — the rule of profiles says a
     /// profile tunes speed and room, never the image. This setting does change the image's last
-    /// bits… exactly like `amx` itself, which has been in the profile from the start. The
+    /// bits, as the plan itself does when it hands rows to the AMX. The
     /// forbidden family is that of the **approximations** — `spectral`, `vae_tuile` —
     /// which change what one sees. Here the deviation is that of fp32 summation order, 2.5·10⁻⁵,
     /// and freezing it makes the image **stable** rather than making it different: what is
     /// unstable is the servo.
-    ///
-    /// ⚠️ Without this setting, `amxFraction` means nothing: the servo corrects it within a few
-    /// blocks. The two are therefore swept together, or not at all.
     ///
     /// ## Default **true**, and a measurement decided it
     ///
@@ -93,76 +57,14 @@ package struct EngineSettings: Sendable {
     /// again — hence verifiable by someone else, on the same machine, without taking our word.
     ///
     /// The servo is not buried for all that: `SILICONED_REPRODUCIBLE=0` turns it back on, and it
-    /// keeps its reason for being — absorbing a thermal drift that 116 s do not show, and serving
-    /// a machine whose throughput ratio is not this one's (rule 1 above).
+    /// keeps its reason for being — absorbing a thermal drift that 116 s do not show. **It only gives the GPU more rows than the
+    /// plan did, never fewer** (`Conductor.linear`): the AMX's slice, which the memory need charges from the plan, stays its ceiling.
     package var frozenCut = true
 
-    /// The in-house matrix flash kernel (`FlashMatrix.swift`). **A tie** on this machine:
-    /// 1.673 against 1.667 TFLOP/s, −132 MB. A chip with a larger fp32 accumulator budget would
-    /// make it win — the measured cliff is a property of the chip.
-    package var flash = false
-    /// **The SDPA cut by heads between the GPU and the CPU** (`HeadSplitAttention`) from S = 1024 on;
-    /// off, those attentions run in one MPSGraph SDPA, as below 1024. ×1.5 on this machine (the map,
-    /// 14/10/2026: 2.33–2.44 against 1.57–1.63 TFLOP/s), hence on by default; a chip whose GPU leaves
-    /// the CPU far behind would reverse it.
-    package var headSplit = true
-    /// **The share of heads the CPU takes** under the cut (`head_split_fraction`): 0.4 as swept on the M1 Pro
-    /// (Z-Image 12 of 30, Anima 6 of 16, Qwen 13 of 32, Krea 2 5 of 12 groups), the map's where its figures say
-    /// another share beats it by more than the margin (`HeadSplitAttention.balance`). Frozen, not servoed: a share
-    /// decides which engine computes a head, hence the bits.
-    package var headSplitFraction = HeadSplitAttention.referenceFraction
-    /// **The DiT's products read the bf16 weights unwidened** (`TensorGEMM`: Metal 4's `matmul2d`,
-    /// fp32 activations × bf16 weights → fp32), the AMX off. Off by default: slower than MPS on this
-    /// machine (2.36 against 3.46 TFLOP/s); the map turns it on where it measures it faster.
-    package var gemmTensor = false
-    /// **The products read the published int8 weights as they are** (`TensorGEMM`, `float × int8_t`, the
-    /// scale after the sums, a convrot rotation moved to the activation), the AMX off on them. Off by
-    /// default, as `gemm_tensor`: a path the map turns on where it measures it faster.
-    package var gemmInt8 = false
-    /// **The products read GGUF Q8_0 as published** (`TensorGEMM.linear_q8`: q · s per block of 32 rows
-    /// into threadgroup memory, then `matmul2d`), beside the AMX on its columns. Off: on the M1 Pro,
-    /// ×0.29 the widened path's speed at 4 096 rows — the threadgroup fp32 operand runs at half MPS's
-    /// rate and its fill costs as much again. A branch the map turns on where it measures it faster
-    /// (schema 9), apart from `gemm_int8`: on the M1 Pro the one wins and the other loses.
-    package var gemmQ8 = false
-    /// **The DiT's products take their activation rounded to bf16** (`BFloatKernels`: `matmul2d`
-    /// `bfloat × bfloat → float` on the published bf16 weights, `bfloat × int8_t` on the 8-bit ones; sums and
-    /// outputs fp32). The weights are read as published, as `gemm_tensor`, and **the operand of a product is
-    /// all that is rounded**: norms, softmax, the residual stream and the modulation stay fp32. P20 allows
-    /// bf16 between two operations. Off by default: a Mac without a bf16 matrix unit loses by it (the M1 Pro,
-    /// ×0.5); the map turns it on where it measures it faster, and `siliconed check … --bf16-activations`
-    /// judges it against diffusers in bf16.
-    package var gemmBF16Activations = false
-    /// Below this height a product keeps its fp32 activation: the modulation and the embedders (a handful
-    /// of rows) gain nothing, and are the operands the error would be most amplified through.
-    package var bf16ActivationMinimumRows = 256
-    /// The published 8-bit weights (`gemm_int8`, `gemm_q8`) take the rounded activation too (`matmul2d`
-    /// `bfloat × int8_t`). Off, and **decided by no map**: it measures the bf16 weights only. Forced by a check.
-    package var bf16ActivationEightBit = false
-    /// **The Neural Engine beside the GPU on the widened products** (`NeuralEngine`: the last rows in fp16,
-    /// the weight's columns lifted by powers of two, a non-finite sent back to the GPU). Off by default, as
-    /// every compute branch: the map turns it on where the pair beats the GPU alone and the ANE's rows hold
-    /// the half-precision threshold. Only on the widened path: a weight read as published (`gemm_tensor`,
-    /// `gemm_int8`, `gemm_q8`) keeps its own product.
-    package var gemmANE = false
-    /// The GPU's share of the rows when `gemm_ane` is on; the ANE takes the rest by 256 rows. A machine
-    /// setting, frozen: each row is one engine's, the same seed gives the same bits.
-    package var aneFraction = 0.5
-    /// Below this height, the GPU alone: a program's fixed cost buys nothing on so few rows. Lowered only
-    /// by a check that must put every product on the ANE (`siliconed check … --neural-engine`).
-    package var aneMinimumRows = 1024
-    /// The GPU's share beside the ANE per weight shape and height (`ane_shares`, `Conductor.Shares`' text),
-    /// set by the map from its grid; with it, `aneFraction` only serves the shapes it cannot place.
-    package var aneShares = Conductor.Shares.none
-    /// The shapes where the AMX also takes part of the GPU's side beside the ANE (`ane_amx`, ρ 1 or 0 per point),
-    /// set by the map where the three engines at once beat both pairs (`NeuralEngine.besideAMX`).
-    package var aneAMX = Conductor.Shares.none
-
-    /// **The route table these settings make** (`RouteTable`): what the engine consults, product by product and
-    /// attention by attention, instead of the switches above. Derived once, after the last override (map,
-    /// profile, environment) — a forced setting is a setting, hence a table. The switches stay the input
-    /// layer: checks, bench and the environment force them as they always did.
-    package private(set) var routes = RouteTable()
+    /// **The plan the process runs under** (`CapacityPlan`): what the engine asks, product by product and attention by attention —
+    /// exact rows per engine and the kernel of each attention. The engine's defaults without a model; an app designates the model of
+    /// its Mac (`designate(plan:)`) before anything reads the settings, and a check designates its strictest case the same way.
+    package private(set) var plan = CapacityPlan.defaults
 
     /// The half-size start, **when forced** (`SILICONED_SPECTRAL`): `k` half-size evaluations of
     /// Z-Image, Qwen-Image-2.1, Anima or Krea 2, 0 = full schedule, within each plan's rules (`Spectral.forced`).
@@ -231,11 +133,6 @@ package struct EngineSettings: Sendable {
     package private(set) var machineProfile: String? = nil
     /// The date of the capacity map applied, if one was (`load(from:map:)`).
     package private(set) var mapRead: String? = nil
-    /// What the rules made of it.
-    package private(set) var mapDecisions: Diagnostic.Decisions? = nil
-    /// **The route table of a map of schema 13**: the table the engine runs under, the settings that were forced (profile,
-    /// environment) rewriting their part of it (`finalRoutes`). `nil`: the table is the switches' (`RouteTable(settings:)`).
-    private var mapRoutes: RouteTable? = nil
     /// **What the reading refused** — a profile from another machine, a setting a profile is not
     /// allowed to write. The library writes nothing to standard error: the caller displays them
     /// (the CLI at startup, an app wherever it likes).
@@ -307,8 +204,10 @@ package struct EngineSettings: Sendable {
     package static let forbiddenReads = Atomic<Int>(0)
     #endif
 
-    /// What an app designated before the first access (`load(from:map:)`): its profile, its map.
-    private static let designated = Mutex<(profile: String?, map: Diagnostic.Report?)>((nil, nil))
+    /// What an app or a check designated before the first access (`load(from:map:)`, `designate(plan:)`): its profile, its map,
+    /// the plan the process runs under.
+    private struct Designation { var profile: String?; var map: Diagnostic.Report?; var plan: CapacityPlan? }
+    private static let designated = Mutex(Designation())
 
     /// The profile's path: `SILICONED_PROFILE`, otherwise the one an app designated
     /// (`load(from:)`), otherwise the process library's `store/profil.json`
@@ -343,8 +242,7 @@ package struct EngineSettings: Sendable {
     /// nothing — unless the profile and the map already read are these. Without this call, the profile
     /// sought is `Library.processWide`'s, which the CLI follows and a sandboxed app would not find.
     ///
-    /// `map`: the diagnostic's report this app kept (`Diagnostic.run`), applied by the rules of
-    /// `CapacityRules.swift` between the defaults and the profile. **Refused with a warning when it is not
+    /// `map`: the diagnostic's report this app kept (`Diagnostic.run`). **Refused with a warning when it is not
     /// `isCurrent`** (another machine, another macOS, another build): the defaults then apply, and the
     /// app measures again. **It never changes settings already read**: an app without a current map defers this
     /// call until its measure — taken in another process, so that nothing here reads the settings before it.
@@ -363,11 +261,30 @@ package struct EngineSettings: Sendable {
                 }
                 return nil
             }
-            designated = (path, map)
+            designated.profile = path
+            designated.map = map
             return nil
         }
         if let refusal { throw EngineError(refusal) }
         _ = effective   // read now: the warnings (profile from another machine, stale map) are ready
+    }
+
+    /// **Designate the plan the process runs under** — the model of this Mac (`CapacityPlan(model:)`), or a check's strictest case
+    /// (`CapacityPlan.forcing`) — before anything reads the settings. **Too late, it throws**, unless the plan already read is this one.
+    package static func designate(plan: CapacityPlan) throws(EngineError) {
+        let late: Bool = designated.withLock { designated in
+            if alreadyRead.load(ordering: .acquiring) { return true }
+            designated.plan = plan
+            return false
+        }
+        if late {
+            // Compared outside the lock: the first read of `effective` takes it.
+            let loaded = read.plan
+            if loaded !== plan && loaded.identity != plan.identity {
+                throw EngineError(Failure.alreadyRead(profileRead: "plan \(loaded.identity)", requested: "plan \(plan.identity)"))
+            }
+        }
+        _ = effective
     }
 
     /// Set on the first read of `effective`: after it, designating a profile no longer serves any purpose.
@@ -379,16 +296,18 @@ package struct EngineSettings: Sendable {
         var refusal: String? = nil
 
         // ── the capacity map, if an app designated one and it is this machine's, this build's ────────
-        if let map = EngineSettings.designated.withLock({ $0.map }) {
+        let designation = EngineSettings.designated.withLock { $0 }
+        if let plan = designation.plan { self.plan = plan }
+        // The environment keeps the last word: a developer's check or judge names the route it forces.
+        if let named = ProcessInfo.processInfo.environment["SILICONED_PLAN"] {
+            if let forced = CapacityPlan.forcing(named: named) { self.plan = forced }
+            else if !named.isEmpty {
+                warnings.append("⚠ SILICONED_PLAN=\(named) not read (amx, flash, ane, bf16act, comma-separated): the plan stays.")
+            }
+        }
+        if let map = designation.map {
             if map.isCurrent {
                 mapRead = map.date
-                if let table = map.routes {
-                    adopt(table)
-                } else {
-                    let decisions = Diagnostic.decide(map)
-                    mapDecisions = decisions
-                    apply(decisions.settings, .map)
-                }
             } else {
                 warnings.append("⚠ the capacity map of \(map.date) was measured on \(map.fingerprint), this is "
                                 + "\(Diagnostic.Fingerprint.current) — map ignored, the defaults apply.")
@@ -418,27 +337,8 @@ package struct EngineSettings: Sendable {
             if let raw = env[variable] { fromEnv[key] = raw }
         }
         // The keys (second argument) are those of `store/profil.json`: on-disk keys, kept for existing profiles.
-        read("SILICONED_AMX", "amx")
         read("SILICONED_AMX_SPIN", "amx_spin")
-        read("SILICONED_AMX_QUANTUM", "amx_quantum")
-        read("SILICONED_AMX_MIN", "amx_min")
-        read("SILICONED_AMX_FRACTION", "amx_fraction")
-        read("SILICONED_AMX_SHARES", "amx_shares")
         read("SILICONED_REPRODUCIBLE", "coupe_figee")
-        read("SILICONED_FLASH", "flash")
-        read("SILICONED_HEAD_SPLIT", "head_split")
-        read("SILICONED_HEAD_SPLIT_FRACTION", "head_split_fraction")
-        read("SILICONED_GEMM_TENSOR", "gemm_tensor")
-        read("SILICONED_GEMM_INT8", "gemm_int8")
-        read("SILICONED_GEMM_Q8", "gemm_q8")
-        read("SILICONED_GEMM_BF16_ACT", "gemm_bf16_act")
-        read("SILICONED_BF16_ACT_MIN", "bf16_act_min")
-        read("SILICONED_BF16_ACT_8BIT", "bf16_act_8bit")
-        read("SILICONED_GEMM_ANE", "gemm_ane")
-        read("SILICONED_ANE_FRACTION", "ane_fraction")
-        read("SILICONED_ANE_MIN", "ane_min")
-        read("SILICONED_ANE_SHARES", "ane_shares")
-        read("SILICONED_ANE_AMX", "ane_amx")
         read("SILICONED_SPECTRAL", "spectral")
         read("SILICONED_VAE_BLOCK", "vae_bloc_requetes")
         read("SILICONED_VAE_TILE", "vae_tuile")
@@ -449,47 +349,13 @@ package struct EngineSettings: Sendable {
         apply(fromEnv, .environment)
 
         if let refusal { warnings.insert(refusal, at: 0) }
-        routes = finalRoutes()
     }
 
-    /// **A map of schema 13 read**: its table, and the switches the rest of the engine still reads (`amx`, `gemm_ane`,
-    /// `flash`…) set to what the table brings up, so that nothing reads a switch that contradicts the table.
-    private mutating func adopt(_ table: RouteTable) {
-        mapRoutes = table
-        let p = table.products
-        let flat: [(String, Bool)] = [("amx", p.usesAMX), ("gemm_ane", p.usesANE), ("gemm_tensor", p.usesBF16Weights),
-                                      ("gemm_int8", p.usesInt8Weights), ("gemm_q8", p.usesQ8Weights),
-                                      ("gemm_bf16_act", p.roundsActivations), ("flash", table.attention.usesFlash),
-                                      ("head_split", table.attention.usesHeadSplit)]
-        apply(Dictionary(uniqueKeysWithValues: flat.map { ($0.0, $0.1 as Any) }), .map)
-    }
-
-    /// **The table the engine runs under**: the map's (schema 13), with each setting forced by a profile or the environment
-    /// rewriting its part — the switches and grids of `RouteTable(settings:)` replace the map's AMX, ANE, weight rules or
-    /// attention rules; without a map, or with an older one, the switches' table alone.
-    private func finalRoutes() -> RouteTable {
-        guard var table = mapRoutes else { return RouteTable(settings: self) }
-        let forced = Set(provenance.filter { $0.value == .profile || $0.value == .environment }.keys)
-        guard !forced.isEmpty else { return table }
-        let flat = RouteTable(settings: self)
-        func touches(_ keys: [String]) -> Bool { !forced.isDisjoint(with: keys) }
-        if touches(["amx", "amx_fraction", "amx_shares"]) { table.products.amx = flat.products.amx }
-        if touches(["gemm_ane", "ane_fraction", "ane_min", "ane_shares", "ane_amx"]) { table.products.ane = flat.products.ane }
-        if touches(["gemm_tensor", "gemm_int8", "gemm_q8", "gemm_bf16_act", "bf16_act_min", "bf16_act_8bit"]) {
-            table.products.weights = flat.products.weights
-        }
-        if touches(["flash", "head_split", "head_split_fraction"]) { table.attention = flat.attention }
-        return table
-    }
-
-    /// **Settings from values alone** — the defaults, then `values` as a map's decisions write them
-    /// (`Decisions.settings`): no environment, no profile, no process-wide state. What the pure tests and
-    /// `RouteTable(decisions:)` read.
-    package init(applying values: [String: Any], map: Diagnostic.Report? = nil) {
+    /// **Settings from values alone** — the defaults, then `values`: no environment, no profile, no process-wide state. What the
+    /// pure tests read.
+    package init(applying values: [String: Any]) {
         machine = Machine.detected()
-        if let table = map?.routes { adopt(table) }
         apply(values, .map)
-        routes = finalRoutes()
     }
 
     /// **A flag is read by its presence, and taken down with `=0`.** Historically the engine
@@ -554,38 +420,8 @@ package struct EngineSettings: Sendable {
             guard let raw = values[key], let d = EngineSettings.real(raw) else { return }
             target = d; provenance[key] = source
         }
-        flag("amx", &amx)
         flag("amx_spin", &amxSpin)
-        integer("amx_quantum", &amxQuantum)
-        integer("amx_min", &amxMinimumRows)
-        real("amx_fraction", &amxFraction)
-        if let raw = values["amx_shares"] {
-            if let shares = Conductor.Shares(text: "\(raw)") { amxShares = shares; provenance["amx_shares"] = source }
-            else { warnings.append("⚠ « amx_shares » unreadable (\(raw)): the scalar share applies.") }
-        }
         flag("coupe_figee", &frozenCut)
-        flag("flash", &flash)
-        flag("head_split", &headSplit)
-        real("head_split_fraction", &headSplitFraction)
-        headSplitFraction = min(max(headSplitFraction, 0.05), 0.8)
-        flag("gemm_tensor", &gemmTensor)
-        flag("gemm_int8", &gemmInt8)
-        flag("gemm_q8", &gemmQ8)
-        flag("gemm_bf16_act", &gemmBF16Activations)
-        integer("bf16_act_min", &bf16ActivationMinimumRows)
-        flag("bf16_act_8bit", &bf16ActivationEightBit)
-        flag("gemm_ane", &gemmANE)
-        real("ane_fraction", &aneFraction)
-        aneFraction = min(max(aneFraction, 0), 1)
-        integer("ane_min", &aneMinimumRows)
-        if let raw = values["ane_shares"] {
-            if let shares = Conductor.Shares(text: "\(raw)") { aneShares = shares; provenance["ane_shares"] = source }
-            else { warnings.append("⚠ « ane_shares » unreadable (\(raw)): the scalar share applies.") }
-        }
-        if let raw = values["ane_amx"] {
-            if let shares = Conductor.Shares(text: "\(raw)") { aneAMX = shares; provenance["ane_amx"] = source }
-            else { warnings.append("⚠ « ane_amx » unreadable (\(raw)): the GPU alone beside the ANE.") }
-        }
         integer("spectral", &spectral)
         integer("vae_bloc_requetes", &vaeRequestBlock)
         integer("vae_tuile", &vaeTile)
@@ -603,6 +439,7 @@ package struct EngineSettings: Sendable {
     package func report(all: Bool = false) -> String {
         var output = "machine : \(machine.summary)\n"
         if let mapRead { output += "map     : \(mapRead)\n" }
+        output += "plan    : \(plan.identity)\n"
         output += "profile : \(profileStatus)\n"
         for row in rows where all || row.source != .byDefault {
             // `%s` wants a `char*` and would yield gibberish on non-ASCII text: we pad in Swift.
@@ -624,23 +461,8 @@ package struct EngineSettings: Sendable {
     /// Every setting, its value as `report` prints it, and where it comes from.
     package var rows: [(key: String, value: String, source: Provenance)] {
         let rows: [(String, String)] = [
-            ("amx", "\(amx)"), ("amx_quantum", "\(amxQuantum)"),
-            ("amx_min", "\(amxMinimumRows)"), ("amx_spin", "\(amxSpin)"),
-            ("amx_fraction", String(format: "%.3f", amxFraction)),
-            ("amx_shares", amxShares.isEmpty ? "none" : "\(amxShares.points.count) points"),
+            ("amx_spin", "\(amxSpin)"),
             ("coupe_figee", "\(frozenCut)"),
-            ("flash", "\(flash)"),
-            ("head_split", "\(headSplit)"),
-            ("head_split_fraction", String(format: "%.3f", headSplitFraction)),
-            ("gemm_tensor", "\(gemmTensor)"),
-            ("gemm_int8", "\(gemmInt8)"),
-            ("gemm_q8", "\(gemmQ8)"),
-            ("gemm_bf16_act", "\(gemmBF16Activations)"), ("bf16_act_min", "\(bf16ActivationMinimumRows)"),
-            ("bf16_act_8bit", "\(bf16ActivationEightBit)"),
-            ("gemm_ane", "\(gemmANE)"),
-            ("ane_fraction", String(format: "%.3f", aneFraction)), ("ane_min", "\(aneMinimumRows)"),
-            ("ane_shares", aneShares.isEmpty ? "none" : "\(aneShares.points.count) points"),
-            ("ane_amx", aneAMX.isEmpty ? "none" : "\(aneAMX.points.filter { $0.ratio > 0 }.count) of \(aneAMX.points.count) points"),
             ("spectral", "\(spectral)"),
             ("vae_bloc_requetes", "\(vaeRequestBlock)"),
             ("vae_tuile", vaeTile == 0 ? "no" : "\(vaeTile) (overlap \(vaeOverlap))"),
@@ -654,14 +476,7 @@ package struct EngineSettings: Sendable {
     /// The dictionary of active values, to write into a profile.
     package var values: [String: Any] {
         [
-            "amx": amx, "amx_quantum": amxQuantum,
-            "amx_min": amxMinimumRows, "amx_fraction": amxFraction, "amx_shares": amxShares.description,
             "coupe_figee": frozenCut,
-            "flash": flash, "head_split": headSplit, "head_split_fraction": headSplitFraction,
-            "gemm_tensor": gemmTensor, "gemm_int8": gemmInt8, "gemm_q8": gemmQ8,
-            "gemm_bf16_act": gemmBF16Activations, "bf16_act_min": bf16ActivationMinimumRows,
-            "bf16_act_8bit": bf16ActivationEightBit,
-            "gemm_ane": gemmANE, "ane_fraction": aneFraction, "ane_min": aneMinimumRows, "ane_shares": aneShares.description, "ane_amx": aneAMX.description,
             "spectral": spectral, "vae_bloc_requetes": vaeRequestBlock,
             "parallel": parallel, "map_tail": mapTail,
         ]

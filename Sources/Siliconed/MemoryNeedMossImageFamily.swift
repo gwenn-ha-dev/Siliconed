@@ -42,6 +42,8 @@ extension MemoryNeed {
         /// What widening the encoder's largest rotated (int8 convrot) weight allocates beside its arena
         /// (`Widen.rotationScratchBytes`): the Compact's; 0 for the Standard's bf16.
         package let encoderRotationScratch: Int
+        /// The format the encoder's products are published in (`Artifact.weightFormat`): the plan's key.
+        package let encoderFormat: CapacityClasses.WeightFormat
 
         package init?(dit: [String: Any], ditSize: Int = .max, encoder: [String: Any], encoderSize: Int = .max, turboRank: Int) {
             guard let encoderConfig = try? Qwen35Encoder.Config(header: encoder), turboRank > 0 else { return nil }
@@ -54,6 +56,7 @@ extension MemoryNeed {
             ditHeader = dit; self.ditSize = ditSize; self.dit = config; self.encoderConfig = encoderConfig
             encoderUnit = unit; self.turboRank = turboRank
             encoderRotationScratch = Widen.rotationScratchBytes(header: encoder, prefixes: (0..<encoderConfig.layers).map { "layers.\($0)." })
+            encoderFormat = Artifact.weightFormat(header: encoder)
         }
 
         /// The maps this card renders with: the library's installed version — DiT, encoder, the DMD LoRA.
@@ -104,10 +107,11 @@ extension MemoryNeed {
             Term("encoder staging", TextEncoder.stagingSlots(granted: request.encoderSlots) * maps.encoderUnit),
             Term("encoder rotation scratch", maps.encoderRotationScratch),
         ] + attention("encoder", heads: encoder.heads, rows: sequence, keys: sequence, headDim: encoder.headDim,
-                      causal: true, split: false, threads: request.threads)
+                      causal: true, threads: request.threads)
           + gemm("encoder", bounded: [(sequence, h, channels), (sequence, h, valueWidth), (sequence, valueWidth, h),
                                       (sequence, h, 2 * a), (sequence, h, kv), (sequence, a, h),
-                                      (sequence, h, i), (sequence, i, h)]))
+                                      (sequence, h, i), (sequence, i, h)], spread: sequence,
+                 plan: request.encoderPlan, weight: maps.encoderFormat, phase: .encoding))
 
         // ── denoising: the DiT's own formula, under the stack the denoiser opens: the turbo LoRA, then the request's ──
         var denoisingRequest = request

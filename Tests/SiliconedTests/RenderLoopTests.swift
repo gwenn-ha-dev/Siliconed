@@ -96,7 +96,7 @@ final class RenderLoopTests: XCTestCase {
 
     /// The kernels record themselves: a graph attention on the GPU (kilobytes), armed and not.
     func testTheGraphAttentionRecordsItselfWhenArmedAndProductsNameTheirEngines() throws {
-        let gemm = try GEMM(freezeCut: true, coexecution: false, tensorWeights: false, neuralEngine: false)
+        let gemm = try GEMM(freezeCut: true, plan: .defaults)
         let (sequence, heads, dim) = (64, 2, 64)
         let bytes = Arena.capacity(for: sequence * heads * dim * 4)
         var keep: [Pages] = []
@@ -130,7 +130,7 @@ final class RenderLoopTests: XCTestCase {
                         b: try gemm.wrap(UnsafeMutableRawPointer(w.floats()), bytes: Arena.capacity(for: kk * n * 4), name: "w"),
                         c: try gemm.wrap(UnsafeMutableRawPointer(c.floats()), bytes: Arena.capacity(for: m * n * 4), name: "c"),
                         m: m, k: kk, n: n, weightIsTransposed: true)
-        XCTAssertEqual(gemm.lastEngines, .gpu)
+        XCTAssertEqual(gemm.lastEngines, "gpu")
         withExtendedLifetime((keep, a, w, c)) {}
     }
 

@@ -81,6 +81,8 @@ extension MemoryNeed {
         /// What widening the largest rotated (int8 convrot) weight allocates beside the arenas
         /// (`Widen.rotationScratchBytes`): the Compact's encoder and DiT, the Light's encoder; 0 otherwise.
         package let encoderRotationScratch: Int, ditRotationScratch: Int
+        /// The formats the two maps' products are published in (`Artifact.weightFormat`): the plan's keys.
+        package let ditFormat: CapacityClasses.WeightFormat, encoderFormat: CapacityClasses.WeightFormat
 
         /// From the headers — pure: the tests hand it headers written in memory. `nil` when the
         /// encoder's config does not parse or a map has no tensor table.
@@ -99,6 +101,7 @@ extension MemoryNeed {
             timestepWidening = Krea2DiT.timestepWidening(header: dit, config: config)
             encoderRotationScratch = Widen.rotationScratchBytes(header: encoder, prefixes: TextEncoder.layerPrefixes(encoderConfig))
             ditRotationScratch = Widen.rotationScratchBytes(header: dit, prefixes: (0..<config.layers).map(Krea2DiT.layerPrefix))
+            ditFormat = Artifact.weightFormat(header: dit); encoderFormat = Artifact.weightFormat(header: encoder)
         }
 
         /// The maps this card renders with: its own DiT (an imported one) or the library's installed
@@ -163,9 +166,9 @@ extension MemoryNeed {
             Term("taps stack", Arena.capacity(for: sequence * taps * h * f)),
             Term("encoder rotation scratch", maps.encoderRotationScratch),
         ] + attention("encoder", heads: encoder.heads, rows: sequence, keys: sequence, headDim: encoder.headDim,
-                      causal: true, split: false, threads: request.threads)
+                      causal: true, threads: request.threads)
           + gemm("encoder", bounded: [(sequence, h, a), (sequence, h, kvE), (sequence, a, h), (sequence, h, i),
-                                      (sequence, i, h)]))
+                                      (sequence, i, h)], spread: sequence, plan: request.encoderPlan, weight: maps.encoderFormat, phase: .encoding))
 
         // ── img2img's starting image, encoded at the render's format (`fitted`: a copy when the size
         //    handed differs): the Qwen-Image encoder's heaps ──────────────────────────────────────
@@ -185,7 +188,7 @@ extension MemoryNeed {
             Term("LoRA down staging", request.loraRanks.count > 1 ? LoRA.downBytes(k: fh, rank: request.loraRanks.max() ?? 0) : 0),
         ] + gemm("fusion", bounded: [(rows, fd, fd), (rows, fd, fh), (rows, fh, fd), (t, fd, fd), (t, fd, fh), (t, fh, fd),
                                      (t, fd, d), (t, d, d)],
-                 rank: rank, ane: request.neuralEngine))
+                 spread: rows, rank: rank, plan: request.ditPlan, weight: maps.ditFormat))
 
         // ── the DiT: its arena, the map's staging blocks, the LoRA cache, the velocity; then either the
         //    modulation's tabulation or the SDPA and the GEMM, the larger ─────────────────────────────
@@ -203,12 +206,13 @@ extension MemoryNeed {
             Term("DiT rotation scratch", maps.ditRotationScratch),
         ]
         // Under the head split, MPSGraph sees the GPU's groups only: its queries' copy and its slices are theirs.
-        let split = Krea2DiT.headSplit(sequence: n, heads: dit.heads, headDim: dit.headDim)
+        let cut = Krea2DiT.attentionAssignment(request.ditPlan, sequence: n, heads: dit.heads, kvHeads: dit.kvHeads, headDim: dit.headDim)
         let running = MemoryNeed.attention("DiT", heads: dit.heads, rows: n, keys: n, headDim: dit.headDim, causal: false,
-                                           split: split, threads: request.threads, group: dit.heads / dit.kvHeads)
+                                           assignment: cut, threads: request.threads, group: dit.heads / dit.kvHeads)
             // The image's rows are exact; the sequence's follow the prompt's bound.
             + gemm("DiT", products: [(s, dit.channels, d), (s, d, dit.channels)],
-                   bounded: [(n, d, d), (n, d, kv), (n, d, hidden), (n, hidden, d)], rank: rank, ane: request.neuralEngine)
+                   bounded: [(n, d, d), (n, d, kv), (n, d, hidden), (n, hidden, d)], spread: t, rank: rank, plan: request.ditPlan,
+                   weight: maps.ditFormat)
         terms += running
         // The tabulation runs right after the DiT is built and before its first evaluation: the arena is
         // mapped and not yet written (an untouched page is not resident) and the stream does not exist
