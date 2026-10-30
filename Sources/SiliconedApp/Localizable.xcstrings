@@ -21754,6 +21754,46 @@
         }
       }
     },
+    "Open a GitHub Issue" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GitHub-Issue öffnen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abrir una incidencia en GitHub"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvrir un signalement GitHub"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apri una segnalazione su GitHub"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GitHub issueを開く"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开 GitHub 议题"
+          }
+        }
+      }
+    },
     "Open it instead, or choose an empty folder." : {
       "localizations" : {
         "de" : {
@@ -21790,46 +21830,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "请改为打开它，或选择一个空文件夹。"
-          }
-        }
-      }
-    },
-    "Open the Issue" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Issue öffnen"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Abrir la incidencia"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ouvrir le signalement"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Apri la segnalazione"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "issueを開く"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "打开议题"
           }
         }
       }
@@ -26792,42 +26792,42 @@
         }
       }
     },
-    "Siliconed measures what each engine of this Mac computes, alone and together, then plans every calculation of a render from it. Sharing the result is optional: a prefilled GitHub issue, opened only by your click." : {
+    "Siliconed measures what each engine of this Mac computes, alone and together, then plans every calculation of a render from it." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Siliconed misst, was jede Recheneinheit dieses Macs rechnet, einzeln und zusammen, und plant daraus jede Berechnung eines Renderings. Das Teilen ist freiwillig: ein vorausgefülltes GitHub-Issue, nur auf Ihren Klick."
+            "value" : "Siliconed misst, was jede Recheneinheit dieses Macs rechnet, einzeln und zusammen, und plant daraus jede Berechnung eines Renderings."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Siliconed mide lo que calcula cada motor de este Mac, por separado y juntos, y con ello planifica cada cálculo de una imagen. Compartir el resultado es opcional: una incidencia de GitHub ya rellenada, abierta solo con tu clic."
+            "value" : "Siliconed mide lo que calcula cada motor de este Mac, por separado y juntos, y con ello planifica cada cálculo de una imagen."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Siliconed mesure ce que calcule chaque moteur de ce Mac, seul et avec les autres, puis planifie à partir de là chaque calcul d’un rendu. Partager le résultat est facultatif : un signalement GitHub prérempli, ouvert seulement par votre clic."
+            "value" : "Siliconed mesure ce que calcule chaque moteur de ce Mac, seul et avec les autres, puis planifie à partir de là chaque calcul d’un rendu."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Siliconed misura ciò che calcola ogni motore di questo Mac, da solo e insieme agli altri, poi pianifica su questa base ogni calcolo di un’immagine. Condividere il risultato è facoltativo: una segnalazione GitHub precompilata, aperta solo dal tuo clic."
+            "value" : "Siliconed misura ciò che calcola ogni motore di questo Mac, da solo e insieme agli altri, poi pianifica su questa base ogni calcolo di un’immagine."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Siliconedは、このMacの各演算装置が何を計算できるかを、単独と同時の両方で測定し、その結果からレンダリングの計算を一つずつ計画します。結果の共有は任意です：入力済みのGitHub issueが、あなたがクリックしたときにだけ開きます。"
+            "value" : "Siliconedは、このMacの各演算装置が何を計算できるかを、単独と同時の両方で測定し、その結果からレンダリングの計算を一つずつ計画します。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Siliconed 会测量这台 Mac 上每个引擎单独和同时能算什么，然后据此规划一次生成中的每一项计算。是否分享结果由你决定：只有在你点按后，才会打开已预先填写的 GitHub 议题。"
+            "value" : "Siliconed 会测量这台 Mac 上每个引擎单独和同时能算什么，然后据此规划一次生成中的每一项计算。"
           }
         }
       }
@@ -35579,46 +35579,6 @@
         }
       }
     },
-    "To send the report another way, without a GitHub account" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Um den Bericht auf anderem Weg zu senden, ohne GitHub-Konto"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Para enviar el informe de otra forma, sin cuenta de GitHub"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Pour envoyer le rapport autrement, sans compte GitHub"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Per inviare il rapporto in altro modo, senza un account GitHub"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "GitHubアカウントなしで、別の方法でレポートを送るには"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "用其他方式发送报告，无需 GitHub 账户"
-          }
-        }
-      }
-    },
     "To start from an image, choose a model that edits" : {
       "localizations" : {
         "de" : {
@@ -35825,42 +35785,42 @@
         }
       }
     },
-    "Try again; if it persists, report it (Help ▸ Measure This Mac…, then Open the Issue)." : {
+    "Try again; if it persists, report it (Help ▸ Measure This Mac…, then Share… ▸ Open a GitHub Issue)." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Versuchen Sie es erneut; falls das Problem bleibt, melden Sie es (Hilfe ▸ Diesen Mac vermessen …, dann Issue öffnen)."
+            "value" : "Versuchen Sie es erneut; falls das Problem bleibt, melden Sie es (Hilfe ▸ Diesen Mac vermessen …, dann Teilen … ▸ GitHub-Issue öffnen)."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Vuelve a intentarlo; si persiste, informa de ello (Ayuda ▸ Medir este Mac…, y luego Abrir la incidencia)."
+            "value" : "Vuelve a intentarlo; si persiste, informa de ello (Ayuda ▸ Medir este Mac…, y luego Compartir… ▸ Abrir una incidencia en GitHub)."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Réessayez ; si cela persiste, signalez-le (Aide ▸ Mesurer ce Mac…, puis Ouvrir le signalement)."
+            "value" : "Réessayez ; si cela persiste, signalez-le (Aide ▸ Mesurer ce Mac…, puis Partager… ▸ Ouvrir un signalement GitHub)."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Riprova; se il problema persiste, segnalalo (Aiuto ▸ Misura questo Mac…, poi Apri la segnalazione)."
+            "value" : "Riprova; se il problema persiste, segnalalo (Aiuto ▸ Misura questo Mac…, poi Condividi… ▸ Apri una segnalazione su GitHub)."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "もう一度お試しください。解決しない場合は報告してください（ヘルプ ▸ このMacを測定… の後、issueを開く）。"
+            "value" : "もう一度お試しください。解決しない場合は報告してください（ヘルプ ▸ このMacを測定… の後、共有… ▸ GitHub issueを開く）。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "请重试；若问题仍然存在，请报告（“帮助” ▸ “测量这台 Mac…”，然后点按“打开议题”）。"
+            "value" : "请重试；若问题仍然存在，请报告（“帮助” ▸ “测量这台 Mac…”，然后点按“共享…” ▸ “打开 GitHub 议题”）。"
           }
         }
       }

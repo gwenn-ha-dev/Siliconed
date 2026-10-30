@@ -120,7 +120,7 @@ extension AppState {
         }
     }
 
-    /// **« Open the issue »**: the report goes to the clipboard, and GitHub's form opens with every field
+    /// **« Open a GitHub Issue »**: the report goes to the clipboard, and GitHub's form opens with every field
     /// prefilled but the report's, which the user pastes. Never the report in the link: signed out, GitHub
     /// sends a new issue's URL through its login page inside `return_to`, escaped once more, and a link
     /// carrying ~6 KB of JSON comes out of it broken — the short one survives the round trip.

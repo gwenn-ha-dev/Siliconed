@@ -239,16 +239,16 @@ struct RackView: View {
 
     private var header: some View {
         HStack(alignment: .firstTextBaseline, spacing: 10) {
-            // The engine's plan comes from this Mac's measure (`Diagnostic.Report`): the title and its
-            // chip open it, orange until it is taken — the first render waits for it — or while the one
-            // kept is orange (a missing or aberrant figure, its memory, its swap or its seconds beyond), a green chip once a green one is kept.
+            // The engine's plan comes from this Mac's measure (`Diagnostic.Report`): the title and the Mac's own
+            // icon open it — greyed until a measure is kept (the first render waits for it), in its colours after.
             let measured = app.mapMeasured
             Button { app.openDiagnostic() } label: {
                 HStack(spacing: 6) {
                     Text("Chain").font(.headline).fixedSize()
-                    Image(systemName: "cpu").font(.body).foregroundStyle(measured ? .green : .orange)
+                    MacIcon(hardwareModel: app.computingHardwareModel)
+                        .frame(width: 26, height: 26)
+                        .saturation(measured ? 1 : 0).opacity(measured ? 1 : 0.5)
                 }
-                .foregroundStyle(measured ? .primary : Color.orange)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)

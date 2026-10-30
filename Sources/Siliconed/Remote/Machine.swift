@@ -38,6 +38,8 @@ package struct RemoteMachine: Codable, Equatable, Sendable {
     /// `Diagnostic.Machine.chip`, and the memory in bytes.
     package var chip: String
     package var memoryBytes: Int
+    /// `hw.model` ("MacBookPro18,3"): the icon the borrower draws beside « Chain ». Absent from a lender older than the field.
+    package var hardwareModel: String?
     /// B, as the lender computes it (also in the catalog: here for the menu, which has no catalog).
     package var ceiling: Int
     /// The ready models' ids.
@@ -53,10 +55,10 @@ package struct RemoteMachine: Codable, Equatable, Sendable {
     /// `nil`: the lender can measure now.
     package var blocker: RemoteBlocker?
 
-    package init(chip: String, memoryBytes: Int, ceiling: Int, ready: [String], stored: RemoteMap? = nil, inUse: RemoteMap? = nil,
-                 remeasuring: Bool = false, warnings: [String] = [], diagnostic: RemoteDiagnostic = .idle,
+    package init(chip: String, hardwareModel: String? = nil, memoryBytes: Int, ceiling: Int, ready: [String], stored: RemoteMap? = nil,
+                 inUse: RemoteMap? = nil, remeasuring: Bool = false, warnings: [String] = [], diagnostic: RemoteDiagnostic = .idle,
                  blocker: RemoteBlocker? = nil) {
-        self.chip = chip; self.memoryBytes = memoryBytes; self.ceiling = ceiling; self.ready = ready
+        self.chip = chip; self.hardwareModel = hardwareModel; self.memoryBytes = memoryBytes; self.ceiling = ceiling; self.ready = ready
         self.stored = stored; self.inUse = inUse; self.remeasuring = remeasuring; self.warnings = warnings
         self.diagnostic = diagnostic; self.blocker = blocker
     }

@@ -1,13 +1,13 @@
 // **« Measure This Mac »: what each engine of this Mac computes, alone and together — the model the engine plans a render
-// from —, then sent as a GitHub issue only if the user wants** (`Diagnostic.swift`). The sheet says the tuning first:
-// sharing is an option, not its purpose (the user, 19/10/2026).
+// from** (`Diagnostic.swift`). Sharing the report is an option behind « Share… », never advised nor the default button: the
+// sheet is for the tuning, not for the issue (the user, 19/10 and 31/10/2026).
 //
 // Three states in one sheet: what the diagnostic does and how long (under a minute, no model needed; it occupies
 // the GPU and the CPU, so it waits for an empty queue — and the queue waits for it); its progress; then
 // the report as a person reads it — the verdict first (green; or orange, and what exactly is missing or aberrant, said
 // simply), then per engine what it reaches against the peak the silicon announces (a bar where the inventory read one) and
 // ✓/✗ (computed right against the exact or not), the memory and the duration, and the last render's gap to the model's
-// prediction, which goes with the report. « Open the issue » copies the report and opens GitHub's form
+// prediction, which goes with the report. « Share… ▸ Open a GitHub Issue » copies the report and opens GitHub's form
 // (`report.issueURL()`), where the user pastes it; « Copy JSON » alone serves whoever has no GitHub account. Nothing is
 // sent without a click, and the issue is submitted in the browser, by the user.
 //
@@ -27,7 +27,7 @@ struct DiagnosticSheet: View {
         VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: 4) {
                 Text("Measure This Mac").font(.title2.weight(.semibold))
-                Text("Siliconed measures what each engine of this Mac computes, alone and together, then plans every calculation of a render from it. Sharing the result is optional: a prefilled GitHub issue, opened only by your click.")
+                Text("Siliconed measures what each engine of this Mac computes, alone and together, then plans every calculation of a render from it.")
                     .font(.callout).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                 if let name = app.mirror?.macName {
@@ -150,14 +150,16 @@ struct DiagnosticSheet: View {
                     .keyboardShortcut(.defaultAction)
                     .disabled(app.diagnosticBlocker != nil)
             case .finished(let report):
+                // Sharing the report is an option the user goes to, never the default: « Close » is.
+                Menu("Share…") {
+                    Button("Open a GitHub Issue") { notice = app.openIssue(report) }
+                    Button("Copy JSON") { app.copyJSON(report) }
+                }
+                .fixedSize()
+                .help("Copies the report and opens GitHub's form; you paste it and submit it there")
                 Button("Measure Again") { notice = nil; app.startDiagnostic() }
                     .disabled(app.diagnosticBlocker != nil)
-                Button("Copy JSON") { app.copyJSON(report) }
-                    .help("To send the report another way, without a GitHub account")
-                Button("Close") { dismiss() }.keyboardShortcut(.cancelAction)
-                Button("Open the Issue") { notice = app.openIssue(report) }
-                    .keyboardShortcut(.defaultAction)
-                    .help("Copies the report and opens GitHub's form; you paste it and submit it there")
+                Button("Close") { dismiss() }.keyboardShortcut(.defaultAction)
             }
         }
     }

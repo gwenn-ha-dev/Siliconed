@@ -70,7 +70,7 @@ extension RemoteControl {
     /// `diagnose [--issue]`: **« Measure This Mac », from the terminal** — the sheet opens in the
     /// app and the diagnostic runs (~1 min, no weights, the queue held meanwhile); the answer is the
     /// report, the same JSON the issue carries. `--issue` then does what the sheet's
-    /// « Open the Issue » does: GitHub's form opens in the browser, prefilled — the user submits it.
+    /// « Open a GitHub Issue » does: GitHub's form opens in the browser, prefilled — the user submits it.
     func diagnose(_ arguments: [String], _ c: Connection) throws {
         let issue = arguments.contains("--issue")
         if let unknown = arguments.first(where: { $0 != "--issue" }) {

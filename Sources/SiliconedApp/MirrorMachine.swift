@@ -11,7 +11,7 @@
 // - **The measure runs on the lender**, in its child process, as its own button would start it: refused
 //   (`machineBusy`) while it renders, installs or measures — it is never queued behind a render, the
 //   local sheet does not either. Its progress is a rank among `Diagnostic.Stage.allCases`, said here in
-//   this Mac's language; its report crosses whole, and « Copy JSON » or « Open the Issue » on the
+//   this Mac's language; its report crosses whole, and « Copy JSON » or « Open a GitHub Issue » on the
 //   borrower carry the lender's report (it is that machine's).
 // - **« Faster Rendering » is the lender's**: `Spectral.halfSizeStart` is its process's. The borrower's
 //   switch reads the catalog's value and writes by `setFasterRendering`; the local preference is not touched.
@@ -45,7 +45,8 @@ final class MachinePublisher {
         case .failed(let problem): .failed(RemoteRefusal(problem))
         }
         return RemoteMachine(
-            chip: machine.chip, memoryBytes: machine.memoryBytes, ceiling: app.memoryCeiling, ready: app.readySet.sorted(),
+            chip: machine.chip, hardwareModel: machine.hardwareModel, memoryBytes: machine.memoryBytes, ceiling: app.memoryCeiling,
+            ready: app.readySet.sorted(),
             stored: app.storedMap.map(RemoteMap.init), inUse: app.mapInUse.map(RemoteMap.init),
             remeasuring: app.remeasuringOrange, warnings: app.profileWarnings, diagnostic: phase,
             blocker: app.diagnosticBlock)
@@ -128,8 +129,16 @@ extension AppState {
                         drift: drift)
     }
 
-    /// A current map taken at rest is kept, and the last render did not run off it (the chip of « Chain » is green).
+    /// A current map taken at rest is kept, and the last render did not run off it (the Mac beside « Chain » is in colour).
     var mapMeasured: Bool { mapFacts.stored.map { $0.current && $0.green } == true && mapFacts.drift == nil }
+
+    /// `hw.model` of the Mac whose measure plans the render — this one, or the lender in a mirror (`nil` from a lender
+    /// older than the field): the icon beside « Chain ».
+    var computingHardwareModel: String? {
+        mirror != nil ? mirrorMachine?.hardwareModel : Self.hardwareModel
+    }
+
+    private static let hardwareModel = Diagnostic.sysctlString("hw.model")
 
     /// **« Faster Rendering »** as the window shows it: this Mac's, or the lender's in a mirror.
     var fasterRenderingShown: Bool { mirror != nil ? mirrorCatalog?.fasterRendering ?? true : fasterRendering }
