@@ -218,6 +218,30 @@ import Testing
         #expect(CapacityPlan(model: m).assign(int8) == (try solve(m, int8)).assignment)
     }
 
+    /// **An assignment decided elsewhere is timed with the rows the ANE takes**: the render's prediction asks `product(assigned:)` for the plan's
+    /// answer, and the GPU's rows alone (what it read before) are a third of the seconds of a product the ANE shares.
+    @Test func anAssignedIntegersProductIsTimedWithTheANEsRowsToo() throws {
+        let g8 = M.Kernel(.gpu, .int8), a8 = M.Kernel(.ane, .int8)
+        var m = machine()
+        m.lines[g8] = .init(t0: 0, rate: 3e12)
+        m.lines[a8] = .init(t0: 0, rate: 9e12)
+        m.sharing["gpu/int8+ane/int8"] = .init(overhead: 0, keep: [.gpu: 0.9, .ane: 0.8])
+        m.preparation[.int8] = [.widened: 1e-9, .native: 1e-11]
+        let int8 = key(4096, 4096, 4096, .int8)
+        let c = CS.Constraints(sustained: false)
+        let chosen = try solve(m, int8)
+        let timed = try #require(CS.product(assigned: chosen.assignment, key: int8, model: m, constraints: c))
+        #expect(timed.route == chosen.route && timed.rows == chosen.rows)
+        #expect(abs(timed.compute - chosen.compute) < 1e-12, "the same seconds as the solver's own candidate: \(timed.compute) against \(chosen.compute)")
+        // The ANE alone is the whole product; its rows are no longer left out.
+        let whole = try #require(CS.product(assigned: ProductAssignment(path: .native, gpu: 0, ane: 4096), key: int8, model: m, constraints: c))
+        #expect(whole.route == "ane/int8" && whole.rows == [a8: 4096])
+        #expect(abs(whole.compute - 2 * 4096.0 * 4096 * 4096 / 9e12) < 1e-9)
+        // A plan that names the ANE where the model has no line for its integers is not timed.
+        m.lines[a8] = nil
+        #expect(CS.product(assigned: chosen.assignment, key: int8, model: m, constraints: c) == nil)
+    }
+
     @Test func theANEMayTakeTheWholeIntegersProductWhenTheGPUIsTheSlowEngine() throws {
         let g8 = M.Kernel(.gpu, .int8), a8 = M.Kernel(.ane, .int8)
         var m = machine(gpuRate: 0.5e12)

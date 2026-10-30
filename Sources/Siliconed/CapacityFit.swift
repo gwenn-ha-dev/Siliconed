@@ -285,6 +285,45 @@ package enum CapacityFit {
         return solve(a, b)
     }
 
+    /// The same with every coefficient kept non-negative: the term that would go negative is dropped and the rest solved again (a small
+    /// active set — the fits here have three or four terms).
+    private static func regressNonNegative(_ rows: [(features: [Double], seconds: Double)]) -> [Double]? {
+        guard let width = rows.first?.features.count else { return nil }
+        var active = Array(0..<width)
+        while !active.isEmpty {
+            let sub = rows.map { row in (features: active.map { row.features[$0] }, seconds: row.seconds) }
+            guard let x = regress(sub) else { return nil }
+            if let worst = x.indices.min(by: { x[$0] < x[$1] }), x[worst] < 0 { active.remove(at: worst); continue }
+            var full = [Double](repeating: 0, count: width)
+            for (i, j) in active.enumerated() { full[j] = x[i] }
+            return full
+        }
+        return nil
+    }
+
+    /// **The ANE's line with the host's passes in it**: `t = t₀ + w·k·n + h·rows·(k·r + n·parts) + 2·rows·k·n / R`, `h` the seconds per element of the
+    /// two passes the host makes over a call's rows (the activation — rotated twice where K is cut, for a convrot weight —, the output), `parts` the
+    /// ANE's own cut of K. `nil` unless the solos tell the terms apart (four distinct shapes at least, the host term and the rate both positive).
+    private static func hostedLine(kernel: Kernel, solos used: [Measurements.Solo]) -> CapacityModel.Line? {
+        guard used.count >= 4, Set(used.map { $0.shape }).count >= 4 else { return nil }
+        let int8 = kernel.form == .int8
+        func elements(_ s: Measurements.Solo) -> Double {
+            let (m, k, n) = (s.shape[0], s.shape[1], s.shape[2])
+            let p = NeuralEngine.parts(k: k, n: n, int8: int8, alignment: int8 ? Widen.largestRotationGroup : 64)
+            return Double(m) * (Double(k) * (int8 && p > 1 ? 2 : 1) + Double(n) * Double(p))
+        }
+        // With the weight's lift when there are enough shapes to tell it from the host passes, without it otherwise.
+        let withLift = used.count >= 6
+        let rows = used.map { s -> (features: [Double], seconds: Double) in
+            var f: [Double] = [1]
+            if withLift { f.append(Double(s.shape[1] * s.shape[2]) * 1e-9) }
+            f += [elements(s) * 1e-9, s.flop * 1e-12]
+            return (f, s.seconds)
+        }
+        guard let x = regressNonNegative(rows), x[x.count - 1] > 0, x[x.count - 2] > 0 else { return nil }
+        return .init(t0: x[0], rate: 1e12 / x[x.count - 1], perWeight: withLift && x[1] > 0 ? x[1] * 1e-9 : nil, perRow: x[x.count - 2] * 1e-9)
+    }
+
     /// **The line of a kernel that reads a product, with the shapes the solos were taken at.** Alone, `t₀ + W / rate` is blind to the two
     /// things a family's shapes change: the ANE pays the weight's lift at every call (`perWeight`: `t = t₀ + w·k·n + W / rate`, which
     /// takes 3 products of different weight sizes at a given W apart where a line cannot), and the AMX's rate falls with k (`rateByK`:
@@ -305,6 +344,7 @@ package enum CapacityFit {
         guard used.count >= 3 else { return plain }
         switch kernel.engine {
         case .ane:
+            if let hosted = hostedLine(kernel: kernel, solos: used) { return hosted }
             let weights = Set(used.map { $0.shape[1] * $0.shape[2] })
             guard weights.count >= 2,
                   let x = regress(used.map { ([1, Double($0.shape[1] * $0.shape[2]) * 1e-9, $0.flop * 1e-12], $0.seconds) }),

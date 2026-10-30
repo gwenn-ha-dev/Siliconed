@@ -67,13 +67,13 @@ final class CapacityClassesTests: XCTestCase {
         XCTAssertEqual(rows(classes(.krea2)).intersection([1040, 4112]), [1040, 4112])
         XCTAssertEqual(executions(classes(.krea2), .krea2, k: 6144, n: 6144, rows: 1040), 3 * 28 * 4, "Krea 2: 4 half-size evaluations")
         XCTAssertEqual(executions(classes(.krea2), .krea2, k: 6144, n: 6144, rows: 4112), 3 * 28 * 4)
-        XCTAssertEqual(executions(classes(.mossImage), .mossImage, k: 3072, n: 3072, rows: 1045), 42, "MOSS-Image: one half-size evaluation")
-        XCTAssertEqual(executions(classes(.mossImage), .mossImage, k: 3072, n: 3072, rows: 4117), 42 * 7)
+        XCTAssertEqual(executions(classes(.mossImage), .mossImage, k: 3072, n: 3072, rows: 1045), 4 * 42, "MOSS-Image: one half-size evaluation, q k v o")
+        XCTAssertEqual(executions(classes(.mossImage), .mossImage, k: 3072, n: 3072, rows: 4117), 4 * 42 * 7)
         XCTAssertEqual(executions(classes(.qwenImage21), .qwenImage21, k: 4096, n: 4096, rows: 1024), 4 * 32 * 3)
         XCTAssertEqual(executions(classes(.anima), .anima, k: 2048, n: 2048, rows: 1024), 6 * 28 * 3)
         // Not at 6 144+ rows of Krea 2 and MOSS at 512²: nothing under the floor.
         XCTAssertEqual(rows(classes(.mossImage, w: 512, h: 512)).intersection([1045]), [1045])
-        XCTAssertEqual(executions(classes(.mossImage, w: 512, h: 512), .mossImage, k: 3072, n: 3072, rows: 1045), 42 * 8)
+        XCTAssertEqual(executions(classes(.mossImage, w: 512, h: 512), .mossImage, k: 3072, n: 3072, rows: 1045), 4 * 42 * 8)
         XCTAssertFalse(classes(.zImage, faster: false).contains { if case .product(_, _, 1056, _) = $0.shape { return true } else { return false } })
     }
 
@@ -84,20 +84,27 @@ final class CapacityClassesTests: XCTestCase {
         XCTAssertEqual(executions(q, .qwenImage21, k: 12288, n: 4096, rows: 3072), 2 * 32 * 5)
         XCTAssertEqual(executions(q, .qwenImage21, k: 4096, n: 12288, rows: 4096) + executions(q, .qwenImage21, k: 4096, n: 12288, rows: 6144), 0)
         XCTAssertNotNil(q.first { $0.shape == .attention(sequence: 6144, keys: 6144 + 19, heads: 32, kvHeads: 32, headDim: 128, cross: false) })
-        // The prefill: 19 rows through every layer, the last one only for its keys and values.
-        XCTAssertEqual(executions(q, .qwenImage21, k: 4096, n: 4096, rows: 19), 4 * 31 + 2)
+        // The prefill: 19 rows through every layer, the last one only for its keys and values — once per pass (the half grid and the full
+        // grid each have their DiT), txt_in's two products beside them (bf16).
+        XCTAssertEqual(executions(q, .qwenImage21, k: 4096, n: 4096, rows: 19), 2 * (4 * 31 + 2) + 2 * 2)
+        XCTAssertEqual(executions(classes(.qwenImage21, w: 1024, h: 1536, faster: false), .qwenImage21, k: 4096, n: 4096, rows: 19), 4 * 31 + 2 + 2)
         // Anima: cross-attention keys are the 512 padded text rows, its k/v products run once per render at 512 rows.
         let a = classes(.anima, faster: false)
         XCTAssertEqual(executions(a, .anima, k: 1024, n: 2048, rows: 512), 56)
+        XCTAssertEqual(executions(classes(.anima), .anima, k: 1024, n: 2048, rows: 512), 2 * 56, "the cross k/v of each of the two grids' DiT")
         let cross = a.first { $0.shape == .attention(sequence: 4096, keys: 512, heads: 16, kvHeads: 16, headDim: 128, cross: true) }
         XCTAssertEqual(cross?.executions[.anima], 28 * 8)
         // Krea 2: GQA 48/12.
         XCTAssertNotNil(classes(.krea2, faster: false).first { $0.shape == .attention(sequence: 4112, keys: 4112, heads: 48, kvHeads: 12, headDim: 128, cross: false) })
         XCTAssertEqual(executions(classes(.krea2, faster: false), .krea2, k: 6144, n: 1536, rows: 4112), 2 * 28 * 8)
-        // MOSS-Image: fused qkv and gate/up, the two text blocks at 21 rows.
+        // MOSS-Image: q, k, v, o apart in the layers (the fused QKV is the two text blocks'), gate and up fused, the text blocks at 21 rows
+        // with their up and gate apart.
         let m = classes(.mossImage, faster: false)
-        XCTAssertEqual(executions(m, .mossImage, k: 3072, n: 9216, rows: 4117), 42 * 8)
-        XCTAssertEqual(executions(m, .mossImage, k: 3072, n: 16384, rows: 21), 2 * 8)
+        XCTAssertEqual(executions(m, .mossImage, k: 3072, n: 9216, rows: 4117), 0)
+        XCTAssertEqual(executions(m, .mossImage, k: 3072, n: 3072, rows: 4117), 4 * 42 * 8)
+        XCTAssertEqual(executions(m, .mossImage, k: 3072, n: 16384, rows: 4117), 42 * 8)
+        XCTAssertEqual(executions(m, .mossImage, k: 3072, n: 9216, rows: 21), 2 * 8)
+        XCTAssertEqual(executions(m, .mossImage, k: 3072, n: 8192, rows: 21), 2 * 2 * 8)
         XCTAssertEqual(executions(m, .mossImage, k: 4096, n: 3072, rows: 21), 8)
     }
 
@@ -126,11 +133,16 @@ final class CapacityClassesTests: XCTestCase {
         XCTAssertNil(CC.WeightFormat.q4k.kind)
         XCTAssertEqual(CC.encoderFormat(.anima, .compact), .bf16)
         XCTAssertEqual(CC.encoderFormat(.zImage, .compact), .int8)
-        // The format is in the shape: the same k×n of two versions are two classes.
+        // The format is in the shape: the same k×n of two versions are two classes — for the blocks the version quantizes; the weights it leaves as
+        // published (Z-Image's refiners and embedders) are the Standard's own classes.
         let std = classes(.zImage), cmp = classes(.zImage, .compact)
+        func format(_ c: CC.Class) -> CC.WeightFormat? { if case let .product(_, _, _, f) = c.shape { return f } else { return nil } }
         XCTAssertEqual(std.count, cmp.count)
-        XCTAssertTrue(Set(std.map(\.shape)).isDisjoint(with: Set(cmp.filter { if case .product = $0.shape { return true } else { return false } }.map(\.shape))))
-        XCTAssertEqual(cmp.compactMap { c -> CC.WeightFormat? in if case let .product(_, _, _, f) = c.shape { return f } else { return nil } }.first, .q8)
+        let quantized = cmp.filter { format($0) == .q8 }, plain = cmp.filter { format($0) == .bf16 }
+        XCTAssertFalse(quantized.isEmpty)
+        XCTAssertTrue(Set(std.map(\.shape)).isDisjoint(with: Set(quantized.map(\.shape))))
+        XCTAssertTrue(plain.allSatisfy { p in std.contains { $0.shape == p.shape } })
+        XCTAssertEqual(quantized.count + plain.count, cmp.filter { format($0) != nil }.count)
     }
 
     // MARK: fusion
@@ -171,9 +183,11 @@ final class CapacityClassesTests: XCTestCase {
         let self1 = anima.first { $0.shape == .attention(sequence: 4096, keys: 4096, heads: 16, kvHeads: 16, headDim: 128, cross: false) }
         let cross = anima.first { $0.shape == .attention(sequence: 4096, keys: 512, heads: 16, kvHeads: 16, headDim: 128, cross: true) }
         XCTAssertEqual(self1?.id, cross?.id, "a self- and a cross-attention of one S share a name: the ledger cannot tell them apart")
-        let ids = classes(.zImage, .compact).filter { $0.phase == .denoising }.compactMap { c -> String? in
-            if case .product = c.shape { return c.id } else { return nil }
-        }
-        XCTAssertTrue(ids.allSatisfy { $0.hasSuffix("~q8") })
+        // Z-Image's Compact quantizes the 30 layers (rows 4 128 and 1 056); the refiners (rows 4 096, 1 024 and the 32 of the context) and the
+        // embedders stay as published, and the engine's record names them so.
+        let compact = classes(.zImage, .compact).filter { $0.phase == .denoising }
+        func rows(_ c: CC.Class) -> Int? { if case let .product(_, _, r, _) = c.shape { return r } else { return nil } }
+        XCTAssertTrue(compact.filter { [4128, 1056].contains(rows($0)) && $0.id.hasPrefix("product:3840x") }.allSatisfy { $0.id.hasSuffix("~q8") || $0.id.contains("x64@") })
+        XCTAssertTrue(compact.filter { [4096, 32].contains(rows($0)) }.allSatisfy { !$0.id.contains("~") })
     }
 }

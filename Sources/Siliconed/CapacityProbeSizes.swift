@@ -50,6 +50,12 @@ extension Diagnostic.CapacityProbes {
         /// (`CapacityFit.productLine`) — two k's at one weight size and three weight sizes (the ANE's lift of the weight against its rows), three
         /// k's for the AMX's rate by k (2 048, 3 840, 12 288) —, no point under 10 GFLOP (its fixed part is all of it).
         package var product: [Shape]
+        /// The ANE's fewest rows, taken as chains (fp16 and integers): a call costs it a fixed part whatever its rows, which products of 1 024 rows and
+        /// more cannot tell from the host's passes — and the half grid's classes give it 256 to 768 rows.
+        package var small: [Shape]
+        /// The ANE's integer route taken as chains (`ane/int8`): the products' shapes but one — the host's passes over the activation and the output are told
+        /// from the weight's lift and the engine's rate by a thin product (n = 1 536) and a cut K (k = 8 192, 12 288).
+        package var integers: [Shape]
         /// The sets' chains (`CapacityFit.overlap`): a short k and, where the tier allows, a long one — κ by k.
         package var chains: [Shape]
         /// The pair of 8-bit kernels' products: 30, 60 and 121 GFLOP at tier 0.
@@ -66,17 +72,23 @@ extension Diagnostic.CapacityProbes {
 
         package static let tiers: [Sizes] = [
             Sizes(tier: 0, solo: [(512, 2048, 2048), (1024, 3840, 3840), (4096, 6144, 6144)],
-                  product: [(2048, 2048, 4096), (2048, 3840, 3840), (4096, 3840, 3840), (1024, 12288, 4096)],
+                  product: [(2048, 2048, 4096), (2048, 3840, 3840), (4096, 3840, 3840), (1024, 12288, 4096), (2048, 8192, 1536)],
+                  small: [(512, 3840, 3840)],
+                  integers: [(2048, 2048, 4096), (2048, 3840, 3840), (1024, 12288, 4096), (2048, 8192, 1536)],
                   chains: [(4096, 3840, 3840), (4096, 12288, 4096)],
                   sharing: [(1024, 3840, 3840), (2048, 3840, 3840), (4096, 3840, 3840)], attention: [1024, 4096],
                   stairRows: [768, 896, 1024, 1792, 1920, 2048, 2304, 4096]),
             Sizes(tier: 1, solo: [(512, 2048, 2048), (1024, 3840, 3840), (2048, 4096, 4096)],
-                  product: [(1024, 2048, 4096), (2048, 3840, 3840), (1024, 12288, 4096)],
+                  product: [(1024, 2048, 4096), (2048, 3840, 3840), (1024, 12288, 4096), (1024, 8192, 1536)],
+                  small: [(512, 3840, 3840)],
+                  integers: [(1024, 2048, 4096), (2048, 3840, 3840), (1024, 12288, 4096), (1024, 8192, 1536)],
                   chains: [(2048, 3840, 3840), (2048, 12288, 4096)],
                   sharing: [(1024, 3840, 3840), (2048, 3840, 3840)], attention: [1024, 2048],
                   stairRows: [768, 1024, 1792, 2048, 2304]),
             Sizes(tier: 2, solo: [(512, 2048, 2048), (1024, 3840, 3840)],
-                  product: [(1024, 2048, 4096), (1024, 3840, 3840), (2048, 3840, 3840)], chains: [(2048, 3840, 3840)], sharing: [(1024, 3840, 3840)], attention: [1024],
+                  product: [(1024, 2048, 4096), (1024, 3840, 3840), (2048, 3840, 3840), (1024, 8192, 1536)],
+                  small: [(512, 3840, 3840)],
+                  integers: [(1024, 2048, 4096), (1024, 3840, 3840), (2048, 3840, 3840), (1024, 8192, 1536)], chains: [(2048, 3840, 3840)], sharing: [(1024, 3840, 3840)], attention: [1024],
                   stairRows: [768, 1024, 1792, 2048]),
         ]
         package static let full = tiers[0]
@@ -85,7 +97,7 @@ extension Diagnostic.CapacityProbes {
 
         /// Every product the tier runs through the engines (the witness's included): what the operands and the engines' surfaces are sized to.
         package var products: [Shape] {
-            solo + product + chains + sharing + stairRows.map { (m: $0, k: Self.stair.k, n: Self.stair.n) } + [Self.witness]
+            solo + product + integers + small + chains + sharing + stairRows.map { (m: $0, k: Self.stair.k, n: Self.stair.n) } + [Self.witness]
         }
 
         /// A lower tier's operands are inside the allocated ones: every dimension of `a`, `b`, `c` is no larger.
@@ -134,7 +146,8 @@ extension Diagnostic.CapacityProbes {
             let productTime = product.reduce(0) { sum, s in
                 sum + Self.runs * flop(s) / g + (x.map { chain(flop(s), rate: $0) } ?? 0) + (a.map { chain(flop(s), rate: $0) } ?? 0) + 0.1
             }
-            p["solos fp32"] = productTime + Self.runs * soloFlop / (g * Self.formRatio["bf16"]!) + truth(product + solo, kinds: a == nil ? 1 : 2)
+            let smallTime = a.map { rate in small.reduce(0) { $0 + chain(flop($1), rate: rate) + 0.1 } + truth(small) } ?? 0
+            p["solos fp32"] = productTime + smallTime + Self.runs * soloFlop / (g * Self.formRatio["bf16"]!) + truth(product + solo, kinds: a == nil ? 1 : 2)
             let stairFlop = stairRows.reduce(0) { $0 + 2 * Double($1) * Double(Self.stair.k) * Double(Self.stair.n) }
             p["stairs"] = a.map { Self.runs * stairFlop / $0 + Double(stairRows.count) * (0.03 + truth([(1, Self.stair.k, Self.stair.n)])) } ?? 0
             let (h, d) = (Double(Self.attentionHeads), Double(Self.attentionHeadDim))
@@ -147,8 +160,15 @@ extension Diagnostic.CapacityProbes {
             let sets = (x != nil ? 1 : 0) + (a != nil ? 1 : 0) + ((x != nil && a != nil) ? 2 : 0)
             let passes = [chains.first].compactMap { $0 } + [chains.first].compactMap { $0 } + (chains.count > 1 ? [chains[1]] : [])
             p["sharing"] = Double(sets) * passes.reduce(0) { $0 + chain(flop($1), rate: setRate) + 0.15 } + truth(chains, kinds: 2)
+            // The ANE's integers run as chains on the products' shapes (the host's passes are told apart by the thin one), the GPU's 8-bit kernels as steady figures.
+            let integersAlone = a.map { rate in (integers + small).reduce(0) { $0 + chain(flop($1), rate: rate) + 0.1 } + truth(integers + small) } ?? 0
             p["solos 8-bit and rounded"] = Self.runs * soloFlop * (1 / (g * Self.formRatio["bf16act"]!) + 1 / (g * Self.formRatio["int8"]!)
-                                                                       + 1 / (g * Self.formRatio["q8"]!)) + truth(solo, kinds: 3)
+                                                                       + 1 / (g * Self.formRatio["q8"]!)) + truth(solo, kinds: 3) + integersAlone
+            // The pair of integer kernels: the chain passes of the fp32 sets' (two on the short shape, one on the long), at the pair's rate.
+            if let a {
+                let pairRate = 0.8 * (g * Self.formRatio["int8"]! + a)
+                p["sharing int8"] = passes.reduce(0) { $0 + chain(flop($1), rate: pairRate) + 0.15 } + truth(chains)
+            }
             return p
         }
 

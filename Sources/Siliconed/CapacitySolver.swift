@@ -435,7 +435,14 @@ private struct ProductSolver {
             if a.amxColumns > 0 {
                 guard let x = line(.amx, form) else { return nil }
                 rows = [g: n - a.amxColumns, x: a.amxColumns]; swapped = true
-            } else { rows[g] = a.gpu }
+            } else {
+                // The ANE's last rows beside the GPU's, both reading the integers: the same kernels `native` times its own candidates by.
+                if a.gpu > 0 { rows[g] = a.gpu }
+                if a.ane > 0 {
+                    guard key.weight == .int8, let e = line(.ane, .int8) else { return nil }
+                    rows[e] = a.ane
+                }
+            }
         }
         guard !rows.isEmpty, let t = seconds(rows, m: m, k: k, n: n, swapped: swapped) else { return nil }
         let prep = preparation(format: key.weight, path: a.path, k: k, n: n)
