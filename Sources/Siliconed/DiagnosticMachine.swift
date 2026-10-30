@@ -18,7 +18,8 @@ extension Diagnostic {
                        gpuCores: gpuCoreCount(), memoryBytes: sysctlInteger("hw.memsize") ?? 0,
                        macOS: macOSLabel(), version: binaryVersion(), build: buildStamp(),
                        gpu: device?.name ?? "none", gpuFamily: device.map(appleFamily) ?? "",
-                       gpuWorkingSetBytes: Int(device?.recommendedMaxWorkingSetSize ?? 0))
+                       gpuWorkingSetBytes: Int(device?.recommendedMaxWorkingSetSize ?? 0),
+                       inventory: Inventory.read())
     }
 
     /// "26.0.1 (25A…)": the version and, when the kernel says it, the build.
@@ -132,7 +133,7 @@ extension Diagnostic {
         return (type as String) == kIOPSBatteryPowerValue
     }
 
-    private static func sysctlString(_ name: String) -> String {
+    package static func sysctlString(_ name: String) -> String {
         var size = 0
         guard sysctlbyname(name, nil, &size, nil, 0) == 0, size > 0 else { return "unknown" }
         var buffer = [CChar](repeating: 0, count: size)
@@ -141,7 +142,7 @@ extension Diagnostic {
     }
 
     /// `nil` when the kernel does not know the name.
-    private static func sysctlInteger(_ name: String) -> Int? {
+    package static func sysctlInteger(_ name: String) -> Int? {
         var value: Int64 = 0
         var size = MemoryLayout<Int64>.size
         guard sysctlbyname(name, &value, &size, nil, 0) == 0 else { return nil }
