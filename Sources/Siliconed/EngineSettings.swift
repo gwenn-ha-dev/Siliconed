@@ -157,6 +157,11 @@ package struct EngineSettings: Sendable {
     /// The shapes where the AMX also takes part of the GPU's side beside the ANE (`ane_amx`, ρ 1 or 0 per point),
     /// set by the map where the three engines at once beat both pairs (`NeuralEngine.besideAMX`).
     package var aneAMX = Conductor.Shares.none
+    /// **The ANE reads a published int8 weight as it is** (`ane_int8`, `NeuralEngine`'s `dequantize` program): with
+    /// `gemm_int8`, the product of an int8 weight is cut between the GPU's int8 kernel and the ANE, which takes the
+    /// integers from the reserve instead of an fp16 copy of the widened weight. Off by default, as every compute branch;
+    /// the map turns it on where the pair measures faster and the ANE's rows hold the half-precision threshold.
+    package var aneInt8 = false
 
     /// **The route table these settings make** (`RouteTable`): what the engine consults, product by product and
     /// attention by attention, instead of the switches above. Derived once, after the last override (map,
@@ -439,6 +444,7 @@ package struct EngineSettings: Sendable {
         read("SILICONED_ANE_MIN", "ane_min")
         read("SILICONED_ANE_SHARES", "ane_shares")
         read("SILICONED_ANE_AMX", "ane_amx")
+        read("SILICONED_ANE_INT8", "ane_int8")
         read("SILICONED_SPECTRAL", "spectral")
         read("SILICONED_VAE_BLOCK", "vae_bloc_requetes")
         read("SILICONED_VAE_TILE", "vae_tuile")
@@ -586,6 +592,7 @@ package struct EngineSettings: Sendable {
             if let shares = Conductor.Shares(text: "\(raw)") { aneAMX = shares; provenance["ane_amx"] = source }
             else { warnings.append("⚠ « ane_amx » unreadable (\(raw)): the GPU alone beside the ANE.") }
         }
+        flag("ane_int8", &aneInt8)
         integer("spectral", &spectral)
         integer("vae_bloc_requetes", &vaeRequestBlock)
         integer("vae_tuile", &vaeTile)
@@ -641,6 +648,7 @@ package struct EngineSettings: Sendable {
             ("ane_fraction", String(format: "%.3f", aneFraction)), ("ane_min", "\(aneMinimumRows)"),
             ("ane_shares", aneShares.isEmpty ? "none" : "\(aneShares.points.count) points"),
             ("ane_amx", aneAMX.isEmpty ? "none" : "\(aneAMX.points.filter { $0.ratio > 0 }.count) of \(aneAMX.points.count) points"),
+            ("ane_int8", "\(aneInt8)"),
             ("spectral", "\(spectral)"),
             ("vae_bloc_requetes", "\(vaeRequestBlock)"),
             ("vae_tuile", vaeTile == 0 ? "no" : "\(vaeTile) (overlap \(vaeOverlap))"),
@@ -661,7 +669,7 @@ package struct EngineSettings: Sendable {
             "gemm_tensor": gemmTensor, "gemm_int8": gemmInt8, "gemm_q8": gemmQ8,
             "gemm_bf16_act": gemmBF16Activations, "bf16_act_min": bf16ActivationMinimumRows,
             "bf16_act_8bit": bf16ActivationEightBit,
-            "gemm_ane": gemmANE, "ane_fraction": aneFraction, "ane_min": aneMinimumRows, "ane_shares": aneShares.description, "ane_amx": aneAMX.description,
+            "gemm_ane": gemmANE, "ane_fraction": aneFraction, "ane_min": aneMinimumRows, "ane_shares": aneShares.description, "ane_amx": aneAMX.description, "ane_int8": aneInt8,
             "spectral": spectral, "vae_bloc_requetes": vaeRequestBlock,
             "parallel": parallel, "map_tail": mapTail,
         ]

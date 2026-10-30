@@ -65,17 +65,19 @@ extension Diagnostic {
     /// first. The ANE takes at most `m − 256` rows (a program of all `m` is the GPU's whole product, refused by
     /// `NeuralEngine.rows`), so each height is asked at the share that gives it exactly those: the heights are
     /// summed apart, the per-column state they share (a few MB) counted once each — over, never under.
-    static func engineBytes(_ points: [GridPoint]) -> Int {
+    static func engineBytes(_ points: [GridPoint], int8: Bool = false) -> Int {
         Dictionary(grouping: points, by: \.m).map { m, group in
             let rows = (m - 1) / NeuralEngine.rowUnit * NeuralEngine.rowUnit
-            return NeuralEngine.bytes(products: group.map { ($0.m, $0.k, $0.n) }, gpuShare: 1 - Double(rows) / Double(m))
+            return NeuralEngine.bytes(products: group.map { ($0.m, $0.k, $0.n) }, gpuShare: 1 - Double(rows) / Double(m), int8: int8)
         }.reduce(0, +)
     }
 
     /// **The Core ML programs an engine over these points loads**: one per part of K (`NeuralEngine.parts`), at
     /// the rows it can take. Each is the framework's own memory, beyond its three surfaces.
-    static func programCount(_ points: [GridPoint]) -> Int {
-        Set(points.map { [$0.m, $0.k, $0.n] }).reduce(0) { $0 + NeuralEngine.parts(k: $1[1], n: $1[2]) }
+    static func programCount(_ points: [GridPoint], int8: Bool = false) -> Int {
+        Set(points.map { [$0.m, $0.k, $0.n] }).reduce(0) {
+            $0 + NeuralEngine.parts(k: $1[1], n: $1[2]) + (int8 ? NeuralEngine.parts(k: $1[1], n: $1[2], int8: true, alignment: Widen.largestRotationGroup) : 0)
+        }
     }
 
     /// **What a loaded program holds beyond its surfaces** (Core ML 27, M1 Pro, 28/10/2026): the 22 programs of the

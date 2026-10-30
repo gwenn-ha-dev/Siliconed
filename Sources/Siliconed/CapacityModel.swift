@@ -45,7 +45,9 @@ package struct CapacityModel: Codable, Sendable, Equatable {
     /// What a kernel reads (a product's weight as it reaches the engine) or which kernel it is (an attention's).
     package enum Form: String, Codable, Sendable, CaseIterable {
         /// Products: the weight widened to fp32; the bf16 weight as published, its activation in fp32 or rounded to
-        /// bf16; the 8-bit weight as published; fp16 (the ANE's programs, from the widened weight).
+        /// bf16; the 8-bit weight as published (`gpu/int8`; `ane/int8`: the ANE's program that takes the integers as its
+        /// input, scale per column or for the tensor, the rotation on the activation); fp16 (the ANE's programs, from the
+        /// widened weight).
         case fp32, bf16, bf16act, int8, q8, fp16
         /// Attentions: the MPSGraph graph, the flash kernel, a share of the heads on the CPU.
         case graph, flash, heads
@@ -95,7 +97,8 @@ package struct CapacityModel: Codable, Sendable, Equatable {
     package var crest: [Engine: Double] = [:]
     package var lines: [Kernel: Line] = [:]
     package var aneRowUnit = 256
-    /// Keyed by the set's engines in order, joined by `+` (`gpu+ane`): a dictionary keyed by a set does not survive JSON.
+    /// Keyed by the set's engines in order, joined by `+` (`gpu+ane`), or by its kernels (`gpu/int8+ane/int8`) where the form
+    /// changes the loss: a dictionary keyed by a set does not survive JSON.
     package var sharing: [String: Sharing] = [:]
     package var heat: [Engine: Double] = [:]
     package var memoryBandwidth: Double?
@@ -109,8 +112,14 @@ package struct CapacityModel: Codable, Sendable, Equatable {
     package init() {}
 
     package static func key(_ engines: [Engine]) -> String { engines.sorted().map(\.rawValue).joined(separator: "+") }
+    /// **The key of a set of kernels** (`gpu/int8+ane/int8`): a set whose kernels read another form than the pair's usual
+    /// (`gpu/fp32`, `ane/fp16`) keeps its own sharing, measured on its own trials — the ANE reading the integers costs the GPU
+    /// beside it what the fp16 program does not, and the other way round.
+    package static func key(_ kernels: [Kernel]) -> String { kernels.sorted { $0.engine < $1.engine }.map(\.description).joined(separator: "+") }
+    /// The set's own sharing when the probes measured one (`key(kernels)`), else its engines' (`key(engines)`).
     package func sharing(_ kernels: [Kernel]) -> Sharing {
-        kernels.count < 2 ? Sharing() : sharing[Self.key(kernels.map(\.engine))] ?? Sharing()
+        kernels.count < 2 ? Sharing()
+            : sharing[Self.key(kernels)] ?? sharing[Self.key(kernels.map(\.engine))] ?? Sharing()
     }
 
     /// The rate a kernel keeps in a set, sustained (`heat`) when asked.

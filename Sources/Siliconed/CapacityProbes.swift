@@ -19,7 +19,8 @@ import MetalPerformanceShadersGraph
 ///      ├─ stairs                   the ANE alone at 8 row counts, one k × n                                          → aneRowUnit
 ///      ├─ attention                graph, flash, the CPU's heads, alone at two sequences                            → lines
 ///      ├─ sharing                  per set: each side alone at its rows, then the set (a balanced pass at three sizes) → keep, overhead
-///      ├─ 8-bit and rounded kernels (they stage their weight in the reserve: after every fp32 route)
+///      ├─ 8-bit and rounded kernels (they stage their weight in the reserve: after every fp32 route), `ane/int8` among them
+///      ├─ sharing int8             the GPU's int8 kernel beside the ANE's, both reading the integers staged in the reserve
 ///      └─ witnesses, end
 ///
 /// What sets it apart — what a probe written by analogy with the old map's route timings would get wrong:
@@ -39,6 +40,11 @@ import MetalPerformanceShadersGraph
 ///   - **the ANE's engine holds its surfaces until it is released**: one engine for the solos, the stairs and the pair, one
 ///     for the three, both counted in the memory plan; a program is compiled at its first call (a new row count is a new
 ///     program), which a warm-up pays — the compile seconds are reported apart.
+///   - **`ane/int8` is the whole route a render takes** (`WeightProducts.int8Product(…ane:)`): the integers copied into the
+///     program's surface, their column sums, the rotation of the activation (convrot, group 256) on the CPU, the scale in the
+///     host's fp32 pass — judged against the fp64 `(A·R)·q·s`, at the bar of the fp16 route (1.25 × bf16's own error on the
+///     same product). Its partner in a set is `gpu/int8`, which reads the same reserve; the pair keeps its own sharing
+///     (`gpu/int8+ane/int8`), not the fp32 pair's;
 ///   - **the CPU's heads cannot run without the GPU's**: the split keeps one head on the GPU (`partition`), so the CPU line is
 ///     measured with 23 heads of 24 on the CPU and one beside them.
 extension Diagnostic {
@@ -185,7 +191,7 @@ extension Diagnostic {
                 return r * p.k * 12 + (1 << 25) + r * p.n * 8 * 5 + r * p.n * 4
             }.max() ?? 0
             let points = shapes.map { GridPoint(m: $0.m, k: $0.k, n: $0.n) }
-            let ane = engineBytes(points) + programCount(points) * programBytes
+            let ane = engineBytes(points, int8: true) + programCount(points, int8: true) * programBytes
             let (h, d) = (attentionHeads, attentionHeadDim)
             let attention = attentionSequences.map { s -> Int in
                 let split = HeadSplitAttention.hostBytes(heads: h, sequence: s, headDim: d, cpuFraction: Double(h - 1) / Double(h))
@@ -202,7 +208,7 @@ extension Diagnostic {
 
         // MARK: - The context
 
-        private enum Truth: Hashable { case fp32, rounded, int8, q8 }
+        private enum Truth: Hashable { case fp32, rounded, int8, roundedInt8, q8 }
         private struct TruthKey: Hashable { let truth: Truth; let m, k, n: Int }
 
         private struct Buffers { let a, b, c: MTLBuffer }
@@ -308,6 +314,13 @@ extension Diagnostic {
                 case .int8:
                     result = Diagnostic.exactRows(rows, a: a, q: operands.q.base.assumingMemoryBound(to: Int8.self), scale: Double(Diagnostic.int8Scale),
                                                   group: Diagnostic.int8Group, k: k, n: n)
+                case .roundedInt8:
+                    var rounded = [Float](repeating: 0, count: rows.count * k)
+                    for (i, row) in rows.enumerated() { for j in 0..<k { rounded[i * k + j] = Half.bf16.round(a[row * k + j]) } }
+                    result = rounded.withUnsafeBufferPointer {
+                        Diagnostic.exactRows(Array(0..<rows.count), a: $0.baseAddress!, q: operands.q.base.assumingMemoryBound(to: Int8.self),
+                                             scale: Double(Diagnostic.int8Scale), group: Diagnostic.int8Group, k: k, n: n)
+                    }
                 case .q8:
                     result = Diagnostic.exactRows(rows, a: a, q: operands.q.base.assumingMemoryBound(to: Int8.self),
                                                   blockScales: operands.q8Scales.floats(), block: Diagnostic.q8Block, k: k, n: n)
@@ -316,20 +329,29 @@ extension Diagnostic {
                 return result
             }
 
-            /// bf16's own rounding of this product: the floor no fp16 path can pass under (invariant 3).
-            private func aneThreshold(m: Int, k: Int, n: Int) -> Double {
-                if let f = floors[[m, k, n]] { return max(Diagnostic.fp32Threshold, Diagnostic.floorMargin * f) }
+            /// bf16's own rounding of this product: the floor no fp16 path can pass under (invariant 3). `truthKind`: the exact
+            /// product it is the floor of — the widened weight's (`fp32`) or the integers' with their rotation (`int8`).
+            private func aneThreshold(_ truthKind: Truth, m: Int, k: Int, n: Int) -> Double {
+                let ints = truthKind == .int8
+                if let f = floors[[m, k, n, ints ? 1 : 0]] { return max(Diagnostic.fp32Threshold, Diagnostic.floorMargin * f) }
                 let rows = Diagnostic.sampleRows(m, count: Diagnostic.sampledRows)
-                let witness = truth(.rounded, m: m, k: k, n: n).map { Double(Half.bf16.round(Float($0))) }
-                let floor = Diagnostic.judge(witness.map(Float.init), truth(.fp32, m: m, k: k, n: n), columns: rows.count, rate: 0, threshold: 1).error
-                floors[[m, k, n]] = floor
+                let witness = truth(ints ? .roundedInt8 : .rounded, m: m, k: k, n: n).map { Double(Half.bf16.round(Float($0))) }
+                let floor = Diagnostic.judge(witness.map(Float.init), truth(truthKind, m: m, k: k, n: n), columns: rows.count, rate: 0, threshold: 1).error
+                floors[[m, k, n, ints ? 1 : 0]] = floor
                 return max(Diagnostic.fp32Threshold, Diagnostic.floorMargin * floor)
+            }
+
+            /// The truth of a product and, for the ANE, bf16's floor under it — both computed before a weight is staged in `b`: a truth
+            /// not yet kept restores `b` from its bf16 copy, and would take the staged integers away.
+            func prime(_ kind: Truth, ane: Bool, m: Int, k: Int, n: Int) {
+                _ = truth(kind, m: m, k: k, n: n)
+                if ane { _ = aneThreshold(kind == .int8 ? .int8 : .fp32, m: m, k: k, n: n) }
             }
 
             /// Runs `body` once with the sampled rows poisoned, and judges them: the route's error, `nil` when it refused.
             func judged(_ truthKind: Truth, ane: Bool, m: Int, k: Int, n: Int, _ body: () -> Bool) -> (pass: Bool, error: Double)? {
                 let exact = truth(truthKind, m: m, k: k, n: n)
-                let threshold = ane ? aneThreshold(m: m, k: k, n: n) : Diagnostic.fp32Threshold
+                let threshold = ane ? aneThreshold(truthKind == .int8 ? .int8 : .fp32, m: m, k: k, n: n) : Diagnostic.fp32Threshold
                 let rows = Diagnostic.sampleRows(m, count: Diagnostic.sampledRows)
                 let out = operands.c.floats()
                 Diagnostic.poison(out, rows: rows, n: n)
@@ -357,6 +379,31 @@ extension Diagnostic {
                 return ok && engine.fallbacks == before
             }
 
+            /// The int8 operands as a render stages them (`WeightProducts.int8Plan`: the integers at the reserve's head, the scale
+            /// after, the rotation of group 256), no AMX columns; `nil` where the plan does not fit or K is not a whole number of groups.
+            func int8Plan(_ k: Int, _ n: Int) -> WeightProducts.Int8Plan? {
+                guard (k * n) % 2 == 0, k % Diagnostic.int8Group == 0 else { return nil }
+                return WeightProducts.int8Plan(k: k, n: n, capacity: k * n, perColumn: false, group: Diagnostic.int8Group, amxColumns: 0)
+            }
+
+            /// The integers and their scale into the reserve (`b`), which the bf16 copy restores.
+            func stageInt8(_ plan: WeightProducts.Int8Plan, k: Int, n: Int) {
+                Widen.copyBfloat16(source: operands.q.base, destination: operands.b.base, count: k * n / 2)
+                (operands.b.base + plan.scalesOffset).storeBytes(of: Diagnostic.int8Scale, as: Float.self)
+                dirty = max(dirty, k * n)
+            }
+
+            /// The ANE over `rows` rows of an int8 product staged in `b`: `first: 0`, no GPU beside it, as `ane` for the fp16 program.
+            func aneInt8(_ engine: NeuralEngine, _ plan: WeightProducts.Int8Plan, rows: Int, _ k: Int, _ n: Int) -> Bool {
+                let raw = operands.b.base
+                let weight = NeuralEngine.Int8Weight(values: raw.assumingMemoryBound(to: Int8.self),
+                                                     scales: (raw + plan.scalesOffset).assumingMemoryBound(to: Float.self),
+                                                     perColumn: plan.perColumn, group: plan.group)
+                let before = engine.fallbacks
+                let ok = engine.product(a: operands.a.floats(), int8: weight, c: operands.c.floats(), first: 0, rows: rows, k: k, n: n)
+                return ok && engine.fallbacks == before
+            }
+
             // MARK: Probes
 
             func probes(_ m: inout Fit.Measurements, _ d: inout Details) throws {
@@ -373,7 +420,8 @@ extension Diagnostic {
                 stage("stairs") { stairs(&m) }
                 try stage("attention") { try attention(&m) }
                 stage("sharing") { sharing(&m) }
-                stage("solos 8-bit and rounded") { solos([.gpu_bf16act, .gpu_int8, .gpu_q8], &m) }
+                stage("solos 8-bit and rounded") { solos([.gpu_bf16act, .gpu_int8, .gpu_q8, .ane_int8], &m) }
+                stage("sharing int8") { sharingInt8(&m) }
                 stage("witnesses end") {
                     restoreB()
                     let end = witnesses()
@@ -437,12 +485,13 @@ extension Diagnostic {
 
             // MARK: Solos
 
-            enum Probe: String { case gpu_fp32, amx_fp32, ane_fp16, gpu_bf16, gpu_bf16act, gpu_int8, gpu_q8
+            enum Probe: String { case gpu_fp32, amx_fp32, ane_fp16, ane_int8, gpu_bf16, gpu_bf16act, gpu_int8, gpu_q8
                 var kernel: Kernel {
                     switch self {
                     case .gpu_fp32: return Kernel(.gpu, .fp32)
                     case .amx_fp32: return Kernel(.amx, .fp32)
                     case .ane_fp16: return Kernel(.ane, .fp16)
+                    case .ane_int8: return Kernel(.ane, .int8)
                     case .gpu_bf16: return Kernel(.gpu, .bf16)
                     case .gpu_bf16act: return Kernel(.gpu, .bf16act)
                     case .gpu_int8: return Kernel(.gpu, .int8)
@@ -455,7 +504,11 @@ extension Diagnostic {
                 for probe in probes {
                     for (rows, k, n) in soloShapes.map({ ($0.m, $0.k, $0.n) }) {
                         guard let s = solo(probe, m: rows, k: k, n: n) else { continue }
-                        if s.error != nil, s.seconds == 0 { m.wrong.append(probe.kernel.description); continue }
+                        if s.error != nil, s.seconds == 0 {
+                            m.wrong.append(probe.kernel.description)
+                            log?(String(format: "  %@ %dx%dx%d  WRONG, error %.3e", probe.kernel.description, rows, k, n, s.error ?? 0))
+                            continue
+                        }
                         m.solos.append(s)
                         log?(String(format: "  %@ %dx%dx%d  %.2f ms  %.2f TFLOP/s  err %.2e", probe.kernel.description, rows, k, n,
                                     s.seconds * 1e3, s.flop / s.seconds * 1e-12, s.error ?? 0))
@@ -480,6 +533,11 @@ extension Diagnostic {
                     guard let e = neural.neuralEngine else { return nil }
                     restoreB(); isANE = true
                     run = { self.ane(e, rows: m, k, n) }
+                case .ane_int8:
+                    guard let e = neural.neuralEngine, let plan = int8Plan(k, n) else { return nil }
+                    truthKind = .int8; isANE = true
+                    staged = { [self] in stageInt8(plan, k: k, n: n) }
+                    run = { self.aneInt8(e, plan, rows: m, k, n) }
                 case .gpu_bf16:
                     guard alone.tensor != nil, alone.tensorBF16 else { return nil }
                     restoreB()
@@ -514,7 +572,7 @@ extension Diagnostic {
                     run = { WeightProducts.int8Product(gemm: self.both, plan: plan, reserve: self.bothB.b, a: self.bothB.a, c: self.bothB.c, m: m, k: k, n: n).status == 0 }
                 }
                 // The truth first (it restores B for the fp32 ones), then the staged weight.
-                _ = truth(truthKind, m: m, k: k, n: n)
+                prime(truthKind, ane: isANE, m: m, k: k, n: n)
                 staged?()
                 guard let verdict = judged(truthKind, ane: isANE, m: m, k: k, n: n, run) else { return nil }
                 guard verdict.pass else { return .init(kernel: name, shape: [m, k, n], flop: flop, seconds: 0, error: verdict.error) }
@@ -653,7 +711,110 @@ extension Diagnostic {
                         log?(String(format: "  validate %@ %dx%dx%d  model %.2f ms  measured %.2f ms  %+.1f %%", key, m, k, n, p * 1e3, t.wall * 1e3, checks.last!.error * 100))
                     }
                 }
+                // The integers' route, on the same products: the ANE alone, then the GPU's int8 kernel beside it.
+                let g8 = Kernel(.gpu, .int8), a8 = Kernel(.ane, .int8)
+                if let e = neural.neuralEngine, let line = model.lines[a8] {
+                    for (m, k, n) in validationShapes.map({ ($0.m, $0.k, $0.n) }) {
+                        guard let plan = int8Plan(k, n) else { continue }
+                        restoreB(); stageInt8(plan, k: k, n: n)
+                        guard let t = long({ self.aneInt8(e, plan, rows: m, k, n) }) else { continue }
+                        let flop = 2.0 * Double(m) * Double(k) * Double(n)
+                        checks.append(Check(what: a8.description, shape: [m, k, n], rows: [a8.description: m], predicted: line.seconds(flop), measured: t))
+                        log?(String(format: "  validate %@ %dx%dx%d  model %.2f ms  long %.2f ms  %+.1f %%", a8.description, m, k, n,
+                                    line.seconds(flop) * 1e3, t * 1e3, checks.last!.error * 100))
+                    }
+                    let key = CapacityModel.key([g8, a8])
+                    for (m, k, n) in validationShapes.map({ ($0.m, $0.k, $0.n) }) where model.sharing[key] != nil {
+                        guard let t = trialInt8(key: key, shape: (m, k, n), model: model, pass: 3), !t.sides.isEmpty else { continue }
+                        var rows: [Kernel: Int] = [:]
+                        for s in t.sides { if let kernel = Kernel(s.kernel) { rows[kernel] = s.rows } }
+                        guard let p = model.seconds(m: m, k: k, n: n, rows: rows) else { continue }
+                        checks.append(Check(what: key, shape: [m, k, n], rows: Dictionary(uniqueKeysWithValues: t.sides.map { ($0.kernel, $0.rows) }),
+                                            predicted: p, measured: t.wall))
+                        log?(String(format: "  validate %@ %dx%dx%d  model %.2f ms  measured %.2f ms  %+.1f %%", key, m, k, n, p * 1e3, t.wall * 1e3, checks.last!.error * 100))
+                    }
+                    restoreB()
+                }
                 return checks
+            }
+
+            // MARK: Sharing of the integers
+
+            /// **The GPU's int8 kernel beside the ANE's**, both reading the integers staged in the reserve — the pair a render of a
+            /// Compact makes under `ane_int8` — in the same two passes as the fp32 sets: the first at the middle size on the solo lines,
+            /// the second at the three sizes on the keep it measured.
+            func sharingInt8(_ measurements: inout Fit.Measurements) {
+                restoreB()
+                var model = Fit.model(from: measurements, allocationUnit: NeuralEngine.rowUnit)
+                let g = Kernel(.gpu, .int8), a = Kernel(.ane, .int8)
+                guard model.lines[g] != nil, model.lines[a] != nil, both.tensorInt8, neural.neuralEngine != nil else { return }
+                let key = CapacityModel.key([g, a])
+                var first = true
+                for pass in [1, 2] {
+                    for shape in (pass == 1 ? [sharingShapes[1]] : sharingShapes) {
+                        if let t = trialInt8(key: key, shape: shape, model: model, pass: pass) {
+                            measurements.trials.append(t)
+                            log?(String(format: "  %@ pass %d  %dx%dx%d  wall %.2f ms  sides %@", key, pass, shape.m, shape.k, shape.n, t.wall * 1e3,
+                                        t.sides.map { String(format: "%@ %d rows solo %.1f within %.1f", $0.kernel, $0.rows, $0.solo * 1e3, ($0.within ?? 0) * 1e3) }.joined(separator: " | ")))
+                        }
+                    }
+                    if first, let fit = Fit.sharing(set: key, trials: measurements.trials, lines: model.lines, using: [1]) {
+                        model.sharing[key] = fit.sharing
+                        first = false
+                    }
+                }
+            }
+
+            private func trialInt8(key: String, shape: (m: Int, k: Int, n: Int), model: CapacityModel, pass: Int) -> Fit.Measurements.Trial? {
+                let (m, k, n) = shape
+                let g = Kernel(.gpu, .int8), a = Kernel(.ane, .int8)
+                guard let plan = int8Plan(k, n), let engine = neural.neuralEngine,
+                      let split = model.split(m: m, k: k, n: n, kernels: [g, a]), let aneRows = split.rows[a], let gpuRows = split.rows[g],
+                      aneRows > 0, gpuRows > 0 else { log?("  \(key) \(m)x\(k)x\(n) pass \(pass): the model gives a side no row"); return nil }
+                engine.shares = .none
+                engine.gpuShare = 1 - Double(aneRows) / Double(m)
+                guard engine.rows(m, k: k, n: n) == aneRows, engine.accepts(rows: aneRows, k: k, n: n, int8Group: plan.group) else {
+                    log?("  \(key) \(m)x\(k)x\(n) pass \(pass): rows \(aneRows) not accepted by the engine"); return nil
+                }
+                prime(.int8, ane: true, m: m, k: k, n: n)
+                stageInt8(plan, k: k, n: n)
+                let buffers = bothB
+                func once() -> (wall: Double, within: [String: Double])? {
+                    var result: (gpu: Double, computed: Bool, gpuWall: Double, aneWall: Double)?
+                    guard let wall = CapacityProbes.timed({
+                        result = WeightProducts.int8Product(gemm: both, plan: plan, reserve: buffers.b, a: buffers.a, c: buffers.c,
+                                                            m: m, k: k, n: n, ane: engine, aneRows: aneRows)
+                        return result?.computed == true
+                    }), let r = result else { return nil }
+                    return (wall, [a.description: r.aneWall, g.description: r.gpuWall])
+                }
+                guard let verdict = judged(.int8, ane: true, m: m, k: k, n: n, { once() != nil }) else {
+                    log?("  \(key) \(m)x\(k)x\(n) pass \(pass): the set refused (fallback)"); return nil
+                }
+                guard verdict.pass else { log?("  \(key) \(m)x\(k)x\(n) pass \(pass): WRONG, error \(verdict.error)"); return .init(set: key, shape: [m, k, n], pass: pass, sides: [], wall: 0, error: verdict.error) }
+                var samples: [(wall: Double, within: [String: Double])] = []
+                var previous = Double.infinity
+                for i in 0..<6 {
+                    guard let s = once() else { return nil }
+                    if i >= 1, s.wall >= previous * 0.9 {
+                        samples.append(s)
+                        for _ in 0..<(s.wall < 0.15 ? 2 : 1) { if let t = once() { samples.append(t) } }
+                        break
+                    }
+                    previous = s.wall
+                }
+                guard !samples.isEmpty else { return nil }
+                let wall = Fit.median(samples.map(\.wall))
+                var sides: [Fit.Measurements.Side] = []
+                for (kernel, rows) in [(g, gpuRows), (a, aneRows)] {
+                    let solo: Double?
+                    if kernel == a { solo = CapacityProbes.steady { self.aneInt8(engine, plan, rows: rows, k, n) } }
+                    else { solo = CapacityProbes.steady { WeightProducts.int8Product(gemm: self.both, plan: plan, reserve: buffers.b, a: buffers.a, c: buffers.c, m: rows, k: k, n: n).status == 0 } }
+                    guard let solo else { return nil }
+                    let within = samples.compactMap { $0.within[kernel.description] }
+                    sides.append(.init(kernel: kernel.description, rows: rows, solo: solo, within: within.isEmpty ? nil : Fit.median(within)))
+                }
+                return .init(set: key, shape: [m, k, n], pass: pass, sides: sides, wall: wall, error: verdict.error)
             }
 
             // MARK: Sharing

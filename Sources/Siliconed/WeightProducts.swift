@@ -55,6 +55,8 @@ package final class WeightProducts {
     private let mergesLoRA: Bool
     /// The operand of a product is rounded to bf16 where the settings and the machine allow it (`gemm_bf16_act`).
     private let roundsActivations: Bool
+    /// The last int8 product had rows on the ANE, and it computed them (`classification`).
+    private var aneTook = false
 
     /// Per phase, accumulated since the last `resetTimings`.
     package private(set) var timings: [String: Double] = [:]
@@ -115,10 +117,20 @@ package final class WeightProducts {
                 timings["gemm GPU", default: 0] += gemm.linear(a: a, bf16: w, c: c, m: m, k: k, n: n,
                                                               weightIsTransposed: transposed)
             case .int8(let plan):
-                let r = Self.int8Product(gemm: gemm, plan: plan, reserve: w, a: a, c: c, m: m, k: k, n: n)
-                timings["gemm GPU", default: 0] += r.gpu
-                timings["widening", default: 0] += r.widening
-                if r.status != 0 { failure = "\(name): the AMX refused its columns (BNNS \(r.status))" }
+                // The ANE beside the GPU on the integers (`ane_int8`): the last rows of the product, read from the reserve.
+                let aneRows = plan.block == nil && plan.amxColumns == 0 && plan.roundedOffset == 0
+                    ? aneInt8Rows(group: plan.group, m: m, k: k, n: n) : 0
+                if aneRows > 0, let ane = gemm.neuralEngine {
+                    let r = Self.int8Product(gemm: gemm, plan: plan, reserve: w, a: a, c: c, m: m, k: k, n: n, ane: ane, aneRows: aneRows)
+                    timings["gemm GPU", default: 0] += r.gpu
+                    aneTook = r.computed
+                } else {
+                    aneTook = false
+                    let r = Self.int8Product(gemm: gemm, plan: plan, reserve: w, a: a, c: c, m: m, k: k, n: n)
+                    timings["gemm GPU", default: 0] += r.gpu
+                    timings["widening", default: 0] += r.widening
+                    if r.status != 0 { failure = "\(name): the AMX refused its columns (BNNS \(r.status))" }
+                }
             case .widened:
                 timings["gemm GPU", default: 0] += gemm.linear(a: a, b: w, c: c, m: m, k: k, n: n,
                                                               weightIsTransposed: transposed, kind: kind(of: name))
@@ -149,6 +161,7 @@ package final class WeightProducts {
         case .bf16(let rounding): return (.bf16, rounding == nil ? "gpu/bf16" : "gpu/bf16act")
         case .int8(let plan):
             let kind: RouteTable.WeightKind = plan.block == nil ? .int8 : .q8
+            if aneTook { return (kind, "gpu+ane/" + kind.rawValue) }
             return (kind, (plan.amxColumns > 0 && gemm.conductor != nil ? "gpu+amx/" : "gpu/") + kind.rawValue)
         case .widened:
             return (kind(of: name), gemm.lastEngines.rawValue)
@@ -267,6 +280,48 @@ package final class WeightProducts {
         return (Attention.verdict(commands, what: "matmul2d float × int8 \(m)×\(k)×\(n)"), widening, status)
     }
 
+    /// **The ANE's rows of an int8 product read as published** (`ane_int8`), the last ones, or 0: the process brought the ANE up, the
+    /// setting is on, the class is not forced off it, and the engine takes the rows (`NeuralEngine.rows`, the grid and share of the
+    /// settings) with a program that accepts the weight's rotation `group`. The caller checked the weight is the program's kind:
+    /// scales per column or for the tensor (never Q8_0's blocks), no activation rounded, no AMX columns.
+    private func aneInt8Rows(group: Int?, m: Int, k: Int, n: Int) -> Int {
+        guard EngineSettings.effective.aneInt8, let ane = gemm.neuralEngine else { return 0 }
+        let forced = gemm.routes.products.forced(k: k, n: n, m: m, kind: .int8, aneBroughtUp: true)
+        guard forced == nil || forced == .ane || forced == .aneAMX else { return 0 }
+        let rows = ane.rows(m, k: k, n: n)
+        return rows > 0 && ane.accepts(rows: rows, k: k, n: n, int8Group: group) ? rows : 0
+    }
+
+    /// **The int8 product cut between the GPU and the ANE**, at the same time: the first `m − aneRows` rows on the GPU's int8
+    /// kernel (`int8Product`, the plan's rotation of its own rows in the reserve's tail), the last `aneRows` on the ANE's int8
+    /// program, which reads the integers and their scales from the same reserve — nothing widened, nothing copied for it but
+    /// the surface. Each row is one engine's. The ANE's rows refused or non-finite: the whole product again on the GPU alone.
+    /// `gpu`: the GPU's seconds (its kernel's, and the whole product's if it had to be redone); `gpuWall`, `aneWall`: each side's
+    /// wall from the start, as `GEMM.lastSides`; `computed`: the ANE's rows were its own.
+    package static func int8Product(gemm: GEMM, plan: Int8Plan, reserve w: MTLBuffer, a: MTLBuffer, c: MTLBuffer, m: Int, k: Int, n: Int,
+                                    ane: NeuralEngine, aneRows: Int) -> (gpu: Double, computed: Bool, gpuWall: Double, aneWall: Double) {
+        let first = m - aneRows
+        nonisolated(unsafe) let (pa, pc) = (a.contents().assumingMemoryBound(to: Float.self), c.contents().assumingMemoryBound(to: Float.self))
+        let raw = w.contents()
+        let weight = NeuralEngine.Int8Weight(values: raw.assumingMemoryBound(to: Int8.self),
+                                             scales: (raw + plan.scalesOffset).assumingMemoryBound(to: Float.self),
+                                             perColumn: plan.perColumn, group: plan.group)
+        nonisolated(unsafe) var computed = false
+        nonisolated(unsafe) var aneWall = 0.0
+        let began = DispatchTime.now().uptimeNanoseconds
+        let group = DispatchGroup()
+        DispatchQueue.global(qos: .userInitiated).async(group: group) {
+            computed = ane.product(a: pa, int8: weight, c: pc, first: first, rows: aneRows, k: k, n: n)
+            aneWall = Double(DispatchTime.now().uptimeNanoseconds - began) * 1e-9
+        }
+        var gpu = int8Product(gemm: gemm, plan: plan, reserve: w, a: a, c: c, m: first, k: k, n: n).gpu
+        let gpuWall = Double(DispatchTime.now().uptimeNanoseconds - began) * 1e-9
+        group.wait()
+        GEMM.neuralEngineTally.withLock { $0.handed += 1; if !computed { $0.givenBack += 1 } }
+        if !computed { gpu += int8Product(gemm: gemm, plan: plan, reserve: w, a: a, c: c, m: m, k: k, n: n).gpu }
+        return (gpu, computed, gpuWall, aneWall)
+    }
+
     /// The AMX's columns: a multiple of 64 (the GPU's tile), 0 without a conductor or under its
     /// `minimumRows`.
     private func amxColumns(k: Int, n: Int, m: Int, kind: RouteTable.WeightKind) -> Int {
@@ -321,11 +376,13 @@ package final class WeightProducts {
            route.path == .native {
             let (k, perColumn, group) = (count / n, scale.shape.count == 1, tensor.rotation?.group)
             let roundsHere = route.roundsActivation
+            // The ANE beside the GPU on the integers (`ane_int8`): the AMX leaves the product, and the activation is not rounded.
+            let aneHere = !roundsHere && scale.block == nil && aneInt8Rows(group: group, m: m, k: k, n: n) > 0
             // Rounded, the GPU alone: the AMX reads the fp32 activation, one rounding for some columns only.
             guard let plan = (roundsHere ? Self.int8Plan(k: k, n: n, capacity: capacity, perColumn: perColumn, group: group,
                                                          amxColumns: 0, block: scale.block, rounded: true) : nil)
                     ?? Self.int8Plan(k: k, n: n, capacity: capacity, perColumn: perColumn, group: group,
-                                     amxColumns: amxColumns(k: k, n: n, m: m, kind: scale.block == nil ? .int8 : .q8),
+                                     amxColumns: aneHere ? 0 : amxColumns(k: k, n: n, m: m, kind: scale.block == nil ? .int8 : .q8),
                                      block: scale.block)
                     ?? Self.int8Plan(k: k, n: n, capacity: capacity, perColumn: perColumn, group: group, amxColumns: 0,
                                      block: scale.block)
