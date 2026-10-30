@@ -22074,6 +22074,46 @@
         }
       }
     },
+    "Other programs" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Andere Programme"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Otros programas"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Autres programmes"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Altri programmi"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ほかのプログラム"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "其他程序"
+          }
+        }
+      }
+    },
     "PNG keeps the prompt, seed and model. JPEG and HEIC are plain pictures, with no metadata." : {
       "localizations" : {
         "de" : {
@@ -30959,6 +30999,52 @@
         }
       }
     },
+    "The last render took %@ where this Mac's measure predicted %@. If the Mac has changed (heat, other programs), measure it again: the new measure applies from the next launch." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das letzte Rendern dauerte %@, wo die Messung dieses Macs %@ vorhergesagt hatte. Hat sich der Mac verändert (Hitze, andere Programme), messen Sie ihn erneut: Die neue Messung gilt ab dem nächsten Start."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "The last render took %1$@ where this Mac's measure predicted %2$@. If the Mac has changed (heat, other programs), measure it again: the new measure applies from the next launch."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El último render tardó %@ donde la medición de este Mac preveía %@. Si el Mac ha cambiado (calor, otros programas), vuelve a medirlo: la nueva medición se aplica desde el próximo inicio."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le dernier rendu a pris %@ là où la mesure de ce Mac en prévoyait %@. Si le Mac a changé (chaleur, autres programmes), mesurez-le de nouveau : la nouvelle mesure s’applique au lancement suivant."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’ultimo render ha richiesto %@ dove la misura di questo Mac ne prevedeva %@. Se il Mac è cambiato (calore, altri programmi), misuralo di nuovo: la nuova misura si applica dal prossimo avvio."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "直近のレンダリングは%@かかりましたが、このMacの測定では%@と予測されていました。Macの状態が変わった場合（発熱、ほかのプログラムなど）は、もう一度測定してください。新しい測定は次回の起動から適用されます。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "上一次渲染用了 %@，而这台 Mac 的测量结果预计为 %@。如果 Mac 的状态变了（发热、其他程序），请重新测量：新的测量结果将从下次启动起生效。"
+          }
+        }
+      }
+    },
     "The last render's matrix products and attention took %@ where %@ was predicted; this goes with the report." : {
       "localizations" : {
         "de" : {
@@ -32035,6 +32121,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "配对失败：未保留任何内容。"
+          }
+        }
+      }
+    },
+    "The process that loaded this route died: it is left out of the plan, and no render loads it." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Der Prozess, der diesen Rechenweg geladen hat, ist abgestürzt: Er bleibt aus dem Plan, und kein Rendern lädt ihn."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El proceso que cargó esta vía de cálculo murió: queda fuera del plan y ningún render la carga."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le processus qui a chargé ce chemin de calcul est mort : il est écarté du plan et aucun rendu ne le charge."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il processo che ha caricato questo percorso di calcolo è morto: resta fuori dal piano e nessun render lo carica."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この計算経路を読み込んだプロセスが異常終了しました：計画から外され、どのレンダリングもこれを読み込みません。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "加载此计算路径的进程已崩溃：它被排除在计划之外，任何渲染都不会加载它。"
           }
         }
       }
@@ -33493,6 +33619,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "这些模块无法连接：%@ 的输出不是 %@ 所需的输入。"
+          }
+        }
+      }
+    },
+    "They kept the Mac busy while it was measured, so the figures are not its own. Quit them and measure again." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sie haben den Mac während der Messung ausgelastet, die Zahlen sind also nicht seine eigenen. Beenden Sie sie und messen Sie erneut."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mantuvieron el Mac ocupado durante la medición, así que las cifras no son las suyas. Ciérralos y vuelve a medir."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ils ont occupé le Mac pendant la mesure : les chiffres ne sont pas les siens. Quittez-les et mesurez de nouveau."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hanno tenuto occupato il Mac durante la misura, quindi le cifre non sono le sue. Chiudili e misura di nuovo."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "測定中にこれらがMacを占有していたため、数値はこのMac本来のものではありません。終了してから、もう一度測定してください。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "测量期间它们占用了 Mac，因此这些数字并不代表它本身的性能。请退出它们后重新测量。"
           }
         }
       }

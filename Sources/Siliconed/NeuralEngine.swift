@@ -649,6 +649,8 @@ package final class NeuralEngine: @unchecked Sendable {
                 .write(to: url.appendingPathComponent("coremldata.bin"))
             let configuration = MLModelConfiguration()
             configuration.computeUnits = .cpuAndNeuralEngine
+            // A program Core ML refuses may take the process down rather than return an error: the measure says what it is about to load.
+            RouteBeacon.announce(shape.int8 ? "ane/int8" : "ane/fp16")
             return try MLModel(contentsOf: url, configuration: configuration)
         } catch {
             return nil

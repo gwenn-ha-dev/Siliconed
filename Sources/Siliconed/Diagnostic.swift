@@ -37,6 +37,15 @@ import Metal
 ///   - **Green is a property of the measure, not of the hour**: every engine the inventory announces has its lines, every set
 ///     its sharing, nothing aberrant, the peak under the need under B, no swap, the minute held. Heat, the battery, Low Power
 ///     Mode and another process's swap are facts of the regime, written beside the model, never a reason for orange;
+///   - **But it knows when the Mac was not free** (`Regime`): after each step a pulse of a few milliseconds asks whether as many
+///     threads as performance cores still get a core each (against a thread alone, measured at the same moment: a clock that went
+///     down is the Mac's, a core that went to another process is not) and whether an empty submission still reaches the GPU promptly,
+///     and the calls of a chain are compared with one another. A step that fails is measured again, after a wait, while the minute
+///     leaves seconds (`Sizes.retryCap`); what stayed busy is orange, named, with the cores the others used written beside it. A
+///     measure that says it was disturbed is the one thing a green card cannot be;
+///   - **It runs in a process of its own** (`Child`), because a program the Neural Engine refuses may kill the process that loads
+///     it: the child says each stage and each route before it touches it, and a supervisor that sees it die by a crash leaves that
+///     route out and measures again — the report says `died`, and no render loads a route the report has not seen load;
 ///   - **It holds the machine's render lock** (`RenderLock.machine`) and runs on the engine's queue: never beside a render, of
 ///     this process or another.
 ///
@@ -102,31 +111,32 @@ package enum Diagnostic {
     ///
     /// It knows no model: the same probes on every Mac, whatever is installed. `validate` (a developer's, outside the minute) adds the
     /// model's seconds on products it never saw, against a long measure — in `measure`'s probes, not in the report.
-    package static func run(cancellation: Cancellation? = nil, validate: Bool = false, log: ((String) -> Void)? = nil,
+    package static func run(cancellation: Cancellation? = nil, validate: Bool = false, skipping: Set<CapacityModel.Kernel> = [],
+                           log: ((String) -> Void)? = nil,
                            onProgress: (@Sendable (_ stage: Stage) -> Void)? = nil) throws(EngineError) -> Report {
-        try measure(cancellation: cancellation, validate: validate, log: log, onProgress: onProgress).report
+        try measure(cancellation: cancellation, validate: validate, skipping: skipping, log: log, onProgress: onProgress).report
     }
 
     /// The same, with the probes' own result beside the report (the fits' details and the validation, which a report does not carry).
-    package static func measure(cancellation: Cancellation? = nil, validate: Bool = false, log: ((String) -> Void)? = nil,
-                                onProgress: (@Sendable (_ stage: Stage) -> Void)? = nil)
+    package static func measure(cancellation: Cancellation? = nil, validate: Bool = false, skipping: Set<CapacityModel.Kernel> = [],
+                                log: ((String) -> Void)? = nil, onProgress: (@Sendable (_ stage: Stage) -> Void)? = nil)
         throws(EngineError) -> (report: Report, probes: CapacityProbes.Result) {
         dispatchPrecondition(condition: .notOnQueue(Engine.file))
         let result = Engine.file.sync {
             Result { () throws(EngineError) -> (report: Report, probes: CapacityProbes.Result) in
-                try runQueued(cancellation: cancellation, validate: validate, log: log, onProgress: onProgress)
+                try runQueued(cancellation: cancellation, validate: validate, skipping: skipping, log: log, onProgress: onProgress)
             }
         }
         return try result.get()
     }
 
-    private static func runQueued(cancellation: Cancellation?, validate: Bool, log: ((String) -> Void)?,
+    private static func runQueued(cancellation: Cancellation?, validate: Bool, skipping: Set<CapacityModel.Kernel>, log: ((String) -> Void)?,
                                   onProgress: (@Sendable (_ stage: Stage) -> Void)?)
         throws(EngineError) -> (report: Report, probes: CapacityProbes.Result) {
         let started = Date()
         let machine = machine()
         let before = conditions()
-        let probes = try CapacityProbes.run(machine: machine, cancellation: cancellation, validate: validate, log: log,
+        let probes = try CapacityProbes.run(machine: machine, cancellation: cancellation, validate: validate, skipping: skipping, log: log,
                                             onStage: { onProgress?($0) })
         let after = conditions()
         var forced: [String: String] = [:]

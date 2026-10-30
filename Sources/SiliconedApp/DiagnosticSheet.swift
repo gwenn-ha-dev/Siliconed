@@ -79,6 +79,9 @@ struct DiagnosticSheet: View {
     static func mapStatus(_ app: AppState) -> LocalizedStringKey {
         let map = app.mapFacts
         if let used = map.inUse {
+            if let drift = map.drift, let predicted = drift.predicted {
+                return driftSentence(measured: drift.measured, predicted: predicted)
+            }
             if used == map.stored, !used.green {
                 return "This session uses the measure of \(day(used.date)), which was incomplete: it is measured again at its next launch."
             }
@@ -93,6 +96,12 @@ struct DiagnosticSheet: View {
             return "The measure of \(day(stored.date)) was taken with another macOS or another version of Siliconed: this Mac is measured again before the next render."
         }
         return "This Mac is measured before its first render: Siliconed plans its calculations from it."
+    }
+
+    /// **A render ran off this Mac's measure** (the footer says it, the chip's tooltip and the sheet too): what it took, what the measure
+    /// predicted, and what to do — measure again, which applies from the next launch: the plan never changes between two renders.
+    static func driftSentence(measured: Double, predicted: Double) -> LocalizedStringKey {
+        "The last render took \(Figures.seconds(measured)) where this Mac's measure predicted \(Figures.seconds(predicted)). If the Mac has changed (heat, other programs), measure it again: the new measure applies from the next launch."
     }
 
     /// A report's ISO date as a day the user reads.
@@ -237,6 +246,7 @@ private struct ReportView: View {
         let subject: String
         switch cause {
         case .noFigure, .computedWrong, .notShared, .implausible: subject = name(of: defect)
+        case .disturbed: subject = String(localized: "Other programs")
         case .memoryOverNeed, .memoryOverBudget, .swapGrew: subject = String(localized: "Memory")
         case .tookTooLong: subject = String(localized: "Duration")
         }
@@ -249,6 +259,7 @@ private struct ReportView: View {
         case .memoryOverBudget: String(localized: "The measure needs more memory than this Mac allows.")
         case .swapGrew: String(localized: "The Mac swapped during the measure: other apps held its memory.")
         case .tookTooLong: String(localized: "The measure took longer than a minute.")
+        case .disturbed: String(localized: "They kept the Mac busy while it was measured, so the figures are not its own. Quit them and measure again.")
         }
         return (subject, sentence)
     }
@@ -294,7 +305,7 @@ private struct ReportView: View {
                             } else {
                                 Color.clear.frame(width: Self.barWidth, height: 1)
                                 Text(verbatim: "—").foregroundStyle(.secondary)
-                                verdict(false)
+                                verdict(false, died: report.judge[row.kernel.description]?.reason == .died)
                             }
                         }
                     }
@@ -336,9 +347,14 @@ private struct ReportView: View {
         (flops * 1e-12).formatted(.number.precision(.fractionLength(2))) + " TFLOP/s"
     }
 
-    @ViewBuilder private func verdict(_ pass: Bool) -> some View {
+    /// ✓ when the route computed right; ✗ when it computed wrong, or — `died` — when the process that loaded it was gone (it is left out
+    /// of the plan all the same, and the measure was taken again without it).
+    @ViewBuilder private func verdict(_ pass: Bool, died: Bool = false) -> some View {
         if pass {
             Image(systemName: "checkmark.circle.fill").foregroundStyle(.green).help("Computed right: within its threshold of the exact result")
+        } else if died {
+            Image(systemName: "xmark.circle.fill").foregroundStyle(.red)
+                .help("The process that loaded this route died: it is left out of the plan, and no render loads it.")
         } else {
             Image(systemName: "xmark.circle.fill").foregroundStyle(.red).help("Computed wrong: beyond its threshold of the exact result")
         }

@@ -8,6 +8,7 @@ import Foundation
 ///     green  =  every engine the inventory announces has its lines         (a kernel without a line must be one the judge excluded)
 ///            ∧  every set of engines that exists has its sharing            (a keep for each member, an overhead — all the sets the solver may offer)
 ///            ∧  nothing aberrant                                             (rules below, each with the figures it stands on)
+///            ∧  the Mac was not busy while it was measured                    (what the guard could not measure again: `Regime.disturbances`)
 ///            ∧  peak ≤ base + need ∧ base + need ≤ B                          (the memory held)
 ///            ∧  swap in use did not grow                                     (the probes pushed nothing out)
 ///            ∧  seconds ≤ the minute + 2 %
@@ -27,6 +28,15 @@ import Foundation
 ///     peak here, a different silicon.
 ///   - **A keep within [0.1, 1.25]**: the fleet's GPU kept 0.34–1.03 of its solo rate in a set (0.48–0.95 here; the AMX beside the ANE 0.77–0.95); the fit clamps at
 ///     [0.05, 1.5], and a keep at its clamp is a side that was not timed, not a measure.
+///   - **The Mac was busy, and the minute could not redo it** (`disturbed`): after a step a pulse asks whether as many threads as the
+///     performance cores still get a core each (the median thread over one thread alone taken at the same moment: 1.04 on a free M1 Pro, 1.08 at
+///     most over 725 pulses, 1.34–1.47 beside four and ten busy loops), whether an empty submission still reaches the GPU promptly (0.22 ms,
+///     0.29 at most; 0.55 ms beside a GPU loop of another process, 1.6–10 ms beside ten busy loops), and whether identical calls agree (a
+///     chain's p90 − p10 over its median: 0.02–0.06 on a free Mac, now and then 0.16–0.22 on an AMX chain at a depth of 12 288, 0.27–1.07 beside
+///     four loops, a GPU loop or a burst). The step is measured again, after a wait for a quiet pulse; the defect is what stayed busy at the third
+///     time or when the minute had no seconds left. It names what it saw — the threads, the GPU's wait, the calls — and the steps; the cores the
+///     others used are written beside it (`Regime.foreign`) for whoever reads the report, never judged: a load is not an effect (a compilation
+///     of two or three cores moved the AMX line by +11 and +17 % with every reading at its free value, and one core by nothing).
 ///   - **A staircase unit of the ANE not over four of the engine's own (1 024 rows).** The fit takes the *largest* unit that explains the
 ///     stairs as well as the best; on stairs read through a disturbed minute it came out at 2 048 — the whole range sampled — where it
 ///     reads 256 (or 128) on a quiet one. A unit that large rounds every row count the model asks of the ANE up to the same step.
@@ -38,7 +48,7 @@ extension Diagnostic {
 
         /// One thing the measure lacks or got aberrant, said precisely.
         package struct Defect: Codable, Sendable, Equatable {
-            package enum Kind: String, Codable, Sendable { case line, sharing, aberrant, memory, swap, time }
+            package enum Kind: String, Codable, Sendable { case line, sharing, aberrant, memory, swap, time, disturbed }
             package var kind: Kind
             /// The kernel (`ane/fp16`), the set (`gpu+ane`) or the quantity (`peak`, `swap`, `seconds`) concerned.
             package var subject: String
@@ -58,6 +68,20 @@ extension Diagnostic {
             package static let maximumANEUnit = 4 * NeuralEngine.rowUnit
             /// The minute, with the 2 % the clock and the report's own assembly take.
             package static let timeAllowance = 1.02
+        }
+
+        /// **A disturbance in words**: what the guard saw, how many steps, and the worst of them — for the report.
+        static func defect(_ d: Regime.Disturbance) -> Defect {
+            let steps = d.steps.count == 1 ? "1 step" : "\(d.steps.count) steps"
+            switch d.kind {
+            case .threads:
+                return Defect(.disturbed, "threads", String(format: "got %.0f %% of their cores at ", 100 / d.worst) + "\(steps) (worst: \(d.worstStep), the median thread \(Diagnostic.format(d.worst)) × a thread alone)")
+            case .gpu:
+                return Defect(.disturbed, "gpu", String(format: "kept an empty submission waiting %.2f ms at ", d.worst * 1e3) + "\(steps) (worst: \(d.worstStep))")
+            case .calls:
+                return Defect(.disturbed, "calls", String(format: "of identical work differed by %.0f %% at ", d.worst * 100)
+                              + "\(steps) (worst: \(d.worstStep), over \(Int(Regime.Rules.spread * 100)) %)")
+            }
         }
 
         /// What the app says: « The measure is not complete: ane/fp16 has no line, swap grew. »
@@ -96,7 +120,7 @@ extension Diagnostic {
 
         /// **The verdict on a measure.**
         package init(model: CapacityModel, measurements: CapacityFit.Measurements, judge: [String: Judge], machine: Machine,
-                     memory: Memory, before: Conditions, after: Conditions, seconds: Double) {
+                     memory: Memory, before: Conditions, after: Conditions, seconds: Double, regime: Regime? = nil) {
             let excluded = Diagnostic.excluded(judge)
             var defects: [Defect] = []
 
@@ -148,6 +172,8 @@ extension Diagnostic {
             if model.lines[CapacityModel.Kernel(.ane, .fp16)] != nil, model.aneRowUnit > Rules.maximumANEUnit {
                 defects.append(Defect(.aberrant, "ane/fp16", "has a staircase of \(model.aneRowUnit) rows (over \(Rules.maximumANEUnit))"))
             }
+            // The Mac was not busy while it measured — what was measured again is not a defect, what stayed busy is.
+            for d in regime?.disturbances ?? [] { defects.append(Self.defect(d)) }
             // The memory held, no swap, the minute.
             if !memory.held {
                 if memory.peak > memory.base + memory.need {

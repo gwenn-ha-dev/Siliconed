@@ -42,7 +42,7 @@ import Testing
         let order = ["\"judge\"", "\"machine\"", "\"measurements\"", "\"model\"", "\"stages\"", "\"verdict\""].map { text.range(of: $0)!.lowerBound }
         #expect(order == order.sorted())
         // Nothing of the model-rendering diagnostics, nor of the table of routes, survives.
-        for gone in ["\"models\"", "\"routes\"", "\"products\"", "\"decisions\"", "\"regime\"", "\"cuts\"", "\"map\"", "golden"] {
+        for gone in ["\"models\"", "\"routes\"", "\"products\"", "\"decisions\"", "\"cuts\"", "\"map\"", "golden"] {
             #expect(!text.contains(gone), "\(gone)")
         }
     }

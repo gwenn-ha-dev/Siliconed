@@ -257,7 +257,13 @@ package enum RemoteControlHelp {
         announces (the GPU's cores and clock, the CPU's clusters, the Neural Engine), then each
         engine alone and in sets on matrix products and on attention, the forms of the weights and
         their preparation, the heat and the memory; each output checked against the exact result,
-        and a route that computed wrong is left out. The queue waits for it, and it for the
+        and a route that computed wrong is left out. After each step it checks that the Mac was
+        free (the threads still had their cores, the GPU answered promptly, identical calls took
+        the same time) and measures the step again, while the minute leaves seconds; what stayed
+        busy is in the verdict ("disturbed"), the cores the others used in "regime". It runs in a
+        process of its own: a route whose load kills that process (a program the Neural Engine
+        refuses) is left out, the measure starts again without it, and "judge" says
+        {"excluded": true, "reason": "died"}. The queue waits for it, and it for the
         queue. The report is the model of this Mac: from the next launch, the engine works out
         from its "model" how many rows each engine takes at every product and every attention;
         before it, the defaults. Its "verdict" is green, or lists what is missing or aberrant.
@@ -1000,10 +1006,16 @@ package enum RemoteControlHelp {
         annonce (les cœurs et la fréquence du GPU, les grappes du CPU, le Neural Engine), puis
         chaque moteur seul et en ensembles sur des produits matriciels et sur l'attention, les formes
         des poids et leur préparation, la chaleur et la mémoire ; chaque sortie vérifiée contre le
-        résultat exact, et une route qui a mal calculé est écartée. La file l'attend, et lui attend
-        la file. Le rapport est le modèle de ce Mac : dès le lancement suivant, le moteur tire de
-        son "model" combien de lignes prend chaque moteur à chaque produit et à chaque attention ;
-        avant, les défauts. Son "verdict" est vert, ou liste ce qui manque ou détonne.
+        résultat exact, et une route qui a mal calculé est écartée. Après chaque étape elle vérifie
+        que le Mac était libre (les fils avaient encore leurs cœurs, le GPU répondait sans attendre,
+        des appels identiques prenaient le même temps) et refait l'étape tant que la minute laisse
+        des secondes ; ce qui est resté occupé est dans le verdict ("disturbed"), les cœurs qu'ont
+        pris les autres dans "regime". Elle tourne dans un processus à part : une route dont le
+        chargement tue ce processus (un programme que le Neural Engine refuse) est écartée, la mesure
+        repart sans elle, et "judge" dit {"excluded": true, "reason": "died"}. La file l'attend, et
+        lui attend la file. Le rapport est le modèle de ce Mac : dès le lancement suivant, le moteur
+        tire de son "model" combien de lignes prend chaque moteur à chaque produit et à chaque
+        attention ; avant, les défauts. Son "verdict" est vert, ou liste ce qui manque ou détonne.
 
           {"type": "started", "stages": ["weight preparation", …]}
           {"ok": true, "report": {"schema": 15, "machine": {…, "inventory": {…}},

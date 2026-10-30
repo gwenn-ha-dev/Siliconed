@@ -199,6 +199,10 @@ private struct Footer: View {
                                       : "Siliconed measures this Mac before its first render — under a minute.")
                     .font(.callout)
                 Text(verbatim: "\(line) · \(done + 1)/\(total)").font(.caption).foregroundStyle(.secondary)
+            } else if !app.busy, let drift = app.drift, let predicted = drift.predicted {
+                // The last render ran off the measure: said once, beside the button that measures again. The plan stays what it is.
+                Text(DiagnosticSheet.driftSentence(measured: drift.measured, predicted: predicted)).font(.caption)
+                Button("Measure This Mac…") { app.openDiagnostic() }.buttonStyle(.link).font(.caption)
             }
             HStack(spacing: 8) {
                 Button { app.render() } label: {

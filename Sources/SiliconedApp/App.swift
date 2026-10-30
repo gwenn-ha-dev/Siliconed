@@ -27,8 +27,12 @@ import SwiftUI
 struct SiliconedApplication: App {
     @NSApplicationDelegateAdaptor(Delegate.self) private var delegate
 
-    /// Launched as the capacity measure's child (`CapacityMeasure`), the process measures and exits here.
-    init() { CapacityMeasure.runIfAsked() }
+    /// Launched as the capacity measure's child (`Diagnostic.Child`), the process measures and exits here.
+    init() {
+        if CommandLine.arguments.dropFirst().first == Diagnostic.Child.argument {
+            Diagnostic.Child.serve(skipping: Diagnostic.Child.skipped(in: CommandLine.arguments))
+        }
+    }
 
     var body: some Scene {
         // The window is an NSWindow opened by the delegate (like Draw Things Headless's Generate
