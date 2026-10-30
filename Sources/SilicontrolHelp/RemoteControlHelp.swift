@@ -202,7 +202,7 @@ package enum RemoteControlHelp {
         formats     → the suggested formats; any valid WxH is accepted (help add)
         neural_engine → the rack's fp32 tag for the installed version: true = part of the DiT
                       on the Neural Engine (--ane, --no-ane of « add »). Only on a Mac whose
-                      capacity map turned it on, and once the model is ready
+                      measure offers it, and once the model is ready
         license_urls → the license file(s) on Hugging Face, at the revision the installation takes:
                       the model's, then each component under a license of its own (a Compact: the
                       publisher's, then each third party's model card). Z-Image has none: its model card, which
@@ -253,20 +253,21 @@ package enum RemoteControlHelp {
         silicontrol diagnose [--issue]
 
         « Measure This Mac » (the app's Help menu), from the terminal. The sheet opens in
-        the app and the diagnostic runs — about a minute, no model needed: the fp32 matrix products of
-        the DiT blocks on the GPU, on the CPU's matrix unit and on both, fp16 and bf16 products,
-        the attention through the engine's three kernels, the weight widening on the CPU and the
-        GPU; each output checked against the exact result. The queue waits for it, and it for the
-        queue. A measure is [rate, error, pass]: TFLOP/s (G values/s for a widening), the worst
-        row's relative error, within the report's "thresholds". The report becomes this Mac's
-        map: from the next launch, the engine branches on it ("decisions": GPU + CPU products,
-        flash, head split — each "on", its "gain", the "margin"); before it, the defaults.
+        the app and the diagnostic runs — under a minute, no model needed: what the silicon
+        announces (the GPU's cores and clock, the CPU's clusters, the Neural Engine), then each
+        engine alone and in sets on matrix products and on attention, the forms of the weights and
+        their preparation, the heat and the memory; each output checked against the exact result,
+        and a route that computed wrong is left out. The queue waits for it, and it for the
+        queue. The report is the model of this Mac: from the next launch, the engine works out
+        from its "model" how many rows each engine takes at every product and every attention;
+        before it, the defaults. Its "verdict" is green, or lists what is missing or aberrant.
 
-          {"type": "started", "stages": ["fp32 matrix products", …]}
-          {"ok": true, "report": {"schema": 5, "machine": {…}, "products": [{"model": "z-image",
-            "product": "up", "m": 1024, "gpu": [3.46, 1.1e-06, true], "amx": […],
-            "gpuShare": 0.609, "coexecution": […], …}], "attention": […], "widening": […],
-            "lowPrecision": […], "witness": {…}, "decisions": {"amx": {"on": true, …}, …}, …}}
+          {"type": "started", "stages": ["weight preparation", …]}
+          {"ok": true, "report": {"schema": 15, "machine": {…, "inventory": {…}},
+            "model": {"lines": {"gpu/fp32": {"t0": 0.0003, "rate": 3.5e12}, …},
+                      "sharing": {"gpu+ane": {"keep": {"gpu": 0.88, "ane": 0.74}, …}, …}, "crest": {…}, "heat": {…}, …},
+            "measurements": {…}, "judge": {"ane/fp16": {"error": …, "threshold": …, "excluded": false}, …},
+            "memory": {…}, "stages": {…}, "verdict": {"green": true, "defects": []}, …}}
 
         --issue   then opens GitHub's issue form in the browser, prefilled with the report (the
                   sheet's « Open the Issue »); the user submits it. "issue_url_length" says how
@@ -316,8 +317,8 @@ package enum RemoteControlHelp {
                               Engine (less energy, an image a little different from fp32's), or
                               fp32 throughout. Kept for the model's installed version, like the
                               tag; the job keeps what it was given. Default: the model's choice
-                              ("neural_engine" of « models »). --ane only on a Mac whose capacity
-                              map turned the Neural Engine on. Jobs say "neural_engine" there;
+                              ("neural_engine" of « models »). --ane only on a Mac whose measure
+                              offers the Neural Engine. Jobs say "neural_engine" there;
                               images, when it ran.
           --batch N           N images (1 to 8) with seeds s, s+1, …; the prompt is encoded once
                               for the whole batch (faster than N requests).
@@ -494,11 +495,12 @@ package enum RemoteControlHelp {
                         "remeasuring": false, "warnings": []}}
 
         faster_rendering   : the Settings switch (help set).
-        settings           : the engine settings renders run on — read: false until this Mac's map is; map: the
-                             capacity map's date (null: the defaults); green: that map is complete (its minute, its
-                             memory under B, every route judged right) — false: it is measured again at the next launch;
-                             remeasuring: this launch measures again before its first render; warnings: why a map or
-                             profile was refused. Two series compared across launches compare their maps too.
+        settings           : the engine settings renders run on — read: false until this Mac's measure is; map: the
+                             date of that measure (null: the defaults); green: it is complete (every engine has its
+                             lines and every set its sharing, nothing aberrant, its memory under B, its minute) — false:
+                             it is measured again at the next launch; remeasuring: this launch measures again before its
+                             first render; warnings: why a measure or profile was refused. Two series compared across
+                             launches compare their measures too.
         stage              : text, image (encoding a reference), denoising, decoding.
         steps_total        : the model's evaluations, not the requested steps (a sketch: those it stops after).
         remaining_s        : null until the app has a measurement for this render.
@@ -747,7 +749,7 @@ package enum RemoteControlHelp {
                                                                            → leave it out
           detail               --detail more|most on a model without Detail (Anima, Krea 2)
                                                                            → leave it out
-          neural_engine        --ane on a Mac whose capacity map leaves the Neural Engine off
+          neural_engine        --ane on a Mac whose measure does not offer the Neural Engine
                                                                            → leave it out
           subject              a named subject: unknown, a name taken, too many images, a model
                                that reads none, a grid citing one          → help subjects
@@ -942,7 +944,7 @@ package enum RemoteControlHelp {
         formats     → les formats conseillés ; tout WxH valide est accepté (help add)
         neural_engine → l'étiquette fp32 du rack pour la version installée : true = une part du
                       DiT sur le Neural Engine (--ane, --no-ane de « add »). Seulement sur un Mac
-                      dont la carte des capacités l'a allumé, et le modèle prêt
+                      dont la mesure l'offre, et le modèle prêt
         license_urls → le(s) fichier(s) de licence sur Hugging Face, à la révision que l'installation
                       prend : celui du modèle, puis chaque composant sous une licence propre
                       (une Compact : celui de l'éditeur, puis la fiche de chaque tiers). Z-Image n'en a pas : sa
@@ -994,21 +996,21 @@ package enum RemoteControlHelp {
         silicontrol diagnose [--issue]
 
         « Mesurer ce Mac » (menu Aide de l'app), depuis le terminal. La feuille s'ouvre
-        dans l'app et le diagnostic tourne — environ une minute, sans modèle : les produits matriciels
-        fp32 des blocs du DiT sur le GPU, sur l'unité matricielle du CPU et sur les deux, des
-        produits fp16 et bf16, l'attention par les trois noyaux du moteur, l'élargissement des
-        poids sur le CPU et le GPU ; chaque sortie vérifiée contre le résultat exact. La file
-        l'attend, et lui attend la file. Une mesure est [débit, écart, verdict] : TFLOP/s (G
-        valeurs/s pour un élargissement), l'écart relatif de la pire ligne, dans les
-        "thresholds" du rapport. Le rapport devient la carte de ce Mac : dès le lancement
-        suivant, le moteur s'y branche ("decisions" : produits GPU + CPU, flash, coupe par
-        têtes — chacun "on", son "gain", la "margin") ; avant, les défauts.
+        dans l'app et le diagnostic tourne — moins d'une minute, sans modèle : ce que le silicium
+        annonce (les cœurs et la fréquence du GPU, les grappes du CPU, le Neural Engine), puis
+        chaque moteur seul et en ensembles sur des produits matriciels et sur l'attention, les formes
+        des poids et leur préparation, la chaleur et la mémoire ; chaque sortie vérifiée contre le
+        résultat exact, et une route qui a mal calculé est écartée. La file l'attend, et lui attend
+        la file. Le rapport est le modèle de ce Mac : dès le lancement suivant, le moteur tire de
+        son "model" combien de lignes prend chaque moteur à chaque produit et à chaque attention ;
+        avant, les défauts. Son "verdict" est vert, ou liste ce qui manque ou détonne.
 
-          {"type": "started", "stages": ["fp32 matrix products", …]}
-          {"ok": true, "report": {"schema": 5, "machine": {…}, "products": [{"model": "z-image",
-            "product": "up", "m": 1024, "gpu": [3.46, 1.1e-06, true], "amx": […],
-            "gpuShare": 0.609, "coexecution": […], …}], "attention": […], "widening": […],
-            "lowPrecision": […], "witness": {…}, "decisions": {"amx": {"on": true, …}, …}, …}}
+          {"type": "started", "stages": ["weight preparation", …]}
+          {"ok": true, "report": {"schema": 15, "machine": {…, "inventory": {…}},
+            "model": {"lines": {"gpu/fp32": {"t0": 0.0003, "rate": 3.5e12}, …},
+                      "sharing": {"gpu+ane": {"keep": {"gpu": 0.88, "ane": 0.74}, …}, …}, "crest": {…}, "heat": {…}, …},
+            "measurements": {…}, "judge": {"ane/fp16": {"error": …, "threshold": …, "excluded": false}, …},
+            "memory": {…}, "stages": {…}, "verdict": {"green": true, "defects": []}, …}}
 
         --issue   ouvre ensuite le formulaire d'issue GitHub dans le navigateur, prérempli avec le
                   rapport (« Ouvrir le signalement » de la feuille) ; c'est l'utilisateur qui l'envoie.
@@ -1057,7 +1059,7 @@ package enum RemoteControlHelp {
                               celle du fp32), ou le fp32 de bout en bout. Gardé pour la version
                               installée du modèle, comme l'étiquette ; le travail garde ce qu'on lui
                               a donné. Défaut : le choix du modèle ("neural_engine" de « models »).
-                              --ane seulement sur un Mac dont la carte des capacités a allumé le
+                              --ane seulement sur un Mac dont la mesure offre le
                               Neural Engine. Les travaux y disent "neural_engine" ; les images,
                               quand il a tourné.
           --batch N           N images (1 à 8) aux graines s, s+1, … ; le prompt est encodé une
@@ -1238,12 +1240,12 @@ package enum RemoteControlHelp {
                         "remeasuring": false, "warnings": []}}
 
         faster_rendering   : l'interrupteur des Réglages (help set).
-        settings           : les réglages du moteur des rendus — read : false tant que la carte de ce Mac ne l'est
-                             pas ; map : la date de la carte (null : les défauts) ; green : cette carte est
-                             complète (sa minute, sa mémoire sous B, chaque route jugée juste) — false : elle se refait
-                             au prochain lancement ; remeasuring : ce lancement mesure à nouveau avant son premier rendu ;
-                             warnings : pourquoi une carte ou un profil a été refusé. Deux séries de deux lancements
-                             comparent aussi leurs cartes.
+        settings           : les réglages du moteur des rendus — read : false tant que la mesure de ce Mac ne l'est
+                             pas ; map : la date de cette mesure (null : les défauts) ; green : elle est complète
+                             (chaque moteur a ses droites et chaque ensemble son partage, rien d'aberrant, sa mémoire
+                             sous B, sa minute) — false : elle se refait au prochain lancement ; remeasuring : ce
+                             lancement mesure à nouveau avant son premier rendu ; warnings : pourquoi une mesure ou un
+                             profil a été refusé. Deux séries de deux lancements comparent aussi leurs mesures.
         stage              : text, image (encodage d'une référence), denoising, decoding.
         steps_total        : les évaluations du modèle, pas les pas demandés (une esquisse : celles après lesquelles elle s'arrête).
         remaining_s        : null tant que l'app n'a pas de mesure pour ce rendu.
@@ -1499,8 +1501,8 @@ package enum RemoteControlHelp {
                                qu'Euler                                    → le retirer
           detail               --detail more|most sur un modèle sans Détail (Anima, Krea 2)
                                                                            → le retirer
-          neural_engine        --ane sur un Mac dont la carte des capacités laisse le Neural Engine
-                               éteint                                      → le retirer
+          neural_engine        --ane sur un Mac dont la mesure n'offre pas le Neural Engine
+                                                                           → le retirer
           subject              un sujet nommé : inconnu, nom déjà pris, trop d'images, modèle qui
                                n'en lit pas, une grille qui en cite un     → help subjects
           disabled             (subjects) les sujets nommés sont éteints dans l'app → les allumer dans son menu

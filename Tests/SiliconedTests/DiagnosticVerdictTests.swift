@@ -196,6 +196,43 @@ import Testing
         #expect(report.verdict.reasons.count == 3)
         #expect(!report.isGreen)
     }
+
+    // ── what an app says of a defect ────────────────────────────────────────────────────────
+
+    /// Each defect has a cause and the engines it concerns, read from the kind and the subject — never from the English of `detail`.
+    @Test func eachDefectHasItsCauseAndItsEngines() {
+        func causes(_ report: Diagnostic.Report) -> [(String, Diagnostic.Cause)] {
+            report.verdict.defects.map { ($0.subject, $0.cause(excluding: report.excluded)) }
+        }
+        var noANE = R.measurements(dropping: ["ane/fp16"])
+        noANE.trials.removeAll { $0.set.contains("ane") }
+        let missing = R.report(measurements: noANE)
+        #expect(causes(missing).contains { $0.0 == "ane/fp16" && $0.1 == .noFigure })
+        #expect(missing.verdict.defects.first?.engines == [.ane] && missing.verdict.defects.first?.kernel == R.ane)
+
+        let reference = R.report(measurements: R.measurements(wrong: ["gpu/fp32"]), judge: R.judge(excluded: ["gpu/fp32"]))
+        #expect(causes(reference).contains { $0.0 == "gpu/fp32" && $0.1 == .computedWrong })
+
+        var m = R.measurements()
+        m.trials.removeAll { $0.set == "gpu+ane" }
+        let alone = R.report(measurements: m)
+        let sharing = alone.verdict.defects[0]
+        #expect(sharing.cause(excluding: alone.excluded) == .notShared)
+        #expect(sharing.kernel == nil && sharing.engines == [.gpu, .ane])
+
+        var slow = R.measurements()
+        for i in slow.solos.indices where slow.solos[i].kernel == "gpu/int8" { slow.solos[i].seconds = slow.solos[i].flop / 1e11 }
+        let aberrant = R.report(measurements: slow).verdict.defects[0]
+        #expect(aberrant.cause(excluding: []) == .implausible && aberrant.engines == [.gpu])
+
+        let over = R.report(memory: .init(budget: 10_737_418_240, base: 60_000_000, need: 2_000_000_000, peak: 2_300_000_000)).verdict.defects[0]
+        let big = R.report(memory: .init(budget: 2_000_000_000, base: 60_000_000, need: 2_970_000_000, peak: 2_400_000_000)).verdict.defects[0]
+        #expect(over.cause(excluding: []) == .memoryOverNeed && big.cause(excluding: []) == .memoryOverBudget)
+        #expect(over.engines.isEmpty && over.kernel == nil)
+        let swap = R.report(before: R.conditions(swap: 1), after: R.conditions(swap: 9)).verdict.defects[0]
+        let late = R.report(seconds: 70).verdict.defects[0]
+        #expect(swap.cause(excluding: []) == .swapGrew && late.cause(excluding: []) == .tookTooLong)
+    }
 }
 
 extension CapacityFit.Measurements {

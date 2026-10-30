@@ -4491,6 +4491,46 @@
         }
       }
     },
+    "A figure that looks wrong, probably because the Mac was busy." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eine Zahl, die falsch aussieht, vermutlich weil der Mac beschäftigt war."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Una cifra que parece errónea, probablemente porque el Mac estaba ocupado."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un chiffre qui paraît faux, sans doute parce que le Mac était occupé."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Una cifra che sembra sbagliata, probabilmente perché il Mac era occupato."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "数値がおかしく見えます。Macがほかの処理で忙しかったのかもしれません。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "数值看起来不对，很可能是因为 Mac 当时很忙。"
+          }
+        }
+      }
+    },
     "A file can't be opened: %@." : {
       "localizations" : {
         "de" : {
@@ -7293,6 +7333,86 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "请用 tools/app.sh 构建 App。"
+          }
+        }
+      }
+    },
+    "CPU" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CPU"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CPU"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CPU"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CPU"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CPU"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CPU"
+          }
+        }
+      }
+    },
+    "CPU matrix unit" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Matrixeinheit der CPU"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unidad matricial de la CPU"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unité matricielle du CPU"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unità matriciale della CPU"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CPU行列ユニット"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CPU 矩阵单元"
           }
         }
       }
@@ -12075,6 +12195,46 @@
         }
       }
     },
+    "Duration" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dauer"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Duración"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Durée"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Durata"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "所要時間"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "耗时"
+          }
+        }
+      }
+    },
     "Each cell adds one of these LoRAs to the stack, at one strength" : {
       "localizations" : {
         "de" : {
@@ -14201,6 +14361,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "全屏幕（空格键）"
+          }
+        }
+      }
+    },
+    "GPU" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GPU"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GPU"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GPU"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GPU"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GPU"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GPU"
           }
         }
       }
@@ -16378,6 +16578,46 @@
         }
       }
     },
+    "It computed wrong, and nothing can be planned without it." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Falsch gerechnet: Ohne diese Recheneinheit lässt sich nichts planen."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Calculó mal, y sin este motor no se puede planificar nada."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Calcul faux : rien ne peut être planifié sans ce moteur."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ha calcolato in modo errato, e senza questo motore non si può pianificare nulla."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "計算結果が誤っており、これなしでは何も計画できません。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "计算结果有误，没有它就无法制定任何计划。"
+          }
+        }
+      }
+    },
     "Its author restricts access on Hugging Face: the download needs your account's access to it." : {
       "localizations" : {
         "de" : {
@@ -17818,42 +18058,42 @@
         }
       }
     },
-    "Matrix products and attention on the GPU, the AMX and the Neural Engine, alone and together, each checked against the exact result: the figures this Mac renders with. No model is needed, nothing is downloaded. Under a minute; the queue waits meanwhile." : {
+    "Matrix products and attention on the GPU, the CPU's matrix unit and the Neural Engine, alone and together, each result checked against the exact one: what Siliconed plans a render with. No model is needed, nothing is downloaded. Under a minute; the queue waits meanwhile." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Matrixprodukte und Attention auf der GPU, der AMX und der Neural Engine, einzeln und zusammen, jedes gegen das exakte Ergebnis geprüft: die Zahlen, mit denen dieser Mac rendert. Kein Modell nötig, nichts wird geladen. Weniger als eine Minute; die Warteschlange wartet so lange."
+            "value" : "Matrixprodukte und Attention auf der GPU, der Matrixeinheit der CPU und der Neural Engine, einzeln und zusammen, jedes Ergebnis gegen das exakte geprüft: die Grundlage, auf der Siliconed ein Rendering plant. Kein Modell nötig, nichts wird geladen. Weniger als eine Minute; die Warteschlange wartet so lange."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Productos de matrices y atención en la GPU, el AMX y el Neural Engine, por separado y juntos, cada uno comprobado frente al resultado exacto: las cifras con las que este Mac genera sus imágenes. No hace falta ningún modelo, no se descarga nada. Menos de un minuto; mientras tanto, la cola espera."
+            "value" : "Productos de matrices y atención en la GPU, la unidad matricial de la CPU y el Neural Engine, por separado y juntos, cada resultado comprobado frente al exacto: las cifras con las que Siliconed planifica una imagen. No hace falta ningún modelo, no se descarga nada. Menos de un minuto; mientras tanto, la cola espera."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Produits matriciels et attention sur le GPU, l’AMX et le Neural Engine, seuls et ensemble, chacun vérifié contre le résultat exact : les chiffres avec lesquels ce Mac fait ses rendus. Aucun modèle n’est nécessaire, rien n’est téléchargé. Moins d’une minute ; la file attend pendant ce temps."
+            "value" : "Produits matriciels et attention sur le GPU, l’unité matricielle du CPU et le Neural Engine, seuls et ensemble, chaque résultat vérifié contre le résultat exact : les chiffres à partir desquels Siliconed planifie un rendu. Aucun modèle n’est nécessaire, rien n’est téléchargé. Moins d’une minute ; la file attend pendant ce temps."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Prodotti di matrici e attention sulla GPU, sull’AMX e sul Neural Engine, da soli e insieme, ciascuno verificato rispetto al risultato esatto: le cifre con cui questo Mac genera le immagini. Non serve alcun modello, non si scarica nulla. Meno di un minuto; nel frattempo la coda attende."
+            "value" : "Prodotti di matrici e attention sulla GPU, sull’unità matriciale della CPU e sul Neural Engine, da soli e insieme, ogni risultato verificato rispetto a quello esatto: le cifre su cui Siliconed pianifica un’immagine. Non serve alcun modello, non si scarica nulla. Meno di un minuto; nel frattempo la coda attende."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "GPU、AMX、Neural Engine での行列積とアテンション。単独と同時の両方で、それぞれを厳密な結果と照合し、この Mac がレンダリングに使う数値を求めます。モデルは不要で、何もダウンロードしません。1分未満で終わり、その間キューは待機します。"
+            "value" : "GPU、CPUの行列ユニット、Neural Engine での行列積とアテンション。単独と同時の両方で、それぞれの結果を厳密な結果と照合し、Siliconed がレンダリングを計画するための数値を求めます。モデルは不要で、何もダウンロードしません。1分未満で終わり、その間キューは待機します。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "在 GPU、AMX 和神经网络引擎上计算矩阵乘积和注意力，分别单独运行和同时运行，每个结果都与精确结果核对，得出这台 Mac 生成时所用的数值。无需任何模型，也不下载任何内容。不到一分钟；期间队列会等待。"
+            "value" : "在 GPU、CPU 矩阵单元和神经网络引擎上计算矩阵乘积和注意力，分别单独运行和同时运行，每个结果都与精确结果核对，得出 Siliconed 规划一次生成所依据的数值。无需任何模型，也不下载任何内容。不到一分钟；期间队列会等待。"
           }
         }
       }
@@ -19380,6 +19620,46 @@
         }
       }
     },
+    "Neural Engine" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Neural Engine"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Neural Engine"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Neural Engine"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Neural Engine"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Neural Engine"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "神经网络引擎"
+          }
+        }
+      }
+    },
     "Never under %@ px on a side" : {
       "localizations" : {
         "de" : {
@@ -19696,6 +19976,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "此图像中没有 Siliconed 设置"
+          }
+        }
+      }
+    },
+    "No figure was measured." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Es wurde keine Zahl gemessen."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se midió ninguna cifra."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun chiffre n’a été mesuré."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Non è stata misurata alcuna cifra."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "測定値が得られませんでした。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有测得任何数值。"
           }
         }
       }
@@ -22110,6 +22430,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "DiT 的一部分在神经网络引擎上以 fp16 运行：更省电（在 M1 Pro 上约省五分之一），图像与 fp32 的略有不同。点按以全程使用 fp32。"
+          }
+        }
+      }
+    },
+    "Peak read from the silicon: %@" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vom Silizium gemeldeter Höchstwert: %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Máximo que anuncia el silicio: %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Maximum annoncé par le silicium : %@"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Massimo dichiarato dal silicio: %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "シリコンが示す最大値：%@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "芯片标称的峰值：%@"
           }
         }
       }
@@ -26392,42 +26752,42 @@
         }
       }
     },
-    "Siliconed measures what this Mac's chip computes, and how fast, then turns on only the compute paths that are right and faster here. Sharing the result is optional: a prefilled GitHub issue, opened only by your click." : {
+    "Siliconed measures what each engine of this Mac computes, alone and together, then plans every calculation of a render from it. Sharing the result is optional: a prefilled GitHub issue, opened only by your click." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Siliconed misst, was der Chip dieses Macs rechnet und wie schnell, und schaltet dann nur die Rechenwege ein, die hier korrekt und schneller sind. Das Teilen ist freiwillig: ein vorausgefülltes GitHub-Issue, nur auf Ihren Klick."
+            "value" : "Siliconed misst, was jede Recheneinheit dieses Macs rechnet, einzeln und zusammen, und plant daraus jede Berechnung eines Renderings. Das Teilen ist freiwillig: ein vorausgefülltes GitHub-Issue, nur auf Ihren Klick."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Siliconed mide lo que calcula el chip de este Mac, y a qué velocidad, y activa solo las rutas de cálculo que aquí son correctas y más rápidas. Compartir el resultado es opcional: una incidencia de GitHub ya rellenada, abierta solo con tu clic."
+            "value" : "Siliconed mide lo que calcula cada motor de este Mac, por separado y juntos, y con ello planifica cada cálculo de una imagen. Compartir el resultado es opcional: una incidencia de GitHub ya rellenada, abierta solo con tu clic."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Siliconed mesure ce que calcule la puce de ce Mac, et à quelle vitesse, puis n’allume que les chemins de calcul justes et plus rapides ici. Partager le résultat est facultatif : un signalement GitHub prérempli, ouvert seulement par votre clic."
+            "value" : "Siliconed mesure ce que calcule chaque moteur de ce Mac, seul et avec les autres, puis planifie à partir de là chaque calcul d’un rendu. Partager le résultat est facultatif : un signalement GitHub prérempli, ouvert seulement par votre clic."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Siliconed misura ciò che calcola il chip di questo Mac, e a quale velocità, poi accende solo i percorsi di calcolo corretti e più veloci qui. Condividere il risultato è facoltativo: una segnalazione GitHub precompilata, aperta solo dal tuo clic."
+            "value" : "Siliconed misura ciò che calcola ogni motore di questo Mac, da solo e insieme agli altri, poi pianifica su questa base ogni calcolo di un’immagine. Condividere il risultato è facoltativo: una segnalazione GitHub precompilata, aperta solo dal tuo clic."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Siliconedは、このMacのチップが何を計算でき、どれだけ速いかを測定し、ここで正しく、かつ高速な計算経路だけを有効にします。結果の共有は任意です：入力済みのGitHub issueが、あなたがクリックしたときにだけ開きます。"
+            "value" : "Siliconedは、このMacの各演算装置が何を計算できるかを、単独と同時の両方で測定し、その結果からレンダリングの計算を一つずつ計画します。結果の共有は任意です：入力済みのGitHub issueが、あなたがクリックしたときにだけ開きます。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Siliconed 会测量这台 Mac 的芯片能算什么、算得多快，然后只启用在这里既正确又更快的计算路径。是否分享结果由你决定：只有在你点按后，才会打开已预先填写的 GitHub 议题。"
+            "value" : "Siliconed 会测量这台 Mac 上每个引擎单独和同时能算什么，然后据此规划一次生成中的每一项计算。是否分享结果由你决定：只有在你点按后，才会打开已预先填写的 GitHub 议题。"
           }
         }
       }
@@ -29033,6 +29393,46 @@
         }
       }
     },
+    "The Mac swapped during the measure: other apps held its memory." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Der Mac hat während der Messung ausgelagert: Andere Apps belegten den Arbeitsspeicher."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El Mac usó el intercambio durante la medición: otras apps ocupaban su memoria."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le Mac a utilisé le swap pendant la mesure : d’autres apps occupaient sa mémoire."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il Mac ha usato lo swap durante la misura: altre app occupavano la sua memoria."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "測定中にMacがスワップを使いました：ほかのアプリがメモリを使っていました。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "测量期间 Mac 使用了交换空间：其他 App 占用了它的内存。"
+          }
+        }
+      }
+    },
     "The cells still waiting leave the queue; the running one stops" : {
       "localizations" : {
         "de" : {
@@ -30559,6 +30959,46 @@
         }
       }
     },
+    "The last render's matrix products and attention took %@ where %@ was predicted; this goes with the report." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Matrixprodukte und die Attention des letzten Renderings dauerten %@, vorhergesagt waren %@; das wird dem Bericht beigefügt."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Los productos de matrices y la atención de la última imagen tardaron %@ donde se habían previsto %@; esto se incluye en el informe."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dernier rendu (produits matriciels et attention) : mesuré %@, prévu %@. Cela part avec le rapport."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I prodotti di matrici e l’attention dell’ultima immagine hanno richiesto %@ contro %@ previsti; questo accompagna il rapporto."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "直近のレンダリングの行列積とアテンションは %@ かかりました（予測は %@）。この結果はレポートに含まれます。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "上一次生成的矩阵乘积和注意力用了 %@，预测为 %@；这一结果会随报告一起提交。"
+          }
+        }
+      }
+    },
     "The library can't be found: %@." : {
       "localizations" : {
         "de" : {
@@ -30999,122 +31439,122 @@
         }
       }
     },
-    "The measure is complete." : {
+    "The measure is incomplete." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Die Messung ist vollständig."
+            "value" : "Die Messung ist unvollständig."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "La medición está completa."
+            "value" : "La medición está incompleta."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "La mesure est complète."
+            "value" : "La mesure est incomplète."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "La misura è completa."
+            "value" : "La misura è incompleta."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "測定は完了しました。"
+            "value" : "測定は完了していません。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "测量已完成。"
+            "value" : "测量不完整。"
           }
         }
       }
     },
-    "The measure is not complete: %@." : {
+    "The measure needs more memory than this Mac allows." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Die Messung ist nicht vollständig: %@."
+            "value" : "Die Messung braucht mehr Arbeitsspeicher, als dieser Mac erlaubt."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "La medición no está completa: %@."
+            "value" : "La medición necesita más memoria de la que este Mac permite."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "La mesure n’est pas complète : %@."
+            "value" : "La mesure demande plus de mémoire que ce Mac n’en permet."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "La misura non è completa: %@."
+            "value" : "La misura richiede più memoria di quanta questo Mac ne consenta."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "測定は完了していません：%@。"
+            "value" : "測定に必要なメモリが、このMacの許容量を超えています。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "测量未完成：%@。"
+            "value" : "测量所需的内存超过了这台 Mac 的允许值。"
           }
         }
       }
     },
-    "The measure of %@ was not complete (a missing or aberrant figure, its memory, its swap or its minute): it is measured again before the next render." : {
+    "The measure of %@ was incomplete: it is measured again before the next render." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Die Messung vom %@ war nicht vollständig (eine fehlende oder unplausible Zahl, ihr Speicher, ihr Swap oder ihre Minute): Sie wird vor dem nächsten Rendern wiederholt."
+            "value" : "Die Messung vom %@ war unvollständig: Sie wird vor dem nächsten Rendern wiederholt."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "La medición del %@ no estaba completa (una cifra ausente o aberrante, su memoria, su swap o su minuto): se repite antes de la próxima imagen."
+            "value" : "La medición del %@ estaba incompleta: se repite antes de la próxima imagen."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "La mesure du %@ n’était pas complète (un chiffre manquant ou aberrant, sa mémoire, son swap ou sa minute) : elle est refaite avant le prochain rendu."
+            "value" : "La mesure du %@ était incomplète : elle est refaite avant le prochain rendu."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "La misura del %@ non era completa (una cifra mancante o anomala, la sua memoria, il suo swap o il suo minuto): viene ripetuta prima della prossima immagine."
+            "value" : "La misura del %@ era incompleta: viene ripetuta prima della prossima immagine."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@ の測定は完了していません（欠けている、または異常な数値、メモリ、スワップ、あるいは時間）。次のレンダリングの前に再測定します。"
+            "value" : "%@ の測定は完了していません。次のレンダリングの前に再測定します。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@ 的测量未完成（缺失或异常的数值、内存、交换空间或一分钟的时限）：将在下次生成之前重新测量。"
+            "value" : "%@ 的测量不完整：将在下次生成之前重新测量。"
           }
         }
       }
@@ -31155,6 +31595,126 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@ 的测量是在另一个 macOS 或另一个版本的 Siliconed 下进行的：将在下次生成之前重新测量这台 Mac。"
+          }
+        }
+      }
+    },
+    "The measure took longer than a minute." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Messung dauerte länger als eine Minute."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La medición tardó más de un minuto."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La mesure a duré plus d’une minute."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La misura è durata più di un minuto."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "測定に1分以上かかりました。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "测量用时超过了一分钟。"
+          }
+        }
+      }
+    },
+    "The measure used more memory than had been counted for it." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Messung hat mehr Arbeitsspeicher belegt, als für sie eingeplant war."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La medición usó más memoria de la que se había calculado para ella."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La mesure a utilisé plus de mémoire qu’on n’en avait compté pour elle."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La misura ha usato più memoria di quella calcolata per essa."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "測定は、見込んでいたより多くのメモリを使いました。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "测量使用的内存超出了预先的估算。"
+          }
+        }
+      }
+    },
+    "The measure used up to %@ of the %@ of memory this Mac allows." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Messung belegte bis zu %@ der %@ Arbeitsspeicher, die dieser Mac zulässt."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La medición usó hasta %@ de los %@ de memoria que este Mac permite."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La mesure a utilisé jusqu’à %@ des %@ de mémoire que ce Mac permet."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La misura ha usato fino a %@ dei %@ di memoria che questo Mac consente."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "測定のメモリ使用量は最大 %@ でした（このMacが許容するのは %@）。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "测量最多使用了 %@ 内存，这台 Mac 允许的上限为 %@。"
           }
         }
       }
@@ -32937,6 +33497,46 @@
         }
       }
     },
+    "They were not measured together." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sie wurden nicht zusammen gemessen."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se midieron juntos."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ils n’ont pas été mesurés ensemble."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Non sono stati misurati insieme."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同時には測定できませんでした。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有一起测量。"
+          }
+        }
+      }
+    },
     "This LoRA is for %@, which isn't installed on that Mac yet: install it first." : {
       "localizations" : {
         "de" : {
@@ -33097,42 +33697,82 @@
         }
       }
     },
-    "This Mac is measured before its first render: Siliconed chooses its compute paths from it." : {
+    "This Mac is measured before its first render: Siliconed plans its calculations from it." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Dieser Mac wird vor dem ersten Rendering gemessen: Siliconed wählt danach seine Rechenwege."
+            "value" : "Dieser Mac wird vor dem ersten Rendering gemessen: Siliconed plant danach seine Berechnungen."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Este Mac se mide antes de su primer renderizado: Siliconed elige a partir de ello sus rutas de cálculo."
+            "value" : "Este Mac se mide antes de su primer renderizado: Siliconed planifica sus cálculos a partir de ello."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ce Mac est mesuré avant son premier rendu : Siliconed en tire ses chemins de calcul."
+            "value" : "Ce Mac est mesuré avant son premier rendu : Siliconed planifie ses calculs à partir de là."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Questo Mac viene misurato prima del suo primo rendering: Siliconed ne ricava i suoi percorsi di calcolo."
+            "value" : "Questo Mac viene misurato prima del suo primo rendering: Siliconed pianifica i suoi calcoli a partire da ciò."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "このMacは最初の生成の前に測定されます：Siliconedはその結果から計算経路を選びます。"
+            "value" : "このMacは最初の生成の前に測定されます：Siliconedはその結果から計算を計画します。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "这台 Mac 会在首次生成之前接受测量：Siliconed 据此选择其计算路径。"
+            "value" : "这台 Mac 会在首次生成之前接受测量：Siliconed 据此规划其计算。"
+          }
+        }
+      }
+    },
+    "This Mac is measured." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dieser Mac ist gemessen."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Este Mac está medido."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce Mac est mesuré."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Questo Mac è stato misurato."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このMacは測定済みです。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这台 Mac 已完成测量。"
           }
         }
       }
@@ -34447,122 +35087,122 @@
         }
       }
     },
-    "This session uses the choices of this Mac's measure of %@." : {
+    "This session plans with the measure of %@; the newer one applies from the next launch." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Diese Sitzung verwendet die Wahl aus der Messung dieses Macs vom %@."
+            "value" : "Diese Sitzung plant mit der Messung vom %@; die neuere gilt ab dem nächsten Start."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Esta sesión usa las elecciones de la medición de este Mac del %@."
+            "value" : "Esta sesión planifica con la medición del %@; la más reciente se aplica desde el próximo inicio."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Cette session utilise les choix de la mesure de ce Mac du %@."
+            "value" : "Cette session planifie avec la mesure du %@ ; la plus récente s’applique au prochain lancement."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Questa sessione usa le scelte della misura di questo Mac del %@."
+            "value" : "Questa sessione pianifica con la misura del %@; la più recente si applica dal prossimo avvio."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "このセッションは、このMacの%@の測定による選択を使っています。"
+            "value" : "このセッションは%@の測定で計画しています。新しい測定は次回の起動から適用されます。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "本次会话使用这台 Mac 对 %@ 的测量所作的选择。"
+            "value" : "本次会话按 %@ 的测量结果进行规划；较新的结果将从下次启动起生效。"
           }
         }
       }
     },
-    "This session uses the measure of %@, which was not complete (a missing or aberrant figure, its memory, its swap or its minute): it is measured again at its next launch." : {
+    "This session plans with this Mac's measure of %@." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Diese Sitzung verwendet die Messung vom %@, die nicht vollständig war (eine fehlende oder unplausible Zahl, ihr Speicher, ihr Swap oder ihre Minute): Sie wird beim nächsten Start wiederholt."
+            "value" : "Diese Sitzung plant mit der Messung dieses Macs vom %@."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Esta sesión usa la medición del %@, que no estaba completa (una cifra ausente o aberrante, su memoria, su swap o su minuto): se repite en el próximo arranque."
+            "value" : "Esta sesión planifica con la medición de este Mac del %@."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Cette session utilise la mesure du %@, qui n’était pas complète (un chiffre manquant ou aberrant, sa mémoire, son swap ou sa minute) : elle est refaite à son prochain lancement."
+            "value" : "Cette session planifie avec la mesure de ce Mac du %@."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Questa sessione usa la misura del %@, che non era completa (una cifra mancante o anomala, la sua memoria, il suo swap o il suo minuto): viene ripetuta al prossimo avvio."
+            "value" : "Questa sessione pianifica con la misura di questo Mac del %@."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "このセッションは %@ の測定を使用していますが、その測定は完了していません（欠けている、または異常な数値、メモリ、スワップ、あるいは時間）。次回の起動時に再測定します。"
+            "value" : "このセッションは、このMacの%@の測定で計画しています。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "本次会话使用 %@ 的测量结果，该结果未完成（缺失或异常的数值、内存、交换空间或一分钟的时限）：将在下次启动时重新测量。"
+            "value" : "本次会话按这台 Mac 在 %@ 的测量结果进行规划。"
           }
         }
       }
     },
-    "This session uses the measure of %@; the newer one applies from the next launch." : {
+    "This session uses the measure of %@, which was incomplete: it is measured again at its next launch." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Diese Sitzung verwendet die Messung vom %@; die neuere gilt ab dem nächsten Start."
+            "value" : "Diese Sitzung verwendet die Messung vom %@, die unvollständig war: Sie wird beim nächsten Start wiederholt."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Esta sesión usa la medición del %@; la más reciente se aplica desde el próximo inicio."
+            "value" : "Esta sesión usa la medición del %@, que estaba incompleta: se repite en su próximo inicio."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Cette session utilise la mesure du %@ ; la plus récente s’applique au prochain lancement."
+            "value" : "Cette session utilise la mesure du %@, qui était incomplète : elle est refaite à son prochain lancement."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Questa sessione usa la misura del %@; la più recente si applica dal prossimo avvio."
+            "value" : "Questa sessione usa la misura del %@, che era incompleta: viene ripetuta al prossimo avvio."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "このセッションは%@の測定を使っています。新しい測定は次回の起動から適用されます。"
+            "value" : "このセッションは %@ の測定を使っていますが、完了していませんでした。次回の起動時に再測定します。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "本次会话使用 %@ 的测量结果；较新的结果将从下次启动起生效。"
+            "value" : "本次会话使用的是 %@ 的测量结果，它并不完整：将在下次启动时重新测量。"
           }
         }
       }
@@ -42099,42 +42739,42 @@
         }
       }
     },
-    "this Mac's capacity map leaves the Neural Engine off" : {
+    "this Mac's measure does not offer the Neural Engine" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "die Fähigkeitskarte dieses Macs lässt die Neural Engine aus"
+            "value" : "die Messung dieses Macs bietet die Neural Engine nicht an"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "el mapa de capacidades de este Mac deja apagado el Neural Engine"
+            "value" : "la medición de este Mac no ofrece el Neural Engine"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "la carte des capacités de ce Mac laisse le Neural Engine éteint"
+            "value" : "la mesure de ce Mac n’offre pas le Neural Engine"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "la mappa delle capacità di questo Mac lascia spento il Neural Engine"
+            "value" : "la misura di questo Mac non offre il Neural Engine"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "このMacの能力マップでは、Neural Engineはオフです"
+            "value" : "このMacの測定では、Neural Engineは利用できません"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "这台 Mac 的容量图让神经网络引擎保持关闭"
+            "value" : "这台 Mac 的测量结果中没有可用的神经网络引擎"
           }
         }
       }

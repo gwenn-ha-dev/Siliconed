@@ -232,6 +232,8 @@ Each stage's line in `check list` gives its own rule. An identity (tokens, sched
 
 Every decoder, Z-Image's included, is judged per plane of the image against a float64 witness of the reference's decoder (`vae-witness`).
 
+**The app's diagnostic applies the same rule.** **Measure This Mac** ([ENGINE](ENGINE.md#an-engine-measured-on-your-mac)) checks every route it times against the exact result, computed in double precision on the Mac's own CPU, on synthetic operands that are the same on every Mac, with the same error per channel: an fp32 product or attention may be 10⁻⁵ from it, the Neural Engine's fp16 product 1.25 times bf16's own rounding. A route beyond its threshold is left out of the plan — the engine never offers it — and the report names it and the error seen; no speed buys back a wrong result.
+
 Krea 2's denoiser has a few boundaries so ill-conditioned that a change of one unit in the last place of the input moves the output by more than the rule allows, the reference included. There, a measure that fails at the witness is judged by *clouds*: the reference and the engine are both run on inputs moved by one ulp, and the engine's median error must stay within 1.25 times the reference's worst. These are the stages whose rule says "clouds when the oracle has draws".
 
 ## Beyond `all`
@@ -245,14 +247,14 @@ oracle-env/bin/python tools/oracle/z-image.py text --long
 siliconed check z-image text --long
 ```
 
-**The Neural Engine.** The app can share the denoiser's matrix products with the Mac's Neural Engine, which computes in fp16 ([ENGINE](ENGINE.md#the-neural-engine)). `--neural-engine` checks that path: every widened product of the DiT with 512 rows or more gives half its rows to the ANE, the same split on every Mac and more than any map gives (a render leaves products under 1,024 rows to the GPU), and the stage is judged against the reference run in bf16 on the same inputs, the engine allowed bf16's own error plus 25 %. The verdict says how many products the ANE computed; on a Mac where it computes none, the stage is skipped. The `dit` stages of the five models take it.
+**The Neural Engine.** The app can share the denoiser's matrix products with the Mac's Neural Engine, which computes in fp16 ([ENGINE](ENGINE.md#the-neural-engine)). `--neural-engine` checks that path: every widened product of the DiT with 512 rows or more gives half its rows to the ANE, the same split on every Mac and more than any plan gives (a render leaves products under 1,024 rows to the GPU), and the stage is judged against the reference run in bf16 on the same inputs, the engine allowed bf16's own error plus 25 %. The verdict says how many products the ANE computed; on a Mac where it computes none, the stage is skipped. The `dit` stages of the five models take it.
 
 ```sh
 oracle-env/bin/python tools/oracle/z-image.py bf16 --size 1024
 siliconed check z-image dit --size 1024 --neural-engine
 ```
 
-**Activations rounded to bf16.** Where this Mac's map turns it on, the DiT's products take their activation rounded to bf16 just before the product (the weights as published, the sums and the output in fp32). `--bf16-activations` checks that path on any Mac, for every product of 256 rows or more, and judges the stage like the Neural Engine's: against the reference run in bf16, the engine allowed bf16's own error plus 25 %. The verdict says how many products rounded their operand. The `dit` stages of the five models take it.
+**Activations rounded to bf16.** Where this Mac's plan takes it, the DiT's products take their activation rounded to bf16 just before the product (the weights as published, the sums and the output in fp32). `--bf16-activations` checks that path on any Mac, for every product of 256 rows or more, and judges the stage like the Neural Engine's: against the reference run in bf16, the engine allowed bf16's own error plus 25 %. The verdict says how many products rounded their operand. The `dit` stages of the five models take it.
 
 ```sh
 siliconed check z-image dit --size 512 --bf16-activations
@@ -370,7 +372,7 @@ LoRAs are not covered here: they are files you choose, not part of what Silicone
 
 `siliconed check` judges precision and nothing else. Times and peak memory are measured on the app alone: `silicontrol measure` ([REMOTE-CONTROL](REMOTE-CONTROL.md#the-socket-and-the-protocol); `silicontrol help measure` lists the options) renders a series in the app, times each render, samples the app's memory and writes a TSV and its summary. The times and peaks in [ENGINE](ENGINE.md) are taken the same way (renders queued in the app with `silicontrol`), so you can redo them on your Mac with the app alone, without Python or an oracle.
 
-The same seed gives the same pixels (the same md5) from one render to the next on one Mac, with one version of the app and one map of that machine. It does not give them from one Mac to another: the map picks other kernels on another chip, and other kernels sum in another order. What carries from Mac to Mac is the rule above, not the bits.
+The same seed gives the same pixels (the same md5) from one render to the next on one Mac, with one version of the app and one measure of that machine. It does not give them from one Mac to another, nor from one measure to another: the plan works out other rows from other numbers, and other rows sum in another order. What carries from Mac to Mac is the rule above, not the bits.
 
 ## Every stage
 

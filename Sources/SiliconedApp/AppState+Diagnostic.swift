@@ -130,7 +130,7 @@ extension AppState {
     func openIssue(_ report: Diagnostic.Report) -> String? {
         do {
             copyJSON(report)
-            NSWorkspace.shared.open(try report.with(render: renderNote).issueURL())
+            NSWorkspace.shared.open(try report.with(render: reportNote(for: report)).issueURL())
             return String(localized: "The report is in the clipboard: paste it into the form's “Report” field.")
         } catch {
             return Problem(error).text
@@ -138,11 +138,17 @@ extension AppState {
     }
 
     func copyJSON(_ report: Diagnostic.Report) {
-        // The last render against the map in use travels with the report (`RenderLoop.Note`, ~1 KB).
-        guard let data = try? report.with(render: renderNote).json() else { return }
+        guard let data = try? report.with(render: reportNote(for: report)).json() else { return }
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(String(decoding: data, as: UTF8.self), forType: .string)
         flash(String(localized: "Report copied (JSON)"))
+    }
+
+    /// **The last render against this report's model** (`RenderLoop.Note`, ~1 KB), if there was one: it travels with the report and is
+    /// shown by the sheet. A render made under another model — a measure taken since, which applies from the next launch — is not
+    /// this report's: its gap would say something about a model the report does not hold.
+    func reportNote(for report: Diagnostic.Report) -> RenderLoop.Note? {
+        renderNote.flatMap { $0.map == report.date ? $0 : nil }
     }
 
     /// The window closes: nothing must keep occupying the GPU with no view to show it.

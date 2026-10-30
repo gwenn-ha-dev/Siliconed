@@ -130,11 +130,6 @@ extension AppState {
     /// A current map taken at rest is kept (the chip of « Chain » is green).
     var mapMeasured: Bool { mapFacts.stored.map { $0.current && $0.green } == true }
 
-    /// This report is the map the settings were read with.
-    func inUse(_ report: Diagnostic.Report) -> Bool {
-        mirror != nil ? mirrorMachine?.inUse?.date == report.date : report == mapInUse
-    }
-
     /// **« Faster Rendering »** as the window shows it: this Mac's, or the lender's in a mirror.
     var fasterRenderingShown: Bool { mirror != nil ? mirrorCatalog?.fasterRendering ?? true : fasterRendering }
 

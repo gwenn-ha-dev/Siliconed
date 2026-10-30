@@ -151,7 +151,7 @@ extension RemoteControl {
         }
         // The Neural Engine: only where this Mac's map turned it on (the rack shows no choice elsewhere).
         if d.neuralEngine == true, !app.neuralEngineOffered {
-            throw Refusal("neural_engine", String(localized: "this Mac's capacity map leaves the Neural Engine off"),
+            throw Refusal("neural_engine", String(localized: "this Mac's measure does not offer the Neural Engine"),
                           help: String(localized: "leave out --ane"))
         }
         guard let prompt = d.prompt, !prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {

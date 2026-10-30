@@ -262,6 +262,28 @@ extension Diagnostic {
         }
     }
 
+    // ── a defect, apart from where it is ────────────────────────────────────────────────────
+
+    /// What kind of trouble a defect of the verdict is, once the kernel or the set it concerns is set aside — so that an app says each in
+    /// its own language, with the name of the engine beside it, without reading the English of `detail`.
+    package enum Cause: Sendable, Equatable {
+        /// A kernel the inventory announces has no line (the probe did not run, or gave nothing).
+        case noFigure
+        /// The reference engine's kernel computed wrong: nothing can be planned without it.
+        case computedWrong
+        /// A set of engines was not measured together.
+        case notShared
+        /// A figure that cannot be a measure of the silicon: a rate beyond the peak read or hopelessly under it, a fixed cost
+        /// below zero, a keep on the fit's clamp, a staircase of the whole range. The usual cause is a Mac that was busy.
+        case implausible
+        /// The probes' peak went over the need the memory plan counted for them.
+        case memoryOverNeed
+        /// The need itself is over B.
+        case memoryOverBudget
+        case swapGrew
+        case tookTooLong
+    }
+
     /// The URL of a new issue with `fields` as its query, **every byte that delimits a field escaped**:
     /// `URLComponents` leaves `+` alone, which GitHub reads back as a space — in a JSON exponent (`1e+20`)
     /// or a chip name. `,` and `:` stay as they are: a query may hold them (RFC 3986, `pchar`), they
@@ -282,5 +304,29 @@ extension Diagnostic {
         guard x.isFinite else { return x.isNaN || x > 0 ? .greatestFiniteMagnitude : -.greatestFiniteMagnitude }
         guard x != 0 else { return 0 }
         return Double(String(format: "%.\(digits - 1)e", x)) ?? x
+    }
+}
+
+extension Diagnostic.Verdict.Defect {
+    /// The kernel this defect concerns (`ane/fp16`), if it concerns one.
+    package var kernel: CapacityModel.Kernel? { CapacityModel.Kernel(subject) }
+
+    /// The engines this defect concerns: the kernel's, or those of the set (`gpu+ane`); none for the memory, the swap or the minute.
+    package var engines: [CapacityModel.Engine] {
+        if let kernel { return [kernel.engine] }
+        return subject.split(separator: "+").compactMap { CapacityModel.Engine(rawValue: String($0)) }
+    }
+
+    /// **What kind of trouble this is**, from the kind and the subject the verdict wrote and the kernels the judge excluded
+    /// (`Report.excluded`): a missing line of the reference engine is « computed wrong » when the judge left it out.
+    package func cause(excluding excluded: Set<CapacityModel.Kernel>) -> Diagnostic.Cause {
+        switch kind {
+        case .line: return kernel.map(excluded.contains) == true ? .computedWrong : .noFigure
+        case .sharing: return .notShared
+        case .aberrant: return .implausible
+        case .memory: return subject == "peak" ? .memoryOverNeed : .memoryOverBudget
+        case .swap: return .swapGrew
+        case .time: return .tookTooLong
+        }
     }
 }

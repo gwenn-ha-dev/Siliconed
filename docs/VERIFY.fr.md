@@ -232,6 +232,8 @@ La ligne de chaque étape dans `check list` donne sa règle. Une identité (toke
 
 Chaque décodeur, celui de Z-Image compris, se juge par plan de l'image contre un témoin float64 du décodeur de la référence (`vae-witness`).
 
+**Le diagnostic de l'app applique la même règle.** **Mesurer ce Mac** ([ENGINE](ENGINE.fr.md#un-moteur-mesuré-sur-votre-mac)) vérifie chaque route qu'il chronomètre contre le résultat exact, calculé en double précision sur le CPU même du Mac, sur des opérandes synthétiques identiques sur tous les Mac, avec le même écart par canal : un produit ou une attention en fp32 peut en être à 10⁻⁵, le produit fp16 du Neural Engine à 1,25 fois l'arrondi propre du bf16. Une route au-delà de son seuil est écartée du plan — le moteur ne la propose jamais — et le rapport la nomme avec l'écart vu ; aucune vitesse ne rachète un résultat faux.
+
 Le débruiteur de Krea 2 a quelques frontières si mal conditionnées qu'un changement d'une unité sur le dernier chiffre de l'entrée déplace la sortie de plus que la règle ne permet, référence comprise. Là, une mesure qui échoue au témoin est jugée par *nuages* : la référence et le moteur tournent tous deux sur des entrées décalées d'un ulp, et l'écart médian du moteur doit rester sous 1,25 fois le pire de la référence. Ce sont les étapes dont la règle dit « clouds when the oracle has draws ».
 
 ## Au-delà de `all`
@@ -245,14 +247,14 @@ oracle-env/bin/python tools/oracle/z-image.py text --long
 siliconed check z-image text --long
 ```
 
-**Le Neural Engine.** L'app peut partager les produits matriciels du débruiteur avec le Neural Engine du Mac, qui calcule en fp16 ([ENGINE](ENGINE.fr.md#le-neural-engine)). `--neural-engine` vérifie ce chemin : chaque produit élargi du DiT d'au moins 512 lignes donne la moitié de ses lignes à l'ANE, le même partage sur tous les Mac et plus qu'aucune carte n'en donne (un rendu laisse au GPU les produits de moins de 1 024 lignes), et l'étape est jugée contre la référence calculée en bf16 sur les mêmes entrées, le moteur ayant droit à l'écart propre au bf16 plus 25 %. Le verdict dit combien de produits l'ANE a calculés ; sur un Mac où il n'en calcule aucun, l'étape est sautée. Les étapes `dit` des cinq modèles l'acceptent.
+**Le Neural Engine.** L'app peut partager les produits matriciels du débruiteur avec le Neural Engine du Mac, qui calcule en fp16 ([ENGINE](ENGINE.fr.md#le-neural-engine)). `--neural-engine` vérifie ce chemin : chaque produit élargi du DiT d'au moins 512 lignes donne la moitié de ses lignes à l'ANE, le même partage sur tous les Mac et plus qu'aucun plan n'en donne (un rendu laisse au GPU les produits de moins de 1 024 lignes), et l'étape est jugée contre la référence calculée en bf16 sur les mêmes entrées, le moteur ayant droit à l'écart propre au bf16 plus 25 %. Le verdict dit combien de produits l'ANE a calculés ; sur un Mac où il n'en calcule aucun, l'étape est sautée. Les étapes `dit` des cinq modèles l'acceptent.
 
 ```sh
 oracle-env/bin/python tools/oracle/z-image.py bf16 --size 1024
 siliconed check z-image dit --size 1024 --neural-engine
 ```
 
-**Activations arrondies en bf16.** Là où la carte de ce Mac l'allume, les produits du DiT prennent leur activation arrondie en bf16 juste avant le produit (les poids tels que publiés, les sommes et la sortie en fp32). `--bf16-activations` vérifie ce chemin sur n'importe quel Mac, pour chaque produit de 256 lignes ou plus, et juge l'étape comme celle du Neural Engine : contre la référence calculée en bf16, l'écart permis étant celui du bf16 plus 25 %. Le verdict dit combien de produits ont arrondi leur opérande. Les étapes `dit` des cinq modèles l'acceptent.
+**Activations arrondies en bf16.** Là où le plan de ce Mac la retient, les produits du DiT prennent leur activation arrondie en bf16 juste avant le produit (les poids tels que publiés, les sommes et la sortie en fp32). `--bf16-activations` vérifie ce chemin sur n'importe quel Mac, pour chaque produit de 256 lignes ou plus, et juge l'étape comme celle du Neural Engine : contre la référence calculée en bf16, l'écart permis étant celui du bf16 plus 25 %. Le verdict dit combien de produits ont arrondi leur opérande. Les étapes `dit` des cinq modèles l'acceptent.
 
 ```sh
 siliconed check z-image dit --size 512 --bf16-activations
@@ -370,7 +372,7 @@ Les LoRA ne sont pas couvertes ici : ce sont des fichiers que vous choisissez, 
 
 `siliconed check` juge la précision et rien d'autre. Les durées et le pic de mémoire se mesurent avec l'app seule : `silicontrol measure` ([REMOTE-CONTROL](REMOTE-CONTROL.fr.md#la-prise-et-le-protocole) ; `silicontrol help measure` en liste les options) rend une série dans l'app, chronomètre chaque rendu, échantillonne la mémoire de l'app et écrit un TSV et son résumé. Les durées et les pics de [ENGINE](ENGINE.fr.md) se prennent de la même façon (des rendus mis en file dans l'app avec `silicontrol`) : vous pouvez les refaire sur votre Mac avec l'app seule, sans Python ni oracle.
 
-La même graine donne les mêmes pixels (le même md5) d'un rendu à l'autre sur un même Mac, avec une même version de l'app et une même carte de la machine. Elle ne les donne pas d'un Mac à l'autre : la carte choisit d'autres noyaux sur une autre puce, et d'autres noyaux somment dans un autre ordre. Ce qui passe d'un Mac à l'autre, c'est la règle ci-dessus, pas les bits.
+La même graine donne les mêmes pixels (le même md5) d'un rendu à l'autre sur un même Mac, avec une même version de l'app et une même mesure de la machine. Elle ne les donne pas d'un Mac à l'autre, ni d'une mesure à l'autre : le plan tire d'autres lignes d'autres nombres, et d'autres lignes somment dans un autre ordre. Ce qui passe d'un Mac à l'autre, c'est la règle ci-dessus, pas les bits.
 
 ## Toutes les étapes
 
