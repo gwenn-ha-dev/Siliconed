@@ -4,7 +4,9 @@
 
 **Générer et éditer des images sur votre Mac, en local, avec des modèles récents aux poids ouverts : calculées en pleine précision, vérifiées contre le code d'origine, et sans jamais prendre plus de mémoire qu'un budget fixe.**
 
-Siliconed est une app macOS libre et gratuite pour la **génération d'images à partir de texte et l'édition d'images par IA, en local**, sur les Mac Apple silicon (M1 et suivants). Elle fait tourner des modèles de diffusion récents — [Krea 2 Turbo](https://huggingface.co/krea/Krea-2-Turbo), [Z-Image Turbo](https://huggingface.co/Tongyi-MAI/Z-Image-Turbo), [Qwen-Image-2.1 Turbo](https://huggingface.co/Qwen/Qwen-Image-2.1-Turbo), [Anima Turbo](https://huggingface.co/circlestone-labs/Anima) et [MOSS-Image](https://huggingface.co/OpenMOSS-Team/MOSS-Image-SFT) (bêta : sa recette en 8 pas est celle de la communauté) — en natif, en Swift et Metal : ni Python, ni serveur, ni cloud, rien ne quitte votre Mac. Elle marche hors ligne une fois le modèle installé.
+Siliconed est une app macOS libre et gratuite pour la **génération d'images à partir de texte et l'édition d'images, en local**, sur les Mac Apple silicon (M1 et suivants). Elle fait tourner des modèles de diffusion récents — [Krea 2 Turbo](https://huggingface.co/krea/Krea-2-Turbo), [Z-Image Turbo](https://huggingface.co/Tongyi-MAI/Z-Image-Turbo), [Qwen-Image-2.1 Turbo](https://huggingface.co/Qwen/Qwen-Image-2.1-Turbo), [Anima Turbo](https://huggingface.co/circlestone-labs/Anima) et [MOSS-Image](https://huggingface.co/OpenMOSS-Team/MOSS-Image-SFT) (bêta : sa recette en 8 pas est celle de la communauté) — en natif, en Swift et Metal : ni Python, ni serveur, ni cloud, rien ne quitte votre Mac. Elle marche hors ligne une fois le modèle installé.
+
+Elle est faite par un développeur indépendant, avec une règle têtue : un résultat qu'on ne peut pas comparer au code d'origine n'est pas livré. Le reste, c'est le plaisir de voir tourner un modèle de 12,9 milliards de paramètres sur un portable.
 
 ![Licence : Apache 2.0](https://img.shields.io/badge/licence-Apache%202.0-blue)
 ![macOS 26+](https://img.shields.io/badge/macOS-26%2B-black)
@@ -18,18 +20,19 @@ Siliconed est une app macOS libre et gratuite pour la **génération d'images à
 
 ## Télécharger
 
-L'app est distribuée en `.dmg` sur la page [Releases](https://github.com/gwenn-ha-dev/Siliconed/releases). Prérequis : macOS 26 ou plus, Apple silicon. Les modèles s'installent depuis l'app ; vous choisissez lesquels. Pour la construire vous-même : [Construire depuis les sources](docs/ENGINE.fr.md#construire-depuis-les-sources).
+L'app est distribuée en `.dmg` sur la page [Releases](https://github.com/gwenn-ha-dev/Siliconed/releases). Prérequis : macOS 26 ou plus, Apple silicon. Rien n'est préinstallé : vous choisissez les modèles depuis l'app, vous lisez chaque licence, et c'est seulement ensuite qu'un octet se télécharge. Pour la construire vous-même : [Construire depuis les sources](docs/ENGINE.fr.md#construire-depuis-les-sources).
 
 ## Ce que fait l'app
 
-- **Génère des images à partir de texte et les édite par instruction.** Qwen-Image-2.1 Turbo prend 1 à 3 images et une phrase (« remplace le ciel nuageux par un ciel bleu »). Quel modèle pour quoi, avec licences et tailles : [Les modèles](docs/APP.fr.md#les-modèles).
-- **Explore avant de s'engager.** Une grille d'esquisses rapides à travers graines, pas, forces de LoRA ou modèles ; la case choisie devient l'image finie.
+- **Dessine à partir de texte, et retouche sur instruction.** Qwen-Image-2.1 Turbo prend 1 à 3 images et une phrase (« remplace le ciel nuageux par un ciel bleu ») et ne change que ce que vous avez nommé. Quel modèle pour quoi, avec licences et tailles : [Les modèles](docs/APP.fr.md#les-modèles).
+- **Explore avant de s'engager.** Une grille d'esquisses rapides à travers graines, pas, forces de LoRA ou modèles ; la case choisie devient l'image finie, celle-là même que son esquisse promettait.
+- **Écrit vos prompts, si vous le demandez** (bêta). L'Atelier de prompts réécrit un prompt court dans le style que chaque modèle aime, ou décrit une image que vous y déposez. Il se sert d'un modèle déjà installé, et jamais pendant un rendu.
 - **Prend vos propres modèles.** Importez des LoRA et des fine-tunes depuis Civitai ou Hugging Face.
-- **Local et privé.** Le rendu se fait sur votre Mac, sans filtre de contenu ajouté par l'app. Elle suit la langue du système (anglais, français, allemand, espagnol, italien, japonais ou chinois simplifié).
+- **Local et privé.** Le rendu se fait sur votre Mac, sans filtre de contenu ajouté par l'app et sans rien envoyer de votre historique. Elle suit la langue du système (anglais, français, allemand, espagnol, italien, japonais ou chinois simplifié).
 - **Calcule sur un autre Mac.** Un MacBook calcule sur le Mac mini de la pièce d'à côté, appairé une fois par un code, chiffré ([comment](docs/APP.fr.md#calculer-sur-un-autre-mac)).
-- **Scriptable.** `silicontrol` pilote l'app ouverte depuis un terminal, pour les scripts et les agents IA ([détails](docs/REMOTE-CONTROL.fr.md)).
+- **Scriptable.** `silicontrol` pilote l'app ouverte depuis un terminal, pour les scripts et les agents de code ([détails](docs/REMOTE-CONTROL.fr.md)).
 
-Pour en savoir plus sur l'app : [docs/APP.fr.md](docs/APP.fr.md).
+Le tour de l'app : [docs/APP.fr.md](docs/APP.fr.md).
 
 ## Ce qui la distingue
 
@@ -41,7 +44,7 @@ Pour en savoir plus sur l'app : [docs/APP.fr.md](docs/APP.fr.md).
 
 ## Documentation
 
-- [docs/APP.fr.md](docs/APP.fr.md) : l'app en détail : créer, éditer, explorer, gérer les modèles, vie privée.
+- [docs/APP.fr.md](docs/APP.fr.md) : l'app en détail : créer, éditer, écrire des prompts, explorer, gérer les modèles, réglages, vie privée.
 - [docs/ENGINE.fr.md](docs/ENGINE.fr.md) : le moteur : la mesure du Mac, le Neural Engine, les chiffres, le rendu plus rapide, Draw Things, la mémoire, le diagnostic communautaire, la vérification, la construction depuis les sources.
 - [docs/VERIFY.fr.md](docs/VERIFY.fr.md) : vérifier les résultats contre la référence sur votre Mac.
 - [docs/REMOTE-CONTROL.fr.md](docs/REMOTE-CONTROL.fr.md) : `silicontrol`, protocole et fonctionnement interne.

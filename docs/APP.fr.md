@@ -2,7 +2,7 @@
 
 # L'app Siliconed
 
-`Siliconed.app` génère des images à partir d'un prompt, les édite par instruction, et tient une file et un historique. Elle suit la langue du système (anglais, français, allemand, espagnol, italien, japonais ou chinois simplifié).
+`Siliconed.app` transforme un prompt en image, retouche vos images quand vous lui dites quoi changer, et tient une file et un historique de tout ce qu'elle fait. Elle suit la langue du système (anglais, français, allemand, espagnol, italien, japonais ou chinois simplifié).
 
 ![La fenêtre : le rack à gauche (prompt, encodeur de texte, débruiteur, décodeur, chacun avec ses réglages et son temps), une image Krea 2 Turbo en 1248×832 à droite — une Irlandaise rousse qui sort des vagues en riant, sa planche de surf sous le bras, sous un ciel ensoleillé —, l'historique en dessous](images/window.jpg)
 
@@ -13,22 +13,24 @@ Le moteur derrière elle, avec les mesures : [Le moteur de Siliconed](ENGINE.fr
 ## Créer
 
 - **Cinq modèles.** Krea 2 Turbo, Z-Image Turbo, Qwen-Image-2.1 Turbo, Anima Turbo et MOSS-Image, chacun sous sa propre licence ([Les modèles](#les-modèles)). Tous cinq lisent le prompt avec un modèle de langage.
-- **La chaîne, visible.** Le rack montre le pipeline de haut en bas (prompt, encodeurs, débruiteur, décodeur), avec des fils typés et l'étage actif allumé ; chaque étage porte ses propres réglages.
+- **La chaîne, visible.** Pas de tuyauterie cachée : le rack montre le pipeline de haut en bas (prompt, encodeurs, débruiteur, décodeur), avec des fils typés et l'étage actif allumé ; chaque étage porte ses réglages et affiche son temps. Sous le titre, deux petites étiquettes disent ce qui est stocké et ce qui calcule : `poids int8` (ou `Q8_0`, `Q4_K_M`, `bf16`…, lu dans ce qui est installé) à côté de `calcule en fp32`. Sur le débruiteur, `calcule en fp32 · ANE` veut dire qu'une partie de ses produits passe par le Neural Engine ; un clic sur l'étiquette l'allume ou l'éteint ([comment](ENGINE.fr.md#le-neural-engine)).
 - **Plus de détail** avec Z-Image et Qwen-Image-2.1 : « Détail : Normal · Plus · Maximum » ajoute de la texture fine, sans temps en plus.
-- **Rendu plus rapide** (Réglages, allumé par défaut) : dès 1024 px de chaque côté, les premières évaluations sur une grille en demi-taille, le reste en pleine taille : d'un quart à un tiers de temps en moins (moins d'un dixième pour MOSS-Image), toujours 8 évaluations, une image un peu différente ([comment](ENGINE.fr.md#rendu-plus-rapide)).
-- **Les variations** : des cousines d'une image, subtiles ou marquées, aux mêmes réglages.
-- **Agrandir ×4** avec la super-résolution de macOS (macOS 26) : aucun prompt, rien d'ajouté, bords et textures affinés ; 1024² devient 4096² en une ou deux secondes.
+- **Rendu plus rapide** (Réglages › Général, allumé par défaut) : dès 1024 px de chaque côté, les premières évaluations sur une grille en demi-taille, le reste en pleine taille : d'un cinquième à un tiers de temps en moins (moins d'un dixième pour MOSS-Image), toujours 8 évaluations, une image un peu différente. Pas avec une LoRA, le Détail ou une édition ([comment](ENGINE.fr.md#rendu-plus-rapide)).
+- **Les variations** : des cousines d'une image, subtiles ou marquées, aux mêmes réglages (le bouton sous l'image, ou son menu contextuel).
+- **Agrandir ×4** avec la super-résolution de macOS (macOS 26) : aucun prompt, rien d'ajouté, bords et textures affinés ; 1024² devient 4096² en une ou deux secondes une fois le modèle de macOS chaud. Elle prend les images jusqu'à 1920 px de côté, et une image agrandie ne s'agrandit pas une seconde fois. L'original reste dans l'historique.
 - **Les LoRA** sur les cinq modèles.
-- **Reproductible au bit près.** Même prompt, même graine, mêmes réglages, même version, sur le même Mac : la même image, octet pour octet. Une version peut changer les pixels : la 0.12 le fait, de quelques unités sur le dernier chiffre, maintenant que son arithmétique arrondit comme la référence.
+- **Reproductible au bit près.** Même prompt, même graine, mêmes réglages, même version, sur le même Mac : la même image, octet pour octet. Deux choses peuvent changer les pixels : une nouvelle version de l'app (la 0.12 l'a fait, de quelques unités sur le dernier chiffre, quand son arithmétique s'est mise à arrondir comme la référence), et une nouvelle mesure de ce Mac, qui peut répartir le travail en d'autres lignes ([Mesurer ce Mac](#mesurer-ce-mac)).
 
 Chaque côté doit être d'au moins 512 et multiple de 16 ; la surface n'a pas de plafond fixe : le budget mémoire décide. Ce qu'un format coûte se calcule sur les formes du modèle avant le premier calcul et se juge contre le budget mémoire du Mac ([comment](ENGINE.fr.md#la-mémoire-et-le-budget)) : un Mac qui ne peut pas le tenir le refuse, et dit lequel le peut. Le sélecteur de taille propose 1536² et 2048² à côté de 1024², et grise ce que le budget de ce Mac refuse ; toute autre taille se tape. Les formats au-delà de 1024×1536 sont chiffrés par les mêmes formules ; Anima Turbo en 2048² a été rendu sur le Mac de référence de 16 Go, avec un pic de 5,4 Go. Sous 512² les modèles sont hors de leur domaine. Qwen-Image-2.1 veut des multiples de 32 (son VAE divise par 16), et Anima au plus 2048 px de côté (les positions que sa référence calcule) ; l'un et l'autre sont refusés avant tout calcul, de même que tout côté au-delà de 8192 px.
 
 ## Éditer
 
 - **L'édition par instruction** avec Qwen-Image-2.1 Turbo : donnez-lui 1 à 3 images et une phrase (« remplace le ciel nuageux par un ciel bleu ») ; son encodeur voit les images. Dans l'app, une édition est plafonnée à une surface de 1024².
-- **Le rideau** : faites glisser une ligne sur deux images, ou sur une édition ou un agrandissement et son original, pour voir ce qui a changé ; zoomez vers le curseur pour regarder un détail (en pinçant, ou à la molette d'une souris).
-- **Alterner** : les deux mêmes images, une à la fois, au même endroit et au même zoom ; cliquez sur l'image, ou appuyez sur ← pour la première et → pour la seconde.
-- **Un historique comme dans Photos** : flèches, ⌫ et ⌘Z, sélection multiple, comparaison côte à côte, export, glisser-déposer, Partager.
+- **Trois façons de comparer** deux images, ou une édition ou un agrandissement et son original : Rideau, Alterner ou Côte à côte, à choisir dans Réglages › Général › Comparaison ou dans la barre d'outils du canevas.
+  - **Rideau** : faites glisser une ligne sur les images pour voir ce qui a changé. Zoomez vers le curseur pour regarder un détail : en pinçant, ou à la molette d'une souris (une molette horizontale déplace toujours l'image).
+  - **Alterner** : les deux mêmes images, une à la fois, au même endroit et au même zoom ; cliquez sur l'image, ou appuyez sur ← pour la première et → pour la seconde.
+- **Les sujets nommés** (Réglages › Avancé, éteints par défaut) : nommez une personne ou une chose à partir d'une photo, puis citez-la par `@nom` dans une édition.
+- **Un historique comme dans Photos** : flèches, ⌫ et ⌘Z, sélection multiple, export, glisser-déposer, Partager.
 
 ![Une édition par Qwen-Image-2.1 dans la fenêtre : la photo Krea 2 de la surfeuse en image 1 dans la boîte Images, l'instruction « Convert this photo to a western comic book style with cel shading », le résultat en cel shading dans le canevas](images/edit.jpg)
 
@@ -37,6 +39,16 @@ Chaque côté doit être d'au moins 512 et multiple de 16 ; la surface n'a pas
 ![Une édition par Qwen-Image-2.1, sous le rideau qui glisse : la surfeuse de Krea 2 qui sort des vagues en combinaison, puis en chemisier de lin blanc, son visage, ses cheveux, sa planche et la mer inchangés](images/outfit.gif)
 
 *Une édition qui ne change que ce qu'on lui dit : « Replace her wetsuit with a white linen blouse. Keep her face, hair, surfboard, pose and the beach unchanged. », la photo Krea 2 en image 1, 203 s.*
+
+## Écrire
+
+L'**Atelier de prompts** (bêta ; Fenêtre › Atelier de prompts, ⌥⌘L) est une fenêtre à part où un modèle de langage écrit le prompt à votre place.
+
+- **Réécrire** transforme un prompt court en un prompt écrit pour le modèle que vous choisissez (« Écrire pour… »). **Décrire** transforme une image déposée en prompt. **Envoyer au rack** met le résultat dans le prompt du rack, et ⌘Z dans ce champ ramène l'ancien. Rien ne s'applique tout seul.
+- **Le rédacteur est un modèle que vous avez déjà** : l'encodeur de texte de Qwen-Image-2.1, Qwen3-VL-8B, mis à écrire. Il ne manque au modèle installé que sa couche de sortie, et « Installer le rédacteur » la télécharge dans le même dépôt (1,25 Go, par plage d'octets). Il faut Qwen-Image-2.1 installé, en Compact sur un Mac de 16 Go (la Standard en demande 24) ; la fenêtre dit ce qui manque.
+- **Nos consignes, une par modèle**, tirées de ce que chaque éditeur dit de ses prompts. Chaque élément de votre prompt est gardé, le texte entre guillemets mot pour mot ; rien n'est retiré, adouci ni moralisé.
+- **Jamais pendant un rendu** : une image qui démarre arrête le rédacteur, et l'atelier attend. Environ 18 jetons par seconde sur un M1 Pro, sur le GPU. Sa sortie gloutonne est celle de transformers, jeton pour jeton ([VERIFY](VERIFY.fr.md)).
+- **Incognito** : textes et images restent en mémoire, sans fichier ni historique ; fermer la fenêtre libère le rédacteur. L'atelier travaille sur ce Mac seulement, pas quand vous calculez sur un autre.
 
 ## Explorer
 
@@ -55,9 +67,17 @@ Le panneau d'exploration construit une grille dans le canevas. Ses axes : les g
 - **Rien n'est préinstallé.** Vous choisissez un modèle ; avant le premier octet téléchargé, l'app affiche sa licence et la place qu'il prend sur disque, et vous demande d'accepter. Chaque fichier est figé à une révision et vérifié par sha256.
 - **Standard, Compact ou Légère.** Chaque modèle s'installe avec les poids de l'éditeur (Standard), avec des poids 8 bits publiés par des tiers (Compact, le défaut et celle que nous recommandons : 19,5 Go au lieu de 34,4 pour Krea 2, 11,7 Go au lieu de 20,4 pour Z-Image, 17,3 Go au lieu de 31,2 pour Qwen-Image-2.1, 4,10 Go au lieu de 5,65 pour Anima, 17,9 Go au lieu de 27,5 pour MOSS-Image ; une image légèrement différente), ou avec le transformeur en 4 à 6 bits tel qu'un tiers le publie (GGUF Q4_K_M ; Légère : 12,8 Go, 9,5 Go, 14,2 Go et 3,31 Go, le moins lu sur le disque à chaque pas ; un autre jeu de poids, une image qui peut se composer autrement). Pour Krea 2, Z-Image, Qwen-Image-2.1 et MOSS-Image, l'encodeur de texte de la Compact est lui aussi en 8 bits, et la Légère le reprend ; celui d'Anima reste le bf16 de l'éditeur dans les trois, faute de version 8 bits publiée. MOSS-Image n'a pas de Légère. La Légère est présélectionnée sur un Mac de 8 Go de mémoire, la Compact ailleurs ; vous choisissez avant d'installer. Une version à la fois : passer à l'autre la remplace ; l'installée continue de rendre jusqu'à ce que la nouvelle soit complète, puis libère sa place ; si le disque ne peut pas tenir les deux, l'app le dit avant l'acceptation.
 - **Les imports Civitai et Hugging Face.** Les LoRA (formats Civitai, Comfy, kohya, diffusers) et le DiT d'un fine-tune (`.safetensors`, ou `.gguf` de Q4 à Q8_0), par glisser-déposer ou ⌘O ; un checkpoint Civitai d'une famille connue s'importe tel quel et emprunte l'encodeur et le VAE de sa famille. Déposé avant que sa famille soit installée, il ouvre l'installation de celle-ci — licence, encodeur et VAE, jamais le DiT de la famille — et s'importe une fois l'installation faite. Un fichier quantifié reste sur le disque tel que publié, jamais requantifié (Z-Image : 6,2 Go en 8 bits, environ 5 Go en GGUF Q4_K_M, au lieu de 12,3 Go ; chaque pas un peu plus lent, le calcul reste en fp32) ; sous 4 bits, le fichier est refusé. Une LoRA importée prend le nom de son fichier ; le nom donné par son auteur et ses mots déclencheurs s'affichent en infobulle.
-- **Statistiques et diagnostic.** La palette des statistiques (⌥⌘I) est un bouton de la barre d'outils. « Mesurer ce Mac » (menu Aide, ou « Chaîne » en tête du rack, à côté de l'icône de ce Mac, grisée tant que ce Mac n'est pas mesuré ; quand un rendu s'est écarté de plus de 10 % de ce que la mesure prévoyait, le bas de la barre latérale le dit, une fois, à côté du bouton qui mesure de nouveau) montre la mesure de ce Mac — toujours une carte, avec la confiance qu'on peut avoir dans le chiffre de chaque moteur et ce qu'elle a trouvé, en phrases simples —, ce que chaque moteur atteint contre la crête que la puce annonce, la mémoire que la mesure a tenue et sa durée, et permet, en option, de partager le rapport (Partager… ▸ Ouvrir un signalement GitHub, Copier le JSON). Le premier rendu mesure d'abord quand ce Mac n'a pas de mesure à jour — aucune, ou une prise par un autre macOS ou une autre version de Siliconed — ; une mesure que vous demandez s'applique au rendu suivant (jamais à un rendu en cours), si bien qu'à partir de là une même graine peut donner une image un peu différente de celle d'avant la mesure.
+- **Statistiques.** Une palette flottante (⌥⌘I, Fenêtre › Statistiques, ou le bouton de la barre d'outils) : où en est le rendu, ce que chaque étage a coûté, ce qui reste pour lui et pour la file, et ce que pesait le dernier rendu. Rien n'est estimé d'après une constante : un modèle ou un format jamais rendu ici n'a pas d'estimation, et la palette le dit.
 
-Les modèles vivent dans `~/Library/Application Support/Siliconed` (modifiable avec `SILICONED_ROOT`). Pour libérer le disque interne, les Réglages les déplacent sur un autre — un disque externe, un partage réseau : chaque fichier est copié, vérifié, puis effacé du Mac. Siliconed ne copie alors sur le Mac que les modèles que vous rendez, le temps de la session, et les efface en quittant ; les licences acceptées et la mesure de ce Mac restent sur le Mac. Débranché, le disque est signalé : rien ne se rend avant son retour.
+### Mesurer ce Mac
+
+Avant son premier rendu, puis après une mise à jour ou un nouveau macOS, Siliconed chronomètre ce que calcule chaque moteur de votre Mac. Moins d'une minute, aucun modèle, et toujours une carte : rien n'est jamais refusé, et la confiance qu'on peut avoir dans chaque chiffre est écrite à côté. Vous pouvez l'ouvrir quand vous voulez : Aide › Mesurer ce Mac…, le titre Chaîne et l'icône du Mac en tête du rack (grisée tant que ce Mac n'est pas mesuré), ou Réglages › Avancé › Ce Mac.
+
+La feuille montre, colonnes titrées : la vitesse de chaque route, sa part de la crête du GPU, si son résultat est égal au résultat exact (Exact ✓), ce que chaque moteur garde de sa vitesse quand ils travaillent ensemble, la mémoire que la mesure a tenue et sa durée. Ce qu'elle a trouvé est dit en phrases simples, chacune avec son effet sur le plan. Le partage est une option, jamais le bouton par défaut : Partager… ▸ Ouvrir un signalement GitHub, ou Copier le JSON.
+
+Une mesure que vous demandez s'applique au **rendu suivant**, jamais à un rendu en cours : à partir de là, une même graine peut donner une image un peu différente de celle d'avant la mesure. Quand un rendu s'est écarté de plus de 10 % de ce que la mesure prévoyait, la barre latérale le dit, une fois, à côté du bouton qui mesure de nouveau.
+
+Les modèles vivent dans `~/Library/Application Support/Siliconed` (modifiable avec `SILICONED_ROOT`). Pour libérer le disque interne, Réglages › Général › Déplacer la bibliothèque… les déplace sur un autre — un disque externe, un partage réseau : chaque fichier est copié, vérifié, puis effacé du Mac. Siliconed ne copie alors sur le Mac que les modèles que vous rendez, le temps de la session, et les efface en quittant ; les licences acceptées et la mesure de ce Mac restent sur le Mac. Débranché, le disque est signalé : rien ne se rend avant son retour.
 
 ![La fenêtre Modèles : les cinq modèles des éditeurs installés en Compacte, chacun avec sa licence et sa place sur le disque (Z-Image Turbo 11,74 Go, Qwen-Image-2.1 Turbo 17,3 Go, Anima Turbo 4,1 Go, Krea 2 Turbo 19,5 Go, MOSS-Image 17,88 Go, marqué bêta), les LoRA en dessous, la place occupée et libre en bas](images/models.jpg)
 
@@ -104,13 +124,23 @@ Les autres versions Compact utilisent des poids 8 bits publiés par des tiers :
 - **Chiffré, rien en clair.** TLS 1.2 avec une clé par Mac appairé, gardée au Trousseau. macOS demande une fois l'accès au réseau local, la première fois que vous prêtez ce Mac ou que vous l'appairez ; un Mac qui ne fait ni l'un ni l'autre n'est jamais interrogé.
 - **Tout marche là-bas** : rendus, éditions avec vos références, variations, grilles et explorations, agrandissement et recadrage, sujets nommés, annulation ; installer un modèle ou importer une LoRA sur le Mac prêteur, le mesurer. En retirer un attend un clic sur ce Mac. Chaque Mac ne voit que ses travaux et ses images, et le Mac prêteur reste dans son propre budget mémoire. `silicontrol` suit Calculer sur ([REMOTE-CONTROL.fr.md](REMOTE-CONTROL.fr.md)).
 
+## Réglages
+
+Siliconed › Réglages… (⌘,), trois onglets.
+
+- **Général** : le Rendu plus rapide ; la Comparaison (Rideau, Alterner, Côte à côte) ; où vivent les modèles, avec Déplacer la bibliothèque…, Ouvrir une bibliothèque… et Ramener sur ce Mac.
+- **Autres Mac** : prêter ce Mac, appairer avec un autre ([Calculer sur un autre Mac](#calculer-sur-un-autre-mac)).
+- **Avancé** : Ligne de commande (installe `silicontrol`, plus bas) ; Ce Mac (la mesure) ; et « Pour essayer », éteint par défaut et susceptible de changer : le Mode développeur (ajoute les solveurs Euler a, DPM++ 2M et UniPC), les Sujets nommés, les Forces de LoRA négatives (curseurs de −1,5 à 1,5, pour les LoRA « curseur » ; une LoRA ordinaire est abîmée par une force négative).
+
+Quand vous calculez sur un autre Mac, l'interrupteur du Rendu plus rapide et la mesure sont ceux de cet autre Mac, et la fenêtre le dit.
+
 ## Privé par construction
 
-Le rendu se fait sur votre Mac. Le seul trafic réseau est le téléchargement du modèle que vous avez accepté et, si vous l'ouvrez (Réglages › Autres Mac), la liaison chiffrée avec un autre Mac du réseau ; le diagnostic copie son rapport et ouvre un formulaire d'issue GitHub que vous choisissez de soumettre ou non. Le cache de rendu ne dure qu'une session : il est vidé au lancement et à la fermeture. Avant chaque rendu, le moteur vérifie le modèle, sa licence, le format et la mémoire qu'il lui faut, et refuse d'emblée un rendu au-delà du budget de ce Mac. L'app ne censure aucun prompt et n'ajoute aucun filtre de contenu ; la licence de chaque modèle s'applique toujours, et celle de Krea 2 Community en demande un à qui déploie le modèle.
+Le rendu se fait sur votre Mac. Le seul trafic réseau est le téléchargement du modèle que vous avez accepté, l'unique requête à GitHub pour connaître la dernière version quand vous choisissez Siliconed › Rechercher les mises à jour… et, si vous l'ouvrez (Réglages › Autres Mac), la liaison chiffrée avec un autre Mac du réseau ; le diagnostic copie son rapport et ouvre un formulaire d'issue GitHub que vous choisissez de soumettre ou non. Le cache de rendu ne dure qu'une session : il est vidé au lancement et à la fermeture. Avant chaque rendu, le moteur vérifie le modèle, sa licence, le format et la mémoire qu'il lui faut, et refuse d'emblée un rendu au-delà du budget de ce Mac. L'app ne censure aucun prompt et n'ajoute aucun filtre de contenu ; la licence de chaque modèle s'applique toujours, et celle de Krea 2 Community en demande un à qui déploie le modèle.
 
-## Pour les agents IA et les scripts : silicontrol
+## Pour les scripts et les agents : silicontrol
 
-Pilote l'app ouverte depuis un terminal. Elle est livrée dans `Siliconed.app/Contents/Helpers/silicontrol` ; Réglages → Avancé → Ligne de commande la lie dans `/usr/local/bin`. Ce que vous ajoutez apparaît dans la fenêtre de l'app, et il n'y a qu'une file, jamais deux rendus à la fois.
+Pilote l'app ouverte depuis un terminal. Elle est livrée dans `Siliconed.app/Contents/Helpers/silicontrol` ; Réglages › Avancé › Ligne de commande la lie dans `/usr/local/bin`. Ce que vous ajoutez apparaît dans la fenêtre de l'app, et il n'y a qu'une file, jamais deux rendus à la fois.
 
 ```
 silicontrol help                 la référence complète (toujours commencer par là)

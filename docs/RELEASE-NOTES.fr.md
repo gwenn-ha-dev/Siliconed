@@ -55,6 +55,10 @@
   largeur quand la taille passe au carré.
 - **Le Mac sur lequel on calcule, à côté de Chaîne** : son icône, comme dans « À propos de ce Mac »,
   grisée tant qu'il n'est pas mesuré ; celle de l'autre Mac quand on calcule dessus.
+- **Le pied du rack dit en quoi calcule la version installée** : la Standard en fp32 de bout en bout, chaque étage vérifié contre la référence ; une Compact ou une Légère en fp32 sur des poids 8 ou 4 bits tels que publiés, avec une partie du DiT en fp16 sur le Neural Engine quand il est allumé.
+- **La barre de progression du Dock bouge.** Elle ne l'a jamais fait : la vignette dessine maintenant elle-même l'icône et la barre.
+- **Les métadonnées Civitai de MOSS-Image** créditent la page SFT et la LoRA DMD sous laquelle tournent ses 8 pas, si bien qu'un Remix sur Civitai reçoit toute la recette.
+- **Un premier chiffre sur un Mac de 8 Go** : Anima Turbo, 1024², Compact, en 80,1 s sur un MacBook Neo ([Les chiffres](ENGINE.fr.md#les-chiffres)).
 - **Partager la carte est une option** : sous Partager… dans Mesurer ce Mac, jamais le bouton par défaut.
 - **La molette d’une souris zoome** sur l’image et dans le rideau, vers le curseur ; une molette horizontale
   déplace toujours l’image, et le trackpad ne change pas. ([#10](https://github.com/gwenn-ha-dev/Siliconed/issues/10))

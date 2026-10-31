@@ -29,9 +29,9 @@ English · [Français](RELEASE-NOTES.fr.md)
 
 ### Measure This Mac reads plainly; a measure applies to the next render
 
-- **The sheet titles every column**: each route's speed, its share of the GPU's peak (the GPU's matrix products only, with the peak in the title), « Exact » (✓), then what each engine keeps of its speed when the engines work together. The Neural Engine's 8-bit route is listed with the others.
+- **The sheet titles every column**: each route's speed, its share of the GPU's peak (the GPU's matrix products only, with the peak in the title), “Exact” (✓), then what each engine keeps of its speed when the engines work together. The Neural Engine's 8-bit route is listed with the others.
 - **A measure applies to the next render**, no longer to the next launch: never to a render under way, so that a render still reads one plan from start to end. From then on, one seed can give an image a little different from before the measure.
-- **The rack says how the weights are stored**: a label on the DiT, the text encoder and the VAE (`int8`, `Q8_0`, `Q4_K_M`, `bf16`…), read from what is installed, beside the label that says what computes (« computes fp32 »). A borrowed Mac publishes them too.
+- **The rack says how the weights are stored**: a label on the DiT, the text encoder and the VAE (`int8`, `Q8_0`, `Q4_K_M`, `bf16`…), read from what is installed, beside the label that says what computes (“computes fp32”). A borrowed Mac publishes them too.
 
 ### Prompt Lab (beta)
 
@@ -55,6 +55,10 @@ English · [Français](RELEASE-NOTES.fr.md)
   size turns square.
 - **The Mac you compute on, beside Chain**: its own icon, as in About This Mac, greyed until it is
   measured; another Mac's when you compute on it.
+- **The rack's footnote says what the installed version computes in**: the Standard in fp32 end to end, every stage verified against the reference; a Compact or a Light in fp32 on 8- or 4-bit weights as published, with part of the DiT in fp16 on the Neural Engine when it is on.
+- **The Dock icon's progress bar moves**. It never did: the tile now draws the icon and the bar itself.
+- **MOSS-Image's Civitai metadata** credits the SFT page and the DMD LoRA its 8 steps run under, so a Remix on Civitai gets the whole recipe.
+- **A first number on an 8 GB Mac**: Anima Turbo, 1024², Compact, in 80.1 s on a MacBook Neo ([Numbers](ENGINE.md#numbers)).
 - **Sharing the map is an option**: under Share… in Measure This Mac, never the default button.
 - **A mouse's wheel zooms** on the image and in the curtain, toward the pointer; a horizontal wheel still
   moves the image, and the trackpad does not change. ([#10](https://github.com/gwenn-ha-dev/Siliconed/issues/10))
@@ -252,7 +256,7 @@ English · [Français](RELEASE-NOTES.fr.md)
 ### Open a Hugging Face model in the app
 
 - **The app opens `siliconed://hf` links**, relayed by a page of the site that offers the .dmg
-  when the app is not installed: what Hugging Face's « Use this model » button opens, once Hugging
+  when the app is not installed: what Hugging Face's “Use this model” button opens, once Hugging
   Face lists Siliconed. A family's own repository opens its installation; any other repository
   lists the `.safetensors` and `.gguf` files the app could import — each judged on its header
   before anything downloads —, with their size and license. The file chosen is downloaded, verified,
@@ -278,8 +282,8 @@ English · [Français](RELEASE-NOTES.fr.md)
 
 ### Fixed
 
-- **A LoRA trained with a different rank per layer showed « rank 0 »** in the Models window and in
-  the rack's tooltip; it now shows its range, « ranks 2–57 » for inCase on Anima.
+- **A LoRA trained with a different rank per layer showed “rank 0”** in the Models window and in
+  the rack's tooltip; it now shows its range, “ranks 2–57” for inCase on Anima.
 
 ## 0.13
 
@@ -424,10 +428,10 @@ English · [Français](RELEASE-NOTES.fr.md)
   way. Each path is checked against the reference.
 - **The map changes the speed, not the picture** beyond the arithmetic it checked; the same Mac
   with the same map still gives the same bits.
-- **« Chain », at the head of the rack, opens the measure**: orange, with its chip, until this Mac is
+- **“Chain”, at the head of the rack, opens the measure**: orange, with its chip, until this Mac is
   measured, a green chip after. **Measure This Mac** (Help menu) shows the map and what it
-  decided; « Open the Issue » now copies the report and opens a short GitHub form to paste it into,
-  since the report no longer fits in a link; « Copy JSON » serves whoever sends it another way.
+  decided; “Open the Issue” now copies the report and opens a short GitHub form to paste it into,
+  since the report no longer fits in a link; “Copy JSON” serves whoever sends it another way.
 
 ### Closer to the reference, to the rounding
 
@@ -466,7 +470,7 @@ English · [Français](RELEASE-NOTES.fr.md)
   end, non-finite alphas or strengths, rank 0, a GGUF Q8_0 block with a non-finite scale.
 - **The memory need counts what it missed**: the scratch of rotated int8 weights (Krea 2's
   Compact overran its text stage by 7 MB), Z-Image's padded tokens. A long Krea 2 prompt, past about
-  170 tokens, no longer stops with « arena exhausted ».
+  170 tokens, no longer stops with “arena exhausted”.
 - **Attention without the head split is sliced by queries** where it would exceed the GPU's matrix
   limit (Z-Image at 1024×1536 on a Mac whose map turns the split off).
 - The flash attention kernel computes in safe math and lost two branches that were never used and
@@ -477,7 +481,7 @@ English · [Français](RELEASE-NOTES.fr.md)
 ### Interface
 
 - **A LoRA takes its file's name**: an imported LoRA is called by its file, no longer by the name
-  written in its metadata, often a trainer's default (« my first lora v1 copy copy »). The
+  written in its metadata, often a trainer's default (“my first lora v1 copy copy”). The
   trainer's name, and the trigger words when the file states them beyond doubt, show in a tooltip on
   the LoRA, in the rack and in the Models window. LoRAs imported before keep their name.
 - Krea 2's license sheet shows the whole license; hairlines and fills a little stronger, secondary
@@ -500,13 +504,13 @@ Timings are measured on a MacBook Pro M1 Pro with 16 GB.
   the line over a detail.
 - **Paste an image** with ⌘V (outside the prompt): copied in Procreate, Photoshop, Preview or the
   Finder, it goes where a drop on the Images box would — an image to edit, or a subject to name.
-- **LoRA in the open**: the stack sits right under the model; « Add » is a menu of the model's
+- **LoRA in the open**: the stack sits right under the model; “Add” is a menu of the model's
   LoRAs; each one shows its strength's slider, its figure (double-click: back to 0.8) and a remove
   button — no more popover to open and close.
 - **Explore stands beside Generate**: the same gesture, many small images instead of one.
 - **The rack says more, in fewer places**: each box shows what its stage took as soon as it ends;
   hovering a stage's name says what it does (text encoder, DiT, VAE…); the memory a render needs is
-  said once, under the rack; what keeps Generate greyed (« Write a prompt »…) is said above it.
+  said once, under the rack; what keeps Generate greyed (“Write a prompt”…) is said above it.
 - **The queue scrolls** past a few renders and shows the running one at its head: its image k/N in a
   batch, the time left, a stop that lets the rest go on. The diagnostic leaves the toolbar (Settings
   and the Help menu keep it).
@@ -514,7 +518,7 @@ Timings are measured on a MacBook Pro M1 Pro with 16 GB.
 ### Fixed
 
 - A crash when marking images to compare, most likely with a large image still being read.
-- PNG metadata always writes `CFG scale: 1`: Civitai's « Remix » no longer starts from its own
+- PNG metadata always writes `CFG scale: 1`: Civitai's “Remix” no longer starts from its own
   default scale, which burnt the image.
 - The Dock icon no longer bounces when the queue empties.
 
@@ -526,7 +530,7 @@ Timings are measured on a MacBook Pro M1 Pro with 16 GB.
   folder, shown in the Finder; each with a sentence saying what it does.
 - **Negative LoRA strengths** (Settings → Experimental): the LoRA sliders go from −1.5
   to 1.5, in the panel and in the exploration. A negative strength pushes the image away from what
-  the LoRA learned: it is meant for « slider » LoRAs (age, detail…), trained to be used from −x to
+  the LoRA learned: it is meant for “slider” LoRAs (age, detail…), trained to be used from −x to
   +x; on an ordinary LoRA it mostly damages the image, hence the switch. Off, a negative value is
   refused, with what to turn on. `silicontrol add --lora name:-0.5` follows the same switch.
 - **A solver axis in the exploration** (Developer Mode): Euler, Euler a, DPM++ 2M and UniPC side by
@@ -536,7 +540,7 @@ Timings are measured on a MacBook Pro M1 Pro with 16 GB.
 ### Fixed
 
 - **LoRA strengths typed with a point in the exploration** (`0.4, 0.8`) were unreadable on a Mac
-  set to a language that writes decimals with a comma, and « Explore » stayed greyed out. Both
+  set to a language that writes decimals with a comma, and “Explore” stayed greyed out. Both
   forms now read.
 
 ## 0.10.1
@@ -577,16 +581,16 @@ Timings are measured on a MacBook Pro M1 Pro with 16 GB.
   a shortcut of ours; it is gone: the image is the Turbo's 8 published steps and nothing else. A
   1024² takes 134 s in the app (142 s from the command line) instead of ~120 s on an M1 Pro with 16 GB;
   1024×1536 232 s instead of 190 s. Edits are unchanged: they never took a step at half size.
-- **ComfyUI's schedule, to compare** (Developer Mode): a « ComfyUI schedule » switch walks the noise
+- **ComfyUI's schedule, to compare** (Developer Mode): a “ComfyUI schedule” switch walks the noise
   levels ComfyUI uses for this model — the base model's, not the Turbo's — same seed, same steps.
   `silicontrol add --schedule comfyui` does the same.
 
 ### Fixed
 
 - **An artist written `@name` in an Anima prompt** was refused by `silicontrol` with Named Subjects on
-  (« No subject is called @name »): a model that reads no images now keeps its `@` as text, as the
+  (“No subject is called @name”): a model that reads no images now keeps its `@` as text, as the
   rack already did.
-- **The text encoder's time** in the rack could read « ≈ 0.00 s » after a prompt read back from the
+- **The text encoder's time** in the rack could read “≈ 0.00 s” after a prompt read back from the
   render cache; only a prompt actually encoded now teaches it.
 - **The time left** counted the running render as nothing until its first full step: the pace learned
   for that model and size now stands in.
@@ -602,7 +606,7 @@ Timings are measured on a MacBook Pro M1 Pro with 16 GB.
   unit and on both at once, fp16 and bf16 products, attention through the engine's three kernels,
   weight widening on the CPU and on the GPU — each result checked against the exact one, computed in
   double precision. The JSON report says what the chip computes, and whether it computes it right.
-- **Fixed: with the Compact install, the diagnostic always said « differs from the reference ».** It
+- **Fixed: with the Compact install, the diagnostic always said “differs from the reference”.** It
   compared the 8-bit weights' output with the full-precision reference: the weights differed, not the
   chip.
 
@@ -829,8 +833,8 @@ Timings are measured on a MacBook Pro M1 Pro with 16 GB.
 
 ### Editing
 
-- **Edit from anywhere.** Right-click an image in the history and choose « Edit with
-  Qwen-Image-2.1 », even when the rack is set to a model that does not edit: the rack switches to
+- **Edit from anywhere.** Right-click an image in the history and choose “Edit with
+  Qwen-Image-2.1”, even when the rack is set to a model that does not edit: the rack switches to
   the editor and the image becomes image 1. A thumbnail dragged from the history onto the Edit box
   becomes a reference.
 - **Original / edited curtain.** An edited image has a button that lays it over its original, with a
@@ -838,17 +842,17 @@ Timings are measured on a MacBook Pro M1 Pro with 16 GB.
 
 ### Images
 
-- **Detail at 1024².** « Detail: Normal · More · Most » now gives clean results at 1024² too, on
+- **Detail at 1024².** “Detail: Normal · More · Most” now gives clean results at 1024² too, on
   Z-Image and Qwen-Image-2.1: its strength follows the size of the image, and it no longer leaves
   a grainy texture at high resolution.
-- **Variations follow « Images ».** Subtle or strong variations of an image now make as many images
-  as the rack's « Images » field (1 by default), instead of always four.
+- **Variations follow “Images”.** Subtle or strong variations of an image now make as many images
+  as the rack's “Images” field (1 by default), instead of always four.
 
 ### Exploration
 
-- **Pick the model in the panel.** The exploration panel has its own « Model » menu.
-- **One status line.** The panel says where it is in a single line: « Sketch at n steps of N », or
-  « Finished images, N steps » for Qwen-Image-2.1, which now explores with finished images (its
+- **Pick the model in the panel.** The exploration panel has its own “Model” menu.
+- **One status line.** The panel says where it is in a single line: “Sketch at n steps of N”, or
+  “Finished images, N steps” for Qwen-Image-2.1, which now explores with finished images (its
   early sketches were blurry).
 
 ### Imported models
