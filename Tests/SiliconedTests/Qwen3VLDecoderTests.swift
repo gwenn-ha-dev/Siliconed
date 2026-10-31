@@ -111,7 +111,8 @@ final class Qwen3VLDecoderTests: XCTestCase {
             } } } }
             h = k; size *= 4
         }
-        return h.map { $0 / Double(g).squareRoot() }
+        let root: Double = Double(g).squareRoot()
+        return h.map { (x: Double) -> Double in x / root }
     }
 
     /// An int8 `[k, n]` matrix as the map lays a tensor out: the values, then on a 16-byte boundary the per-column scales in
@@ -434,8 +435,9 @@ final class Qwen3VLDecoderTests: XCTestCase {
         let a = heads * d, kv = kvHeads * d, qParts = 3, kParts = 2, vParts = 4
         let qp = rng.floats(qParts * a), kp = rng.floats(kParts * kv), vp = rng.floats(vParts * kv)
         let qw = rng.floats(d).map { 1 + $0 / 2 }, kw = rng.floats(d).map { 1 + $0 / 2 }
-        let angles = (0..<(d / 2)).map { Float($0) * 0.37 + 0.1 }
-        let freqs = angles.flatMap { [cosf($0), sinf($0)] }
+        // Typed: Swift 6.3's checker (the CI's) gives up on `Float($0) * 0.37 + 0.1` in a closure.
+        let angles: [Float] = (0..<(d / 2)).map { (i: Int) -> Float in Float(i) * 0.37 + 0.1 }
+        let freqs: [Float] = angles.flatMap { (angle: Float) -> [Float] in [cosf(angle), sinf(angle)] }
         let q = try buffer(floats: [Float](repeating: 0, count: a)), cache = try buffer(floats: [Float](repeating: .nan, count: 6 * kv))
         let row = 2
         try oneCommand {
@@ -658,7 +660,9 @@ final class Qwen3VLDecoderTests: XCTestCase {
             var t = MapWriter.Tensor(name: name, shape: [k, n], dtype: .int8, scale: .init(dtype: .float32, shape: [n]), transposed: true) {
                 var bytes = [UInt8](repeating: 0, count: k * n)
                 self.fillBytes(&bytes, count: k * n, seed: UInt64(k * 31 + n))
-                let scale = (0..<n).flatMap { _ in withUnsafeBytes(of: (1 / (64 * Float(k).squareRoot())).bitPattern.littleEndian) { Array($0) } }
+                let value: Float = 1 / (64 * Float(k).squareRoot())
+                let one: [UInt8] = withUnsafeBytes(of: value.bitPattern.littleEndian) { Array($0) }
+                let scale: [UInt8] = (0..<n).flatMap { (_: Int) -> [UInt8] in one }
                 return .init(values: bytes, scale: scale, absMax: 1)
             }
             t.rotation = 256

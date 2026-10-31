@@ -239,7 +239,13 @@ final class PromptWriterTests: XCTestCase {
     // ── the head map ───────────────────────────────────────────────────────────────────────────
 
     private func bf16(_ count: Int, seed: UInt16) -> [UInt8] {
-        (0..<count).flatMap { i -> [UInt8] in let v = UInt16(truncatingIfNeeded: Int(seed) &* 31 &+ i &* 7) | 0x3C00 & 0x3FFF; return [UInt8(v & 255), UInt8(v >> 8)] }
+        // Typed step by step: Swift 6.3's checker gives up on mixed integer literals in one closure (the CI's).
+        let mask: UInt16 = 0x3C00 & 0x3FFF
+        return (0..<count).flatMap { (i: Int) -> [UInt8] in
+            let mixed: Int = Int(seed) &* 31 &+ i &* 7
+            let v: UInt16 = UInt16(truncatingIfNeeded: mixed) | mask
+            return [UInt8(v & 255), UInt8(v >> 8)]
+        }
     }
 
     /// A one-file safetensors: `[(name, shape, bytes)]`.
