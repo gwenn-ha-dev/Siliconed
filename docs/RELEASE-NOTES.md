@@ -49,6 +49,22 @@ English · [Français](RELEASE-NOTES.fr.md)
   (`siliconed check qwen-image-2.1 writer`). About 18 tokens a second on an M1 Pro, on the GPU, from the
   weights kept in memory.
 
+### The menus and Settings, tidied; VoiceOver can drive it
+
+- **A Help menu that helps**: Siliconed Help (this guide), Remote Control Help (`silicontrol`'s), Report a Problem…, then Measure This Mac….
+- **Render Again (Same Seed)** replaces “Redo” (⌘R); the rack's batch field is now **Batch**.
+- **Window › Show Siliconed** brings the window back (⌘N is gone), **Close Window** has ⌘W back, Full Screen moves to ⌃⌘F, and “Copy the silicontrol command” is **Copy as Terminal Command**.
+- **Generate steps aside** in the Render menu while the exploration panel, the Prompt Lab or Settings is the key window, so ⌘↩ reaches that window's own button.
+- **Settings › Advanced** reads This Mac, Command Line, then **Beta**: More Solvers (formerly Developer Mode), Named Subjects and Negative LoRA Strengths, with the Beta badge the Prompt Lab wears too. The comparison choice left Settings for the canvas toolbar, and Measure This Mac left the Models window.
+- **Clear History…** asks nothing when every image is saved (⌘Z brings the history back); “Accept and Render” is no longer the default button, so Return cannot accept a license by accident.
+- **VoiceOver**: labels on every icon button, on the images (read as their prompt), on the rack's tiles and on the progress, which now speaks in percent; the curtain is one adjustable element (up and down move the line, or switch the image in Switch); the toast is announced. Click targets of the small close and stop buttons grow to 24 pt, and Reduce Motion now stops every animation of the app.
+- **Keys stay with the control that has them**: with a slider, a stepper or a button focused, the arrows and Space are the control's, not the history's.
+- **Smaller things**: “Reset to 0.8” in a LoRA's context menu; the rack's footnote and the preview switch say what they change (the preview does not change the image); durations follow the system's format.
+
+### Fixed
+
+- **Editing with a reference image crashed on some Macs (M4, macOS 26.6)**: Qwen3-VL's 72-wide attention heads now run padded to 128, exactly. The reporter's own diagnosis pointed straight at it. ([#11](https://github.com/gwenn-ha-dev/Siliconed/issues/11))
+
 ### Also
 
 - **One spinner per render**, in the progress under the image; the sidebar keeps its width when the

@@ -49,6 +49,22 @@
   (`siliconed check qwen-image-2.1 writer`). Environ 18 jetons par seconde sur un M1 Pro, sur le GPU,
   depuis les poids gardés en mémoire.
 
+### Menus et Réglages remis en ordre ; VoiceOver peut tout piloter
+
+- **Un menu Aide qui aide** : Aide de Siliconed (ce guide), Aide de la télécommande (celui de `silicontrol`), Signaler un problème…, puis Mesurer ce Mac….
+- **Rendre à nouveau (même graine)** remplace « Refaire » (⌘R) ; le champ du lot du rack s'appelle maintenant **Lot**.
+- **Fenêtre › Afficher Siliconed** ramène la fenêtre (⌘N disparaît), **Fermer la fenêtre** retrouve ⌘W, le Plein écran passe à ⌃⌘F, et « Copier la commande silicontrol » devient **Copier comme commande de Terminal**.
+- **Générer s'efface** dans le menu Rendu quand le panneau d'exploration, l'Atelier de prompts ou les Réglages sont la fenêtre active, si bien que ⌘↩ atteint le bouton de cette fenêtre.
+- **Réglages › Avancé** se lit Ce Mac, Ligne de commande, puis **Bêta** : Plus de solveurs (ex-Mode développeur), Sujets nommés et Forces de LoRA négatives, avec le badge Bêta que porte aussi l'Atelier de prompts. Le choix de la comparaison a quitté les Réglages pour la barre d'outils du canevas, et Mesurer ce Mac a quitté la fenêtre Modèles.
+- **Vider l'historique…** ne demande rien quand toutes les images sont enregistrées (⌘Z le rend) ; « Accepter et rendre » n'est plus le bouton par défaut, si bien que Retour ne peut plus accepter une licence par mégarde.
+- **VoiceOver** : des étiquettes sur tous les boutons-icônes, sur les images (lues comme leur prompt), sur les tuiles du rack et sur la progression, qui parle maintenant en pourcentage ; le rideau est un seul élément ajustable (haut et bas déplacent la ligne, ou changent l'image en mode Alterner) ; la bulle d'information est annoncée. Les cibles des petits boutons de fermeture et d'arrêt passent à 24 pt, et Réduire les animations coupe maintenant toutes celles de l'app.
+- **Les touches restent au contrôle qui les a** : avec un curseur, un stepper ou un bouton actif, les flèches et Espace sont les siennes, pas celles de l'historique.
+- **Petites choses** : « Revenir à 0,8 » dans le menu contextuel d'une LoRA ; le pied du rack et l'interrupteur de l'aperçu disent ce qu'ils changent (l'aperçu ne change pas l'image) ; les durées suivent le format du système.
+
+### Corrigé
+
+- **L'édition avec une image de référence plantait sur certains Mac (M4, macOS 26.6)** : les têtes d'attention de 72 de large de Qwen3-VL tournent maintenant complétées à 128, exactement. Le diagnostic du rapporteur désignait directement la cause. ([#11](https://github.com/gwenn-ha-dev/Siliconed/issues/11))
+
 ### Aussi
 
 - **Une seule roue par rendu**, dans la progression sous l’image ; le panneau de gauche garde sa

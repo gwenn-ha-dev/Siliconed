@@ -55,7 +55,7 @@ to History”.
 
 **Variations are the menu's.** `silicontrol vary i7 subtle|strong [--batch N]` and an image's
 “Variations” menu (the button under the image, its context menu) both call `AppState.vary`: as
-many ordinary jobs as the rack's “Images” (1 by default; `--batch` overrides it), with exactly that image's settings and seed, each adding one variation seed drawn at random
+many ordinary jobs as the rack's “Batch” (1 by default; `--batch` overrides it), with exactly that image's settings and seed, each adding one variation seed drawn at random
 (`Request.variations`, `Sources/Siliconed/Variation.swift`) at the family's strength (`Variation.Amount`), never a
 number the command passes. A variation of a variation appends to the chain, so it varies *that*
 image. Refused on a grid's sheet, a sketch, or a model that is not ready (`model`). Each image's
@@ -67,7 +67,9 @@ queue — refused while a render runs —, answered with the new image once it i
 Apple's model is downloaded by macOS only with `--download` (else `download_required`);
 `silicontrol help enlarge` has the rest.
 
-**Faster Rendering is the Settings switch's too.** `silicontrol set faster-rendering on|off` writes
+**Solvers follow More Solvers.** `--solver` is accepted only with More Solvers on (Settings › Advanced › Beta) and on a model that offers more than Euler; otherwise the answer is a refusal (`solver`) that names the setting.
+
+**Faster Rendering is the app's setting too.** `silicontrol set faster-rendering on|off` writes
 `AppState.fasterRendering` (the preference, `Spectral.halfSizeStart`) and the window's switch follows,
 as a click; `status` reports it (`"faster_rendering"`). Refused (`busy`) unless nothing runs or waits:
 the engine reads it at every plan, and a job planned under one value and finished under the other
@@ -128,7 +130,7 @@ command itself, without launching the app.
 
 ## What was measured
 
-On the reference M1 Pro, 16 GB, in October 2026 (app 0.4):
+Taken on the reference M1 Pro, 16 GB, when the remote control was written, with an early version of the app and not retaken since:
 
 - **Same bits**: the app's image equals a render of the library called directly with the same
   request (512², seed 42, identical decoded bytes). Likewise for a variation of a variation queued by

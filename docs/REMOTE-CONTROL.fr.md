@@ -60,7 +60,7 @@ l'historique ».
 
 **Les variations sont celles du menu.** `silicontrol vary i7 subtle|strong [--batch N]` et le menu
 « Variations » d'une image (le bouton sous l'image, son menu contextuel) appellent tous deux
-`AppState.vary` : autant de travaux ordinaires que le champ « Images » du rack (1 par défaut ;
+`AppState.vary` : autant de travaux ordinaires que le champ « Lot » du rack (1 par défaut ;
 `--batch` le remplace), avec exactement les réglages et la graine de cette
 image, chacun ajoutant une graine de variation tirée au hasard (`Request.variations`,
 `Sources/Siliconed/Variation.swift`) à la force de la famille (`Variation.Amount`), jamais un nombre que la
@@ -75,7 +75,9 @@ sans prompt, hors de la file — refusé pendant un rendu —, avec la nouvelle 
 fois dans l'historique. Le modèle d'Apple n'est téléchargé par macOS qu'avec `--download` (sinon
 `download_required`) ; le reste est dans `silicontrol help enlarge`.
 
-**Le rendu plus rapide est aussi celui de l'interrupteur des Réglages.** `silicontrol set faster-rendering on|off`
+**Les solveurs suivent Plus de solveurs.** `--solver` n'est accepté qu'avec Plus de solveurs allumé (Réglages › Avancé › Bêta) et sur un modèle qui propose autre chose qu'Euler ; sinon la réponse est un refus (`solver`) qui nomme le réglage.
+
+**Le rendu plus rapide est aussi un réglage de l'app.** `silicontrol set faster-rendering on|off`
 écrit `AppState.fasterRendering` (la préférence, `Spectral.halfSizeStart`) et l'interrupteur de la fenêtre
 suit, comme un clic ; `status` le donne (`"faster_rendering"`). Refusé (`busy`) sauf si rien ne tourne ni
 n'attend : le moteur le lit à chaque plan, et un travail planifié sous une valeur et fini sous l'autre
@@ -137,7 +139,7 @@ argument) est servie par la commande elle-même, sans lancer l'app.
 
 ## Ce qui a été mesuré
 
-Sur le M1 Pro de référence, 16 Go, en octobre 2026 (app 0.4) :
+Pris sur le M1 Pro de référence, 16 Go, quand la télécommande a été écrite, avec une version ancienne de l'app et sans être refaits depuis :
 
 - **Mêmes bits** : l'image de l'app = un rendu de la bibliothèque appelée directement, même requête
   (512², graine 42, octets décodés identiques). De même pour une variation de variation mise en file
