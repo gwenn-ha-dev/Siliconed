@@ -361,7 +361,7 @@ struct CropEditor: View {
                 Label(shapeName, systemImage: "aspectratio")
             }
             .menuStyle(.borderlessButton).fixedSize()
-            .help("The frame's proportions — the ones the size picker offers, the image's own, or free")
+            .help("The frame’s proportions — the ones the size picker offers, the image’s own, or free")
             Button { app.swapCropOrientation() } label: { Image(systemName: "rectangle.portrait.rotate") }
                 .disabled(!canTurn)
                 .help("Turn the frame: portrait or landscape")

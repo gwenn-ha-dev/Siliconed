@@ -319,7 +319,7 @@ package enum RemoteControlHelp {
                               most can over-sharpen. Default: normal (the image as the model
                               makes it). Not on Anima nor Krea 2. Jobs and images say
                               "detail" when it is not normal.
-          --solver NAME       the rack's Solver, in Developer Mode only: euler (default, the one
+          --solver NAME       the rack's Solver, with More Solvers on only: euler (default, the one
                               the model was distilled for), euler-ancestral, dpmpp-2m or unipc.
                               Same steps, same time, another image. Jobs and images say "solver"
                               when it is not euler.
@@ -413,7 +413,7 @@ package enum RemoteControlHelp {
           loras=none,flat,ink one LoRA added to the stack per cell (none: the cell without), at
           loras:0.6=…         strength 1 — or the one given; names as --lora takes them
           solver=euler,dpmpp-2m   these solvers (euler, euler-ancestral, dpmpp-2m, unipc), same seed
-                              and steps; Developer Mode, like --solver
+                              and steps; More Solvers, like --solver
           --x gives the columns, --y the rows (without --y: one row). X and Y vary two different
           settings. EVERY {…} GROUP OF THE PROMPT MUST BE AN AXIS: a group left out would stack
           several images in a cell (error "grid"); write \\{ \\} for braces that are not
@@ -752,7 +752,7 @@ package enum RemoteControlHelp {
                                                                            → a model with "edit": true; its "max_references"
           ref                  unreadable reference image                   → check the path
           img2img              --image / --strength: not in the app         → leave them out
-          solver               --solver outside Developer Mode, or on a model that walks Euler only
+          solver               --solver without More Solvers, or on a model that walks Euler only
                                                                            → leave it out
           detail               --detail more|most on a model without Detail (Anima, Krea 2)
                                                                            → leave it out

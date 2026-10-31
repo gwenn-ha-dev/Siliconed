@@ -151,7 +151,7 @@ extension AppState {
             references.append(ReferenceImage(source: .image(cg), vignette: NSImage(cgImage: vignette, size: .zero),
                                              name: name, width: cg.width, height: cg.height))
         } else {
-            flash(String(localized: "This image can't be read"))
+            flash(String(localized: "This image can’t be read"))
         }
     }
 }

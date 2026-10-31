@@ -71,7 +71,7 @@ struct SceneView: View {
         .onChange(of: app.zoom) { z1, z2 in
             let target = settled ?? ZoomAnchor.offset(offset, from: z1, to: z2, at: pointer, in: zone)
             settled = nil
-            withAnimation(.spring(duration: 0.3)) { offset = z2 == 1 ? .zero : clamped(target) }
+            withAnimation(Motion.pick(.spring(duration: 0.3))) { offset = z2 == 1 ? .zero : clamped(target) }
         }
         .onAppear(perform: watchScroll)
         .onDisappear { scrollMonitor.map(NSEvent.removeMonitor); scrollMonitor = nil }
@@ -83,10 +83,8 @@ struct SceneView: View {
         guard scrollMonitor == nil else { return }
         scrollMonitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { event in
             guard hovering, app.currentJob == nil || !app.followsRender, app.selectedImage != nil else { return event }
-            if let z = Wheel.zoom(app.zoom, by: event) { if z != app.zoom { app.zoom = z }; return nil }
-            let k: CGFloat = event.hasPreciseScrollingDeltas ? 1 : 10
-            offset = clamped(CGSize(width: offset.width + event.scrollingDeltaX * k,
-                                    height: offset.height + event.scrollingDeltaY * k))
+            guard let move = Wheel.zoomedOrMoved(event, app: app) else { return nil }
+            offset = clamped(CGSize(width: offset.width + move.width, height: offset.height + move.height))
             return nil
         }
     }
@@ -119,7 +117,7 @@ struct SceneView: View {
             .clipShape(RoundedRectangle(cornerRadius: 6))
             .shadow(color: .black.opacity(0.35), radius: 18, y: 6)
             .frame(maxWidth: l, maxHeight: h)
-            .animation(.easeInOut(duration: 0.25), value: app.preview == nil)
+            .animation(Motion.pick(.easeInOut(duration: 0.25)), value: app.preview == nil)
             ProgressIndicator(app: app)
         }
         .padding(28)
@@ -128,7 +126,7 @@ struct SceneView: View {
     // ── The chosen image ──
 
     private func image(_ cg: CGImage) -> some View {
-        Image(decorative: cg, scale: 1)
+        Image(cg, scale: 1, label: Text(verbatim: app.selectedEntry?.settings.prompt ?? ""))
             .resizable()
             .interpolation(.high)
             .scaledToFit()
@@ -139,7 +137,7 @@ struct SceneView: View {
             .offset(x: liveOffset.width + dragOffset.width, y: liveOffset.height + dragOffset.height)
             .gesture(zoomGesture)
             .simultaneousGesture(dragGesture)
-            .onTapGesture(count: 2) { withAnimation(.spring(duration: 0.3)) { app.zoom = 1; offset = .zero } }
+            .onTapGesture(count: 2) { withAnimation(Motion.pick(.spring(duration: 0.3))) { app.zoom = 1; offset = .zero } }
             .onTapGesture { MainWindow.shared.releaseTextFocus() }
             .draggableWhenFitted(zoom == 1, app.selectedEntry.map(app.transferable), preview: cg)
             .contextMenu { if let e = app.selectedEntry { MenuEntry(app: app, entry: e) } }
@@ -157,6 +155,9 @@ struct SceneView: View {
                 case .ended: hovering = false; pointer = nil
                 }
             }
+            // The pointer's `.ended` is not delivered to a view that goes away under it (a curtain replaces the image):
+            // without this the wheel would stay caught here.
+            .onDisappear { hovering = false; pointer = nil }
             .zIndex(1)
     }
 
@@ -180,16 +181,21 @@ struct SceneView: View {
                 }
                 Button { app.export(group) } label: { Image(systemName: "square.and.arrow.down") }
                     .help("Export the selected images to a folder (⇧⌘E)")
+                    .accessibilityLabel(Text("Export Images…"))
                 ShareLink(items: group.map(app.transferable), preview: { SharePreview($0.name) }) {
                     Image(systemName: "square.and.arrow.up")
                 }
                 .help("Share the selected images")
+                .accessibilityLabel(Text("Share…"))
                 Button { app.copyImages(group) } label: { Image(systemName: "doc.on.doc") }
                     .help("Copy the selected images (⇧⌘C)")
+                    .accessibilityLabel(Text("Copy Image"))
                 Button { app.delete(group) } label: { Image(systemName: "trash") }
                     .help("Remove the selected images from the history (⌫, undo with ⌘Z)")
+                    .accessibilityLabel(Text("Remove from History"))
                 Button { app.unmark() } label: { Image(systemName: "xmark.circle") }
                     .help("Keep only the image shown (Esc)")
+                    .accessibilityLabel(Text("Keep Only This Image"))
             } else {
                 VStack(alignment: .leading, spacing: 1) {
                     Text(e.settings.prompt).font(.callout).lineLimit(1).truncationMode(.tail)
@@ -198,31 +204,38 @@ struct SceneView: View {
                 .frame(maxWidth: 420, alignment: .leading)
                 Divider().frame(height: 22)
                 Button { app.redo(e) } label: { Image(systemName: "arrow.clockwise") }
-                    .help("Redo: same settings, same seed (⌘R)")
+                    .help("Render again: same settings, same seed (⌘R)")
+                    .accessibilityLabel(Text("Render Again (Same Seed)"))
                 if e.grid == nil {
                     Menu { VariationButtons(app: app, entry: e) } label: { Image(systemName: "square.on.square.dashed") }
                         .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
                         .disabled(!app.canVary(e))
-                        .help("Variations: cousins of this image, same scene, slightly different — as many as the rack's Images")
+                        .help("Variations: cousins of this image, same scene, slightly different — as many as the rack’s Batch")
+                        .accessibilityLabel(Text("Variations"))
                 }
                 EnlargeButton(app: app, entry: e)
                 Button { app.beginCrop(e) } label: { Image(systemName: "crop") }
                     .disabled(app.cropRefusal(e) != nil)
                     .help(app.cropRefusal(e) ?? String(localized: "Crop: a new image, the original stays (C)"))
+                    .accessibilityLabel(Text("Crop…"))
                 if app.canCompareOriginal(e) {
                     Button { app.comparesOriginal.toggle() } label: {
                         Image(systemName: "square.lefthalf.filled")
                             .foregroundStyle(app.comparesOriginal ? Color.accentColor : .primary)
                     }
+                    .accessibilityLabel(Text("Compare with Original"))
+                    .accessibilityAddTraits(app.comparesOriginal ? .isSelected : [])
                     .help(app.comparesOriginal ? (e.enlarged == nil ? "Show the edited image alone (Esc)" : "Show the enlarged image alone (Esc)")
                                                : e.enlarged == nil ? "Compare with the original: the image edited, under a curtain"
                                                : "Compare with the original, merely stretched to this size, under a curtain")
                 }
                 Button { details.toggle() } label: { Image(systemName: "info.circle") }
                     .help("Image details")
+                    .accessibilityLabel(Text("Image details"))
                     .popover(isPresented: $details, arrowEdge: .top) { Details(app: app, entry: e) }
                 Button { app.fullScreen = true } label: { Image(systemName: "arrow.up.left.and.arrow.down.right") }
                     .help("Full screen (Space)")
+                    .accessibilityLabel(Text("Full Screen"))
             }
         }
         .buttonStyle(.borderless)
@@ -230,7 +243,7 @@ struct SceneView: View {
         .padding(.horizontal, 16).padding(.vertical, 8)
         .glass(Capsule())
         .zIndex(2)
-        .animation(.easeInOut(duration: 0.15), value: group.count > 1)
+        .animation(Motion.pick(.easeInOut(duration: 0.15)), value: group.count > 1)
     }
 
     // ── Nothing yet ──
@@ -248,14 +261,14 @@ struct SceneView: View {
                     .font(.system(size: 46, weight: .light))
                     .foregroundStyle(.secondary)
                 Text(absent).font(.title3).foregroundStyle(.secondary)
-                Text("Connect it to render. Settings can also go back to this Mac's library.")
+                Text("Connect it to render. Settings can also go back to this Mac’s library.")
                     .font(.callout).foregroundStyle(.secondary)
                 Button("Settings…") { SettingsWindow.shared.show(app) }
                     .padding(.top, 4)
             } else if app.visibleReady.isEmpty {
                 Welcome(app: app)
             } else if let family = app.familyToInstall {
-                Text("\(app.card?.name ?? family.name) isn't installed").font(.title3).foregroundStyle(.secondary)
+                Text("\(app.card?.name ?? family.name) isn’t installed").font(.title3).foregroundStyle(.secondary)
                 Button("Install…") { app.installSelectedModel() }
                     .disabled(!app.managementPossible)
                     .padding(.top, 4)
@@ -315,7 +328,7 @@ private struct Comparison: View {
 
     private func cell(_ e: Entry, _ image: CGImage) -> some View {
         VStack(spacing: 6) {
-            Image(decorative: image, scale: 1)
+            Image(image, scale: 1, label: Text(verbatim: e.settings.prompt))
                 .resizable()
                 .interpolation(.high)
                 .scaledToFit()
@@ -328,6 +341,8 @@ private struct Comparison: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isButton)
         .onTapGesture { app.show(e.id) }
         .draggable(app.transferable(e)) {
             Image(decorative: e.vignette, scale: 1).resizable().scaledToFit().frame(width: 96, height: 96)

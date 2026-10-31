@@ -153,7 +153,7 @@ enum EnlargeFailure: Error {
 extension AppState {
     /// Why « Enlarge » cannot take this image now, in a sentence — `nil` when it can.
     func enlargeRefusal(_ entry: Entry) -> String? {
-        if !(mirrorCatalog.map(\.enlarges) ?? SuperResolution.available) { return String(localized: "This Mac does not offer macOS's super-resolution") }
+        if !(mirrorCatalog.map(\.enlarges) ?? SuperResolution.available) { return String(localized: "This Mac does not offer macOS’s super-resolution") }
         if entry.grid != nil || entry.sketch != nil { return String(localized: "A grid is not enlarged") }
         if entry.enlarged != nil { return String(localized: "This image is already enlarged") }
         // A render past 1920 px (the sizes B now allows) is no enlargement: it is beyond macOS's input.
@@ -172,9 +172,9 @@ extension AppState {
         let size = "\(entry.width)×\(entry.height) → \(entry.width * f)×\(entry.height * f)"
         let megapixels = Double(entry.width * entry.height) / 1_000_000
         if let speed = enlargeSpeed {
-            return String(localized: "Enlarge ×4 with macOS's super-resolution: \(size), about \(Figures.seconds(speed * megapixels)). The original stays.")
+            return String(localized: "Enlarge ×4 with macOS’s super-resolution: \(size), about \(Figures.seconds(speed * megapixels)). The original stays.")
         }
-        return String(localized: "Enlarge ×4 with macOS's super-resolution: \(size). The original stays.")
+        return String(localized: "Enlarge ×4 with macOS’s super-resolution: \(size). The original stays.")
     }
 
     /// **« Enlarge »** from the app: the model there, the image is enlarged at once; missing, an alert
@@ -199,7 +199,7 @@ extension AppState {
     /// Apple's model, downloaded once: asked of the user first.
     static func consentsToDownload() -> Bool {
         let alert = NSAlert()
-        alert.messageText = String(localized: "Enlarge with macOS's super-resolution?")
+        alert.messageText = String(localized: "Enlarge with macOS’s super-resolution?")
         alert.informativeText = String(localized: "Siliconed enlarges ×4 with a model made by Apple: it sees only the image — no prompt — and sharpens edges and textures without adding anything. macOS downloads it once from Apple and keeps it; it is not in your models folder.")
         alert.addButton(withTitle: String(localized: "Download and Enlarge"))
         alert.addButton(withTitle: String(localized: "Cancel"))
@@ -215,7 +215,7 @@ extension AppState {
         // A render asked meanwhile waited in the queue (`next`): it starts now.
         defer { enlarging = nil; enlargeDownload = nil; next() }
         switch SuperResolution.state(width: entry.width, height: entry.height) {
-        case .unavailable: throw EnlargeFailure.refused(String(localized: "This Mac does not offer macOS's super-resolution"))
+        case .unavailable: throw EnlargeFailure.refused(String(localized: "This Mac does not offer macOS’s super-resolution"))
         case .ready: break
         case .downloadRequired, .downloading:
             guard download else { throw EnlargeFailure.downloadRequired }

@@ -34,7 +34,7 @@ struct StageBox<Content: View>: View {
         }
         .boxed(edge: edge, width: state == .idle || state == .done ? 1 : 1.5,
                wash: state == .active ? Palette.live : state == .failed ? Palette.failure : nil)
-        .animation(.easeInOut(duration: 0.25), value: state)
+        .animation(Motion.pick(.easeInOut(duration: 0.25)), value: state)
     }
 
     private var edge: Color {
@@ -105,7 +105,7 @@ struct PortBox<Trailing: View, Content: View>: View {
             content
         }
         .boxed(edge: focused ? Palette.live : Palette.hairline, width: focused ? 1.5 : 1)
-        .animation(.easeInOut(duration: 0.15), value: focused)
+        .animation(Motion.pick(.easeInOut(duration: 0.15)), value: focused)
     }
 }
 
@@ -162,7 +162,7 @@ struct ModuleSlot: View {
         .font(.callout)
         .padding(.horizontal, 8).padding(.vertical, 5)
         .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(Palette.well))
-        .help("Set by the model's family")
+        .help("Set by the model’s family")
     }
 }
 
@@ -180,13 +180,13 @@ struct WeightsTag: View {
 
     static func explanation(_ f: WeightFormat) -> Text {
         switch f {
-        case .int8: Text("The weights are stored in 8 bits (int8), as published: a quarter of fp32's size. The products are computed in fp32.")
-        case .q8_0: Text("The weights are stored in 8 bits in blocks of 32 (GGUF Q8_0), as published: a quarter of fp32's size. The products are computed in fp32.")
+        case .int8: Text("The weights are stored in 8 bits (int8), as published: a quarter of fp32’s size. The products are computed in fp32.")
+        case .q8_0: Text("The weights are stored in 8 bits in blocks of 32 (GGUF Q8_0), as published: a quarter of fp32’s size. The products are computed in fp32.")
         case .fp8: Text("The weights are stored in 8 bits (fp8), as published. The products are computed in fp32.")
-        case .q4_k_m, .q4_k, .q4_0, .q4_1: Text("The weights are stored in about 4 bits (GGUF \(f.label)), as published: an eighth of fp32's size. The products are computed in fp32.")
+        case .q4_k_m, .q4_k, .q4_0, .q4_1: Text("The weights are stored in about 4 bits (GGUF \(f.label)), as published: an eighth of fp32’s size. The products are computed in fp32.")
         case .q5_k_m, .q5_k, .q5_0, .q5_1, .q6_k: Text("The weights are stored in 5 to 6 bits (GGUF \(f.label)), as published. The products are computed in fp32.")
-        case .bf16: Text("The weights are stored in bf16, as the publisher released them: half of fp32's size. The products are computed in fp32.")
-        case .fp16: Text("The weights are stored in fp16: half of fp32's size. The products are computed in fp32.")
+        case .bf16: Text("The weights are stored in bf16, as the publisher released them: half of fp32’s size. The products are computed in fp32.")
+        case .fp16: Text("The weights are stored in fp16: half of fp32’s size. The products are computed in fp32.")
         case .fp32: Text("The weights are stored in fp32. The products are computed in fp32.")
         }
     }
@@ -252,6 +252,7 @@ struct PromptNode: View {
                         PromptField(app: app, focused: $fieldTyping)
                     } else {
                         TextEditor(text: $app.prompt)
+                            .accessibilityLabel(Text("Prompt"))
                             .font(.body)
                             .scrollContentBackground(.hidden)
                             .scrollIndicators(.automatic)
@@ -358,6 +359,7 @@ struct ImagesNode: View {
                 .disabled(refusal != nil).opacity(refusal == nil ? 1 : 0.35)
                 .help(app.references.isEmpty ? "The image to edit — or drop or paste it here (⌘V)"
                                              : "Add an image the prompt can draw from — or drop or paste it here (⌘V)")
+                .accessibilityLabel(Text("Add an Image"))
             }
             Spacer(minLength: 0)
         }

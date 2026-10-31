@@ -110,7 +110,7 @@ extension AppState {
     static func diagnosticLine(_ stage: Diagnostic.Stage) -> String {
         switch stage {
         case .widening: String(localized: "weight preparation")
-        case .witness: String(localized: "the engines' first measurement")
+        case .witness: String(localized: "the engines’ first measurement")
         case .engines: String(localized: "each engine alone")
         case .sharing: String(localized: "the engines together")
         case .forms: String(localized: "the weight forms")
@@ -127,7 +127,7 @@ extension AppState {
         do {
             copyJSON(report)
             NSWorkspace.shared.open(try report.with(render: reportNote(for: report)).issueURL())
-            return String(localized: "The report is in the clipboard: paste it into the form's “Report” field.")
+            return String(localized: "The report is in the clipboard: paste it into the form’s “Report” field.")
         } catch {
             return Problem(error).text
         }

@@ -1,7 +1,7 @@
 // **The XY grid in the app: the form's two axes, the cells in the queue, the sheet.**
 //
 //     the exploration  X and Y: a group of the prompt, the seed, the steps, a LoRA's strength, the
-//     window           model, the edit's images, the solver (Developer Mode) — and their values
+//     window           model, the edit's images, the solver (More Solvers) — and their values
 //                      (`GridAxisForm`, `Exploration.swift`)
 //        │ « Explore » (or `silicontrol grid`)
 //        ▼
@@ -54,7 +54,7 @@ struct GridAxisForm: Equatable {
         case addedLoRA
         /// Each image of the edit, alone.
         case image
-        /// The solvers ticked in `solvers` (Developer Mode, `AppState.offeredSolvers`).
+        /// The solvers ticked in `solvers` (More Solvers, `AppState.offeredSolvers`).
         case solver
     }
     var kind: Kind
@@ -416,7 +416,7 @@ struct AxisRow: View {
                     Text("List").tag(true)
                 }
                 .pickerStyle(.segmented).labelsHidden().fixedSize()
-                .help("The seeds that follow the rack's seed, or the seeds you list")
+                .help("The seeds that follow the rack’s seed, or the seeds you list")
                 if form.listSeeds {
                     TextField("Seeds", text: $form.seeds, prompt: Text(verbatim: "42, 7, 1000"))
                         .labelsHidden().textFieldStyle(.roundedBorder)

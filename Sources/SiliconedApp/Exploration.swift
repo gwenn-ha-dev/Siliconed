@@ -84,11 +84,11 @@ extension AppState {
         if let reason = linkBlocker { return reason }
         if let reason = libraryBlocker { return reason }
         if let reason = installBlocker { return reason }
-        if !exploresModels, missing != nil { return String(localized: "This model isn't installed.") }
+        if !exploresModels, missing != nil { return String(localized: "This model isn’t installed.") }
         if explorePrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return String(localized: "Write a prompt.") }
         // Named subjects are rewritten for « Generate » only: a grid would read `@alice` as text.
         if subjectsActive, !NamedSubjects.mentions(in: explorePrompt).isEmpty {
-            return String(localized: "The exploration doesn't cite named subjects yet.")
+            return String(localized: "The exploration doesn’t cite named subjects yet.")
         }
         let g: RenderGrid
         switch grid {
@@ -103,14 +103,14 @@ extension AppState {
         for (id, steps, _) in cellPlans(g) {
             // In a mirror: the other Mac's models, and the step counts it published.
             if mirror != nil {
-                guard readySet.contains(id) else { return String(localized: "\(modelName(id)) isn't installed.") }
+                guard readySet.contains(id) else { return String(localized: "\(modelName(id)) isn’t installed.") }
                 if let t = mirrorCatalog?.traits[id], !t.steps.contains(steps) {
                     return String(localized: "\(modelName(id)) has no schedule for \(String(steps)) steps.")
                 }
                 continue
             }
             guard let m = model(id) else {
-                return String(localized: "\(modelName(id)) isn't installed.")
+                return String(localized: "\(modelName(id)) isn’t installed.")
             }
             if (try? m.chain.denoising.check(steps: steps, startImage: false)) == nil {
                 return String(localized: "\(modelName(id)) has no schedule for \(String(steps)) steps.")
@@ -268,19 +268,19 @@ struct ExplorationPanel: View {
                         ForEach(app.visibleReady) { card in Text(card.name).tag(card.id) }
                     }
                     .font(.callout)
-                    .help("The rack's model: changing it here changes it there")
+                    .help("The rack’s model: changing it here changes it there")
                     loras
                 }
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Base").font(.callout.weight(.semibold))
                     Text(base).font(.caption).foregroundStyle(.secondary).lineLimit(3)
-                        .help("The rack's LoRAs, seed and images to edit: the exploration varies them")
+                        .help("The rack’s LoRAs, seed and images to edit: the exploration varies them")
                 }
                 depth
                 Picker("Format", selection: $app.exploreShape) {
-                    Image(systemName: "square").help("512 × 512").tag(ExploreShape.square)
-                    Image(systemName: "rectangle.portrait").help("512 × 768").tag(ExploreShape.portrait)
-                    Image(systemName: "rectangle").help("768 × 512").tag(ExploreShape.landscape)
+                    Image(systemName: "square").help("512 × 512").accessibilityLabel(Text("Square")).tag(ExploreShape.square)
+                    Image(systemName: "rectangle.portrait").help("512 × 768").accessibilityLabel(Text("Portrait")).tag(ExploreShape.portrait)
+                    Image(systemName: "rectangle").help("768 × 512").accessibilityLabel(Text("Landscape")).tag(ExploreShape.landscape)
                 }
                 .pickerStyle(.segmented)
                 .help("Small and fast: 512 on the short side — the models are out of their domain below")
@@ -311,12 +311,12 @@ struct ExplorationPanel: View {
                             in: 1...e.all) {
                         Text(sketchLine(e)).monospacedDigit()
                     }
-                    .help("A sketch stops early: the later it stops, the closer to the finished image (a LoRA's style can settle late), the longer it takes. The step count is the rack's")
+                    .help("A sketch stops early: the later it stops, the closer to the finished image (a LoRA’s style can settle late), the longer it takes. The step count is the rack’s")
                 } else {
                     Stepper(value: $app.steps, in: 1...50) {
                         Text(sketchLine(e)).monospacedDigit()
                     }
-                    .help("This model does not sketch: its cells are finished images. The step count is the rack's (a steps axis overrides it)")
+                    .help("This model does not sketch: its cells are finished images. The step count is the rack’s (a steps axis overrides it)")
                 }
                 if app.exploreStop != 0 {
                     Button("Automatic") { app.exploreStop = 0 }.buttonStyle(.link).font(.caption)
@@ -336,9 +336,9 @@ struct ExplorationPanel: View {
     private var loras: some View {
         VStack(alignment: .leading, spacing: 3) {
             // A trap measured by its first user: filled, this list STACKS its LoRAs on every cell —
-            // comparing them is an axis's job (« LoRA to Compare »).
+            // comparing them is an axis's job (“LoRA to Compare”).
             Text("LoRAs on Every Cell").font(.callout.weight(.semibold))
-            Text("Stacked together, the rack's own. To compare LoRAs, choose « LoRA to Compare » on an axis.")
+            Text("Stacked together, the rack’s own. To compare LoRAs, choose “LoRA to Compare” on an axis.")
                 .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             ForEach($app.loras) { $slot in LoRARow(app: app, slot: $slot) }
             if app.activeLoRAs.count > 1 {
@@ -454,7 +454,7 @@ struct ExplorationCanvas: View {
                 .help("The sketches side by side, labelled — an image of the history, in memory like the others")
             Button { MainWindow.shared.showExploration() } label: { Image(systemName: "slider.horizontal.3") }
                 .buttonStyle(.borderless)
-                .help("The exploration's panel (⌥⌘G)")
+                .help("The exploration’s panel (⌥⌘G)")
             Button { app.showsExploration = false } label: { Image(systemName: "xmark") }
                 .buttonStyle(.borderless)
                 .help("Back to the images — the grid stays at the head of the strip")
@@ -561,7 +561,8 @@ private struct CellImage: View {
     @State private var full: CGImage?
 
     var body: some View {
-        Image(decorative: side > 240 ? (full ?? entry.vignette) : entry.vignette, scale: 1)
+        Image(side > 240 ? (full ?? entry.vignette) : entry.vignette, scale: 1,
+              label: Text(verbatim: "\(entry.settings.prompt) · \(entry.legend)"))
             .resizable().interpolation(.high)
             .task(id: side > 240) { if side > 240, full == nil { full = await Entry.decoded(entry.png).image } }
     }

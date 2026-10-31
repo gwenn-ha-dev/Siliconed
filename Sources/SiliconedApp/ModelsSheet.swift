@@ -44,7 +44,7 @@ struct ModelManagement: View {
                 Section {
                     ForEach(families) { familyLine($0) }
                 } header: {
-                    Text("Publishers' models")
+                    Text("Publishers’ models")
                 } footer: {
                     Text("Downloaded at a pinned revision and verified (sha256), then forged without changing their precision. Installing takes a little more space while forging.")
                         .font(.caption).foregroundStyle(.secondary)
@@ -53,7 +53,7 @@ struct ModelManagement: View {
                     if !imported.isEmpty {
                         ForEach(imported, id: \.card.id) { importedLine($0.card, $0.bytes) }
                     } else {
-                        Text("None. A Civitai checkpoint of a known family imports as is (⌘O); it borrows its family's encoder and VAE.")
+                        Text("None. A Civitai checkpoint of a known family imports as is (⌘O); it borrows its family’s encoder and VAE.")
                             .font(.callout).foregroundStyle(.secondary)
                     }
                 }
@@ -98,13 +98,13 @@ struct ModelManagement: View {
     // ── What the sheet lists: the visible families, and what belongs to them ──
 
     private var families: [Library.Occupancy.FamilyPart] {
-        AppState.inDisplayOrder((app.occupancy?.families ?? []).filter { app.isVisible($0.family) }, family: \.family)
+        AppState.inDisplayOrder(app.occupancy?.families ?? [], family: \.family)
     }
     private var imported: [(card: ModelCard, bytes: Int)] {
-        AppState.inDisplayOrder((app.occupancy?.imported ?? []).filter { app.isVisible($0.card.family) }, family: \.card.family)
+        AppState.inDisplayOrder(app.occupancy?.imported ?? [], family: \.card.family)
     }
     private var loras: [(card: LoRACard, bytes: Int)] {
-        (app.occupancy?.loras ?? []).filter { Family(rawValue: $0.card.target).map(app.isVisible) ?? app.developerMode }
+        app.occupancy?.loras ?? []
     }
 
     // ── Header and footer ──
@@ -122,8 +122,6 @@ struct ModelManagement: View {
                 Button("Show in Finder") { app.showInFinder() }
                     .disabled(app.mirror != nil)
                     .help(app.localOnlyHelp ?? "")
-                Button("Measure This Mac…") { app.openDiagnostic() }
-                    .help("Measures what this Mac computes, then opens a prefilled GitHub issue")
             }
             if app.visibleReady.isEmpty {
                 Text("Nothing comes with Siliconed. Choose a model: its license and the space it takes are shown before anything is downloaded.")
@@ -208,7 +206,7 @@ struct ModelManagement: View {
             }
             // A checkpoint dropped before its family: said here, where the license is accepted.
             if !offer.thenImport.isEmpty {
-                Label("\(offer.thenImport.map(\.lastPathComponent).joined(separator: ", ")) will be imported once this is installed. Its image model is that file, under its author's license; the text encoder and the VAE below are \(card.name)'s.",
+                Label("\(offer.thenImport.map(\.lastPathComponent).joined(separator: ", ")) will be imported once this is installed. Its image model is that file, under its author’s license; the text encoder and the VAE below are \(card.name)’s.",
                       systemImage: "square.and.arrow.down")
                     .font(.callout)
                 Divider()
@@ -347,7 +345,7 @@ struct ModelManagement: View {
                 Text(f.name).fontWeight(.medium)
                 Text(app.readySet.contains(f.id)
                      ? String(localized: "\(f.family.name) architecture")
-                     : String(localized: "\(f.family.name) architecture — needs its family's encoder and VAE"))
+                     : String(localized: "\(f.family.name) architecture — needs its family’s encoder and VAE"))
                     .font(.caption).foregroundStyle(.secondary)
             }
             Spacer()
@@ -406,7 +404,7 @@ struct ModelManagement: View {
         switch r {
         case .family:
             return String(localized: "The DiT, encoder and VAE are deleted; installing again downloads them again.")
-                + " " + String(localized: "This family's imported models and LoRAs stay.")
+                + " " + String(localized: "This family’s imported models and LoRAs stay.")
         case .model:
             return String(localized: "Its forged card is deleted. To get it back, import its file again.")
         case .lora:
@@ -466,10 +464,10 @@ struct VersionChoice: View {
     /// publisher's: only its image model changes.
     static func summary(_ v: Variant, _ f: Family) -> String {
         switch (v, f) {
-        case (.standard, _): String(localized: "The publisher's weights, as published.")
-        case (.compact, .anima): String(localized: "Smaller on disk: the image model in 8 bits, the publisher's text encoder; images slightly different.")
+        case (.standard, _): String(localized: "The publisher’s weights, as published.")
+        case (.compact, .anima): String(localized: "Smaller on disk: the image model in 8 bits, the publisher’s text encoder; images slightly different.")
         case (.compact, _): String(localized: "Smaller on disk; images slightly different, about as fast.")
-        case (.light, .anima): String(localized: "The smallest on disk: the image model in 4 to 6 bits, the publisher's text encoder; another set of weights, so an image may come out composed differently.")
+        case (.light, .anima): String(localized: "The smallest on disk: the image model in 4 to 6 bits, the publisher’s text encoder; another set of weights, so an image may come out composed differently.")
         case (.light, _): String(localized: "The smallest on disk, made for Macs with 8 GB; another set of weights, so an image may come out composed differently.")
         }
     }
@@ -478,31 +476,31 @@ struct VersionChoice: View {
     static func details(_ v: Variant, _ f: Family) -> String {
         switch (v, f) {
         case (.compact, .zImage):
-            String(localized: "8-bit weights published by third parties: the image model from unsloth (GGUF Q8_0), the text encoder from Disty0 (SDNQ int8). Tokenizer and VAE are the publisher's.")
+            String(localized: "8-bit weights published by third parties: the image model from unsloth (GGUF Q8_0), the text encoder from Disty0 (SDNQ int8). Tokenizer and VAE are the publisher’s.")
         case (.compact, .qwenImage21):
-            String(localized: "8-bit weights published by third parties: the image model from Comfy-Org (int8 convrot), the text encoder from unsloth (int8 convrot). Processor and VAE are the publisher's.")
+            String(localized: "8-bit weights published by third parties: the image model from Comfy-Org (int8 convrot), the text encoder from unsloth (int8 convrot). Processor and VAE are the publisher’s.")
         case (.light, .zImage):
-            String(localized: "The image model in 4 to 6 bits, published by unsloth (GGUF Q4_K_M); the Compact's 8-bit text encoder, from Disty0 (SDNQ int8). Tokenizer and VAE are the publisher's.")
+            String(localized: "The image model in 4 to 6 bits, published by unsloth (GGUF Q4_K_M); the Compact’s 8-bit text encoder, from Disty0 (SDNQ int8). Tokenizer and VAE are the publisher’s.")
         case (.light, .qwenImage21):
-            String(localized: "The image model in 4 to 8 bits, published by unsloth (GGUF Q4_K_M); the Compact's 8-bit text encoder, from unsloth (int8 convrot). Processor and VAE are the publisher's.")
+            String(localized: "The image model in 4 to 8 bits, published by unsloth (GGUF Q4_K_M); the Compact’s 8-bit text encoder, from unsloth (int8 convrot). Processor and VAE are the publisher’s.")
         case (.compact, .anima):
-            String(localized: "The image model in 8 bits, published by vanes430 (GGUF Q8_0). The text encoder (bf16), tokenizers and VAE are the publisher's.")
+            String(localized: "The image model in 8 bits, published by vanes430 (GGUF Q8_0). The text encoder (bf16), tokenizers and VAE are the publisher’s.")
         case (.light, .anima):
-            String(localized: "The image model in 4 to 6 bits, published by vanes430 (GGUF Q4_K_M). The text encoder (bf16), tokenizers and VAE are the publisher's.")
+            String(localized: "The image model in 4 to 6 bits, published by vanes430 (GGUF Q4_K_M). The text encoder (bf16), tokenizers and VAE are the publisher’s.")
         // Krea's own repository is gated: every byte comes from copies proven equal to its files.
         case (.standard, .krea2):
-            String(localized: "The image model and the text encoder in the publisher's precision (bf16), downloaded from Comfy-Org's copy; the VAE and the tokenizer from Qwen's. Each is the publisher's file, value for value.")
+            String(localized: "The image model and the text encoder in the publisher’s precision (bf16), downloaded from Comfy-Org’s copy; the VAE and the tokenizer from Qwen’s. Each is the publisher’s file, value for value.")
         case (.compact, .krea2):
             String(localized: "8-bit weights published by Comfy-Org: the image model and the text encoder (int8 convrot). VAE and tokenizer as in the Standard version.")
         case (.light, .krea2):
-            String(localized: "The image model in 4 to 5 bits, published by vantagewithai (GGUF Q4_K_M); the Compact's 8-bit text encoder, from Comfy-Org (int8 convrot). VAE and tokenizer as in the Standard version.")
+            String(localized: "The image model in 4 to 5 bits, published by vantagewithai (GGUF Q4_K_M); the Compact’s 8-bit text encoder, from Comfy-Org (int8 convrot). VAE and tokenizer as in the Standard version.")
         // The 8 steps are the community's LoRA, applied beside the weights in fp32 — never merged into the bf16 ones.
         case (.standard, .mossImage):
-            String(localized: "The image model and the text encoder in the publisher's precision (bf16); the 8-step LoRA from lodestones, in fp32. VAE and tokenizer are the publisher's.")
+            String(localized: "The image model and the text encoder in the publisher’s precision (bf16); the 8-step LoRA from lodestones, in fp32. VAE and tokenizer are the publisher’s.")
         case (.compact, .mossImage):
-            String(localized: "8-bit weights published by Comfy-Org: the image model and the text encoder (int8 convrot); the 8-step LoRA from lodestones, in fp32. VAE and tokenizer are the publisher's.")
+            String(localized: "8-bit weights published by Comfy-Org: the image model and the text encoder (int8 convrot); the 8-step LoRA from lodestones, in fp32. VAE and tokenizer are the publisher’s.")
         default:
-            String(localized: "The image model and the text encoder in the publisher's precision (bf16).")
+            String(localized: "The image model and the text encoder in the publisher’s precision (bf16).")
         }
     }
 }
@@ -510,10 +508,12 @@ struct VersionChoice: View {
 /// « Beta », same outlined capsule as the version badge, in the orange of « non-commercial » (a caveat, not an error).
 /// Shown where a model with a community recipe is chosen (`Family.isBeta`).
 struct BetaBadge: View {
+    /// What the hover says: by default, why a model is in beta.
+    var help: LocalizedStringKey = "Beta: the 8-step recipe is the community’s distillation, not the publisher’s. It leaves beta when the publisher releases its own fast version."
     var body: some View {
         Text("Beta").font(.caption).foregroundStyle(.orange)
             .padding(.horizontal, 5).padding(.vertical, 1)
             .overlay(Capsule().strokeBorder(Color.orange.opacity(0.6)))
-            .help("Beta: the 8-step recipe is the community's distillation, not the publisher's. It leaves beta when the publisher releases its own fast version.")
+            .help(help)
     }
 }

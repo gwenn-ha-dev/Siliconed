@@ -140,7 +140,7 @@ struct SubjectSheet: View {
                         ForEach(draft.pictures.indices, id: \.self) { i in Text(verbatim: "\(i + 1)").tag(i) }
                     }
                     .pickerStyle(.segmented).labelsHidden().fixedSize()
-                    .help("The subject's two pictures: each has its own frame")
+                    .help("The subject’s two pictures: each has its own frame")
                 }
                 Button("Whole Image") { draft.pictures[shown].frame = .whole }
                     .disabled(draft.pictures.indices.contains(shown) ? draft.pictures[shown].frame == .whole : true)
@@ -170,7 +170,7 @@ struct SubjectSheet: View {
         panel.message = String(localized: "Another picture of the same subject.")
         guard panel.runModal() == .OK, let url = panel.url else { return }
         guard let p = SubjectDraft.picture(.file(url)) else {
-            app.flash(String(localized: "This image can't be read"))
+            app.flash(String(localized: "This image can’t be read"))
             return
         }
         draft.pictures.append(p)

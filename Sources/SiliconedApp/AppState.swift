@@ -3,22 +3,22 @@
 // **Incognito by default**: the history lives in memory and dies with the
 // process. Nothing is written to disk without an explicit gesture — "Save", "Copy" —,
 // no temporary file, no preference, no log: nothing that Spotlight or recent items
-// could find. **The exceptions**, each a gesture of the user: five preferences — the « Developer
-// Mode » switch, the comparison's curtain, switch or side by side (`Curtain.mode`), the experimental
-// « Named Subjects » and « Negative LoRA Strengths » switches (`SubjectLibrary.enabledKey`,
-// `negativeLoRAKey`) and this Mac's capacity map, measured when
-// the user asks (`capacityMapKey`), like the system language the app follows —, the licenses accepted, which the library keeps itself (`<local>/accepted-licenses.json`) because its
+// could find. **The exceptions**, each a gesture of the user: the preferences (UserDefaults) — the « More
+// Solvers » switch (`developerModeKey`), « Faster Rendering », the comparison's curtain, switch or side by side
+// (`Curtain.mode`), the beta « Named Subjects » and « Negative LoRA Strengths » switches (`SubjectLibrary.enabledKey`,
+// `negativeLoRAKey`), the file format of the last export (`exportFormatKey`), the Neural Engine's choice per
+// model (`neuralEngineKey`), the Macs paired and the lending switch (`OtherMacs`), and this Mac's capacity map
+// with the last render's note against it (`capacityMapKey`, `renderNoteKey`, `driftToldKey`), measured when
+// the user asks, like the system language the app follows —, the licenses accepted, which the library keeps itself (`<local>/accepted-licenses.json`) because its
 // engine refuses a render without them, and where the library is when the user moved it (`<local>/library-location`,
 // `AppState+Place.swift`). A library on another disk is rendered through a copy on this Mac, removed when the
 // app quits (`WorkingCopy`). The named subjects (`Subjects.swift`) live in memory, like
 // the history.
 //
-// **Four models in front**, in this order: Z-Image Turbo, Qwen-Image-2.1 Turbo, Anima Turbo, Krea 2
-// Turbo (`frontFamilies`) — every family the library knows since Krea 2 joined them. The filter
-// stays here, in the app (the library is the same): a family left out of `frontFamilies` would show
-// in the list, the Models sheet and `silicontrol models` only in Developer Mode. Developer Mode offers
-// the solvers on the models in front (`offeredSolvers`): Euler, the distillation's own, is every
-// other render's.
+// **Five models in front**, in this order: Z-Image Turbo, Qwen-Image-2.1 Turbo, Anima Turbo, Krea 2
+// Turbo, MOSS-Image (`frontFamilies`) — every family the library knows, so nothing is filtered: the order
+// is all `frontFamilies` sets. « More Solvers » (`developerMode`, a key older than its name) offers the
+// solvers on those models (`offeredSolvers`): Euler, the distillation's own, is every other render's.
 //
 // **The main thread does no computing**: the engine runs on its queue, and what the app does with
 // the pixels — decoding the reference image, encoding the PNG, reducing the thumbnail — goes to a
@@ -26,7 +26,7 @@
 // it changes, never at each drawing of the view.
 //
 // **All the phrases go through `String(localized:)`** or through a `Text` key: the table is
-// `Localizable.xcstrings` (English source, fr de es it), which `tools/app.sh` synchronizes and compiles.
+// `Localizable.xcstrings` (English source, then fr de es it ja zh-Hans), which `tools/app.sh` synchronizes and compiles.
 // The engine's refusals are translated case by case in `Problems.swift`.
 //
 // A client of `Siliconed` from the same package (`import`, never `@testable`): it reaches the library's
@@ -61,21 +61,20 @@ final class AppState {
     var readySet: Set<String> = []
 
     // ── What the app shows ──
-    /// **The families in front**: the four the product is, **in the order every list shows them**
+    /// **The families in front**: the five the product is, **in the order every list shows them**
     /// (the rack's picker, the Models sheet, the welcome, `silicontrol models`) — not the engine's
-    /// `Family.allCases`. The others need Developer Mode, and come after them.
+    /// `Family.allCases`. A family added to the engine and not here comes after them (`displayRank`).
     static let frontFamilies: [Family] = [.zImage, .qwenImage21, .anima, .krea2, .mossImage]
     private static let developerModeKey = "developerMode"
-    /// **Developer Mode**: the solvers (`offeredSolvers`) — and a family not in
-    /// front, were there one (none since Krea 2 joined them).
+    /// **More Solvers** (Settings ▸ Advanced ▸ Beta): the solvers (`offeredSolvers`). The property and its
+    /// preference key keep the name they had when this was « Developer Mode ».
     /// One of the app's preferences (with `Curtain.mode`, the named subjects' switch and the capacity
     /// map) — written without a render gesture, because the user switched it.
     var developerMode = UserDefaults.standard.bool(forKey: AppState.developerModeKey) {
         didSet {
             guard developerMode != oldValue else { return }
             UserDefaults.standard.set(developerMode, forKey: Self.developerModeKey)
-            // A model that leaves the list leaves the form too, and so does a solver.
-            if !isVisible(identifier) { identifier = defaultIdentifier }
+            // A solver the models no longer offer leaves the form.
             if !developerMode {
                 solver = .euler
                 // The solver axis is the rack's choice swept: it leaves with it.
@@ -84,7 +83,6 @@ final class AppState {
             }
         }
     }
-    func isVisible(_ family: Family) -> Bool { developerMode || Self.frontFamilies.contains(family) }
     private static let negativeLoRAKey = "negativeLoRAStrengths"
     /// **Negative LoRA strengths** (Experimental): W + s·ΔW with s < 0 pushes the image away from what
     /// the LoRA learned — meant for « slider » LoRAs, trained as a difference to be used from −x to +x;
@@ -155,7 +153,6 @@ final class AppState {
     func refusesNegativeStrength(_ g: RenderGrid) -> Bool {
         !negativeLoRAStrengths && g.cells.contains { $0.loraStrengths.contains { $0 < 0 } || ($0.addedLoRA != nil && $0.addedStrength < 0) }
     }
-    func isVisible(_ id: String) -> Bool { cards.first { $0.id == id }.map { isVisible($0.family) } ?? false }
     /// Where a family comes in a list: the front ones in `frontFamilies`' order, the others after.
     static func displayRank(_ family: Family) -> Int {
         frontFamilies.firstIndex(of: family) ?? frontFamilies.count + (Family.allCases.firstIndex(of: family) ?? 0)
@@ -168,7 +165,7 @@ final class AppState {
             .map(\.element)
     }
     /// The models the list offers: the front families' (and their imported fine-tunes), or all of them.
-    var visibleCards: [ModelCard] { Self.inDisplayOrder(cards.filter { isVisible($0.family) }, family: \.family) }
+    var visibleCards: [ModelCard] { Self.inDisplayOrder(cards, family: \.family) }
     /// The visible models ready to render — empty at first launch: the canvas welcomes (`Welcome`).
     var visibleReady: [ModelCard] { visibleCards.filter { readySet.contains($0.id) } }
     /// Z-Image first (Apache 2.0); a non-commercial model is never the default unless it is the only one.
@@ -211,14 +208,14 @@ final class AppState {
     /// Whether the form's model offers Detail — the rack hides the choice otherwise.
     var offersDetail: Bool { mirror != nil ? traits?.acceptsDetail ?? true : model(identifier)?.chain.denoising.acceptsDetail ?? true }
     var effectiveDetail: Detail { offersDetail ? detail : .normal }
-    /// **The solver** (`Solver`), offered in Developer Mode on the models in front
+    /// **The solver** (`Solver`), offered with More Solvers on the models in front
     /// (`offeredSolvers`). What a render takes is `effectiveSolver`: a choice the form's model does
     /// not offer is Euler.
     var solver = Solver.euler
     /// The families whose samplers walk every solver (`DenoisingModule.solvers`: Z-Image's,
     /// Qwen-Image-2.1's, Anima's since 0.10, Krea 2's since it is in front).
     static let solverFamilies: Set<Family> = [.zImage, .qwenImage21, .anima, .krea2]
-    /// The solvers the rack offers: all four in Developer Mode on those families, Euler alone otherwise.
+    /// The solvers the rack offers: all four with More Solvers on those families, Euler alone otherwise.
     var offeredSolvers: [Solver] {
         developerMode && card.map({ Self.solverFamilies.contains($0.family) }) == true ? Solver.allCases : [.euler]
     }

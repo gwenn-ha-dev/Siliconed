@@ -60,12 +60,12 @@ struct HubSheet: View {
     private func repository(_ r: HubRepository, _ offer: AppState.HubOffer) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             if let l = r.license {
-                Text("License on its page: \(l). The file is its author's, under that license.")
+                Text("License on its page: \(l). The file is its author’s, under that license.")
             } else {
-                Text("No license declared on its page: the file is its author's.")
+                Text("No license declared on its page: the file is its author’s.")
             }
             if r.gated {
-                Text("Its author restricts access on Hugging Face: the download needs your account's access to it.")
+                Text("Its author restricts access on Hugging Face: the download needs your account’s access to it.")
             }
         }
         .font(.callout).foregroundStyle(.secondary)

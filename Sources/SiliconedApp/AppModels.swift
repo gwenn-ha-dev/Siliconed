@@ -138,7 +138,7 @@ struct RenderSettings {
     var editing: Bool { references - subjectImages > 0 }
     /// **More detail** (`Request.detail`): the rack's Normal · More · Most.
     var detail: Detail = .normal
-    /// **The solver** (`Request.solver`): Euler unless picked in Developer Mode.
+    /// **The solver** (`Request.solver`): Euler unless picked with More Solvers on.
     var solver: Solver = .euler
     /// **Its denoiser could take the Neural Engine** (`Engine.Render.neuralEngine`): set from the render, for
     /// the image's panel — the choice itself is read when the job starts (`Job.neuralEngine`).
@@ -474,9 +474,11 @@ struct Measures {
 /// French, `0.85 s` in English). The developer's command line keeps its decimal point: it is a
 /// syntax, not a display.
 enum Figures {
-    /// `0.85 s`, `12.3 s` — the precision of the engine's timers.
+    /// `0.85 sec`, `12.3 sec` (`0,85 s` in French, `0.85秒` in Japanese) — the precision of the engine's timers.
     static func seconds(_ s: Double) -> String {
-        s.formatted(.number.precision(.fractionLength(s < 10 ? 2 : 1))) + " s"
+        Measurement(value: s, unit: UnitDuration.seconds)
+            .formatted(.measurement(width: .abbreviated, usage: .asProvided,
+                                    numberFormatStyle: .number.precision(.fractionLength(s < 10 ? 2 : 1))))
     }
 
     /// `42 s`, `1 min 5 s`, `1 h 2 min` — a waiting time ("42 sec", "1 min, 5 sec" in English).

@@ -182,8 +182,8 @@ extension SubjectSource {
     /// Why a picture could not be read, naming its file without the home folder.
     static func unreadable(_ source: SubjectSource) -> String {
         switch source {
-        case .file(let url): String(localized: "This image can't be read: \(Library.withoutHome(url.path))")
-        case .png: String(localized: "This image can't be read")
+        case .file(let url): String(localized: "This image can’t be read: \(Library.withoutHome(url.path))")
+        case .png: String(localized: "This image can’t be read")
         }
     }
 }
@@ -283,7 +283,7 @@ extension Problem {
             self.init(String(localized: "This prompt takes \(String(count)) images: a render takes \(String(max)) at most."),
                       suggestion: String(localized: "A subject with two pictures counts twice."))
         case .modelReadsNoImages:
-            self.init(String(localized: "This model doesn't read images: its prompt can't cite subjects."))
+            self.init(String(localized: "This model doesn’t read images: its prompt can’t cite subjects."))
         case .noPicture(let name):
             self.init(String(localized: "The subject @\(name) has no picture."))
         }
@@ -390,7 +390,7 @@ extension AppState {
     /// A file or PNG bytes dropped on the subjects shelf: the sheet opens on it.
     func nameSubject(_ source: SubjectSource) {
         guard let draft = SubjectDraft(new: source, taken: subjects.all.map(\.name)) else {
-            flash(String(localized: "This image can't be read"))
+            flash(String(localized: "This image can’t be read"))
             return
         }
         subjectDraft = draft

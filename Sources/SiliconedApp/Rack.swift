@@ -192,6 +192,7 @@ private struct Wires: View {
 
 struct RackView: View {
     @Bindable var app: AppState
+    @State private var hoversTitle = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
@@ -249,9 +250,15 @@ struct RackView: View {
                         .frame(width: 26, height: 26)
                         .saturation(measured ? 1 : 0).opacity(measured ? 1 : 0.5)
                 }
+                .padding(.horizontal, 6).padding(.vertical, 2)
+                .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(hoversTitle ? Palette.well : .clear))
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .onHover { hoversTitle = $0 }
+            .padding(.leading, -6)
+            .accessibilityLabel(Text("Measure This Mac"))
+            .accessibilityHint(Text(DiagnosticSheet.mapStatus(app)))
             .help(DiagnosticSheet.mapStatus(app))
             ComputeOnMenu(app: app)
             Spacer()
@@ -271,10 +278,10 @@ struct RackView: View {
         let ane = app.neuralEngineOffered && app.neuralEngine(for: app.identifier)
         let quantized = app.card.flatMap { app.installedVariant(of: $0.family) }.map { $0 != .standard } ?? false
         switch (quantized, ane) {
-        case (false, false): return "fp32 end to end, every stage verified against the reference; on request, part of the DiT on the Neural Engine"
-        case (false, true): return "fp32, except part of the DiT in fp16 on the Neural Engine; on request, fp32 end to end, every stage verified against the reference"
-        case (true, true): return "The weights as published, computed in fp32, except part of the DiT in fp16 on the Neural Engine"
-        case (true, false): return "The weights as published, computed in fp32 end to end"
+        case (false, false): return "fp32 end to end, every stage verified against the reference"
+        case (false, true): return "fp32, except part of the DiT in fp16 on the Neural Engine"
+        case (true, true): return "The weights as published, in fp32 except part of the DiT on the Neural Engine"
+        case (true, false): return "The weights as published, computed in fp32"
         }
     }
 
@@ -305,7 +312,7 @@ struct RackView: View {
             WeightsTag(format: app.weightFormats?.text)
             if app.promptNamesImages {
                 Tag(text: Text("sees the images"), symbol: "eye")
-                    .help("The encoder reads the edit's images with the prompt: the prompt can name them (image 1, image 2)")
+                    .help("The encoder reads the edit’s images with the prompt: the prompt can name them (image 1, image 2)")
             }
             Cost(app.stageCost(.text))
         }
@@ -322,7 +329,7 @@ struct RackView: View {
 
     private var vae: some View {
         StageBox(title: "VAE decoder", symbol: "square.grid.3x3.square", state: app.state(of: .decoding),
-                 explanation: "Turns the DiT's result, the latent, into pixels: the final image") {
+                 explanation: "Turns the DiT’s result, the latent, into pixels: the final image") {
             ModuleSlot(name: app.moduleNames.decoding)
             WeightsTag(format: app.weightFormats?.vae)
             Cost(app.stageCost(.decoding))
