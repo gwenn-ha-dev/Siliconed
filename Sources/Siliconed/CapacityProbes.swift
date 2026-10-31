@@ -6,7 +6,7 @@ import MetalPerformanceShadersGraph
 
 /// **The capacity probes: what a Mac's engines do alone, and what they lose together — a few dozen runs, no weights, the numbers
 /// `CapacityModel` is made of.** The machine layer; the arithmetic that turns its measurements into a model is `CapacityFit` (pure,
-/// tested), the sizes and their projection `CapacityProbeSizes`, the verdict on the measure `DiagnosticVerdict`. The routes are the
+/// tested), the sizes and their projection `CapacityProbeSizes`, what the measure found `DiagnosticFindings`. The routes are the
 /// existing ones, forced one by one (`GEMM`, `Conductor`, `NeuralEngine`, `TensorGEMM`, `WeightProducts`, the three attentions); each
 /// keeps the judge against the fp64 truth of the checks' rule (a wrong route fills nothing and is excluded from the plan).
 ///
@@ -324,7 +324,8 @@ extension Diagnostic {
             return last
         }
 
-        /// **A chain's figure** (`chainWarm`…): the median call over the window after the ramp, and the calls it holds. `nil` when the body refuses.
+        /// **A chain's figure** (`chainWarm`…): the median call over the window after the ramp (its quickest third when the calls disagree,
+        /// `figure`), and the calls it holds. `nil` when the body refuses.
         private static func chain(_ body: () -> Bool) -> (seconds: Double, calls: Int, spread: Double)? {
             let begin = now()
             var times: [Double] = []
@@ -340,7 +341,7 @@ extension Diagnostic {
                 if elapsed >= chainCap, !times.isEmpty { break }
             }
             lastSpread = max(lastSpread, spread(times))
-            return (Fit.median(times), times.count, spread(times))
+            return (figure(times), times.count, spread(times))
         }
 
         /// The dispersion of the figure the last `steady` or `chain` returned: what the guard reads beside the pulse. One thread measures.
@@ -662,8 +663,9 @@ extension Diagnostic {
             /// **A step measured when the Mac is free, or as free as the minute allows.** `body` is the step's timing: the figure it
             /// returns is kept when the pulse that closes it says the threads still had their cores and the GPU its promptness, and
             /// the calls inside it agreed (`Regime.Rules`). Otherwise it waits — for a quiet pulse, at most two seconds — and measures
-            /// it again, three times at most and while `retryBudget` has seconds. What it could not redo is kept as it was and said by the
-            /// verdict (`Regime.disturbances`): a figure taken on a busy Mac is never passed for the Mac's.
+            /// it again, three times at most and while `retryBudget` has seconds. What it could not redo is kept — its chains read on the fast side
+            /// (`figure`) — and said by the findings (`Regime.disturbances`) as an uncertainty: a figure taken on a busy Mac is never passed for
+            /// the Mac's, and never refused either.
             func guarded<T>(_ step: String, _ body: () -> T?) -> T? {
                 if lastPulse == nil { lastPulse = takePulse(step: "start", attempt: 0, record: true) }
                 if let last = lastPulse, regime.busy(last), retryBudget > 0 { waitForQuiet(step) }
@@ -1197,12 +1199,13 @@ extension Diagnostic {
                     CapacityProbes.lastSpread = max(CapacityProbes.lastSpread, CapacityProbes.spread(samples.map(\.wall)))
                     return true
                 }) != nil else { return nil }
-                let wall = Fit.median(samples.map(\.wall))
+                let used = CapacityProbes.quick(samples)
+                let wall = Fit.median(used.map(\.wall))
                 // `solo` is the line's seconds at the rows the side took (the reference of κ, as the fp32 sets').
                 var sides: [Fit.Measurements.Side] = []
                 for (kernel, rows) in [(g, gpuRows), (a, aneRows)] {
                     guard let solo = model.alone(kernel, rows: rows, k: k, n: n) else { return nil }
-                    let within = samples.compactMap { $0.within[kernel.description] }
+                    let within = used.compactMap { $0.within[kernel.description] }
                     sides.append(.init(kernel: kernel.description, rows: rows, solo: solo, within: within.isEmpty ? nil : Fit.median(within)))
                 }
                 return .init(set: key, shape: [m, k, n], pass: pass, sides: sides, wall: wall, error: verdict.error)
@@ -1337,13 +1340,14 @@ extension Diagnostic {
                     CapacityProbes.lastSpread = max(CapacityProbes.lastSpread, CapacityProbes.spread(samples.map(\.wall)))
                     return true
                 }) != nil else { return nil }
-                let wall = Fit.median(samples.map(\.wall))
+                let used = CapacityProbes.quick(samples)
+                let wall = Fit.median(used.map(\.wall))
                 // `solo` is the line's seconds at the rows the side took: the reference of κ (the line's own bias at these rows is in κ).
                 var sides: [Fit.Measurements.Side] = []
                 for kernel in set {
                     let r = kernel == a ? aneRows : kernel == x ? amxRows : gpuRows
                     guard let solo = model.alone(kernel, rows: r, k: k, n: n) else { return nil }
-                    let within = samples.compactMap { $0.within[kernel.description] }
+                    let within = used.compactMap { $0.within[kernel.description] }
                     sides.append(.init(kernel: kernel.description, rows: r, solo: solo, within: within.isEmpty ? nil : Fit.median(within)))
                 }
                 return .init(set: key, shape: [m, k, n], pass: pass, sides: sides, wall: wall, error: verdict.error)

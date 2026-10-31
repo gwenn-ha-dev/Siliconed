@@ -4,7 +4,7 @@ import XCTest
 
 /// **The diagnostic's means without a GPU and without a byte of weights**: the conditions and flags it reads, the issue link, the
 /// blocks it widens, and its CPU references against naive loops. The report itself, its JSON and its verdict are
-/// `DiagnosticReportTests` and `DiagnosticVerdictTests`.
+/// `DiagnosticReportTests` and `DiagnosticFindingsTests`.
 final class DiagnosticTests: XCTestCase {
     /// The machine's state and flags read without a GPU.
     func testConditionsAndFeaturesRead() {

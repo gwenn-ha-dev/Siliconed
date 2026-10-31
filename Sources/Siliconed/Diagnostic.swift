@@ -15,7 +15,7 @@ import Metal
 ///        │                                   the weights' preparation, the heat, the memory plan — each route judged against
 ///        │                                   the exact result (fp64) by the checks' rule
 ///        ├─ fit        CapacityFit            lines t(W) = t₀ + W / rate, the sets' keep and overhead (pure, replayable offline)
-///        └─ verdict    DiagnosticVerdict      green or orange, and what exactly is missing or aberrant
+///        └─ findings   DiagnosticFindings     what was missing, aberrant or uncertain, and what the plan does with it
 ///
 /// What sets it apart — what a diagnostic written by analogy with a table of routes timed against each other would get wrong:
 ///
@@ -26,7 +26,7 @@ import Metal
 ///     any block on any set of engines, and the solver (`CapacitySolver`) chooses at the shape of each product the render
 ///     really makes. The Mac need not be at rest for the lines to be right, and a Mac nobody has measured is served by the same
 ///     lines;
-///   - **A route that computes wrong is excluded, not a reason for orange**: against fp64, never against another fp32, with the
+///   - **A route that computes wrong is excluded, and the map stays a map**: against fp64, never against another fp32, with the
 ///     checks' rule (the fp32 threshold; the ANE within 1.25 × bf16's own rounding — invariant 3). `excluded` names it, the plan
 ///     never offers it, and the report says which and by how much;
 ///   - **Every output is poisoned before each engine** (NaN on the sampled rows): a submission that fails silently leaves the
@@ -34,15 +34,17 @@ import Metal
 ///   - **The sizes follow the machine, not its name** (`CapacityProbes.Sizes`): chosen from the inventory's peak, then from the
 ///     first witnesses' own rates, so that the slowest Mac of the fleet holds the minute; each stage's projection is written
 ///     beside its seconds (`stages`);
-///   - **Green is a property of the measure, not of the hour**: every engine the inventory announces has its lines, every set
-///     its sharing, nothing aberrant, the peak under the need under B, no swap, the minute held. Heat, the battery, Low Power
-///     Mode and another process's swap are facts of the regime, written beside the model, never a reason for orange;
-///   - **But it knows when the Mac was not free** (`Regime`): after each step a pulse of a few milliseconds asks whether as many
-///     threads as performance cores still get a core each (against a thread alone, measured at the same moment: a clock that went
-///     down is the Mac's, a core that went to another process is not) and whether an empty submission still reaches the GPU promptly,
-///     and the calls of a chain are compared with one another. A step that fails is measured again, after a wait, while the minute
-///     leaves seconds (`Sizes.retryCap`); what stayed busy is orange, named, with the cores the others used written beside it. A
-///     measure that says it was disturbed is the one thing a green card cannot be;
+///   - **A finished measure is always a map**: applied as it stands, never refused, never asked again. What the probes could not give
+///     is said and the plan does without it (a route or a set that is not offered, like one the judge excluded); what is aberrant is
+///     bounded or left out, named, with its effect; heat, the battery, Low Power Mode, another process's swap and the cores the others
+///     used are facts of the regime, written beside the model (`Findings`);
+///   - **It knows how sure each figure is, and reads the quick side of a noisy one** (`Regime`): after each step a pulse of a few
+///     milliseconds asks whether as many threads as performance cores still get a core each (against a thread alone, measured at the
+///     same moment: a clock that went down is the Mac's, a core that went to another process is not) and whether an empty submission
+///     still reaches the GPU promptly, and the calls of a chain are compared with one another. A step that fails is measured again, after
+///     a wait, while the minute leaves seconds (`Sizes.retryCap`) — and then it is kept: **a disturbance only adds time**, so a chain whose
+///     calls disagree is read on its fast side (`CapacityProbes.figure`), how far they disagreed is written beside each engine and set
+///     (`Report.uncertainty`), and the Mac need not be at rest: a moving mouse, a browser, Activity Monitor are the Mac's life;
 ///   - **It runs in a process of its own** (`Child`), because a program the Neural Engine refuses may kill the process that loads
 ///     it: the child says each stage and each route before it touches it, and a supervisor that sees it die by a crash leaves that
 ///     route out and measures again — the report says `died`, and no render loads a route the report has not seen load;
@@ -54,16 +56,17 @@ import Metal
 /// (P20: never under bf16, sums in fp32 — a precision the engine refuses is no capacity).
 ///
 /// **The engine reads it in the app, and only there**: the app measures before its first render when it holds no current report
-/// — none yet, one of another `Fingerprint` (hardware, chip, macOS build, the app's build: an update measures again), one that
-/// is not green — and whenever the user asks (« Measure This Mac »). It keeps the report in its preferences and hands it to
+/// — none yet, one of another `Fingerprint` (hardware, chip, macOS build, the app's build: an update measures again) — and whenever
+/// the user asks (« Measure This Mac »). It keeps the report in its preferences and hands it to
 /// `EngineSettings.load(from:map:)`, which designates the plan of its model. The command line, the checks and the close-out
 /// never designate one unless a developer names it (`SILICONED_MAP`): today's defaults.
 package enum Diagnostic {
-    /// The JSON's version: the script that aggregates the reports reads it. **15** (30/10/2026): the capacity model — inventory,
-    /// the probes' raw measurements, the model they fit, the judge per kernel, the memory, the stages and a verdict of defects;
-    /// 14 and before were a table of routes timed against each other (grid of classes, pairs A B A B), which the engine no longer
-    /// reads. A report of a schema under 15 is not a map: the app measures again (`isCurrent`).
-    package static let schema = 15
+    /// The JSON's version: the script that aggregates the reports reads it. **16** (31/10/2026): no verdict — `findings`, each with its
+    /// effect on the plan, replace the green flag and the defects, and the fit's aberrant figures are bounded; 15 (30/10/2026) was the
+    /// capacity model — inventory, the probes' raw measurements, the model they fit, the judge per kernel, the memory, the stages and
+    /// a verdict of defects; 14 and before were a table of routes timed against each other (grid of classes, pairs A B A B), which the
+    /// engine no longer reads. A report of a schema under 16 is not a map: the app measures again (`isCurrent`).
+    package static let schema = 16
     package static let repository = "https://github.com/gwenn-ha-dev/Siliconed"
     /// Wall seconds the whole diagnostic promises, inventory and witnesses included, on any Mac.
     package static let minute = 60.0
