@@ -2,7 +2,7 @@
 //
 //     the rack     the chain top to bottom, each module with its settings (`Rack.swift`)
 //     ─────────
-//     the cost before the click (rule 7: memory and time), « Generate », the queue, what went wrong
+//     the cost before the click (memory and time), « Generate », the queue, what went wrong
 //
 // No form beside the rack: a setting lives in the box of the stage that reads it. No mask, no setting
 // between two steps: what is set is taken whole at the click (`Job`), and changing it afterwards
@@ -122,6 +122,7 @@ struct ReferenceThumbnail: View {
                         .buttonStyle(.plain)
                         .padding(4)
                         .help("Crop this image (the frame keeps at least \(String(Format.minimumSide)) px a side)")
+                        .accessibilityLabel(Text("Crop…"))
                     }
                 }
                 .overlay(alignment: .topTrailing) {
@@ -129,10 +130,12 @@ struct ReferenceThumbnail: View {
                         Button { app.removeReference(reference.id) } label: {
                             Image(systemName: "xmark.circle.fill").symbolRenderingMode(.palette)
                                 .foregroundStyle(.white, .black.opacity(0.6))
+                                .frame(width: 24, height: 24).contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
                         .padding(4)
                         .help("Remove")
+                        .accessibilityLabel(Text("Remove"))
                     }
                 }
             Text(number == 1 ? String(localized: "edited") : String(localized: "image \(number)"))
@@ -140,6 +143,9 @@ struct ReferenceThumbnail: View {
         }
         .onHover { hover = $0 }
         .help(Text(verbatim: "\(reference.name) · \(reference.width) × \(reference.height)"))
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(Text(verbatim: "\(number). \(reference.name)"))
+        .accessibilityAction(named: Text("Remove")) { app.removeReference(reference.id) }
         .draggable(Self.prefix + reference.id.uuidString) {
             Image(nsImage: reference.vignette).resizable().scaledToFit().frame(width: 48, height: 48)
         }
@@ -191,7 +197,7 @@ private struct Footer: View {
                 if let f = refusal?.smaller {
                     Button(String(localized: "Use \(String(f.width)) × \(String(f.height))")) { app.useFormat(f) }
                         .buttonStyle(.link).font(.caption)
-                        .help("The largest of this model's sizes this Mac renders")
+                        .help("The largest of this model’s sizes this Mac renders")
                 }
             } else if case let .running(done, total, line) = app.diagnostic {
                 // Before the first render, the measure it waits for: why nothing starts yet, and how far.
@@ -216,7 +222,7 @@ private struct Footer: View {
                 }
                 .buttonStyle(.bordered)
                 .fixedSize()
-                .help("Sweep seeds, a LoRA's strength, words of the prompt, models or the images to edit — small sketches, fast (⌥⌘G)")
+                .help("Sweep seeds, a LoRA’s strength, words of the prompt, models or the images to edit — small sketches, fast (⌥⌘G)")
             }
             .controlSize(.extraLarge)
             if app.busy { queue }
@@ -348,9 +354,10 @@ private struct Footer: View {
                         .font(.caption2).monospacedDigit().foregroundStyle(.secondary)
                 }
             }
-            Button { app.cancel() } label: { Image(systemName: "stop.circle.fill").foregroundStyle(.secondary) }
+            Button { app.cancel() } label: { Image(systemName: "stop.circle.fill").foregroundStyle(.secondary).frame(width: 24, height: 24).contentShape(Rectangle()) }
                 .buttonStyle(.borderless)
                 .help("Stop (⌘.)")
+                .accessibilityLabel(Text("Stop"))
         }
         .frame(height: Self.rowHeight)
     }
@@ -394,9 +401,10 @@ private struct Footer: View {
                     if let e = app.estimation(job) {
                         Text(verbatim: "≈ " + Figures.duration(e)).font(.caption2).monospacedDigit().foregroundStyle(.secondary)
                     }
-                    Button { app.remove(job) } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary) }
+                    Button { app.remove(job) } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary).frame(width: 24, height: 24).contentShape(Rectangle()) }
                         .buttonStyle(.borderless)
                         .help("Remove from the queue")
+                        .accessibilityLabel(Text("Remove from the queue"))
                 }
                 .frame(height: Self.rowHeight)
             }
@@ -430,8 +438,9 @@ struct ProblemView: View {
             .textSelection(.enabled)
             .frame(maxWidth: .infinity, alignment: .leading)
             if let close {
-                Button(action: close) { Image(systemName: "xmark") }
+                Button(action: close) { Image(systemName: "xmark").frame(width: 24, height: 24).contentShape(Rectangle()) }
                     .buttonStyle(.borderless).help("Close")
+                    .accessibilityLabel(Text("Close"))
             }
         }
         .font(.callout)

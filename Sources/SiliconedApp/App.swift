@@ -12,7 +12,7 @@
 // `DiagnosticSheet.swift` (« Measure This Mac »), `Problems.swift` (each `EngineError`, in the
 // user's language), `Statistics.swift` (the floating statistics palette), `RemoteControl.swift` and `RemoteControlSocket.swift` (the
 // socket that `silicontrol …` drives, `docs/REMOTE-CONTROL.md`; its `help` text is the module
-// `SilicontrolHelp`, shared with `silicontrol`); the phrases are in `Localizable.xcstrings` (English source, fr de es it). To launch it:
+// `SilicontrolHelp`, shared with `silicontrol`); the phrases are in `Localizable.xcstrings` (English source, then fr de es it ja zh-Hans). To launch it:
 // `tools/app.sh` (builds `Siliconed.app` at the repository root, translations included, and opens
 // it), or `swift run SiliconedApp` (in English, no icon). **The models live in the app's space**
 // (`Library.standard`, `~/Library/Application Support/Siliconed/`), which it fills itself — install,
@@ -66,11 +66,13 @@ private struct AppCommands: Commands {
                 .keyboardShortcut(",")
         }
         CommandGroup(replacing: .help) {
+            Button("Siliconed Help") { window.open(.help) }
+            Button("Remote Control Help") { window.open(.remoteControl) }
+            Button("Report a Problem…") { window.open(.problem) }
+            Divider()
             Button("Measure This Mac…") { app.openDiagnostic() }
         }
         CommandGroup(replacing: .newItem) {
-            Button("Siliconed Window") { window.show() }
-                .keyboardShortcut("n")
             Button("Import a Model or LoRA…") { app.chooseToImport() }
                 .keyboardShortcut("o")
                 .disabled(!app.importPossible)
@@ -78,6 +80,9 @@ private struct AppCommands: Commands {
                 .keyboardShortcut("m", modifiers: [.command, .shift])
         }
         CommandGroup(replacing: .saveItem) {
+            // `.saveItem` holds the system's Close: replaced, ⌘W must be given back.
+            Button("Close Window") { NSApp.keyWindow?.performClose(nil) }
+                .keyboardShortcut("w")
             Button("Save Image…") { app.selectedEntry.map(app.save) }
                 .keyboardShortcut("s")
                 .disabled(app.selectedEntry == nil)
@@ -92,7 +97,7 @@ private struct AppCommands: Commands {
             Button(app.targets.count > 1 ? "Copy \(app.targets.count) Images" : "Copy Image") { app.copyImages(app.targets) }
                 .keyboardShortcut("c", modifiers: [.command, .shift])
                 .disabled(app.targets.isEmpty)
-            Button("Copy the silicontrol command") { app.copyCommand() }
+            Button("Copy as Terminal Command") { app.copyCommand() }
         }
         CommandGroup(after: .toolbar) {
             // On the exploration's grid, the cells' size; otherwise the image's zoom.
@@ -114,9 +119,12 @@ private struct AppCommands: Commands {
             Divider()
         }
         CommandMenu("Render") {
+            // ⌘↩ is also « Explore » in the exploration's panel and « Rewrite » in the Lab: while one of
+            // them is the key window the menu item steps aside, so that the key reaches that window's button.
             Button("Generate") { app.render() }
                 .keyboardShortcut(.return)
-            Button("Redo Image (Same Seed)") { app.selectedEntry.map(app.redo) }
+                .disabled(!window.carrier.mainIsKey)
+            Button("Render Again (Same Seed)") { app.selectedEntry.map(app.redo) }
                 .keyboardShortcut("r")
             Button("Exploration") { window.showExploration() }
                 .keyboardShortcut("g", modifiers: [.command, .option])
@@ -142,7 +150,7 @@ private struct AppCommands: Commands {
         }
         CommandMenu("Image") {
             Button("Full Screen") { if app.selectedImage != nil { app.fullScreen = true } }
-                .keyboardShortcut("f")
+                .keyboardShortcut("f", modifiers: [.command, .control])
             // « C » itself is read by its character in `MainWindow.key`, when nothing is being typed.
             Button("Crop…") { app.beginCropOfShownImage() }
                 .disabled(app.selectedEntry == nil || app.cropping != nil)
@@ -171,6 +179,7 @@ private struct AppCommands: Commands {
                 .disabled(app.history.isEmpty)
         }
         CommandGroup(after: .windowList) {
+            Button("Show Siliconed") { window.show() }
             Button("Statistics") { window.toggleStatistics() }
                 .keyboardShortcut("i", modifiers: [.command, .option])
             // By its character, never its key code: the same letter on an AZERTY keyboard. Free in the menus.
@@ -180,51 +189,47 @@ private struct AppCommands: Commands {
     }
 }
 
+@MainActor
 final class Delegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Launched by `swift run` (no .app bundle), a SwiftUI executable remains a background
         // process: no Dock, no foreground window. `tools/app.sh` makes the bundle.
         NSApp.setActivationPolicy(.regular)
-        MainActor.assumeIsolated {
-            // **Incognito**: nothing of the user's survives the session. The render cache (prompts'
-            // conditionings, posed images' latents, Qwen's K/V) serves during it and is emptied here —
-            // which covers a crash — and at exit.
-            MainWindow.shared.emptyRenderCache()
-            MainWindow.shared.show()
-            // The remote control (`silicontrol …`): the same queue, the same history.
-            MainWindow.shared.remote.boot()
-            MainWindow.shared.otherMacs.boot()
-        }
+        // **Incognito**: nothing of the user's survives the session. The render cache (prompts'
+        // conditionings, posed images' latents, Qwen's K/V) serves during it and is emptied here —
+        // which covers a crash — and at exit.
+        MainWindow.shared.emptyRenderCache()
+        MainWindow.shared.show()
+        // The remote control (`silicontrol …`): the same queue, the same history.
+        MainWindow.shared.remote.boot()
+        MainWindow.shared.otherMacs.boot()
     }
 
     /// **Incognito has a price**: the history lives only in this process. Quitting with images never
     /// saved, or with a render under way, asks first — and offers to export them.
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        MainActor.assumeIsolated { MainWindow.shared.mayQuit() } ? .terminateNow : .terminateCancel
+        MainWindow.shared.mayQuit() ? .terminateNow : .terminateCancel
     }
 
     func applicationWillTerminate(_ notification: Notification) {
-        MainActor.assumeIsolated {
-            MainWindow.shared.remote.stop()
-            MainWindow.shared.otherMacs.stop()
-            MainWindow.shared.emptyRenderCache()
-            MainWindow.shared.local.removeWorkingCopy()
-        }
+        MainWindow.shared.remote.stop()
+        MainWindow.shared.otherMacs.stop()
+        MainWindow.shared.emptyRenderCache()
+        MainWindow.shared.local.removeWorkingCopy()
+        MainWindow.shared.local.stopWatchingVolumes()
     }
 
     /// `siliconed://hf?…` — « Use this model » on Hugging Face, through the site's relay page;
     /// at launch too. Anything else the scheme receives is ignored.
     func application(_ application: NSApplication, open urls: [URL]) {
-        MainActor.assumeIsolated {
-            for link in urls.compactMap(HubLink.init) {
-                MainWindow.shared.show()
-                MainWindow.shared.local.open(link)
-            }
+        for link in urls.compactMap(HubLink.init) {
+            MainWindow.shared.show()
+            MainWindow.shared.local.open(link)
         }
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows: Bool) -> Bool {
-        if !hasVisibleWindows { MainActor.assumeIsolated { MainWindow.shared.show() } }
+        if !hasVisibleWindows { MainWindow.shared.show() }
         return true
     }
 
@@ -237,6 +242,9 @@ final class Carrier {
     var mirror: AppState?
     /// The other Mac's `id` while its mirror is shown.
     var showing: String?
+    /// The main window (or a sheet of it) is the key window: « Generate » of the Render menu answers ⌘↩ then,
+    /// and only then (`MainWindow.watchKeyWindow`).
+    var mainIsKey = true
 }
 
 /// The window's content: the state the carrier shows, rebuilt from scratch at each switch (`id`), so
@@ -306,6 +314,7 @@ final class MainWindow: NSObject, NSWindowDelegate {
         window = f
         app.undoManager = f.undoManager
         watchKeys()
+        watchKeyWindow()
         NSApp.activate()
         f.makeKeyAndOrderFront(nil)
         // First launch (nothing comes preinstalled): the canvas welcomes and offers the three models
@@ -345,9 +354,7 @@ final class MainWindow: NSObject, NSWindowDelegate {
                                     send: { [weak self] id, source in self?.otherMacs.send(stream: source, id: id, to: mac.id) },
                                     cancel: { [weak self] id in self?.otherMacs.cancel(stream: id, to: mac.id) }))
             let m = AppState(mirroring: link, library: local.library, subjects: local.subjects)
-            m.prompt = from.prompt; m.identifier = from.identifier; m.steps = from.steps
-            m.orientation = from.orientation; m.format = from.format; m.batch = from.batch
-            m.fixedSeed = from.fixedSeed; m.seed = from.seed; m.detail = from.detail; m.previews = from.previews
+            m.copyForm(from: from)
             carrier.mirror = m
             carrier.showing = mac.id
             otherMacs.show(mac, in: m)
@@ -415,7 +422,7 @@ final class MainWindow: NSObject, NSWindowDelegate {
                 }
             } catch {
                 alert.messageText = String(localized: "The check did not succeed.")
-                alert.informativeText = String(localized: "GitHub could not be reached. New versions are also listed on the project's page.")
+                alert.informativeText = String(localized: "GitHub could not be reached. New versions are also listed on the project’s page.")
                 alert.addButton(withTitle: String(localized: "Open the Page"))
                 alert.addButton(withTitle: String(localized: "Cancel"))
             }
@@ -467,6 +474,41 @@ final class MainWindow: NSObject, NSWindowDelegate {
         statistics?.orderFront(nil)
     }
 
+    @ObservationIgnored private var keyWindowObservers: [NSObjectProtocol] = []
+
+    /// Which window is key, for the menus: the Render menu's ⌘↩ belongs to the main window only.
+    private func watchKeyWindow() {
+        guard keyWindowObservers.isEmpty else { return }
+        let center = NotificationCenter.default
+        for name in [NSWindow.didBecomeKeyNotification, NSWindow.didResignKeyNotification] {
+            keyWindowObservers.append(center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.refreshKeyWindow() }
+            })
+        }
+    }
+
+    private func refreshKeyWindow() {
+        guard let window else { return }
+        let key = NSApp.keyWindow
+        // No key window (the app is in the background): the menu is not reachable anyway.
+        carrier.mainIsKey = key == nil || key === window || key?.sheetParent === window
+    }
+
+    /// The pages Help opens: the docs on GitHub, in French when the app speaks it.
+    enum Page { case help, remoteControl, problem }
+
+    func open(_ page: Page) {
+        let french = Bundle.main.preferredLocalizations.first?.hasPrefix("fr") ?? false
+        let base = "https://github.com/gwenn-ha-dev/Siliconed/"
+        let url: String = switch page {
+        case .help: base + "blob/main/docs/" + (french ? "APP.fr.md" : "APP.md")
+        case .remoteControl: base + "blob/main/docs/" + (french ? "REMOTE-CONTROL.fr.md" : "REMOTE-CONTROL.md")
+        // GitHub's chooser of issue templates; nothing is attached.
+        case .problem: base + "issues/new/choose"
+        }
+        if let url = URL(string: url) { NSWorkspace.shared.open(url) }
+    }
+
     /// Takes the keyboard from the prompt (a click on an image): the arrows then walk the strip.
     func releaseTextFocus() {
         guard let w = window, w.firstResponder is NSText else { return }
@@ -502,6 +544,9 @@ final class MainWindow: NSObject, NSWindowDelegate {
                event.charactersIgnoringModifiers?.lowercased() == "v" {
                 return app.pasteImage() ? nil : event
             }
+            // A control that has the keyboard (a slider, a stepper, a menu, a button reached by Tab) keeps its
+            // keys: ← → adjust it, Space presses it, ⌫ is not the history's.
+            if w.firstResponder is NSControl { return event }
             guard !app.history.isEmpty else { return event }
             // C opens the crop, by its character: on an AZERTY keyboard the key code of C is another letter.
             if Self.chord(event).isEmpty,

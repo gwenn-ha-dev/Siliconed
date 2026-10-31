@@ -15,7 +15,7 @@ extension AppRefusal {
         case .editSurface(let w, let h):
             String(localized: "the app edits up to 1024² of area, not \(String(w))x\(String(h))")
         case .loraNotInstalled(let name):
-            String(localized: "This LoRA isn't installed on this Mac: \(name)")
+            String(localized: "This LoRA isn’t installed on this Mac: \(name)")
         case .seedCount:
             String(localized: "A render takes 1 to 8 images.")
         case .queueFull:
@@ -33,7 +33,7 @@ extension AppRefusal {
         case .cropSmallest(let side):
             String(localized: "This image is already at the smallest size, \(String(side)) px")
         case .imagesNotRestorable:
-            String(localized: "These images can't be restored.")
+            String(localized: "These images can’t be restored.")
         case .subjectsIncomplete:
             String(localized: "A render that cites named subjects needs their prompt and images.")
         case .machineBusy:
@@ -41,15 +41,15 @@ extension AppRefusal {
         case .libraryBusy:
             String(localized: "That Mac is busy: its library can change once its render, installation or measure is done.")
         case .libraryUnreachable:
-            String(localized: "The disk of that Mac's library is not connected.")
+            String(localized: "The disk of that Mac’s library is not connected.")
         case .familyUnknown(let id):
-            String(localized: "That Mac doesn't offer \(id).")
+            String(localized: "That Mac doesn’t offer \(id).")
         case .modelUnknown(let id):
-            String(localized: "That Mac doesn't hold the model \(id).")
+            String(localized: "That Mac doesn’t hold the model \(id).")
         case .hubNeedsFamily(let family):
-            String(localized: "This LoRA is for \(family.name), which isn't installed on that Mac yet: install it first.")
+            String(localized: "This LoRA is for \(family.name), which isn’t installed on that Mac yet: install it first.")
         case .hubFileUnknown(let path):
-            String(localized: "Hugging Face doesn't list \(path) any more.")
+            String(localized: "Hugging Face doesn’t list \(path) any more.")
         case .removalDeclined:
             String(localized: "That Mac declined the removal: nothing was removed.")
         case .removalUnanswered:
@@ -57,7 +57,7 @@ extension AppRefusal {
         case .removalPending:
             String(localized: "That Mac is already asking about another removal: try again once it is answered.")
         case .licenseMismatch(let model):
-            String(localized: "The license shown is not this Mac's text for \(ModelCard.withID(model)?.name ?? model): nothing was accepted.")
+            String(localized: "The license shown is not this Mac’s text for \(ModelCard.withID(model)?.name ?? model): nothing was accepted.")
         }
     }
 }

@@ -54,11 +54,19 @@ struct MainView: View {
         .overlay {
             if app.fullScreen, let image = app.selectedImage?.image { FullScreen(app: app, image: image) }
         }
-        .animation(.easeInOut(duration: 0.15), value: app.fullScreen)
+        .animation(Motion.pick(.easeInOut(duration: 0.15)), value: app.fullScreen)
     }
 }
 
 // MARK: - The materials
+
+/// **Reduce Motion** (System Settings ▸ Accessibility ▸ Display): the app's springs and fades are
+/// dropped, the state changes at once.
+enum Motion {
+    static func pick(_ animation: Animation) -> Animation? {
+        NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? nil : animation
+    }
+}
 
 extension View {
     /// The chosen image leaves by a drag while it is fitted; zoomed in, a drag pans it.
@@ -114,7 +122,7 @@ private struct GraphCanvas: View {
                     .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
-        .animation(.spring(duration: 0.3), value: app.toast)
+        .animation(Motion.pick(.spring(duration: 0.3)), value: app.toast)
         // A PNG Siliconed wrote brings back its settings — the canvas is where an image is opened.
         // Any other image keeps the canvas's meaning: an edit's reference when the model edits
         // (to edit a Siliconed image, drop it on the rack's « Images » box, or « Edit This Image »).
@@ -145,23 +153,24 @@ private struct FullScreen: View {
     var body: some View {
         ZStack {
             Color.black.opacity(0.94)
-            Image(decorative: image, scale: 1)
+            Image(image, scale: 1, label: Text(verbatim: app.selectedEntry?.settings.prompt ?? ""))
                 .resizable()
                 .interpolation(.high)
                 .scaledToFit()
                 .padding(24)
-            Button("Close") { app.fullScreen = false }
-                .keyboardShortcut(.cancelAction)
-                .opacity(0)
-            Button("Previous") { app.chooseAdjacent(-1) }
-                .keyboardShortcut(.leftArrow, modifiers: [])
-                .opacity(0)
-            Button("Next") { app.chooseAdjacent(1) }
-                .keyboardShortcut(.rightArrow, modifiers: [])
-                .opacity(0)
-            Button("Close") { app.fullScreen = false }
-                .keyboardShortcut(.space, modifiers: [])
-                .opacity(0)
+            // The keys, invisible: the image is what VoiceOver reads (Esc and a click close it).
+            Group {
+                Button("Close") { app.fullScreen = false }
+                    .keyboardShortcut(.cancelAction)
+                Button("Previous") { app.chooseAdjacent(-1) }
+                    .keyboardShortcut(.leftArrow, modifiers: [])
+                Button("Next") { app.chooseAdjacent(1) }
+                    .keyboardShortcut(.rightArrow, modifiers: [])
+                Button("Close") { app.fullScreen = false }
+                    .keyboardShortcut(.space, modifiers: [])
+            }
+            .opacity(0)
+            .accessibilityHidden(true)
         }
         .ignoresSafeArea()
         .contentShape(Rectangle())

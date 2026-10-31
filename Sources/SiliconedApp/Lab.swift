@@ -6,7 +6,7 @@
 //     │            ( Rewrite | Describe )                │
 //     │ ┌──────────────────────────────────────────────┐ │
 //     │ │ woman posing in a library                    │ │   Rewrite: a text, typed, pasted
-//     │ │                    Use the Rack's Prompt     │ │   or taken from the rack
+//     │ │                    Use the Rack’s Prompt     │ │   or taken from the rack
 //     │ └──────────────────────────────────────────────┘ │   Describe: an image, dropped or opened
 //     │ [                  Rewrite                     ] │
 //     │ ┌ Result ─────────────────────────── Edit ─────┐ │
@@ -43,7 +43,6 @@ final class LabModel {
     struct Result: Equatable { var text: String; var original: String? }
 
     /// The engine's writer; nothing is read from disk until the first `availability`, and no weight until the first gesture.
-    /// `FakeLabWriter` (`LabWriter.swift`) stands in for previews.
     var writer: any LabWriter = EngineLabWriter(library: MainWindow.shared.local.library) { didSet { refresh() } }
     private(set) var availability: LabAvailability = .unavailable(.preparing)
 
@@ -328,7 +327,7 @@ struct LabView: View {
             case .needsMemory(let n): return ("memorychip", String(localized: "The writer needs a Mac with \(n) GB of memory."))
             case .preparing: return ("hourglass", String(localized: "The writer is being prepared."))
             case .needsHead(let bytes):
-                return ("arrow.down.circle", String(localized: "The writer needs one more download from Qwen-Image-2.1's repository: \(Figures.disk(Int(bytes))).")) 
+                return ("arrow.down.circle", String(localized: "The writer needs one more download from Qwen-Image-2.1’s repository: \(Figures.disk(Int(bytes))).")) 
             }
         }
         if target == nil { return ("shippingbox", String(localized: "No writer is installed yet. Install a model to have one.")) }
@@ -376,6 +375,7 @@ struct LabView: View {
 
     private var header: some View {
         HStack(alignment: .firstTextBaseline) {
+            BetaBadge(help: "Beta: the Prompt Lab works, and may change.")
             if families.count > 1, let target {
                 Picker("Write for", selection: Binding(get: { target }, set: { model.chosenTarget = $0 })) {
                     ForEach(families, id: \.self) { Text(verbatim: $0.name).tag($0) }
@@ -416,7 +416,7 @@ struct LabView: View {
                     }
                 }
                 .disabled(model.isWriting)
-            Button("Use the Rack's Prompt") { model.useRackPrompt(rack) }
+            Button("Use the Rack’s Prompt") { model.useRackPrompt(rack) }
                 .buttonStyle(.link).font(.callout)
                 .disabled(rack.prompt.isEmpty || model.isWriting)
         }
@@ -571,7 +571,7 @@ struct LabView: View {
             }
             .controlSize(.large)
             .disabled(current?.text.isEmpty != false || model.isWriting || followingAnotherMac)
-            .help("Replaces the rack's prompt. ⌘Z in the prompt field brings the old one back.")
+            .help("Replaces the rack’s prompt. ⌘Z in the prompt field brings the old one back.")
         }
     }
 

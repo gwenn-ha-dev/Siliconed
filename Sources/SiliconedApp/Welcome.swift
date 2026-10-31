@@ -106,11 +106,11 @@ struct Welcome: View {
         case .zImage: String(localized: "Fast and photographic. The one to start with.")
         case .qwenImage21: String(localized: "Generates, and edits a photo by instruction: “change her jacket to red”.")
         // Its publisher trained it for illustration and keeps it there: no photorealism, by choice.
-        case .anima: String(localized: "Illustration, painting and anime. No photorealism: its publisher's choice.")
+        case .anima: String(localized: "Illustration, painting and anime. No photorealism: its publisher’s choice.")
         // The largest DiT of the four (12.8 B), and the slowest render.
         case .krea2: String(localized: "Aesthetic images, from photography to painting. The largest model, and the slowest.")
         // A 9 B language model reads the prompt; the eight steps come from the community's distillation, not the publisher's.
-        case .mossImage: String(localized: "Long, detailed prompts, read by a 9 B language model. Eight steps through the community's distillation.")
+        case .mossImage: String(localized: "Long, detailed prompts, read by a 9 B language model. Eight steps through the community’s distillation.")
         }
     }
 }
@@ -158,18 +158,25 @@ struct ProgressIndicator: View {
                                 .frame(height: 4)
                         }
                     }
-                    .animation(.easeOut(duration: 0.3), value: app.currentStep)
+                    .accessibilityHidden(true)
+                    .animation(Motion.pick(.easeOut(duration: 0.3)), value: app.currentStep)
                 } else {
                     ProgressView(value: app.fraction).progressViewStyle(.linear)
                 }
             }
             .frame(width: 360)
+            // One element: what the render is doing, and how far it is.
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(Text(verbatim: label))
+            .accessibilityValue(Text(verbatim: Figures.percent(Int(app.fraction * 100))))
             Button(role: .destructive) { app.cancel() } label: {
                 Image(systemName: "stop.fill")
+                    .frame(width: 24, height: 24)
             }
             .buttonStyle(.borderless)
             .imageScale(.large)
             .help("Stop (⌘.)")
+            .accessibilityLabel(Text("Stop"))
         }
         .padding(.horizontal, 16).padding(.vertical, 10)
         .glass(RoundedRectangle(cornerRadius: 16))

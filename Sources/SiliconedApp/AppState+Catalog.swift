@@ -74,7 +74,7 @@ extension AppState {
         if let reason = linkBlocker { return reason }
         if let reason = libraryBlocker { return reason }
         if let reason = installBlocker { return reason }
-        if missing != nil { return String(localized: "This model isn't installed.") }
+        if missing != nil { return String(localized: "This model isn’t installed.") }
         if prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return String(localized: "Write a prompt.") }
         let n: Int
         switch alternatives {
@@ -235,7 +235,7 @@ extension AppState {
                                          loraStrengths: stack.map(\.strength), images: references.count),
                                    x: x, y: try gridY.axis(stack: stack))
             guard !refusesNegativeStrength(g) else { throw .gridRefused(reason: .invalidValue) }
-            // A solver the form's model does not offer (Developer Mode off) renders nothing new.
+            // A solver the form's model does not offer (More Solvers off) renders nothing new.
             guard g.cells.allSatisfy({ $0.solver.map(offeredSolvers.contains) ?? true }) else { throw .gridRefused(reason: .invalidValue) }
             return g
         }

@@ -88,6 +88,12 @@ extension AppState {
         }
     }
 
+    /// At exit: the observers `watchVolumes` added.
+    func stopWatchingVolumes() {
+        for observer in volumeObservers { NSWorkspace.shared.notificationCenter.removeObserver(observer) }
+        volumeObservers = []
+    }
+
     private func volumesChanged() {
         let reachable = library.isReachable
         guard reachable != libraryReachable else { return }
@@ -159,7 +165,7 @@ extension AppState {
         do { switchLibrary(to: try library.opening(url)) } catch { problem = Problem(error) }
     }
 
-    /// « Use This Mac's Library »: the disk is absent, or the user wants this Mac's — nothing moved.
+    /// « Use This Mac’s Library »: the disk is absent, or the user wants this Mac's — nothing moved.
     func useLocalLibrary() {
         guard forgeInProgress == nil, !busy, !diagnosticRunning else { return }
         do { switchLibrary(to: try library.useLocal()) } catch { problem = Problem(error) }

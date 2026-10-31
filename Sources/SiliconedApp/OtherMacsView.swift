@@ -23,7 +23,7 @@ struct OtherMacsSection: View {
     var body: some View {
         Section {
             Toggle(isOn: $macs.lending) {
-                titled("Lend This Mac", "Paired Macs render on this one, with its models. Nothing connects before you accept a pairing.")
+                SettingLabel("Lend This Mac", "Paired Macs render on this one, with its models. Nothing connects before you accept a pairing.")
             }
             if macs.lending {
                 ForEach(macs.pairings?.lent ?? [], id: \.identity) { m in
@@ -48,7 +48,7 @@ struct OtherMacsSection: View {
                     clientSheet = true
                 }
             } label: {
-                titled("Compute on Another Mac", "Pair once, with a code shown on both screens.")
+                SettingLabel("Compute on Another Mac", "Pair once, with a code shown on both screens.")
             }
             ForEach(macs.pairings?.borrowed ?? [], id: \.id) { m in
                 LabeledContent {
@@ -67,7 +67,7 @@ struct OtherMacsSection: View {
                 }
             }
         } header: {
-            titled("Other Macs", "One Mac renders for another on the same network.")
+            SettingLabel("Other Macs", "One Mac renders for another on the same network.")
         }
         .onAppear { macs.load() }
         .sheet(isPresented: $hostSheet, onDismiss: macs.closePairing) {
@@ -92,13 +92,6 @@ struct OtherMacsSection: View {
     static func mismatch(_ m: Hello.Mismatch) -> String {
         switch m {
         case .protocolVersion, .appVersion: String(localized: "refused: the two Macs must run the same version of Siliconed")
-        }
-    }
-
-    private func titled(_ title: LocalizedStringKey, _ text: LocalizedStringKey) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(title)
-            Text(text).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
         }
     }
 }

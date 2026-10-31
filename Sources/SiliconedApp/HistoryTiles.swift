@@ -32,7 +32,7 @@ struct Banner: View {
             }
             .scrollIndicators(.never)
             .onChange(of: app.selection) { _, id in
-                if let id { withAnimation { reader.scrollTo(id, anchor: .center) } }
+                if let id { withAnimation(Motion.pick(.default)) { reader.scrollTo(id, anchor: .center) } }
             }
             }
             Divider()
@@ -101,7 +101,7 @@ private struct Thumbnail: View {
             .accessibilityLabel(Text(verbatim: entry.settings.prompt))
             .accessibilityValue(Text(verbatim: entry.legend))
             .accessibilityAddTraits(marked ? [.isButton, .isSelected] : .isButton)
-            .animation(.easeOut(duration: 0.12), value: hover)
+            .animation(Motion.pick(.easeOut(duration: 0.12)), value: hover)
     }
 }
 
@@ -145,6 +145,10 @@ private struct LiveTile: View {
         .contentShape(Rectangle())
         .onTapGesture { app.followsRender = true; app.showsExploration = false }
         .help("The render in progress")
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text("The render in progress"))
+        .accessibilityValue(Text(verbatim: Figures.percent(Int(app.fraction * 100))))
+        .accessibilityAddTraits(.isButton)
     }
 }
 
@@ -171,7 +175,11 @@ private struct ExplorationTile: View {
         .frame(height: side + 4)
         .contentShape(Rectangle())
         .onTapGesture { app.showsExploration = true }
-        .help("The exploration's grid")
+        .help("The exploration’s grid")
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text("The exploration’s grid"))
+        .accessibilityValue(Text(verbatim: "\(run.entries.count)/\(run.jobs.count)"))
+        .accessibilityAddTraits(.isButton)
     }
 }
 
@@ -203,6 +211,7 @@ struct EnlargeButton: View {
             Button { app.enlarge(entry) } label: { Image(systemName: "arrow.up.left.and.down.right.magnifyingglass") }
                 .disabled(app.enlargeRefusal(entry) != nil)
                 .help(app.enlargeHelp(entry))
+                .accessibilityLabel(Text("Enlarge ×4"))
         }
     }
 }
@@ -248,7 +257,7 @@ struct MenuEntry: View {
             ShareLink("Share…", item: app.transferable(entry), preview: SharePreview(app.exportName(entry)))
             Button("Full Screen") { app.show(entry.id); app.fullScreen = true }
             Divider()
-            Button(app.busy ? "Redo (Same Seed), Queued" : "Redo (Same Seed)") { app.redo(entry) }
+            Button(app.busy ? "Render Again (Same Seed), Queued" : "Render Again (Same Seed)") { app.redo(entry) }
             if entry.grid == nil, entry.sketch == nil {
                 Menu("Variations") { VariationButtons(app: app, entry: entry) }
                     .disabled(!app.canVary(entry))

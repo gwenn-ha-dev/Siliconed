@@ -276,7 +276,7 @@ extension AppState {
             memoryCeiling = c.ceiling
             // Not `fasterRendering`: its setter writes this Mac's preference and the engine's switch.
             settingsRead = c.settingsRead
-            if !isVisible(identifier) || !readySet.contains(identifier),
+            if !readySet.contains(identifier),
                let first = visibleReady.first?.id { identifier = first }
             readMirroredCatalog()
         case .queue(let q):
@@ -596,5 +596,16 @@ extension AppState {
             forgetCompletedJobs()
         }
         endHeld()
+    }
+}
+
+extension AppState {
+    /// **The form that crosses a switch of Mac** (`MainWindow.compute(on:)`): what the user has typed and chosen,
+    /// carried from the state left to the state shown. The one place that lists it — a setting added to the
+    /// form is added here. The LoRAs and the edit's images are not: they name files of one Mac's library.
+    func copyForm(from other: AppState) {
+        prompt = other.prompt; identifier = other.identifier; steps = other.steps
+        orientation = other.orientation; format = other.format; batch = other.batch
+        fixedSeed = other.fixedSeed; seed = other.seed; detail = other.detail; previews = other.previews
     }
 }

@@ -62,7 +62,7 @@ struct PromptField: NSViewRepresentable {
             if !typing { coordinator?.completion.close() }
         }
         view.setAccessibilityLabel(String(localized: "Prompt"))
-        view.setAccessibilityHelp(String(localized: "Write @ and a subject's name to cite it."))
+        view.setAccessibilityHelp(String(localized: "Write @ and a subject’s name to cite it."))
         layout.thumbnail = { [weak coordinator = context.coordinator] key in coordinator?.thumbnail(key) }
         context.coordinator.view = view
         PromptTextView.current = view

@@ -167,7 +167,7 @@
         }
       }
     },
-    "%@ architecture — needs its family's encoder and VAE" : {
+    "%@ architecture — needs its family’s encoder and VAE" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -287,7 +287,7 @@
         }
       }
     },
-    "%@ doesn't offer Detail" : {
+    "%@ doesn’t offer Detail" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -327,7 +327,7 @@
         }
       }
     },
-    "%@ doesn't offer Detail." : {
+    "%@ doesn’t offer Detail." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -367,7 +367,7 @@
         }
       }
     },
-    "%@ doesn't offer Detail: Normal will be used." : {
+    "%@ doesn’t offer Detail: Normal will be used." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -407,7 +407,7 @@
         }
       }
     },
-    "%@ doesn't offer the %@ solver" : {
+    "%@ doesn’t offer the %@ solver" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -453,7 +453,7 @@
         }
       }
     },
-    "%@ doesn't offer the %@ solver." : {
+    "%@ doesn’t offer the %@ solver." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -499,7 +499,7 @@
         }
       }
     },
-    "%@ doesn't start from an image." : {
+    "%@ doesn’t start from an image." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -751,7 +751,7 @@
         }
       }
     },
-    "%@ has no variations: a grid's sheet, or its model is not ready" : {
+    "%@ has no variations: a grid’s sheet, or its model is not ready" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -911,7 +911,7 @@
         }
       }
     },
-    "%@ isn't installed" : {
+    "%@ isn’t installed" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -951,7 +951,7 @@
         }
       }
     },
-    "%@ isn't installed." : {
+    "%@ isn’t installed." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -991,7 +991,7 @@
         }
       }
     },
-    "%@ isn't installed: its steps and LoRAs are left out." : {
+    "%@ isn’t installed: its steps and LoRAs are left out." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -1563,7 +1563,7 @@
         }
       }
     },
-    "%@ wasn't imported: uninstall it from the Models sheet." : {
+    "%@ wasn’t imported: uninstall it from the Models sheet." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -1643,7 +1643,7 @@
         }
       }
     },
-    "%@ will be imported once this is installed. Its image model is that file, under its author's license; the text encoder and the VAE below are %@'s." : {
+    "%@ will be imported once this is installed. Its image model is that file, under its author’s license; the text encoder and the VAE below are %@’s." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -3066,39 +3066,123 @@
     "%lld renders" : {
       "localizations" : {
         "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld Renderings"
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld Rendering"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld Renderings"
+                }
+              }
+            }
+          }
+        },
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld render"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld renders"
+                }
+              }
+            }
           }
         },
         "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld renderizados"
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld renderizado"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld renderizados"
+                }
+              }
+            }
           }
         },
         "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld rendus"
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld rendu"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld rendus"
+                }
+              }
+            }
           }
         },
         "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld rendering"
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld rendering"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld rendering"
+                }
+              }
+            }
           }
         },
         "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "生成%lld件"
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "生成%lld件"
+                }
+              }
+            }
           }
         },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld 次生成"
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld 次生成"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld 次生成"
+                }
+              }
+            }
           }
         }
       }
@@ -3106,39 +3190,123 @@
     "%lld sketches" : {
       "localizations" : {
         "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld Skizzen"
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld Skizze"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld Skizzen"
+                }
+              }
+            }
+          }
+        },
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld sketch"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld sketches"
+                }
+              }
+            }
           }
         },
         "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld bocetos"
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld boceto"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld bocetos"
+                }
+              }
+            }
           }
         },
         "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld esquisses"
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld esquisse"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld esquisses"
+                }
+              }
+            }
           }
         },
         "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld schizzi"
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld schizzo"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld schizzi"
+                }
+              }
+            }
           }
         },
         "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "スケッチ%lld件"
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "スケッチ%lld件"
+                }
+              }
+            }
           }
         },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld 张草稿"
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld 张草稿"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld 张草稿"
+                }
+              }
+            }
           }
         }
       }
@@ -3845,7 +4013,7 @@
         }
       }
     },
-    "--sketch belongs to « silicontrol grid »" : {
+    "--sketch belongs to “silicontrol grid”" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -3885,42 +4053,42 @@
         }
       }
     },
-    "--solver %@ is offered only in Developer Mode" : {
+    "--solver %@ is offered only when More Solvers is on" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "--solver %@ gibt es nur im Entwicklermodus"
+            "value" : "--solver %@ gibt es nur, wenn „Weitere Solver“ eingeschaltet ist"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "--solver %@ solo se ofrece en el Modo de desarrollador"
+            "value" : "--solver %@ solo se ofrece si «Más solvers» está activado"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "--solver %@ n’est proposé qu’en Mode développeur"
+            "value" : "--solver %@ n’est proposé que si « Plus de solveurs » est activé"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "--solver %@ è disponibile solo nella Modalità sviluppatore"
+            "value" : "--solver %@ è disponibile solo se «Più solver» è attivo"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "--solver %@ は開発者モードでのみ使えます"
+            "value" : "--solver %@ は「ソルバーを追加」がオンのときのみ使えます"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "--solver %@ 仅在开发者模式下提供"
+            "value" : "--solver %@ 仅在开启“更多求解器”时提供"
           }
         }
       }
@@ -4011,7 +4179,7 @@
         }
       }
     },
-    "--x and --y belong to « silicontrol grid »" : {
+    "--x and --y belong to “silicontrol grid”" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -4371,7 +4539,7 @@
         }
       }
     },
-    "8-bit weights published by Comfy-Org: the image model and the text encoder (int8 convrot); the 8-step LoRA from lodestones, in fp32. VAE and tokenizer are the publisher's." : {
+    "8-bit weights published by Comfy-Org: the image model and the text encoder (int8 convrot); the 8-step LoRA from lodestones, in fp32. VAE and tokenizer are the publisher’s." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -4411,7 +4579,7 @@
         }
       }
     },
-    "8-bit weights published by third parties: the image model from Comfy-Org (int8 convrot), the text encoder from unsloth (int8 convrot). Processor and VAE are the publisher's." : {
+    "8-bit weights published by third parties: the image model from Comfy-Org (int8 convrot), the text encoder from unsloth (int8 convrot). Processor and VAE are the publisher’s." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -4451,7 +4619,7 @@
         }
       }
     },
-    "8-bit weights published by third parties: the image model from unsloth (GGUF Q8_0), the text encoder from Disty0 (SDNQ int8). Tokenizer and VAE are the publisher's." : {
+    "8-bit weights published by third parties: the image model from unsloth (GGUF Q8_0), the text encoder from Disty0 (SDNQ int8). Tokenizer and VAE are the publisher’s." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -4611,7 +4779,7 @@
         }
       }
     },
-    "A file can't be opened: %@." : {
+    "A file can’t be opened: %@." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -4851,7 +5019,7 @@
         }
       }
     },
-    "A grid that varies the model can't take a LoRA: each LoRA is made for one model." : {
+    "A grid that varies the model can’t take a LoRA: each LoRA is made for one model." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -5411,7 +5579,7 @@
         }
       }
     },
-    "A sketch stops early: the later it stops, the closer to the finished image (a LoRA's style can settle late), the longer it takes. The step count is the rack's" : {
+    "A sketch stops early: the later it stops, the closer to the finished image (a LoRA’s style can settle late), the longer it takes. The step count is the rack’s" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -6057,6 +6225,46 @@
         }
       }
     },
+    "Add an Image" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bild hinzufügen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Añadir una imagen"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajouter une image"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aggiungi un’immagine"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "画像を追加"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加图像"
+          }
+        }
+      }
+    },
     "Add an image the prompt can draw from — or drop or paste it here (⌘V)" : {
       "localizations" : {
         "de" : {
@@ -6217,42 +6425,42 @@
         }
       }
     },
-    "Adds the solvers Euler a, DPM++ 2M and UniPC, in the panel and as an exploration axis." : {
+    "Adds the solvers Euler a, DPM++ 2M and UniPC to the DiT’s box and to the exploration’s axes. The default, Euler, is the one the models were distilled for." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Fügt die Solver Euler a, DPM++ 2M und UniPC hinzu, im Panel und als Achse der Erkundung."
+            "value" : "Fügt die Solver Euler a, DPM++ 2M und UniPC zur Box des DiT und zu den Achsen der Erkundung hinzu. Standard ist Euler, der Solver, für den die Modelle destilliert wurden."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Añade los solvers Euler a, DPM++ 2M y UniPC, en el panel y como eje de exploración."
+            "value" : "Añade los solvers Euler a, DPM++ 2M y UniPC a la caja del DiT y a los ejes de la exploración. El predeterminado, Euler, es aquel para el que se destilaron los modelos."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ajoute les solveurs Euler a, DPM++ 2M et UniPC, dans le rack et comme axe d’exploration."
+            "value" : "Ajoute les solveurs Euler a, DPM++ 2M et UniPC à la boîte du DiT et aux axes de l’exploration. Euler, par défaut, est celui pour lequel les modèles ont été distillés."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Aggiunge i solver Euler a, DPM++ 2M e UniPC, nel pannello e come asse dell’esplorazione."
+            "value" : "Aggiunge i solver Euler a, DPM++ 2M e UniPC al riquadro del DiT e agli assi dell’esplorazione. Quello predefinito, Euler, è quello per cui i modelli sono stati distillati."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ソルバー Euler a、DPM++ 2M、UniPC をパネルと探索の軸に追加します。"
+            "value" : "ソルバー Euler a、DPM++ 2M、UniPC を DiT のボックスと探索の軸に追加します。標準の Euler は、モデルが蒸留されたときのソルバーです。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "在面板中添加求解器 Euler a、DPM++ 2M 和 UniPC，并作为探索轴。"
+            "value" : "在 DiT 的方框和探索的轴中添加求解器 Euler a、DPM++ 2M 和 UniPC。默认的 Euler 是这些模型蒸馏时所用的求解器。"
           }
         }
       }
@@ -6377,47 +6585,7 @@
         }
       }
     },
-    "Also switched from the canvas toolbar." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Auch über die Symbolleiste der Leinwand umschaltbar."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "También se cambia desde la barra de herramientas del lienzo."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Se change aussi depuis la barre d’outils de l’image."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Si cambia anche dalla barra degli strumenti della tela."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "キャンバスのツールバーからも切り替えられます。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "也可从画布工具栏切换。"
-          }
-        }
-      }
-    },
-    "An axis of the grid can't be read." : {
+    "An axis of the grid can’t be read." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -6537,7 +6705,7 @@
         }
       }
     },
-    "An axis of the grid names a LoRA that isn't in the stack." : {
+    "An axis of the grid names a LoRA that isn’t in the stack." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -6577,7 +6745,7 @@
         }
       }
     },
-    "An axis of the grid names a group of alternatives the prompt doesn't have." : {
+    "An axis of the grid names a group of alternatives the prompt doesn’t have." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -6857,7 +7025,7 @@
         }
       }
     },
-    "Anima derives from NVIDIA's Cosmos-Predict2, under the NVIDIA Open Model License." : {
+    "Anima derives from NVIDIA’s Cosmos-Predict2, under the NVIDIA Open Model License." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -7337,6 +7505,46 @@
         }
       }
     },
+    "Batch" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Anzahl"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lote"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lot"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lotto"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "バッチ"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "批量"
+          }
+        }
+      }
+    },
     "Beta" : {
       "localizations" : {
         "de" : {
@@ -7377,7 +7585,47 @@
         }
       }
     },
-    "Beta: the 8-step recipe is the community's distillation, not the publisher's. It leaves beta when the publisher releases its own fast version." : {
+    "Beta: still being settled, and may change." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Beta: noch in Arbeit und kann sich ändern."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Beta: aún en ajuste y puede cambiar."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bêta : encore en mise au point, susceptible de changer."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Beta: ancora in fase di messa a punto, può cambiare."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ベータ：調整中のため、変更される場合があります。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Beta：仍在调整中，可能会有变化。"
+          }
+        }
+      }
+    },
+    "Beta: the 8-step recipe is the community’s distillation, not the publisher’s. It leaves beta when the publisher releases its own fast version." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -7413,6 +7661,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "测试版：8 步配方是社区的蒸馏版本，而非发布方的。待发布方推出自己的快速版本后，将结束测试。"
+          }
+        }
+      }
+    },
+    "Beta: the Prompt Lab works, and may change." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Beta: Das Prompt-Labor funktioniert, kann sich aber ändern."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Beta: el Laboratorio de prompts funciona, pero puede cambiar."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bêta : l’Atelier de prompts fonctionne, mais peut changer."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Beta: il Laboratorio di prompt funziona, ma può cambiare."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ベータ：プロンプトラボは動作しますが、変更される場合があります。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Beta：提示词实验室可以使用，但可能会有变化。"
           }
         }
       }
@@ -7937,7 +8225,7 @@
         }
       }
     },
-    "Check the file's permissions, and that its disk is connected." : {
+    "Check the file’s permissions, and that its disk is connected." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -8817,7 +9105,7 @@
         }
       }
     },
-    "Choose one of the model's sizes, like 1024 × 1024 or 832 × 1216." : {
+    "Choose one of the model’s sizes, like 1024 × 1024 or 832 × 1216." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -9457,6 +9745,46 @@
         }
       }
     },
+    "Close Window" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fenster schließen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cerrar ventana"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fermer la fenêtre"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chiudi finestra"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ウインドウを閉じる"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "关闭窗口"
+          }
+        }
+      }
+    },
     "Command Line" : {
       "localizations" : {
         "de" : {
@@ -9577,7 +9905,7 @@
         }
       }
     },
-    "Commercial use is allowed, under the license's terms." : {
+    "Commercial use is allowed, under the license’s terms." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -9653,6 +9981,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "紧凑"
+          }
+        }
+      }
+    },
+    "Compare with Original" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mit Original vergleichen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Comparar con el original"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Comparer à l’original"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Confronta con l’originale"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "元の画像と比較"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "与原图对比"
           }
         }
       }
@@ -9733,46 +10101,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "与原图在卷帘下对比：已编辑的图像"
-          }
-        }
-      }
-    },
-    "Comparison" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Vergleich"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Comparación"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Comparaison"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Confronto"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "比較"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "对比"
           }
         }
       }
@@ -10017,7 +10345,7 @@
         }
       }
     },
-    "Connect it to render. Settings can also go back to this Mac's library." : {
+    "Connect it to render. Settings can also go back to this Mac’s library." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -10057,7 +10385,7 @@
         }
       }
     },
-    "Connect the disk — or, in Settings, go back to this Mac's library." : {
+    "Connect the disk — or, in Settings, go back to this Mac’s library." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -10297,7 +10625,7 @@
         }
       }
     },
-    "Copies the library to the folder you choose, checks every file, then removes it from here. The licenses you accepted and this Mac's settings stay on this Mac" : {
+    "Copies the library to the folder you choose, checks every file, then removes it from here. The licenses you accepted and this Mac’s settings stay on this Mac" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -10337,7 +10665,7 @@
         }
       }
     },
-    "Copies the report and opens GitHub's form; you paste it and submit it there" : {
+    "Copies the report and opens GitHub’s form; you paste it and submit it there" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -10577,6 +10905,46 @@
         }
       }
     },
+    "Copy as Terminal Command" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Als Terminal-Befehl kopieren"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copiar como comando de Terminal"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copier comme commande de Terminal"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copia come comando di Terminale"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ターミナルコマンドとしてコピー"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "拷贝为“终端”命令"
+          }
+        }
+      }
+    },
     "Copy the Command" : {
       "localizations" : {
         "de" : {
@@ -10733,46 +11101,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "拷贝所选图像（⇧⌘C）"
-          }
-        }
-      }
-    },
-    "Copy the silicontrol command" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "silicontrol-Befehl kopieren"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Copiar el comando silicontrol"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Copier la commande silicontrol"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Copia il comando silicontrol"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "silicontrolコマンドをコピー"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "拷贝 silicontrol 命令"
           }
         }
       }
@@ -11777,46 +12105,6 @@
         }
       }
     },
-    "Developer Mode" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Entwicklermodus"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Modo de desarrollador"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mode développeur"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Modalità sviluppatore"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "開発者モード"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "开发者模式"
-          }
-        }
-      }
-    },
     "DiT" : {
       "localizations" : {
         "de" : {
@@ -12755,7 +13043,7 @@
         }
       }
     },
-    "Each route alone, in trillions of operations a second (TFLOP/s). The bar is the share of the GPU's peak, which its cores and clock announce; only the GPU has one, and only its matrix products are compared to it. ✓: the result is within its threshold of the exact one." : {
+    "Each route alone, in trillions of operations a second (TFLOP/s). The bar is the share of the GPU’s peak, which its cores and clock announce; only the GPU has one, and only its matrix products are compared to it. ✓: the result is within its threshold of the exact one." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -13435,7 +13723,7 @@
         }
       }
     },
-    "Enlarge with macOS's super-resolution?" : {
+    "Enlarge with macOS’s super-resolution?" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -13515,7 +13803,7 @@
         }
       }
     },
-    "Enlarge ×4 with macOS's super-resolution: %@, about %@. The original stays." : {
+    "Enlarge ×4 with macOS’s super-resolution: %@, about %@. The original stays." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -13561,7 +13849,7 @@
         }
       }
     },
-    "Enlarge ×4 with macOS's super-resolution: %@. The original stays." : {
+    "Enlarge ×4 with macOS’s super-resolution: %@. The original stays." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -13757,46 +14045,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "评估次数"
-          }
-        }
-      }
-    },
-    "Every image has been saved. You can undo this with ⌘Z." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Alle Bilder wurden gesichert. Mit ⌘Z können Sie dies widerrufen."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Todas las imágenes se han guardado. ⌘Z lo deshace."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Toutes les images ont été enregistrées. ⌘Z annule."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tutte le immagini sono state salvate. Puoi annullare con ⌘Z."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "すべての画像を保存しました。⌘Zで取り消せます。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "所有图像均已存储。你可以按 ⌘Z 撤销。"
           }
         }
       }
@@ -14525,46 +14773,6 @@
         }
       }
     },
-    "For Testing" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Zum Testen"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Para pruebas"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Pour essayer"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Per prove"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "テスト用"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "用于试用"
-          }
-        }
-      }
-    },
     "Forget" : {
       "localizations" : {
         "de" : {
@@ -15166,7 +15374,7 @@
         }
       }
     },
-    "GitHub could not be reached. New versions are also listed on the project's page." : {
+    "GitHub could not be reached. New versions are also listed on the project’s page." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -15206,7 +15414,7 @@
         }
       }
     },
-    "Give each axis its values: a group of the prompt, seeds, steps, a LoRA of the stack, models or the edit's images." : {
+    "Give each axis its values: a group of the prompt, seeds, steps, a LoRA of the stack, models or the edit’s images." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -15412,7 +15620,7 @@
         }
       }
     },
-    "Groups of alternatives can't be nested (character %@)." : {
+    "Groups of alternatives can’t be nested (character %@)." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -15532,7 +15740,7 @@
         }
       }
     },
-    "Hugging Face doesn't list %@ any more." : {
+    "Hugging Face doesn’t list %@ any more." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -15612,7 +15820,7 @@
         }
       }
     },
-    "Identical calls differed by more than a free Mac's: those figures are read on their quick side." : {
+    "Identical calls differed by more than a free Mac’s: those figures are read on their quick side." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -15652,7 +15860,7 @@
         }
       }
     },
-    "Illustration, painting and anime. No photorealism: its publisher's choice." : {
+    "Illustration, painting and anime. No photorealism: its publisher’s choice." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -17378,7 +17586,7 @@
         }
       }
     },
-    "It computed wrong: the plan has no model of it, and the engine's defaults answer." : {
+    "It computed wrong: the plan has no model of it, and the engine’s defaults answer." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -17418,7 +17626,7 @@
         }
       }
     },
-    "Its author restricts access on Hugging Face: the download needs your account's access to it." : {
+    "Its author restricts access on Hugging Face: the download needs your account’s access to it." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -17534,6 +17742,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "最多保留 %lld 张图像。"
+          }
+        }
+      }
+    },
+    "Keep Only This Image" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nur dieses Bild behalten"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Conservar solo esta imagen"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ne garder que cette image"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mantieni solo questa immagine"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この画像だけを残す"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仅保留这张图像"
           }
         }
       }
@@ -17858,7 +18106,7 @@
         }
       }
     },
-    "Leave the number of steps at the model's default." : {
+    "Leave the number of steps at the model’s default." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -17978,6 +18226,46 @@
         }
       }
     },
+    "Lets a LoRA’s strength go from −1.5 to 1.5, for “slider” LoRAs. An ordinary LoRA is damaged by a negative strength." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lässt die Stärke einer LoRA von −1,5 bis 1,5 reichen, für „Slider“-LoRAs. Eine gewöhnliche LoRA wird durch eine negative Stärke beschädigt."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Permite que la fuerza de un LoRA vaya de −1,5 a 1,5, para LoRA «slider». Una fuerza negativa daña un LoRA corriente."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Laisse la force d’un LoRA aller de −1,5 à 1,5, pour les LoRA « slider ». Un LoRA ordinaire est abîmé par une force négative."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Permette alla forza di un LoRA di andare da −1,5 a 1,5, per i LoRA «slider». Una forza negativa danneggia un LoRA ordinario."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "LoRA の強さを −1.5〜1.5 にできます。「スライダー」LoRA 用で、通常の LoRA は負の強さで画像が崩れます。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "允许 LoRA 的强度在 −1.5 至 1.5 之间，适用于“slider”类 LoRA。普通 LoRA 使用负强度会受损。"
+          }
+        }
+      }
+    },
     "Letters, digits, - and _ only, without spaces." : {
       "localizations" : {
         "de" : {
@@ -18058,7 +18346,7 @@
         }
       }
     },
-    "License on its page: %@. The file is its author's, under that license." : {
+    "License on its page: %@. The file is its author’s, under that license." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -18618,7 +18906,7 @@
         }
       }
     },
-    "Long, detailed prompts, read by a 9 B language model. Eight steps through the community's distillation." : {
+    "Long, detailed prompts, read by a 9 B language model. Eight steps through the community’s distillation." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -18698,42 +18986,42 @@
         }
       }
     },
-    "Made with the %@ solver, offered in Developer Mode: Euler will be used." : {
+    "Made with the %@ solver, offered when More Solvers is on: Euler will be used." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Mit dem Solver %@ erstellt, den es im Entwicklermodus gibt: Euler wird verwendet."
+            "value" : "Mit dem Solver %@ erstellt, den es bei eingeschaltetem „Weitere Solver“ gibt: Euler wird verwendet."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Hecha con el solver %@, que se ofrece en el Modo de desarrollador: se usará Euler."
+            "value" : "Hecha con el solver %@, que se ofrece cuando «Más solvers» está activado: se usará Euler."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Faite avec le solveur %@, proposé en Mode développeur : Euler sera utilisé."
+            "value" : "Faite avec le solveur %@, proposé quand « Plus de solveurs » est activé : Euler sera utilisé."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Creata con il solver %@, disponibile nella Modalità sviluppatore: verrà usato Euler."
+            "value" : "Creata con il solver %@, disponibile quando «Più solver» è attivo: verrà usato Euler."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "開発者モードで使える%@ソルバーで作成されました：Eulerが使われます。"
+            "value" : "「ソルバーを追加」がオンのときに使える%@ソルバーで作成されました：Eulerが使われます。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "使用 %@ 求解器生成，该求解器仅在开发者模式下提供：将使用 Euler。"
+            "value" : "使用 %@ 求解器生成，该求解器仅在开启“更多求解器”时提供：将使用 Euler。"
           }
         }
       }
@@ -18858,7 +19146,7 @@
         }
       }
     },
-    "Matrix products and attention on the GPU, the CPU's matrix unit and the Neural Engine, alone and together, each result checked against the exact one: what Siliconed plans a render with. No model is needed, nothing is downloaded. Under a minute; the queue waits meanwhile." : {
+    "Matrix products and attention on the GPU, the CPU’s matrix unit and the Neural Engine, alone and together, each result checked against the exact one: what Siliconed plans a render with. No model is needed, nothing is downloaded. Under a minute; the queue waits meanwhile." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -19378,46 +19666,6 @@
         }
       }
     },
-    "Measures what this Mac computes, then opens a prefilled GitHub issue" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Misst, was dieser Mac rechnet, und öffnet dann ein vorausgefülltes GitHub-Issue"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mide lo que calcula este Mac y luego abre una incidencia de GitHub ya rellenada"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mesure ce que calcule ce Mac, puis ouvre un signalement GitHub prérempli"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Misura ciò che calcola questo Mac, poi apre una segnalazione GitHub precompilata"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "このMacの計算結果を測定し、入力済みのGitHub issueを開きます"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "测量这台 Mac 的计算能力，然后打开已预先填写的 GitHub 议题"
-          }
-        }
-      }
-    },
     "Memory" : {
       "localizations" : {
         "de" : {
@@ -19815,6 +20063,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "更多"
+          }
+        }
+      }
+    },
+    "More Solvers" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Weitere Solver"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Más solvers"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Plus de solveurs"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Più solver"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ソルバーを追加"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更多求解器"
           }
         }
       }
@@ -20220,42 +20508,42 @@
         }
       }
     },
-    "Name a person or thing from a photo, cite it as @name in an edit." : {
+    "Name a person, an object or a style from a photo, then cite it as @name in the prompt of an edit." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Benennen Sie eine Person oder Sache nach einem Foto und zitieren Sie sie als @name in einer Bearbeitung."
+            "value" : "Benennen Sie eine Person, ein Objekt oder einen Stil nach einem Foto und zitieren Sie es dann als @name im Prompt einer Bearbeitung."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nombre a una persona o cosa a partir de una foto y cítela como @nombre en una edición."
+            "value" : "Nombre a una persona, un objeto o un estilo a partir de una foto y cítelo después como @nombre en el prompt de una edición."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nommez une personne ou une chose d’après une photo, citez-la en @nom dans une édition."
+            "value" : "Nommez une personne, un objet ou un style d’après une photo, puis citez-le en @nom dans le prompt d’une édition."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Dai un nome a una persona o cosa da una foto, citala come @nome in una modifica."
+            "value" : "Dai un nome a una persona, un oggetto o uno stile da una foto, poi citalo come @nome nel prompt di una modifica."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "写真から人や物に名前を付け、編集で @名前 として引用します。"
+            "value" : "写真から人・物・スタイルに名前を付け、編集のプロンプトで @名前 として引用します。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "根据照片为人物或事物命名，并在编辑中以 @名称 引用。"
+            "value" : "根据照片为人物、物体或风格命名，然后在编辑的提示词中以 @名称 引用。"
           }
         }
       }
@@ -20940,7 +21228,7 @@
         }
       }
     },
-    "No license declared on its page: the file is its author's." : {
+    "No license declared on its page: the file is its author’s." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -21260,7 +21548,7 @@
         }
       }
     },
-    "Non-commercial: personal use and research only. Images made with it can't be sold or used in a commercial product." : {
+    "Non-commercial: personal use and research only. Images made with it can’t be sold or used in a commercial product." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -21380,7 +21668,7 @@
         }
       }
     },
-    "None. A Civitai checkpoint of a known family imports as is (⌘O); it borrows its family's encoder and VAE." : {
+    "None. A Civitai checkpoint of a known family imports as is (⌘O); it borrows its family’s encoder and VAE." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -22270,6 +22558,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "物体"
+          }
+        }
+      }
+    },
+    "Off by default; they may change." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Standardmäßig aus; können sich ändern."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Desactivados por defecto; pueden cambiar."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Désactivés par défaut ; susceptibles de changer."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Disattivati per impostazione predefinita; possono cambiare."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "初期状態ではオフです。変更される場合があります。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "默认关闭；可能会有变化。"
           }
         }
       }
@@ -23394,7 +23722,7 @@
         }
       }
     },
-    "Part of the DiT runs in fp16 on the Neural Engine: less energy (about a fifth on an M1 Pro), an image a little different from fp32's. Click for fp32 throughout." : {
+    "Part of the DiT runs in fp16 on the Neural Engine: less energy (about a fifth on an M1 Pro), an image a little different from fp32’s. Click for fp32 throughout." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -24036,7 +24364,7 @@
         }
       }
     },
-    "Publishers' models" : {
+    "Publishers’ models" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -24682,166 +25010,6 @@
         }
       }
     },
-    "Redo (Same Seed)" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Wiederholen (gleicher Seed)"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Rehacer (misma semilla)"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Refaire (même graine)"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Rifai (stesso seme)"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "やり直し（同じシード）"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "重做（相同种子）"
-          }
-        }
-      }
-    },
-    "Redo (Same Seed), Queued" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Wiederholen (gleicher Seed), eingereiht"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Rehacer (misma semilla), en cola"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Refaire (même graine), en file"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Rifai (stesso seme), in coda"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "やり直し（同じシード）、キューに追加済み"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "重做（相同种子），已加入队列"
-          }
-        }
-      }
-    },
-    "Redo Image (Same Seed)" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Bild wiederholen (gleicher Seed)"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Rehacer la imagen (misma semilla)"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Refaire l’image (même graine)"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Rifai immagine (stesso seme)"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "画像をやり直す（同じシード）"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "重做图像（相同种子）"
-          }
-        }
-      }
-    },
-    "Redo: same settings, same seed (⌘R)" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Wiederholen: gleiche Einstellungen, gleicher Seed (⌘R)"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Rehacer: mismos ajustes, misma semilla (⌘R)"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Refaire : mêmes réglages, même graine (⌘R)"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Rifai: stesse impostazioni, stesso seme (⌘R)"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "やり直し：同じ設定、同じシード（⌘R）"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "重做：相同设置，相同种子（⌘R）"
-          }
-        }
-      }
-    },
     "References" : {
       "localizations" : {
         "de" : {
@@ -24998,6 +25166,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "重新安装…"
+          }
+        }
+      }
+    },
+    "Remote Control Help" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hilfe zur Fernsteuerung"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ayuda del control remoto"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aide de la télécommande"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aiuto per il controllo remoto"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "リモートコントロールのヘルプ"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "遥控帮助"
           }
         }
       }
@@ -25562,7 +25770,7 @@
         }
       }
     },
-    "Remove the variation: the seed's own image" : {
+    "Remove the variation: the seed’s own image" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -25838,6 +26046,126 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "生成"
+          }
+        }
+      }
+    },
+    "Render Again (Same Seed)" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Erneut rendern (gleicher Seed)"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Renderizar de nuevo (misma semilla)"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rendre à nouveau (même graine)"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Renderizza di nuovo (stesso seme)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "もう一度生成（同じシード）"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重新生成（相同种子）"
+          }
+        }
+      }
+    },
+    "Render Again (Same Seed), Queued" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Erneut rendern (gleicher Seed), eingereiht"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Renderizar de nuevo (misma semilla), en cola"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rendre à nouveau (même graine), en file"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Renderizza di nuovo (stesso seme), in coda"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "もう一度生成（同じシード）、キューに追加済み"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重新生成（相同种子），已加入队列"
+          }
+        }
+      }
+    },
+    "Render again: same settings, same seed (⌘R)" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Erneut rendern: gleiche Einstellungen, gleicher Seed (⌘R)"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Renderizar de nuevo: mismos ajustes, misma semilla (⌘R)"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rendre à nouveau : mêmes réglages, même graine (⌘R)"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Renderizza di nuovo: stesse impostazioni, stesso seme (⌘R)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "もう一度生成：同じ設定、同じシード（⌘R）"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重新生成：相同设置，相同种子（⌘R）"
           }
         }
       }
@@ -26186,7 +26514,7 @@
         }
       }
     },
-    "Replaces the rack's prompt. ⌘Z in the prompt field brings the old one back." : {
+    "Replaces the rack’s prompt. ⌘Z in the prompt field brings the old one back." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -26262,6 +26590,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "替换…"
+          }
+        }
+      }
+    },
+    "Report a Problem…" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Problem melden …"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Informar de un problema…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Signaler un problème…"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Segnala un problema…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "問題を報告…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "报告问题…"
           }
         }
       }
@@ -26342,6 +26710,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "请报告此问题：App 构建了引擎拒绝的处理链。"
+          }
+        }
+      }
+    },
+    "Reset to 0.8" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Auf 0,8 zurücksetzen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restablecer a 0,8"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Revenir à 0,8"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ripristina a 0,8"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "0.8 に戻す"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "恢复为 0.8"
           }
         }
       }
@@ -27152,7 +27560,7 @@
         }
       }
     },
-    "Set by the model's family" : {
+    "Set by the model’s family" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -27352,7 +27760,7 @@
         }
       }
     },
-    "Share of the GPU's peak (%@)" : {
+    "Share of the GPU’s peak (%@)" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -27592,6 +28000,46 @@
         }
       }
     },
+    "Show Siliconed" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Siliconed anzeigen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostrar Siliconed"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Afficher Siliconed"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostra Siliconed"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Siliconed を表示"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示 Siliconed"
+          }
+        }
+      }
+    },
     "Show in Finder" : {
       "localizations" : {
         "de" : {
@@ -27748,6 +28196,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "仅显示放大后的图像（Esc）"
+          }
+        }
+      }
+    },
+    "Shows the image taking shape on the canvas after each step. It does not change the image." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zeigt nach jedem Schritt, wie das Bild auf der Arbeitsfläche Gestalt annimmt. Das Bild selbst ändert sich dadurch nicht."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Muestra la imagen tomando forma en el lienzo tras cada paso. No cambia la imagen."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Montre l’image qui prend forme sur le canevas après chaque pas. Cela ne change pas l’image."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostra l’immagine che prende forma sul canvas dopo ogni passo. Non modifica l’immagine."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ステップごとに、画像ができていく様子をキャンバスに表示します。画像自体は変わりません。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "每一步之后，在画布上显示图像逐渐成形的过程。这不会改变图像。"
           }
         }
       }
@@ -27952,42 +28440,42 @@
         }
       }
     },
-    "Siliconed Window" : {
+    "Siliconed Help" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Siliconed-Fenster"
+            "value" : "Siliconed-Hilfe"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ventana de Siliconed"
+            "value" : "Ayuda de Siliconed"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Fenêtre de Siliconed"
+            "value" : "Aide de Siliconed"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Finestra di Siliconed"
+            "value" : "Aiuto di Siliconed"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Siliconedウインドウ"
+            "value" : "Siliconed ヘルプ"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Siliconed 窗口"
+            "value" : "Siliconed 帮助"
           }
         }
       }
@@ -28192,7 +28680,7 @@
         }
       }
     },
-    "Siliconed ships no weights. The Compact version is the publisher's model republished in 8 bits by third parties, and downloaded from them; the publisher's license applies, and each third party's model card says what it changed." : {
+    "Siliconed ships no weights. The Compact version is the publisher’s model republished in 8 bits by third parties, and downloaded from them; the publisher’s license applies, and each third party’s model card says what it changed." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -28232,7 +28720,7 @@
         }
       }
     },
-    "Siliconed ships no weights. The Compact version's image model is the publisher's, republished in 8 bits by vanes430 and downloaded from there; everything else comes from the publisher. The publisher's license applies, and vanes430's model card says what it changed." : {
+    "Siliconed ships no weights. The Compact version’s image model is the publisher’s, republished in 8 bits by vanes430 and downloaded from there; everything else comes from the publisher. The publisher’s license applies, and vanes430’s model card says what it changed." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -28272,7 +28760,7 @@
         }
       }
     },
-    "Siliconed ships no weights. The Light version is the publisher's model republished in 4 to 8 bits by third parties, and downloaded from them; the publisher's license applies, and each third party's model card says what it changed." : {
+    "Siliconed ships no weights. The Light version is the publisher’s model republished in 4 to 8 bits by third parties, and downloaded from them; the publisher’s license applies, and each third party’s model card says what it changed." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -28312,7 +28800,7 @@
         }
       }
     },
-    "Siliconed ships no weights. The Light version's image model is the publisher's, republished in 4 to 6 bits by vanes430 and downloaded from there; everything else comes from the publisher. The publisher's license applies, and vanes430's model card says what it changed." : {
+    "Siliconed ships no weights. The Light version’s image model is the publisher’s, republished in 4 to 6 bits by vanes430 and downloaded from there; everything else comes from the publisher. The publisher’s license applies, and vanes430’s model card says what it changed." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -28352,7 +28840,7 @@
         }
       }
     },
-    "Siliconed ships no weights. The publisher's repository asks for a Hugging Face account, so its files are downloaded from copies proven identical: the image model and the text encoder from Comfy-Org, the VAE and the tokenizer from Qwen. The publisher's license applies, and each model card says whose files they are." : {
+    "Siliconed ships no weights. The publisher’s repository asks for a Hugging Face account, so its files are downloaded from copies proven identical: the image model and the text encoder from Comfy-Org, the VAE and the tokenizer from Qwen. The publisher’s license applies, and each model card says whose files they are." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -28392,7 +28880,7 @@
         }
       }
     },
-    "Siliconed ships no weights: the model is downloaded from its publisher, under the publisher's license." : {
+    "Siliconed ships no weights: the model is downloaded from its publisher, under the publisher’s license." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -28540,46 +29028,6 @@
         }
       }
     },
-    "Sliders from −1.5 to 1.5, for « slider » LoRAs; an ordinary LoRA is damaged by a negative strength." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Regler von −1,5 bis 1,5, für „Slider“-LoRAs; eine gewöhnliche LoRA wird durch eine negative Stärke beschädigt."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Deslizadores de −1,5 a 1,5, para LoRA «slider»; una fuerza negativa daña un LoRA corriente."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Curseurs de −1,5 à 1,5, pour les LoRA « slider » ; un LoRA ordinaire est abîmé par une force négative."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cursori da −1,5 a 1,5, per i LoRA «slider»; una forza negativa danneggia un LoRA ordinario."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "スライダーは −1.5〜1.5。「スライダー」LoRA 用で、通常の LoRA は負の強さで画像が崩れます。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "滑块范围为 −1.5 至 1.5，适用于“slider”类 LoRA；普通 LoRA 使用负强度会受损。"
-          }
-        }
-      }
-    },
     "Small and fast: 512 on the short side — the models are out of their domain below" : {
       "localizations" : {
         "de" : {
@@ -28620,7 +29068,7 @@
         }
       }
     },
-    "Smaller on disk: the image model in 8 bits, the publisher's text encoder; images slightly different." : {
+    "Smaller on disk: the image model in 8 bits, the publisher’s text encoder; images slightly different." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -28860,7 +29308,7 @@
         }
       }
     },
-    "Stacked together, the rack's own. To compare LoRAs, choose « LoRA to Compare » on an axis." : {
+    "Stacked together, the rack’s own. To compare LoRAs, choose “LoRA to Compare” on an axis." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -29746,6 +30194,46 @@
         }
       }
     },
+    "Strength" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stärke"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fuerza"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Force"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Forza"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "強さ"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "强度"
+          }
+        }
+      }
+    },
     "Strength — double-click for 0.8" : {
       "localizations" : {
         "de" : {
@@ -30147,7 +30635,7 @@
         }
       }
     },
-    "Sweep seeds, a LoRA's strength, words of the prompt, models or the images to edit — small sketches, fast (⌥⌘G)" : {
+    "Sweep seeds, a LoRA’s strength, words of the prompt, models or the images to edit — small sketches, fast (⌥⌘G)" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -30467,7 +30955,7 @@
         }
       }
     },
-    "That Mac doesn't hold the model %@." : {
+    "That Mac doesn’t hold the model %@." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -30507,7 +30995,7 @@
         }
       }
     },
-    "That Mac doesn't offer %@." : {
+    "That Mac doesn’t offer %@." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -30827,7 +31315,7 @@
         }
       }
     },
-    "The LoRA %@ doesn't say which model it's for." : {
+    "The LoRA %@ doesn’t say which model it’s for." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -31153,7 +31641,7 @@
         }
       }
     },
-    "The denoiser: the publisher's model, or a fine-tune you imported" : {
+    "The denoiser: the publisher’s model, or a fine-tune you imported" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -31273,7 +31761,7 @@
         }
       }
     },
-    "The disk of that Mac's library is not connected." : {
+    "The disk of that Mac’s library is not connected." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -31313,7 +31801,7 @@
         }
       }
     },
-    "The download of %@ is corrupt: its checksum doesn't match." : {
+    "The download of %@ is corrupt: its checksum doesn’t match." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -31439,7 +31927,7 @@
         }
       }
     },
-    "The encoder reads the edit's images with the prompt: the prompt can name them (image 1, image 2)" : {
+    "The encoder reads the edit’s images with the prompt: the prompt can name them (image 1, image 2)" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -31679,7 +32167,7 @@
         }
       }
     },
-    "The exploration doesn't cite named subjects yet." : {
+    "The exploration doesn’t cite named subjects yet." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -31719,7 +32207,7 @@
         }
       }
     },
-    "The exploration's grid" : {
+    "The exploration’s grid" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -31759,7 +32247,7 @@
         }
       }
     },
-    "The exploration's panel (⌥⌘G)" : {
+    "The exploration’s panel (⌥⌘G)" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -31879,7 +32367,7 @@
         }
       }
     },
-    "The frame's proportions — the ones the size picker offers, the image's own, or free" : {
+    "The frame’s proportions — the ones the size picker offers, the image’s own, or free" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -31959,7 +32447,7 @@
         }
       }
     },
-    "The grid's two axes vary the same setting." : {
+    "The grid’s two axes vary the same setting." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -31999,7 +32487,7 @@
         }
       }
     },
-    "The image couldn't be encoded as PNG." : {
+    "The image couldn’t be encoded as PNG." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -32039,7 +32527,7 @@
         }
       }
     },
-    "The image couldn't be saved to %@." : {
+    "The image couldn’t be saved to %@." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -32079,7 +32567,7 @@
         }
       }
     },
-    "The image it started from isn't in the file (img2img)." : {
+    "The image it started from isn’t in the file (img2img)." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -32119,7 +32607,7 @@
         }
       }
     },
-    "The image model and the text encoder in the publisher's precision (bf16), downloaded from Comfy-Org's copy; the VAE and the tokenizer from Qwen's. Each is the publisher's file, value for value." : {
+    "The image model and the text encoder in the publisher’s precision (bf16), downloaded from Comfy-Org’s copy; the VAE and the tokenizer from Qwen’s. Each is the publisher’s file, value for value." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -32159,7 +32647,7 @@
         }
       }
     },
-    "The image model and the text encoder in the publisher's precision (bf16)." : {
+    "The image model and the text encoder in the publisher’s precision (bf16)." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -32199,7 +32687,7 @@
         }
       }
     },
-    "The image model and the text encoder in the publisher's precision (bf16); the 8-step LoRA from lodestones, in fp32. VAE and tokenizer are the publisher's." : {
+    "The image model and the text encoder in the publisher’s precision (bf16); the 8-step LoRA from lodestones, in fp32. VAE and tokenizer are the publisher’s." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -32239,7 +32727,7 @@
         }
       }
     },
-    "The image model in 4 to 5 bits, published by vantagewithai (GGUF Q4_K_M); the Compact's 8-bit text encoder, from Comfy-Org (int8 convrot). VAE and tokenizer as in the Standard version." : {
+    "The image model in 4 to 5 bits, published by vantagewithai (GGUF Q4_K_M); the Compact’s 8-bit text encoder, from Comfy-Org (int8 convrot). VAE and tokenizer as in the Standard version." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -32279,7 +32767,7 @@
         }
       }
     },
-    "The image model in 4 to 6 bits, published by unsloth (GGUF Q4_K_M); the Compact's 8-bit text encoder, from Disty0 (SDNQ int8). Tokenizer and VAE are the publisher's." : {
+    "The image model in 4 to 6 bits, published by unsloth (GGUF Q4_K_M); the Compact’s 8-bit text encoder, from Disty0 (SDNQ int8). Tokenizer and VAE are the publisher’s." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -32319,7 +32807,7 @@
         }
       }
     },
-    "The image model in 4 to 6 bits, published by vanes430 (GGUF Q4_K_M). The text encoder (bf16), tokenizers and VAE are the publisher's." : {
+    "The image model in 4 to 6 bits, published by vanes430 (GGUF Q4_K_M). The text encoder (bf16), tokenizers and VAE are the publisher’s." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -32359,7 +32847,7 @@
         }
       }
     },
-    "The image model in 4 to 8 bits, published by unsloth (GGUF Q4_K_M); the Compact's 8-bit text encoder, from unsloth (int8 convrot). Processor and VAE are the publisher's." : {
+    "The image model in 4 to 8 bits, published by unsloth (GGUF Q4_K_M); the Compact’s 8-bit text encoder, from unsloth (int8 convrot). Processor and VAE are the publisher’s." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -32399,7 +32887,7 @@
         }
       }
     },
-    "The image model in 8 bits, published by vanes430 (GGUF Q8_0). The text encoder (bf16), tokenizers and VAE are the publisher's." : {
+    "The image model in 8 bits, published by vanes430 (GGUF Q8_0). The text encoder (bf16), tokenizers and VAE are the publisher’s." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -32439,7 +32927,7 @@
         }
       }
     },
-    "The image model is the file you imported, under its author's license. Its text encoder and VAE are those of the installed version, under the licenses linked below." : {
+    "The image model is the file you imported, under its author’s license. Its text encoder and VAE are those of the installed version, under the licenses linked below." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -32679,7 +33167,7 @@
         }
       }
     },
-    "The largest of this model's sizes this Mac renders" : {
+    "The largest of this model’s sizes this Mac renders" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -32719,7 +33207,7 @@
         }
       }
     },
-    "The last render took %@ where this Mac's measure predicted %@. If the Mac has changed (heat, other programs), measure it again: the new measure applies to the next render." : {
+    "The last render took %@ where this Mac’s measure predicted %@. If the Mac has changed (heat, other programs), measure it again: the new measure applies to the next render." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -32765,7 +33253,7 @@
         }
       }
     },
-    "The last render's matrix products and attention took %@ where %@ was predicted; this goes with the report." : {
+    "The last render’s matrix products and attention took %@ where %@ was predicted; this goes with the report." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -32805,7 +33293,7 @@
         }
       }
     },
-    "The library can't be found: %@." : {
+    "The library can’t be found: %@." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -32885,7 +33373,7 @@
         }
       }
     },
-    "The library is on “%@”, which isn't connected." : {
+    "The library is on “%@”, which isn’t connected." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -32965,7 +33453,7 @@
         }
       }
     },
-    "The license of %@ hasn't been accepted." : {
+    "The license of %@ hasn’t been accepted." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -33005,7 +33493,7 @@
         }
       }
     },
-    "The license shown is not this Mac's text for %@: nothing was accepted." : {
+    "The license shown is not this Mac’s text for %@: nothing was accepted." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -33125,7 +33613,7 @@
         }
       }
     },
-    "The machine profile couldn't be read as it is." : {
+    "The machine profile couldn’t be read as it is." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -33165,7 +33653,7 @@
         }
       }
     },
-    "The machine profile sets « %@ », which it may not: a profile tunes speed and room, never the image." : {
+    "The machine profile sets “%@”, which it may not: a profile tunes speed and room, never the image." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -33445,7 +33933,7 @@
         }
       }
     },
-    "The memory %@ needs can't be computed: its files can't be read." : {
+    "The memory %@ needs can’t be computed: its files can’t be read." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -33565,7 +34053,7 @@
         }
       }
     },
-    "The next render is a variation of the seed's image, like the image it came from" : {
+    "The next render is a variation of the seed’s image, like the image it came from" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -33885,7 +34373,7 @@
         }
       }
     },
-    "The prompt has a group of alternatives that isn't an axis of the grid." : {
+    "The prompt has a group of alternatives that isn’t an axis of the grid." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -34045,7 +34533,7 @@
         }
       }
     },
-    "The publisher's weights, as published." : {
+    "The publisher’s weights, as published." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -34205,7 +34693,7 @@
         }
       }
     },
-    "The rack's LoRAs, seed and images to edit: the exploration varies them" : {
+    "The rack’s LoRAs, seed and images to edit: the exploration varies them" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -34245,7 +34733,7 @@
         }
       }
     },
-    "The rack's model: changing it here changes it there" : {
+    "The rack’s model: changing it here changes it there" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -34325,7 +34813,7 @@
         }
       }
     },
-    "The report is in the clipboard: paste it into the form's “Report” field." : {
+    "The report is in the clipboard: paste it into the form’s “Report” field." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -34445,7 +34933,7 @@
         }
       }
     },
-    "The seeds that follow the rack's seed, or the seeds you list" : {
+    "The seeds that follow the rack’s seed, or the seeds you list" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -34765,7 +35253,7 @@
         }
       }
     },
-    "The smallest on disk: the image model in 4 to 6 bits, the publisher's text encoder; another set of weights, so an image may come out composed differently." : {
+    "The smallest on disk: the image model in 4 to 6 bits, the publisher’s text encoder; another set of weights, so an image may come out composed differently." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -34965,7 +35453,7 @@
         }
       }
     },
-    "The subject's two pictures: each has its own frame" : {
+    "The subject’s two pictures: each has its own frame" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -35125,7 +35613,7 @@
         }
       }
     },
-    "The weights are stored in 8 bits (int8), as published: a quarter of fp32's size. The products are computed in fp32." : {
+    "The weights are stored in 8 bits (int8), as published: a quarter of fp32’s size. The products are computed in fp32." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -35165,7 +35653,7 @@
         }
       }
     },
-    "The weights are stored in 8 bits in blocks of 32 (GGUF Q8_0), as published: a quarter of fp32's size. The products are computed in fp32." : {
+    "The weights are stored in 8 bits in blocks of 32 (GGUF Q8_0), as published: a quarter of fp32’s size. The products are computed in fp32." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -35205,7 +35693,7 @@
         }
       }
     },
-    "The weights are stored in about 4 bits (GGUF %@), as published: an eighth of fp32's size. The products are computed in fp32." : {
+    "The weights are stored in about 4 bits (GGUF %@), as published: an eighth of fp32’s size. The products are computed in fp32." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -35245,7 +35733,7 @@
         }
       }
     },
-    "The weights are stored in bf16, as the publisher released them: half of fp32's size. The products are computed in fp32." : {
+    "The weights are stored in bf16, as the publisher released them: half of fp32’s size. The products are computed in fp32." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -35285,7 +35773,7 @@
         }
       }
     },
-    "The weights are stored in fp16: half of fp32's size. The products are computed in fp32." : {
+    "The weights are stored in fp16: half of fp32’s size. The products are computed in fp32." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -35365,82 +35853,82 @@
         }
       }
     },
-    "The weights as published, computed in fp32 end to end" : {
+    "The weights as published, computed in fp32" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Die Gewichte wie veröffentlicht, durchgehend in fp32 berechnet"
+            "value" : "Die Gewichte wie veröffentlicht, in fp32 berechnet"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Los pesos tal como se publicaron, calculados en fp32 de principio a fin"
+            "value" : "Los pesos tal como se publicaron, calculados en fp32"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Les poids tels que publiés, calculés en fp32 de bout en bout"
+            "value" : "Les poids tels que publiés, calculés en fp32"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "I pesi così come pubblicati, calcolati in fp32 da cima a fondo"
+            "value" : "I pesi così come pubblicati, calcolati in fp32"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "公開されたままの重みを、エンドツーエンドでfp32で計算"
+            "value" : "公開されたままの重みを fp32 で計算"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "按发布原样的权重，端到端以 fp32 计算"
+            "value" : "按发布原样的权重，以 fp32 计算"
           }
         }
       }
     },
-    "The weights as published, computed in fp32, except part of the DiT in fp16 on the Neural Engine" : {
+    "The weights as published, in fp32 except part of the DiT on the Neural Engine" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Die Gewichte wie veröffentlicht, in fp32 berechnet, außer einem Teil des DiT in fp16 auf der Neural Engine"
+            "value" : "Die Gewichte wie veröffentlicht, in fp32 außer einem Teil des DiT auf der Neural Engine"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Los pesos tal como se publicaron, calculados en fp32, salvo una parte del DiT en fp16 en el Neural Engine"
+            "value" : "Los pesos tal como se publicaron, en fp32 salvo una parte del DiT en el Neural Engine"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Les poids tels que publiés, calculés en fp32, sauf une partie du DiT en fp16 sur le Neural Engine"
+            "value" : "Les poids tels que publiés, en fp32 sauf une partie du DiT sur le Neural Engine"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "I pesi così come pubblicati, calcolati in fp32, salvo una parte del DiT in fp16 sul Neural Engine"
+            "value" : "I pesi così come pubblicati, in fp32 salvo una parte del DiT sul Neural Engine"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "公開されたままの重みをfp32で計算。ただしDiTの一部はNeural Engineでfp16"
+            "value" : "公開されたままの重みを fp32 で計算（DiT の一部のみ Neural Engine）"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "按发布原样的权重，以 fp32 计算，但 DiT 的一部分在神经网络引擎上以 fp16 运行"
+            "value" : "按发布原样的权重，以 fp32 运行，DiT 的一部分在神经网络引擎上"
           }
         }
       }
@@ -35605,7 +36093,7 @@
         }
       }
     },
-    "The writer needs one more download from Qwen-Image-2.1's repository: %@." : {
+    "The writer needs one more download from Qwen-Image-2.1’s repository: %@." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -35817,7 +36305,7 @@
         }
       }
     },
-    "These images can't be restored." : {
+    "These images can’t be restored." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -35857,7 +36345,7 @@
         }
       }
     },
-    "These modules don't connect: %@ comes out where %@ is expected." : {
+    "These modules don’t connect: %@ comes out where %@ is expected." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -35943,7 +36431,7 @@
         }
       }
     },
-    "This LoRA is for %@, which isn't installed on that Mac yet: install it first." : {
+    "This LoRA is for %@, which isn’t installed on that Mac yet: install it first." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -35983,7 +36471,7 @@
         }
       }
     },
-    "This LoRA isn't installed on this Mac: %@" : {
+    "This LoRA isn’t installed on this Mac: %@" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -36063,7 +36551,7 @@
         }
       }
     },
-    "This Mac does not offer macOS's super-resolution" : {
+    "This Mac does not offer macOS’s super-resolution" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -36183,7 +36671,7 @@
         }
       }
     },
-    "This disk can't hold the models: its format (MS-DOS FAT) stops at 4 GB per file." : {
+    "This disk can’t hold the models: its format (MS-DOS FAT) stops at 4 GB per file." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -36223,7 +36711,7 @@
         }
       }
     },
-    "This family's imported models and LoRAs stay." : {
+    "This family’s imported models and LoRAs stay." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -36263,7 +36751,7 @@
         }
       }
     },
-    "This file can't be imported: %@." : {
+    "This file can’t be imported: %@." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -36343,7 +36831,7 @@
         }
       }
     },
-    "This folder can't be written to: %@." : {
+    "This folder can’t be written to: %@." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -36423,7 +36911,7 @@
         }
       }
     },
-    "This folder isn't a Siliconed library: %@." : {
+    "This folder isn’t a Siliconed library: %@." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -36555,7 +37043,7 @@
         }
       }
     },
-    "This image can't be read" : {
+    "This image can’t be read" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -36595,7 +37083,7 @@
         }
       }
     },
-    "This image can't be read: %@" : {
+    "This image can’t be read: %@" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -36635,7 +37123,7 @@
         }
       }
     },
-    "This image can't be read: %@." : {
+    "This image can’t be read: %@." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -37081,7 +37569,7 @@
         }
       }
     },
-    "This model does not sketch: its cells are finished images. The step count is the rack's (a steps axis overrides it)" : {
+    "This model does not sketch: its cells are finished images. The step count is the rack’s (a steps axis overrides it)" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -37121,7 +37609,7 @@
         }
       }
     },
-    "This model doesn't edit images." : {
+    "This model doesn’t edit images." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -37161,7 +37649,7 @@
         }
       }
     },
-    "This model doesn't read images: its prompt can't cite subjects." : {
+    "This model doesn’t read images: its prompt can’t cite subjects." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -37201,7 +37689,7 @@
         }
       }
     },
-    "This model doesn't render in %lld steps." : {
+    "This model doesn’t render in %lld steps." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -37287,7 +37775,7 @@
         }
       }
     },
-    "This model is installed on “%@”, but its license hasn't been accepted there yet. It renders nothing before." : {
+    "This model is installed on “%@”, but its license hasn’t been accepted there yet. It renders nothing before." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -37327,7 +37815,7 @@
         }
       }
     },
-    "This model is installed, but its license hasn't been accepted in this library yet. The engine renders nothing before." : {
+    "This model is installed, but its license hasn’t been accepted in this library yet. The engine renders nothing before." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -37367,7 +37855,7 @@
         }
       }
     },
-    "This model isn't installed." : {
+    "This model isn’t installed." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -37493,7 +37981,7 @@
         }
       }
     },
-    "This render went wrong and its image is unusable: it wasn't kept." : {
+    "This render went wrong and its image is unusable: it wasn’t kept." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -37573,7 +38061,7 @@
         }
       }
     },
-    "This session plans with this Mac's measure of %@." : {
+    "This session plans with this Mac’s measure of %@." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -37735,46 +38223,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "时间"
-          }
-        }
-      }
-    },
-    "To compare and try; off by default, may change." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Zum Vergleichen und Ausprobieren; standardmäßig aus, kann sich ändern."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Para comparar y probar; desactivados por defecto, pueden cambiar."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Pour comparer et essayer ; éteints par défaut, peuvent encore changer."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Per confrontare e provare; disattivati per impostazione predefinita, possono cambiare."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "比較と試用のため。初期設定ではオフで、今後変わることがあります。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "用于对比和尝试；默认关闭，可能会有变动。"
           }
         }
       }
@@ -38071,42 +38519,42 @@
         }
       }
     },
-    "Try again; if it persists, report it (Help ▸ Measure This Mac…, then Share… ▸ Open a GitHub Issue)." : {
+    "Try again; if it persists, report it (Help ▸ Report a Problem…)." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Versuchen Sie es erneut; falls das Problem bleibt, melden Sie es (Hilfe ▸ Diesen Mac vermessen …, dann Teilen … ▸ GitHub-Issue öffnen)."
+            "value" : "Versuchen Sie es erneut; falls das Problem bleibt, melden Sie es (Hilfe ▸ Problem melden …)."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Vuelve a intentarlo; si persiste, informa de ello (Ayuda ▸ Medir este Mac…, y luego Compartir… ▸ Abrir una incidencia en GitHub)."
+            "value" : "Vuelve a intentarlo; si persiste, informa de ello (Ayuda ▸ Informar de un problema…)."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Réessayez ; si cela persiste, signalez-le (Aide ▸ Mesurer ce Mac…, puis Partager… ▸ Ouvrir un signalement GitHub)."
+            "value" : "Réessayez ; si cela persiste, signalez-le (Aide ▸ Signaler un problème…)."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Riprova; se il problema persiste, segnalalo (Aiuto ▸ Misura questo Mac…, poi Condividi… ▸ Apri una segnalazione su GitHub)."
+            "value" : "Riprova; se il problema persiste, segnalalo (Aiuto ▸ Segnala un problema…)."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "もう一度お試しください。解決しない場合は報告してください（ヘルプ ▸ このMacを測定… の後、共有… ▸ GitHub issueを開く）。"
+            "value" : "もう一度お試しください。解決しない場合は報告してください（ヘルプ ▸ 問題を報告…）。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "请重试；若问题仍然存在，请报告（“帮助” ▸ “测量这台 Mac…”，然后点按“共享…” ▸ “打开 GitHub 议题”）。"
+            "value" : "请重试；若问题仍然存在，请报告（“帮助” ▸ “报告问题…”）。"
           }
         }
       }
@@ -38151,7 +38599,7 @@
         }
       }
     },
-    "Turns the DiT's result, the latent, into pixels: the final image" : {
+    "Turns the DiT’s result, the latent, into pixels: the final image" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -38637,7 +39085,7 @@
         }
       }
     },
-    "Use This Mac's Library" : {
+    "Use This Mac’s Library" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -38677,7 +39125,7 @@
         }
       }
     },
-    "Use the Rack's Prompt" : {
+    "Use the Rack’s Prompt" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -38717,7 +39165,7 @@
         }
       }
     },
-    "Uses a library that is already somewhere else, another disk's for instance. Nothing is moved" : {
+    "Uses a library that is already somewhere else, another disk’s for instance. Nothing is moved" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -38997,42 +39445,42 @@
         }
       }
     },
-    "Variations: cousins of this image, same scene, slightly different — as many as the rack's Images" : {
+    "Variations: cousins of this image, same scene, slightly different — as many as the rack’s Batch" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Variationen: Verwandte dieses Bilds, gleiche Szene, leicht anders – so viele, wie das Feld „Bilder“ des Racks angibt"
+            "value" : "Variationen: Verwandte dieses Bilds, gleiche Szene, leicht anders – so viele, wie das Feld „Anzahl“ des Racks angibt"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Variaciones: primas de esta imagen, misma escena, algo distintas — tantas como indique el campo Imágenes del rack"
+            "value" : "Variaciones: primas de esta imagen, misma escena, algo distintas — tantas como indique el campo Lote del rack"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Variations : des cousines de cette image, même scène, un peu différentes — autant que le champ Images du rack"
+            "value" : "Variations : des cousines de cette image, même scène, un peu différentes — autant que le champ Lot du rack"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Variazioni: parenti di questa immagine, stessa scena, leggermente diverse — tante quante indica il campo Immagini del rack"
+            "value" : "Variazioni: parenti di questa immagine, stessa scena, leggermente diverse — tante quante indica il campo Lotto del rack"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "バリエーション：この画像の仲間で、同じシーンを少しずつ変えたもの — ラックの「画像」の枚数だけ"
+            "value" : "バリエーション：この画像の仲間で、同じシーンを少しずつ変えたもの — ラックの「バッチ」の枚数だけ"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "变体：这张图像的“近亲”，场景相同，略有不同——数量与调节栏的“图像”一致"
+            "value" : "变体：这张图像的“近亲”，场景相同，略有不同——数量与调节栏的“批量”一致"
           }
         }
       }
@@ -39889,7 +40337,7 @@
         }
       }
     },
-    "Write @ and a subject's name to cite it." : {
+    "Write @ and a subject’s name to cite it." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -40449,7 +40897,7 @@
         }
       }
     },
-    "a grid's cell is one image: --batch does not apply" : {
+    "a grid’s cell is one image: --batch does not apply" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -40529,42 +40977,42 @@
         }
       }
     },
-    "a solver axis is offered only in Developer Mode" : {
+    "a solver axis is offered only when More Solvers is on" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "eine Solver-Achse gibt es nur im Entwicklermodus"
+            "value" : "eine Solver-Achse gibt es nur, wenn „Weitere Solver“ eingeschaltet ist"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "un eje de solvers solo se ofrece en el Modo de desarrollador"
+            "value" : "un eje de solvers solo se ofrece si «Más solvers» está activado"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "un axe de solveurs n’est proposé qu’en Mode développeur"
+            "value" : "un axe de solveurs n’est proposé que si « Plus de solveurs » est activé"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "un asse di solver è offerto solo in Modalità sviluppatore"
+            "value" : "un asse di solver è offerto solo se «Più solver» è attivo"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ソルバーの軸は開発者モードでのみ使えます"
+            "value" : "ソルバーの軸は「ソルバーを追加」がオンのときのみ使えます"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "求解器轴仅在开发者模式下提供"
+            "value" : "求解器轴仅在开启“更多求解器”时提供"
           }
         }
       }
@@ -41973,82 +42421,82 @@
         }
       }
     },
-    "fp32 end to end, every stage verified against the reference; on request, part of the DiT on the Neural Engine" : {
+    "fp32 end to end, every stage verified against the reference" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "durchgehend fp32, jede Stufe an der Referenz überprüft; auf Wunsch ein Teil des DiT auf der Neural Engine"
+            "value" : "durchgehend fp32, jede Stufe an der Referenz überprüft"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "fp32 de principio a fin, cada etapa verificada frente a la referencia; si se pide, una parte del DiT en el Neural Engine"
+            "value" : "fp32 de principio a fin, cada etapa verificada frente a la referencia"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "fp32 de bout en bout, chaque étage vérifié contre la référence ; à la demande, une partie du DiT sur le Neural Engine"
+            "value" : "fp32 de bout en bout, chaque étage vérifié contre la référence"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "fp32 da cima a fondo, ogni stadio verificato rispetto al riferimento; su richiesta, una parte del DiT sul Neural Engine"
+            "value" : "fp32 da cima a fondo, ogni stadio verificato rispetto al riferimento"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "fp32でエンドツーエンド、すべてのステージをリファレンスに対して検証済み。必要に応じて、DiTの一部をNeural Engineで実行"
+            "value" : "fp32 でエンドツーエンド、すべてのステージをリファレンスに対して検証済み"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "端到端 fp32，每个阶段都对照参考实现验证；如有需要，DiT 的一部分可在神经网络引擎上运行"
+            "value" : "端到端 fp32，每个阶段都对照参考实现验证"
           }
         }
       }
     },
-    "fp32, except part of the DiT in fp16 on the Neural Engine; on request, fp32 end to end, every stage verified against the reference" : {
+    "fp32, except part of the DiT in fp16 on the Neural Engine" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "fp32, außer einem Teil des DiT in fp16 auf der Neural Engine; auf Wunsch durchgehend fp32, jede Stufe an der Referenz überprüft"
+            "value" : "fp32, außer einem Teil des DiT in fp16 auf der Neural Engine"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "fp32, salvo una parte del DiT en fp16 en el Neural Engine; si se pide, fp32 de principio a fin, cada etapa verificada frente a la referencia"
+            "value" : "fp32, salvo una parte del DiT en fp16 en el Neural Engine"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "fp32, sauf une partie du DiT en fp16 sur le Neural Engine ; à la demande, fp32 de bout en bout, chaque étage vérifié contre la référence"
+            "value" : "fp32, sauf une partie du DiT en fp16 sur le Neural Engine"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "fp32, salvo una parte del DiT in fp16 sul Neural Engine; su richiesta, fp32 da cima a fondo, ogni stadio verificato rispetto al riferimento"
+            "value" : "fp32, salvo una parte del DiT in fp16 sul Neural Engine"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "fp32。ただしDiTの一部はNeural Engineでfp16。必要に応じてfp32でエンドツーエンド、すべてのステージをリファレンスに対して検証済み"
+            "value" : "fp32。ただし DiT の一部は Neural Engine で fp16"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "fp32，但 DiT 的一部分在神经网络引擎上以 fp16 运行；如有需要，端到端 fp32，每个阶段都对照参考实现验证"
+            "value" : "fp32，但 DiT 的一部分在神经网络引擎上以 fp16 运行"
           }
         }
       }
@@ -42773,7 +43221,7 @@
         }
       }
     },
-    "macOS does not have Apple's enlargement model yet" : {
+    "macOS does not have Apple’s enlargement model yet" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -42979,46 +43427,6 @@
         }
       }
     },
-    "model \"%@\" is shown only in Developer Mode" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Modell \"%@\" wird nur im Entwicklermodus angezeigt"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "el modelo \"%@\" solo se muestra en el Modo de desarrollador"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "le modèle \"%@\" n’est montré qu’en Mode développeur"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "il modello \"%@\" è visibile solo in Modalità sviluppatore"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "モデル \"%@\" は開発者モードでのみ表示されます"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "模型“%@”仅在开发者模式下显示"
-          }
-        }
-      }
-    },
     "model \"%@\" unavailable: %@" : {
       "localizations" : {
         "de" : {
@@ -43175,46 +43583,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "模型：%@"
-          }
-        }
-      }
-    },
-    "models: %@ — or turn on Developer Mode in Settings (⌘,)" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Modelle: %@ — oder den Entwicklermodus in den Einstellungen (⌘,) einschalten"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "modelos: %@ — o activa el Modo de desarrollador en Ajustes (⌘,)"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "modèles : %@ — ou allumez le Mode développeur dans les Réglages (⌘,)"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "modelli: %@ — o attiva la Modalità sviluppatore nelle Impostazioni (⌘,)"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "モデル：%@ — または「設定」（⌘,）で開発者モードをオンにしてください"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "模型：%@——或在“设置”（⌘,）中开启开发者模式"
           }
         }
       }
@@ -44859,7 +45227,7 @@
         }
       }
     },
-    "switch the publisher's model first: %@" : {
+    "switch the publisher’s model first: %@" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -45231,7 +45599,7 @@
         }
       }
     },
-    "the engines' first measurement" : {
+    "the engines’ first measurement" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -45511,7 +45879,7 @@
         }
       }
     },
-    "this Mac's measure does not offer the Neural Engine" : {
+    "this Mac’s measure does not offer the Neural Engine" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -45751,46 +46119,6 @@
         }
       }
     },
-    "turn on Developer Mode in Settings (⌘,)" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "den Entwicklermodus in den Einstellungen (⌘,) einschalten"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "activa el Modo de desarrollador en Ajustes (⌘,)"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "allumez le Mode développeur dans les Réglages (⌘,)"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "attiva la Modalità sviluppatore nelle Impostazioni (⌘,)"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "「設定」（⌘,）で開発者モードをオンにしてください"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "请在“设置”（⌘,）中开启开发者模式"
-          }
-        }
-      }
-    },
     "turn on Experimental → Named Subjects in Settings (⌘,)" : {
       "localizations" : {
         "de" : {
@@ -45867,6 +46195,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "请在“设置”（⌘,）中开启“实验性”→“负 LoRA 强度”"
+          }
+        }
+      }
+    },
+    "turn on More Solvers in Settings (⌘,)" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "„Weitere Solver“ in den Einstellungen (⌘,) einschalten"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "activa «Más solvers» en Ajustes (⌘,)"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "allumez « Plus de solveurs » dans les Réglages (⌘,)"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "attiva «Più solver» nelle Impostazioni (⌘,)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「設定」（⌘,）で「ソルバーを追加」をオンにしてください"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请在“设置”（⌘,）中开启“更多求解器”"
           }
         }
       }
@@ -46074,39 +46442,123 @@
     "up to %lld images" : {
       "localizations" : {
         "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "bis zu %lld Bilder"
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "bis zu %lld Bild"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "bis zu %lld Bilder"
+                }
+              }
+            }
+          }
+        },
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "up to %lld image"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "up to %lld images"
+                }
+              }
+            }
           }
         },
         "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "hasta %lld imágenes"
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "hasta %lld imagen"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "hasta %lld imágenes"
+                }
+              }
+            }
           }
         },
         "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "jusqu’à %lld images"
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "jusqu’à %lld image"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "jusqu’à %lld images"
+                }
+              }
+            }
           }
         },
         "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "fino a %lld immagini"
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "fino a %lld immagine"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "fino a %lld immagini"
+                }
+              }
+            }
           }
         },
         "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "最大%lld枚の画像"
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "最大%lld枚の画像"
+                }
+              }
+            }
           }
         },
         "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "最多 %lld 张图像"
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "最多 %lld 张图像"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "最多 %lld 张图像"
+                }
+              }
+            }
           }
         }
       }
@@ -46477,7 +46929,7 @@
         }
       }
     },
-    "“%@” isn't a size: write it as width × height, like 832x1216." : {
+    "“%@” isn’t a size: write it as width × height, like 832x1216." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {

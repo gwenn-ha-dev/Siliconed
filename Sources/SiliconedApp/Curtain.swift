@@ -33,8 +33,8 @@ import SwiftUI
 @MainActor @Observable
 final class Curtain {
     static let shared = Curtain()
-    /// The mode's key; the earlier one held only « curtain or not », and is read once when the new one is absent.
-    private static let key = "comparisonMode", earlierKey = "comparisonCurtain"
+    /// The mode's key.
+    private static let key = "comparisonMode"
 
     /// How two images of one size are shown.
     enum Mode: String { case sideBySide, curtain, alternate }
@@ -52,9 +52,7 @@ final class Curtain {
     var alternates: Bool { mode == .alternate }
 
     private static func storedMode() -> Mode {
-        let d = UserDefaults.standard
-        if let raw = d.string(forKey: key), let m = Mode(rawValue: raw) { return m }
-        return (d.object(forKey: earlierKey) as? Bool ?? true) ? .curtain : .sideBySide
+        UserDefaults.standard.string(forKey: key).flatMap(Mode.init(rawValue:)) ?? .curtain
     }
 
     /// The line, from 0 (all B) to 1 (all A).
@@ -63,7 +61,7 @@ final class Curtain {
     /// ← → : the curtain moves its line a twentieth of the frame per press; the switch shows A (←) or B (→).
     func nudge(_ direction: CGFloat) {
         if alternates { position = direction < 0 ? 1 : 0; return }
-        withAnimation(.easeOut(duration: 0.12)) { position = min(max(position + direction / 20, 0), 1) }
+        withAnimation(Motion.pick(.easeOut(duration: 0.12))) { position = min(max(position + direction / 20, 0), 1) }
     }
 
     /// The switch: the other image.
@@ -165,15 +163,15 @@ struct CurtainView: View {
         .overlay(alignment: .topLeading) { tag(tagA, .leading).opacity(curtain.position > 0.12 ? 1 : 0) }
         .overlay(alignment: .topTrailing) { tag(tagB, .trailing).opacity(curtain.position < 0.88 ? 1 : 0) }
         .overlay(alignment: .leading) { if !curtain.alternates { handle } }
-        .animation(.easeOut(duration: 0.15), value: curtain.position > 0.12)
-        .animation(.easeOut(duration: 0.15), value: curtain.position < 0.88)
+        .animation(Motion.pick(.easeOut(duration: 0.15)), value: curtain.position > 0.12)
+        .animation(Motion.pick(.easeOut(duration: 0.15)), value: curtain.position < 0.88)
         .onGeometryChange(for: CGSize.self) { $0.size } action: { frame = $0 }
         .contentShape(Rectangle())
         .pointerStyle(curtain.alternates ? .default : .columnResize)
         .gesture(curtain.alternates ? AnyGesture(swapGesture.map { _ in () }) : AnyGesture(lineGesture.map { _ in () }))
         .simultaneousGesture(zoomGesture)
         .simultaneousGesture(TapGesture(count: 2).onEnded {
-            withAnimation(.spring(duration: 0.3)) { app.zoom = 1; offset = .zero }
+            withAnimation(Motion.pick(.spring(duration: 0.3))) { app.zoom = 1; offset = .zero }
         })
         .onContinuousHover { phase in
             switch phase {
@@ -187,12 +185,20 @@ struct CurtainView: View {
         .onChange(of: app.zoom) { z1, z2 in
             let target = settled ?? ZoomAnchor.offset(offset, from: z1, to: z2, at: pointer, in: frame)
             settled = nil
-            withAnimation(.spring(duration: 0.3)) { offset = z2 == 1 ? .zero : clamped(target) }
+            withAnimation(Motion.pick(.spring(duration: 0.3))) { offset = z2 == 1 ? .zero : clamped(target) }
         }
         .onAppear(perform: watchScroll)
-        .onDisappear { scrollMonitor.map(NSEvent.removeMonitor); scrollMonitor = nil }
+        .onDisappear { scrollMonitor.map(NSEvent.removeMonitor); scrollMonitor = nil; hovering = false }
         .help(curtain.alternates ? "Click the image, or press ← →, to show one image or the other"
                                  : "Drag the line, or press ← →, to reveal one image or the other")
+        // The line is dragged: VoiceOver moves it with the adjustable actions instead (up and down).
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(verbatim: tagA + " / " + tagB))
+        .accessibilityValue(Text(verbatim: curtain.alternates ? (curtain.position > 0.5 ? tagA : tagB)
+                                                               : Figures.percent(Int((curtain.position * 100).rounded()))))
+        .accessibilityAdjustableAction { direction in
+            curtain.nudge(direction == .increment ? 1 : -1)
+        }
     }
 
     /// One image, under the common zoom and offset.
@@ -279,11 +285,9 @@ struct CurtainView: View {
         guard scrollMonitor == nil else { return }
         scrollMonitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { event in
             guard hovering else { return event }
-            if let z = Wheel.zoom(app.zoom, by: event) { if z != app.zoom { app.zoom = z }; return nil }
+            guard let move = Wheel.zoomedOrMoved(event, app: app) else { return nil }
             guard app.zoom > 1 else { return event }
-            let k: CGFloat = event.hasPreciseScrollingDeltas ? 1 : 10
-            offset = clamped(CGSize(width: offset.width + event.scrollingDeltaX * k,
-                                    height: offset.height + event.scrollingDeltaY * k))
+            offset = clamped(CGSize(width: offset.width + move.width, height: offset.height + move.height))
             return nil
         }
     }
@@ -304,15 +308,15 @@ struct CurtainSwitch: View {
     var body: some View {
         let possible = Curtain.pair(app) != nil
         HStack(spacing: 2) {
-            segment("square.split.2x1", active: curtain.mode == .sideBySide, possible: possible) {
+            segment("square.split.2x1", name: "Side by Side", active: curtain.mode == .sideBySide, possible: possible) {
                 curtain.mode = .sideBySide
             }
             .help(possible ? "Side by side" : "The two images are not the same size: they can only be shown side by side")
-            segment("square.lefthalf.filled", active: curtain.mode == .curtain, possible: possible) {
+            segment("square.lefthalf.filled", name: "Curtain", active: curtain.mode == .curtain, possible: possible) {
                 curtain.mode = .curtain
             }
             .help(possible ? "Curtain: drag the line across the two images (← →)" : "The two images are not the same size: they can only be shown side by side")
-            segment("rectangle.2.swap", active: curtain.mode == .alternate, possible: possible) {
+            segment("rectangle.2.swap", name: "Switch", active: curtain.mode == .alternate, possible: possible) {
                 curtain.mode = .alternate
             }
             .help(possible ? "Switch: one image at a time, at the same place and zoom — click it, or ← for A and → for B"
@@ -323,10 +327,10 @@ struct CurtainSwitch: View {
     }
 
     /// Not `.disabled`: a disabled button shows no help, and the help is the reason.
-    private func segment(_ symbol: String, active: Bool, possible: Bool, action: @escaping () -> Void) -> some View {
+    private func segment(_ symbol: String, name: LocalizedStringKey, active: Bool, possible: Bool, action: @escaping () -> Void) -> some View {
         Button {
             guard possible else { return }
-            withAnimation(.easeInOut(duration: 0.2)) { action() }
+            withAnimation(Motion.pick(.easeInOut(duration: 0.2))) { action() }
         } label: {
             Image(systemName: symbol)
                 .imageScale(.medium)
@@ -336,6 +340,9 @@ struct CurtainSwitch: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(Text(name))
+        .accessibilityAddTraits(active && possible ? .isSelected : [])
+        .accessibilityHint(possible ? Text(verbatim: "") : Text("The two images are not the same size: they can only be shown side by side"))
     }
 }
 
@@ -354,6 +361,14 @@ enum Wheel {
         let away = event.scrollingDeltaY * (event.isDirectionInvertedFromDevice ? -1 : 1)
         let notches = event.hasPreciseScrollingDeltas ? away / 10 : away
         return min(max(z * pow(1.15, notches), 1), 8)
+    }
+
+    /// **A wheel event as the canvas and the curtain read it, the same way**: a wheel zooms (`app.zoom`), anything else
+    /// is a move, handed back as the offset it adds (two fingers; a horizontal wheel). `nil`: the wheel zoomed, the event is taken.
+    @MainActor static func zoomedOrMoved(_ event: NSEvent, app: AppState) -> CGSize? {
+        if let z = zoom(app.zoom, by: event) { if z != app.zoom { app.zoom = z }; return nil }
+        let k: CGFloat = event.hasPreciseScrollingDeltas ? 1 : 10
+        return CGSize(width: event.scrollingDeltaX * k, height: event.scrollingDeltaY * k)
     }
 }
 

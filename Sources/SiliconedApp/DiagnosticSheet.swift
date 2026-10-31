@@ -59,7 +59,7 @@ struct DiagnosticSheet: View {
 
     private var ready: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Matrix products and attention on the GPU, the CPU's matrix unit and the Neural Engine, alone and together, each result checked against the exact one: what Siliconed plans a render with. No model is needed, nothing is downloaded. Under a minute; the queue waits meanwhile.")
+            Text("Matrix products and attention on the GPU, the CPU’s matrix unit and the Neural Engine, alone and together, each result checked against the exact one: what Siliconed plans a render with. No model is needed, nothing is downloaded. Under a minute; the queue waits meanwhile.")
                 .font(.callout)
                 .fixedSize(horizontal: false, vertical: true)
             mapStatus
@@ -86,7 +86,7 @@ struct DiagnosticSheet: View {
                 return driftSentence(measured: drift.measured, predicted: predicted)
             }
             return used == map.stored
-                ? "This session plans with this Mac's measure of \(day(used.date))."
+                ? "This session plans with this Mac’s measure of \(day(used.date))."
                 : "This session plans with the measure of \(day(used.date)); the newer one applies to the next render."
         }
         if let stored = map.stored, !stored.current {
@@ -98,7 +98,7 @@ struct DiagnosticSheet: View {
     /// **A render ran off this Mac's measure** (the footer says it, the chip's tooltip and the sheet too): what it took, what the measure
     /// predicted, and what to do — measure again, which applies to the next render: a render never changes its plan on the way.
     static func driftSentence(measured: Double, predicted: Double) -> LocalizedStringKey {
-        "The last render took \(Figures.seconds(measured)) where this Mac's measure predicted \(Figures.seconds(predicted)). If the Mac has changed (heat, other programs), measure it again: the new measure applies to the next render."
+        "The last render took \(Figures.seconds(measured)) where this Mac’s measure predicted \(Figures.seconds(predicted)). If the Mac has changed (heat, other programs), measure it again: the new measure applies to the next render."
     }
 
     /// A report's ISO date as a day the user reads.
@@ -151,7 +151,7 @@ struct DiagnosticSheet: View {
                     Button("Copy JSON") { app.copyJSON(report) }
                 }
                 .fixedSize()
-                .help("Copies the report and opens GitHub's form; you paste it and submit it there")
+                .help("Copies the report and opens GitHub’s form; you paste it and submit it there")
                 Button("Measure Again") { notice = nil; app.startDiagnostic() }
                     .disabled(app.diagnosticBlocker != nil)
                 Button("Close") { dismiss() }.keyboardShortcut(.defaultAction)
@@ -267,7 +267,7 @@ private struct ReportView: View {
             }
             .font(.callout)
             if rows.contains(where: { $0.plusMinus > Diagnostic.Regime.Rules.spread / 2 }) {
-                Text("Identical calls differed by more than a free Mac's: those figures are read on their quick side.")
+                Text("Identical calls differed by more than a free Mac’s: those figures are read on their quick side.")
                     .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             } else {
                 Text("Identical calls agreed to within these margins.")
@@ -335,7 +335,7 @@ private struct ReportView: View {
         }
         let sentence = switch cause {
         case .noFigure: String(localized: "No figure was measured: the plan does not offer it.")
-        case .computedWrong: String(localized: "It computed wrong: the plan has no model of it, and the engine's defaults answer.")
+        case .computedWrong: String(localized: "It computed wrong: the plan has no model of it, and the engine’s defaults answer.")
         case .notShared: String(localized: "They were not measured together: the plan does not offer them as a set.")
         case .implausible: String(localized: "A figure that looks wrong, probably because the Mac was busy: the plan bounds it or leaves it out.")
         case .memoryOverNeed: String(localized: "The measure used more memory than had been counted for it.")
@@ -377,14 +377,14 @@ private struct ReportView: View {
         let peak = report.model.crest[.gpu]
         VStack(alignment: .leading, spacing: 6) {
             Text("What each engine reaches").font(.headline)
-            Text("Each route alone, in trillions of operations a second (TFLOP/s). The bar is the share of the GPU's peak, which its cores and clock announce; only the GPU has one, and only its matrix products are compared to it. ✓: the result is within its threshold of the exact one.")
+            Text("Each route alone, in trillions of operations a second (TFLOP/s). The bar is the share of the GPU’s peak, which its cores and clock announce; only the GPU has one, and only its matrix products are compared to it. ✓: the result is within its threshold of the exact one.")
                 .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 6) {
                 GridRow {
                     Color.clear.frame(height: 1)
                     Text("Speed").gridColumnAlignment(.trailing)
                     Group {
-                        if let peak { Text("Share of the GPU's peak (\(Self.rate(peak)))") } else { Text(verbatim: "") }
+                        if let peak { Text("Share of the GPU’s peak (\(Self.rate(peak)))") } else { Text(verbatim: "") }
                     }
                     Text("Exact").gridColumnAlignment(.center)
                 }
@@ -539,7 +539,7 @@ private struct ReportView: View {
             Text("The measure used up to \(Figures.memory(report.memory.peak)) of the \(Figures.memory(report.memory.budget)) of memory this Mac allows.")
             Text("\(Figures.duration(report.seconds)) in all")
             if let render, let predicted = render.predicted {
-                Text("The last render's matrix products and attention took \(Figures.seconds(render.measured)) where \(Figures.seconds(predicted)) was predicted; this goes with the report.")
+                Text("The last render’s matrix products and attention took \(Figures.seconds(render.measured)) where \(Figures.seconds(predicted)) was predicted; this goes with the report.")
             }
         }
         .font(.caption).foregroundStyle(.secondary)

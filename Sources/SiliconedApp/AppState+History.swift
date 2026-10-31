@@ -171,12 +171,12 @@ extension AppState {
     /// Everything, after a confirmation that says how many were never saved.
     func clearHistory() {
         guard !history.isEmpty else { return }
+        let n = unsaved.count
+        // Everything saved, and ⌘Z brings it back: nothing to confirm.
+        if n == 0 { delete(history); return }
         let alert = NSAlert()
         alert.messageText = String(localized: "Clear the history?")
-        let n = unsaved.count
-        alert.informativeText = n == 0
-            ? String(localized: "Every image has been saved. You can undo this with ⌘Z.")
-            : String(localized: "\(n) of these images were never saved. You can undo this with ⌘Z while the app is open.")
+        alert.informativeText = String(localized: "\(n) of these images were never saved. You can undo this with ⌘Z while the app is open.")
         alert.addButton(withTitle: String(localized: "Clear History"))
         alert.addButton(withTitle: String(localized: "Cancel"))
         alert.buttons[0].hasDestructiveAction = true
@@ -374,6 +374,11 @@ extension AppState {
     /// A transient confirmation ("Image copied") that clears by itself.
     func flash(_ message: String) {
         toast = message
+        // Read out by VoiceOver: a toast lasts two seconds and is not in the focus order.
+        if let element = NSApp.mainWindow ?? NSApp.keyWindow {
+            NSAccessibility.post(element: element, notification: .announcementRequested,
+                                 userInfo: [.announcement: message, .priority: NSAccessibilityPriorityLevel.high.rawValue])
+        }
         toastTask?.cancel()
         toastTask = Task {
             try? await Task.sleep(for: .seconds(2))

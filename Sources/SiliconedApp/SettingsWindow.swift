@@ -6,27 +6,28 @@
 //     │        [ General ]  Other Macs   Advanced             │
 //     │ ┌──────────────────────────────────────────────────┐ │
 //     │ │ Faster Rendering   the first steps at half size   │ │
-//     │ │ Comparison         curtain or side by side        │ │
 //     │ │ Models             where the library is, shown in │ │
 //     │ │                    the Finder; moved to another   │ │
 //     │ │                    disk, opened, brought back     │ │
 //     │ └──────────────────────────────────────────────────┘ │
 //     └──────────────────────────────────────────────────────┘
 //
-//     General     what an everyday user touches: the speed switch, the comparison, the library.
+//     General     what an everyday user touches: the speed switch, the library.
 //     Other Macs  lend this Mac, compute on another (`OtherMacsView.swift`).
-//     Advanced    kept out of the way: Command Line (silicontrol, linked into /usr/local/bin),
-//                 This Mac (the capacity map, measured only when asked), For Testing (Developer
-//                 Mode, Named Subjects, Negative LoRA Strengths: off by default, may change).
-//                 ┌ Command Line ─ [Install…]
-//                 ├ This Mac ───── [Measure This Mac…]
-//                 └ For Testing ── Developer Mode · Named Subjects · Negative LoRA Strengths
+//     Advanced    kept out of the way: This Mac (the capacity map, measured only when asked), Command
+//                 Line (silicontrol, linked into /usr/local/bin), Beta (More Solvers, Named Subjects,
+//                 Negative LoRA Strengths: off by default, may change).
+//                 ┌ This Mac ───── [Measure This Mac…]
+//                 ├ Command Line ─ [Install…]
+//                 └ Beta ───────── More Solvers · Named Subjects · Negative LoRA Strengths
 //
 // - **Incognito**: an NSWindow of ours, as `MainWindow` — not SwiftUI's `Settings` scene, which would
 //   keep its frame; not restorable. What it sets are the app's preferences (`AppState`'s header), the
 //   same keys as before: a switch moved here keeps its value.
-// - **A switch changes what it changes at once**, as from the menu it replaces: Developer Mode off takes
-//   the solver and a solver axis with it (`AppState.developerMode`).
+// - **A switch changes what it changes at once**, as from the menu it replaces: More Solvers off takes
+//   the solver and a solver axis with it (`AppState.developerMode`, whose key keeps its old name).
+// - How two images are compared (curtain, switch, side by side) is set under the image, where it is
+//   used (`CurtainSwitch`), and remembered.
 // - **The capacity map is measured from the sheet**, on the main window (`DiagnosticSheet`): this
 //   window says where the session stands and opens it.
 
@@ -45,7 +46,7 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
             window.makeKeyAndOrderFront(nil)
             return
         }
-        let host = NSHostingController(rootView: SettingsView(app: app, curtain: .shared, macs: MainWindow.shared.otherMacs))
+        let host = NSHostingController(rootView: SettingsView(app: app, macs: MainWindow.shared.otherMacs))
         host.sizingOptions = [.preferredContentSize]
         let w = NSWindow(contentViewController: host)
         w.title = String(localized: "Settings")
@@ -68,7 +69,6 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
 /// **What the window shows**: three tabs, each switch with its sentence.
 struct SettingsView: View {
     @Bindable var app: AppState
-    @Bindable var curtain: Curtain
     let macs: OtherMacs
     /// Read again after an install: the link is the file system's, not the app's.
     @State private var command = SilicontrolCommand.state
@@ -102,28 +102,18 @@ struct SettingsView: View {
         Form {
             Section {
                 Toggle(isOn: fasterRendering) {
-                    titled("Faster Rendering", "From 1024² up, the first steps at half size: faster, a slightly different image. Not with a LoRA, Detail or an edit.")
+                    SettingLabel("Faster Rendering", "From 1024² up, the first steps at half size: faster, a slightly different image. Not with a LoRA, Detail or an edit.")
                 }
                 if let name = MainWindow.shared.carrier.mirror?.mirror?.macName {
                     Text("This is the setting of “\(name)”, the Mac that computes for you.").font(.caption)
                 }
             }
             Section {
-                Picker(selection: $curtain.mode) {
-                    Text("Curtain").tag(Curtain.Mode.curtain)
-                    Text("Switch").tag(Curtain.Mode.alternate)
-                    Text("Side by Side").tag(Curtain.Mode.sideBySide)
-                } label: {
-                    titled("Comparison", "Also switched from the canvas toolbar.")
-                }
-                .pickerStyle(.segmented)
-            }
-            Section {
                 LabeledContent {
                     Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([app.library.root]) }
                         .disabled(!app.libraryReachable)
                 } label: {
-                    titled("Models", "Where the installed models and LoRAs live. Remove them in the Models window, not the Finder.")
+                    SettingLabel("Models", "Where the installed models and LoRAs live. Remove them in the Models window, not the Finder.")
                 }
                 Text(verbatim: app.library.displayPath).font(.caption).textSelection(.enabled)
                 library
@@ -132,10 +122,25 @@ struct SettingsView: View {
         .formStyle(.grouped)
     }
 
-    /// Out of the everyday way, the technical last: the terminal, the capacity map, then what is
-    /// unfinished or meant for comparing.
+    /// Out of the everyday way: the capacity map that renders are planned from, the terminal, then what
+    /// is still in beta.
     private var advanced: some View {
         Form {
+            Section {
+                LabeledContent {
+                    Button("Measure This Mac…") {
+                        MainWindow.shared.show()
+                        shown.openDiagnostic()
+                    }
+                } label: {
+                    SettingLabel("This Mac", "Under a minute; done before the first render and after each update. A new measure applies to the next render.")
+                }
+                if let name = shown.mirror?.macName {
+                    Text("This measures “\(name)”, the Mac that computes for you.").font(.caption)
+                }
+                Text(DiagnosticSheet.mapStatus(shown)).font(.caption)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             Section {
                 LabeledContent {
                     Button(command == .installed ? "Reinstall…" : "Install…") {
@@ -143,7 +148,7 @@ struct SettingsView: View {
                         command = SilicontrolCommand.state
                     }
                 } label: {
-                    titled("Command Line", "silicontrol drives this app from a terminal, a script or an AI agent. See: silicontrol help")
+                    SettingLabel("Command Line", "silicontrol drives this app from a terminal, a script or an AI agent. See: silicontrol help")
                 }
                 Group {
                     switch command {
@@ -155,33 +160,21 @@ struct SettingsView: View {
                 .font(.caption)
             }
             Section {
-                LabeledContent {
-                    Button("Measure This Mac…") {
-                        MainWindow.shared.show()
-                        shown.openDiagnostic()
-                    }
-                } label: {
-                    titled("This Mac", "Under a minute; done before the first render and after each update. A new measure applies to the next render.")
-                }
-                if let name = shown.mirror?.macName {
-                    Text("This measures “\(name)”, the Mac that computes for you.").font(.caption)
-                }
-                Text(DiagnosticSheet.mapStatus(shown)).font(.caption)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            Section {
                 Toggle(isOn: $app.developerMode) {
-                    titled("Developer Mode", "Adds the solvers Euler a, DPM++ 2M and UniPC, in the panel and as an exploration axis.")
+                    SettingLabel("More Solvers", "Adds the solvers Euler a, DPM++ 2M and UniPC to the DiT’s box and to the exploration’s axes. The default, Euler, is the one the models were distilled for.")
                 }
                 Toggle(isOn: Binding(get: { app.subjects.enabled },
                                      set: { app.subjects.enabled = $0; if !$0 { app.referenceMode = .images } })) {
-                    titled("Named Subjects", "Name a person or thing from a photo, cite it as @name in an edit.")
+                    SettingLabel("Named Subjects", "Name a person, an object or a style from a photo, then cite it as @name in the prompt of an edit.")
                 }
                 Toggle(isOn: $app.negativeLoRAStrengths) {
-                    titled("Negative LoRA Strengths", "Sliders from −1.5 to 1.5, for « slider » LoRAs; an ordinary LoRA is damaged by a negative strength.")
+                    SettingLabel("Negative LoRA Strengths", "Lets a LoRA’s strength go from −1.5 to 1.5, for “slider” LoRAs. An ordinary LoRA is damaged by a negative strength.")
                 }
             } header: {
-                titled("For Testing", "To compare and try; off by default, may change.")
+                HStack(spacing: 8) {
+                    BetaBadge(help: "Beta: still being settled, and may change.")
+                    Text("Off by default; they may change.").font(.caption).foregroundStyle(.secondary)
+                }
             }
         }
         .formStyle(.grouped)
@@ -201,16 +194,16 @@ struct SettingsView: View {
         HStack {
             Button("Move Library…") { app.chooseLibraryDestination() }
                 .disabled(!app.managementPossible)
-                .help("Copies the library to the folder you choose, checks every file, then removes it from here. The licenses you accepted and this Mac's settings stay on this Mac")
+                .help("Copies the library to the folder you choose, checks every file, then removes it from here. The licenses you accepted and this Mac’s settings stay on this Mac")
             Button("Open Library…") { app.chooseLibraryToOpen() }
                 .disabled(app.forgeInProgress != nil || app.busy)
-                .help("Uses a library that is already somewhere else, another disk's for instance. Nothing is moved")
+                .help("Uses a library that is already somewhere else, another disk’s for instance. Nothing is moved")
         }
         if app.libraryIsElsewhere {
             HStack {
                 Button("Move Back to This Mac") { app.moveLibraryHome() }
                     .disabled(!app.managementPossible)
-                Button("Use This Mac's Library") { app.useLocalLibrary() }
+                Button("Use This Mac’s Library") { app.useLocalLibrary() }
                     .disabled(app.forgeInProgress != nil || app.busy)
                     .help("Renders with what this Mac holds — maybe nothing yet. The library on the other disk is not touched")
             }
@@ -221,15 +214,21 @@ struct SettingsView: View {
         }
     }
 
-    /// A setting's name, and under it what it does.
-    private func titled(_ title: LocalizedStringKey, _ text: LocalizedStringKey) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(title)
-            explanation(text)
-        }
-    }
-
     private func explanation(_ text: LocalizedStringKey) -> some View {
         Text(text).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+    }
+}
+
+/// **A setting's name, and under it what it does** — in the Settings' tabs and in the Other Macs section.
+struct SettingLabel: View {
+    let title: LocalizedStringKey
+    let text: LocalizedStringKey
+    init(_ title: LocalizedStringKey, _ text: LocalizedStringKey) { self.title = title; self.text = text }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title)
+            Text(text).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+        }
     }
 }

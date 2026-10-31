@@ -26,7 +26,7 @@ struct DiTBox: View {
                 }
             }
             .labelsHidden()
-            .help("The denoiser: the publisher's model, or a fine-tune you imported")
+            .help("The denoiser: the publisher’s model, or a fine-tune you imported")
             if let card = app.card {
                 if app.missing != nil {
                     HStack {
@@ -85,7 +85,7 @@ struct DiTBox: View {
                 Tag(text: Text("computes \(on ? "fp32 · ANE" : "fp32")"), symbol: on ? "leaf" : nil)
             }
             .buttonStyle(.plain)
-            .help(on ? String(localized: "Part of the DiT runs in fp16 on the Neural Engine: less energy (about a fifth on an M1 Pro), an image a little different from fp32's. Click for fp32 throughout.")
+            .help(on ? String(localized: "Part of the DiT runs in fp16 on the Neural Engine: less energy (about a fifth on an M1 Pro), an image a little different from fp32’s. Click for fp32 throughout.")
                      : String(localized: "The DiT in fp32 throughout, the image verified against the reference. Click to run part of it in fp16 on the Neural Engine: less energy (about a fifth on an M1 Pro), an image a little different."))
         } else {
             Tag(text: Text("computes \("fp32")"))
@@ -107,7 +107,7 @@ struct DiTBox: View {
             Field(title: "Size") {
                 Picker("Orientation", selection: $app.orientation) {
                     ForEach([RecommendedFormat.Orientation.square, .portrait, .landscape], id: \.self) { o in
-                        Image(systemName: o.symbol).help(o.label).tag(o)
+                        Image(systemName: o.symbol).help(o.label).accessibilityLabel(Text(verbatim: o.label)).tag(o)
                     }
                 }
                 .pickerStyle(.segmented).labelsHidden().fixedSize()
@@ -134,6 +134,7 @@ struct DiTBox: View {
                 Button { customSize = true } label: { Image(systemName: "pencil") }
                     .buttonStyle(.borderless)
                     .help("Type a size (width × height)")
+                    .accessibilityLabel(Text("Type a size (width × height)"))
                     .popover(isPresented: $customSize, arrowEdge: .trailing) { CustomSize(app: app) }
             }
         } else {
@@ -153,6 +154,7 @@ struct DiTBox: View {
                 Button { app.seed = UInt64.random(in: 0...UInt64(UInt32.max)) } label: { Image(systemName: "dice") }
                     .buttonStyle(.borderless)
                     .help("Draw a seed")
+                    .accessibilityLabel(Text("Draw a seed"))
             }
             Picker("Seed", selection: $app.fixedSeed) {
                 Text("Random").tag(false)
@@ -164,13 +166,14 @@ struct DiTBox: View {
         if !app.variations.isEmpty {
             Field(title: "Variation") {
                 Text(verbatim: app.variations.map { VariationWords.label($0.strength) }.joined(separator: " + "))
-                Button { app.variations = [] } label: { Image(systemName: "xmark.circle.fill") }
+                Button { app.variations = [] } label: { Image(systemName: "xmark.circle.fill").frame(width: 24, height: 24).contentShape(Rectangle()) }
                     .buttonStyle(.borderless).foregroundStyle(.secondary)
-                    .help("Remove the variation: the seed's own image")
+                    .help("Remove the variation: the seed’s own image")
+                    .accessibilityLabel(Text("Remove the variation: the seed’s own image"))
             }
-            .help("The next render is a variation of the seed's image, like the image it came from")
+            .help("The next render is a variation of the seed’s image, like the image it came from")
         }
-        Field(title: "Images") {
+        Field(title: "Batch") {
             Stepper(value: $app.batch, in: 1...8) { Text(verbatim: "\(app.batch)").monospacedDigit() }
                 .fixedSize()
         }
@@ -190,7 +193,7 @@ struct DiTBox: View {
             }
             .help("Adds fine texture and small details; Most can over-sharpen")
         }
-        // Developer Mode, the models in front: how a step moves to the next. Euler is the distillation's own.
+        // More Solvers, the models in front: how a step moves to the next. Euler is the distillation's own.
         if app.offeredSolvers.count > 1 {
             Field(title: "Solver") {
                 Picker("Solver", selection: $app.solver) {
@@ -202,6 +205,7 @@ struct DiTBox: View {
         }
         Toggle("Preview every step", isOn: $app.previews)
             .font(.callout)
+            .help("Shows the image taking shape on the canvas after each step. It does not change the image.")
     }
 
     /// **The LoRA stack, in the open** — as reachable as the steps or the seed: a title with « Add »
@@ -250,7 +254,7 @@ struct DiTBox: View {
                         Capsule().fill(i <= app.currentStep ? Palette.live : Palette.well).frame(height: 4)
                     }
                 }
-                .animation(.easeOut(duration: 0.3), value: app.currentStep)
+                .animation(Motion.pick(.easeOut(duration: 0.3)), value: app.currentStep)
             }
         }
     }
@@ -300,17 +304,24 @@ struct LoRARow: View {
                 Text(Figures.strength(slot.strength)).monospacedDigit().foregroundStyle(.secondary)
                     .onTapGesture(count: 2) { slot.strength = LoRASlot().strength }
                     .help("Strength — double-click for 0.8")
+                    .accessibilityLabel(Text("Strength"))
+                    .accessibilityAddTraits(.isStaticText)
                 Button {
                     // The id is read BEFORE: `slot` is a binding on `app.loras`, and re-reading it
                     // in `removeAll`'s predicate accesses the array during its mutation.
                     let id = slot.id
                     app.loras.removeAll { $0.id == id }
-                } label: { Image(systemName: "xmark.circle.fill") }
+                } label: { Image(systemName: "xmark.circle.fill").frame(width: 24, height: 24).contentShape(Rectangle()) }
                     .buttonStyle(.borderless).foregroundStyle(.secondary)
                     .help("Remove this LoRA from the stack")
+                    .accessibilityLabel(Text("Remove this LoRA from the stack"))
             }
             Slider(value: $slot.strength, in: app.loraStrengthRange)
                 .controlSize(.small)
+                .accessibilityLabel(Text("Strength"))
+        }
+        .contextMenu {
+            Button("Reset to 0.8") { slot.strength = LoRASlot().strength }
         }
         .font(.callout)
         .padding(.horizontal, 8).padding(.vertical, 6)

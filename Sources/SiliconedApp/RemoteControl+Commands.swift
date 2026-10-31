@@ -31,7 +31,7 @@ extension RemoteControl {
             throw Refusal("usage", String(localized: "install expects one model id"), help: "silicontrol models")
         }
         let b = app.library
-        guard let card = b.cards().first(where: { $0.id == id || $0.family.rawValue == id }), app.isVisible(card.family) else {
+        guard let card = b.cards().first(where: { $0.id == id || $0.family.rawValue == id }) else {
             let visible = visibleCards(b).map(\.id).joined(separator: ", ")
             throw Refusal("model", String(localized: "unknown model: \"\(id)\""), help: String(localized: "models: \(visible)"))
         }
@@ -48,7 +48,7 @@ extension RemoteControl {
             let name = card.name, family = card.family.name, kept = VersionChoice.name(installed ?? .standard)
             let command = "silicontrol install \(card.family.rawValue) --\(asked.rawValue)"
             throw Refusal("usage", String(localized: "\(name) needs \(family) in the version installed (\(kept)): an imported model does not switch versions"),
-                          help: String(localized: "switch the publisher's model first: \(command)"))
+                          help: String(localized: "switch the publisher’s model first: \(command)"))
         }
         // Ready, and in the version asked (an imported model keeps its family's version): nothing to do.
         guard card.missing(in: b) != nil || (!card.isImported && b.variant(of: card.family) != variant) else {
@@ -117,7 +117,7 @@ extension RemoteControl {
         var steps: Int?
         /// `--detail more|most`: the rack's Detail choice (`Request.detail`).
         var detail = Detail.normal
-        /// `--solver NAME`: the rack's Solver (`Request.solver`), Developer Mode and `AppState.solverFamilies` only.
+        /// `--solver NAME`: the rack's Solver (`Request.solver`), More Solvers and `AppState.solverFamilies` only.
         var solver = Solver.euler
         /// `--ane`, `--no-ane`: the rack's fp32 tag (`Job.neuralEngine`); `nil`, the model's choice.
         var neuralEngine: Bool?
@@ -323,7 +323,7 @@ extension RemoteControl {
         if let reason = app.libraryBlocker { throw Refusal("library_absent", reason, help: String(localized: "connect the disk, then retry")) }
         if let reason = app.installBlocker { throw Refusal("busy", reason, help: String(localized: "retry once the installation is done (silicontrol models)")) }
         guard app.canVary(e) else {
-            throw Refusal("model", String(localized: "\(e.name) has no variations: a grid's sheet, or its model is not ready"),
+            throw Refusal("model", String(localized: "\(e.name) has no variations: a grid’s sheet, or its model is not ready"),
                           help: "silicontrol models")
         }
         guard app.file.count + count <= AppState.maxQueueLength else {
@@ -371,7 +371,7 @@ extension RemoteControl {
                 finish(c, Response.failure("refused", sentence))
             } catch EnlargeFailure.downloadRequired {
                 finish(c, Response.failure("download_required",
-                                           String(localized: "macOS does not have Apple's enlargement model yet"),
+                                           String(localized: "macOS does not have Apple’s enlargement model yet"),
                                            help: "silicontrol enlarge \(e.name) --download"))
             } catch EnlargeFailure.download {
                 finish(c, Response.failure("download_failed", String(localized: "The enlargement model could not be downloaded")))

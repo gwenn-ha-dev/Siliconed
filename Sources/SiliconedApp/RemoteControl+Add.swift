@@ -106,16 +106,16 @@ extension RemoteControl {
         if let reason = app.libraryBlocker { throw Refusal("library_absent", reason, help: String(localized: "connect the disk, then retry")) }
         if let reason = app.installBlocker { throw Refusal("busy", reason, help: String(localized: "retry once the installation is done (silicontrol models)")) }
         if !grid, d.sketch {
-            throw Refusal("usage", String(localized: "--sketch belongs to « silicontrol grid »"), help: "silicontrol help grid")
+            throw Refusal("usage", String(localized: "--sketch belongs to “silicontrol grid”"), help: "silicontrol help grid")
         }
         if !grid, d.x != nil || d.y != nil {
-            throw Refusal("usage", String(localized: "--x and --y belong to « silicontrol grid »"), help: "silicontrol help grid")
+            throw Refusal("usage", String(localized: "--x and --y belong to “silicontrol grid”"), help: "silicontrol help grid")
         }
         if grid, d.x == nil {
             throw Refusal("usage", String(localized: "a grid needs --x (and optionally --y)"), help: "silicontrol help grid")
         }
         if grid, d.batchGiven {
-            throw Refusal("usage", String(localized: "a grid's cell is one image: --batch does not apply"),
+            throw Refusal("usage", String(localized: "a grid’s cell is one image: --batch does not apply"),
                           help: String(localized: "--x seeds=N gives N seeds — silicontrol help grid"))
         }
         let b = app.library
@@ -126,32 +126,25 @@ extension RemoteControl {
                         help: String(localized: "ready: \(readySet) — silicontrol models"))
         }
         let card = b.cards().first { $0.id == model.identifier }
-        // The app renders what it shows: the other families need Developer Mode (the developer's
-        // command line renders them all).
-        guard card.map({ app.isVisible($0.family) }) ?? true else {
-            let visible = visibleCards(b).map(\.id).joined(separator: ", ")
-            throw Refusal("model", String(localized: "model \"\(d.model)\" is shown only in Developer Mode"),
-                        help: String(localized: "models: \(visible) — or turn on Developer Mode in Settings (⌘,)"))
-        }
-        // A solver other than Euler: the rack's, so Developer Mode, and the models in front only.
+        // A solver other than Euler: the rack's, so More Solvers, and the models in front only.
         if d.solver != .euler {
             guard app.developerMode else {
-                throw Refusal("solver", String(localized: "--solver \(d.solver.rawValue) is offered only in Developer Mode"),
-                              help: String(localized: "turn on Developer Mode in Settings (⌘,)"))
+                throw Refusal("solver", String(localized: "--solver \(d.solver.rawValue) is offered only when More Solvers is on"),
+                              help: String(localized: "turn on More Solvers in Settings (⌘,)"))
             }
             guard card.map({ AppState.solverFamilies.contains($0.family) }) == true else {
-                throw Refusal("solver", String(localized: "\(card?.name ?? model.name) doesn't offer the \(d.solver.rawValue) solver"),
+                throw Refusal("solver", String(localized: "\(card?.name ?? model.name) doesn’t offer the \(d.solver.rawValue) solver"),
                               help: String(localized: "Euler only, or --model z-image"))
             }
         }
         // Detail: not on a model that offers none (Anima, Krea 2) — the rack hides it there.
         if d.detail != .normal, !model.chain.denoising.acceptsDetail {
-            throw Refusal("detail", String(localized: "\(card?.name ?? model.name) doesn't offer Detail"),
+            throw Refusal("detail", String(localized: "\(card?.name ?? model.name) doesn’t offer Detail"),
                           help: String(localized: "leave out --detail"))
         }
         // The Neural Engine: only where this Mac's map turned it on (the rack shows no choice elsewhere).
         if d.neuralEngine == true, !app.neuralEngineOffered {
-            throw Refusal("neural_engine", String(localized: "this Mac's measure does not offer the Neural Engine"),
+            throw Refusal("neural_engine", String(localized: "this Mac’s measure does not offer the Neural Engine"),
                           help: String(localized: "leave out --ane"))
         }
         guard let prompt = d.prompt, !prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
@@ -361,12 +354,12 @@ extension RemoteControl {
             let p = Problem(error)
             throw Refusal("grid", p.title, help: p.suggestion ?? "silicontrol help grid")
         }
-        // A solver axis is the rack's Solver swept, so as `--solver`: Developer Mode, and the models in
+        // A solver axis is the rack's Solver swept, so as `--solver`: More Solvers, and the models in
         // front (a model axis: a cell of a model walking Euler alone renders Euler, as in the app).
         if g.cells.contains(where: { ($0.solver ?? .euler) != .euler }) {
             guard app.developerMode else {
-                throw Refusal("solver", String(localized: "a solver axis is offered only in Developer Mode"),
-                              help: String(localized: "turn on Developer Mode in Settings (⌘,)"))
+                throw Refusal("solver", String(localized: "a solver axis is offered only when More Solvers is on"),
+                              help: String(localized: "turn on More Solvers in Settings (⌘,)"))
             }
             guard g.cells.contains(where: { $0.model != nil }) || card.map({ AppState.solverFamilies.contains($0.family) }) == true else {
                 throw Refusal("solver", String(localized: "\(card?.name ?? model.name) walks Euler only"),

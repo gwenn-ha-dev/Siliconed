@@ -306,7 +306,7 @@ final class RemoteControl {
 
     /// The library's models the app shows, in its order (`AppState.inDisplayOrder`).
     func visibleCards(_ b: Library) -> [ModelCard] {
-        AppState.inDisplayOrder(b.cards().filter { app.isVisible($0.family) }, family: \.family)
+        AppState.inDisplayOrder(b.cards(), family: \.family)
     }
 
     // ── install ──

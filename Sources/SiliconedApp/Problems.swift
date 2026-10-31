@@ -56,15 +56,15 @@ struct Problem: Equatable, Sendable {
     private static func sentence(_ e: EngineError) -> String {
         switch e {
         case .modelNotInstalled(let m):                              // model_not_installed
-            return String(localized: "\(name(m)) isn't installed.")
+            return String(localized: "\(name(m)) isn’t installed.")
         case .unknownModel(let m):                                   // unknown_model
             return String(localized: "There is no model called “\(m)”.")
         case .licenseNotAccepted(let m):                             // license_not_accepted
-            return String(localized: "The license of \(name(m)) hasn't been accepted.")
+            return String(localized: "The license of \(name(m)) hasn’t been accepted.")
         case .fileMissing(let p):                                    // file_missing
             return String(localized: "A file is missing: \(file(p)).")
         case .fileUnreadable(let p):                                 // file_unreadable
-            return String(localized: "A file can't be opened: \(file(p)).")
+            return String(localized: "A file can’t be opened: \(file(p)).")
         case .corruptMap(let f):                                     // corrupt_map
             if let f { return String(localized: "A model file is damaged or from another version: \(file(f)).") }
             return String(localized: "A model file is damaged or from another version.")
@@ -82,22 +82,22 @@ struct Problem: Equatable, Sendable {
         case let .downloadRefused(f, status):                        // download_refused
             return String(localized: "The download of \(f) was refused by the server (HTTP \(String(status))).")
         case .downloadCorrupt(let f):                                // download_corrupt
-            return String(localized: "The download of \(f) is corrupt: its checksum doesn't match.")
+            return String(localized: "The download of \(f) is corrupt: its checksum doesn’t match.")
         case .importRefused(let f, _):                               // import_refused
-            return String(localized: "This file can't be imported: \(file(f)).")
+            return String(localized: "This file can’t be imported: \(file(f)).")
         case let .importNeedsFamily(f, m):                           // import_needs_family
             return String(localized: "To import \(file(f)), install \(name(m)) first.")
         case .notAnImportedModel(let m):                             // not_an_imported_model
-            return String(localized: "\(name(m)) wasn't imported: uninstall it from the Models sheet.")
+            return String(localized: "\(name(m)) wasn’t imported: uninstall it from the Models sheet.")
         case let .libraryAbsent(p, volume):                          // library_absent
-            if let volume { return String(localized: "The library is on “\(volume)”, which isn't connected.") }
-            return String(localized: "The library can't be found: \(Library.withoutHome(p)).")
+            if let volume { return String(localized: "The library is on “\(volume)”, which isn’t connected.") }
+            return String(localized: "The library can’t be found: \(Library.withoutHome(p)).")
         case let .libraryRefused(p, reason):                         // library_refused
             let folder = Library.withoutHome(p)
             switch reason {
-            case .fileSizeLimit: return String(localized: "This disk can't hold the models: its format (MS-DOS FAT) stops at 4 GB per file.")
-            case .readOnly: return String(localized: "This folder can't be written to: \(folder).")
-            case .notALibrary: return String(localized: "This folder isn't a Siliconed library: \(folder).")
+            case .fileSizeLimit: return String(localized: "This disk can’t hold the models: its format (MS-DOS FAT) stops at 4 GB per file.")
+            case .readOnly: return String(localized: "This folder can’t be written to: \(folder).")
+            case .notALibrary: return String(localized: "This folder isn’t a Siliconed library: \(folder).")
             case .alreadyALibrary: return String(localized: "This folder already holds a Siliconed library: \(folder).")
             case .sameLibrary: return String(localized: "This folder is the library itself, or inside it.")
             case .copyDamaged: return String(localized: "A file read back from the new place differs from the original: \(file(p)).")
@@ -106,9 +106,9 @@ struct Problem: Equatable, Sendable {
             return String(localized: "The prompt is empty.")
         case let .invalidSteps(steps, allowed):                      // invalid_steps
             return allowed.isEmpty ? String(localized: "\(steps) steps: a render takes between 1 and \(Request.maximumSteps).")
-                : String(localized: "This model doesn't render in \(steps) steps.")
+                : String(localized: "This model doesn’t render in \(steps) steps.")
         case let .tooManyReferences(count, max):                     // too_many_references
-            return max == 0 ? String(localized: "This model doesn't edit images.")
+            return max == 0 ? String(localized: "This model doesn’t edit images.")
                 : String(localized: "\(count) images: this model reads \(max) at most.")
         case let .imageTooSmall(side, minimum):                      // image_too_small
             return String(localized: "Too small: \(String(side)) px on a side, \(String(minimum)) px at least.")
@@ -122,7 +122,7 @@ struct Problem: Equatable, Sendable {
                 return String(localized: "\(String(w)) × \(String(h)) is larger than the engine addresses, whatever the memory: \(String(bound / 1_000_000)) megapixels at most.")
             }
         case .formatUnreadable(let t):                               // format_unreadable
-            return String(localized: "“\(t)” isn't a size: write it as width × height, like 832x1216.")
+            return String(localized: "“\(t)” isn’t a size: write it as width × height, like 832x1216.")
         case let .promptSyntax(position, reason):                    // prompt_syntax
             switch reason {
             case .unclosedGroup:
@@ -130,7 +130,7 @@ struct Problem: Equatable, Sendable {
             case .unmatchedClose:
                 return String(localized: "The prompt closes a group of alternatives that was never opened (character \(String(position))).")
             case .nestedGroup:
-                return String(localized: "Groups of alternatives can't be nested (character \(String(position))).")
+                return String(localized: "Groups of alternatives can’t be nested (character \(String(position))).")
             }
         case let .tooManyPromptVariants(count, max):                 // too_many_prompt_variants
             return String(localized: "These alternatives make \(String(count)) prompts: \(String(max)) at most.")
@@ -141,13 +141,13 @@ struct Problem: Equatable, Sendable {
         case .gridRefused(let reason):                               // grid_refused
             switch reason {
             case .emptyAxis: return String(localized: "An axis of the grid has no value.")
-            case .sameAxisTwice: return String(localized: "The grid's two axes vary the same setting.")
-            case .noSuchGroup: return String(localized: "An axis of the grid names a group of alternatives the prompt doesn't have.")
-            case .noSuchLoRA: return String(localized: "An axis of the grid names a LoRA that isn't in the stack.")
-            case .groupNotOnAxis: return String(localized: "The prompt has a group of alternatives that isn't an axis of the grid.")
+            case .sameAxisTwice: return String(localized: "The grid’s two axes vary the same setting.")
+            case .noSuchGroup: return String(localized: "An axis of the grid names a group of alternatives the prompt doesn’t have.")
+            case .noSuchLoRA: return String(localized: "An axis of the grid names a LoRA that isn’t in the stack.")
+            case .groupNotOnAxis: return String(localized: "The prompt has a group of alternatives that isn’t an axis of the grid.")
             case .invalidValue: return String(localized: "An axis of the grid has a value no render takes.")
-            case .unreadableAxis: return String(localized: "An axis of the grid can't be read.")
-            case .loraAcrossModels: return String(localized: "A grid that varies the model can't take a LoRA: each LoRA is made for one model.")
+            case .unreadableAxis: return String(localized: "An axis of the grid can’t be read.")
+            case .loraAcrossModels: return String(localized: "A grid that varies the model can’t take a LoRA: each LoRA is made for one model.")
             }
         case let .tooManyGridCells(count, max):                      // too_many_grid_cells
             return String(localized: "This grid makes \(String(count)) cells: \(String(max)) at most.")
@@ -156,37 +156,37 @@ struct Problem: Equatable, Sendable {
         case let .strengthTooLow(s, steps, _):                       // strength_too_low
             return String(localized: "A strength of \(Figures.strength(s)) leaves no step out of \(steps).")
         case .imageToImageUnsupported(let m):                        // image_to_image_unsupported
-            return String(localized: "\(name(m)) doesn't start from an image.")
+            return String(localized: "\(name(m)) doesn’t start from an image.")
         case let .solverUnsupported(s, m):                           // solver_unsupported
-            return String(localized: "\(name(m)) doesn't offer the \(s) solver.")
+            return String(localized: "\(name(m)) doesn’t offer the \(s) solver.")
         case .detailUnsupported(let m):                              // detail_unsupported
-            return String(localized: "\(name(m)) doesn't offer Detail.")
+            return String(localized: "\(name(m)) doesn’t offer Detail.")
         case .imageUnreadable(let f):                                // image_unreadable
-            return String(localized: "This image can't be read: \(file(f)).")
+            return String(localized: "This image can’t be read: \(file(f)).")
         case .imageEncodingFailed:                                   // image_encoding_failed
-            return String(localized: "The image couldn't be encoded as PNG.")
+            return String(localized: "The image couldn’t be encoded as PNG.")
         case .imageWriteFailed(let f):                               // image_write_failed
-            return String(localized: "The image couldn't be saved to \(f).")
+            return String(localized: "The image couldn’t be saved to \(f).")
         case let .unsupportedLoRA(f, reason):                        // unsupported_lora
             switch reason {
             case .notALoRA: return String(localized: "\(file(f)) is a model, not a LoRA.")
-            case .noTarget: return String(localized: "The LoRA \(file(f)) doesn't say which model it's for.")
+            case .noTarget: return String(localized: "The LoRA \(file(f)) doesn’t say which model it’s for.")
             case .inconsistent: return String(localized: "The LoRA \(file(f)) is damaged.")
             }
         case let .loraForOtherModel(lora, target, model):            // lora_for_other_model
             return String(localized: "The LoRA \(lora) is for \(name(target)), not for \(name(model)).")
         case let .incompatibleChain(output, input):                  // incompatible_chain
-            return String(localized: "These modules don't connect: \(output) comes out where \(input) is expected.")
+            return String(localized: "These modules don’t connect: \(output) comes out where \(input) is expected.")
         case let .insufficientMemory(needed, _):                     // insufficient_memory
             return AppState.needsMac(needed)
         case .memoryNeedUnknown(let m):                              // memory_need_unknown
-            return String(localized: "The memory \(name(m)) needs can't be computed: its files can't be read.")
+            return String(localized: "The memory \(name(m)) needs can’t be computed: its files can’t be read.")
         case .renderAlreadyRunning:                                  // render_already_running
             return String(localized: "Another program is already rendering on this library.")
         case .cancelled:                                             // cancelled
             return String(localized: "Stopped.")
         case .nonFiniteImage:                                        // non_finite_image
-            return String(localized: "This render went wrong and its image is unusable: it wasn't kept.")
+            return String(localized: "This render went wrong and its image is unusable: it wasn’t kept.")
         case .settingsAlreadyLoaded:                                 // settings_already_loaded
             return String(localized: "The engine settings were already loaded from another profile.")
         case .internalFailure(let component, _):                     // internal_failure
@@ -207,7 +207,7 @@ struct Problem: Equatable, Sendable {
         case .fileMissing:
             return String(localized: "Choose the file again, or reinstall the model it belongs to.")
         case .fileUnreadable:
-            return String(localized: "Check the file's permissions, and that its disk is connected.")
+            return String(localized: "Check the file’s permissions, and that its disk is connected.")
         case .corruptMap, .memoryNeedUnknown:
             return String(localized: "Reinstall the model from the Models sheet, or import it again.")
         case .diskFull:
@@ -227,7 +227,7 @@ struct Problem: Equatable, Sendable {
         case .importNeedsFamily:
             return String(localized: "Install it from the Models sheet (⇧⌘M), then import the file again: an import downloads nothing.")
         case .libraryAbsent:
-            return String(localized: "Connect the disk — or, in Settings, go back to this Mac's library.")
+            return String(localized: "Connect the disk — or, in Settings, go back to this Mac’s library.")
         case .libraryRefused(_, .fileSizeLimit):
             return String(localized: "Choose a disk formatted APFS, Mac OS Extended or exFAT.")
         case .libraryRefused(_, .readOnly):
@@ -247,7 +247,7 @@ struct Problem: Equatable, Sendable {
         case let .invalidSteps(_, allowed) where !allowed.isEmpty:
             return String(localized: "Choose \(allowed.map(String.init).formatted(.list(type: .or))) steps.")
         case .invalidSteps:
-            return String(localized: "Leave the number of steps at the model's default.")
+            return String(localized: "Leave the number of steps at the model’s default.")
         case .tooManyReferences(_, let max) where max == 0:
             return String(localized: "Choose a model that edits, like Qwen-Image-2.1.")
         case .tooManyReferences(_, let max):
@@ -267,13 +267,13 @@ struct Problem: Equatable, Sendable {
             case .sameAxisTwice: return String(localized: "Choose another setting for one of the axes.")
             case .invalidValue: return String(localized: "Steps are whole numbers from 1, a grid needs at least one seed, and a negative LoRA strength needs Experimental → Negative LoRA Strengths.")
             case .unreadableAxis, .emptyAxis, .noSuchGroup, .noSuchLoRA:
-                return String(localized: "Give each axis its values: a group of the prompt, seeds, steps, a LoRA of the stack, models or the edit's images.")
+                return String(localized: "Give each axis its values: a group of the prompt, seeds, steps, a LoRA of the stack, models or the edit’s images.")
             case .loraAcrossModels: return String(localized: "Remove the LoRAs, or vary something other than the model.")
             }
         case .tooManyGridCells:
             return String(localized: "Remove values from an axis.")
         case .imageTooSmall, .formatRefused, .formatUnreadable:
-            return String(localized: "Choose one of the model's sizes, like 1024 × 1024 or 832 × 1216.")
+            return String(localized: "Choose one of the model’s sizes, like 1024 × 1024 or 832 × 1216.")
         case .strengthOutOfRange, .strengthTooLow:
             return String(localized: "Increase the strength, or the number of steps.")
         case .imageToImageUnsupported:
@@ -301,7 +301,7 @@ struct Problem: Equatable, Sendable {
         case .settingsAlreadyLoaded:
             return String(localized: "Quit and reopen the app.")
         case .internalFailure, .nonFiniteImage:
-            return String(localized: "Try again; if it persists, report it (Help ▸ Measure This Mac…, then Share… ▸ Open a GitHub Issue).")
+            return String(localized: "Try again; if it persists, report it (Help ▸ Report a Problem…).")
         }
     }
 }
@@ -405,9 +405,9 @@ extension AppState {
         profileWarnings.map { w in
             if let open = w.range(of: "« "), let close = w.range(of: " » ignored in the profile"), open.upperBound <= close.lowerBound {
                 let key = String(w[open.upperBound..<close.lowerBound])
-                return String(localized: "The machine profile sets « \(key) », which it may not: a profile tunes speed and room, never the image.")
+                return String(localized: "The machine profile sets “\(key)”, which it may not: a profile tunes speed and room, never the image.")
             }
-            return String(localized: "The machine profile couldn't be read as it is.")
+            return String(localized: "The machine profile couldn’t be read as it is.")
         }
     }
 }

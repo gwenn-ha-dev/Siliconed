@@ -64,16 +64,16 @@ extension RemoteControl {
         if let down = app.linkBlocker { throw Refusal("link", down) }
         // The same usage rules as here (`add`).
         if !grid, d.sketch {
-            throw Refusal("usage", String(localized: "--sketch belongs to « silicontrol grid »"), help: "silicontrol help grid")
+            throw Refusal("usage", String(localized: "--sketch belongs to “silicontrol grid”"), help: "silicontrol help grid")
         }
         if !grid, d.x != nil || d.y != nil {
-            throw Refusal("usage", String(localized: "--x and --y belong to « silicontrol grid »"), help: "silicontrol help grid")
+            throw Refusal("usage", String(localized: "--x and --y belong to “silicontrol grid”"), help: "silicontrol help grid")
         }
         if grid, d.x == nil {
             throw Refusal("usage", String(localized: "a grid needs --x (and optionally --y)"), help: "silicontrol help grid")
         }
         if grid, d.batchGiven {
-            throw Refusal("usage", String(localized: "a grid's cell is one image: --batch does not apply"),
+            throw Refusal("usage", String(localized: "a grid’s cell is one image: --batch does not apply"),
                           help: String(localized: "--x seeds=N gives N seeds — silicontrol help grid"))
         }
         guard app.readySet.contains(d.model), let card = app.cards.first(where: { $0.id == d.model }) else {
@@ -266,8 +266,8 @@ extension RemoteControl {
         }
         if g.cells.contains(where: { ($0.solver ?? .euler) != .euler }) {
             guard app.developerMode else {
-                throw Refusal("solver", String(localized: "a solver axis is offered only in Developer Mode"),
-                              help: String(localized: "turn on Developer Mode in Settings (⌘,)"))
+                throw Refusal("solver", String(localized: "a solver axis is offered only when More Solvers is on"),
+                              help: String(localized: "turn on More Solvers in Settings (⌘,)"))
             }
             guard g.cells.contains(where: { $0.model != nil }) || AppState.solverFamilies.contains(card.family) else {
                 throw Refusal("solver", String(localized: "\(card.name) walks Euler only"),
@@ -378,7 +378,7 @@ extension RemoteControl {
     func varyOnMirror(_ mirror: MirrorLink, _ arguments: [String], _ c: Connection) throws {
         let (e, amount, count) = try varyRequest(arguments)
         guard app.canVary(e) else {
-            throw Refusal("model", String(localized: "\(e.name) has no variations: a grid's sheet, or its model is not ready"),
+            throw Refusal("model", String(localized: "\(e.name) has no variations: a grid’s sheet, or its model is not ready"),
                           help: "silicontrol models")
         }
         guard app.file.count + count <= AppState.maxQueueLength else {
@@ -428,7 +428,7 @@ extension RemoteControl {
                 o["computing_on"] = mirror.macName
                 finish(c, ["ok": true, "image": o, "computing_on": mirror.macName])
             case .downloadRequired:
-                finish(c, Response.failure("download_required", String(localized: "macOS does not have Apple's enlargement model yet"),
+                finish(c, Response.failure("download_required", String(localized: "macOS does not have Apple’s enlargement model yet"),
                                            help: "silicontrol enlarge \(e.name) --download"))
             case .refused(let sentence):
                 finish(c, Response.failure("refused", sentence))

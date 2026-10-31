@@ -631,7 +631,7 @@ extension AppState {
         if target == nil, let model = recipe.model {
             // Steps and LoRAs belong to that model: the form's stay.
             let name = cards.first { $0.family.rawValue == model }?.name ?? model
-            notes.append(String(localized: "\(name) isn't installed: its steps and LoRAs are left out."))
+            notes.append(String(localized: "\(name) isn’t installed: its steps and LoRAs are left out."))
         }
 
         var stack: [LoRASlot] = loras
@@ -661,7 +661,7 @@ extension AppState {
             restoredFormat = RecommendedFormat(w, h)
         }
         if recipe.sourceImageMissing {
-            notes.append(String(localized: "The image it started from isn't in the file (img2img)."))
+            notes.append(String(localized: "The image it started from isn’t in the file (img2img)."))
         }
         if !recipe.unreadable.isEmpty {
             let keys = recipe.unreadable.formatted(.list(type: .and))
@@ -674,10 +674,10 @@ extension AppState {
                                        steps: target == nil ? steps : (recipe.steps ?? target!.defaultSteps),
                                        loras: stack, detail: recipe.detail, solver: recipe.solver))
         if recipe.solver != .euler, !offeredSolvers.contains(recipe.solver) {
-            notes.append(String(localized: "Made with the \(recipe.solver.choice) solver, offered in Developer Mode: Euler will be used."))
+            notes.append(String(localized: "Made with the \(recipe.solver.choice) solver, offered when More Solvers is on: Euler will be used."))
         }
         if recipe.detail != .normal, !offersDetail {
-            notes.append(String(localized: "\(model?.name ?? identifier) doesn't offer Detail: Normal will be used."))
+            notes.append(String(localized: "\(model?.name ?? identifier) doesn’t offer Detail: Normal will be used."))
         }
         if let s = recipe.seed { seed = s; fixedSeed = true }
         // A variation is its seed's: without the seed, there is nothing to vary.
