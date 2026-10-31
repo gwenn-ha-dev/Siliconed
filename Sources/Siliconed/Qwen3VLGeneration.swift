@@ -100,6 +100,20 @@ package final class Qwen3VLGenerator {
     private let freezeCut: Bool
 
     package var cancellation: Cancellation?
+
+    /// **Teacher forcing, for the check against the reference**: the sequence continues with `tokens` (the
+    /// reference's) whatever the engine would choose, and `observe` hears each step's engine choice (its
+    /// argmax, the first maximum) and the whole row of logits, before the next pass. The engine's tokens equal
+    /// the reference's exactly when every step's choice does: a free run never leaves the forced path before
+    /// the first difference, so the one run proves both the tokens and the logits. Nil: a free run.
+    package struct Teacher {
+        package let tokens: [Int]
+        package let observe: (_ step: Int, _ choice: Int, _ logits: UnsafeBufferPointer<Float>) -> Void
+        package init(tokens: [Int], observe: @escaping (_ step: Int, _ choice: Int, _ logits: UnsafeBufferPointer<Float>) -> Void) {
+            self.tokens = tokens; self.observe = observe
+        }
+    }
+    package var teacher: Teacher?
     /// Seconds, by phase: `vision`, `prefill`, `decode`, `head` (`lm_head`, inside the other two).
     package private(set) var timings: [String: Double] = [:]
     /// Passes over the 36 layers: each reads every layer once.
@@ -269,6 +283,8 @@ package final class Qwen3VLGenerator {
         var nextPosition = Qwen3VLChat.firstGeneratedPosition(request.positions)
         var processed = 0
         var generated: [Int] = [], stopped = false
+        let rowOfLogits: UnsafeMutablePointer<Float>? = teacher.map { _ in .allocate(capacity: vocabulary) }
+        defer { rowOfLogits?.deallocate() }
 
         while !stopped && generated.count < maxNewTokens {
             try cancellation.check()
@@ -340,7 +356,12 @@ package final class Qwen3VLGenerator {
                 let headStarted = Date()
                 last.update(from: x + (used - 1) * h, count: h)
                 Ops.rmsNorm(last, weight: finalNorm, into: last, rows: 1, columns: h, eps: config.eps)
-                let pick = try greedy(last, headRows: headRows, logits: logits)
+                let choice = try greedy(last, headRows: headRows, logits: logits, row: rowOfLogits)
+                var pick = choice
+                if let teacher, let row = rowOfLogits {
+                    teacher.observe(generated.count, choice, UnsafeBufferPointer(start: row, count: vocabulary))
+                    if generated.count < teacher.tokens.count { pick = teacher.tokens[generated.count] }
+                }
                 timings["head", default: 0] += Date().timeIntervalSince(headStarted)
                 generated.append(pick)
                 ids.append(pick)
@@ -363,7 +384,7 @@ package final class Qwen3VLGenerator {
     /// `lm_head` on the normalized row, block of rows by block of rows (widened, then one product),
     /// and the argmax — the first maximum, as `torch.argmax`.
     private func greedy(_ hidden: UnsafePointer<Float>, headRows: UnsafeMutablePointer<Float>,
-                        logits: UnsafeMutablePointer<Float>) throws -> Int {
+                        logits: UnsafeMutablePointer<Float>, row: UnsafeMutablePointer<Float>? = nil) throws -> Int {
         let h = config.hidden
         var best = Top2()
         var first = 0
@@ -373,6 +394,7 @@ package final class Qwen3VLGenerator {
             cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasTrans, 1, Int32(n), Int32(h), 1,
                         hidden, Int32(h), headRows, Int32(h), 0, logits, Int32(n))
             best.scan(logits, count: n, base: first)
+            if let row { (row + first).update(from: logits, count: n) }
             first += n
         }
         return best.id
