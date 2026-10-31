@@ -80,6 +80,10 @@ English · [Français](RELEASE-NOTES.fr.md)
   moves the image, and the trackpad does not change. ([#10](https://github.com/gwenn-ha-dev/Siliconed/issues/10))
 - **Switch**, beside Side by Side and Curtain: two images one at a time, at the same place and zoom; a
   click, or ← →, shows the other. ([#10](https://github.com/gwenn-ha-dev/Siliconed/issues/10))
+- **Faster Rendering is chosen per model**, like the Neural Engine: on by default for the Compact and
+  the Light, off for the Standard, which stays the image checked against the reference. The choice is
+  saved with the image, so Render Again gives the same one; `silicontrol set faster-rendering on|off
+  --model ID` sets one model's, `silicontrol models` tells each.
 - **Faster Rendering, measured**: at 1024² it takes a third off a render on Krea 2, a fifth to a
   quarter on Z-Image, Qwen-Image-2.1 and Anima, and 6 to 9 % on MOSS-Image.
 

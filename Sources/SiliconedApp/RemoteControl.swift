@@ -298,6 +298,8 @@ final class RemoteControl {
                 o["loras"] = b.loras(for: f.id).map { ["lora": Self.shortName($0.path), "name": $0.name] }
                 // The rack's fp32 tag, per installed version: only on a Mac whose map offers the Neural Engine.
                 if app.neuralEngineOffered { o["neural_engine"] = app.neuralEngine(for: f.id) }
+                // Faster Rendering is chosen per installed version too: what « measure » reads and gives back.
+                o["faster_rendering"] = app.fasterRendering(for: f.id)
             }
             return o
         }

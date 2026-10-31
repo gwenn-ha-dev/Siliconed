@@ -35,10 +35,11 @@ final class MeasurementTests: XCTestCase {
             var faster = true, sets: [String] = [], added = 0
             let send: Runner.Send = { argv, onLine in
                 switch argv[0] {
-                case "status": return (["ok": true, "running": NSNull(), "queue": [], "faster_rendering": faster], getpid())
-                case "models": return (["ok": true, "models": [["id": "fake", "ready": true, "variant": "standard"]]], getpid())
+                case "status": return (["ok": true, "running": NSNull(), "queue": []], getpid())
+                case "models": return (["ok": true, "models": [["id": "other", "ready": true, "faster_rendering": false],
+                                                               ["id": "fake", "ready": true, "variant": "standard", "faster_rendering": faster]]], getpid())
                 case "set":
-                    sets.append(argv[1] + "=" + argv[2])
+                    sets.append(argv[1...].joined(separator: " "))
                     faster = argv[2] == "on"
                     return (["ok": true], getpid())
                 default:
@@ -59,7 +60,8 @@ final class MeasurementTests: XCTestCase {
             } else {
                 _ = try Runner.run(o, send: send, log: { _ in }, emit: { _ in }, append: { lines.append($0) })
             }
-            XCTAssertEqual(sets, ["faster-rendering=off", "faster-rendering=on"], "failing: \(failing)")
+            // The measured model's choice, not the rack's: the setting is per model.
+            XCTAssertEqual(sets, ["faster-rendering off --model fake", "faster-rendering on --model fake"], "failing: \(failing)")
             XCTAssertTrue(faster)
             let column = TSV.header.firstIndex(of: "faster_rendering")!
             for line in lines.dropFirst() { XCTAssertEqual(line.split(separator: "\t", omittingEmptySubsequences: false)[column], "off") }
@@ -68,16 +70,20 @@ final class MeasurementTests: XCTestCase {
         var sets = 0
         let quiet: Runner.Send = { argv, onLine in
             if argv[0] == "set" { sets += 1 }
-            if argv[0] == "status" { return (["ok": true, "running": NSNull(), "queue": [], "faster_rendering": false], getpid()) }
-            if argv[0] == "models" { return (["ok": true, "models": [["id": "fake", "ready": true]]], getpid()) }
+            if argv[0] == "status" { return (["ok": true, "running": NSNull(), "queue": []], getpid()) }
+            if argv[0] == "models" { return (["ok": true, "models": [["id": "fake", "ready": true, "faster_rendering": false]]], getpid()) }
             return (["ok": false, "error": "render"], getpid())
         }
         let o = try MeasureOptions.parse(["--model", "fake", "--settle", "0", "--faster-rendering", "off"])
         XCTAssertThrowsError(try Runner.run(o, send: quiet, log: { _ in }, emit: { _ in }, append: { _ in }))
         XCTAssertEqual(sets, 0)
-        // An app that does not report the setting cannot be asked to change it.
+        // An app that does not report the setting per model cannot be asked to change it.
         let old: Runner.Send = { argv, _ in
-            argv[0] == "status" ? (["ok": true, "running": NSNull(), "queue": []], getpid()) : (["ok": true], getpid())
+            switch argv[0] {
+            case "status": return (["ok": true, "running": NSNull(), "queue": [], "faster_rendering": true], getpid())
+            case "models": return (["ok": true, "models": [["id": "fake", "ready": true]]], getpid())
+            default: return (["ok": true], getpid())
+            }
         }
         XCTAssertThrowsError(try Runner.run(o, send: old, log: { _ in }, emit: { _ in }, append: { _ in })) {
             XCTAssertEqual(($0 as? Failure)?.code, "unsupported")

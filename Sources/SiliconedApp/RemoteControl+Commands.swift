@@ -260,21 +260,28 @@ extension RemoteControl {
 
     // ── set ──
 
-    /// **`set faster-rendering on|off`: the Settings switch of the current model, from the terminal** —
-    /// `AppState.setFasterRendering(_:for:)`, so the choice is written and the window's switch follows, exactly as a click. Only with the queue
-    /// empty, so that a series is not started under one recipe and finished under the other (a job keeps the value it was queued
-    /// with: `RenderSettings.fasterRendering`). Setting the value it already has is not a change.
+    /// **`set faster-rendering on|off [--model ID]`: one model's Settings switch, from the terminal** —
+    /// `AppState.setFasterRendering(_:for:)`, so the choice is written and the window's switch follows, exactly as a click. The
+    /// choice is per model (per installed version, like the Neural Engine's), so the model is named; without `--model`, the
+    /// model in the rack. Only with the queue empty, so that a series is not started under one recipe and finished under the
+    /// other (a job keeps the value it was queued with: `RenderSettings.fasterRendering`). Setting the value it already has
+    /// is not a change.
     func set(_ arguments: [String]) throws -> [String: Any] {
-        guard arguments.count == 2, arguments[0] == "faster-rendering", ["on", "off"].contains(arguments[1]) else {
-            throw Refusal("usage", "set faster-rendering on|off")
+        let usage = Refusal("usage", "set faster-rendering on|off [--model ID]")
+        guard arguments.count == 2 || (arguments.count == 4 && arguments[2] == "--model"),
+              arguments[0] == "faster-rendering", ["on", "off"].contains(arguments[1]) else { throw usage }
+        let id = arguments.count == 4 ? arguments[3] : app.identifier
+        guard let card = app.cards.first(where: { $0.id == id }) else {
+            let visible = visibleCards(app.library).map(\.id).joined(separator: ", ")
+            throw Refusal("model", String(localized: "unknown model: \"\(id)\""), help: String(localized: "models: \(visible)"))
         }
         guard !app.busy, app.forgeInProgress == nil, !app.diagnosticRunning, app.awaitingLicense.isEmpty else {
             throw Refusal("busy", String(localized: "a render, an installation or the diagnostic is running"),
                           help: "silicontrol wait, then retry")
         }
-        let previous = app.fasterRendering(for: app.identifier)
-        app.setFasterRendering(arguments[1] == "on", for: app.identifier)
-        return ["ok": true, "faster_rendering": app.fasterRendering(for: app.identifier), "previous": previous]
+        let previous = app.fasterRendering(for: card.id)
+        app.setFasterRendering(arguments[1] == "on", for: card.id)
+        return ["ok": true, "model": card.id, "faster_rendering": app.fasterRendering(for: card.id), "previous": previous]
     }
 
     // ── history, save ──

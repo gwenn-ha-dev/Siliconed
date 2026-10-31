@@ -77,13 +77,16 @@ fois dans l'historique. Le modèle d'Apple n'est téléchargé par macOS qu'avec
 
 **Les solveurs suivent Plus de solveurs.** `--solver` n'est accepté qu'avec Plus de solveurs allumé (Réglages › Avancé › Bêta) et sur un modèle qui propose autre chose qu'Euler ; sinon la réponse est un refus (`solver`) qui nomme le réglage.
 
-**Le rendu plus rapide est aussi un réglage de l'app.** `silicontrol set faster-rendering on|off`
-écrit `AppState.fasterRendering` (la préférence, `Spectral.halfSizeStart`) et l'interrupteur de la fenêtre
-suit, comme un clic ; `status` le donne (`"faster_rendering"`). Refusé (`busy`) sauf si rien ne tourne ni
-n'attend : le moteur le lit à chaque plan, et un travail planifié sous une valeur et fini sous l'autre
-mélangerait deux recettes. C'est un réglage de l'app, il persiste comme l'interrupteur ; `silicontrol
-measure --faster-rendering on|off` le pose pour une série, l'inscrit dans le TSV et rend la valeur
-d'avant à la fin, même si la série échoue. Éteint, c'est la pleine taille, les mêmes bits qu'avant ce réglage.
+**Le rendu plus rapide est aussi un réglage de l'app, un par modèle.** `silicontrol set faster-rendering
+on|off [--model ID]` passe par `AppState.setFasterRendering(_:for:)`, rangé par version installée comme le
+choix du Neural Engine (allumé par défaut sur la Compact et la Légère, éteint sur la Standard), et
+l'interrupteur de la fenêtre suit, comme un clic ; sans `--model`, le modèle du rack. `models` donne la
+valeur de chaque modèle installé, `status` celle du rack (`"faster_rendering"`). Refusé (`busy`) sauf si
+rien ne tourne ni n'attend : un travail garde la valeur avec laquelle il est entré dans la file
+(`RenderSettings.fasterRendering`), et un travail planifié sous une valeur et fini sous l'autre
+mélangerait deux recettes. Il persiste comme l'interrupteur ; `silicontrol measure --faster-rendering
+on|off` le pose pour le modèle mesuré, l'inscrit dans le TSV et rend la valeur d'avant à la fin, même si
+la série échoue. Éteint, c'est la pleine taille : l'image contrôlée contre la référence.
 
 ## La commande
 

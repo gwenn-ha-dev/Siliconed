@@ -111,7 +111,7 @@ package enum RemoteControlHelp {
       follow                                   live events until the queue is empty
       cancel [t3 …]                            stops the running render, or removes jobs
       clear                                    empties the queue and stops the running render
-      set faster-rendering on|off              the Settings switch, as a click (queue empty)
+      set faster-rendering on|off [--model ID] a model's Faster Rendering, as a click (queue empty)
       history [N]                              the session's images (most recent first)
       save i7 [i8 …] DEST                      writes images (.png/.jpg file, or folder)
       vary i7 subtle|strong [--batch N]        variations of an image (same settings, same seed)
@@ -203,6 +203,8 @@ package enum RemoteControlHelp {
         neural_engine → the rack's fp32 tag for the installed version: true = part of the DiT
                       on the Neural Engine (--ane, --no-ane of « add »). Only on a Mac whose
                       measure offers it, and once the model is ready
+        faster_rendering → Faster Rendering for the installed version (help set): on by default for
+                      the Compact and the Light, off for the Standard; once the model is ready
         license_urls → the license file(s) on Hugging Face, at the revision the installation takes:
                       the model's, then each component under a license of its own (a Compact: the
                       publisher's, then each third party's model card). Z-Image has none: its model card, which
@@ -503,7 +505,7 @@ package enum RemoteControlHelp {
            "history_images": 12, "library": "/Users/…/Siliconed", "faster_rendering": true,
            "settings": {"read": true, "map": "2026-10-26T14:43:50Z", "warnings": []}}
 
-        faster_rendering   : the Settings switch (help set).
+        faster_rendering   : Faster Rendering of the model in the rack (help set).
         settings           : the engine settings renders run on — read: false until this Mac's measure is; map: the
                              date of that measure (null: the defaults); warnings: why a measure or profile was
                              refused. A measure is applied as it stands, whatever it found (see help diagnose). Two
@@ -559,17 +561,19 @@ package enum RemoteControlHelp {
         """,
 
         "set": """
-        silicontrol set faster-rendering on|off
+        silicontrol set faster-rendering on|off [--model ID]
 
-        Flips the Settings switch « Faster Rendering » exactly as a click does: the preference is
-        written, the switch in the window follows, the next plan reads it. On (the default), from
-        1024 px on the first evaluations run on a grid of half the size: faster, another image than
-        at full size. Off: full size, the same bits as before the setting existed.
-        Only with nothing running or waiting (a job planned under one value and finished under the
-        other would mix two recipes): else "busy". « status » tells the current value.
+        Flips « Faster Rendering » for one model exactly as a click does: the choice is written, the
+        switch in the window follows, the next plan reads it. It is chosen per installed version, like
+        the Neural Engine: on by default for the Compact and the Light, off for the Standard. On, from
+        1024 px the first evaluations run on a grid of half the size: faster, another image than at
+        full size. Off: full size, the image checked against the reference. Without --model, the
+        model in the rack. Only with nothing running or waiting (a job planned under one value and
+        finished under the other would mix two recipes): else "busy". « models » tells each model's
+        value, « status » the rack's.
 
-        Answer: {"ok": true, "faster_rendering": false, "previous": true}
-        FAILURES: usage, busy.
+        Answer: {"ok": true, "model": "krea2", "faster_rendering": false, "previous": true}
+        FAILURES: usage, model, busy.
         """,
 
         "history": """
@@ -689,10 +693,10 @@ package enum RemoteControlHelp {
         Repeats our timings and peaks on your Mac, with this app alone: a series of renders, each timed
         from the request to the PNG, the app's peak memory sampled while it renders, the pixels hashed.
         Defaults: z-image, 1024x1024, 3 renders, seed 42, "a 30 year old woman posing in a library",
-        15 s of rest first. Faster Rendering (Settings) is written in the TSV for each render;
-        --faster-rendering on|off sets it for the series (« set faster-rendering », as a click) and
-        gives the value from before back at the end, even when the series fails. Without it the app's
-        value is kept: a number published "with it off" is --faster-rendering off.
+        15 s of rest first. The measured model's Faster Rendering is written in the TSV for each
+        render; --faster-rendering on|off sets it for the series (« set faster-rendering --model », as
+        a click) and gives the value from before back at the end, even when the series fails. Without
+        it the model's value is kept: a number published "with it off" is --faster-rendering off.
 
         The series: the queue must be idle (else "busy"); a load render (the weights come in; its time
         is reported apart); a witness; the N renders; a witness again. The witness is the default prompt
@@ -859,7 +863,7 @@ package enum RemoteControlHelp {
       follow                                   les évènements en direct jusqu'à file vide
       cancel [t3 …]                            arrête le rendu en cours, ou retire des travaux
       clear                                    vide la file et arrête le rendu en cours
-      set faster-rendering on|off              l'interrupteur des Réglages, comme un clic (file vide)
+      set faster-rendering on|off [--model ID] le rendu plus rapide d'un modèle, comme un clic (file vide)
       history [N]                              les images de la session (la plus récente d'abord)
       save i7 [i8 …] DEST                      écrit des images (fichier .png/.jpg, ou dossier)
       vary i7 subtle|strong [--batch N]        variations d'une image (mêmes réglages, même graine)
@@ -952,6 +956,8 @@ package enum RemoteControlHelp {
         neural_engine → l'étiquette fp32 du rack pour la version installée : true = une part du
                       DiT sur le Neural Engine (--ane, --no-ane de « add »). Seulement sur un Mac
                       dont la mesure l'offre, et le modèle prêt
+        faster_rendering → le rendu plus rapide de la version installée (help set) : allumé par défaut
+                      sur la Compact et la Légère, éteint sur la Standard ; le modèle prêt
         license_urls → le(s) fichier(s) de licence sur Hugging Face, à la révision que l'installation
                       prend : celui du modèle, puis chaque composant sous une licence propre
                       (une Compact : celui de l'éditeur, puis la fiche de chaque tiers). Z-Image n'en a pas : sa
@@ -1255,7 +1261,7 @@ package enum RemoteControlHelp {
            "history_images": 12, "library": "/Users/…/Siliconed", "faster_rendering": true,
            "settings": {"read": true, "map": "2026-10-26T14:43:50Z", "warnings": []}}
 
-        faster_rendering   : l'interrupteur des Réglages (help set).
+        faster_rendering   : le rendu plus rapide du modèle du rack (help set).
         settings           : les réglages du moteur des rendus — read : false tant que la mesure de ce Mac ne l'est
                              pas ; map : la date de cette mesure (null : les défauts) ; warnings : pourquoi une mesure ou
                              un profil a été refusé. Une mesure s'applique telle quelle, quoi qu'elle ait trouvé (voir
@@ -1313,18 +1319,19 @@ package enum RemoteControlHelp {
         """,
 
         "set": """
-        silicontrol set faster-rendering on|off
+        silicontrol set faster-rendering on|off [--model ID]
 
-        Bascule l'interrupteur « Faster Rendering » des Réglages exactement comme un clic : la
-        préférence est écrite, l'interrupteur de la fenêtre suit, le prochain plan la lit. Allumé
-        (par défaut), dès 1024 px les premières évaluations se font sur une grille de demi-taille :
-        plus vite, une autre image qu'en pleine taille. Éteint : pleine taille, les mêmes bits
-        qu'avant ce réglage. Seulement quand rien ne tourne ni n'attend (un travail planifié sous une
-        valeur et fini sous l'autre mélangerait deux recettes) : sinon « busy ». « status » donne la
-        valeur actuelle.
+        Bascule le rendu plus rapide d'un modèle exactement comme un clic : le choix est écrit,
+        l'interrupteur de la fenêtre suit, le prochain plan le lit. Il se choisit par version
+        installée, comme le Neural Engine : allumé par défaut sur la Compact et la Légère, éteint sur
+        la Standard. Allumé, dès 1024 px les premières évaluations se font sur une grille de
+        demi-taille : plus vite, une autre image qu'en pleine taille. Éteint : pleine taille, l'image
+        contrôlée contre la référence. Sans --model, le modèle du rack. Seulement quand rien ne
+        tourne ni n'attend (un travail planifié sous une valeur et fini sous l'autre mélangerait deux
+        recettes) : sinon « busy ». « models » donne la valeur de chaque modèle, « status » celle du rack.
 
-        Réponse : {"ok": true, "faster_rendering": false, "previous": true}
-        ÉCHECS : usage, busy.
+        Réponse : {"ok": true, "model": "krea2", "faster_rendering": false, "previous": true}
+        ÉCHECS : usage, model, busy.
         """,
 
         "history": """
@@ -1447,10 +1454,10 @@ package enum RemoteControlHelp {
         Refait nos temps et nos pics chez vous, avec cette seule app : une série de rendus, chacun chronométré
         de la demande au PNG, le pic mémoire de l'app échantillonné pendant qu'elle rend, les pixels hachés.
         Défauts : z-image, 1024x1024, 3 rendus, graine 42, « a 30 year old woman posing in a library »,
-        15 s de repos d'abord. Faster Rendering (Réglages) est écrit dans le TSV à chaque rendu ;
-        --faster-rendering on|off le pose pour la série (« set faster-rendering », comme un clic) et
-        rend la valeur d'avant à la fin, même si la série échoue. Sans lui, la valeur de l'app reste :
-        un chiffre publié « éteint » est --faster-rendering off.
+        15 s de repos d'abord. Le rendu plus rapide du modèle mesuré est écrit dans le TSV à chaque
+        rendu ; --faster-rendering on|off le pose pour la série (« set faster-rendering --model »,
+        comme un clic) et rend la valeur d'avant à la fin, même si la série échoue. Sans lui, la valeur
+        du modèle reste : un chiffre publié « éteint » est --faster-rendering off.
 
         La série : la file doit être libre (sinon « busy ») ; un rendu de chargement (les poids entrent ; son temps
         est donné à part) ; un témoin ; les N rendus ; un témoin encore. Le témoin est le prompt par défaut à la

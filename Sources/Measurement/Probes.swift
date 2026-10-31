@@ -54,12 +54,6 @@ package enum Probes {
         return nil
     }
 
-    /// An app preference, as the app stored it (`nil`: never written, the app uses its default).
-    package static func preference(_ key: String, of identifier: String) -> Bool? {
-        CFPreferencesAppSynchronize(identifier as CFString)
-        return CFPreferencesCopyAppValue(key as CFString, identifier as CFString) as? Bool
-    }
-
     // MARK: Peak sampling
 
     /// `phys_footprint` of `pid` every `interval` seconds on a thread of its own, the maximum kept —

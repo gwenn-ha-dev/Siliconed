@@ -80,6 +80,10 @@
   déplace toujours l’image, et le trackpad ne change pas. ([#10](https://github.com/gwenn-ha-dev/Siliconed/issues/10))
 - **Alterner**, à côté de Côte à côte et Rideau : deux images une à la fois, au même endroit et au même
   zoom ; un clic, ou ← →, montre l’autre. ([#10](https://github.com/gwenn-ha-dev/Siliconed/issues/10))
+- **Le rendu plus rapide se choisit par modèle**, comme le Neural Engine : allumé par défaut sur la
+  Compact et la Légère, éteint sur la Standard, qui reste l'image contrôlée contre la référence. Le choix
+  est gardé avec l'image, Rendre à nouveau redonne le même ; `silicontrol set faster-rendering on|off
+  --model ID` règle celui d'un modèle, `silicontrol models` donne celui de chacun.
 - **Le rendu plus rapide, mesuré** : en 1024², il retire un tiers du temps d'un rendu sur Krea 2, un
   cinquième à un quart sur Z-Image, Qwen-Image-2.1 et Anima, et 6 à 9 % sur MOSS-Image.
 

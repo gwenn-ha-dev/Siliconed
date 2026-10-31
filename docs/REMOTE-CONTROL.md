@@ -69,13 +69,16 @@ Apple's model is downloaded by macOS only with `--download` (else `download_requ
 
 **Solvers follow More Solvers.** `--solver` is accepted only with More Solvers on (Settings › Advanced › Beta) and on a model that offers more than Euler; otherwise the answer is a refusal (`solver`) that names the setting.
 
-**Faster Rendering is the app's setting too.** `silicontrol set faster-rendering on|off` writes
-`AppState.fasterRendering` (the preference, `Spectral.halfSizeStart`) and the window's switch follows,
-as a click; `status` reports it (`"faster_rendering"`). Refused (`busy`) unless nothing runs or waits:
-the engine reads it at every plan, and a job planned under one value and finished under the other
-would mix two recipes. It is a setting of the app, so it persists like the switch does; `silicontrol
-measure --faster-rendering on|off` sets it for a series, writes it in the TSV and gives the value from
-before back at the end, even when the series fails. Off is full size, the same bits as before the setting existed.
+**Faster Rendering is the app's setting too, one per model.** `silicontrol set faster-rendering on|off
+[--model ID]` goes through `AppState.setFasterRendering(_:for:)`, keyed per installed version like the
+Neural Engine's choice (on by default for the Compact and the Light, off for the Standard), and the
+window's switch follows, as a click; without `--model`, the model in the rack. `models` reports each
+installed model's value, `status` the rack's (`"faster_rendering"`). Refused (`busy`) unless nothing
+runs or waits: a job carries the value it was queued with (`RenderSettings.fasterRendering`), and one
+planned under one value and finished under the other would mix two recipes. It persists like the
+switch does; `silicontrol measure --faster-rendering on|off` sets it for the measured model, writes it
+in the TSV and gives the value from before back at the end, even when the series fails. Off is full
+size: the image checked against the reference.
 
 ## The command
 
