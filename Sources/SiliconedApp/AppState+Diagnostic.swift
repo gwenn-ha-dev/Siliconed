@@ -50,7 +50,7 @@ extension AppState {
     /// measures on the defaults, whatever this process uses — a measure taken again is not skewed by the model in use —,
     /// and frees its memory on exit. **A route that kills the child is left out and the measure starts again**
     /// (`Diagnostic.Child.Supervisor`): the report says which route and why, and no render loads a route the report has not seen load.
-    /// Its report applies at once when nothing read the settings yet (`keep`). `next` calls this past its
+    /// Its report applies from the next render (`keep`). `next` calls this past its
     /// own guards, a job waiting; the sheet and the remote control through `startDiagnostic`.
     func measure() {
         guard let executable = Bundle.main.executableURL else { return }
@@ -74,7 +74,7 @@ extension AppState {
             diagnostic = .ready
         } else if let report = outcome.report {
             diagnostic = .finished(report)
-            keep(report)   // what this Mac uses: from now if nothing read the settings yet, else from the next launch — whatever it found
+            keep(report)   // what this Mac plans with: from the next render — whatever it found
         } else {
             // The one refusal the app says in its own words: another process renders.
             let failure = outcome.failure ?? ("internal", "the measuring process did not finish")
@@ -141,7 +141,7 @@ extension AppState {
     }
 
     /// **The last render against this report's model** (`RenderLoop.Note`, ~1 KB), if there was one: it travels with the report and is
-    /// shown by the sheet. A render made under another model — a measure taken since, which applies from the next launch — is not
+    /// shown by the sheet. A render made under another model — a measure taken since, which applies from the next render — is not
     /// this report's: its gap would say something about a model the report does not hold.
     func reportNote(for report: Diagnostic.Report) -> RenderLoop.Note? {
         renderNote.flatMap { $0.map == report.date ? $0 : nil }

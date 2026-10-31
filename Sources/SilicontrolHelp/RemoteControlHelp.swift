@@ -266,7 +266,7 @@ package enum RemoteControlHelp {
         process of its own: a route whose load kills that process (a program the Neural Engine
         refuses) is left out, the measure starts again without it, and "judge" says
         {"excluded": true, "reason": "died"}. The queue waits for it, and it for the
-        queue. The report is the model of this Mac: from the next launch, the engine works out
+        queue. The report is the model of this Mac: from the next render, the engine works out
         from its "model" how many rows each engine takes at every product and every attention;
         before it, the defaults. A finished measure is always applied: its "findings" say, each with
         its effect on the plan ("fact", "left out", "bounded", "fast side"), what was missing, what

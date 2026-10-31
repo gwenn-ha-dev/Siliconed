@@ -288,6 +288,7 @@ struct RackView: View {
         StageBox(title: "Text encoder", symbol: "character.textbox", state: app.state(of: .text),
                  explanation: "A language model reads the prompt and turns it into what the DiT understands") {
             ModuleSlot(name: app.moduleNames.text)
+            WeightsTag(format: app.weightFormats?.text)
             if app.promptNamesImages {
                 Tag(text: Text("sees the images"), symbol: "eye")
                     .help("The encoder reads the edit's images with the prompt: the prompt can name them (image 1, image 2)")
@@ -300,6 +301,7 @@ struct RackView: View {
         StageBox(title: "Image encoder", symbol: "photo", state: app.state(of: .image),
                  explanation: "Turns the images to edit into the compact form the DiT works in, the latent") {
             ModuleSlot(name: app.moduleNames.encoding)
+            WeightsTag(format: app.weightFormats?.vae)
             Cost(app.references.isEmpty && app.subjectImageCount == 0 ? (nil, false) : app.stageCost(.image))
         }
     }
@@ -308,6 +310,7 @@ struct RackView: View {
         StageBox(title: "VAE decoder", symbol: "square.grid.3x3.square", state: app.state(of: .decoding),
                  explanation: "Turns the DiT's result, the latent, into pixels: the final image") {
             ModuleSlot(name: app.moduleNames.decoding)
+            WeightsTag(format: app.weightFormats?.vae)
             Cost(app.stageCost(.decoding))
         }
     }

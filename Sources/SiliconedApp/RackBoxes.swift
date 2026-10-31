@@ -165,6 +165,32 @@ struct ModuleSlot: View {
     }
 }
 
+/// **How a module's weights are stored** (`WeightFormat`): « weights int8 », the name verbatim and the word said in the user's
+/// language, so that it is never taken for the label of the computation (« computes fp32 »). The hover says what it is in plain words.
+struct WeightsTag: View {
+    let format: WeightFormat?
+    /// What the module is, in the sentence of the hover: its stage.
+    var body: some View {
+        if let format {
+            Tag(text: Text("weights \(format.label)"), symbol: "shippingbox")
+                .help(Self.explanation(format))
+        }
+    }
+
+    static func explanation(_ f: WeightFormat) -> Text {
+        switch f {
+        case .int8: Text("The weights are stored in 8 bits (int8), as published: a quarter of fp32's size. The products are computed in fp32.")
+        case .q8_0: Text("The weights are stored in 8 bits in blocks of 32 (GGUF Q8_0), as published: a quarter of fp32's size. The products are computed in fp32.")
+        case .fp8: Text("The weights are stored in 8 bits (fp8), as published. The products are computed in fp32.")
+        case .q4_k_m, .q4_k, .q4_0, .q4_1: Text("The weights are stored in about 4 bits (GGUF \(f.label)), as published: an eighth of fp32's size. The products are computed in fp32.")
+        case .q5_k_m, .q5_k, .q5_0, .q5_1, .q6_k: Text("The weights are stored in 5 to 6 bits (GGUF \(f.label)), as published. The products are computed in fp32.")
+        case .bf16: Text("The weights are stored in bf16, as the publisher released them: half of fp32's size. The products are computed in fp32.")
+        case .fp16: Text("The weights are stored in fp16: half of fp32's size. The products are computed in fp32.")
+        case .fp32: Text("The weights are stored in fp32. The products are computed in fp32.")
+        }
+    }
+}
+
 /// A label: a small capsule, neutral — or with a dot of color (the latent's wire).
 struct Tag: View {
     let text: Text

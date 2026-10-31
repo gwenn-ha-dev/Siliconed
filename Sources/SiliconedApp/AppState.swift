@@ -127,9 +127,9 @@ final class AppState {
         didSet { UserDefaults.standard.set(neuralEngineChoices, forKey: Self.neuralEngineKey) }
     }
     /// This Mac's map turned the Neural Engine on: otherwise there is nothing to choose, the denoiser is fp32.
-    /// Not before the settings are read: `effective` read at launch would freeze the defaults, and the measure
-    /// the first render starts would apply only at the next launch (`EngineSettings.load` refuses it).
-    var neuralEngineOffered: Bool { settingsRead && EngineSettings.effective.plan.usesANE }
+    /// Not before the settings are read: `effective` read at launch would freeze the defaults and the first measure could no longer
+    /// designate its plan (`EngineSettings.load` refuses it). Follows a new measure (`settingsEpoch`).
+    var neuralEngineOffered: Bool { _ = settingsEpoch; return settingsRead && EngineSettings.effective.plan.usesANE }
     /// The key of a choice: the model and its installed version — another version starts from its own default.
     private func neuralEngineKey(_ card: ModelCard) -> String {
         card.isImported ? card.id : "\(card.id) \(library.variant(of: card.family).rawValue)"
@@ -546,7 +546,7 @@ final class AppState {
     /// **No render without one** (the user, 18/10/2026): the defaults are the M1 Pro's, and only a measure says what another
     /// Mac's engines are worth. So the first render measures first — when none is kept, or the one kept is of another schema or
     /// another `fingerprint` (another Mac, macOS build or app build) —, said in the sidebar, never in the background; the user can
-    /// also measure again (« Measure This Mac »), which then applies from the next launch.
+    /// also measure again (« Measure This Mac »), which then applies to the next render.
     private static let capacityMapKey = "capacityMap"
 
     /// The stored report; an older schema is not a map (`Report.read`).
@@ -561,7 +561,7 @@ final class AppState {
     }
 
     /// **Checks a finished render against the model it ran under**: its note is shown by the report and kept beside it.
-    /// Never changes the plan — the routes, the bits stay as they were — in this session or the next.
+    /// Never changes the plan itself: a new measure, taken by the user, does — from the next render.
     func checkMap(_ render: Engine.Render, model: Model, references: Int) {
         guard let map = mapInUse,
               let check = RenderLoop.check(render, variant: model.library?.variant(of: model.family) ?? .standard,
@@ -595,10 +595,12 @@ final class AppState {
 
     /// The map kept in the preferences, current or not.
     private(set) var storedMap: Diagnostic.Report?
-    /// The map this process's settings were read with — `nil`: not read yet, or read without one (a
-    /// refusal, `profileWarnings`). It never changes once set: the settings are read once per process,
-    /// and a render's bits must not move mid-session.
+    /// The map this process's plan comes from — `nil`: not read yet, or read without one (a refusal, `profileWarnings`).
+    /// It changes only between two renders (`EngineSettings.adopt`): a render reads one plan from start to end, and the
+    /// next one may differ from the last — another measure of the same Mac can give an image a little different from one seed.
     private(set) var mapInUse: Diagnostic.Report?
+    /// Counts the plan's replacements: what the needs, the offer of the Neural Engine and the catalog are recomputed from.
+    private(set) var settingsEpoch = 0
     /// **The engine's settings were read** (`EngineSettings.load`), the map with them: renders may run,
     /// and the memory needs be computed — they read the settings (`amx` adds the AMX's operands).
     var settingsRead = false
@@ -606,15 +608,31 @@ final class AppState {
     @ObservationIgnored private(set) var renderNote: RenderLoop.Note?
     private static let renderNoteKey = "capacityMapRenderNote"
 
-    /// Keeps `report` as the map of the next launches — and of this one, when nothing read the settings yet.
+    /// Keeps `report` as this Mac's map, and the engine's plan from the next render (at once when no render runs).
     func keep(_ report: Diagnostic.Report) {
         guard let data = try? report.json(pretty: false) else { return }
         UserDefaults.standard.set(data, forKey: Self.capacityMapKey)
         if report.date != renderNote?.map { renderNote = nil; UserDefaults.standard.removeObject(forKey: Self.renderNoteKey) }
         drift = nil
         storedMap = report
-        if !settingsRead { readSettings(map: report) }
+        if !settingsRead { readSettings(map: report) } else { EngineSettings.adopt(map: report); syncPlan() }
     }
+
+    /// **Before a job starts** (`next`): a measure that finished during a render becomes the plan now, so that the render that
+    /// follows reads it whole.
+    func applyPendingMap() {
+        guard settingsRead, currentJob == nil else { return }
+        if EngineSettings.applyPendingMap() { syncPlan() }
+    }
+
+    /// The map in use is the one the engine's plan comes from; what showed a need follows.
+    private func syncPlan() {
+        let date = EngineSettings.effective.mapRead
+        if let date, let stored = storedMap, stored.date == date, mapInUse?.date != date { mapInUse = stored }
+        if EngineSettings.generation != planGeneration { planGeneration = EngineSettings.generation; settingsEpoch += 1 }
+        profileWarnings = EngineSettings.effective.warnings.map(Library.withoutHome)
+    }
+    @ObservationIgnored private var planGeneration = 0
 
     /// **Reads the engine's settings**, once: the profile of THIS library and `map`.
     private func readSettings(map: Diagnostic.Report) {
@@ -622,6 +640,7 @@ final class AppState {
             try EngineSettings.load(from: library, map: map)
             profileWarnings = EngineSettings.effective.warnings.map(Library.withoutHome)
             mapInUse = map
+            planGeneration = EngineSettings.generation
         } catch {
             profileWarnings = [Library.withoutHome(error.localizedDescription)]
         }

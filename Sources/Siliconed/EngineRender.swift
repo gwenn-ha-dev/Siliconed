@@ -50,6 +50,9 @@ extension Engine {
     private func execute(_ request: Request, _ seeds: [UInt64], _ model: Model,
                           _ cancellation: Cancellation?,
                           _ onProgress: (@Sendable (Event) -> Void)?) throws -> [Render] {
+        // One render, one plan: a measure that ends meanwhile applies to the next one (`EngineSettings.adopt`).
+        EngineSettings.renderBegan()
+        defer { EngineSettings.renderEnded() }
         let chain = model.chain, cache = model.library?.renderCache
         let space = chain.denoising.space
         guard !seeds.isEmpty else { return [] }

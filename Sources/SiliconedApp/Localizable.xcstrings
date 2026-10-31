@@ -1163,6 +1163,46 @@
         }
       }
     },
+    "%@ of the sum of its engines alone" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ der Summe seiner Motoren allein"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ de la suma de sus motores por separado"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ de la somme de ses moteurs seuls"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ della somma dei suoi motori da soli"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "単独時の各エンジンの合計の%@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "其各引擎单独速度之和的%@"
+          }
+        }
+      }
+    },
     "%@ on disk" : {
       "localizations" : {
         "de" : {
@@ -4251,6 +4291,46 @@
         }
       }
     },
+    "8-bit weights" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "8-Bit-Gewichte"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "pesos de 8 bits"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "poids 8 bits"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "pesi a 8 bit"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "8ビットの重み"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "8 位权重"
+          }
+        }
+      }
+    },
     "8-bit weights published by Comfy-Org: the image model and the text encoder (int8 convrot). VAE and tokenizer as in the Standard version." : {
       "localizations" : {
         "de" : {
@@ -4847,6 +4927,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "语言模型读取提示词，并将其转换为 DiT 能够理解的内容"
+          }
+        }
+      }
+    },
+    "A measure applies to the next render, never to one under way. From then on, a seed can give an image a little different from before it." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eine Messung gilt für das nächste Rendern, nie für eines, das läuft. Von da an kann derselbe Seed ein etwas anderes Bild ergeben als vor der Messung."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Una medición se aplica al siguiente render, nunca a uno en curso. A partir de ahí, una misma semilla puede dar una imagen algo distinta de la de antes de la medición."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Une mesure s’applique au rendu suivant, jamais à un rendu en cours. À partir de là, une même graine peut donner une image un peu différente de celle d’avant la mesure."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Una misura si applica al render successivo, mai a uno in corso. Da lì in poi, uno stesso seed può dare un’immagine un po’ diversa da quella di prima della misura."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "測定は次のレンダリングから適用され、実行中のレンダリングには適用されません。それ以降は、同じシードでも測定前とは少し違う画像になることがあります。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一次测量会应用到下一次渲染，而不会影响正在进行的渲染。此后，同一个种子生成的图像可能与测量前略有不同。"
           }
         }
       }
@@ -12275,6 +12395,46 @@
         }
       }
     },
+    "Each keeps of its speed alone" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das behält jeder von seiner Geschwindigkeit allein"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lo que cada uno conserva de su velocidad a solas"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Part que chacun garde de sa vitesse seul"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quanto ciascuno conserva della sua velocità da solo"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "単独時の速度のうち各エンジンが保つ割合"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "各引擎在组合时保留的单独速度"
+          }
+        }
+      }
+    },
     "Each model at its own number of steps; the LoRAs are left out, each is made for one model" : {
       "localizations" : {
         "de" : {
@@ -12351,6 +12511,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "这 %lld 张图像各自单独处理，使用相同的指令"
+          }
+        }
+      }
+    },
+    "Each route alone, in trillions of operations a second (TFLOP/s). The bar is the share of the GPU's peak, which its cores and clock announce; only the GPU has one, and only its matrix products are compared to it. ✓: the result is within its threshold of the exact one." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Jede Route allein, in Billionen Operationen pro Sekunde (TFLOP/s). Der Balken ist der Anteil an der Spitzenleistung der GPU, die ihre Kerne und ihr Takt angeben; nur die GPU hat eine, und nur ihre Matrixprodukte werden damit verglichen. ✓: Das Ergebnis liegt innerhalb seiner Schwelle um das exakte."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cada ruta a solas, en billones de operaciones por segundo (TFLOP/s). La barra es la parte del pico de la GPU, que anuncian sus núcleos y su reloj; solo la GPU tiene uno, y solo sus productos matriciales se comparan con él. ✓: el resultado está dentro de su umbral del resultado exacto."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chaque route seule, en milliers de milliards d’opérations par seconde (TFLOP/s). La barre est la part du pic du GPU, que ses cœurs et son horloge annoncent ; seul le GPU en a un, et seuls ses produits matriciels s’y comparent. ✓ : le résultat est à moins de son seuil du résultat exact."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ogni percorso da solo, in migliaia di miliardi di operazioni al secondo (TFLOP/s). La barra è la quota del picco della GPU, che i suoi core e il suo clock annunciano; solo la GPU ne ha uno, e solo i suoi prodotti matriciali vi si confrontano. ✓: il risultato è entro la sua soglia dal risultato esatto."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "各経路を単独で動かしたときの、1秒あたり1兆回の演算数(TFLOP/s)。バーはGPUのピーク性能(コア数とクロックから求めた値)に対する割合です。ピークがあるのはGPUだけで、比べるのも行列積だけです。✓は、結果が正確な結果から許容範囲内にあることを示します。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "每条路径单独运行的速度，单位为每秒万亿次运算（TFLOP/s）。条形表示占 GPU 峰值（由其核心数和时钟频率得出）的比例；只有 GPU 有峰值，也只有它的矩阵乘积与之比较。✓：结果与精确结果的差距在其阈值之内。"
           }
         }
       }
@@ -12915,6 +13115,46 @@
         }
       }
     },
+    "Engines" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Motoren"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Motores"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Moteurs"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Motori"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "エンジン"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "引擎"
+          }
+        }
+      }
+    },
     "Enlarge with macOS's super-resolution?" : {
       "localizations" : {
         "de" : {
@@ -13277,6 +13517,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "所有图像均已存储。你可以按 ⌘Z 撤销。"
+          }
+        }
+      }
+    },
+    "Exact" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Exakt"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Exacto"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Exact"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esatto"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正確さ"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "精确"
           }
         }
       }
@@ -18218,6 +18498,46 @@
         }
       }
     },
+    "Matrix products on the 8-bit weights, Neural Engine" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Matrixprodukte auf den 8-Bit-Gewichten, Neural Engine"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Productos matriciales sobre los pesos de 8 bits, Neural Engine"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Produits matriciels sur les poids 8 bits, Neural Engine"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prodotti matriciali sui pesi a 8 bit, Neural Engine"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "8ビットの重みでの行列積(Neural Engine)"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "8 位权重上的矩阵乘积（Neural Engine）"
+          }
+        }
+      }
+    },
     "Matrix products on the 8-bit weights, read as published" : {
       "localizations" : {
         "de" : {
@@ -18414,6 +18734,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "矩阵乘积，使用 bf16 权重的 GPU 张量单元"
+          }
+        }
+      }
+    },
+    "Matrix products, GPU tensor units, bf16 weights and activations" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Matrixprodukte, Tensoreinheiten der GPU, bf16-Gewichte und -Aktivierungen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Productos matriciales, unidades tensoriales de la GPU, pesos y activaciones en bf16"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Produits matriciels, unités tensorielles du GPU, poids et activations en bf16"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prodotti matriciali, unità tensoriali della GPU, pesi e attivazioni in bf16"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "行列積(GPUのテンソルユニット、bf16の重みとアクティベーション)"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "矩阵乘积（GPU 张量单元，bf16 权重与激活）"
           }
         }
       }
@@ -26232,6 +26592,46 @@
         }
       }
     },
+    "Share of the GPU's peak (%@)" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Anteil an der GPU-Spitzenleistung (%@)"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Parte del pico de la GPU (%@)"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Part du pic du GPU (%@)"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quota del picco della GPU (%@)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GPUのピークに対する割合(%@)"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "占 GPU 峰值的比例（%@）"
+          }
+        }
+      }
+    },
     "Share the selected images" : {
       "localizations" : {
         "de" : {
@@ -27576,6 +27976,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "求解器：%@"
+          }
+        }
+      }
+    },
+    "Speed" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Geschwindigkeit"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Velocidad"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vitesse"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Velocità"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "速度"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "速度"
           }
         }
       }
@@ -30239,6 +30679,46 @@
         }
       }
     },
+    "The engines together" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Motoren zusammen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Los motores juntos"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les moteurs ensemble"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I motori insieme"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "エンジンを組み合わせたとき"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "引擎组合"
+          }
+        }
+      }
+    },
     "The enlargement model could not be downloaded" : {
       "localizations" : {
         "de" : {
@@ -31199,48 +31679,48 @@
         }
       }
     },
-    "The last render took %@ where this Mac's measure predicted %@. If the Mac has changed (heat, other programs), measure it again: the new measure applies from the next launch." : {
+    "The last render took %@ where this Mac's measure predicted %@. If the Mac has changed (heat, other programs), measure it again: the new measure applies to the next render." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Das letzte Rendern dauerte %@, wo die Messung dieses Macs %@ vorhergesagt hatte. Hat sich der Mac verändert (Hitze, andere Programme), messen Sie ihn erneut: Die neue Messung gilt ab dem nächsten Start."
+            "value" : "Das letzte Rendern dauerte %@, wo die Messung dieses Macs %@ vorhergesagt hatte. Hat sich der Mac verändert (Hitze, andere Programme), messen Sie ihn erneut: Die neue Messung gilt für das nächste Rendern."
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "new",
-            "value" : "The last render took %1$@ where this Mac's measure predicted %2$@. If the Mac has changed (heat, other programs), measure it again: the new measure applies from the next launch."
+            "value" : "The last render took %1$@ where this Mac's measure predicted %2$@. If the Mac has changed (heat, other programs), measure it again: the new measure applies to the next render."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "El último render tardó %@ donde la medición de este Mac preveía %@. Si el Mac ha cambiado (calor, otros programas), vuelve a medirlo: la nueva medición se aplica desde el próximo inicio."
+            "value" : "El último render tardó %@ donde la medición de este Mac preveía %@. Si el Mac ha cambiado (calor, otros programas), vuelve a medirlo: la nueva medición se aplica al siguiente render."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Le dernier rendu a pris %@ là où la mesure de ce Mac en prévoyait %@. Si le Mac a changé (chaleur, autres programmes), mesurez-le de nouveau : la nouvelle mesure s’applique au lancement suivant."
+            "value" : "Le dernier rendu a pris %@ là où la mesure de ce Mac en prévoyait %@. Si le Mac a changé (chaleur, autres programmes), mesurez-le de nouveau : la nouvelle mesure s’applique au rendu suivant."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "L’ultimo render ha richiesto %@ dove la misura di questo Mac ne prevedeva %@. Se il Mac è cambiato (calore, altri programmi), misuralo di nuovo: la nuova misura si applica dal prossimo avvio."
+            "value" : "L’ultimo render ha richiesto %@ dove la misura di questo Mac ne prevedeva %@. Se il Mac è cambiato (calore, altri programmi), misuralo di nuovo: la nuova misura si applica al render successivo."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "直近のレンダリングは%@かかりましたが、このMacの測定では%@と予測されていました。Macの状態が変わった場合（発熱、ほかのプログラムなど）は、もう一度測定してください。新しい測定は次回の起動から適用されます。"
+            "value" : "直前のレンダリングは%@かかりました。この Mac の測定では%@と予測されていました。Mac の状態が変わった場合(発熱、ほかのプログラム)は、もう一度測定してください。新しい測定は次のレンダリングから適用されます。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "上一次渲染用了 %@，而这台 Mac 的测量结果预计为 %@。如果 Mac 的状态变了（发热、其他程序），请重新测量：新的测量结果将从下次启动起生效。"
+            "value" : "上一次渲染用时 %@，而这台 Mac 的测量预测为 %@。如果 Mac 的状态变了（发热、其他程序），请重新测量：新的测量会应用到下一次渲染。"
           }
         }
       }
@@ -32245,6 +32725,46 @@
         }
       }
     },
+    "The products of the DiT are computed in fp32, the image verified against the reference." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Produkte des DiT werden in fp32 berechnet, das Bild gegen die Referenz geprüft."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Los productos del DiT se calculan en fp32, con la imagen verificada contra la referencia."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les produits du DiT sont calculés en fp32, l’image vérifiée contre la référence."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I prodotti del DiT sono calcolati in fp32, con l’immagine verificata rispetto al riferimento."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "DiTの積はfp32で計算され、画像は基準と照合されます。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "DiT 的乘积以 fp32 计算，图像对照参考结果验证。"
+          }
+        }
+      }
+    },
     "The prompt closes a group of alternatives that was never opened (character %@)." : {
       "localizations" : {
         "de" : {
@@ -32885,6 +33405,46 @@
         }
       }
     },
+    "The set reaches" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das Ganze erreicht"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El conjunto alcanza"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’ensemble atteint"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’insieme raggiunge"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "組み合わせの速度"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "组合达到"
+          }
+        }
+      }
+    },
     "The setting and its light — not its people." : {
       "localizations" : {
         "de" : {
@@ -33401,6 +33961,326 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "两张图像尺寸不同：只能并排显示"
+          }
+        }
+      }
+    },
+    "The weights are stored in 5 to 6 bits (GGUF %@), as published. The products are computed in fp32." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Gewichte sind mit 5 bis 6 Bit gespeichert (GGUF %@), wie veröffentlicht. Die Produkte werden in fp32 berechnet."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Los pesos se almacenan en 5 a 6 bits (GGUF %@), tal como se publicaron. Los productos se calculan en fp32."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les poids sont stockés sur 5 à 6 bits (GGUF %@), tels que publiés. Les produits sont calculés en fp32."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I pesi sono memorizzati a 5–6 bit (GGUF %@), come pubblicati. I prodotti sono calcolati in fp32."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重みは公開されたままの5〜6ビット(GGUF %@)で保存されています。積はfp32で計算されます。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "权重按发布时的 5 至 6 位（GGUF %@）存储。乘积以 fp32 计算。"
+          }
+        }
+      }
+    },
+    "The weights are stored in 8 bits (fp8), as published. The products are computed in fp32." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Gewichte sind mit 8 Bit gespeichert (fp8), wie veröffentlicht. Die Produkte werden in fp32 berechnet."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Los pesos se almacenan en 8 bits (fp8), tal como se publicaron. Los productos se calculan en fp32."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les poids sont stockés sur 8 bits (fp8), tels que publiés. Les produits sont calculés en fp32."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I pesi sono memorizzati a 8 bit (fp8), come pubblicati. I prodotti sono calcolati in fp32."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重みは公開されたままの8ビット(fp8)で保存されています。積はfp32で計算されます。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "权重按发布时的 8 位（fp8）存储。乘积以 fp32 计算。"
+          }
+        }
+      }
+    },
+    "The weights are stored in 8 bits (int8), as published: a quarter of fp32's size. The products are computed in fp32." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Gewichte sind mit 8 Bit gespeichert (int8), wie veröffentlicht: ein Viertel der Größe von fp32. Die Produkte werden in fp32 berechnet."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Los pesos se almacenan en 8 bits (int8), tal como se publicaron: la cuarta parte del tamaño de fp32. Los productos se calculan en fp32."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les poids sont stockés sur 8 bits (int8), tels que publiés : le quart de la taille du fp32. Les produits sont calculés en fp32."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I pesi sono memorizzati a 8 bit (int8), come pubblicati: un quarto della dimensione di fp32. I prodotti sono calcolati in fp32."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重みは公開されたままの8ビット(int8)で保存され、サイズはfp32の4分の1です。積はfp32で計算されます。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "权重按发布时的 8 位（int8）存储，大小为 fp32 的四分之一。乘积以 fp32 计算。"
+          }
+        }
+      }
+    },
+    "The weights are stored in 8 bits in blocks of 32 (GGUF Q8_0), as published: a quarter of fp32's size. The products are computed in fp32." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Gewichte sind mit 8 Bit in Blöcken von 32 gespeichert (GGUF Q8_0), wie veröffentlicht: ein Viertel der Größe von fp32. Die Produkte werden in fp32 berechnet."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Los pesos se almacenan en 8 bits en bloques de 32 (GGUF Q8_0), tal como se publicaron: la cuarta parte del tamaño de fp32. Los productos se calculan en fp32."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les poids sont stockés sur 8 bits par blocs de 32 (GGUF Q8_0), tels que publiés : le quart de la taille du fp32. Les produits sont calculés en fp32."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I pesi sono memorizzati a 8 bit in blocchi da 32 (GGUF Q8_0), come pubblicati: un quarto della dimensione di fp32. I prodotti sono calcolati in fp32."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重みは公開されたままの32個ずつのブロックの8ビット(GGUF Q8_0)で保存され、サイズはfp32の4分の1です。積はfp32で計算されます。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "权重按发布时的 8 位、每 32 个一块（GGUF Q8_0）存储，大小为 fp32 的四分之一。乘积以 fp32 计算。"
+          }
+        }
+      }
+    },
+    "The weights are stored in about 4 bits (GGUF %@), as published: an eighth of fp32's size. The products are computed in fp32." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Gewichte sind mit etwa 4 Bit gespeichert (GGUF %@), wie veröffentlicht: ein Achtel der Größe von fp32. Die Produkte werden in fp32 berechnet."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Los pesos se almacenan en unos 4 bits (GGUF %@), tal como se publicaron: la octava parte del tamaño de fp32. Los productos se calculan en fp32."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les poids sont stockés sur environ 4 bits (GGUF %@), tels que publiés : le huitième de la taille du fp32. Les produits sont calculés en fp32."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I pesi sono memorizzati a circa 4 bit (GGUF %@), come pubblicati: un ottavo della dimensione di fp32. I prodotti sono calcolati in fp32."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重みは公開されたままのおよそ4ビット(GGUF %@)で保存され、サイズはfp32の8分の1です。積はfp32で計算されます。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "权重按发布时的约 4 位（GGUF %@）存储，大小为 fp32 的八分之一。乘积以 fp32 计算。"
+          }
+        }
+      }
+    },
+    "The weights are stored in bf16, as the publisher released them: half of fp32's size. The products are computed in fp32." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Gewichte sind in bf16 gespeichert, wie der Herausgeber sie veröffentlicht hat: die Hälfte der Größe von fp32. Die Produkte werden in fp32 berechnet."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Los pesos se almacenan en bf16, tal como los publicó el editor: la mitad del tamaño de fp32. Los productos se calculan en fp32."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les poids sont stockés en bf16, tels que l’éditeur les a publiés : la moitié de la taille du fp32. Les produits sont calculés en fp32."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I pesi sono memorizzati in bf16, come li ha pubblicati l’editore: metà della dimensione di fp32. I prodotti sono calcolati in fp32."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重みは発行元が公開したままのbf16で保存され、サイズはfp32の半分です。積はfp32で計算されます。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "权重按发布者发布时的 bf16 存储，大小为 fp32 的一半。乘积以 fp32 计算。"
+          }
+        }
+      }
+    },
+    "The weights are stored in fp16: half of fp32's size. The products are computed in fp32." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Gewichte sind in fp16 gespeichert: die Hälfte der Größe von fp32. Die Produkte werden in fp32 berechnet."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Los pesos se almacenan en fp16: la mitad del tamaño de fp32. Los productos se calculan en fp32."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les poids sont stockés en fp16 : la moitié de la taille du fp32. Les produits sont calculés en fp32."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I pesi sono memorizzati in fp16: metà della dimensione di fp32. I prodotti sono calcolati in fp32."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重みはfp16で保存され、サイズはfp32の半分です。積はfp32で計算されます。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "权重以 fp16 存储，大小为 fp32 的一半。乘积以 fp32 计算。"
+          }
+        }
+      }
+    },
+    "The weights are stored in fp32. The products are computed in fp32." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Gewichte sind in fp32 gespeichert. Die Produkte werden in fp32 berechnet."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Los pesos se almacenan en fp32. Los productos se calculan en fp32."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les poids sont stockés en fp32. Les produits sont calculés en fp32."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I pesi sono memorizzati in fp32. I prodotti sono calcolati in fp32."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重みはfp32で保存されています。積はfp32で計算されます。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "权重以 fp32 存储。乘积以 fp32 计算。"
           }
         }
       }
@@ -35293,42 +36173,42 @@
         }
       }
     },
-    "This session plans with the measure of %@; the newer one applies from the next launch." : {
+    "This session plans with the measure of %@; the newer one applies to the next render." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Diese Sitzung plant mit der Messung vom %@; die neuere gilt ab dem nächsten Start."
+            "value" : "Diese Sitzung plant mit der Messung vom %@; die neuere gilt für das nächste Rendern."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Esta sesión planifica con la medición del %@; la más reciente se aplica desde el próximo inicio."
+            "value" : "Esta sesión planifica con la medición del %@; la más reciente se aplica al siguiente render."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Cette session planifie avec la mesure du %@ ; la plus récente s’applique au prochain lancement."
+            "value" : "Cette session planifie avec la mesure du %@ ; la plus récente s’applique au rendu suivant."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Questa sessione pianifica con la misura del %@; la più recente si applica dal prossimo avvio."
+            "value" : "Questa sessione pianifica con la misura del %@; la più recente si applica al render successivo."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "このセッションは%@の測定で計画しています。新しい測定は次回の起動から適用されます。"
+            "value" : "このセッションは%@の測定で計画しています。新しい測定は次のレンダリングから適用されます。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "本次会话按 %@ 的测量结果进行规划；较新的结果将从下次启动起生效。"
+            "value" : "本次会话按 %@ 的测量进行规划；更新的测量会应用到下一次渲染。"
           }
         }
       }
@@ -36025,42 +36905,42 @@
         }
       }
     },
-    "Under a minute; done before the first render and after each update. A new measure applies from the next launch." : {
+    "Under a minute; done before the first render and after each update. A new measure applies to the next render." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Weniger als eine Minute; vor dem ersten Rendering und nach jedem Update. Eine neue Messung gilt ab dem nächsten Start."
+            "value" : "Weniger als eine Minute; vor dem ersten Rendern und nach jedem Update. Eine neue Messung gilt für das nächste Rendern."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Menos de un minuto; se hace antes del primer render y tras cada actualización. Una nueva medición se aplica en el próximo arranque."
+            "value" : "Menos de un minuto; se hace antes del primer render y tras cada actualización. Una nueva medición se aplica al siguiente render."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Moins d’une minute ; faite avant le premier rendu et après chaque mise à jour. Une nouvelle mesure s’applique au prochain lancement."
+            "value" : "Moins d’une minute ; faite avant le premier rendu et après chaque mise à jour. Une nouvelle mesure s’applique au rendu suivant."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Meno di un minuto; eseguita prima del primo rendering e dopo ogni aggiornamento. Una nuova misura vale dal prossimo avvio."
+            "value" : "Meno di un minuto; fatta prima del primo render e dopo ogni aggiornamento. Una nuova misura si applica al render successivo."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "1分未満。最初の生成の前と各アップデートの後に行われます。新しい測定は次回の起動から適用されます。"
+            "value" : "1分足らずで、最初のレンダリングの前とアップデートのたびに行われます。新しい測定は次のレンダリングから適用されます。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "不到一分钟；在首次生成之前以及每次更新之后进行。新的测量结果将在下次启动时生效。"
+            "value" : "不到一分钟；在首次渲染之前以及每次更新之后进行。新的测量会应用到下一次渲染。"
           }
         }
       }
@@ -37273,6 +38153,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "从一列（X）或一行（Y）到下一列或下一行有何变化"
+          }
+        }
+      }
+    },
+    "When engines share a product, each keeps only part of the speed it has alone: they compete for memory and for power. Then the set reaches less than the sum of its engines alone, and more than its best one." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Teilen sich Motoren ein Produkt, behält jeder nur einen Teil der Geschwindigkeit, die er allein hat: Sie konkurrieren um Speicher und Energie. Das Ganze erreicht dann weniger als die Summe seiner Motoren allein und mehr als der beste von ihnen."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cuando varios motores comparten un producto, cada uno conserva solo una parte de la velocidad que tiene a solas: compiten por la memoria y la energía. El conjunto alcanza entonces menos que la suma de sus motores a solas, y más que el mejor de ellos."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quand des moteurs se partagent un produit, chacun ne garde qu’une part de la vitesse qu’il a seul : ils se disputent la mémoire et l’énergie. L’ensemble atteint alors moins que la somme de ses moteurs seuls, et plus que le meilleur d’entre eux."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quando più motori si dividono un prodotto, ciascuno conserva solo una parte della velocità che ha da solo: si contendono memoria ed energia. L’insieme raggiunge allora meno della somma dei suoi motori da soli, e più del migliore di essi."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "複数のエンジンが1つの積を分担すると、メモリと電力を取り合うため、各エンジンが保つ速度は単独時の一部だけになります。そのため組み合わせの速度は、単独時の合計より低く、最も速い1つよりは高くなります。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当多个引擎分担同一个乘积时，各自只保留单独运行速度的一部分：它们争用内存和电力。组合因此低于各引擎单独速度之和，又高于其中最快的一个。"
           }
         }
       }
@@ -38559,6 +39479,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "计算"
+          }
+        }
+      }
+    },
+    "computes %@" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "rechnet in %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "calcula en %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "calcule en %@"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "calcola in %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "計算:%@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "计算：%@"
           }
         }
       }
@@ -43585,6 +44545,46 @@
         }
       }
     },
+    "weights %@" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gewichte %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "pesos %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "poids %@"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "pesi %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重み:%@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "权重：%@"
+          }
+        }
+      }
+    },
     "width x height, e.g. 832x1216" : {
       "localizations" : {
         "de" : {
@@ -43621,6 +44621,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "宽 x 高，例如 832x1216"
+          }
+        }
+      }
+    },
+    "± is how far apart identical calls were during the measure, for each engine and each set: the margin of its figures." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "± sagt, wie weit identische Aufrufe während der Messung auseinanderlagen, für jeden Motor und jedes Ensemble: die Spanne seiner Zahlen."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "± indica cuánto se separaron las llamadas idénticas durante la medición, para cada motor y cada conjunto: el margen de sus cifras."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le ± dit de combien des appels identiques ont différé pendant la mesure, pour chaque moteur et chaque ensemble : la marge de ses chiffres."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "± dice di quanto si sono discostate le chiamate identiche durante la misura, per ogni motore e ogni insieme: il margine delle sue cifre."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "±は、測定中に同一の呼び出しがどれだけ離れていたかを、エンジンごと・組み合わせごとに示します。数値の幅です。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "± 表示测量期间相同调用之间相差多少，按每个引擎和每种组合给出：其数字的误差范围。"
           }
         }
       }

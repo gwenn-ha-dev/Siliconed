@@ -66,17 +66,20 @@ struct DiTBox: View {
     }
 
     @ViewBuilder private var technical: some View {
+        // What is stored, then what computes: two labels, two words, so that « int8 » and « fp32 » are never one thing.
+        WeightsTag(format: app.weightFormats?.dit)
         if app.neuralEngineOffered {
             // The model's choice, per installed version: a click switches it for the next renders.
             let on = app.neuralEngine(for: app.identifier)
             Button { app.setNeuralEngine(!on, for: app.identifier) } label: {
-                Tag(text: Text(verbatim: on ? "fp32 · ANE" : "fp32"), symbol: on ? "leaf" : nil)
+                Tag(text: Text("computes \(on ? "fp32 · ANE" : "fp32")"), symbol: on ? "leaf" : nil)
             }
             .buttonStyle(.plain)
             .help(on ? String(localized: "Part of the DiT runs in fp16 on the Neural Engine: less energy (about a fifth on an M1 Pro), an image a little different from fp32's. Click for fp32 throughout.")
                      : String(localized: "The DiT in fp32 throughout, the image verified against the reference. Click to run part of it in fp16 on the Neural Engine: less energy (about a fifth on an M1 Pro), an image a little different."))
         } else {
-            Tag(text: Text(verbatim: "fp32"))
+            Tag(text: Text("computes \("fp32")"))
+                .help("The products of the DiT are computed in fp32, the image verified against the reference.")
         }
         if let space = app.chain?.denoising.space {
             Tag(text: Text("latent · \(space.channels) ch"), dot: WireKind.latent.color)

@@ -530,7 +530,7 @@ final class MirrorServer {
                                           acceptsDetail: d.acceptsDetail,
                                           steps: (1...50).filter { (try? d.check(steps: $0, startImage: false)) != nil },
                                           text: m.chain.text.name, encoding: m.chain.encoding?.name,
-                                          decoding: m.chain.decoding.name)
+                                          decoding: m.chain.decoding.name, weights: m.formats)
             }
             if app.settingsRead, let card = app.cards.first(where: { $0.id == id }) {   // see `answer`
                 for f in card.formats {
@@ -666,7 +666,7 @@ final class MirrorServer {
 
     private func watchCatalog() {
         withObservationTracking {
-            _ = app.readySet; _ = app.cards; _ = app.settingsRead; _ = app.fasterRendering
+            _ = app.readySet; _ = app.cards; _ = app.settingsRead; _ = app.settingsEpoch; _ = app.fasterRendering
         } onChange: { [weak self] in
             DispatchQueue.main.async { MainActor.assumeIsolated { self?.fireCatalog() } }
         }

@@ -243,6 +243,7 @@ extension AppState {
             return
         }
         guard enlarging == nil, drawingSheets.isEmpty else { return }
+        applyPendingMap()
         guard settingsRead else {
             if case .ready = diagnostic { measure() }
             return

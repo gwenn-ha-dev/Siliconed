@@ -15,7 +15,7 @@ import Foundation
 ///                  verdict:  held  ·  drift  ·  unjudged                              (`RenderLoopVerdict.swift`)
 ///
 /// **The loop reports, it never steers**: the gap goes into the render's record (the note, the journal), and the plan stays what the
-/// model made it — two renders of one seed on one Mac are one image, whatever the first one measured. A model that is out of date is a
+/// model made it — two renders of one seed under one measure are one image, whatever the first one measured. A model that is out of date is a
 /// measure to take again (« Measure This Mac »), not a factor to apply between two renders.
 ///
 /// What sets it apart — what a comparison written by analogy with "sum the census, divide by the model" would get wrong:

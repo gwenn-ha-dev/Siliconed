@@ -27,6 +27,12 @@
   et le Neural Engine ensemble aussi bien qu'une mesure lancée depuis le Terminal.
 - **Moins d'une minute** sur le Mac le plus lent, sans aucun modèle.
 
+### Mesurer ce Mac se lit simplement ; une mesure s’applique au rendu suivant
+
+- **La feuille titre chaque colonne** : la vitesse de chaque route, sa part du pic du GPU (les produits matriciels du GPU seulement, le pic dans le titre), « Exact » (✓), puis ce que chaque moteur garde de sa vitesse quand les moteurs travaillent ensemble. La route 8 bits du Neural Engine est listée avec les autres.
+- **Une mesure s’applique au rendu suivant**, plus au lancement suivant : jamais à un rendu en cours, si bien qu’un rendu lit toujours un seul plan, du début à la fin. À partir de là, une même graine peut donner une image un peu différente de celle d’avant la mesure.
+- **Le rack dit comment les poids sont stockés** : une étiquette sur le DiT, l’encodeur de texte et le VAE (`int8`, `Q8_0`, `Q4_K_M`, `bf16`…), lue sur ce qui est installé, à côté de celle qui dit ce qui calcule (« calcule en fp32 »). Un Mac prêté les publie aussi.
+
 ### Aussi
 
 - **Le Mac sur lequel on calcule, à côté de Chaîne** : son icône, comme dans « À propos de ce Mac »,

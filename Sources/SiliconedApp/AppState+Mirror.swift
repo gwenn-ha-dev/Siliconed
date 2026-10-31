@@ -249,6 +249,11 @@ extension AppState {
         return (chain?.text.name, chain?.encoding?.name, chain?.decoding.name)
     }
 
+    /// How the weights of the model on the rack are stored: read from its installed maps here, published by the lender in a mirror.
+    var weightFormats: WeightFormats? {
+        mirror != nil ? traits?.weights : model(identifier)?.formats
+    }
+
     func readMirroredCatalog() {
         guard let c = mirrorCatalog else { compatibleLoras = []; missing = nil; return }
         compatibleLoras = (c.loras[identifier] ?? []).compactMap { l in

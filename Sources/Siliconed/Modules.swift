@@ -196,6 +196,8 @@ package struct Model: Sendable {
     /// The library it was built from — where its renders keep what they do not redo
     /// (`Library.cacheFolder`). `nil` for a hand-composed chain: nothing is cached.
     package let library: Library?
+    /// **How the installed weights are stored** (`WeightFormats`), read once with the model; empty for a hand-composed chain.
+    package var formats = WeightFormats()
 
     /// A hand-composed chain, under the sheet of the model whose denoiser it holds.
     package init(card: ModelCard, chain: Chain) { self.card = card; self.chain = chain; self.library = nil }
@@ -242,6 +244,12 @@ package struct Model: Sendable {
 
     /// `named`, with the internal failure that says which file is missing.
     package static func make(_ identifier: String, in b: Library) throws -> Model {
+        var model = try construct(identifier, in: b)
+        model.formats = WeightFormats.read(card: model.card, in: b)
+        return model
+    }
+
+    private static func construct(_ identifier: String, in b: Library) throws -> Model {
         switch identifier {
         case "z-image": return try zImage(in: b, card: .zImage, dit: b.ditMap(.zImage))
         case "anima": return try anima(in: b, card: .anima, dit: b.ditMap(.anima))

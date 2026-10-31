@@ -160,7 +160,7 @@ struct SettingsView: View {
                         shown.openDiagnostic()
                     }
                 } label: {
-                    titled("This Mac", "Under a minute; done before the first render and after each update. A new measure applies from the next launch.")
+                    titled("This Mac", "Under a minute; done before the first render and after each update. A new measure applies to the next render.")
                 }
                 if let name = shown.mirror?.macName {
                     Text("This measures “\(name)”, the Mac that computes for you.").font(.caption)

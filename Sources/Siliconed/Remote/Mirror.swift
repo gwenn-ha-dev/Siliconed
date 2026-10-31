@@ -214,8 +214,11 @@ package struct RemoteTraits: Codable, Equatable, Sendable {
     package var steps: [Int]
     /// The rack's module names.
     package var text: String?, encoding: String?, decoding: String?
+    /// How this model's weights are stored on the lending Mac (`WeightFormats`): the rack's labels. Absent from an older lender.
+    package var weights: WeightFormats?
     package init(maxReferences: Int, readsImages: Bool, acceptsDetail: Bool, steps: [Int],
-                 text: String?, encoding: String?, decoding: String?) {
+                 text: String?, encoding: String?, decoding: String?, weights: WeightFormats? = nil) {
+        self.weights = weights
         self.maxReferences = maxReferences; self.readsImages = readsImages; self.acceptsDetail = acceptsDetail
         self.steps = steps; self.text = text; self.encoding = encoding; self.decoding = decoding
     }

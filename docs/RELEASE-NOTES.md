@@ -27,6 +27,12 @@ English · [Français](RELEASE-NOTES.fr.md)
   as one launched from the Terminal.
 - **Under a minute** on the slowest Mac, without any model.
 
+### Measure This Mac reads plainly; a measure applies to the next render
+
+- **The sheet titles every column**: each route's speed, its share of the GPU's peak (the GPU's matrix products only, with the peak in the title), « Exact » (✓), then what each engine keeps of its speed when the engines work together. The Neural Engine's 8-bit route is listed with the others.
+- **A measure applies to the next render**, no longer to the next launch: never to a render under way, so that a render still reads one plan from start to end. From then on, one seed can give an image a little different from before the measure.
+- **The rack says how the weights are stored**: a label on the DiT, the text encoder and the VAE (`int8`, `Q8_0`, `Q4_K_M`, `bf16`…), read from what is installed, beside the label that says what computes (« computes fp32 »). A borrowed Mac publishes them too.
+
 ### Also
 
 - **The Mac you compute on, beside Chain**: its own icon, as in About This Mac, greyed until it is

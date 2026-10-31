@@ -58,7 +58,8 @@ import Metal
 /// **The engine reads it in the app, and only there**: the app measures before its first render when it holds no current report
 /// — none yet, one of another `Fingerprint` (hardware, chip, macOS build, the app's build: an update measures again) — and whenever
 /// the user asks (« Measure This Mac »). It keeps the report in its preferences and hands it to
-/// `EngineSettings.load(from:map:)`, which designates the plan of its model. The command line, the checks and the close-out
+/// `EngineSettings.load(from:map:)`, which designates the plan of its model — a later measure replaces it between two renders
+/// (`EngineSettings.adopt(map:)`), never during one. The command line, the checks and the close-out
 /// never designate one unless a developer names it (`SILICONED_MAP`): today's defaults.
 package enum Diagnostic {
     /// The JSON's version: the script that aggregates the reports reads it. **16** (31/10/2026): no verdict — `findings`, each with its

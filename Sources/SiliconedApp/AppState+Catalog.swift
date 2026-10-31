@@ -59,6 +59,7 @@ extension AppState {
     /// **The memory this render needs**: its floor computed from the request's shapes, with what the
     /// app already holds (`ModelCard.memoryNeed`) — what the engine's preflight compares to B. `nil` when it cannot be computed.
     var memoryNeed: Int? {
+        _ = settingsEpoch
         guard settingsRead else { return nil }
         let f = outputFormat
         return need(f, images: references.count + subjectImageCount)
@@ -129,6 +130,7 @@ extension AppState {
     /// **The smallest Mac that renders `format` with `images` references**, in GB — `nil` when this
     /// one does. The engine's own check (`ModelCard.checkMemory`), against B.
     func macNeeded(_ format: RecommendedFormat, images: Int) -> Int? {
+        _ = settingsEpoch
         guard settingsRead, let card else { return nil }
         do { try checkNeed(format, images: images) }
         catch {
@@ -154,6 +156,7 @@ extension AppState {
     }
 
     var memoryRefusal: MemoryRefusal? {
+        _ = settingsEpoch
         guard settingsRead, let card else { return nil }
         let f = outputFormat
         let images = references.count + subjectImageCount

@@ -65,7 +65,7 @@ package struct EngineSettings: Sendable {
     /// **The plan the process runs under** (`CapacityPlan`): what the engine asks, product by product and attention by attention —
     /// exact rows per engine and the kernel of each attention. The engine's defaults without a model; an app designates the model of
     /// its Mac (`designate(plan:)`) before anything reads the settings, and a check designates its strictest case the same way.
-    package private(set) var plan = CapacityPlan.defaults
+    package fileprivate(set) var plan = CapacityPlan.defaults
 
     /// The half-size start, **when forced** (`SILICONED_SPECTRAL`): `k` half-size evaluations of
     /// Z-Image, Qwen-Image-2.1, Anima or Krea 2, 0 = full schedule, within each plan's rules (`Spectral.forced`).
@@ -133,11 +133,15 @@ package struct EngineSettings: Sendable {
     /// What the profile says about the machine that measured it, if it mentions it.
     package private(set) var machineProfile: String? = nil
     /// The date of the report whose model is the plan, if one was designated and is this Mac's, this build's (`load(from:map:)`).
-    package private(set) var mapRead: String? = nil
+    package fileprivate(set) var mapRead: String? = nil
+    /// A check designated its plan, or the environment forced one: a measure does not replace it.
+    fileprivate var planFixed = false
+    /// For the tests: a plan a check designated is not replaced by a measure.
+    mutating func planFixedForTesting() { planFixed = true }
     /// **What the reading refused** — a profile from another machine, a setting a profile is not
     /// allowed to write. The library writes nothing to standard error: the caller displays them
     /// (the CLI at startup, an app wherever it likes).
-    package private(set) var warnings: [String] = []
+    package fileprivate(set) var warnings: [String] = []
 
     // ── the machine ─────────────────────────────────────────────────────────────────────────
 
@@ -186,29 +190,56 @@ package struct EngineSettings: Sendable {
 
     // ── reading ─────────────────────────────────────────────────────────────────────────
 
-    /// The process's active settings, read once, on first access. The whole engine goes through here.
+    /// The process's active settings, read on first access. The whole engine goes through here. **Only the plan can change afterwards**
+    /// (`adopt(map:)`, between two renders, never during one); the profile and the environment are read once.
     package static var effective: EngineSettings {
         #if DEBUG
         if readsForbidden { forbiddenReads.add(1, ordering: .relaxed) }
         #endif
-        return read
+        return live.current
     }
-    private static let read = EngineSettings()
+    private static let live = SettingsStore(EngineSettings())
+
+    /// **A finished measure applies to the next render** (`AppState.keep`): the report's plan replaces the process's, now when no render
+    /// runs, else at `applyPendingMap()` — which the app calls before it starts a job. A render reads one plan from its first line to
+    /// its last: `Engine.execute` counts itself in (`renderBegan`), and nothing is replaced while a count is open.
+    @discardableResult
+    package static func adopt(map report: Diagnostic.Report) -> Adoption { live.adopt(report) }
+    /// Applies the measure `adopt` deferred, if no render runs. Returns whether the plan changed.
+    @discardableResult
+    package static func applyPendingMap() -> Bool { live.applyPending() }
+    /// A render begins / ends (`Engine.execute`): the plan is not replaced in between.
+    package static func renderBegan() { live.renderBegan() }
+    package static func renderEnded() { live.renderEnded() }
+    /// Counts each replacement of the plan: what the app watches to recompute what it showed (needs, the Neural Engine's offer).
+    package static var generation: Int { live.generation }
+
+    package enum Adoption: Sendable, Equatable {
+        /// The plan is the report's from now on.
+        case applied
+        /// A render runs: the report waits for `applyPendingMap()`.
+        case deferred
+        /// Nothing to replace: the plan was designated or forced (a check, `SILICONED_PLAN`), or the report is not this Mac's.
+        case unchanged
+    }
+
+    /// The prefix of the warning for a report that is not this Mac's: dropped when a later report replaces it.
+    static let staleMapWarning = "⚠ the capacity model of"
 
     #if DEBUG
     /// **A tripwire for what must not read the settings** (debug builds only): inside
     /// `$readsForbidden.withValue(true)`, each read of `effective` is counted. A plan asked before the
     /// capacity map froze the process on the defaults once (the map then refused, the AMX off for the
-    /// session); the first read cannot be watched in a test process where others already read, every
-    /// read can.
+    /// session: the first read designates the profile and the first plan, and a map measured later can only replace the plan between two renders);
+    /// the first read cannot be watched in a test process where others already read, every read can.
     @TaskLocal package static var readsForbidden = false
     package static let forbiddenReads = Atomic<Int>(0)
     #endif
 
     /// What an app or a check designated before the first access (`load(from:map:)`, `designate(plan:)`): its profile, its report,
     /// the plan the process runs under.
-    private struct Designation { var profile: String?; var map: Diagnostic.Report?; var plan: CapacityPlan? }
-    private static let designated = Mutex(Designation())
+    fileprivate struct Designation { var profile: String?; var map: Diagnostic.Report?; var plan: CapacityPlan? }
+    fileprivate static let designated = Mutex(Designation())
 
     /// The profile's path: `SILICONED_PROFILE`, otherwise the one an app designated
     /// (`load(from:)`), otherwise the process library's `store/profil.json`
@@ -234,9 +265,9 @@ package struct EngineSettings: Sendable {
 
     /// **For an app: read the machine's profile from ITS library, and run on the model its report holds.**
     ///
-    /// The settings are a property of the machine, read once for the whole process (`effective`) —
-    /// there is no sense in changing them along the way, and the engine reads them deep in its
-    /// loops. **Nothing reads them before a render** but a render's memory need: neither building a
+    /// The settings are a property of the machine, read for the whole process (`effective`) — the engine reads them
+    /// deep in its loops, so a render must see one set from its first line to its last: **only the plan is replaced
+    /// afterwards, between two renders** (`adopt(map:)`). **Nothing reads them before a render** but a render's memory need: neither building a
     /// `Request`, nor a `Model`, nor listing the catalog — a render, `ModelCard.memoryNeed`,
     /// `effective` and this `load` do. An app therefore calls this at launch, before it shows a need or
     /// renders. **Too late, it throws** (`EngineError.settingsAlreadyLoaded`) instead of silently doing
@@ -246,8 +277,9 @@ package struct EngineSettings: Sendable {
     /// `map`: the diagnostic's report this app kept (`Diagnostic.run`). **Refused with a warning when it is not
     /// `isCurrent`** (an older schema, another machine, another macOS, another build): the defaults then apply, and the
     /// app measures again. Taken, its `model` is the plan of the process (`Report.plan`); a process without the ANE restricts it
-    /// (`CapacityPlan.restricted(allowingANE:)`). **It never changes settings already read**: an app without a current report
-    /// defers this call until its measure — taken in another process, so that nothing here reads the settings before it.
+    /// (`CapacityPlan.restricted(allowingANE:)`). **It does not replace settings already read** — a later measure goes through
+    /// `adopt(map:)`, between two renders —: an app without a current report defers this call until its measure, taken in
+    /// another process, so that nothing here reads the settings before it.
     package static func load(from library: Library, map: Diagnostic.Report? = nil) throws(EngineError) {
         let path = library.profile
         // Designate and read under the same lock: a render that read `effective` between the two
@@ -281,7 +313,7 @@ package struct EngineSettings: Sendable {
         }
         if late {
             // Compared outside the lock: the first read of `effective` takes it.
-            let loaded = read.plan
+            let loaded = live.current.plan
             if loaded !== plan && loaded.identity != plan.identity {
                 throw EngineError(Failure.alreadyRead(profileRead: "plan \(loaded.identity)", requested: "plan \(plan.identity)"))
             }
@@ -296,7 +328,7 @@ package struct EngineSettings: Sendable {
     /// warning and nothing — the defaults apply. Pure: no process state.
     static func designation(of report: Diagnostic.Report) -> (plan: CapacityPlan?, warning: String?) {
         if report.isCurrent { return (report.plan(), nil) }
-        return (nil, "⚠ the capacity model of \(report.date) (schema \(report.schema)) was measured on \(report.fingerprint), this is "
+        return (nil, "\(staleMapWarning) \(report.date) (schema \(report.schema)) was measured on \(report.fingerprint), this is "
                      + "\(Diagnostic.Fingerprint.current) — ignored, the defaults apply.")
     }
 
@@ -323,6 +355,7 @@ package struct EngineSettings: Sendable {
                 warnings.append("⚠ SILICONED_PLAN=\(named) not read (amx, flash, ane, aneint8, int8, bf16act, comma-separated): the plan stays.")
             }
         }
+        planFixed = chosen
         if let report {
             let taken = EngineSettings.designation(of: report)
             if let warning = taken.warning { warnings.append(warning) }
@@ -521,5 +554,59 @@ package struct EngineSettings: Sendable {
         try FileManager.default.createDirectory(atPath: (path as NSString).deletingLastPathComponent,
                                                 withIntermediateDirectories: true)
         try data.write(to: URL(fileURLWithPath: path))
+    }
+}
+
+/// **The settings of the process and the turn of their replacement.** A render counts itself in; the plan of a new measure is put in
+/// place only when no render is counted, so that one render reads one plan whatever the clock says. What a plan fixes and survives
+/// a render (`RenderCache` keys carry the plan's identity; a model, a pipeline, a GEMM and its Neural Engine programs are built
+/// per render) follows without a purge. A class and not a global, so that a test builds its own.
+final class SettingsStore: Sendable {
+    private struct Turn { var renders = 0; var pending: Diagnostic.Report?; var generation = 0 }
+    private let settings: Mutex<EngineSettings>
+    private let turn = Mutex(Turn())
+
+    init(_ initial: EngineSettings) { settings = Mutex(initial) }
+
+    var current: EngineSettings { settings.withLock { $0 } }
+    var generation: Int { turn.withLock { $0.generation } }
+    var rendering: Bool { turn.withLock { $0.renders > 0 } }
+
+    func renderBegan() { turn.withLock { $0.renders += 1 } }
+    func renderEnded() { turn.withLock { $0.renders = max(0, $0.renders - 1) } }
+
+    func adopt(_ report: Diagnostic.Report) -> EngineSettings.Adoption {
+        turn.withLock { turn in
+            if turn.renders > 0 { turn.pending = report; return .deferred }
+            turn.pending = nil
+            return replace(with: report, in: &turn) ? .applied : .unchanged
+        }
+    }
+
+    @discardableResult
+    func applyPending() -> Bool {
+        turn.withLock { turn in
+            guard turn.renders == 0, let report = turn.pending else { return false }
+            turn.pending = nil
+            return replace(with: report, in: &turn)
+        }
+    }
+
+    /// Under the turn's lock. The plan and the date of the report it came from; the profile's values and the environment's stay.
+    private func replace(with report: Diagnostic.Report, in turn: inout Turn) -> Bool {
+        let taken = EngineSettings.designation(of: report)
+        let changed = settings.withLock { s -> Bool in
+            s.warnings.removeAll { $0.hasPrefix(EngineSettings.staleMapWarning) }
+            if let warning = taken.warning { s.warnings.append(warning) }
+            guard !s.planFixed, let plan = taken.plan else { return false }
+            let changed = s.plan.identity != plan.identity || s.mapRead != report.date
+            s.plan = plan; s.mapRead = report.date
+            return changed
+        }
+        if changed {
+            EngineSettings.designated.withLock { $0.map = report }
+            turn.generation += 1
+        }
+        return changed
     }
 }

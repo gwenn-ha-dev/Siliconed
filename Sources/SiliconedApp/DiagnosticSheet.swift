@@ -6,8 +6,10 @@
 // the GPU and the CPU, so it waits for an empty queue — and the queue waits for it); its progress; then
 // the report as a person reads it — the map first (always: a finished measure is a map, applied as it stands), then how sure
 // each engine's figure is and what the measure found, said plainly, with no grade; then per engine what it reaches against the
-// peak the silicon announces (a bar where the inventory read one) and ✓/✗ (computed right against the exact or not), the memory
-// and the duration, and the last render's gap to the model's prediction, which goes with the report. « Share… ▸ Open a GitHub
+// peak the silicon announces (a bar where the inventory read one: the GPU's, and only for its matrix products), the column
+// « Exact » (✓/✗: computed right against the exact result or not), what the engines keep of their speed when they work together, the
+// memory and the duration, and the last render's gap to the model's prediction, which goes with the report. Every column is titled:
+// the sheet carries four signs (the card, the bars, the ✓, the ±) and none is left to a tooltip. « Share… ▸ Open a GitHub
 // Issue » copies the report and opens GitHub's form
 // (`report.issueURL()`), where the user pastes it; « Copy JSON » alone serves whoever has no GitHub account. Nothing is
 // sent without a click, and the issue is submitted in the browser, by the user.
@@ -69,8 +71,8 @@ struct DiagnosticSheet: View {
         .padding(20)
     }
 
-    /// **Where this session stands against the model**: one in use; a newer one waiting for the next
-    /// launch; none yet, or a stale one — the first render measures.
+    /// **Where this session stands against the model**: one in use; a newer one waiting for the end of the render under way;
+    /// none yet, or a stale one — the first render measures.
     @ViewBuilder private var mapStatus: some View {
         Text(Self.mapStatus(app)).font(.callout).foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
@@ -85,7 +87,7 @@ struct DiagnosticSheet: View {
             }
             return used == map.stored
                 ? "This session plans with this Mac's measure of \(day(used.date))."
-                : "This session plans with the measure of \(day(used.date)); the newer one applies from the next launch."
+                : "This session plans with the measure of \(day(used.date)); the newer one applies to the next render."
         }
         if let stored = map.stored, !stored.current {
             return "The measure of \(day(stored.date)) was taken with another macOS or another version of Siliconed: this Mac is measured again before the next render."
@@ -94,9 +96,9 @@ struct DiagnosticSheet: View {
     }
 
     /// **A render ran off this Mac's measure** (the footer says it, the chip's tooltip and the sheet too): what it took, what the measure
-    /// predicted, and what to do — measure again, which applies from the next launch: the plan never changes between two renders.
+    /// predicted, and what to do — measure again, which applies to the next render: a render never changes its plan on the way.
     static func driftSentence(measured: Double, predicted: Double) -> LocalizedStringKey {
-        "The last render took \(Figures.seconds(measured)) where this Mac's measure predicted \(Figures.seconds(predicted)). If the Mac has changed (heat, other programs), measure it again: the new measure applies from the next launch."
+        "The last render took \(Figures.seconds(measured)) where this Mac's measure predicted \(Figures.seconds(predicted)). If the Mac has changed (heat, other programs), measure it again: the new measure applies to the next render."
     }
 
     /// A report's ISO date as a day the user reads.
@@ -168,17 +170,41 @@ private struct ReportView: View {
     /// The last render under this very report, if there was one (`AppState.reportNote(for:)`): it goes with the report.
     var render: RenderLoop.Note?
 
-    /// The label of a kernel's row, in the order the sheet shows them.
-    private static var rows: [(kernel: CapacityModel.Kernel, label: String)] {
-        [(.init(.gpu, .fp32), String(localized: "Matrix products, GPU")),
-         (.init(.amx, .fp32), String(localized: "Matrix products, CPU matrix unit")),
-         (.init(.ane, .fp16), String(localized: "Matrix products, Neural Engine")),
-         (.init(.gpu, .bf16), String(localized: "Matrix products, GPU tensor units on the bf16 weights")),
-         (.init(.gpu, .int8), String(localized: "Matrix products on the 8-bit weights, read as published")),
-         (.init(.gpu, .q8), String(localized: "Matrix products on the GGUF 8-bit weights, read as published")),
-         (.init(.gpu, .graph), String(localized: "Attention, system kernel")),
-         (.init(.gpu, .flash), String(localized: "Attention, Siliconed kernel")),
-         (.init(.cpu, .heads), String(localized: "Attention, split between GPU and CPU"))]
+    /// **The routes in the order the sheet reads them**: the products on the weights widened to fp32 or fp16, then on the weights as
+    /// published, then the attentions. A route the model measured and this list does not know follows, by its engine and form.
+    private static let order: [CapacityModel.Kernel] = [
+        .init(.gpu, .fp32), .init(.amx, .fp32), .init(.ane, .fp16),
+        .init(.gpu, .bf16), .init(.gpu, .bf16act), .init(.gpu, .int8), .init(.ane, .int8), .init(.gpu, .q8),
+        .init(.gpu, .graph), .init(.gpu, .flash), .init(.cpu, .heads)]
+
+    /// The label of a route, as a person reads it.
+    static func label(for kernel: CapacityModel.Kernel) -> String {
+        switch (kernel.engine, kernel.form) {
+        case (.gpu, .fp32): String(localized: "Matrix products, GPU")
+        case (.amx, .fp32): String(localized: "Matrix products, CPU matrix unit")
+        case (.ane, .fp16): String(localized: "Matrix products, Neural Engine")
+        case (.gpu, .bf16): String(localized: "Matrix products, GPU tensor units on the bf16 weights")
+        case (.gpu, .bf16act): String(localized: "Matrix products, GPU tensor units, bf16 weights and activations")
+        case (.gpu, .int8): String(localized: "Matrix products on the 8-bit weights, read as published")
+        case (.ane, .int8): String(localized: "Matrix products on the 8-bit weights, Neural Engine")
+        case (.gpu, .q8): String(localized: "Matrix products on the GGUF 8-bit weights, read as published")
+        case (.gpu, .graph): String(localized: "Attention, system kernel")
+        case (.gpu, .flash): String(localized: "Attention, Siliconed kernel")
+        case (.cpu, .heads): String(localized: "Attention, split between GPU and CPU")
+        default: engineName(kernel.engine) + " · " + kernel.form.rawValue
+        }
+    }
+
+    /// An attention kernel: the peak of the matrix products says nothing of it.
+    private static func isAttention(_ kernel: CapacityModel.Kernel) -> Bool { [.graph, .flash, .heads].contains(kernel.form) }
+
+    /// The kernels to list: every route the model has a figure for, then those the judge left out without one.
+    static func kernels(of report: Diagnostic.Report) -> [CapacityModel.Kernel] {
+        var all = Set(report.reached.map(\.kernel))
+        for key in report.judge.keys { if let kernel = CapacityModel.Kernel(key) { all.insert(kernel) } }
+        let known = order.filter(all.contains)
+        let rest = all.subtracting(known).sorted { ($0.engine, $0.form.rawValue) < ($1.engine, $1.form.rawValue) }
+        return known + rest
     }
 
     var body: some View {
@@ -190,6 +216,7 @@ private struct ReportView: View {
                     assurance
                     found
                     reached
+                    together
                     facts
                     machine
                 }
@@ -209,6 +236,8 @@ private struct ReportView: View {
             VStack(alignment: .leading, spacing: 8) {
                 Text("This Mac is measured.").font(.headline)
                 Text(status).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                Text("A measure applies to the next render, never to one under way. From then on, a seed can give an image a little different from before it.")
+                    .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 0)
         }
@@ -226,6 +255,8 @@ private struct ReportView: View {
         let rows = Self.margins(report)
         VStack(alignment: .leading, spacing: 6) {
             Text("How sure the measure is").font(.headline)
+            Text("± is how far apart identical calls were during the measure, for each engine and each set: the margin of its figures.")
+                .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 4) {
                 ForEach(rows, id: \.name) { row in
                     GridRow {
@@ -320,7 +351,7 @@ private struct ReportView: View {
     /// attention and a product of one engine are two things to the reader —; two or three engines together, joined by « + ».
     private static func name(of finding: Diagnostic.Finding) -> String {
         if let kernel = finding.kernel {
-            if [.graph, .flash, .heads].contains(kernel.form), let row = rows.first(where: { $0.kernel == kernel }) { return row.label }
+            if isAttention(kernel) { return label(for: kernel) }
             return engineName(kernel.engine)
         }
         if finding.engines.contains(.cpu) { return String(localized: "Attention, split between GPU and CPU") }
@@ -338,27 +369,40 @@ private struct ReportView: View {
 
     // ── what each engine reaches ──
 
-    /// **What each engine reaches**, against the peak read: a bar and `3.53 TFLOP/s · 76 %` where the inventory gave a peak, the rate
-    /// alone where it did not; a kernel the judge left out, ✗.
+    /// **What each engine reaches, alone**, one line per route the measure has a figure for. Four columns, each titled: the speed
+    /// (TFLOP/s: millions of millions of operations a second); the share of the GPU's peak, the only peak the Mac announces —
+    /// its cores and its clock — and only for its matrix products, because a percentage of a product's peak misleads on an attention;
+    /// and whether the route computed right (✓), within its threshold of the exact result, or not (✗).
     @ViewBuilder private var reached: some View {
+        let peak = report.model.crest[.gpu]
         VStack(alignment: .leading, spacing: 6) {
             Text("What each engine reaches").font(.headline)
+            Text("Each route alone, in trillions of operations a second (TFLOP/s). The bar is the share of the GPU's peak, which its cores and clock announce; only the GPU has one, and only its matrix products are compared to it. ✓: the result is within its threshold of the exact one.")
+                .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 6) {
-                ForEach(Self.rows, id: \.kernel.description) { row in
-                    let line = report.reached.first { $0.kernel == row.kernel }
-                    let excluded = report.judge[row.kernel.description]?.excluded == true
-                    if line != nil || excluded {
-                        GridRow {
-                            Text(verbatim: row.label).foregroundStyle(.secondary)
-                            if let line, !excluded {
-                                bar(line)
-                                figure(line).monospacedDigit()
-                                verdict(true)
-                            } else {
-                                Color.clear.frame(width: Self.barWidth, height: 1)
-                                Text(verbatim: "—").foregroundStyle(.secondary)
-                                verdict(false, died: report.judge[row.kernel.description]?.reason == .died)
-                            }
+                GridRow {
+                    Color.clear.frame(height: 1)
+                    Text("Speed").gridColumnAlignment(.trailing)
+                    Group {
+                        if let peak { Text("Share of the GPU's peak (\(Self.rate(peak)))") } else { Text(verbatim: "") }
+                    }
+                    Text("Exact").gridColumnAlignment(.center)
+                }
+                .font(.caption.weight(.medium)).foregroundStyle(.secondary)
+                ForEach(Self.kernels(of: report), id: \.description) { kernel in
+                    let line = report.reached.first { $0.kernel == kernel }
+                    let excluded = report.judge[kernel.description]?.excluded == true
+                    GridRow {
+                        Text(verbatim: Self.label(for: kernel)).foregroundStyle(.secondary)
+                            .frame(maxWidth: 250, alignment: .leading).fixedSize(horizontal: false, vertical: true)
+                        if let line, !excluded {
+                            Text(verbatim: Self.rate(line.rate)).monospacedDigit()
+                            share(line, attention: Self.isAttention(kernel))
+                            verdict(true)
+                        } else {
+                            Text(verbatim: "—").foregroundStyle(.secondary)
+                            Color.clear.frame(width: Self.barWidth, height: 1)
+                            verdict(false, died: report.judge[kernel.description]?.reason == .died)
                         }
                     }
                 }
@@ -368,30 +412,102 @@ private struct ReportView: View {
         }
     }
 
-    private static let barWidth: CGFloat = 80
+    // ── the engines together ──
 
-    /// The share of the peak read, as a level (capped at the bar's end: a tensor form may run above the fp32 peak); nothing where no
-    /// peak was read — the bar's room stays, so that the figures line up.
-    @ViewBuilder private func bar(_ line: Diagnostic.Report.Reach) -> some View {
-        if let fraction = line.fraction, let crest = line.crest {
-            Capsule().fill(Palette.well)
-                .overlay(alignment: .leading) {
-                    Capsule().fill(Palette.live).frame(width: Self.barWidth * min(max(fraction, 0.02), 1))
-                }
-                .frame(width: Self.barWidth, height: 6)
-                .help("Peak read from the silicon: \(Self.rate(crest))")
-        } else {
-            Color.clear.frame(width: Self.barWidth, height: 1)
+    /// What a set of engines keeps: per engine, its share of its own speed alone while the set works on one product, and what the set
+    /// reaches against the sum of what its engines reach alone. Nothing where no set was measured.
+    struct Together { var name: String; var keeps: [(engine: CapacityModel.Engine, keep: Double)]; var ofSum: Double? }
+
+    /// The route an engine runs alone, for the sum: the kernel a set's key names, else the engine's product on the widened weight.
+    private static func alone(_ engine: CapacityModel.Engine, named kernel: CapacityModel.Kernel?) -> CapacityModel.Kernel {
+        if let kernel { return kernel }
+        switch engine {
+        case .gpu: return .init(.gpu, .fp32)
+        case .amx: return .init(.amx, .fp32)
+        case .ane: return .init(.ane, .fp16)
+        case .cpu: return .init(.cpu, .heads)
         }
     }
 
-    /// `3.53 TFLOP/s`, then ` · 76 %` of the peak read where there is one.
-    private func figure(_ line: Diagnostic.Report.Reach) -> some View {
-        HStack(spacing: 0) {
-            Text(verbatim: Self.rate(line.rate))
-            if let fraction = line.fraction {
-                Text(verbatim: " · " + Figures.percent(Int((100 * fraction).rounded()))).foregroundStyle(.secondary)
+    static func together(_ report: Diagnostic.Report) -> [Together] {
+        let engines: [CapacityModel.Engine] = [.gpu, .amx, .ane, .cpu]
+        return report.model.sharing.compactMap { key, sharing in
+            let parts = key.split(separator: "+").map(String.init)
+            let kernels = parts.map { CapacityModel.Kernel($0) }
+            let members = parts.compactMap { part in CapacityModel.Kernel(part)?.engine ?? CapacityModel.Engine(rawValue: part) }
+            guard members.count >= 2 else { return nil }
+            var keeps: [(engine: CapacityModel.Engine, keep: Double)] = []
+            var sum = 0.0, joint = 0.0
+            for (member, kernel) in zip(members, kernels) {
+                guard let keep = sharing.keep[member] else { continue }
+                keeps.append((member, keep))
+                if let rate = report.model.lines[alone(member, named: kernel)]?.rate {
+                    sum += rate; joint += rate * keep
+                }
             }
+            guard !keeps.isEmpty else { return nil }
+            var name = members.map(engineName).joined(separator: " + ")
+            if kernels.contains(where: { $0?.form == .int8 }) { name += ", " + String(localized: "8-bit weights") }
+            return Together(name: name, keeps: keeps.sorted { engines.firstIndex(of: $0.engine)! < engines.firstIndex(of: $1.engine)! },
+                            ofSum: sum > 0 ? joint / sum : nil)
+        }
+        .sorted { ($0.keeps.count, $0.name) < ($1.keeps.count, $1.name) }
+    }
+
+    /// **The engines together**: what each keeps of its speed when they work on the same product, then what the set reaches against
+    /// the sum of its engines alone. The plan splits every product by these figures; none is a verdict.
+    @ViewBuilder private var together: some View {
+        let sets = Self.together(report)
+        if !sets.isEmpty {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("The engines together").font(.headline)
+                Text("When engines share a product, each keeps only part of the speed it has alone: they compete for memory and for power. Then the set reaches less than the sum of its engines alone, and more than its best one.")
+                    .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                Grid(alignment: .topLeading, horizontalSpacing: 14, verticalSpacing: 6) {
+                    GridRow {
+                        Text("Engines")
+                        Text("Each keeps of its speed alone")
+                        Text("The set reaches")
+                    }
+                    .font(.caption.weight(.medium)).foregroundStyle(.secondary)
+                    ForEach(sets, id: \.name) { set in
+                        GridRow {
+                            Text(verbatim: set.name).foregroundStyle(.secondary)
+                                .frame(maxWidth: 190, alignment: .leading).fixedSize(horizontal: false, vertical: true)
+                            Text(verbatim: set.keeps.map { Self.engineName($0.engine) + " " + Figures.percent(Int((100 * $0.keep).rounded())) }
+                                .joined(separator: " · "))
+                                .fixedSize(horizontal: false, vertical: true)
+                            if let share = set.ofSum {
+                                Text("\(Figures.percent(Int((100 * share).rounded()))) of the sum of its engines alone").monospacedDigit()
+                            } else {
+                                Text(verbatim: "—").foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                }
+                .font(.callout)
+                .textSelection(.enabled)
+            }
+        }
+    }
+
+    private static let barWidth: CGFloat = 80
+
+    /// The share of the peak, as a bar and a figure — the GPU's matrix products only (capped at the bar's end: a tensor form may run above the
+    /// fp32 peak); nothing for an attention or an engine without a peak, the column's room stays so that the figures line up.
+    @ViewBuilder private func share(_ line: Diagnostic.Report.Reach, attention: Bool) -> some View {
+        if !attention, let fraction = line.fraction, let crest = line.crest {
+            HStack(spacing: 8) {
+                Capsule().fill(Palette.well)
+                    .overlay(alignment: .leading) {
+                        Capsule().fill(Palette.live).frame(width: Self.barWidth * min(max(fraction, 0.02), 1))
+                    }
+                    .frame(width: Self.barWidth, height: 6)
+                Text(verbatim: Figures.percent(Int((100 * fraction).rounded()))).monospacedDigit()
+            }
+            .help("Peak read from the silicon: \(Self.rate(crest))")
+        } else {
+            Color.clear.frame(width: Self.barWidth, height: 1)
         }
     }
 
