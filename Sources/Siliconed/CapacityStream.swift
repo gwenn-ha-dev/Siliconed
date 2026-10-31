@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 
 /// **The weight stream beside the computation: the disk's seconds of a render, planned with the blocks, not added to them.**
 /// Pure. The bytes come from what the engine reads (`Streaming`), the rate from the map (`CapacityModel.diskBandwidth`), the computation
@@ -87,5 +88,57 @@ extension CapacitySolver.Streaming {
             self.init(bytesPerEvaluation: Double(maps.ditStreamedBytes(plan: plan, fraction: QwenImage21DiT.generationTail)))
         default: return nil
         }
+    }
+}
+
+// MARK: - The priority of the readers
+
+/// **The class of service the weight stream reads at, phase by phase — decided by the map, not by a default fixed on one Mac.**
+/// A phase (the half grid's evaluations, the full grid's) reads the same bytes beside a computation of its own length:
+///
+///     need(phase) = streamed bytes / C(phase)            C = the solver's seconds of one evaluation at that phase's rows
+///     class       = the lowest StreamClass whose measured mean ≥ need · (1 + ε)         (`CapacityDisk.choose`), else the default
+///
+/// The lower classes leave the performance cores to the computation (the full grid's evaluations ran ~4 % faster at `background` on the
+/// Compact Krea 2) but read slower; a half-size evaluation computes a quarter of the time and reads as much, so it is the first to need the
+/// default. The answer is memoised by what it depends on; a plan without a model, a map without readings or a family without classes
+/// answers the default — the stream as it was.
+extension CapacityDisk {
+    private struct Phase: Hashable { var identity: String; var family: Family; var format: CapacityClasses.WeightFormat; var tokens: Int; var text: Int; var bytes: Int }
+    private static let memo = Mutex<[Phase: StreamClass]>([:])
+
+    /// **The seconds of one evaluation** at `tokens` image rows under `plan`, `nil` when the plan has no model or the model cannot time it.
+    package static func evaluationSeconds(plan: CapacityPlan, family: Family, format: CapacityClasses.WeightFormat, tokens: Int,
+                                          textRows: Int) -> Double? {
+        guard let model = plan.model,
+              let classes = CapacityClasses.evaluationClasses(family: family, format: format, tokens: tokens,
+                                                              promptTokens: CapacityClasses.promptTokens(family, textRows: textRows)),
+              let solved = CapacitySolver.solve(model: model, classes: classes, family: family, constraints: plan.constraints)
+        else { return nil }
+        return solved.seconds
+    }
+
+    /// **The class a phase's reads run at**: `bytes` read per evaluation, beside `tokens` image rows of computation.
+    package static func streamClass(plan: CapacityPlan, family: Family, format: CapacityClasses.WeightFormat, tokens: Int, textRows: Int,
+                                    bytes: Int) -> StreamClass {
+        guard let model = plan.model, !model.diskClasses.isEmpty, bytes > 0 else { return .standard }
+        let key = Phase(identity: plan.identity, family: family, format: format, tokens: tokens, text: textRows, bytes: bytes)
+        if let known = memo.withLock({ $0[key] }) { return known }
+        let chosen = evaluationSeconds(plan: plan, family: family, format: format, tokens: tokens, textRows: textRows).map {
+            choose(bytes: Double(bytes), compute: $0, readings: model.diskReadings)
+        } ?? .standard
+        memo.withLock { $0[key] = chosen }
+        return chosen
+    }
+}
+
+extension Artifact {
+    /// **The readers' priority for the phase a DiT evaluation is in**, once its stream exists: `tokens` image rows beside `textRows` text rows
+    /// (the rows the DiT really computes). The one call every family that streams makes after `streamUnits`; no stream, no effect.
+    package func setStreamPhase(family: Family, tokens: Int, textRows: Int) {
+        guard let stream else { return }
+        stream.setPriority(CapacityDisk.streamClass(plan: EngineSettings.effective.plan, family: family,
+                                                    format: Artifact.weightFormat(header: header), tokens: tokens, textRows: textRows,
+                                                    bytes: stream.sweepBytes))
     }
 }

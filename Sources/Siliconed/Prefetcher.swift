@@ -2,6 +2,30 @@ import Darwin
 import Foundation
 import Synchronization
 
+/// **The class of service of the threads that read the weights** (`TailStream`, `Prefetcher`), lowest first. A concurrent `pread` at the
+/// default class slows the products beside it (the GEMM of a 512² Anima evaluation 0.95 → 1.71 s); at `.background` the compute keeps the
+/// performance cores, but the kernel also throttles the reads (its I/O policy, the efficiency cores). Which class a phase can afford is
+/// not a constant: it is the lowest whose measured rate covers what the phase has to read (`CapacityDisk.choose`, from the map).
+/// Timing only: no value is computed differently.
+package enum StreamClass: String, CaseIterable, Sendable, Comparable {
+    case background, utility, standard = "default"
+    package var qos: DispatchQoS {
+        switch self {
+        case .background: return .background
+        case .utility: return .utility
+        case .standard: return .unspecified
+        }
+    }
+    package var rank: Int { Self.allCases.firstIndex(of: self)! }
+    package static func < (a: StreamClass, b: StreamClass) -> Bool { a.rank < b.rank }
+}
+
+package enum StreamPriority {
+    /// `SILICONED_STREAM_QOS` = `default` | `utility` | `background`: **a forcing of measurement** (as `SILICONED_PLAN` is), which the map's
+    /// choice does not override. Unset or unknown: the map decides.
+    package static let forced: StreamClass? = StreamClass(rawValue: ProcessInfo.processInfo.environment["SILICONED_STREAM_QOS"] ?? "")
+}
+
 /// The prefetcher: a few threads that tell the kernel what the computation is going to read, before it reads it.
 ///
 /// There is **no residency policy here**, and that is the point. The access order is the order of the
@@ -27,7 +51,7 @@ package final class Prefetcher {
 
     private let artifact: Artifact
     private let threads: Int
-    private let queue = DispatchQueue(label: "siliconed.prefetch", attributes: .concurrent)
+    private let queue = DispatchQueue(label: "siliconed.prefetch", qos: (StreamPriority.forced ?? .standard).qos, attributes: .concurrent)
     private let group = DispatchGroup()
     private let lock = NSLock()
     private var inFlight: Set<String> = []
@@ -188,7 +212,19 @@ package final class TailStream {
     private var evaluation = 0                              // whole sweeps of the sequence completed (the trace's)
     private let mapped: Int                                 // the map's base address, for the fallback copy
     private let lock = NSLock()
-    private let queue = DispatchQueue(label: "siliconed.tail", attributes: .concurrent)
+    /// One queue per class (a queue's class is fixed when it is made); `priority` says which one the next reads go to.
+    private let queues = StreamClass.allCases.map { DispatchQueue(label: "siliconed.tail.\($0.rawValue)", qos: $0.qos, attributes: .concurrent) }
+    private var priority: StreamClass = StreamPriority.forced ?? .standard
+    private var queue: DispatchQueue { queues[priority.rank] }
+    /// The bytes one sweep of the sequence reads: what an evaluation asks of the disk.
+    package let sweepBytes: Int
+    /// **The class the reads from now on run at.** A forcing (`SILICONED_STREAM_QOS`) keeps it. The reads already queued finish where
+    /// they were; the next visit's go to the new class.
+    package func setPriority(_ new: StreamClass) {
+        lock.lock(); defer { lock.unlock() }
+        if StreamPriority.forced == nil { priority = new }
+    }
+    package var currentPriority: StreamClass { lock.lock(); defer { lock.unlock() }; return priority }
     private let reads = DispatchGroup()
     /// Measured: four lanes, slices of 64 MiB; a run under 4 MiB is one read.
     package static let lanes = 4, piece = 64 << 20, smallest = 4 << 20
@@ -230,6 +266,7 @@ package final class TailStream {
         let bytes = visits.map { $0.runs.reduce(0) { $0 + $1.end - $1.start } }
         let slotBytes = max(buffer ?? 0, bytes.max()!)
         self.slotBytes = slotBytes
+        sweepBytes = bytes.reduce(0, +)
         mapped = Int(bitPattern: artifact.mappedPointer(artifact.order[0])!) - artifact.tensors[artifact.order[0]]!.offset
         // Mapped, not `malloc`ed: `munmap` hands the pages back at once, where malloc's large-block
         // cache could keep a freed gigabyte in the footprint through the decoding.

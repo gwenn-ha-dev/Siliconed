@@ -511,6 +511,7 @@ package final class QwenImage21DiT: BoundaryRecording, PhaseTiming {
                 }
                 return uses
             })
+            if kind != .prefill { artifact.setStreamPhase(family: .qwenImage21, tokens: s, textRows: p) }
         }
         // Requested once the stream exists: requested before, a streamed block 0 would be paged in
         // through the cache, then read again by the stream.

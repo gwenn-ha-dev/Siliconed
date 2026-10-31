@@ -217,6 +217,13 @@ package struct CapacityModel: Codable, Sendable, Equatable {
     package var heat: [Engine: Double] = [:]
     package var memoryBandwidth: Double?
     package var diskBandwidth: Double?
+    /// The same read at each class of service of the stream's threads, by class name (`"background"`, `"utility"`, `"default"`):
+    /// the fastest pass and the slowest (`CapacityDisk.Reading`). Empty on a report that did not measure them.
+    package var diskClasses: [String: CapacityDisk.Reading] = [:]
+    /// The readings by class, for `CapacityDisk.choose`.
+    package var diskReadings: [StreamClass: CapacityDisk.Reading] {
+        Dictionary(uniqueKeysWithValues: diskClasses.compactMap { name, r in StreamClass(rawValue: name).map { ($0, r) } })
+    }
     /// Seconds per value to bring a weight of `kind` to the form a kernel reads (`WeightPath`).
     package var preparation: [WeightKind: [WeightPath: Double]] = [:]
     /// Seconds per value to widen a K-quant (Q4_K to Q6_K) weight: it has no `WeightKind`, so `preparation` cannot say it,
@@ -228,7 +235,7 @@ package struct CapacityModel: Codable, Sendable, Equatable {
     // MARK: - JSON
 
     private enum CodingKeys: String, CodingKey {
-        case crest, lines, aneRowUnit, sharing, heat, memoryBandwidth, diskBandwidth, preparation, kquantPreparation
+        case crest, lines, aneRowUnit, sharing, heat, memoryBandwidth, diskBandwidth, diskClasses, preparation, kquantPreparation
     }
 
     /// The engines of a dictionary keyed by their names.
@@ -261,6 +268,7 @@ package struct CapacityModel: Codable, Sendable, Equatable {
         heat = try Self.engines(try c.decodeIfPresent([String: Double].self, forKey: .heat) ?? [:], codingPath: c.codingPath + [CodingKeys.heat])
         memoryBandwidth = try c.decodeIfPresent(Double.self, forKey: .memoryBandwidth)
         diskBandwidth = try c.decodeIfPresent(Double.self, forKey: .diskBandwidth)
+        diskClasses = try c.decodeIfPresent([String: CapacityDisk.Reading].self, forKey: .diskClasses) ?? [:]
         let prepared = try c.decodeIfPresent([String: [String: Double]].self, forKey: .preparation) ?? [:]
         for (kindName, paths) in prepared {
             guard let kind = WeightKind(rawValue: kindName) else {
@@ -285,6 +293,7 @@ package struct CapacityModel: Codable, Sendable, Equatable {
         try c.encode(Dictionary(uniqueKeysWithValues: heat.map { ($0.key.rawValue, $0.value) }), forKey: .heat)
         try c.encodeIfPresent(memoryBandwidth, forKey: .memoryBandwidth)
         try c.encodeIfPresent(diskBandwidth, forKey: .diskBandwidth)
+        if !diskClasses.isEmpty { try c.encode(diskClasses, forKey: .diskClasses) }
         try c.encode(Dictionary(uniqueKeysWithValues: preparation.map { kind, paths in
             (kind.rawValue, Dictionary(uniqueKeysWithValues: paths.map { ($0.key.rawValue, $0.value) }))
         }), forKey: .preparation)
@@ -302,6 +311,7 @@ package struct CapacityModel: Codable, Sendable, Equatable {
         m.sharing = sharing.mapValues { Sharing(overhead: r($0.overhead), keep: $0.keep.mapValues(r), sustained: $0.sustained.map(r), keepByK: $0.keepByK?.map { .init(k: $0.k, keep: $0.keep.mapValues(r)) }, kFrom: $0.kFrom, kTo: $0.kTo) }
         m.heat = heat.mapValues(r)
         m.memoryBandwidth = memoryBandwidth.map(r); m.diskBandwidth = diskBandwidth.map(r)
+        m.diskClasses = diskClasses.mapValues { .init(rate: r($0.rate), mean: r($0.mean)) }
         m.preparation = preparation.mapValues { $0.mapValues(r) }
         m.kquantPreparation = kquantPreparation.map(r)
         return m
