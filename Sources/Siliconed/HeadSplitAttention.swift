@@ -96,8 +96,14 @@ package final class HeadSplitAttention {
     }
 
     private let queue: MTLCommandQueue
-    private let graph: MPSGraph
-    private let q, k, v, out: MPSGraphTensor
+    /// The graph of the GPU's heads, `nil` when a kernel of ours computes them (`gpuKernel`).
+    private let graph: MPSGraph?
+    private let q, k, v, out: MPSGraphTensor?
+    /// **The GPU heads' other kernels** (the plan's `gpuKernel`): the three stages by tiles or the flash kernel, on the first `gpuHeads` heads.
+    private let tiled: TiledAttention?
+    private let flash: FlashMatrix?
+    /// The kernel the GPU's heads actually run (`graph` when the one asked for refused the shape).
+    package let gpuKernel: AttentionAssignment.Kernel
     private let threads: Int
     private let work: [(head: Int, row: Int, rows: Int)]
     /// The CPU heads' output, `[S, a·Dh]`, copied into `out` once the GPU is done.
@@ -206,7 +212,7 @@ package final class HeadSplitAttention {
     package init(device: MTLDevice, queue: MTLCommandQueue, heads: Int, sequence: Int, headDim: Int,
                  keys: Int? = nil, kvHeads: Int? = nil, cpuHeads: Int? = nil, cpuFraction: Double? = nil,
                  threads: Int = EngineSettings.effective.machine.performanceCores,
-                 matrixLimit: Int = Attention.maxMatrix) throws {
+                 matrixLimit: Int = Attention.maxMatrix, gpuKernel asked: AttentionAssignment.Kernel = .graph) throws {
         let kvHeads = kvHeads ?? heads
         precondition(heads % kvHeads == 0, "\(heads) heads over \(kvHeads) k/v heads")
         let group = heads / kvHeads
@@ -231,6 +237,31 @@ package final class HeadSplitAttention {
             try Scratch(host, thread: $0, rows: HeadSplitAttention.blockRows, keys: keys, headDim: headDim, workspace: workspace)
         }
 
+        // The GPU's heads on a kernel of ours: the graph is not built (its 7 MB and its copy of the queries are not held). A kernel that
+        // refuses the shape leaves the heads to the graph, said once.
+        var own: (tiled: TiledAttention?, flash: FlashMatrix?, kernel: AttentionAssignment.Kernel) = (nil, nil, .graph)
+        if !cpu.isEmpty || asked != .graph {
+            switch asked {
+            case .tiles, .tiles16:
+                let a = AttentionAssignment(kernel: .split, cpuHeads: cpu.count, gpuKernel: asked)
+                if let t = try? TiledAttention(device: device, queue: queue, heads: heads, sequence: sequence, headDim: headDim, keys: keys,
+                                               kvHeads: kvHeads, precision: a.gpuTilePrecision, computed: gpu.count) {
+                    own = (t, nil, asked)
+                } else { Warnings.emit("⚠ head split: the tiled kernel refuses S=\(sequence), the GPU's heads keep the graph") }
+            case .flash:
+                if kvHeads == heads, let f = try? FlashMatrix(device: device, queue: queue, heads: heads, sequence: sequence, headDim: headDim,
+                                                              rowsPerSimdgroup: 8, dimsPerSimdgroup: 64, keysPerTile: 16, blocksPerGroup: 8,
+                                                              computed: gpu.count) {
+                    own = (nil, f, .flash)
+                } else { Warnings.emit("⚠ head split: the flash kernel refuses S=\(sequence), the GPU's heads keep the graph") }
+            default: break
+            }
+        }
+        self.tiled = own.tiled; self.flash = own.flash; self.gpuKernel = own.kernel
+        if own.kernel != .graph {
+            graph = nil; q = nil; k = nil; v = nil; out = nil
+            return
+        }
         let graph = MPSGraph()
         self.graph = graph
         let n = { (x: Int) in NSNumber(value: x) }
@@ -372,20 +403,36 @@ package final class HeadSplitAttention {
         // a sentinel in the last row of head 0, which the graph overwrites whenever it runs.
         let probe = (sequence - 1) * heads * headDim, sentinel: UInt32 = 0x7FA5_A5A5
         outPointer[probe] = Float(bitPattern: sentinel)
-        let commands = MPSCommandBuffer(from: queue)
-        graph.encode(to: commands,
-                     feeds: [q: data(qBuffer, shape), k: data(kBuffer, kvShape), v: data(vBuffer, kvShape)],
-                     targetOperations: nil, resultsDictionary: [out: data(outBuffer, shape)], executionDescriptor: nil)
+        let finished = Atomic<UInt64>(0), done = DispatchSemaphore(value: 0)
+        // The GPU's heads on a kernel of ours: one command buffer, committed and not awaited (the graph's route below is the old one).
+        var own: MTLCommandBuffer?
+        var commands: MPSCommandBuffer?
+        let started: UInt64
+        if let tiled {
+            started = DispatchTime.now().uptimeNanoseconds
+            own = tiled.submit(q: qBuffer, k: kBuffer, v: vBuffer, into: outBuffer)
+        } else if let flash {
+            started = DispatchTime.now().uptimeNanoseconds
+            own = flash.submit(q: qBuffer, k: kBuffer, v: vBuffer, into: outBuffer)
+        } else {
+            let c = MPSCommandBuffer(from: queue)
+            graph!.encode(to: c,
+                          feeds: [q!: data(qBuffer, shape), k!: data(kBuffer, kvShape), v!: data(vBuffer, kvShape)],
+                          targetOperations: nil, resultsDictionary: [out!: data(outBuffer, shape)], executionDescriptor: nil)
+            commands = c
+            started = DispatchTime.now().uptimeNanoseconds
+        }
         // The GPU part's time is the wall time to the completion of the buffer the graph left current:
         // the root's own GPU time covers only its first segment when the graph committed by itself
         // (Krea 2 at 1024²: 0.96 s reported for ~4 s of work).
-        let finished = Atomic<UInt64>(0), done = DispatchSemaphore(value: 0)
-        commands.commandBuffer.addCompletedHandler { _ in
+        let completion: (MTLCommandBuffer) -> Void = { _ in
             finished.store(DispatchTime.now().uptimeNanoseconds, ordering: .releasing)
             done.signal()
         }
-        let started = DispatchTime.now().uptimeNanoseconds
-        commands.commit()
+        if let commands {
+            commands.commandBuffer.addCompletedHandler(completion)
+            commands.commit()
+        }
 
         if !work.isEmpty {
             // A thread takes a contiguous run of items (bounds by endpoints), hence one or two heads,
@@ -400,16 +447,24 @@ package final class HeadSplitAttention {
         }
         let cpu = Double(DispatchTime.now().uptimeNanoseconds - started) * 1e-9
 
+        let what = "SDPA (head split) S=\(sequence) H=\(gpuHeads)/\(heads) \(gpuKernel.rawValue)"
+        if let own {
+            // The GPU part's seconds are the buffer's own (it began when it was submitted).
+            own.waitUntilCompleted()
+            finished.store(started + UInt64(max(0, own.gpuEndTime - own.gpuStartTime) * 1e9), ordering: .releasing)
+            done.signal()
+            _ = Attention.verdict(own, what: what)
+        } else if let commands {
         commands.waitUntilCompleted()
         let root = commands.rootCommandBuffer
         root.waitUntilCompleted()
-        let what = "SDPA (head split) S=\(sequence) H=\(gpuHeads)/\(heads)"
         if root.error != nil || root.gpuEndTime > root.gpuStartTime {
             _ = Attention.verdict(root, what: what)
         } else if outPointer[probe].bitPattern == sentinel {
             // Committed by the graph itself (1024×1536): the work ran in buffers MPS made, whose
             // verdict we do not hold — the sentinel says whether it ran.
             Attention.report("\(what): the output was never written")
+        }
         }
         done.wait()
         let gpu = Double(finished.load(ordering: .acquiring) - started) * 1e-9

@@ -536,6 +536,7 @@ package enum EngineError: Error, Equatable, Sendable, Codable, LocalizedError, C
         case let e as Arena.Failure: self = .internalFailure(component: "arena", detail: e.description)
         case let e as GEMM.Failure: self = .internalFailure(component: "gpu", detail: e.description)
         case let e as FlashMatrix.Failure: self = .internalFailure(component: "flash", detail: e.description)
+        case let e as TiledAttention.Failure: self = .internalFailure(component: "tiled attention", detail: e.description)
         case let e as Numerics.Failure: self = .internalFailure(component: "forge", detail: e.description)
         default:
             let ns = error as NSError
