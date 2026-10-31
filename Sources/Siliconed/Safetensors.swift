@@ -1,8 +1,8 @@
 import Darwin
 import Foundation
 
-/// The format of the golden tensors, read-only: eight bytes of length, a JSON header, then
-/// the bytes. We map it rather than read it — the golden tensors at 1024² weigh 764 MB, and nothing
+/// **A checkpoint, read-only**: the golden tensors, the published sources the forge reads, the files an import is given, the VAEs.
+/// Eight bytes of length, a JSON header, then the bytes. We map it rather than read it — the golden tensors at 1024² weigh 764 MB, and nothing
 /// requires copying them to compare them.
 ///
 /// A **GGUF** file (`"GGUF"` magic) opens through the same door (`GGUF.parse`): its

@@ -126,7 +126,6 @@ final class RequestTests: XCTestCase {
 
     /// B2: building a request does not read the machine's profile.
     func testNothingReadsTheProfileAtConstruction() {
-        XCTAssertNil(Request("p").reproducible, "resolved at render time, not frozen at construction")
         XCTAssertEqual(Request("p", previews: true).previews, true)
     }
 

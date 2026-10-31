@@ -60,9 +60,7 @@ package final class AnimaVAE {
         guard weights.entries["decoder.conv_in.weight"]?.shape == [384, 16, 3, 3, 3] else {
             throw Safetensors.Failure.badHeader("\(path): not the Qwen-Image VAE")
         }
-        guard let device = MTLCreateSystemDefaultDevice(), let queue = device.makeCommandQueue() else {
-            throw GEMM.Failure.noDevice
-        }
+        let (device, queue) = try SystemGPU.open()
         self.device = device
         self.queue = queue
         self.weights = weights
@@ -142,7 +140,7 @@ package final class AnimaVAE {
     /// walked without a device.
     package static func plan(latentHeight h: Int, latentWidth w: Int, config: Config = .qwenImage) -> VAELayout {
         let memory = VAEMemory()
-        _ = try? decode(nil, latentHeight: h, latentWidth: w, config: config, weights: nil, memory: memory)
+        do { _ = try decode(nil, latentHeight: h, latentWidth: w, config: config, weights: nil, memory: memory) } catch { preconditionFailure("VAE plan walk refused: \(error)") }
         return memory.layout
     }
 

@@ -219,7 +219,7 @@ final class AppTests: XCTestCase {
     func testAStepDoneOnACancelledRenderThrows() {
         let token = Cancellation()
         let receivedEvents = Counter()
-        let context = Context(reproducible: true, cancellation: token) { if case .step = $0 { receivedEvents.add() } }
+        let context = Context(cancellation: token) { if case .step = $0 { receivedEvents.add() } }
         context.beginDenoising(evaluations: 3)
         let x = [Float](repeating: 0, count: 16), v = x
         XCTAssertNoThrow(try context.stepDone(sigma: 1, seconds: 0, evaluatedHeight: 1, evaluatedWidth: 1, space: .flux, x: x, v: v,
@@ -354,11 +354,11 @@ final class AppTests: XCTestCase {
     func testTheMetadataOfARender() {
         let r = Engine.Render(model: "anima", prompt: "p", seed: 7, steps: 8,
                              loras: [LoRAEntry("store/niji.lora.silicon", strength: 0.8)], loraSummary: nil,
-                             image: ImageRGB(pixels: [0, 0, 0], height: 1, width: 1), reproducible: true,
+                             image: ImageRGB(pixels: [0, 0, 0], height: 1, width: 1),
                              evaluations: 8, sketch: nil, spectral: 0, strength: 0.6,
                              startStep: 3, startSigma: 0.8, timings: .init(), footprints: .init(), tokens: 1)
         XCTAssertEqual(r.metadata, ["prompt": "p", "seed": "7", "model": "anima", "steps": "8", "format": "1x1",
-                                       "reproducible": "true", "Software": "Siliconed", "strength": "0.60",
+                                       "Software": "Siliconed", "strength": "0.60",
                                        "image": "source not included", "lora": "niji.lora.silicon:0.80",
                                        "parameters": r.parameters()])
     }
@@ -369,8 +369,7 @@ final class AppTests: XCTestCase {
         let r = Engine.Render(model: "qwen-image-2.1", prompt: "woman posing in a library, « livres »", seed: 4_000_000_000_123,
                              steps: 6, loras: [LoRAEntry("store/flat.lora.silicon", strength: 0.8),
                                                LoRAEntry("/x/a:b.lora.silicon", strength: -0.25)], loraSummary: nil,
-                             image: ImageRGB(pixels: [Float](repeating: 0, count: 3 * 16 * 32), height: 16, width: 32),
-                             reproducible: false, evaluations: 6, sketch: nil, spectral: 0, strength: nil,
+                             image: ImageRGB(pixels: [Float](repeating: 0, count: 3 * 16 * 32), height: 16, width: 32), evaluations: 6, sketch: nil, spectral: 0, strength: nil,
                              startStep: 0, startSigma: 1, timings: .init(), footprints: .init(), tokens: 1)
         let recipe = try XCTUnwrap(Engine.Render.Recipe(metadata: PNG.text(try r.png())))
         XCTAssertEqual(recipe.model, "qwen-image-2.1")
@@ -382,7 +381,6 @@ final class AppTests: XCTestCase {
         XCTAssertEqual(recipe.loras, [LoRAEntry("flat.lora.silicon", strength: 0.8),
                                       LoRAEntry("a:b.lora.silicon", strength: -0.25)])
         XCTAssertNil(recipe.strength); XCTAssertFalse(recipe.sourceImageMissing)
-        XCTAssertEqual(recipe.reproducible, false)
         XCTAssertEqual(recipe.unreadable, [])
 
         // img2img: the strength comes back, and the fact that the source image does not.
@@ -396,12 +394,12 @@ final class AppTests: XCTestCase {
         // Unreadable values: nil, and named; a bad LoRA entry is skipped, the good ones kept.
         let bad = try XCTUnwrap(Engine.Render.Recipe(metadata: [
             "Software": "Siliconed", "model": "z-image", "seed": "-3", "steps": "0", "format": "wide",
-            "reproducible": "maybe", "strength": "2", "lora": "flat.lora.silicon:0.50,broken,:0.3,x.lora.silicon:nan"]))
+            "strength": "2", "lora": "flat.lora.silicon:0.50,broken,:0.3,x.lora.silicon:nan"]))
         XCTAssertEqual(bad.model, "z-image")
-        XCTAssertNil(bad.seed); XCTAssertNil(bad.steps); XCTAssertNil(bad.width); XCTAssertNil(bad.reproducible)
+        XCTAssertNil(bad.seed); XCTAssertNil(bad.steps); XCTAssertNil(bad.width)
         XCTAssertNil(bad.strength)
         XCTAssertEqual(bad.loras, [LoRAEntry("flat.lora.silicon", strength: 0.5)])
-        XCTAssertEqual(bad.unreadable, ["format", "lora", "reproducible", "seed", "steps", "strength"])
+        XCTAssertEqual(bad.unreadable, ["format", "lora", "seed", "steps", "strength"])
         // Above the cap, the steps are unreadable too: 2·10⁹ would allocate the schedule (8 GB) first.
         let many = try XCTUnwrap(Engine.Render.Recipe(metadata: ["Software": "Siliconed", "steps": "2000000000"]))
         XCTAssertNil(many.steps); XCTAssertEqual(many.unreadable, ["steps"])

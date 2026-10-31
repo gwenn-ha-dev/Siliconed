@@ -1,5 +1,10 @@
 import Foundation
 
+// **Anima's σ schedule.** The Turbo's `FlowMatchEulerDiscreteScheduler` under `use_dynamic_shifting = false`, and nothing else of
+// the model: the DiT itself is `Anima.swift`, its sampling loop the shared `Sampler.swift`. What sets it apart from the other
+// families' schedules is that it is computed **in float32, operation by operation**, as the reference's `set_timesteps`
+// does — the same formula in double, rounded once, is one bit off on half of the σ of N = 1…50 (see `sigmas`).
+
 extension AnimaDiT {
     /// The Anima Turbo schedule: `sigmas = linspace(1, 1/N, N)` shifted by `shift = 3`
     /// (`σ' = 3σ / (1 + 2σ)`), then a zero terminal σ — `FlowMatchEulerDiscreteScheduler` under
@@ -15,18 +20,5 @@ extension AnimaDiT {
             let x = Float(s)
             return k * x / (1 + k1 * x)
         } + [0]
-    }
-}
-
-/// **NumPy's `linspace(start, stop, num)`** in double, as `function_base.linspace` computes it:
-/// `step = (stop − start)/(num − 1)`, `i·step + start`, the last value set to `stop`. Anima's and
-/// Krea 2's pipelines hand it to the scheduler, which casts it to float32.
-package enum NumPyRamp {
-    package static func linspace(_ start: Double, _ stop: Double, _ count: Int) -> [Double] {
-        guard count > 1 else { return count == 1 ? [start] : [] }
-        let step = (stop - start) / Double(count - 1)
-        var values = (0..<count).map { Double($0) * step + start }
-        values[count - 1] = stop
-        return values
     }
 }

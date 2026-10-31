@@ -390,7 +390,7 @@ package final class HeadSplitAttention {
         if !work.isEmpty {
             // A thread takes a contiguous run of items (bounds by endpoints), hence one or two heads,
             // each packed once; a free-for-all would repack a head at nearly every item.
-            HeadSplitAttention.perform(threads) { t in
+            Parallel.perform(threads) { t in
                 let s = scratch[t]
                 s.packedHead = -1
                 for i in (t * work.count / threads)..<((t + 1) * work.count / threads) {
@@ -415,7 +415,7 @@ package final class HeadSplitAttention {
         let gpu = Double(finished.load(ordering: .acquiring) - started) * 1e-9
         if cpuHeads > 0 {
             let width = heads * headDim, spilled = cpuHeads * headDim, column = gpuHeads * headDim
-            HeadSplitAttention.perform(threads) { t in
+            Parallel.perform(threads) { t in
                 for row in stride(from: t, to: sequence, by: threads) {
                     (outPointer + row * width + column).update(from: spill + row * spilled, count: spilled)
                 }
@@ -428,15 +428,6 @@ package final class HeadSplitAttention {
             }
         }
         return (gpu, cpu)
-    }
-
-    /// `body(0..<n)` on `n` threads, returning when all are done. Each thread owns its scratch and
-    /// its work items, so nothing is written twice — the same pattern as `Parallel.rows`.
-    private static func perform(_ n: Int, _ body: (Int) -> Void) {
-        withoutActuallyEscaping(body) { body in
-            nonisolated(unsafe) let body = body
-            DispatchQueue.concurrentPerform(iterations: n) { body($0) }
-        }
     }
 
     /// `rows` query rows of one CPU head, into the spill.

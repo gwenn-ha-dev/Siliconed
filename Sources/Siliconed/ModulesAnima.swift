@@ -35,8 +35,7 @@ package struct AnimaTextModule: TextModule {
         context.timings.tokenizer = Date().timeIntervalSince(begin)
         context.footprints.tokenizer = Arena.processFootprint()
         try context.check()
-        let encoder = try TextEncoder(artifact: try Artifact(path: map), sequence: qwenIds.count,
-                                       freezeCut: context.reproducible)
+        let encoder = try TextEncoder(artifact: try Artifact(path: map), sequence: qwenIds.count)
         encoder.cancellation = context.cancellation
         let hidden = try encoder.encode(ids: qwenIds, realTokens: qwenIds.count)
         context.footprints.encoder = Arena.processFootprint()
@@ -121,8 +120,7 @@ package struct AnimaDenoisingModule: DenoisingModule {
         let told = context.told(schedule, start: start)
         let build = { (h: Int, w: Int, range: Range<Int>) throws -> AnimaDiT in
             let dit = try AnimaDiT(artifact: try Artifact(path: map), latentHeight: h, latentWidth: w,
-                                   textLength: text.rows, freezeCut: context.reproducible,
-                                   neuralEngine: context.neuralEngine, lora: lora)
+                                   textLength: text.rows, neuralEngine: context.neuralEngine, lora: lora)
             dit.cancellation = context.cancellation
             try dit.tabulate(sigmas: Array(told[range]))
             return dit

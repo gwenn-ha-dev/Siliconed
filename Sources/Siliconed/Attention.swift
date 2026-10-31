@@ -10,7 +10,7 @@ import Synchronization
 /// matrix weighs 4128² × 30 × 4 bytes = **2.0 GB**. A fused attention is needed, not three GEMMs.
 ///
 /// The mask is passed as `nil`: at 1024² the image tokens number 4096, already a multiple of 32, and
-/// the text padding tokens are **semantic and visible** (pitfall 3.8, verified — the reference's
+/// the text padding tokens are **semantic and visible** (verified — the reference's
 /// mask has an L2 of √S, so it is all ones). The caller must confirm this.
 package final class Attention {
     private let queue: MTLCommandQueue
@@ -318,7 +318,7 @@ package final class Attention {
                       resultsDictionary: [out: data(outBuffer, sequence)])
             return Double(DispatchTime.now().uptimeNanoseconds - started) * 1e-9
         }
-        let commands = queue.makeCommandBuffer()!
+        let commands = queue.checkedCommandBuffer()
         graph.encode(to: MPSCommandBuffer(commandBuffer: commands),
                      feeds: feeds,
                      targetOperations: nil,
@@ -334,8 +334,8 @@ package final class Attention {
     /// engine then reads values that come from no computation, and the defect shows up three
     /// layers further on as an entirely non-finite image.
     ///
-    /// The project had drawn this lesson on a bench kernel; it had never been applied
-    /// here nor in `GEMM`, that is, to the **only two submissions of the render path**.
+    /// The lesson was drawn on a bench kernel, then applied to every submission of the render path: `Attention`, `GEMM`,
+    /// `TensorGEMM`, `FlashMatrix`, `HeadSplitAttention`, `ElementwiseGPU`, `AnimaGELU`, `MossImage`'s SITU.
     ///
     /// We do not throw: these calls are deep inside non-throwing loops. We count, and say so
     /// loudly — once per cause, so as not to drown the output under thirty-two repetitions.

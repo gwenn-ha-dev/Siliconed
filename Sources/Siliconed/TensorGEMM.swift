@@ -1,5 +1,6 @@
 import Foundation
 import Metal
+import Synchronization
 
 /// **The product that reads the published weights as they are**: Metal 4's `matmul2d`, fp32
 /// activations × bf16 weights → fp32 — a path of the plan (`WeightPath.bf16`, `.native`), **never the default**, assigned where
@@ -53,7 +54,7 @@ import Metal
 ///     `x · W = (x · R) · q · s`, `R = H/√G` — fp32 butterflies on `x`, the integers never touched.
 package final class TensorGEMM {
     private let queue: MTLCommandQueue
-    func makeCommands() -> MTLCommandBuffer { queue.makeCommandBuffer()! }
+    func makeCommands() -> MTLCommandBuffer { queue.checkedCommandBuffer() }
     /// `[k, n]` weights (the forge's layout), then `[n, k]` (a published `nn.Linear`).
     private let byColumns, byRows: MTLComputePipelineState
     /// The int8 product, the scale's pass, the rotation of the activation (`linear(a:int8:…)`).
@@ -191,19 +192,19 @@ package final class TensorGEMM {
     }
     """
 
-    /// `nil` on a device without Metal 4, or when this macOS's compiler refuses the
-    /// kernel: the caller keeps the default path.
+    /// `nil` on a device without Metal 4, or when this macOS's compiler refuses the kernel: the caller keeps the
+    /// default path — and the refusal is said (`MetalCompile`), since that path is slower and another arithmetic.
     package init?(device: MTLDevice, queue: MTLCommandQueue, roundingActivations: Bool = false) {
         guard device.supportsFamily(.metal4) else { return nil }
         let options = MTLCompileOptions()
         options.languageVersion = .version4_0
         options.mathMode = .safe
-        guard let library = try? device.makeLibrary(source: TensorGEMM.source, options: options),
+        guard let library = MetalCompile.library(device, TensorGEMM.source, options, what: "matmul2d kernels"),
               let kn = library.makeFunction(name: "linear_kn"), let nk = library.makeFunction(name: "linear_nk"),
-              let byColumns = try? device.makeComputePipelineState(function: kn),
-              let byRows = try? device.makeComputePipelineState(function: nk) else { return nil }
+              let byColumns = MetalCompile.pipeline(device, kn, what: "matmul2d linear_kn"),
+              let byRows = MetalCompile.pipeline(device, nk, what: "matmul2d linear_nk") else { return nil }
         func pipeline(_ name: String) -> MTLComputePipelineState? {
-            library.makeFunction(name: name).flatMap { try? device.makeComputePipelineState(function: $0) }
+            library.makeFunction(name: name).flatMap { MetalCompile.pipeline(device, $0, what: "matmul2d \(name)") }
         }
         guard let int8 = pipeline("linear_int8"), let scaleColumns = pipeline("scale_columns"),
               let rotateGroups = pipeline("rotate_groups") else { return nil }
@@ -223,8 +224,8 @@ package final class TensorGEMM {
     package func linear(a: MTLBuffer, w: MTLBuffer, c: MTLBuffer, m: Int, k: Int, n: Int,
                         weightIsTransposed: Bool) -> Double {
         let pipeline = weightIsTransposed ? byColumns : byRows
-        let commands = queue.makeCommandBuffer()!
-        let encoder = commands.makeComputeCommandEncoder()!
+        let commands = queue.checkedCommandBuffer()
+        let encoder = commands.checkedEncoder()
         encoder.setComputePipelineState(pipeline)
         encoder.setBuffer(a, offset: 0, index: 0)
         encoder.setBuffer(w, offset: 0, index: 1)
@@ -267,8 +268,8 @@ package final class TensorGEMM {
                                                      rounding: rounding, c: c, m: m, k: k, n: n, columns: columns) {
             return rounded
         }
-        let commands = queue.makeCommandBuffer()!
-        let encoder = commands.makeComputeCommandEncoder()!
+        let commands = queue.checkedCommandBuffer()
+        let encoder = commands.checkedEncoder()
         var mkn = SIMD3<UInt32>(UInt32(m), UInt32(k), UInt32(n))
         if let block, let blocks {
             encoder.setComputePipelineState(blocks)
@@ -322,5 +323,31 @@ package final class TensorGEMM {
         encoder.endEncoding()
         commands.commit()
         return commands
+    }
+}
+
+/// **A Metal compilation that fails is said.** The tensor kernels are optional by design (an older macOS, a device without
+/// Metal 4 never gets them), but on a Mac that should have them, a refusal by this macOS's compiler silently sends every product to
+/// the default path: slower, and another arithmetic. The message goes out once per cause.
+enum MetalCompile {
+    private static let said = Mutex<Set<String>>([])
+
+    static func library(_ device: MTLDevice, _ source: String, _ options: MTLCompileOptions, what: String) -> MTLLibrary? {
+        do { return try device.makeLibrary(source: source, options: options) } catch {
+            say("\(what): the compiler refused the source — \(error.localizedDescription)")
+            return nil
+        }
+    }
+
+    static func pipeline(_ device: MTLDevice, _ function: MTLFunction, what: String) -> MTLComputePipelineState? {
+        do { return try device.makeComputePipelineState(function: function) } catch {
+            say("\(what): no pipeline — \(error.localizedDescription)")
+            return nil
+        }
+    }
+
+    private static func say(_ message: String) {
+        let key = String(message.prefix(80))
+        if said.withLock({ $0.insert(key).inserted }) { Warnings.emit("⚠ \(message); the default product path is used") }
     }
 }

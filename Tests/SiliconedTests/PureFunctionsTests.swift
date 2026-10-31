@@ -216,36 +216,6 @@ final class PureFunctionsTests: XCTestCase {
         }
     }
 
-    // ── the GPU/AMX cut ──────────────────────────────────────────────────────────────────
-
-    /// The servo only gives the GPU more rows than the plan did — the AMX's slice, which the memory need charges from the plan, is
-    /// its ceiling — and on the GPU's tile (the quantum exists so that the MPS operator cache stays small: a different `gpuRows` on
-    /// each call made them drop from 3.35 to 1.46 TFLOP/s).
-    func testTheServoOnlyMovesRowsTowardTheGPUOnItsTile() {
-        let q = GEMM.rowQuantum
-        for (planned, m) in [(640, 1024), (2048, 4128), (3072, 4096), (0, 1024)] {
-            XCTAssertEqual(Conductor.servoRows(planned: planned, total: m, learned: nil), planned, "nothing learned: the plan's")
-            var previous = planned
-            for learned in stride(from: 0.0, through: 1.0, by: 0.05) {
-                let rows = Conductor.servoRows(planned: planned, total: m, learned: learned)
-                XCTAssertGreaterThanOrEqual(rows, planned, "never fewer than the plan's: m=\(m) learned=\(learned)")
-                XCTAssertLessThanOrEqual(rows, m)
-                XCTAssertTrue(rows == planned || rows == m || rows % q == 0, "off the tile: \(rows)")
-                XCTAssertGreaterThanOrEqual(rows, previous, "a larger share gives the GPU more rows")
-                previous = rows
-            }
-        }
-        XCTAssertEqual(Conductor.servoRows(planned: 1024, total: 1024, learned: 0.5), 1024, "no AMX rows: nothing to move")
-    }
-
-    func testTheServoIsAPureFunction() {
-        // This is **the whole reproducibility contract**: frozen, the rows are the plan's and nothing else, so two renders of the
-        // same seed yield the same bits.
-        for _ in 0..<100 {
-            XCTAssertEqual(Conductor.servoRows(planned: 2560, total: 4128, learned: 0.7), Conductor.servoRows(planned: 2560, total: 4128, learned: 0.7))
-        }
-    }
-
     // ── the GPU heights ───────────────────────────────────────────────────────────────
 
     func testRowSplitCoversEveryRowOnceAtSafeHeights() {

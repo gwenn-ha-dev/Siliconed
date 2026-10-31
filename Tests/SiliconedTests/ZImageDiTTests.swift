@@ -102,7 +102,7 @@ final class ZImageDiTTests: XCTestCase {
 
     private func evaluate(_ artifact: Artifact, lora: LoRA? = nil) throws -> (out: [Float], boundaries: [String: [Float]]) {
         let dit = try DiT(artifact: artifact, latentHeight: latentHeight, latentWidth: latentWidth,
-                          capLength: capLength, freezeCut: true, lora: lora)
+                          capLength: capLength, lora: lora)
         dit.recordBoundaries = true
         let out = try latent.withUnsafeBufferPointer { l in
             try caps.withUnsafeBufferPointer { c in try dit.forward(latent: l.baseAddress!, caps: c.baseAddress!, sigma: 0.8) }

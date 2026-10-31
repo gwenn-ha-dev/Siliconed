@@ -36,8 +36,7 @@ package struct ZImageTextModule: TextModule {
         context.timings.tokenizer = Date().timeIntervalSince(begin)
         context.footprints.tokenizer = Arena.processFootprint()
         try context.check()
-        let encoder = try TextEncoder(artifact: try Artifact(path: map), sequence: realCount,
-                                       freezeCut: context.reproducible)
+        let encoder = try TextEncoder(artifact: try Artifact(path: map), sequence: realCount)
         encoder.cancellation = context.cancellation
         let caps = Array(try encoder.encode(ids: identifiers, realTokens: realCount))
         context.footprints.encoder = Arena.processFootprint()
@@ -101,8 +100,7 @@ package struct ZImageDenoisingModule: DenoisingModule {
         let full = { () throws -> DiT in
             if let kept = context.keptDenoiser as? DiT { return kept }
             let dit = try DiT(artifact: try Artifact(path: map), latentHeight: height, latentWidth: width,
-                              capLength: text.rows, freezeCut: context.reproducible,
-                              neuralEngine: context.neuralEngine, lora: lora)
+                              capLength: text.rows, neuralEngine: context.neuralEngine, lora: lora)
             dit.cancellation = context.cancellation
             context.keptDenoiser = dit
             return dit
@@ -113,7 +111,7 @@ package struct ZImageDenoisingModule: DenoisingModule {
             context.keptDenoiser = nil
             let half = try DiT(artifact: try Artifact(path: map), latentHeight: planned.reducedHeight,
                                latentWidth: planned.reducedWidth, capLength: text.rows,
-                               freezeCut: context.reproducible, neuralEngine: context.neuralEngine, lora: lora)
+                               neuralEngine: context.neuralEngine, lora: lora)
             half.cancellation = context.cancellation
             sampler = Sampler(half: half, halfSteps: planned.reduced, steps: steps, full: full)
         } else {

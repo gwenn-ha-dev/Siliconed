@@ -136,7 +136,7 @@ package enum Ops {
 
     /// RoPE, on **adjacent pairs** `(2i, 2i+1)` and not by halves.
     ///
-    /// This is pitfall 3.1, and it does not show: a LLaMA-style port, which pairs `i` and `i+D/2`,
+    /// This does not show: a LLaMA-style port, which pairs `i` and `i+D/2`,
     /// produces a result of the right shape, the right norm, and wrong. The reference does
     /// `view_as_complex(x.reshape(…, -1, 2))`, hence adjacent pairs.
     ///
@@ -297,7 +297,7 @@ extension Ops {
     }
 }
 
-/// The 3D RoPE tables of Z-Image's DiT. Axis 0 is a **segment index** and not a time (pitfall 3.2):
+/// The 3D RoPE tables of Z-Image's DiT. Axis 0 is a **segment index** and not a time:
 /// the text occupies `1…L`, the image occupies the constant value `L+1`, and axes 1 and 2 carry the
 /// spatial coordinates. The image padding tokens receive `(0, 0, 0)`.
 ///
@@ -348,5 +348,100 @@ package struct RopeTables {
             }
             offset += half
         }
+    }
+}
+
+/// The operations several families share: they came out of one family's file, which the others then reached into.
+extension Ops {
+    /// `x = x · (1 + scale) + shift`, in place, per row.
+    package static func modulate(_ x: UnsafeMutablePointer<Float>, scale: UnsafePointer<Float>,
+                                shift: UnsafePointer<Float>, rows: Int, columns: Int) {
+        var factor = [Float](repeating: 1, count: columns)
+        vDSP_vadd(scale, 1, factor, 1, &factor, 1, vDSP_Length(columns))
+        factor.withUnsafeBufferPointer { f in
+            let factor = f.baseAddress!
+            Parallel.rows(rows, width: columns) { first, howMany in
+                for row in first..<(first + howMany) {
+                    let r = x + row * columns
+                    Ops.multiplyAdd(r, times: factor, plus: shift, count: columns)   // two roundings, as torch
+                }
+            }
+        }
+    }
+
+    /// GELU, `tanh` approximation: `½ x (1 + tanh(√(2/π) (x + 0.044715 x³)))`.
+    package static func geluTanh(_ x: UnsafeMutablePointer<Float>, count: Int) {
+        let c = Float((2 / Double.pi).squareRoot())
+        nonisolated(unsafe) let x = x   // disjoint slices, one per task
+        Parallel.perform(max(1, count / 65536 + 1)) { piece in
+            let start = piece * 65536, end = min(start + 65536, count)
+            guard start < end else { return }
+            for i in start..<end {
+                let value = x[i]
+                x[i] = 0.5 * value * (1 + tanhf(c * (value + 0.044715 * value * value * value)))
+            }
+        }
+    }
+
+    /// `c[row] += bias` for each of `rows` rows of `columns` floats.
+    package static func addBias(_ c: UnsafeMutablePointer<Float>, bias: UnsafePointer<Float>, rows: Int, columns: Int) {
+        Parallel.rows(rows, width: columns) { first, howMany in
+            for row in first..<(first + howMany) {
+                vDSP_vadd(c + row * columns, 1, bias, 1, c + row * columns, 1, vDSP_Length(columns))
+            }
+        }
+    }
+}
+
+/// The attention plumbing of the Qwen3-family text encoders (Qwen3, Qwen3.5, the Qwen3-VL language model).
+extension Ops {
+    /// QK-Norm: `RMSNorm` over each head's `headDim` — a norm per *head*, not per token: the mean square runs over the
+    /// `headDim` components of a head, not over the whole vector — with the weight already `1 + w` (the forge folded it).
+    package static func normHeads(_ t: UnsafeMutablePointer<Float>, weight: UnsafePointer<Float>, rows: Int, heads: Int,
+                                  headDim d: Int, eps: Float) {
+        Parallel.rows(rows, width: heads * d) { first, howMany in
+            for s in first..<(first + howMany) {
+                for h in 0..<heads {
+                    let row = t + (s * heads + h) * d
+                    var sum: Float = 0
+                    for j in 0..<d { sum += row[j] * row[j] }
+                    let scale = 1 / (sum / Float(d) + eps).squareRoot()
+                    for j in 0..<d { row[j] = row[j] * scale * weight[j] }
+                }
+            }
+        }
+    }
+
+    /// `kvHeads` heads repeated `group` times (what GQA asks for and `MPSGraph.scaledDotProductAttention` does not expose): a
+    /// copy rather than a broadcast, which would cost one more transposition. Query head `h` reads kv head `h / group`.
+    package static func expandKV(_ source: UnsafePointer<Float>, into destination: UnsafeMutablePointer<Float>, rows: Int,
+                                 headDim d: Int, group: Int, kvHeads: Int) {
+        Parallel.rows(rows, width: kvHeads * group * d) { first, howMany in
+            for s in first..<(first + howMany) {
+                for kvHead in 0..<kvHeads {
+                    let from = source + (s * kvHeads + kvHead) * d
+                    for repetition in 0..<group {
+                        (destination + (s * (kvHeads * group) + kvHead * group + repetition) * d).update(from: from, count: d)
+                    }
+                }
+            }
+        }
+    }
+}
+
+extension Artifact {
+    /// `materialize` into a caller's buffer, refusing a tensor that does not hold exactly `count` values.
+    func materializeExactly(_ name: String, count: Int, into destination: UnsafeMutablePointer<Float>) throws {
+        let got = try materialize(name, into: destination, capacity: count)
+        guard got == count else { throw Artifact.Failure.badHeader("\(name): \(got) values, \(count) expected") }
+    }
+}
+
+/// **The frequencies of the sinusoidal timestep embeddings** (`[cos | sin]` of `t · ωⱼ`, `ωⱼ = 10⁴^(−j/half)`), in double, as
+/// Krea 2's and Qwen-Image-2.1's references compute them: `exp(−ln(10⁴) · j / half)`. **Not MOSS-Image's**, whose `pow(10⁴, −j / half)`
+/// gives other doubles in the last bit (`SinusoidTests`): it keeps its own.
+package enum Sinusoid {
+    package static func frequencies(half: Int) -> [Double] {
+        (0..<half).map { exp(-log(10000) * Double($0) / Double(half)) }
     }
 }

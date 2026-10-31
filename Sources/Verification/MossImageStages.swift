@@ -134,7 +134,7 @@ package enum MossImageStages {
         let conditioning = Conditioning(format: .mossImage, rows: rows, width: textEntry.shape[1], values: Array(text), tokens: rows)
         let started = Date()
         try module.denoise(&produced, text: conditioning, steps: steps, start: 0, lora: nil,
-                           context: Context(reproducible: false, onProgress: nil))
+                           context: Context(onProgress: nil))
         if invocation.profile { print(String(format: "denoising %.1f s for %d steps", Date().timeIntervalSince(started), steps)) }
         report.add(latent.withUnsafeBufferPointer {
             Judge.planes("product vs the stage's loop (latent_final)", engine: produced.values, oracle: $0, planes: channels, floor: 1e-5)

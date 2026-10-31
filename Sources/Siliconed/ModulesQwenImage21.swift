@@ -25,7 +25,7 @@ package struct QwenImage21TextModule: ImageTextModule {
         context.footprints.tokenizer = Arena.processFootprint()
         try context.check()
         let artifact = try Artifact(path: map)
-        let encoder = try Qwen3VLEncoder(artifact: artifact, tokenizer: tokenizer, freezeCut: context.reproducible)
+        let encoder = try Qwen3VLEncoder(artifact: artifact, tokenizer: tokenizer)
         encoder.cancellation = context.cancellation
         // Its own autorelease pool: the attention's autoreleased tensor data would otherwise keep
         // Metal buffers alive past the encoder on a thread that never drains (see `QwenImage21DiT.pass`).
@@ -137,7 +137,6 @@ package struct QwenImage21DenoisingModule: DenoisingModule {
         }
         try check(steps: steps, startImage: start > 0)
         var sampler = QwenImage21Sampler(artifact: try Artifact(path: map), lora: lora)
-        sampler.freezeCut = context.reproducible
         sampler.neuralEngine = context.neuralEngine
         sampler.cancellation = context.cancellation
         sampler.storage = storage
@@ -163,7 +162,7 @@ package struct QwenImage21DenoisingModule: DenoisingModule {
                                                        imageSlots: text.imageSlots.filter { $0 }.count)
             if QwenImage21CachePolicy.storage(prefix: prefix) == .file {
                 let key = kvKey(stack: lora?.layers ?? [], text: text, references: references, latent: latent,
-                                reproducible: context.reproducible, neuralEngine: context.neuralEngine)
+                                neuralEngine: context.neuralEngine)
                 cache.keepOnlyKV([key])
                 sampler.kept = (cache.kvPath(key), key.hex)
                 sampler.keptReserve = cache.keptReserve
@@ -189,9 +188,9 @@ package struct QwenImage21DenoisingModule: DenoisingModule {
     /// states and slots, each reference latent, and the target's grid (it closes the joint sequence).
     /// Not the seed, not σ: the conditions read `t = 0` and never see the target.
     func kvKey(stack: [LoRA.Layer], text: Conditioning, references: [Latent], latent: Latent,
-               reproducible: Bool, neuralEngine: Bool) -> RenderCache.Key {
+               neuralEngine: Bool) -> RenderCache.Key {
         var k = RenderCache.KeyBuilder("qwen21 kv v2")
-        k.add(RenderCache.build); k.add(RenderCache.numerics(reproducible: reproducible, neuralEngine: neuralEngine))
+        k.add(RenderCache.build); k.add(RenderCache.numerics(neuralEngine: neuralEngine))
         k.add(RenderCache.stamp(map))
         k.add(stack.count)
         for layer in stack { k.add(RenderCache.stamp(layer.artifact.path)); k.add(Int(layer.strength.bitPattern)) }

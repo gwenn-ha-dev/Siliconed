@@ -102,7 +102,6 @@ package final class Qwen3VLGenerator {
     /// The head map's `eos_token_ids` (`generation_config.eos_token_id`).
     package let stops: Set<Int>
     package let vocabulary: Int
-    private let freezeCut: Bool
 
     package var cancellation: Cancellation?
     /// A decode step runs on the GPU from the resident weights when `load` could build the decoder; the CPU's passes
@@ -142,8 +141,7 @@ package final class Qwen3VLGenerator {
     /// The query rows an attention task takes at once.
     package static let attentionBlock = 64
 
-    package init(encoder: Artifact, head: Artifact, tokenizer: Tokenizer,
-                 freezeCut: Bool = EngineSettings.effective.frozenCut) throws {
+    package init(encoder: Artifact, head: Artifact, tokenizer: Tokenizer) throws {
         let config = try TextEncoder.Config(header: encoder.header)
         guard config.mropeSections != nil else { throw Failure.incomplete("the encoder map declares no mRoPE: not Qwen3-VL") }
         guard encoder.header["final_norm"] as? Bool != true else {
@@ -167,7 +165,7 @@ package final class Qwen3VLGenerator {
         self.encoder = encoder; self.head = head; self.config = config
         self.vision = try Qwen3VLVision.Config(header: encoder.header)
         self.tokens = try Qwen3VLPrompt.Tokens(header: encoder.header, tokenizer: tokenizer)
-        self.stops = Set(eos); self.vocabulary = lm.shape[0]; self.freezeCut = freezeCut
+        self.stops = Set(eos); self.vocabulary = lm.shape[0]
     }
 
     // MARK: - Residency
@@ -254,7 +252,7 @@ package final class Qwen3VLGenerator {
         var features: [Qwen3VLVision.Features] = []
         if let largest = request.images.map(\.patches).max() {
             let t0 = Date()
-            let tower = try Qwen3VLVision(artifact: encoder, config: vision, maximumPatches: largest, freezeCut: freezeCut)
+            let tower = try Qwen3VLVision(artifact: encoder, config: vision, maximumPatches: largest)
             tower.cancellation = cancellation
             features = try request.images.map { try tower.encode($0) }
             timings["vision"] = Date().timeIntervalSince(t0)
@@ -285,7 +283,7 @@ package final class Qwen3VLGenerator {
         let scratch = slice["scratch"]!, finalNorm = slice["finalNorm"]!, reserve = slice["reserve"]!
         let last = slice["last"]!, headRows = slice["headRows"]!, logits = slice["logits"]!
         // The encoder's own GEMM phase: the plan asks the encoder's questions of the encoder's products.
-        let gemm = try GEMM(freezeCut: freezeCut, phase: .encoding)
+        let gemm = try GEMM(phase: .encoding)
         let normedBuf = try gemm.wrap(normed, bytes: rows * h * 4, name: "normed")
         let projectedBuf = try gemm.wrap(projected, bytes: rows * h * 4, name: "projected")
         let qBuf = try gemm.wrap(q, bytes: rows * a * 4, name: "q")

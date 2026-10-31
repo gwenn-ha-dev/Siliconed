@@ -328,10 +328,10 @@ enum KernelStages {
         rule: "against cblas_sgemm, per row: the GPU's rows bit for bit, the AMX's ≤ 1e-5 (another summation order over k = 3 840)"
     ) { _ in
         let report = Report(title: "kernels gemm-split")
-        // The AMX brought up, the servo on: the seam moves with the observed times (toward the GPU), and the check follows it.
+        // The AMX brought up, the cut the plan's and frozen: the seam stays where the plan pins it.
         let plan = CapacityPlan.probing(amx: true)
-        let gemm = try GEMM(freezeCut: false, plan: plan)
-        guard let conductor = gemm.conductor else { throw Skip("no AMX conductor on this machine") }
+        let gemm = try GEMM(plan: plan)
+        guard gemm.conductor != nil else { throw Skip("no AMX conductor on this machine") }
         let m = 1024, k = 3840, n = 3840
         let arena = try Arena(capacity: (m * k + k * n + m * n) * 4 + (32 << 20))
         let a = try arena.reserve("a", bytes: m * k * 4).assumingMemoryBound(to: Float.self)
@@ -379,8 +379,8 @@ enum KernelStages {
         memset(c, 0, m * n * 4)
         let planned = 640                      // five eighths of the rows to the GPU, on its 64-row tile
         let cut = planned
-        // The AMX's side on a frozen conductor of its own: the servo's (`conductor`) learns from the GPU's side, which here is nothing.
-        let direct = Conductor(queue: gemm.queue, driven: false)
+        // The AMX's side on a conductor of its own: the GPU's side here is nothing.
+        let direct = Conductor(queue: gemm.queue)
         truth.withUnsafeBufferPointer { c.update(from: $0.baseAddress!, count: cut * n) }
         _ = direct.linear(a: ab, b: bb, c: cb, gpuRows: cut, amxRows: m - cut, k: k, n: n, weightIsTransposed: true,
                           multiply: { _ in 0 })
@@ -395,11 +395,11 @@ enum KernelStages {
         let small = 511
         _ = gemm.linear(a: ab, b: bb, c: cb, m: small, k: k, n: n, weightIsTransposed: true)
         report.add(Judge.identity("GPU alone, \(small) rows", differing: small - rows(0, small).exact, of: small, unit: "row"))
-        // The whole split, three times, as the plan assigns it: the servo moves the seam toward the GPU, so the check follows it.
+        // The whole split, three times, as the plan assigns it.
         plan.pin(ProductKey(k: k, n: n, m: m), ProductAssignment(gpu: planned, amx: m - planned))
         for pass in 1...3 {
             memset(c, 0, m * n * 4)
-            let used = Conductor.servoRows(planned: planned, total: m, learned: conductor.fraction["\(k)×\(n)"])
+            let used = planned
             _ = gemm.linear(a: ab, b: bb, c: cb, m: m, k: k, n: n, weightIsTransposed: true)
             judge(String(format: "split %d (GPU %.0f %%)", pass, 100 * Double(used) / Double(m)), cut: used)
         }

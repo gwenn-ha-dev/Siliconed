@@ -111,19 +111,18 @@ package struct RenderCache: Sendable {
     package static let build: String = Bundle.main.executableURL.map { stamp($0.resolvingSymlinksInPath().path) } ?? "unknown"
 
     /// **What changes a computation's bits**: the plan the engine runs under (which engine takes which rows, which kernel runs
-    /// each attention), plus the render's `reproducible` and the thread count.
-    package static func numerics(reproducible: Bool, neuralEngine: Bool = false) -> String {
+    /// each attention), plus the thread count.
+    package static func numerics(neuralEngine: Bool = false) -> String {
         let s = EngineSettings.effective
         // The Neural Engine computes in fp16: a K/V the DiT wrote with it is not one written without.
         let plan = s.plan.restricted(allowingANE: neuralEngine)
-        return "plan \(plan.identity) frozen \(reproducible) parallel \(s.parallel)"
+        return "plan \(plan.identity) parallel \(s.parallel)"
     }
 
     /// The key of a text stage's output: the module, the prompt, the images it sees.
-    package static func textKey(_ module: any CacheIdentified, prompt: String, images: [ImageRGB],
-                                reproducible: Bool) -> Key {
+    package static func textKey(_ module: any CacheIdentified, prompt: String, images: [ImageRGB]) -> Key {
         var k = KeyBuilder("conditioning v1")
-        k.add(build); k.add(numerics(reproducible: reproducible))
+        k.add(build); k.add(numerics())
         for part in module.cacheIdentity { k.add(part) }
         k.add(prompt)
         k.add(images.count)
@@ -132,9 +131,9 @@ package struct RenderCache: Sendable {
     }
 
     /// The key of an image encoder's latent.
-    package static func imageKey(_ module: any CacheIdentified, image: ImageRGB, reproducible: Bool) -> Key {
+    package static func imageKey(_ module: any CacheIdentified, image: ImageRGB) -> Key {
         var k = KeyBuilder("latent v1")
-        k.add(build); k.add(numerics(reproducible: reproducible))
+        k.add(build); k.add(numerics())
         for part in module.cacheIdentity { k.add(part) }
         k.add(image)
         return k.finish()

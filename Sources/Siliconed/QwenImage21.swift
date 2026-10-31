@@ -57,7 +57,7 @@ import Foundation
 /// references (P = 2 072), 2.2 GB. It belongs to the DiT, hence to its map and its LoRA stack.
 /// The step copies the cached prefix into `keys`/`values` before attending (0.64 s per evaluation
 /// at P = 2 072, measured): the price of not holding `P + S` rows per layer.
-package final class QwenImage21DiT {
+package final class QwenImage21DiT: BoundaryRecording, PhaseTiming {
     package struct Config {
         package let dim, heads, headDim, hidden, layers, channels, context: Int
         package let axes: [Int]
@@ -82,13 +82,13 @@ package final class QwenImage21DiT {
 
     package let config: Config
     package let sequence: QwenImage21Sequence
-    package private(set) var boundaries: [String: [Float]] = [:]
+    package internal(set) var boundaries: [String: [Float]] = [:]
     package var recordBoundaries = false
     /// The token of the render in progress, consulted between two layers (see `Cancellation`).
     package var cancellation: Cancellation?
     /// The weight products' phases (`WeightProducts`) added to the DiT's own.
     package var timings: [String: Double] { ownTimings.merging(products.timings, uniquingKeysWith: +) }
-    private var ownTimings: [String: Double] = [:]
+    var ownTimings: [String: Double] = [:]
     package func resetTimings() { ownTimings.removeAll(); products.resetTimings() }
 
     private let artifact: Artifact
@@ -289,7 +289,6 @@ package final class QwenImage21DiT {
     ///     otherwise; the unlinked file when keeping it would leave less than `reserve` bytes free.
     package init(artifact: Artifact, sequence: QwenImage21Sequence, lora: LoRA? = nil, fullPass: Bool = false,
                  storage: CacheStorage = .memory, kept: (path: String, key: String, reserve: Int64)? = nil,
-                 freezeCut: Bool = EngineSettings.effective.frozenCut,
                  neuralEngine: Bool = EngineSettings.effective.plan.usesANE) throws {
         guard let kind = artifact.header["kind"] as? String, Family(ditKind: kind) == .qwenImage21 else {
             if artifact.header["kind"] as? String == Family.supersededQwenImage21Kind {
@@ -305,7 +304,7 @@ package final class QwenImage21DiT {
         self.config = Config(header: artifact.header)
         self.sequence = sequence
         self.prefetcher = Prefetcher(artifact: artifact)
-        self.gemm = try GEMM(freezeCut: freezeCut, neuralEngine: neuralEngine)
+        self.gemm = try GEMM(neuralEngine: neuralEngine)
         self.elementwise = try ElementwiseGPU(device: gemm.device, queue: gemm.queue)
         self.allowsFullPass = fullPass || storage == .recompute
         self.storage = storage
@@ -371,17 +370,6 @@ package final class QwenImage21DiT {
                                   transposed: true, lora: cacheLoRA, mid: loraMid,
                                   midFloats: loraMid.map { sizes[$0]! / 4 } ?? 0, mergesLoRA: true, roundsActivations: true)
         QwenImage21Rope.write(into: freqs, positions: sequence.positions, axes: config.axes, theta: config.theta)
-    }
-
-    private func record(_ name: String, _ p: UnsafePointer<Float>, _ n: Int) {
-        guard recordBoundaries else { return }
-        boundaries[name] = Array(UnsafeBufferPointer(start: p, count: n))
-    }
-
-    private func timed<T>(_ phase: String, _ body: () throws -> T) rethrows -> T {
-        let started = DispatchTime.now().uptimeNanoseconds
-        defer { ownTimings[phase, default: 0] += Double(DispatchTime.now().uptimeNanoseconds - started) * 1e-9 }
-        return try body()
     }
 
     // ── the two entry points ────────────────────────────────────────────────────────────
@@ -762,8 +750,9 @@ package final class QwenImage21DiT {
         let half = dim / 2
         let entry = 1000 * Double(timestep)
         var out = [Double](repeating: 0, count: dim)
+        let frequencies = Sinusoid.frequencies(half: half)
         for j in 0..<half {
-            let angle = entry * exp(-log(10000) * Double(j) / Double(half))
+            let angle = entry * frequencies[j]
             out[j] = cos(angle)
             out[half + j] = sin(angle)
         }

@@ -3,10 +3,10 @@ import Metal
 import MetalPerformanceShaders
 import Synchronization
 
-/// The engine's GEMM: `MPSMatrixMultiplication` in fp32.
+/// The engine's GEMM: the products on the GPU, `MPSMatrixMultiplication` in fp32 by default, and the doorway to the engines a
+/// plan may add on a product (`Conductor`: rows to the AMX; `TensorGEMM`: the published weight as it is; the Neural Engine).
 ///
-/// fp32 and not fp16, and the decision rests on three independent measurements:
-/// the AMX has no other path, MPS is both faster *and* exact there, and the DiT
+/// fp32 and not fp16, and the decision rests on independent measurements: MPS is both faster *and* exact there, and the DiT
 /// activations overflow fp16 by a factor of thirteen. This is not a compromise.
 ///
 /// The buffers are wrapped with `bytesNoCopy` around the arena: MPS reads where the engine
@@ -23,26 +23,21 @@ package final class GEMM {
     /// 157 MB, costs more than the computation. Memoized by address.
     private var buffers: [UInt: MTLBuffer] = [:]
 
-    /// And the operators do not move either: there are only five GEMM shapes in a block.
+    /// And the operators do not move either: a block has a handful of GEMM shapes.
     ///
-    /// Building one `MPSMatrixMultiplication` per call — 224 times per evaluation — dropped the
+    /// Building one `MPSMatrixMultiplication` per call (hundreds per evaluation) dropped the
     /// GEMMs from 3.35 to 1.46 TFLOP/s. The object carries the kernel selection; redoing it every
     /// time means redoing the selection every time. Same fault as for the buffers, and it only shows
     /// up with instrumentation: the arithmetic count gave 14 s, the measurement 32.
     private struct Shape: Hashable { let m, k, n: Int; let transposed: Bool; var accumulates = false }
     private var operators: [Shape: MPSMatrixMultiplication] = [:]
 
-    /// Count and GPU time per shape. The gap between 3.34 TFLOP/s on the bench and 1.49 in the
-    /// engine was chased by hypotheses — alignment of M, `bytesNoCopy`, interleaved CPU writes,
-    /// rebuilding the operator — and none held. Counting is less clever and safer.
+    /// Count and GPU time per shape: counting is less clever than a hypothesis, and safer.
     ///
-    /// **`best` is there for a hypothesis this list did not contain: the asymmetry of the
-    /// measurement itself.** The bench (`m4_gemm.swift`, since archived) timed the same way — `gpuEndTime −
-    /// gpuStartTime`, one GEMM per buffer — but it kept the **best of five**, on the same
-    /// buffers left warm. The engine sums *all* its executions, cold operands and clock dropped
-    /// between two bursts: it is an average. Comparing a best to an average manufactures a gap
-    /// that is not a defect. The engine's best against the bench's best settles it; and the gap
-    /// between the engine's best and its average quantifies what cold starts and variance cost.
+    /// **`best` is there because a bench keeps the best of several runs on warm buffers while the engine sums all its executions,
+    /// cold operands and clock dropped between two bursts**: comparing a best to an average manufactures a gap that is not a
+    /// defect. The engine's best against the bench's best settles it; the gap between the engine's best and its average
+    /// quantifies what cold starts and variance cost.
     package private(set) var census: [String: (count: Int, seconds: Double, best: Double)] = [:]
     private func record(_ key: String, _ seconds: Double) {
         let previous = census[key] ?? (0, 0, Double.infinity)
@@ -76,7 +71,7 @@ package final class GEMM {
         init(device: MTLDevice) { self.device = device }
         private func buffer(_ name: String, _ floats: Int) -> MTLBuffer {
             if let t = buffers[name], t.length >= floats * 4 { return t }
-            let t = device.makeBuffer(length: floats * 4, options: .storageModeShared)!
+            let t = device.checkedBuffer(length: floats * 4)
             t.label = "padding tier \(name)"
             buffers[name] = t
             return t
@@ -173,27 +168,21 @@ package final class GEMM {
     /// Products that went through the bf16 activation path in this process: a check says what ran.
     package static let roundedProducts = Mutex<Int>(0)
 
-    /// - Parameter freezeCut: the GPU/AMX cut is not servo-controlled. This is the reproducible mode:
-    ///   the rows stay the plan's, so the cut is a pure function and two renders of the same
-    ///   seed return the same bits. No effect without the AMX.
     /// - Parameter plan: the engines it brings up are built (`CapacityPlan.Resources`: the conductor, `TensorGEMM`, the Neural
     ///   Engine), and it answers each product. The process's by default; a probe or a check passes its own.
     /// - Parameter phase: the encoders' products (`.encoding`) never take the ANE or a rounded activation.
     /// - Parameter neuralEngine: this process may bring the ANE up (the Standard's and a refusing request's may not).
-    package init(freezeCut: Bool = EngineSettings.effective.frozenCut,
-                 plan base: CapacityPlan = EngineSettings.effective.plan,
+    package init(plan base: CapacityPlan = EngineSettings.effective.plan,
                  phase: CapacityClasses.Phase = .denoising,
                  neuralEngine allowed: Bool = true) throws {
-        guard let device = MTLCreateSystemDefaultDevice(), let queue = device.makeCommandQueue() else {
-            throw Failure.noDevice
-        }
+        let (device, queue) = try SystemGPU.open()
         self.device = device
         self.queue = queue
         let plan = base.restricted(allowingANE: allowed && phase == .denoising)
         self.plan = plan
         self.phase = phase
         let r = plan.resources
-        if r.amx { conductor = Conductor(queue: queue, driven: !freezeCut) }
+        if r.amx { conductor = Conductor(queue: queue) }
         if r.usesTensor {
             tensor = TensorGEMM(device: device, queue: queue, roundingActivations: r.roundedActivations)
         }
@@ -432,7 +421,7 @@ package final class GEMM {
             return lora(x: x, down: down, mid: mid, up: up, c: c, m: body, k: k, r: r, n: n)
                 + padded(first: body, rows: tail)
         }
-        let commands = queue.makeCommandBuffer()!
+        let commands = queue.checkedCommandBuffer()
         encoder(Shape(m: m, k: k, n: r, transposed: true), into: commands, x, down, mid)
         encoder(Shape(m: m, k: r, n: n, transposed: true, accumulates: true), into: commands, mid, up, c)
         commands.commit()
@@ -467,7 +456,7 @@ package final class GEMM {
         if GEMM.poisonedRows.contains(m) { return padded(first: 0, rows: m) }
         let (body, tail) = GEMM.rowSplit(m)
         if tail > 0 { return accumulatedLinear(a: a, b: b, c: c, m: body, k: k, n: n) + padded(first: body, rows: tail) }
-        let commands = queue.makeCommandBuffer()!
+        let commands = queue.checkedCommandBuffer()
         encoder(Shape(m: m, k: k, n: n, transposed: true, accumulates: true), into: commands, a, b, c)
         commands.commit()
         commands.waitUntilCompleted()
@@ -585,7 +574,7 @@ package final class GEMM {
                       MPSMatrixDescriptor(rows: m, columns: n, rowBytes: n * size, dataType: .float32))
             descriptors[shape] = shapes
         }
-        let commands = queue.makeCommandBuffer()!
+        let commands = queue.checkedCommandBuffer()
         multiply.encode(commandBuffer: commands,
                         leftMatrix: MPSMatrix(buffer: a, descriptor: shapes.0),
                         rightMatrix: MPSMatrix(buffer: b, descriptor: shapes.1),

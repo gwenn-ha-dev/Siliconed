@@ -31,7 +31,7 @@ package struct MossImageTextModule: TextModule {
         try context.check()
         let artifact = try Artifact(path: map)
         let hidden = try autoreleasepool { () throws -> [Float] in
-            let encoder = try Qwen35Encoder(artifact: artifact, sequence: ids.count, freezeCut: context.reproducible)
+            let encoder = try Qwen35Encoder(artifact: artifact, sequence: ids.count)
             encoder.cancellation = context.cancellation
             return try encoder.encode(ids: ids)
         }
@@ -112,7 +112,7 @@ package struct MossImageDenoisingModule: DenoisingModule {
         // full one takes over the small one's expanded LoRA, the one thing that outlives it.
         func build(height: Int, width: Int, expanded: CacheLoRA? = nil) throws -> MossImageDiT {
             let dit = try MossImageDiT(artifact: artifact, gridHeight: height, gridWidth: width, maxText: tokens,
-                                       freezeCut: context.reproducible, neuralEngine: context.neuralEngine, lora: stack,
+                                       neuralEngine: context.neuralEngine, lora: stack,
                                        expanded: expanded)
             dit.cancellation = context.cancellation
             try context.check()

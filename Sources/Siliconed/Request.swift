@@ -39,7 +39,7 @@ package struct LoRAEntry: Sendable, Hashable {
 /// specific to a model (Qwen-Image-2.1's spectral schedule, for instance) lives on its module.
 ///
 /// **Building a request reads nothing** — neither the machine's profile nor a file: what depends
-/// on them (`reproducible` left at `nil`) is resolved at render time. An app can therefore hold
+/// on them is resolved at render time. An app can therefore hold
 /// one in its state before having chosen its library and loaded its profile.
 package struct Request: Sendable, Equatable {
     package var prompt: String
@@ -53,10 +53,6 @@ package struct Request: Sendable, Equatable {
     /// throws `EngineError.invalidSteps` before any computation.
     package var steps: Int?
     package var loras: [LoRAEntry]
-    /// **Same seed, same bits**: the GPU/AMX split is not servo-controlled. See `Conductor.driven`.
-    /// `nil`: the machine's setting (`EngineSettings.effective.frozenCut`, true by default), **read at
-    /// render time**, not at construction.
-    package var reproducible: Bool?
     /// **The img2img starting image.** Set at any size, it is **immediately** filled and
     /// center-cropped to the request's format (`ImageRGB.fitted`): a request never keeps a
     /// full-size photo (48 Mpx would weigh 576 MB of floats for the whole render). `nil`: txt2img
@@ -167,19 +163,19 @@ package struct Request: Sendable, Equatable {
 
     package init(_ prompt: String, width: Int, height: Int, seed: UInt64 = 42, steps: Int? = nil,
                 loras: [LoRAEntry] = [], image: ImageRGB? = nil, strength: Double = Strength.defaultValue,
-                previews: Bool = false, reproducible: Bool? = nil) {
+                previews: Bool = false) {
         self.prompt = prompt; self.width = width; self.height = height; self.seed = seed
         self.steps = steps; self.loras = loras; self.image = image; self.strength = strength
-        self.previews = previews; self.reproducible = reproducible
+        self.previews = previews
         fit()   // `didSet` does not run inside an `init`
     }
 
     /// The `resolution × resolution` square — the common case, written short.
     package init(_ prompt: String, resolution: Int = 1024, seed: UInt64 = 42, steps: Int? = nil,
                 loras: [LoRAEntry] = [], image: ImageRGB? = nil, strength: Double = Strength.defaultValue,
-                previews: Bool = false, reproducible: Bool? = nil) {
+                previews: Bool = false) {
         self.init(prompt, width: resolution, height: resolution, seed: seed, steps: steps,
-                  loras: loras, image: image, strength: strength, previews: previews, reproducible: reproducible)
+                  loras: loras, image: image, strength: strength, previews: previews)
     }
 
     /// The image at the current format. A format refused by `Format` is not fitted (the render

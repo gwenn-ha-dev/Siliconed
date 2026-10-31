@@ -165,7 +165,7 @@ final class MossImageTests: XCTestCase {
     /// The kernel against the definition in double, on a fused `[hidden | gate]` row (the main blocks) and on
     /// two buffers with the output over `hidden` (the text blocks).
     func testTheKernelIsTheDefinition() throws {
-        let gemm = try GEMM(freezeCut: false, neuralEngine: false)
+        let gemm = try GEMM(neuralEngine: false)
         let kernels = try MossImageKernels(device: gemm.device, queue: gemm.queue)
         let (rows, columns) = (37, 300)
         let page = Arena.alignment / 4

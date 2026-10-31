@@ -169,7 +169,7 @@ final class NamedSubjectsTests: XCTestCase {
     /// nobody cited, the engine's metadata untouched.
     func testTheMetadataKeepsThePromptTyped() throws {
         let engine = ["prompt": "alice in a library\n\nalice is the person in <image1>.", "seed": "42",
-                      "model": "qwen-image-2.1", "steps": "8", "format": "1024x1024", "reproducible": "true",
+                      "model": "qwen-image-2.1", "steps": "8", "format": "1024x1024",
                       "Software": "Siliconed"]
         XCTAssertEqual(N.metadata(engine, typed: "@alice in a library", modelPrompt: nil), engine)
         let m = N.metadata(engine, typed: "@alice in a library", modelPrompt: engine["prompt"])

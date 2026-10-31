@@ -236,3 +236,16 @@ package final class Sampler {
         return bad > 0 ? (bad, first) : nil
     }
 }
+
+/// **NumPy's `linspace(start, stop, num)`** in double, as `function_base.linspace` computes it:
+/// `step = (stop − start)/(num − 1)`, `i·step + start`, the last value set to `stop`. Anima's and
+/// Krea 2's pipelines hand it to the scheduler, which casts it to float32.
+package enum NumPyRamp {
+    package static func linspace(_ start: Double, _ stop: Double, _ count: Int) -> [Double] {
+        guard count > 1 else { return count == 1 ? [start] : [] }
+        let step = (stop - start) / Double(count - 1)
+        var values = (0..<count).map { Double($0) * step + start }
+        values[count - 1] = stop
+        return values
+    }
+}

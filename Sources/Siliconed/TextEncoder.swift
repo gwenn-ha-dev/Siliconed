@@ -151,12 +151,7 @@ package final class TextEncoder {
 
     /// - Parameter sequence: the number of positions computed. **Not necessarily 512** — see
     ///   the note on causality at the top of this file.
-    /// - Parameter freezeCut: the reproducible mode. **The encoder needs it as much as the
-    ///   DiT**: its blocks run at 512 tokens, hence where a plan may give the AMX rows, the GPU/AMX split
-    ///   applies there and is slaved to it. An engine that froze only the DiT would render
-    ///   different captions on every run, and the image behind them too — it is
-    ///   exactly the kind of half-fix that reads like a fix.
-    package init(artifact: Artifact, sequence: Int, freezeCut: Bool = EngineSettings.effective.frozenCut) throws {
+    package init(artifact: Artifact, sequence: Int) throws {
         guard let lastLayer = artifact.header["last_layer"] as? Int else {
             throw Artifact.Failure.badHeader("`last_layer` missing: this artifact is not an encoder")
         }
@@ -168,7 +163,7 @@ package final class TextEncoder {
         // seems to use only locals.
         // The Neural Engine serves the denoisers only (`Request.neuralEngine`): an encoder's rows are a prompt's
         // tokens, under its minimum, and its output enters the render cache's keys, which do not name it.
-        let gemm = try GEMM(freezeCut: freezeCut, phase: .encoding)
+        let gemm = try GEMM(phase: .encoding)
         let s = sequence, h = config.hidden, a = config.attentionWidth
         let kv = config.kvWidth, i = config.intermediate
         let arena = try Arena(capacity: TextEncoder.arenaBytes(config: config, sequence: s))
@@ -335,10 +330,7 @@ package final class TextEncoder {
     }
 
     private func widen(_ name: String, count: Int, into destination: UnsafeMutablePointer<Float>) throws {
-        let got = try artifact.materialize(name, into: destination, capacity: count)
-        guard got == count else {
-            throw Artifact.Failure.badHeader("\(name): \(got) values, \(count) expected")
-        }
+        try artifact.materializeExactly(name, count: count, into: destination)
     }
 
     /// `RMSNorm` over the `Dh` axis, head by head — Qwen3's QK-Norm, **before** RoPE.
@@ -346,20 +338,8 @@ package final class TextEncoder {
     /// It is a norm per *head* and not per token: the mean square is taken over the 128
     /// components of a head, not over the 4096 of the whole vector. Confusing the two gives plausible
     /// vectors and wrong attention.
-    private func normHeads(_ t: UnsafeMutablePointer<Float>, weight: UnsafePointer<Float>,
-                           heads: Int) {
-        let d = config.headDim, eps = config.eps
-        Parallel.rows(sequence, width: heads * d) { first, howMany in
-            for s in first..<(first + howMany) {
-                for h in 0..<heads {
-                    let row = t + (s * heads + h) * d
-                    var sum: Float = 0
-                    for j in 0..<d { sum += row[j] * row[j] }
-                    let scale = 1 / (sum / Float(d) + eps).squareRoot()
-                    for j in 0..<d { row[j] = row[j] * scale * weight[j] }
-                }
-            }
-        }
+    private func normHeads(_ t: UnsafeMutablePointer<Float>, weight: UnsafePointer<Float>, heads: Int) {
+        Ops.normHeads(t, weight: weight, rows: sequence, heads: heads, headDim: config.headDim, eps: config.eps)
     }
 
     /// `kvHeads` heads repeated `groupSize` times — what GQA asks for and what
@@ -370,18 +350,7 @@ package final class TextEncoder {
     /// that the same pass reads — and a graph that broadcast would cost one more transposition.
     /// **To revisit if the encoder becomes anything other than a single pass.**
     private func expandKV(_ source: UnsafePointer<Float>, into destination: UnsafeMutablePointer<Float>) {
-        let d = config.headDim, group = config.groupSize, kvHeads = config.kvHeads
-        Parallel.rows(sequence, width: config.attentionWidth) { first, howMany in
-            for s in first..<(first + howMany) {
-                for kvHead in 0..<kvHeads {
-                    let from = source + (s * kvHeads + kvHead) * d
-                    for repetition in 0..<group {
-                        let to = destination + (s * (kvHeads * group) + kvHead * group + repetition) * d
-                        to.update(from: from, count: d)
-                    }
-                }
-            }
-        }
+        Ops.expandKV(source, into: destination, rows: sequence, headDim: config.headDim, group: config.groupSize, kvHeads: config.kvHeads)
     }
 
     /// **Krea 2's taps**: `hidden_states[i]` for each `i` requested — the INPUT of
