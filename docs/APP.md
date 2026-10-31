@@ -2,7 +2,7 @@ English · [Français](APP.fr.md)
 
 # The Siliconed app
 
-`Siliconed.app` turns a prompt into an image, edits images when you tell it what to change, and keeps a queue and a history of everything it does. It follows the system language (English, French, German, Spanish, Italian, Japanese or Simplified Chinese).
+`Siliconed.app` turns a prompt into an image, edits images when you tell it what to change, and keeps a queue and a history of it all. No account, no cloud, no spinner that waits for a server somewhere. Just your Mac, working hard and telling you what it is doing. It follows the system language (English, French, German, Spanish, Italian, Japanese or Simplified Chinese).
 
 ![The window: the rack on the left (prompt, text encoder, denoiser, decoder, each with its settings and time), a Krea 2 Turbo image at 1248×832 on the right — a laughing red-haired Irish woman running out of the surf, her surfboard under her arm, under a sunny sky —, the history below](images/window.jpg)
 
@@ -15,8 +15,8 @@ The engine behind it, with the measurements: [The Siliconed engine](ENGINE.md).
 - **Five models.** Krea 2 Turbo, Z-Image Turbo, Qwen-Image-2.1 Turbo, Anima Turbo and MOSS-Image, each under its own license ([Models](#models)). All five read the prompt with a language model.
 - **The chain, visible.** No hidden pipeline: the rack shows it top to bottom (prompt, encoders, denoiser, decoder), with typed wires and the active stage lit; each stage holds its own settings and shows its time. Under the title, two small labels say what is stored and what computes: `weights int8` (or `Q8_0`, `Q4_K_M`, `bf16`…, read from what is installed) beside `computes fp32`. On the denoiser, `computes fp32 · ANE` means part of its products run on the Neural Engine; click the label to switch ([how](ENGINE.md#the-neural-engine)).
 - **More detail** with Z-Image and Qwen-Image-2.1: “Detail: Normal · More · Most” adds fine texture, at no extra time.
-- **Faster Rendering** (Settings › General, on by default): from 1024 px on each side, the first evaluations on a half-size grid, the rest at full size: a fifth to a third less time (under a tenth for MOSS-Image), still 8 evaluations, a slightly different image. Not with a LoRA, Detail or an edit ([how](ENGINE.md#faster-rendering)).
-- **Variations**: cousins of an image, subtle or strong, with the same settings (the button under the image, or its context menu).
+- **Faster Rendering**: from 1024 px on each side, the first evaluations on a half-size grid, the rest at full size. A fifth to a third less time (under a tenth for MOSS-Image), still 8 evaluations, a slightly different image. It is a choice per model, like the Neural Engine's: on for the Compact and the Light, off for the Standard, which stays the image checked against the reference. The choice is saved with the image, so Render Again gives the same one. Not with a LoRA, Detail or an edit ([how](ENGINE.md#faster-rendering)).
+- **Variations**: cousins of an image, subtle or strong, with the same settings (the button under the image, or its context menu). **Render Again (Same Seed)**, ⌘R, is the other direction: the same image, to check that you are not dreaming. How many you get at once is the rack's **Batch**.
 - **Enlarge ×4** with macOS's own super-resolution (macOS 26): no prompt, nothing added, edges and texture sharpened; 1024² becomes 4096² in a second or two once macOS's model is warm. It takes images up to 1920 px a side, and an enlarged image is not enlarged again. The original stays in the history.
 - **LoRAs** on all five models.
 - **Reproducible to the bit.** Same prompt, seed, settings and version on the same Mac, same image, byte for byte. Two things can change the pixels: a new version of the app (0.12 did, by a few units in the last place, once its arithmetic rounded as the reference does), and a new measure of this Mac, which may split the work in other rows ([Measure This Mac](#measure-this-mac)).
@@ -26,10 +26,10 @@ Each side must be at least 512 and a multiple of 16; there is no fixed ceiling o
 ## Edit
 
 - **Editing by instruction** with Qwen-Image-2.1 Turbo: give it 1 to 3 images and a sentence (“replace the cloudy sky with a blue sky”); its encoder sees the images. In the app an edit is limited to an area of 1024².
-- **Three ways to compare** two images, an edit or an enlargement and its original: pick Curtain, Switch or Side by Side in Settings › General › Comparison, or from the canvas toolbar.
+- **Three ways to compare** two images, an edit or an enlargement and its original: pick Curtain, Switch or Side by Side in the canvas toolbar.
   - **Curtain**: drag a line across the images to see what changed. Zoom in toward the pointer to look at a detail: pinch, or a mouse's wheel (a horizontal wheel still moves the image).
   - **Switch**: the same two images one at a time, at the same place and zoom; click the image, or press ← for the first and → for the second.
-- **Named subjects** (Settings › Advanced, off by default): name a person or a thing from a photo, then cite it as `@name` in an edit.
+- **Named subjects** (beta, off by default; Settings › Advanced › Beta): name a person, an object or a style from a photo, then cite it as `@name` in the prompt of an edit.
 - **A history like Photos**: arrows, ⌫ and ⌘Z, multiple selection, export, drag and drop, Share.
 
 ![An edit by Qwen-Image-2.1 in the window: the Krea 2 photo of the surfer as image 1 in the Images box, the instruction “Convert this photo to a western comic book style with cel shading”, the cel-shaded result in the canvas](images/edit.jpg)
@@ -40,19 +40,19 @@ Each side must be at least 512 and a multiple of 16; there is no fixed ceiling o
 
 *An edit that changes only what it is told: “Replace her wetsuit with a white linen blouse. Keep her face, hair, surfboard, pose and the beach unchanged.”, the Krea 2 photo as image 1, 203 s.*
 
-## Write
+## Write (let a model do the typing)
 
 The **Prompt Lab** (beta; Window › Prompt Lab, ⌥⌘L) is a window of its own where a language model writes the prompt for you.
 
 - **Rewrite** turns a short prompt into one written for the model you pick (“Write for…”). **Describe** turns a dropped image into a prompt. **Send to Rack** puts the result in the rack's prompt, and ⌘Z in that field brings the old one back. Nothing is applied on its own.
-- **The writer is a model you already have**: Qwen-Image-2.1's text encoder, Qwen3-VL-8B, made to write. Only its output layer is missing from the installed model, and “Install the Writer” downloads it from the same repository (1.25 GB, by byte range). It needs Qwen-Image-2.1 installed, in the Compact on a 16 GB Mac (the Standard asks for 24 GB); the window tells you what is missing.
+- **The writer is a model you already have**: Qwen-Image-2.1's text encoder, Qwen3-VL-8B, made to write. Only its output layer is missing from the installed model, and “Install the Writer” downloads it from the same repository (1.25 GB, by byte range). It needs Qwen-Image-2.1 installed, in the Compact on a 16 GB Mac (the Standard needs a bigger one); the window tells you what is missing.
 - **Our instructions, one per model**, drawn from what each publisher says of its prompts. Every element of your prompt is kept, quoted text word for word; nothing is removed, softened or moralized.
 - **Never during a render**: an image that starts stops the writer, and the lab waits. About 18 tokens a second on an M1 Pro, on the GPU. Its greedy output matches transformers' token for token ([VERIFY](VERIFY.md)).
 - **Incognito**: texts and images stay in memory, with no file and no history; closing the window releases the writer. The lab works on this Mac only, not while you compute on another.
 
-## Explore
+## Explore (sketch first, commit later)
 
-The exploration panel builds a grid in the canvas. Its axes: seeds, steps, the strength of a LoRA, LoRAs to try, models, the alternatives written in braces in the prompt, each image of an edit, or, in Developer Mode, the solvers. Each cell is a sketch, stopped after a few steps, at 512 on the short side (with Qwen-Image-2.1, a finished image); once a model has rendered at that size, the panel shows what the grid will cost on this Mac before you start. “Finish This Image” renders the chosen cell to the end with the same seed: the image its sketch announced.
+The exploration panel builds a grid in the canvas. Its axes: seeds, steps, the strength of a LoRA, LoRAs to try, models, the alternatives written in braces in the prompt, each image of an edit, or, with More Solvers on, the solvers. Each cell is a sketch, stopped after a few steps, at 512 on the short side (with Qwen-Image-2.1, a finished image); once a model has rendered at that size, the panel shows what the grid will cost on this Mac before you start. “Finish This Image” renders the chosen cell to the end with the same seed: the image its sketch announced.
 
 ![An exploration with Anima Turbo and the inCase LoRA, filling in the canvas: sketches of a laughing red-haired Irish woman on a sunny cliff-top beach, the wetsuit's colour across (teal, coral red, mustard yellow, navy) and the LoRA's strength down (0, 0.5, 1), the axes as labels, the last row still rendering](images/grid.jpg)
 
@@ -71,13 +71,13 @@ The exploration panel builds a grid in the canvas. Its axes: seeds, steps, the s
 
 ### Measure This Mac
 
-Before its first render, and again after an update or a new macOS, Siliconed times what each engine of your Mac computes. It takes under a minute, needs no model, and gives a map every time: nothing is ever refused, and how sure the measure is of each figure is written beside it. You can open it whenever you like: Help › Measure This Mac…, the Chain title and the Mac's icon at the head of the rack (greyed until this Mac is measured), or Settings › Advanced › This Mac.
+Before its first render, and again after an update or a new macOS, Siliconed times what each engine of your Mac computes. It takes under a minute, needs no model, and gives a map every time: nothing is ever refused, and how sure the measure is of each figure is written beside it. You can open it whenever you like: Help › Measure This Mac…, the Chain title and the Mac's icon at the head of the rack (greyed until this Mac is measured), or Settings › Advanced › This Mac. It is not in the Models window: installing a model and measuring a Mac are two different jobs.
 
 The sheet shows, with its columns titled: each route's speed, its share of the GPU's peak, whether its result matched the exact one (Exact ✓), what each engine keeps of its speed when they work together, the memory the measure held and how long it took. What it found is said in plain sentences, each with its effect on the plan. Sharing is an option, never the default: Share… ▸ Open a GitHub Issue, or Copy JSON.
 
 A measure you ask for applies to the **next** render, never to one under way, so from then on one seed can give a slightly different image from before the measure. When a render ran more than 10 % off what the measure predicted, the sidebar says so, once, beside the button that measures again.
 
-Models live in `~/Library/Application Support/Siliconed` (override with `SILICONED_ROOT`). To free the internal disk, Settings › General › Move Library… moves them to another one — an external disk, a network share: every file is copied, checked, then removed from the Mac. Siliconed then copies to the Mac only the models you render, for the session, and removes them when it quits; the licenses you accepted and this Mac's measurements stay on the Mac. Unplugged, the disk is flagged: nothing renders until it is back.
+Models live in `~/Library/Application Support/Siliconed` (override with `SILICONED_ROOT`). To free the internal disk, Settings › Move Library… moves them to another one — an external disk, a network share: every file is copied, checked, then removed from the Mac. Siliconed then copies to the Mac only the models you render, for the session, and removes them when it quits; the licenses you accepted and this Mac's measurements stay on the Mac. Unplugged, the disk is flagged: nothing renders until it is back.
 
 ![The Models window: the five publishers' models installed in Compact, each with its license and its size on disk (Z-Image Turbo 11.74 GB, Qwen-Image-2.1 Turbo 17.3 GB, Anima Turbo 4.1 GB, Krea 2 Turbo 19.5 GB, MOSS-Image 17.88 GB, marked beta), the LoRAs below, the disk used and free at the bottom](images/models.jpg)
 
@@ -124,23 +124,45 @@ The other Compact versions use 8-bit weights published by third parties: [unslot
 - **Encrypted, nothing in clear.** TLS 1.2 with a key per paired Mac, kept in the Keychain. macOS asks once for the local network, the first time you lend this Mac or pair it; a Mac that never does either is never asked.
 - **Everything works there**: renders, edits with your references, variations, grids and explorations, enlarging and cropping, named subjects, undo; installing a model or importing a LoRA on the lending Mac, measuring it. Removing a model waits for a click on that Mac. Each Mac sees only its own jobs and images, and the lending Mac stays within its own memory budget. `silicontrol` follows Compute On ([REMOTE-CONTROL.md](REMOTE-CONTROL.md)).
 
-## Settings
+## Settings (few, on purpose)
 
 Siliconed › Settings… (⌘,), three tabs.
 
-- **General**: Faster Rendering; Comparison (Curtain, Switch, Side by Side); where the models live, with Move Library…, Open Library… and Move Back to This Mac.
+- **General**: where the models live, with Move Library…, Open Library… and Move Back to This Mac; the Faster Rendering choice sits with it.
 - **Other Macs**: lend this Mac, pair with another ([Render on another Mac](#render-on-another-mac)).
-- **Advanced**: Command Line (installs `silicontrol`, below); This Mac (the measure); and “For Testing”, off by default and liable to change: Developer Mode (adds the solvers Euler a, DPM++ 2M and UniPC), Named Subjects, Negative LoRA Strengths (sliders from −1.5 to 1.5, for “slider” LoRAs; an ordinary LoRA is damaged by a negative strength).
+- **Advanced**, in this order: This Mac (the measure); Command Line (installs `silicontrol`, below); and **Beta**, off by default and liable to change: More Solvers (adds the solvers Euler a, DPM++ 2M and UniPC to the denoiser's box and to the exploration's axes; Euler, the default, is the one the models were distilled for), Named Subjects, Negative LoRA Strengths (strengths from −1.5 to 1.5, for “slider” LoRAs; an ordinary LoRA is damaged by a negative strength).
 
-While you compute on another Mac, the Faster Rendering switch and the measure are that Mac's, and the window says so.
+While you compute on another Mac, the measure and the Faster Rendering choice are that Mac's, and the window says so.
 
-## Private by construction
+## Keyboard
+
+Lost? The Help menu holds Siliconed Help (this guide), Remote Control Help (the `silicontrol` guide), Report a Problem… and Measure This Mac…; Window › Show Siliconed brings the window back if you closed it. The menus hold the full list of keys; these are the ones worth knowing. ⌘ is Command, ⌥ Option, ⌃ Control.
+
+| Keys | Does |
+|---|---|
+| ⌘↩ | Generate (Explore in the exploration panel, Rewrite in the Prompt Lab) |
+| ⌘R | Render Again (Same Seed) |
+| ⌘. · ⌥⌘. | Stop Render · Clear Queue and Stop |
+| ⌥⌘G | Exploration |
+| ⌘S · ⇧⌘E | Save Image… · Export Images… |
+| ⇧⌘C | Copy Image |
+| ⌘O · ⇧⌘M | Import a Model or LoRA… · Models… |
+| ⌘+ · ⌘− · ⌘0 | Zoom In · Zoom Out · Zoom to Fit |
+| ⌃⌘F | Full Screen (Esc, Space or a click leaves; ← → move between images) |
+| ⌥⌘← · ⌥⌘→ | Previous · Next Image, from anywhere |
+| ⌥⌘A | Select All Images |
+| ⌥⌘I · ⌥⌘L | Statistics · Prompt Lab |
+| ⌘, · ⌘W | Settings · Close Window |
+
+And without ⌘, once nothing is being typed in a field and the history is not empty: **← →** walk the history (with ⇧ they extend the selection; with the curtain shown they move its line, with Switch they show A or B), **Home** and **End** jump to the newest and the oldest image, **Space** opens full screen, **⌫** removes the selected images from the history, **C** opens the crop (Return crops, Esc leaves), **Esc** leaves a comparison or clears a multiple selection, ⌘A selects all, ⌘V pastes an image into the Images box. Esc also leaves the field you are typing in. A slider, a stepper or a button you reached with Tab keeps its own keys.
+
+## Private by construction (nobody's looking)
 
 Rendering happens on your Mac. The only network traffic is the model download you accepted, the one request to GitHub for the latest version number when you choose Siliconed › Check for Updates…, and, if you turn it on (Settings › Other Macs), the encrypted link to another Mac of your network; the diagnostic copies its report and opens a GitHub issue form that you choose to submit or not. The render cache lasts one session: it is emptied at launch and at quit. Before each render the engine checks the model, its license, the format and the memory it needs, and refuses up front a render beyond this Mac's budget. The app censors no prompt and adds no content filter; each model's license still applies, and Krea 2 Community's asks whoever deploys the model for one.
 
 ## For scripts and agents: silicontrol
 
-Drives the running app from a terminal. It ships in `Siliconed.app/Contents/Helpers/silicontrol`; Settings › Advanced › Command Line links it into `/usr/local/bin`. What you add appears in the app's window, and there is one queue, never two renders at once.
+Drives the running app from a terminal. It ships in `Siliconed.app/Contents/Helpers/silicontrol`; Settings › Advanced › Command Line links it into `/usr/local/bin`. What you add appears in the app's window, and there is one queue, never two renders at once. Edit › Copy as Terminal Command puts on the pasteboard the `silicontrol` command for the form as it stands: handy for turning a render you like into a script.
 
 ```
 silicontrol help                 the full reference (always start here)

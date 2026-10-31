@@ -25,7 +25,7 @@ La mesure achète de la vitesse, jamais une autre image au-delà de l'arithméti
 
 Le Neural Engine du Mac calcule en fp16. Là où le plan de ce Mac lui donne des lignes, il prend une partie des produits matriciels du DiT à côté du GPU, bloc par bloc : chaque colonne de poids et chaque ligne d'activations est remontée d'une puissance de deux dans la plage du fp16 puis ramenée en fp32, et les lignes qui débordent retournent au GPU. Sur des poids int8 (la Compact de Krea 2, de Qwen-Image-2.1 et de MOSS-Image), il lit les poids tels que publiés, en 8 bits, et les élargit lui-même ; l'échelle de chaque colonne est appliquée ensuite, en fp32. Sur le M1 Pro, c'est cette route qui retire un quart aux temps de ces trois Compact ([Les chiffres](#les-chiffres)). Les encodeurs de texte et le VAE ne s'en servent jamais. L'étiquette `calcule en fp32` du module DiT du rack le bascule d'un clic, par modèle : **éteint par défaut sur la Standard**, qui reste les poids de l'éditeur calculés en fp32, l'image vérifiée contre la référence ; **allumé par défaut sur la Compact et la Légère**, dont les poids en 8 et 4 bits font déjà une autre image que celle de la Standard. L'étiquette affiche **calcule en fp32 · ANE** quand il est allumé, et une image calculée avec lui porte `neural-engine` dans ses métadonnées. Sur un Mac dont la mesure n'offre pas le Neural Engine (aucun trouvé, ou ses résultats étaient faux), le tag est un simple fp32 et il n'y a rien à choisir.
 
-Sur le M1 Pro, 1024², Standard, rendu plus rapide, graine 42, le prompt de la bibliothèque (« a 30 year old woman posing in a library »), le 23/10/2026, app 0.14 :
+Ces chiffres de temps et d'énergie ont été pris le 23/10/2026 avec l'app 0.14, avant le modèle de capacités de la 0.18, et n'ont pas été refaits depuis (les temps de la 0.18 sont dans [Les chiffres](#les-chiffres)). Le M1 Pro, 1024², Standard, rendu plus rapide allumé, graine 42, le prompt de la bibliothèque (« a 30 year old woman posing in a library ») :
 
 | | Krea 2 Turbo | Z-Image Turbo | Qwen-Image-2.1 Turbo |
 |---|---|---|---|
@@ -44,7 +44,7 @@ Machine de référence : MacBook Pro M1 Pro (8 cœurs, 14 cœurs GPU), 16 Go. A
 
 | | Krea 2 Turbo | Z-Image Turbo | Qwen-Image-2.1 Turbo | Anima Turbo | MOSS-Image |
 |---|---|---|---|---|---|
-| 1024², Compact (8 bits, par défaut), Neural Engine allumé, rendu plus rapide allumé (par défaut) | **99,9 s** | **79,6 s** | **72,8 s** | **32,4 s** | **80,2 s** |
+| 1024², Compact (8 bits, par défaut), Neural Engine allumé, rendu plus rapide allumé | **99,9 s** | **79,6 s** | **72,8 s** | **32,4 s** | **80,2 s** |
 | 1024², Compact, rendu plus rapide éteint | 150,6 s | 100,0 s | 88,2 s | 39,0 s | 85,6 s |
 | 1024², Standard (les bf16 de l'éditeur, calculés en fp32), rendu plus rapide allumé | 147,1 s | 85,4 s | 108,4 s | 32,2 s | 105,5 s |
 | 1024², Standard, rendu plus rapide éteint (toutes les évaluations en pleine taille) | 217,2 s | 112,4 s | 136,9 s | 42,0 s | 115,7 s |
@@ -65,7 +65,7 @@ Chaque ligne est une série `silicontrol measure` dans une app tout juste ouvert
 
 ### Rendu plus rapide
 
-Allumé par défaut (Réglages › Général), pour les cinq modèles. Dès 1024 px de chaque côté (1024², 1024×1536, 1536×1024…), les premières évaluations se font sur la grille en demi-taille — 3 sur 8 pour Z-Image, Qwen-Image-2.1 et Anima, 4 pour Krea 2, dont le calendrier garde ses premiers niveaux de bruit plus hauts, 1 pour MOSS-Image, qui commence à perdre du détail fin dès la deuxième — et le reste en pleine taille. Toujours 8 évaluations ; une évaluation en demi-taille coûte environ un quart d'une pleine. Aucun format portrait ou paysage usuel n'en profite : la moitié de 832×1216 passerait sous 512 px d'un côté. En 1024² sur la machine de référence, il retire un tiers du temps d'un rendu sur Krea 2, un cinquième à un quart sur Z-Image, Qwen-Image-2.1 et Anima (17 à 24 %), et 6 à 9 % sur MOSS-Image, dont la seule évaluation en demi-taille est tout ce qu'il permet ([Les chiffres](#les-chiffres)).
+Un choix par modèle, comme celui du Neural Engine : allumé par défaut sur la Compact et la Légère, éteint sur la Standard (qui reste l'image vérifiée contre la référence), pour les cinq modèles. Le choix est enregistré avec l'image, donc Rendre à nouveau redonne la même. Dès 1024 px de chaque côté (1024², 1024×1536, 1536×1024…), les premières évaluations se font sur la grille en demi-taille — 3 sur 8 pour Z-Image, Qwen-Image-2.1 et Anima, 4 pour Krea 2, dont le calendrier garde ses premiers niveaux de bruit plus hauts, 1 pour MOSS-Image, qui commence à perdre du détail fin dès la deuxième — et le reste en pleine taille. Toujours 8 évaluations ; une évaluation en demi-taille coûte environ un quart d'une pleine. Aucun format portrait ou paysage usuel n'en profite : la moitié de 832×1216 passerait sous 512 px d'un côté. En 1024² sur la machine de référence, il retire un tiers du temps d'un rendu sur Krea 2, un cinquième à un quart sur Z-Image, Qwen-Image-2.1 et Anima (17 à 24 %), et 6 à 9 % sur MOSS-Image, dont la seule évaluation en demi-taille est tout ce qu'il permet ([Les chiffres](#les-chiffres)).
 
 La petite grille reçoit l'état moyenné plus la basse bande du bruit de départ : elle tient une image propre, bruitée comme il faut ; la vitesse ramenée en pleine taille est celle qui mène l'état complet à l'estimation propre agrandie : elle emporte aussi le bruit fin qu'une demi-grille ne voit pas, au rythme d'un pas plein. Les pas en demi-taille retirés dans la 0.8.2 n'avaient ni l'un ni l'autre : leur vitesse agrandie laissait ce bruit fin en place (du sable sur la peau et les murs), et leur petite grille était une simple décimation, dont le repliement se lisait comme une texture (du craquelé). Le nombre d'évaluations en demi-taille de chaque modèle a été jugé à l'œil sur deux prompts, un portrait et la bibliothèque : ni sable ni craquelé, taches de rousseur, cheveux et dos des livres intacts ; un pas de plus, et le détail fin commence à partir.
 
@@ -79,8 +79,8 @@ Il donne une autre image que la recette en pleine taille à la même graine (la 
 |---|---|---|---|---|
 | Siliconed, Standard | les bf16 de l'éditeur, calculés en fp32 | 113–119 s | 2,6 | 51–58 Go |
 | Siliconed, Légère | GGUF Q4_K_M | 118–120 s | 2,0 | 3,5–8,7 Go |
-| Siliconed, Standard, rendu plus rapide (par défaut) | les bf16 de l'éditeur, calculés en fp32 | 85–86 s | 2,8 | 51–58 Go |
-| Siliconed, Légère, rendu plus rapide (par défaut) | GGUF Q4_K_M | 90–91 s | 2,1 | 3,5–8,7 Go |
+| Siliconed, Standard, rendu plus rapide allumé | les bf16 de l'éditeur, calculés en fp32 | 85–86 s | 2,8 | 51–58 Go |
+| Siliconed, Légère, rendu plus rapide allumé | GGUF Q4_K_M | 90–91 s | 2,1 | 3,5–8,7 Go |
 | Draw Things, Exact | f16 | 167–179 s | 5,3 | 99 Go |
 | Draw Things, par défaut | 8 bits (`q8p`) | 142–164 s | 3,5–4,3 | 11 Go |
 | Draw Things, 6 bits | 6 bits (`q6p`) | 136–138 s | 3,5 | 6–14 Go |
@@ -91,7 +91,7 @@ Huit bits contre huit bits, le 23/10/2026 (app 0.14) : la Compact de Siliconed 
 
 | | poids | temps | pic mémoire (Gio) | lu sur le disque par rendu |
 |---|---|---|---|---|
-| Siliconed, Compact, rendu plus rapide et Neural Engine (tous deux par défaut) | GGUF Q8_0 | 81,1–83,2 s (témoin 81,3 s) | 2,6 | 3,7–11 Go |
+| Siliconed, Compact, rendu plus rapide et Neural Engine (tous deux allumés sur la Compact) | GGUF Q8_0 | 81,1–83,2 s (témoin 81,3 s) | 2,6 | 3,7–11 Go |
 | Draw Things, par défaut | 8 bits (`q8p`) | 135,0–144,2 s | 4,3 | 10–18 Go |
 
 ## La mémoire et le budget

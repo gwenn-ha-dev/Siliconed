@@ -6,7 +6,7 @@
 
 Siliconed est une app macOS libre et gratuite pour la **génération d'images à partir de texte et l'édition d'images, en local**, sur les Mac Apple silicon (M1 et suivants). Elle fait tourner des modèles de diffusion récents — [Krea 2 Turbo](https://huggingface.co/krea/Krea-2-Turbo), [Z-Image Turbo](https://huggingface.co/Tongyi-MAI/Z-Image-Turbo), [Qwen-Image-2.1 Turbo](https://huggingface.co/Qwen/Qwen-Image-2.1-Turbo), [Anima Turbo](https://huggingface.co/circlestone-labs/Anima) et [MOSS-Image](https://huggingface.co/OpenMOSS-Team/MOSS-Image-SFT) (bêta : sa recette en 8 pas est celle de la communauté) — en natif, en Swift et Metal : ni Python, ni serveur, ni cloud, rien ne quitte votre Mac. Elle marche hors ligne une fois le modèle installé.
 
-Elle est faite par un développeur indépendant, avec une règle têtue : un résultat qu'on ne peut pas comparer au code d'origine n'est pas livré. Le reste, c'est le plaisir de voir tourner un modèle de 12,9 milliards de paramètres sur un portable.
+Un développeur, un MacBook Pro de 16 Go et une règle têtue : un résultat qu'on ne peut pas comparer au code d'origine n'est pas livré. Le reste, c'est la joie toute simple de voir tourner un modèle de 12,9 milliards de paramètres sur un portable qui, sur le papier, n'a rien à faire là.
 
 ![Licence : Apache 2.0](https://img.shields.io/badge/licence-Apache%202.0-blue)
 ![macOS 26+](https://img.shields.io/badge/macOS-26%2B-black)
@@ -18,7 +18,7 @@ Elle est faite par un développeur indépendant, avec une règle têtue : un r�
 
 *Une photo de Krea 2 Turbo, éditée par Qwen-Image-2.1 avec une phrase (« Convert this photo to a western comic book style with cel shading », graine 42, 215 s sur un M1 Pro), comparées sous le rideau.*
 
-## Télécharger
+## Télécharger (un .dmg, rien d'exotique)
 
 L'app est distribuée en `.dmg` sur la page [Releases](https://github.com/gwenn-ha-dev/Siliconed/releases). Prérequis : macOS 26 ou plus, Apple silicon. Rien n'est préinstallé : vous choisissez les modèles depuis l'app, vous lisez chaque licence, et c'est seulement ensuite qu'un octet se télécharge. Pour la construire vous-même : [Construire depuis les sources](docs/ENGINE.fr.md#construire-depuis-les-sources).
 
@@ -34,12 +34,12 @@ L'app est distribuée en `.dmg` sur la page [Releases](https://github.com/gwenn-
 
 Le tour de l'app : [docs/APP.fr.md](docs/APP.fr.md).
 
-## Ce qui la distingue
+## Pourquoi s'embêter
 
-- **Rapide, sans rogner.** Sur un MacBook Pro M1 Pro de 16 Go, en 1024² : Qwen-Image-2.1 Turbo en 73 s, Z-Image Turbo en 80 s, Krea 2 Turbo en 100 s, avec les 8 évaluations (passages du modèle) que demandent leurs recettes, par défaut les premières en demi-taille, dans la Compact que l'app recommande (le modèle en poids 8 bits, moitié moins de disque ; [les trois versions](docs/APP.fr.md#la-gestion-des-modèles)). Chaque calcul va au GPU, à l'unité matricielle du CPU ou au Neural Engine selon ce que ce Mac a mesuré. En précision complète, les poids bf16 de l'éditeur calculés en fp32 : Z-Image 85 s. [Tous les chiffres](docs/ENGINE.fr.md#les-chiffres).
-- **De gros modèles sur un Mac de 16 Go.** 34 Go de modèle tournent sur un Mac de 16 Go : les poids sont lus sur le disque au moment où ils servent, et Siliconed ne prend jamais plus que les ¾ de la mémoire du Mac moins 2 Go. Chaque rendu calcule ce qu'il lui faut avant de commencer ; au-delà du budget, il est refusé d'emblée. [Comment c'est mesuré](docs/ENGINE.fr.md#la-mémoire-et-le-budget).
-- **Vérifié contre les modèles d'origine.** Chaque étage est comparé, canal par canal, à l'implémentation de référence (diffusers / transformers en fp32 sur CPU), et ce qui ne se vérifie pas n'est pas livré. Refaites les contrôles chez vous : [VERIFY.fr.md](docs/VERIFY.fr.md). La CI passe les étages CPU des noyaux chaque fois que le moteur change ; son GPU est virtuel, les étages GPU se jugent sur votre Mac.
-- **Mesuré sur votre Mac.** Avant le premier rendu, en moins d'une minute et sans aucun modèle, il mesure ce que calcule chaque moteur de votre Mac — le GPU, l'unité matricielle du CPU, le Neural Engine —, seul et avec les autres, et vérifie chaque résultat contre le résultat exact ; il calcule ensuite, pour chaque produit et chaque attention d'un rendu, comment répartir les lignes entre les moteurs qui ont calculé juste. [Comment](docs/ENGINE.fr.md#un-moteur-mesuré-sur-votre-mac).
+- **Rapide, sans rogner.** Sur le M1 Pro de 16 Go qui a fait tous les essais, en 1024² : Qwen-Image-2.1 Turbo en 73 s, Z-Image Turbo en 80 s, Krea 2 Turbo en 100 s, avec les 8 évaluations (passages du modèle) que demandent leurs recettes, les premières en demi-taille, dans la Compact que l'app recommande (le modèle en poids 8 bits, moitié moins de disque ; [les trois versions](docs/APP.fr.md#la-gestion-des-modèles)). Chaque calcul va au GPU, à l'unité matricielle du CPU ou au Neural Engine selon ce que ce Mac a mesuré. En précision complète, les poids bf16 de l'éditeur calculés en fp32 : Z-Image 85 s. [Tous les chiffres](docs/ENGINE.fr.md#les-chiffres).
+- **Gros modèles, petit Mac.** 34 Go de modèle sur un Mac de 16 Go, ça sent la mauvaise idée. Les poids sont lus sur le disque au moment où ils servent, et Siliconed ne prend jamais plus que les ¾ de la mémoire du Mac moins 2 Go : un budget qu'il ne dépasse pas, jamais. Chaque rendu calcule ce qu'il lui faut avant de commencer ; au-delà du budget, il est poliment refusé d'emblée. [Comment c'est mesuré](docs/ENGINE.fr.md#la-mémoire-et-le-budget).
+- **Vérifié contre les modèles d'origine, avec un brin de manie.** Chaque étage est comparé, canal par canal, à l'implémentation de référence (diffusers / transformers en fp32 sur CPU), et ce qui ne se vérifie pas n'est pas livré. Refaites les contrôles chez vous : [VERIFY.fr.md](docs/VERIFY.fr.md). La CI passe les étages CPU des noyaux chaque fois que le moteur change ; son GPU est virtuel, les étages GPU se jugent sur votre Mac.
+- **Connaît votre Mac.** Avant le premier rendu, en moins d'une minute et sans aucun modèle, il mesure ce que calcule chaque moteur de votre Mac — le GPU, l'unité matricielle du CPU, le Neural Engine —, seul et avec les autres, et vérifie chaque résultat contre le résultat exact ; il calcule ensuite, pour chaque produit et chaque attention d'un rendu, comment répartir les lignes entre les moteurs qui ont calculé juste. [Comment](docs/ENGINE.fr.md#un-moteur-mesuré-sur-votre-mac).
 - **Mesuré à côté du moteur de Draw Things** sur le même Mac, avec la méthode et tous les chiffres : [À côté de Draw Things](docs/ENGINE.fr.md#à-côté-de-draw-things).
 
 ## Documentation

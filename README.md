@@ -6,7 +6,7 @@ English · [Français](README.fr.md)
 
 Siliconed is a free, open-source macOS app for **local text-to-image generation and image editing** on Apple silicon Macs (M1 and later). It runs recent diffusion models — [Krea 2 Turbo](https://huggingface.co/krea/Krea-2-Turbo), [Z-Image Turbo](https://huggingface.co/Tongyi-MAI/Z-Image-Turbo), [Qwen-Image-2.1 Turbo](https://huggingface.co/Qwen/Qwen-Image-2.1-Turbo), [Anima Turbo](https://huggingface.co/circlestone-labs/Anima) and [MOSS-Image](https://huggingface.co/OpenMOSS-Team/MOSS-Image-SFT) (beta: its 8-step recipe is the community's) — natively in Swift and Metal: no Python, no server, no cloud, nothing leaves your Mac. It works offline once a model is installed.
 
-It is made by one independent developer with a stubborn rule: if a result cannot be checked against the original code, it does not ship. The rest is the pleasure of watching a 12.9-billion-parameter model run on a laptop.
+One developer, one MacBook Pro with 16 GB, and a stubborn rule: if a result cannot be checked against the original code, it does not ship. The rest is the plain joy of watching a 12.9-billion-parameter model run on a laptop that, on paper, has no business doing it.
 
 ![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue)
 ![macOS 26+](https://img.shields.io/badge/macOS-26%2B-black)
@@ -18,7 +18,7 @@ It is made by one independent developer with a stubborn rule: if a result cannot
 
 *A photo from Krea 2 Turbo, edited by Qwen-Image-2.1 with one sentence (“Convert this photo to a western comic book style with cel shading”, seed 42, 215 s on an M1 Pro), compared under the curtain.*
 
-## Download
+## Download (it is a .dmg, nothing exotic)
 
 The app ships as a `.dmg` on the [Releases](https://github.com/gwenn-ha-dev/Siliconed/releases) page. Requirements: macOS 26 or later, Apple silicon. Nothing comes preinstalled: you pick the models from inside the app, read each license, and only then does a byte download. To build it yourself: [Build from source](docs/ENGINE.md#build-from-source).
 
@@ -34,13 +34,13 @@ The app ships as a `.dmg` on the [Releases](https://github.com/gwenn-ha-dev/Sili
 
 The tour of the app: [docs/APP.md](docs/APP.md).
 
-## What sets it apart
+## Why bother, then
 
-- **Fast, without cutting corners.** On a MacBook Pro M1 Pro with 16 GB, at 1024²: Qwen-Image-2.1 Turbo in 73 s, Z-Image Turbo in 80 s, Krea 2 Turbo in 100 s, with the 8 evaluations (passes of the model) their recipes call for, by default the first ones at half size, in the Compact the app recommends (the model in 8-bit weights, half the disk; [the three versions](docs/APP.md#model-management)). Each computation goes to the GPU, the CPU's matrix unit or the Neural Engine as this Mac measured them. In full precision, the publisher's bf16 weights computed in fp32: Z-Image 85 s. [All the numbers](docs/ENGINE.md#numbers).
-- **Large models on a 16 GB Mac.** 34 GB of model run on a 16 GB Mac: weights are read from disk as they are needed, and Siliconed never takes more than ¾ of the Mac's memory minus 2 GB. Each render works out what it needs before it starts; one beyond the budget is refused up front. [How it is measured](docs/ENGINE.md#memory-and-the-budget).
-- **Checked against the original models.** Every stage is compared, channel by channel, with the reference implementation (diffusers / transformers in fp32 on CPU), and what cannot be checked does not ship. Run the checks yourself: [VERIFY.md](docs/VERIFY.md). The CI runs the kernels' CPU stages each time the engine changes; its GPU is virtual, so the GPU stages run on your Mac.
-- **Measured on your Mac.** Before the first render, in under a minute and without any model, it measures what each engine of your Mac — the GPU, the CPU's matrix unit, the Neural Engine — computes, alone and together, and checks every result against the exact one; it then works out, for every product and every attention of a render, how to share the rows among the engines that computed right. [How](docs/ENGINE.md#an-engine-measured-on-your-mac).
-- **Measured next to Draw Things' engine** on the same Mac, with the method and every figure: [Next to Draw Things](docs/ENGINE.md#next-to-draw-things).
+- **Fast, without cutting corners.** On the M1 Pro with 16 GB that did all the testing, at 1024²: Qwen-Image-2.1 Turbo in 73 s, Z-Image Turbo in 80 s, Krea 2 Turbo in 100 s, with the 8 evaluations (passes of the model) their recipes call for, the first ones at half size, in the Compact the app recommends (the model in 8-bit weights, half the disk; [the three versions](docs/APP.md#model-management)). Each computation goes to the GPU, the CPU's matrix unit or the Neural Engine as this Mac measured them. In full precision, the publisher's bf16 weights computed in fp32: Z-Image 85 s. [All the numbers](docs/ENGINE.md#numbers).
+- **Big models, small Mac.** 34 GB of model on a 16 GB Mac sounds like a bad idea. Weights are read from disk as they are needed, and Siliconed never takes more than ¾ of the Mac's memory minus 2 GB, a budget it does not exceed, ever. Each render works out what it needs before it starts; one beyond the budget is politely refused up front. [How it is measured](docs/ENGINE.md#memory-and-the-budget).
+- **Checked against the original models, a bit obsessively.** Every stage is compared, channel by channel, with the reference implementation (diffusers / transformers in fp32 on CPU), and what cannot be checked does not ship. Run the checks yourself: [VERIFY.md](docs/VERIFY.md). The CI runs the kernels' CPU stages each time the engine changes; its GPU is virtual, so the GPU stages run on your Mac.
+- **Knows your Mac.** Before the first render, in under a minute and without any model, it measures what each engine of your Mac — the GPU, the CPU's matrix unit, the Neural Engine — computes, alone and together, and checks every result against the exact one; it then works out, for every product and every attention of a render, how to share the rows among the engines that computed right. [How](docs/ENGINE.md#an-engine-measured-on-your-mac).
+- **Measured next to Draw Things' engine**, on the same Mac. The method and every figure are in [Next to Draw Things](docs/ENGINE.md#next-to-draw-things).
 
 ## Documentation
 

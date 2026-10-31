@@ -2,7 +2,7 @@
 
 # L'app Siliconed
 
-`Siliconed.app` transforme un prompt en image, retouche vos images quand vous lui dites quoi changer, et tient une file et un historique de tout ce qu'elle fait. Elle suit la langue du système (anglais, français, allemand, espagnol, italien, japonais ou chinois simplifié).
+`Siliconed.app` transforme un prompt en image, retouche vos images quand vous lui dites quoi changer, et tient une file et un historique de tout ça. Pas de compte, pas de cloud, pas de roue qui tourne en attendant un serveur quelque part : juste votre Mac, qui travaille dur et vous dit ce qu'il fait. Elle suit la langue du système (anglais, français, allemand, espagnol, italien, japonais ou chinois simplifié).
 
 ![La fenêtre : le rack à gauche (prompt, encodeur de texte, débruiteur, décodeur, chacun avec ses réglages et son temps), une image Krea 2 Turbo en 1248×832 à droite — une Irlandaise rousse qui sort des vagues en riant, sa planche de surf sous le bras, sous un ciel ensoleillé —, l'historique en dessous](images/window.jpg)
 
@@ -15,8 +15,8 @@ Le moteur derrière elle, avec les mesures : [Le moteur de Siliconed](ENGINE.fr
 - **Cinq modèles.** Krea 2 Turbo, Z-Image Turbo, Qwen-Image-2.1 Turbo, Anima Turbo et MOSS-Image, chacun sous sa propre licence ([Les modèles](#les-modèles)). Tous cinq lisent le prompt avec un modèle de langage.
 - **La chaîne, visible.** Pas de tuyauterie cachée : le rack montre le pipeline de haut en bas (prompt, encodeurs, débruiteur, décodeur), avec des fils typés et l'étage actif allumé ; chaque étage porte ses réglages et affiche son temps. Sous le titre, deux petites étiquettes disent ce qui est stocké et ce qui calcule : `poids int8` (ou `Q8_0`, `Q4_K_M`, `bf16`…, lu dans ce qui est installé) à côté de `calcule en fp32`. Sur le débruiteur, `calcule en fp32 · ANE` veut dire qu'une partie de ses produits passe par le Neural Engine ; un clic sur l'étiquette l'allume ou l'éteint ([comment](ENGINE.fr.md#le-neural-engine)).
 - **Plus de détail** avec Z-Image et Qwen-Image-2.1 : « Détail : Normal · Plus · Maximum » ajoute de la texture fine, sans temps en plus.
-- **Rendu plus rapide** (Réglages › Général, allumé par défaut) : dès 1024 px de chaque côté, les premières évaluations sur une grille en demi-taille, le reste en pleine taille : d'un cinquième à un tiers de temps en moins (moins d'un dixième pour MOSS-Image), toujours 8 évaluations, une image un peu différente. Pas avec une LoRA, le Détail ou une édition ([comment](ENGINE.fr.md#rendu-plus-rapide)).
-- **Les variations** : des cousines d'une image, subtiles ou marquées, aux mêmes réglages (le bouton sous l'image, ou son menu contextuel).
+- **Rendu plus rapide** : dès 1024 px de chaque côté, les premières évaluations sur une grille en demi-taille, le reste en pleine taille. D'un cinquième à un tiers de temps en moins (moins d'un dixième pour MOSS-Image), toujours 8 évaluations, une image un peu différente. C'est un choix par modèle, comme celui du Neural Engine : allumé sur la Compact et la Légère, éteint sur la Standard, qui reste l'image vérifiée contre la référence. Le choix est enregistré avec l'image, donc Rendre à nouveau redonne la même. Pas avec une LoRA, le Détail ou une édition ([comment](ENGINE.fr.md#rendu-plus-rapide)).
+- **Les variations** : des cousines d'une image, subtiles ou marquées, aux mêmes réglages (le bouton sous l'image, ou son menu contextuel). **Rendre à nouveau (même graine)**, ⌘R, va dans l'autre sens : la même image, pour vérifier qu'on ne rêve pas. Le nombre d'images d'un coup, c'est le **Lot** du rack.
 - **Agrandir ×4** avec la super-résolution de macOS (macOS 26) : aucun prompt, rien d'ajouté, bords et textures affinés ; 1024² devient 4096² en une ou deux secondes une fois le modèle de macOS chaud. Elle prend les images jusqu'à 1920 px de côté, et une image agrandie ne s'agrandit pas une seconde fois. L'original reste dans l'historique.
 - **Les LoRA** sur les cinq modèles.
 - **Reproductible au bit près.** Même prompt, même graine, mêmes réglages, même version, sur le même Mac : la même image, octet pour octet. Deux choses peuvent changer les pixels : une nouvelle version de l'app (la 0.12 l'a fait, de quelques unités sur le dernier chiffre, quand son arithmétique s'est mise à arrondir comme la référence), et une nouvelle mesure de ce Mac, qui peut répartir le travail en d'autres lignes ([Mesurer ce Mac](#mesurer-ce-mac)).
@@ -26,10 +26,10 @@ Chaque côté doit être d'au moins 512 et multiple de 16 ; la surface n'a pas
 ## Éditer
 
 - **L'édition par instruction** avec Qwen-Image-2.1 Turbo : donnez-lui 1 à 3 images et une phrase (« remplace le ciel nuageux par un ciel bleu ») ; son encodeur voit les images. Dans l'app, une édition est plafonnée à une surface de 1024².
-- **Trois façons de comparer** deux images, ou une édition ou un agrandissement et son original : Rideau, Alterner ou Côte à côte, à choisir dans Réglages › Général › Comparaison ou dans la barre d'outils du canevas.
+- **Trois façons de comparer** deux images, ou une édition ou un agrandissement et son original : Rideau, Alterner ou Côte à côte, à choisir dans la barre d'outils du canevas.
   - **Rideau** : faites glisser une ligne sur les images pour voir ce qui a changé. Zoomez vers le curseur pour regarder un détail : en pinçant, ou à la molette d'une souris (une molette horizontale déplace toujours l'image).
   - **Alterner** : les deux mêmes images, une à la fois, au même endroit et au même zoom ; cliquez sur l'image, ou appuyez sur ← pour la première et → pour la seconde.
-- **Les sujets nommés** (Réglages › Avancé, éteints par défaut) : nommez une personne ou une chose à partir d'une photo, puis citez-la par `@nom` dans une édition.
+- **Les sujets nommés** (bêta, éteints par défaut ; Réglages › Avancé › Bêta) : nommez une personne, un objet ou un style à partir d'une photo, puis citez-le par `@nom` dans le prompt d'une édition.
 - **Un historique comme dans Photos** : flèches, ⌫ et ⌘Z, sélection multiple, export, glisser-déposer, Partager.
 
 ![Une édition par Qwen-Image-2.1 dans la fenêtre : la photo Krea 2 de la surfeuse en image 1 dans la boîte Images, l'instruction « Convert this photo to a western comic book style with cel shading », le résultat en cel shading dans le canevas](images/edit.jpg)
@@ -40,7 +40,7 @@ Chaque côté doit être d'au moins 512 et multiple de 16 ; la surface n'a pas
 
 *Une édition qui ne change que ce qu'on lui dit : « Replace her wetsuit with a white linen blouse. Keep her face, hair, surfboard, pose and the beach unchanged. », la photo Krea 2 en image 1, 203 s.*
 
-## Écrire
+## Écrire (laissez un modèle taper)
 
 L'**Atelier de prompts** (bêta ; Fenêtre › Atelier de prompts, ⌥⌘L) est une fenêtre à part où un modèle de langage écrit le prompt à votre place.
 
@@ -50,9 +50,9 @@ L'**Atelier de prompts** (bêta ; Fenêtre › Atelier de prompts, ⌥⌘L) es
 - **Jamais pendant un rendu** : une image qui démarre arrête le rédacteur, et l'atelier attend. Environ 18 jetons par seconde sur un M1 Pro, sur le GPU. Sa sortie gloutonne est celle de transformers, jeton pour jeton ([VERIFY](VERIFY.fr.md)).
 - **Incognito** : textes et images restent en mémoire, sans fichier ni historique ; fermer la fenêtre libère le rédacteur. L'atelier travaille sur ce Mac seulement, pas quand vous calculez sur un autre.
 
-## Explorer
+## Explorer (esquissez d'abord, engagez-vous après)
 
-Le panneau d'exploration construit une grille dans le canevas. Ses axes : les graines, les pas, la force d'une LoRA, des LoRA à essayer, les modèles, les variantes écrites entre accolades dans le prompt, chaque image d'une édition ou, en mode développeur, les solveurs. Chaque case est une esquisse, arrêtée après quelques pas, à 512 sur le petit côté (avec Qwen-Image-2.1, une image finie) ; dès qu'un modèle a rendu à cette taille, le panneau dit ce que la grille coûtera sur ce Mac avant de la lancer. « Finir cette image » rend la case choisie jusqu'au bout avec la même graine : l'image que son esquisse annonçait.
+Le panneau d'exploration construit une grille dans le canevas. Ses axes : les graines, les pas, la force d'une LoRA, des LoRA à essayer, les modèles, les variantes écrites entre accolades dans le prompt, chaque image d'une édition ou, avec Plus de solveurs allumé, les solveurs. Chaque case est une esquisse, arrêtée après quelques pas, à 512 sur le petit côté (avec Qwen-Image-2.1, une image finie) ; dès qu'un modèle a rendu à cette taille, le panneau dit ce que la grille coûtera sur ce Mac avant de la lancer. « Finir cette image » rend la case choisie jusqu'au bout avec la même graine : l'image que son esquisse annonçait.
 
 ![Une exploration avec Anima Turbo et la LoRA inCase qui se remplit dans le canevas : des esquisses d'une Irlandaise rousse qui rit sur une plage ensoleillée au pied des falaises, la couleur de la combinaison en colonnes (teal, coral red, mustard yellow, navy) et la force de la LoRA en lignes (0 ; 0,5 ; 1), les axes en étiquettes, la dernière ligne encore en cours](images/grid.jpg)
 
@@ -71,13 +71,13 @@ Le panneau d'exploration construit une grille dans le canevas. Ses axes : les g
 
 ### Mesurer ce Mac
 
-Avant son premier rendu, puis après une mise à jour ou un nouveau macOS, Siliconed chronomètre ce que calcule chaque moteur de votre Mac. Moins d'une minute, aucun modèle, et toujours une carte : rien n'est jamais refusé, et la confiance qu'on peut avoir dans chaque chiffre est écrite à côté. Vous pouvez l'ouvrir quand vous voulez : Aide › Mesurer ce Mac…, le titre Chaîne et l'icône du Mac en tête du rack (grisée tant que ce Mac n'est pas mesuré), ou Réglages › Avancé › Ce Mac.
+Avant son premier rendu, puis après une mise à jour ou un nouveau macOS, Siliconed chronomètre ce que calcule chaque moteur de votre Mac. Moins d'une minute, aucun modèle, et toujours une carte : rien n'est jamais refusé, et la confiance qu'on peut avoir dans chaque chiffre est écrite à côté. Vous pouvez l'ouvrir quand vous voulez : Aide › Mesurer ce Mac…, le titre Chaîne et l'icône du Mac en tête du rack (grisée tant que ce Mac n'est pas mesuré), ou Réglages › Avancé › Ce Mac. Elle n'est pas dans la fenêtre Modèles : installer un modèle et mesurer un Mac sont deux métiers différents.
 
 La feuille montre, colonnes titrées : la vitesse de chaque route, sa part de la crête du GPU, si son résultat est égal au résultat exact (Exact ✓), ce que chaque moteur garde de sa vitesse quand ils travaillent ensemble, la mémoire que la mesure a tenue et sa durée. Ce qu'elle a trouvé est dit en phrases simples, chacune avec son effet sur le plan. Le partage est une option, jamais le bouton par défaut : Partager… ▸ Ouvrir un signalement GitHub, ou Copier le JSON.
 
 Une mesure que vous demandez s'applique au **rendu suivant**, jamais à un rendu en cours : à partir de là, une même graine peut donner une image un peu différente de celle d'avant la mesure. Quand un rendu s'est écarté de plus de 10 % de ce que la mesure prévoyait, la barre latérale le dit, une fois, à côté du bouton qui mesure de nouveau.
 
-Les modèles vivent dans `~/Library/Application Support/Siliconed` (modifiable avec `SILICONED_ROOT`). Pour libérer le disque interne, Réglages › Général › Déplacer la bibliothèque… les déplace sur un autre — un disque externe, un partage réseau : chaque fichier est copié, vérifié, puis effacé du Mac. Siliconed ne copie alors sur le Mac que les modèles que vous rendez, le temps de la session, et les efface en quittant ; les licences acceptées et la mesure de ce Mac restent sur le Mac. Débranché, le disque est signalé : rien ne se rend avant son retour.
+Les modèles vivent dans `~/Library/Application Support/Siliconed` (modifiable avec `SILICONED_ROOT`). Pour libérer le disque interne, Réglages › Déplacer la bibliothèque… les déplace sur un autre — un disque externe, un partage réseau : chaque fichier est copié, vérifié, puis effacé du Mac. Siliconed ne copie alors sur le Mac que les modèles que vous rendez, le temps de la session, et les efface en quittant ; les licences acceptées et la mesure de ce Mac restent sur le Mac. Débranché, le disque est signalé : rien ne se rend avant son retour.
 
 ![La fenêtre Modèles : les cinq modèles des éditeurs installés en Compacte, chacun avec sa licence et sa place sur le disque (Z-Image Turbo 11,74 Go, Qwen-Image-2.1 Turbo 17,3 Go, Anima Turbo 4,1 Go, Krea 2 Turbo 19,5 Go, MOSS-Image 17,88 Go, marqué bêta), les LoRA en dessous, la place occupée et libre en bas](images/models.jpg)
 
@@ -124,23 +124,45 @@ Les autres versions Compact utilisent des poids 8 bits publiés par des tiers :
 - **Chiffré, rien en clair.** TLS 1.2 avec une clé par Mac appairé, gardée au Trousseau. macOS demande une fois l'accès au réseau local, la première fois que vous prêtez ce Mac ou que vous l'appairez ; un Mac qui ne fait ni l'un ni l'autre n'est jamais interrogé.
 - **Tout marche là-bas** : rendus, éditions avec vos références, variations, grilles et explorations, agrandissement et recadrage, sujets nommés, annulation ; installer un modèle ou importer une LoRA sur le Mac prêteur, le mesurer. En retirer un attend un clic sur ce Mac. Chaque Mac ne voit que ses travaux et ses images, et le Mac prêteur reste dans son propre budget mémoire. `silicontrol` suit Calculer sur ([REMOTE-CONTROL.fr.md](REMOTE-CONTROL.fr.md)).
 
-## Réglages
+## Réglages (peu, exprès)
 
 Siliconed › Réglages… (⌘,), trois onglets.
 
-- **Général** : le Rendu plus rapide ; la Comparaison (Rideau, Alterner, Côte à côte) ; où vivent les modèles, avec Déplacer la bibliothèque…, Ouvrir une bibliothèque… et Ramener sur ce Mac.
+- **Général** : où vivent les modèles, avec Déplacer la bibliothèque…, Ouvrir une bibliothèque… et Ramener sur ce Mac ; le choix du Rendu plus rapide est à côté.
 - **Autres Mac** : prêter ce Mac, appairer avec un autre ([Calculer sur un autre Mac](#calculer-sur-un-autre-mac)).
-- **Avancé** : Ligne de commande (installe `silicontrol`, plus bas) ; Ce Mac (la mesure) ; et « Pour essayer », éteint par défaut et susceptible de changer : le Mode développeur (ajoute les solveurs Euler a, DPM++ 2M et UniPC), les Sujets nommés, les Forces de LoRA négatives (curseurs de −1,5 à 1,5, pour les LoRA « curseur » ; une LoRA ordinaire est abîmée par une force négative).
+- **Avancé**, dans cet ordre : Ce Mac (la mesure) ; Ligne de commande (installe `silicontrol`, plus bas) ; et **Bêta**, éteint par défaut et susceptible de changer : Plus de solveurs (ajoute les solveurs Euler a, DPM++ 2M et UniPC à la boîte du débruiteur et aux axes de l'exploration ; Euler, le défaut, est celui pour lequel les modèles ont été distillés), les Sujets nommés, les Forces de LoRA négatives (curseurs de −1,5 à 1,5, pour les LoRA « curseur » ; une LoRA ordinaire est abîmée par une force négative).
 
-Quand vous calculez sur un autre Mac, l'interrupteur du Rendu plus rapide et la mesure sont ceux de cet autre Mac, et la fenêtre le dit.
+Quand vous calculez sur un autre Mac, la mesure et le choix du Rendu plus rapide sont ceux de cet autre Mac, et la fenêtre le dit.
 
-## Privé par construction
+## Clavier
+
+Perdu ? Le menu Aide contient l'Aide de Siliconed (ce guide), l'Aide de la télécommande (celui de `silicontrol`), Signaler un problème… et Mesurer ce Mac… ; Fenêtre › Afficher Siliconed ramène la fenêtre si vous l'avez fermée. Les menus donnent la liste complète des raccourcis ; voici ceux qui valent le coup. ⌘ est Commande, ⌥ Option, ⌃ Contrôle.
+
+| Touches | Fait |
+|---|---|
+| ⌘↩ | Générer (Explorer dans le panneau d'exploration, Réécrire dans l'Atelier de prompts) |
+| ⌘R | Rendre à nouveau (même graine) |
+| ⌘. · ⌥⌘. | Arrêter le rendu · Vider la file et arrêter |
+| ⌥⌘G | Exploration |
+| ⌘S · ⇧⌘E | Enregistrer l'image… · Exporter les images… |
+| ⇧⌘C | Copier l'image |
+| ⌘O · ⇧⌘M | Importer un modèle ou une LoRA… · Modèles… |
+| ⌘+ · ⌘− · ⌘0 | Zoom avant · Zoom arrière · Taille ajustée |
+| ⌃⌘F | Plein écran (Échap, Espace ou un clic le quitte ; ← → changent d'image) |
+| ⌥⌘← · ⌥⌘→ | Image précédente · suivante, de partout |
+| ⌥⌘A | Sélectionner toutes les images |
+| ⌥⌘I · ⌥⌘L | Statistiques · Atelier de prompts |
+| ⌘, · ⌘W | Réglages · Fermer la fenêtre |
+
+Et sans ⌘, quand rien n'est en cours de saisie dans un champ et que l'historique n'est pas vide : **← →** parcourent l'historique (avec ⇧ ils étendent la sélection ; avec le rideau affiché ils déplacent sa ligne, avec Alterner ils montrent A ou B), **Début** et **Fin** sautent à l'image la plus récente et à la plus ancienne, **Espace** ouvre le plein écran, **⌫** retire les images sélectionnées de l'historique, **C** ouvre le recadrage (Retour recadre, Échap le quitte), **Échap** quitte une comparaison ou vide une sélection multiple, ⌘A sélectionne tout, ⌘V colle une image dans la boîte Images. Échap quitte aussi le champ où vous tapez. Un curseur, un stepper ou un bouton atteint par Tab garde ses propres touches.
+
+## Privé par construction (personne ne regarde)
 
 Le rendu se fait sur votre Mac. Le seul trafic réseau est le téléchargement du modèle que vous avez accepté, l'unique requête à GitHub pour connaître la dernière version quand vous choisissez Siliconed › Rechercher les mises à jour… et, si vous l'ouvrez (Réglages › Autres Mac), la liaison chiffrée avec un autre Mac du réseau ; le diagnostic copie son rapport et ouvre un formulaire d'issue GitHub que vous choisissez de soumettre ou non. Le cache de rendu ne dure qu'une session : il est vidé au lancement et à la fermeture. Avant chaque rendu, le moteur vérifie le modèle, sa licence, le format et la mémoire qu'il lui faut, et refuse d'emblée un rendu au-delà du budget de ce Mac. L'app ne censure aucun prompt et n'ajoute aucun filtre de contenu ; la licence de chaque modèle s'applique toujours, et celle de Krea 2 Community en demande un à qui déploie le modèle.
 
 ## Pour les scripts et les agents : silicontrol
 
-Pilote l'app ouverte depuis un terminal. Elle est livrée dans `Siliconed.app/Contents/Helpers/silicontrol` ; Réglages › Avancé › Ligne de commande la lie dans `/usr/local/bin`. Ce que vous ajoutez apparaît dans la fenêtre de l'app, et il n'y a qu'une file, jamais deux rendus à la fois.
+Pilote l'app ouverte depuis un terminal. Elle est livrée dans `Siliconed.app/Contents/Helpers/silicontrol` ; Réglages › Avancé › Ligne de commande la lie dans `/usr/local/bin`. Ce que vous ajoutez apparaît dans la fenêtre de l'app, et il n'y a qu'une file, jamais deux rendus à la fois. Édition › Copier comme commande de Terminal met dans le presse-papiers la commande `silicontrol` du formulaire tel qu'il est : pratique pour transformer un rendu réussi en script.
 
 ```
 silicontrol help                 la référence complète (toujours commencer par là)
