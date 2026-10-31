@@ -55,17 +55,17 @@ package struct Krea2DenoisingModule: DenoisingModule {
 
     /// **By default every evaluation at full size**: the published recipe as it stands.
     ///
-    /// **The half-size start** (`halfSizeStart`, off by default; Z-Image's recipe, by `euler`): the
+    /// **The half-size start** (`Request.fasterRendering`, off by default; Z-Image's recipe, by `euler`): the
     /// first `halfSizeSteps` evaluations on the half grid. Only at the recipe's eight, from the first
     /// step, on a grid that halves above the floor (`Spectral.floor` in 8-px cells: 1024², 1024×1536
     /// and its transpose; a 512² or 832×1216 never halves), never under a user LoRA or another
     /// schedule (`withLoRA`: never judged under them). `SILICONED_SPECTRAL` forces `k` (a
     /// measurement), within the same rules.
-    package func plan(height: Int, width: Int, steps: Int, start: Int, withLoRA: Bool) -> DenoisingPlan {
-        let halvable = Spectral.divisible(height: height, width: width, by: 2,
-                                          floor: Spectral.floor(factor: space.factor))
-        let rule = Spectral.halfSizeStart && steps == defaultSteps ? Self.halfSizeSteps : 0
-        let k = start > 0 || !halvable || withLoRA ? 0 : min(max(0, Spectral.forced ?? rule), steps - 1)
+    package func plan(height: Int, width: Int, steps: Int, start: Int, withLoRA: Bool, faster: Bool) -> DenoisingPlan {
+        let k = Spectral.reducedEvaluations(faster: faster, height: height, width: width, steps: steps, start: start,
+                                            withLoRA: withLoRA, defaultSteps: defaultSteps, halfSizeSteps: Self.halfSizeSteps,
+                                            evaluations: steps,
+                                            floor: Spectral.floor(factor: space.factor))
         return DenoisingPlan(startStep: start, startSigma: sigmas(steps: steps)[start], evaluations: steps - start,
                              reduced: k, reducedHeight: k > 0 ? height / 2 : height,
                              reducedWidth: k > 0 ? width / 2 : width)
@@ -89,7 +89,8 @@ package struct Krea2DenoisingModule: DenoisingModule {
         let merged = try fusion(text, artifact: artifact, lora: lora, context: context)
         let (height, width) = (latent.height, latent.width)
         let planned = plan(height: height, width: width, steps: steps, start: start,
-                           withLoRA: lora != nil || context.detail != .normal)
+                           withLoRA: lora != nil || context.detail != .normal,
+                           faster: context.fasterRendering)
         // The modulation of only the σs evaluated — from `start` to the last non-null one —, in
         // one pass. It depends only on σ: the following images of a batch reuse the first's table.
         let σ = sigmas(steps: steps)

@@ -135,7 +135,7 @@ package enum EngineError: Error, Equatable, Sendable, Codable, LocalizedError, C
     /// delivering it as done; nothing of it is kept. Not a misuse: the same request rendered again is the
     /// remedy, and an issue if it comes back. The count and where are in the render's warnings.
     case nonFiniteImage
-    /// `EngineSettings.load(from:)` after the settings were read from another profile.
+    /// `EngineSettings.load(map:)` after the settings were read with another map.
     case settingsAlreadyLoaded(loaded: String, requested: String)
     /// A breakdown deep in the engine (GPU, kernels, arenas, forge numerics): not a misuse.
     /// `component` names where, `detail` is the technical message.

@@ -143,6 +143,10 @@ struct RenderSettings {
     /// **Its denoiser could take the Neural Engine** (`Engine.Render.neuralEngine`): set from the render, for
     /// the image's panel — the choice itself is read when the job starts (`Job.neuralEngine`).
     var neuralEngine = false
+    /// **« Faster Rendering » as the image was (or will be) rendered** (`Request.fasterRendering`): what « Redo » and the variations
+    /// give back, so that the same settings render the same image whatever the Settings switch says by then. `nil`: the model's
+    /// choice when the job is queued (`AppState.fasterRendering(for:)`), fixed then.
+    var fasterRendering: Bool? = nil
     var isVariation: Bool { !variations.isEmpty }
 }
 
@@ -285,7 +289,7 @@ struct Job: Identifiable {
     let id = UUID()
     /// `t3`: numbered in the session, whether it comes from a click or from the remote control.
     let ordinal: Int
-    let settings: RenderSettings
+    var settings: RenderSettings
     let seeds: [UInt64]
     /// The edit's references, in order — image 1 is the one edited: re-read, not re-noised.
     let references: [ReferenceImage]

@@ -84,7 +84,7 @@ extension MemoryNeed {
         /// version (Standard, Compact or Light), and that version's encoder. `nil` when they are not
         /// installed — the render is refused before, by the preflight's first check. Each file is
         /// read once: kept by its path, size, date and inode (`installed`), read again when replaced.
-        package init?(card: ModelCard, library: Library = .processWide) {
+        package init?(card: ModelCard, library: Library) {
             let ditPath = card.map ?? library.map(library.ditMap(.zImage))
             let encoderPath = library.map(library.encoderMap(.zImage))
             let key = InstalledFiles(paths: [ditPath, encoderPath])

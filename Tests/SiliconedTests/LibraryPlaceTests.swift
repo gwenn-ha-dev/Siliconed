@@ -34,7 +34,6 @@ final class LibraryPlaceTests: XCTestCase {
         try write(URL(fileURLWithPath: b.map(Family.zImage.encoderMap)), "encoder")
         try write(URL(fileURLWithPath: Installer(library: b).componentsFolder(.zImage)).appendingPathComponent("vae.safetensors"), "vae")
         try write(URL(fileURLWithPath: b.map("flat.lora.silicon")), "lora")
-        try write(URL(fileURLWithPath: b.profile), "{}")
         try write(URL(fileURLWithPath: b.acceptedLicensesFile), "{}")
         try write(b.cacheFolder.appendingPathComponent("kv/a.kv"), "kv")
         return b
@@ -43,7 +42,7 @@ final class LibraryPlaceTests: XCTestCase {
     // ── moving ─────────────────────────────────────────────────────────────────────────────────
 
     /// **The models go, this Mac's own files stay**, and the space follows the library there: same
-    /// bytes, same dates, the old place emptied but for the profile, the licenses and the cache.
+    /// bytes, same dates, the old place emptied but for the licenses and the cache.
     func testAMovedLibraryIsFollowedAndTheMachineFilesStay() throws {
         let b = try space()
         let original = try FileManager.default.attributesOfItem(atPath: b.map(Family.zImage.ditMap))[.modificationDate] as? Date
@@ -62,11 +61,10 @@ final class LibraryPlaceTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: Installer(library: b).componentsFolder(.zImage)))
         XCTAssertFalse(FileManager.default.fileExists(atPath: destination.appendingPathComponent(".moving").path))
         // This Mac's files: where they were, and where the moved library looks for them.
-        XCTAssertEqual(moved.profile, b.profile)
         XCTAssertEqual(moved.acceptedLicensesFile, b.acceptedLicensesFile)
         XCTAssertEqual(moved.cacheFolder.path, b.cacheFolder.path)
         XCTAssertEqual(moved.socket, b.socket)
-        for kept in [b.profile, b.acceptedLicensesFile, b.cacheFolder.appendingPathComponent("kv/a.kv").path] {
+        for kept in [b.acceptedLicensesFile, b.cacheFolder.appendingPathComponent("kv/a.kv").path] {
             XCTAssertTrue(FileManager.default.fileExists(atPath: kept), kept)
         }
         XCTAssertFalse(FileManager.default.fileExists(atPath: destination.appendingPathComponent("store/profil.json").path))

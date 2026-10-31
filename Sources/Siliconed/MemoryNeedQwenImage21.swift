@@ -116,7 +116,7 @@ package struct QwenImage21Maps: Sendable {
 
     /// The maps this card renders with: its own DiT (an imported one) or the library's installed
     /// version, that version's encoder, the family's tokenizer. `nil` when one cannot be read.
-    package init?(card: ModelCard, library: Library = .processWide) {
+    package init?(card: ModelCard, library: Library) {
         let ditPath = card.map ?? library.map(library.ditMap(.qwenImage21))
         let encoderPath = library.map(library.encoderMap(.qwenImage21))
         guard let processor = try? library.component(.qwenImage21, "processor") else { return nil }

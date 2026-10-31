@@ -1,0 +1,273 @@
+import Accelerate
+internal import AMXLegacy
+import Foundation
+import Metal
+import MetalPerformanceShadersGraph
+
+// The probes' solos, the ANE's staircase and the attentions — each engine, each kernel alone (`CapacityProbes.run`).
+
+extension Diagnostic.CapacityProbes.Context {
+    // MARK: Solos
+
+    enum Probe: String, CaseIterable { case gpu_fp32, amx_fp32, ane_fp16, ane_int8, gpu_bf16, gpu_bf16act, gpu_int8, gpu_q8
+        var kernel: Kernel {
+            switch self {
+            case .gpu_fp32: return Kernel(.gpu, .fp32)
+            case .amx_fp32: return Kernel(.amx, .fp32)
+            case .ane_fp16: return Kernel(.ane, .fp16)
+            case .ane_int8: return Kernel(.ane, .int8)
+            case .gpu_bf16: return Kernel(.gpu, .bf16)
+            case .gpu_bf16act: return Kernel(.gpu, .bf16act)
+            case .gpu_int8: return Kernel(.gpu, .int8)
+            case .gpu_q8: return Kernel(.gpu, .q8)
+            }
+        }
+    }
+
+    func solos(_ probes: [Probe], _ m: inout Fit.Measurements, shapes: [Sizes.Shape]? = nil, chained: Bool = false) {
+        for probe in probes {
+            for (rows, k, n) in (shapes ?? sizes.solo).map({ ($0.m, $0.k, $0.n) }) {
+                guard let s = solo(probe, m: rows, k: k, n: n, chained: chained) else { continue }
+                if s.error != nil, s.seconds == 0 {
+                    m.wrong.append(probe.kernel.description)
+                    log?(String(format: "  %@ %dx%dx%d  WRONG, error %.3e", probe.kernel.description, rows, k, n, s.error ?? 0))
+                    continue
+                }
+                m.solos.append(s)
+                log?(String(format: "  %@ %dx%dx%d  %.2f ms  %.2f TFLOP/s  err %.2e", probe.kernel.description, rows, k, n,
+                            s.seconds * 1e3, s.flop / s.seconds * 1e-12, s.error ?? 0))
+            }
+        }
+    }
+
+    /// One kernel on one product: judged on its first run, then timed. A kernel that judged wrong returns seconds 0.
+    func solo(_ probe: Probe, m: Int, k: Int, n: Int, chained: Bool = false) -> Fit.Measurements.Solo? {
+        guard !skipped.contains(probe.kernel) else { return nil }
+        let flop = 2.0 * Double(m) * Double(k) * Double(n)
+        let name = probe.kernel.description
+        RouteBeacon.announce(name)
+        let run: () -> Bool
+        var truthKind = Truth.fp32
+        var isANE = false
+        var staged: (() -> Void)?
+        switch probe {
+        case .gpu_fp32:
+            restoreB(); run = { self.gpu(m, k, n) }
+        case .amx_fp32:
+            restoreB(); run = { self.amx(m, k, n) }
+        case .ane_fp16:
+            guard let e = neural.neuralEngine else { return nil }
+            restoreB(); isANE = true
+            run = { self.ane(e, rows: m, k, n) }
+        case .ane_int8:
+            guard let e = neural.neuralEngine, let plan = int8Plan(k, n) else { return nil }
+            truthKind = .int8; isANE = true
+            staged = { [self] in stageInt8(plan, k: k, n: n) }
+            run = { self.aneInt8(e, plan, rows: m, k, n) }
+        case .gpu_bf16:
+            guard alone.tensor != nil, alone.tensorBF16 else { return nil }
+            restoreB()
+            run = { _ = self.alone.linear(a: self.aloneB.a, bf16: self.bf16, c: self.aloneB.c, m: m, k: k, n: n, weightIsTransposed: true); return true }
+        case .gpu_bf16act:
+            guard alone.bf16Activations, let plan = WeightProducts.roundingPlan(k: k, n: n, capacity: k * n) else { return nil }
+            truthKind = .rounded
+            staged = { [self] in
+                Widen.copyBfloat16(source: operands.bf16.base, destination: operands.b.base, count: k * n)
+                dirty = max(dirty, k * n)
+            }
+            run = {
+                _ = self.alone.linear(a: self.aloneB.a, rounding: (self.aloneB.b, plan.offset, plan.rows), bf16: self.aloneB.b,
+                                      c: self.aloneB.c, m: m, k: k, n: n, weightIsTransposed: true)
+                return true
+            }
+        case .gpu_int8, .gpu_q8:
+            let isInt8 = probe == .gpu_int8
+            guard isInt8 ? both.tensorInt8 : both.tensorQ8, (k * n) % 2 == 0, isInt8 ? k % Diagnostic.int8Group == 0 : k % Diagnostic.q8Block == 0,
+                  let plan = WeightProducts.int8Plan(k: k, n: n, capacity: k * n, perColumn: false, group: isInt8 ? Diagnostic.int8Group : nil,
+                                                     amxColumns: 0, block: isInt8 ? nil : Diagnostic.q8Block) else { return nil }
+            truthKind = isInt8 ? .int8 : .q8
+            staged = { [self] in
+                Widen.copyBfloat16(source: operands.q.base, destination: operands.b.base, count: k * n / 2)
+                if isInt8 {
+                    (operands.b.base + plan.scalesOffset).storeBytes(of: Diagnostic.int8Scale, as: Float.self)
+                } else {
+                    (operands.b.base + plan.scalesOffset).copyMemory(from: operands.q8Scales.base, byteCount: (k + Diagnostic.q8Block - 1) / Diagnostic.q8Block * n * 4)
+                }
+                dirty = max(dirty, k * n)
+            }
+            run = { WeightProducts.int8Product(gemm: self.both, plan: plan, reserve: self.bothB.b, a: self.bothB.a, c: self.bothB.c, m: m, k: k, n: n).status == 0 }
+        }
+        // The truth first (it restores B for the fp32 ones), then the staged weight.
+        prime(truthKind, ane: isANE, m: m, k: k, n: n)
+        staged?()
+        guard let verdict = judged(name, truthKind, ane: isANE, m: m, k: k, n: n, run) else { return nil }
+        guard verdict.pass else { return .init(kernel: name, shape: [m, k, n], flop: flop, seconds: 0, error: verdict.error) }
+        // An ANE route is judged again on a massive activation, at the middle size (the exact product of a few more rows costs
+        // what the solo does): over its bar there, the route is wrong on this Mac, as on any product.
+        if isANE, sizes.solo.count > 1 || sizes.product.count > 1,
+           (sizes.product.count > 1 && (m, k, n) == (sizes.product[1].m, sizes.product[1].k, sizes.product[1].n))
+            || (sizes.solo.count > 1 && (m, k, n) == (sizes.solo[1].m, sizes.solo[1].k, sizes.solo[1].n)),
+           let massive = massive(truthKind, kernel: name, m: m, k: k, n: n, run), !massive.pass {
+            return .init(kernel: name, shape: [m, k, n], flop: flop, seconds: 0, error: max(massive.rowError, massive.columnError))
+        }
+        guard let t = guarded("\(name) \(m)x\(k)x\(n)", { () -> Double? in
+            chained ? CapacityProbes.chain(run)?.seconds : CapacityProbes.steady(run)
+        }) else { return nil }
+        return .init(kernel: name, shape: [m, k, n], flop: flop, seconds: t, error: verdict.error)
+    }
+
+    // MARK: The ANE's staircase
+
+    func stairs(_ m: inout Fit.Measurements) {
+        guard !skipped.contains(Kernel(.ane, .fp16)), let engine = neural.neuralEngine else { return }
+        RouteBeacon.announce("ane/fp16")
+        restoreB()
+        m.stairShape = [Sizes.stair.k, Sizes.stair.n]
+        for rows in sizes.stairRows {
+            let (k, n) = Sizes.stair
+            let run = { self.ane(engine, rows: rows, k, n) }
+            guard let v = judged("ane/fp16", .fp32, ane: true, m: rows, k: k, n: n, run) else { continue }
+            guard v.pass else { m.wrong.append("ane/fp16"); continue }
+            guard let t = guarded("stair \(rows)", { CapacityProbes.steady(run) }) else { continue }
+            m.stairs.append(.init(rows: rows, seconds: t))
+            log?(String(format: "  stair %d rows  %.2f ms", rows, t * 1e3))
+        }
+    }
+
+    // MARK: Attention
+
+    func attention(_ measurements: inout Fit.Measurements) throws {
+        let (h, d) = (Sizes.attentionHeads, Sizes.attentionHeadDim)
+        let floats = sizes.attention.max()! * h * d
+        let pages = (q: Pages(bytes: floats * 4), k: Pages(bytes: floats * 4), v: Pages(bytes: floats * 4), out: Pages(bytes: floats * 4))
+        Diagnostic.fill(pages.q.floats(), count: floats, scale: 3, seed: 11)
+        Diagnostic.fill(pages.k.floats(), count: floats, scale: 3, seed: 12)
+        Diagnostic.fill(pages.v.floats(), count: floats, scale: 1, seed: 13)
+        let buffers = (q: try bench.buffer(pages.q), k: try bench.buffer(pages.k), v: try bench.buffer(pages.v), out: try bench.buffer(pages.out))
+        let out = pages.out.floats()
+        for s in sizes.attention {
+            autoreleasepool {
+                let rows = Diagnostic.sampleRows(s, count: Diagnostic.sampledQueries)
+                let exact = Diagnostic.exactAttention(q: pages.q.floats(), k: pages.k.floats(), v: pages.v.floats(), sequence: s, heads: h, headDim: d, rows: rows)
+                let flop = 4.0 * Double(s) * Double(s) * Double(h) * Double(d)
+                func verdict(_ kernel: String) -> (pass: Bool, error: Double) {
+                    let width = h * d, vectors = rows.count * h
+                    var got = [Float](repeating: 0, count: vectors * d)
+                    for (i, row) in rows.enumerated() {
+                        for head in 0..<h { for x in 0..<d { got[x * vectors + i * h + head] = out[row * width + head * d + x] } }
+                    }
+                    let judged = Diagnostic.judge(got, exact, columns: vectors, threshold: Diagnostic.fp32Threshold)
+                    keep(kernel, error: judged.error, threshold: Diagnostic.fp32Threshold, pass: judged.pass)
+                    return judged
+                }
+                func poison() { for row in rows { (out + row * h * d).update(repeating: .nan, count: h * d) } }
+                func record(_ kernel: Kernel, flop: Double, run: () -> Bool, shape: [Int]) {
+                    poison()
+                    guard run() else { return }
+                    let v = verdict(kernel.description)
+                    guard v.pass else { measurements.wrong.append(kernel.description); return }
+                    guard let t = guarded("\(kernel.description) S=\(s)", { CapacityProbes.steady(run) }) else { return }
+                    measurements.solos.append(.init(kernel: kernel.description, shape: shape, flop: flop, seconds: t, error: v.error))
+                    log?(String(format: "  %@ S=%d  %.2f ms  %.2f TFLOP/s", kernel.description, s, t * 1e3, flop / t * 1e-12))
+                }
+                let graph = Attention(device: bench.device, queue: bench.queue, heads: h, sequence: s, headDim: d)
+                RouteBeacon.announce("gpu/graph")
+                record(Kernel(.gpu, .graph), flop: flop, run: { _ = graph.run(q: buffers.q, k: buffers.k, v: buffers.v, into: buffers.out); return true }, shape: [s, h, d])
+                RouteBeacon.announce("gpu/flash")
+                if !skipped.contains(Kernel(.gpu, .flash)), let flash = try? FlashMatrix(device: bench.device, queue: bench.queue, heads: h, sequence: s, headDim: d) {
+                    record(Kernel(.gpu, .flash), flop: flop, run: { _ = flash.run(q: buffers.q, k: buffers.k, v: buffers.v, into: buffers.out); return true }, shape: [s, h, d])
+                }
+                // The CPU's heads: all but one of them, the figure being the CPU part's own wall.
+                RouteBeacon.announce("cpu/heads")
+                if !skipped.contains(Kernel(.cpu, .heads)), let split = try? HeadSplitAttention(device: bench.device, queue: bench.queue, heads: h, sequence: s, headDim: d,
+                                                       cpuFraction: Double(h - 1) / Double(h)) {
+                    nonisolated(unsafe) let (qp, kp, vp, op) = (pages.q.floats(), pages.k.floats(), pages.v.floats(), out)
+                    var cpuSeconds = 0.0
+                    let run = {
+                        let r = split.run(q: buffers.q, k: buffers.k, v: buffers.v, into: buffers.out, q: qp, k: kp, v: vp, out: op)
+                        cpuSeconds = r.cpu
+                        return true
+                    }
+                    poison()
+                    if run() {
+                        let v = verdict("cpu/heads")
+                        if !v.pass { measurements.wrong.append("cpu/heads") } else {
+                            let heads = guarded("cpu/heads S=\(s)") { () -> Double? in
+                                var times: [Double] = []
+                                var previous = Double.infinity
+                                for i in 0..<5 {
+                                    _ = run()
+                                    if i >= 1 { times.append(cpuSeconds) }
+                                    if i >= 1, cpuSeconds >= previous * 0.9, times.count >= 2 { break }
+                                    previous = cpuSeconds
+                                }
+                                return Fit.median(Array(times.suffix(3)))
+                            }
+                            guard let t = heads else { return }
+                            let cpuFlop = 4.0 * Double(s) * Double(s) * Double(d) * Double(split.cpuHeads)
+                            measurements.solos.append(.init(kernel: Kernel(.cpu, .heads).description, shape: [s, h, d, split.cpuHeads],
+                                                            flop: cpuFlop, seconds: t, error: v.error))
+                            log?(String(format: "  cpu/heads S=%d (%d heads)  %.2f ms  %.2f TFLOP/s", s, split.cpuHeads, t * 1e3, cpuFlop / t * 1e-12))
+                            attentionSet(&measurements, sequence: s, cpuSolo: (split.cpuHeads, t), flop: flop, pages: pages, buffers: buffers,
+                                         verdict: verdict, poison: poison)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// **The attention as a set of two engines**: the system graph on the GPU's heads beside the CPU's, at the heads the two solo lines
+    /// balance, each side by the clock the split gives it (`HeadSplitAttention.run`: the GPU part's, the CPU part's wall). A side alone is its
+    /// solo line scaled to its heads (both are proportional to them: the graph's and the heads' t₀ are nil). The same fit as the products'
+    /// sets (`Fit.sharing`): a trial of `heads` rows of `2·S²·Dh` each.
+    func attentionSet(_ measurements: inout Fit.Measurements, sequence s: Int, cpuSolo: (heads: Int, seconds: Double), flop: Double,
+                      pages: (q: Pages, k: Pages, v: Pages, out: Pages),
+                      buffers: (q: MTLBuffer, k: MTLBuffer, v: MTLBuffer, out: MTLBuffer),
+                      verdict: (String) -> (pass: Bool, error: Double), poison: () -> Void) {
+        let (h, d) = (Sizes.attentionHeads, Sizes.attentionHeadDim)
+        let key = CapacityModel.key([.gpu, .cpu])
+        guard let graph = measurements.solos.last(where: { $0.kernel == Kernel(.gpu, .graph).description && $0.shape.first == s })?.seconds else { return }
+        // Rates over all the heads: the GPU's (the graph alone), the CPU's (its heads over its wall).
+        let cpuRate = Double(cpuSolo.heads) / cpuSolo.seconds, gpuRate = Double(h) / graph
+        let fraction = cpuRate / (cpuRate + gpuRate)
+        guard let split = try? HeadSplitAttention(device: bench.device, queue: bench.queue, heads: h, sequence: s, headDim: d,
+                                                  cpuFraction: fraction), split.cpuHeads > 0, split.gpuHeads > 0 else { return }
+        nonisolated(unsafe) let (qp, kp, vp, op) = (pages.q.floats(), pages.k.floats(), pages.v.floats(), pages.out.floats())
+        var sides: (gpu: Double, cpu: Double) = (0, 0)
+        let run = {
+            sides = split.run(q: buffers.q, k: buffers.k, v: buffers.v, into: buffers.out, q: qp, k: kp, v: vp, out: op)
+            return true
+        }
+        poison()
+        guard run() else { return }
+        let judged = verdict(key)
+        let shape = [h, 2 * s * s * d, 1]
+        guard judged.pass else {
+            measurements.trials.append(.init(set: key, shape: shape, pass: 2, sides: [], wall: 0, error: judged.error))
+            log?("  \(key) S=\(s): WRONG, error \(judged.error)")
+            return
+        }
+        var walls: [Double] = [], gpu: [Double] = [], cpu: [Double] = []
+        _ = guarded("\(key) S=\(s)") { () -> Bool? in
+            walls = []; gpu = []; cpu = []
+            var previous = Double.infinity
+            for i in 0..<6 {
+                guard let wall = CapacityProbes.timed(run) else { return nil }
+                if i >= 1 { walls.append(wall); gpu.append(sides.gpu); cpu.append(sides.cpu) }
+                if i >= 2, wall >= previous * 0.9 { break }
+                previous = wall
+            }
+            return true
+        }
+        guard !walls.isEmpty else { return }
+        let gpuAlone = graph * Double(split.gpuHeads) / Double(h), cpuAlone = cpuSolo.seconds * Double(split.cpuHeads) / Double(cpuSolo.heads)
+        measurements.trials.append(.init(
+            set: key, shape: shape, pass: 2,
+            sides: [.init(kernel: Kernel(.gpu, .graph).description, rows: split.gpuHeads, solo: gpuAlone, within: Fit.median(gpu)),
+                    .init(kernel: Kernel(.cpu, .heads).description, rows: split.cpuHeads, solo: cpuAlone, within: Fit.median(cpu))],
+            wall: Fit.median(walls), error: judged.error))
+        log?(String(format: "  %@ S=%d  %d + %d heads  wall %.2f ms  gpu %.2f/%.2f cpu %.2f/%.2f ms", key, s, split.gpuHeads, split.cpuHeads,
+                    Fit.median(walls) * 1e3, gpuAlone * 1e3, Fit.median(gpu) * 1e3, cpuAlone * 1e3, Fit.median(cpu) * 1e3))
+    }
+}

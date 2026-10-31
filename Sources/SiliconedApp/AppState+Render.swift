@@ -67,7 +67,8 @@ extension AppState {
             var plan = model.map { m in
                 let f = m.chain.denoising.space.factor
                 let plan = m.chain.denoising.plan(height: s.format.height / f, width: s.format.width / f, steps: s.steps,
-                                                  start: 0, withLoRA: !s.loras.isEmpty || s.detail != .normal)
+                                                  start: 0, withLoRA: !s.loras.isEmpty || s.detail != .normal,
+                                                  faster: s.fasterRendering ?? fasterRendering(for: s.identifier))
                 return s.references > 0 ? plan.unreduced : plan
             }
             // A stop at or past the plan's count is a finished image — kept by the exploration all the same.
@@ -208,6 +209,8 @@ extension AppState {
     /// Ready-made jobs enter the queue, in order — the path of the button and of the remote control.
     func enqueue(_ jobs: [Job]) {
         guard !jobs.isEmpty else { return }
+        // « Faster Rendering » is fixed when the job is queued: the plan it was given and the request it renders agree.
+        let jobs = jobs.map { job -> Job in var j = job; j.settings = resolvingFaster(job.settings); return j }
         if let mirror {
             // The form is blocked while the link is down; what reaches here by another door is said, not dropped.
             if let down = linkBlocker { problem = Problem(down); flash(down); return }
@@ -347,6 +350,7 @@ extension AppState {
             request.solver = settings.solver
             request.variations = settings.variations
             request.neuralEngine = job.neuralEngine ?? neuralEngine(for: settings.identifier)
+            request.fasterRendering = settings.fasterRendering ?? fasterRendering(for: settings.identifier)
 
             var progress = Engine.Progress()
             for try await item in Engine().events(request, seeds: job.seeds, model: model) {
@@ -400,7 +404,7 @@ extension AppState {
                                         width: renderResult.image.width, height: renderResult.image.height,
                                         seed: renderResult.seed, timings: renderResult.timings, footprints: renderResult.footprints,
                                         evaluations: renderResult.evaluations,
-                                        settings: { var s = settings; s.neuralEngine = renderResult.neuralEngine; return s }(),
+                                        settings: { var s = settings; s.neuralEngine = renderResult.neuralEngine; s.fasterRendering = renderResult.fasterRendering; return s }(),
                                         metadata: named ?? renderResult.metadata, references: job.references,
                                         sketch: renderResult.sketch, owner: job.owner)
                     // A sketch belongs to its exploration, not to the history.
@@ -457,14 +461,19 @@ extension AppState {
         }
     }
 
+    /// The settings with « Faster Rendering » fixed (`RenderSettings.fasterRendering`): what a mirror's form sends.
+    func resolvingFaster(_ settings: RenderSettings) -> RenderSettings {
+        var s = settings; s.fasterRendering = settings.fasterRendering ?? fasterRendering(for: settings.identifier); return s
+    }
+
     /// The per-image plan that the chosen model's denoiser foresees for these settings.
     /// `withLoRA`: a LoRA or a Detail — either turns the spectral schedule off; so do references (an edit).
     func expectedPlan(steps: Int, format: RecommendedFormat, withLoRA: Bool, references: Int) -> DenoisingPlan? {
-        // A plan reads the settings (`Spectral.forced`): none before they are (`settingsRead`).
+        // A plan reads the settings (`EngineSettings.effective`, through the memory need): none before they are (`settingsRead`).
         guard settingsRead, let chain else { return nil }
         let f = chain.denoising.space.factor
         let plan = chain.denoising.plan(height: format.height / f, width: format.width / f,
-                                        steps: steps, start: 0, withLoRA: withLoRA)
+                                        steps: steps, start: 0, withLoRA: withLoRA, faster: fasterRendering(for: identifier))
         return references > 0 ? plan.unreduced : plan
     }
 
@@ -562,7 +571,8 @@ extension AppState {
             let f = m.chain.denoising.space.factor
             let plan = m.chain.denoising.plan(height: entry.settings.format.height / f, width: entry.settings.format.width / f,
                                               steps: entry.settings.steps, start: 0,
-                                              withLoRA: !entry.settings.loras.isEmpty || entry.settings.detail != .normal)
+                                              withLoRA: !entry.settings.loras.isEmpty || entry.settings.detail != .normal,
+                                              faster: entry.settings.fasterRendering ?? fasterRendering(for: entry.settings.identifier))
             return entry.settings.references > 0 ? plan.unreduced : plan
         }
         let jobs = (0..<(count ?? batch)).map { _ in

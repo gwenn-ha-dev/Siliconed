@@ -12,7 +12,7 @@ package enum Parallel {
     /// split by rows should be bit-for-bit identical, so any deviation is a defect.
     package static let threshold: Int = {
         let requested = EngineSettings.effective.parallel
-        if requested == 0 && EngineSettings.effective.provenance["parallel"] == nil { return 1 << 18 }
+        if requested == 0 && EngineSettings.effective.provenance[.parallel] == nil { return 1 << 18 }
         return requested == 0 ? Int.max : requested
     }()
 

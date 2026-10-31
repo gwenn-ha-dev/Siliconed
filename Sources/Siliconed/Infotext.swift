@@ -100,11 +100,11 @@ package enum Infotext {
         return Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String
     }()
 
-    /// **The text.** `strength`: the img2img's, `nil` in txt2img. `civitaiModelVersion`: the base
+    /// **The text.** `fasterRendering`: the half-size start was in play. `strength`: the img2img's, `nil` in txt2img. `civitaiModelVersion`: the base
     /// model's page, `nil` for an imported fine-tune or a family Civitai is not checked for.
     package static func text(prompt: String, steps: Int, sampler solver: Solver, seed: UInt64,
                              width: Int, height: Int, model: String, strength: Double?, loras: [LoRA],
-                             civitaiModelVersion: Int?, version: String?) -> String {
+                             civitaiModelVersion: Int?, version: String?, fasterRendering: Bool = false) -> String {
         let named = loras.map { (name: name($0.name), lora: $0) }
         let tags = named.filter { $0.lora.strength >= 0 && $0.lora.strength.isFinite }
             .map { "<lora:\($0.name):\(String(format: "%.2f", $0.lora.strength))>" }
@@ -120,6 +120,8 @@ package enum Infotext {
             }
             details.append("Civitai resources: [\(resources.joined(separator: ","))]")
         }
+        // The half-size start moves the image: a reader who redoes the settings needs it. Civitai keeps unknown pairs.
+        if fasterRendering { details.append("Faster rendering: true") }
         details.append("Version: " + value(version.map { "Siliconed \($0)" } ?? "Siliconed"))
         return ([prompt] + tags).joined(separator: " ") + "\n" + details.joined(separator: ", ")
     }

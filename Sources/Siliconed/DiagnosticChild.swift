@@ -208,7 +208,9 @@ extension Diagnostic {
 
             package func stop() {
                 let process = state.withLock { s -> Process? in s.stopped = true; return s.process }
-                process?.terminate()
+                // `terminate()` on a process that never launched raises: only a running one is ended here (`run` ends one that
+                // started after the request, below).
+                if let process, process.isRunning { process.terminate() }
             }
 
             package func run(onStage: (Stage) -> Void = { _ in }, onRoute: (String) -> Void = { _ in },
@@ -221,16 +223,15 @@ extension Diagnostic {
                     let pipe = Pipe()
                     process.standardOutput = pipe
                     process.standardError = FileHandle.nullDevice
-                    let go = state.withLock { s -> Bool in
-                        if s.stopped { return false }
-                        s.process = process
-                        return true
-                    }
-                    guard go else { outcome.stopped = true; return outcome }
+                    guard !state.withLock({ $0.stopped }) else { outcome.stopped = true; return outcome }
                     do { try process.run() } catch {
                         outcome.failure = ("internal", "the measuring process did not start: \(error.localizedDescription)")
                         return outcome
                     }
+                    // Registered only once launched, so that `stop()` never meets a process that did not start; a stop that came
+                    // between the check above and here ends this one now.
+                    let stoppedMeanwhile = state.withLock { s -> Bool in s.process = process; return s.stopped }
+                    if stoppedMeanwhile { process.terminate() }
                     var stage: Stage?, route: String?
                     var report: Report?, failure: (String, String)?
                     var pending = Data()

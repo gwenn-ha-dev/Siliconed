@@ -434,11 +434,11 @@ final class MemoryNeedQwenTests: XCTestCase {
         // keep the full DiT; one at full size — the product's, at every format — does.
         let module = QwenImage21DenoisingModule(map: "", scheduler: .init())
         if Spectral.forced == nil {
-            XCTAssertEqual(module.plan(height: 64, width: 64, steps: 8, start: 0, withLoRA: false).reduced, 0)
+            XCTAssertEqual(module.plan(height: 64, width: 64, steps: 8, start: 0, withLoRA: false, faster: false).reduced, 0)
         }
         XCTAssertFalse(QwenImage21DenoisingModule.keepsDenoiser(reduced: 2))
         XCTAssertTrue(QwenImage21DenoisingModule.keepsDenoiser(reduced: 0))
-        XCTAssertEqual(module.plan(height: 32, width: 32, steps: 8, start: 0, withLoRA: false).reduced, 0)
+        XCTAssertEqual(module.plan(height: 32, width: 32, steps: 8, start: 0, withLoRA: false, faster: false).reduced, 0)
     }
 
     /// **The map's type is read from its header**: an 8-bit map's staging blocks are about half a

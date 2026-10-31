@@ -68,7 +68,7 @@ package struct QwenImage21DenoisingModule: DenoisingModule {
     /// **By default every evaluation at full size** (since 0.10): the published recipe as it stands —
     /// a half-size phase changes the image.
     ///
-    /// **The half-size start** (`halfSizeStart`, off by default; Z-Image's recipe): the first
+    /// **The half-size start** (`Request.fasterRendering`, off by default; Z-Image's recipe): the first
     /// `halfSizeSteps` evaluations on the half grid, by the half-size phase of `QwenImage21Sampler` —
     /// not the `x += dt·𝓘v(𝓟x)` steps it ran until 0.10 (two, judged clean then), which left the
     /// latent's high-frequency noise in place and handed the model an alias. Only at the recipe's
@@ -78,11 +78,11 @@ package struct QwenImage21DenoisingModule: DenoisingModule {
     /// edit — the plan cannot see the references, the chain zeroes it (`DenoisingPlan.unreduced`) and
     /// the denoiser ignores it with references. `SILICONED_SPECTRAL` forces `k` (a measurement),
     /// within the same rules.
-    package func plan(height: Int, width: Int, steps: Int, start: Int, withLoRA: Bool) -> DenoisingPlan {
-        let halvable = Spectral.divisible(height: height, width: width, by: 2,
-                                          floor: Spectral.floor(factor: space.factor))
-        let rule = Spectral.halfSizeStart && steps == defaultSteps ? Self.halfSizeSteps : 0
-        let k = start > 0 || !halvable || withLoRA ? 0 : min(max(0, Spectral.forced ?? rule), steps - 1)
+    package func plan(height: Int, width: Int, steps: Int, start: Int, withLoRA: Bool, faster: Bool) -> DenoisingPlan {
+        let k = Spectral.reducedEvaluations(faster: faster, height: height, width: width, steps: steps, start: start,
+                                            withLoRA: withLoRA, defaultSteps: defaultSteps, halfSizeSteps: Self.halfSizeSteps,
+                                            evaluations: steps,
+                                            floor: Spectral.floor(factor: space.factor))
         return DenoisingPlan(startStep: start, startSigma: sigmas(steps: steps)[start],
                              evaluations: steps - start, reduced: k,
                              reducedHeight: k > 0 ? height / 2 : height, reducedWidth: k > 0 ? width / 2 : width)
@@ -147,7 +147,8 @@ package struct QwenImage21DenoisingModule: DenoisingModule {
         // Detail, like a LoRA, turns it off (`plan`), and so does another schedule; an edit has none.
         let reduced = references.isEmpty
             ? plan(height: height, width: width, steps: steps, start: start,
-                   withLoRA: lora != nil || context.detail != .normal).reduced : 0
+                   withLoRA: lora != nil || context.detail != .normal,
+                           faster: context.fasterRendering).reduced : 0
         // **The previous image's DiT is reused only when no half-size DiT comes first**
         // (`keepsDenoiser`): the memory need charges one DiT at a time — the half-size one is built and
         // released before the full one —, and the full DiT of image n kept beside the half-size one of

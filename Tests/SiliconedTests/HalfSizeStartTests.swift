@@ -5,51 +5,44 @@ import XCTest
 /// it, and the two operators it adds — the images it changes are judged by eye, not here.
 final class HalfSizeStartTests: XCTestCase {
 
-    override func tearDown() {
-        Spectral.halfSizeStart = false
-    }
-
     func testOffByDefaultAndThreeEvaluationsWhenOn() {
         let z = ZImageDenoisingModule(map: "")
-        XCTAssertEqual(z.plan(height: 128, width: 128, steps: 8, start: 0, withLoRA: false).reduced, 0)
-        Spectral.halfSizeStart = true
-        let plan = z.plan(height: 128, width: 128, steps: 8, start: 0, withLoRA: false)
+        XCTAssertEqual(z.plan(height: 128, width: 128, steps: 8, start: 0, withLoRA: false, faster: false).reduced, 0)
+        let plan = z.plan(height: 128, width: 128, steps: 8, start: 0, withLoRA: false, faster: true)
         XCTAssertEqual(plan.reduced, 3)
         XCTAssertEqual(plan.evaluations, 8)
         XCTAssertEqual(plan.reducedHeight, 64); XCTAssertEqual(plan.reducedWidth, 64)
-        XCTAssertEqual(z.plan(height: 192, width: 128, steps: 8, start: 0, withLoRA: false).reduced, 3)
+        XCTAssertEqual(z.plan(height: 192, width: 128, steps: 8, start: 0, withLoRA: false, faster: true).reduced, 3)
     }
 
     func testNeverUnderTheFloorNorWithALoRANorOffTheRecipe() {
         let z = ZImageDenoisingModule(map: "")
-        Spectral.halfSizeStart = true
         // 512², and 832×1216 whose half has a side under 512 px.
-        XCTAssertEqual(z.plan(height: 64, width: 64, steps: 8, start: 0, withLoRA: false).reduced, 0)
-        XCTAssertEqual(z.plan(height: 152, width: 104, steps: 8, start: 0, withLoRA: false).reduced, 0)
-        XCTAssertEqual(z.plan(height: 128, width: 128, steps: 8, start: 0, withLoRA: true).reduced, 0)
-        XCTAssertEqual(z.plan(height: 128, width: 128, steps: 8, start: 3, withLoRA: false).reduced, 0)
-        XCTAssertEqual(z.plan(height: 128, width: 128, steps: 12, start: 0, withLoRA: false).reduced, 0)
+        XCTAssertEqual(z.plan(height: 64, width: 64, steps: 8, start: 0, withLoRA: false, faster: true).reduced, 0)
+        XCTAssertEqual(z.plan(height: 152, width: 104, steps: 8, start: 0, withLoRA: false, faster: true).reduced, 0)
+        XCTAssertEqual(z.plan(height: 128, width: 128, steps: 8, start: 0, withLoRA: true, faster: true).reduced, 0)
+        XCTAssertEqual(z.plan(height: 128, width: 128, steps: 8, start: 3, withLoRA: false, faster: true).reduced, 0)
+        XCTAssertEqual(z.plan(height: 128, width: 128, steps: 12, start: 0, withLoRA: false, faster: true).reduced, 0)
     }
 
     /// **Anima's plan**: the same rules, in 8-px cells with each half side a multiple of the ×2 patch.
     func testAnimaOffByDefaultThreeWhenOnNeverUnderTheRules() throws {
         try XCTSkipIf(Spectral.forced != nil, "SILICONED_SPECTRAL forces k")
         let anima = AnimaDenoisingModule(map: "")
-        XCTAssertEqual(anima.plan(height: 128, width: 128, steps: 8, start: 0, withLoRA: false).reduced, 0)
-        Spectral.halfSizeStart = true
-        let plan = anima.plan(height: 128, width: 128, steps: 8, start: 0, withLoRA: false)
+        XCTAssertEqual(anima.plan(height: 128, width: 128, steps: 8, start: 0, withLoRA: false, faster: false).reduced, 0)
+        let plan = anima.plan(height: 128, width: 128, steps: 8, start: 0, withLoRA: false, faster: true)
         XCTAssertEqual(plan.reduced, AnimaDenoisingModule.halfSizeSteps)
         XCTAssertEqual(plan.evaluations, 8)
         XCTAssertEqual([plan.reducedHeight, plan.reducedWidth], [64, 64])
-        XCTAssertEqual(anima.plan(height: 192, width: 128, steps: 8, start: 0, withLoRA: false).reduced,
+        XCTAssertEqual(anima.plan(height: 192, width: 128, steps: 8, start: 0, withLoRA: false, faster: true).reduced,
                        AnimaDenoisingModule.halfSizeSteps)
         // 512², 832×1216 (a half side under 512 px), 1032² (a half side off the patch).
-        XCTAssertEqual(anima.plan(height: 64, width: 64, steps: 8, start: 0, withLoRA: false).reduced, 0)
-        XCTAssertEqual(anima.plan(height: 152, width: 104, steps: 8, start: 0, withLoRA: false).reduced, 0)
-        XCTAssertEqual(anima.plan(height: 130, width: 130, steps: 8, start: 0, withLoRA: false).reduced, 0)
-        XCTAssertEqual(anima.plan(height: 128, width: 128, steps: 8, start: 0, withLoRA: true).reduced, 0)
-        XCTAssertEqual(anima.plan(height: 128, width: 128, steps: 8, start: 2, withLoRA: false).reduced, 0)
-        XCTAssertEqual(anima.plan(height: 128, width: 128, steps: 12, start: 0, withLoRA: false).reduced, 0)
+        XCTAssertEqual(anima.plan(height: 64, width: 64, steps: 8, start: 0, withLoRA: false, faster: true).reduced, 0)
+        XCTAssertEqual(anima.plan(height: 152, width: 104, steps: 8, start: 0, withLoRA: false, faster: true).reduced, 0)
+        XCTAssertEqual(anima.plan(height: 130, width: 130, steps: 8, start: 0, withLoRA: false, faster: true).reduced, 0)
+        XCTAssertEqual(anima.plan(height: 128, width: 128, steps: 8, start: 0, withLoRA: true, faster: true).reduced, 0)
+        XCTAssertEqual(anima.plan(height: 128, width: 128, steps: 8, start: 2, withLoRA: false, faster: true).reduced, 0)
+        XCTAssertEqual(anima.plan(height: 128, width: 128, steps: 12, start: 0, withLoRA: false, faster: true).reduced, 0)
     }
 
     /// 𝓑x + σ𝓑ε: the 2×2 mean of `a + σ·b`, block by block, channel by channel.

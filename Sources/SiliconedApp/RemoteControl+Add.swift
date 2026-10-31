@@ -255,7 +255,7 @@ extension RemoteControl {
         }
         let f = model.chain.denoising.space.factor
         let plan = model.chain.denoising.plan(height: height / f, width: width / f, steps: steps, start: 0,
-                                                 withLoRA: !stack.isEmpty || d.detail != .normal)
+                                                 withLoRA: !stack.isEmpty || d.detail != .normal, faster: app.fasterRendering(for: model.identifier))
         // One seed for the whole series, drawn once: the alternatives are compared at the same seeds.
         let firstNumber = d.seed ?? UInt64.random(in: 0...UInt64(UInt32.max))
         if grid {

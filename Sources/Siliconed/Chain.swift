@@ -239,6 +239,8 @@ package extension Model {
 /// package (`package`) — only the engine and the CLI checks construct it.
 package final class Context {
     package let reproducible: Bool
+    /// **« Faster Rendering »** (`Request.fasterRendering`), resolved once by the engine: what every `plan` of this render reads.
+    package var fasterRendering = false
     /// **The denoiser's products may take the Neural Engine** (`Request.neuralEngine`), where this Mac's map
     /// turned it on: resolved at render time. The encoders never do.
     package var neuralEngine = EngineSettings.effective.plan.usesANE
@@ -374,7 +376,8 @@ package protocol DenoisingModule: Sendable {
     func sigmas(steps: Int) -> [Float]
     /// `height`, `width`: the latent grid, not the pixels. `withLoRA`: the request carries a
     /// stack — Qwen-Image-2.1 turns its spectral schedule off there (`QwenImage21DenoisingModule.plan`).
-    func plan(height: Int, width: Int, steps: Int, start: Int, withLoRA: Bool) -> DenoisingPlan
+    /// `faster`: « Faster Rendering » (`Request.fasterRendering`): the half-size start, where the family's rule allows it.
+    func plan(height: Int, width: Int, steps: Int, start: Int, withLoRA: Bool, faster: Bool) -> DenoisingPlan
     func denoise(_ latent: inout Latent, text: Conditioning, steps: Int, start: Int, lora: LoRA?,
                    context: Context) throws
     /// **How many reference images it can read** (editing): 0 for a denoiser
@@ -426,9 +429,9 @@ package protocol DecodingModule: Sendable {
 }
 
 package extension DenoisingModule {
-    /// The plan of a request without a LoRA.
+    /// The plan of a request without a LoRA, at full size.
     func plan(height: Int, width: Int, steps: Int, start: Int) -> DenoisingPlan {
-        plan(height: height, width: width, steps: steps, start: start, withLoRA: false)
+        plan(height: height, width: width, steps: steps, start: start, withLoRA: false, faster: false)
     }
     var maxReferences: Int { 0 }
     func denoise(_ latent: inout Latent, text: Conditioning, steps: Int, start: Int,

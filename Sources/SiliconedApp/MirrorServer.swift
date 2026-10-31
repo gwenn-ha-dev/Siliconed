@@ -369,7 +369,7 @@ final class MirrorServer {
         }
         let f = denoising.space.factor
         let full = denoising.plan(height: r.height / f, width: r.width / f, steps: r.steps, start: 0,
-                                  withLoRA: !r.loras.isEmpty || r.detail != .normal)
+                                  withLoRA: !r.loras.isEmpty || r.detail != .normal, faster: r.fasterRendering ?? app.fasterRendering(for: r.model))
         // An edit's plan is unreduced (`AppState.expectedPlan`).
         let plan = references.isEmpty ? full : full.unreduced
         var job = MirrorProjection.job(r, ordinal: app.nextJobNumber(), plan: plan)
@@ -543,7 +543,7 @@ final class MirrorServer {
         }
         return MirrorCatalog(ready: app.readySet.sorted(), traits: traits, loras: loras, loraNames: names, needs: needs,
                              ceiling: app.memoryCeiling, settingsRead: app.settingsRead,
-                             neuralEngineOffered: app.neuralEngineOffered, fasterRendering: app.fasterRendering,
+                             neuralEngineOffered: app.neuralEngineOffered,
                              enlarges: SuperResolution.available)
     }
 
@@ -666,7 +666,7 @@ final class MirrorServer {
 
     private func watchCatalog() {
         withObservationTracking {
-            _ = app.readySet; _ = app.cards; _ = app.settingsRead; _ = app.settingsEpoch; _ = app.fasterRendering
+            _ = app.readySet; _ = app.cards; _ = app.settingsRead; _ = app.settingsEpoch
         } onChange: { [weak self] in
             DispatchQueue.main.async { MainActor.assumeIsolated { self?.fireCatalog() } }
         }

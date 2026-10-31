@@ -14,7 +14,7 @@ package struct LoRAEntry: Sendable, Hashable {
     package var strength: Double
     package init(_ path: String, strength: Double = 1) { self.path = path; self.strength = strength }
 
-    /// `carte.silicon:0.8,autre.silicon:0.5` — the syntax of `SILICONED_LORA`. A missing or
+    /// `carte.silicon:0.8,autre.silicon:0.5` — the syntax of the CLI's `SILICONED_LORA`. A missing or
     /// unreadable strength is 1. An entry made only of colons (`:`) names no file: it is kept as
     /// written, so the render refuses it by name (`EngineError.fileMissing(path: ":")`) rather than
     /// the parse trapping on a piece that is not there.
@@ -107,6 +107,12 @@ package struct Request: Sendable, Equatable {
     /// False: the denoiser in fp32 throughout, the image the checks compare with the reference. It can only
     /// turn the branch off: where the map left it off, true changes nothing. The encoders never take it.
     package var neuralEngine = true
+    /// **« Faster Rendering »**: the family's first evaluations on the half grid (`Spectral.reducedEvaluations`) — a quarter to a third
+    /// faster at 1024² and above, **another image than the recipe at full size**, which is why it is a field of the request and not a
+    /// setting of the machine: the same request renders the same image, whatever else runs. Off by default (the CLI, the checks and the
+    /// judge render the recipe); the app sets it from its setting. Where the family's rule refuses it (a LoRA, Detail, an edit, another
+    /// step count, a format that does not halve), true changes nothing.
+    package var fasterRendering = false
 
     /// The most steps a request may ask for. The Turbo models are distilled for 6 to 8; the cap is
     /// there for what does not come from the stepper — a PNG's metadata, `silicontrol --steps`, the

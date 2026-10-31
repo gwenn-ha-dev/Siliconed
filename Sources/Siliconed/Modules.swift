@@ -73,17 +73,17 @@ package struct ZImageDenoisingModule: DenoisingModule {
     /// Evaluations are counted from the start to the end: every step moves (`FlowMatchSchedule`),
     /// hence `N − t_start` evaluations, `⌈N·s⌉` at a strength `s` in img2img.
     ///
-    /// **The half-size start** (`Spectral.halfSizeStart`, the app's « Faster Rendering »): the first
+    /// **The half-size start** (`Request.fasterRendering`, the app's « Faster Rendering »): the first
     /// three evaluations (σ 1 → 0.833) on the half grid, by `Sampler.init(half:…)` — not the steps
     /// removed in 0.8.2, whose grain it was written against. Only from the first step, at the
     /// recipe's eight, on a grid that halves above the floor (1024², 1024×1536 and its transpose),
     /// without a LoRA or Detail (never judged under either). `SILICONED_SPECTRAL` forces the count (a
     /// measurement), within the same rules.
-    package func plan(height: Int, width: Int, steps: Int, start: Int, withLoRA: Bool) -> DenoisingPlan {
+    package func plan(height: Int, width: Int, steps: Int, start: Int, withLoRA: Bool, faster: Bool) -> DenoisingPlan {
         let σ = FlowMatchSchedule(steps: steps).sigmas
-        let halvable = Spectral.divisible(height: height, width: width, by: 2)
-        let rule = Spectral.halfSizeStart && steps == defaultSteps ? Self.halfSizeSteps : 0
-        let k = start > 0 || !halvable || withLoRA ? 0 : min(max(0, Spectral.forced ?? rule), steps - 1)
+        let k = Spectral.reducedEvaluations(faster: faster, height: height, width: width, steps: steps, start: start,
+                                            withLoRA: withLoRA, defaultSteps: defaultSteps, halfSizeSteps: Self.halfSizeSteps,
+                                            evaluations: steps)
         return DenoisingPlan(startStep: start, startSigma: σ[start], evaluations: steps - start,
                              reduced: k, reducedHeight: k > 0 ? height / 2 : height,
                              reducedWidth: k > 0 ? width / 2 : width)
@@ -96,7 +96,8 @@ package struct ZImageDenoisingModule: DenoisingModule {
                           context: Context) throws {
         let (height, width) = (latent.height, latent.width)
         let planned = plan(height: height, width: width, steps: steps, start: start,
-                           withLoRA: lora != nil || context.detail != .normal)
+                           withLoRA: lora != nil || context.detail != .normal,
+                           faster: context.fasterRendering)
         let full = { () throws -> DiT in
             if let kept = context.keptDenoiser as? DiT { return kept }
             let dit = try DiT(artifact: try Artifact(path: map), latentHeight: height, latentWidth: width,

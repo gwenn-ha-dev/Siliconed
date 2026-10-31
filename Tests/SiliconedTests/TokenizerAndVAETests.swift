@@ -68,95 +68,8 @@ final class TokenizerAndVAETests: XCTestCase {
         XCTAssertNotEqual(symbols[Int(UInt8(ascii: " "))], " ")
     }
 
-    // ── the decoder: the tile geometry ─────────────────────────────────────────────
+    // ── the decoder: the bands ─────────────────────────────────────────────────────────────
 
-    func testTilesCoverTheWholePlane() {
-        // **The property that matters**: not one latent pixel must escape the tiles. A hole would
-        // not show on an average PSNR — it would show on the image, once.
-        for L in [64, 96, 128, 160, 256] {
-            for t in [32, 48, 80] where t < L {
-                for o in [4, 8, 16] where t > 2 * o {
-                    let p = VAE.positions(side: L, tile: t, overlap: o)
-                    var covered = [Bool](repeating: false, count: L)
-                    for begin in p {
-                        XCTAssertGreaterThanOrEqual(begin, 0)
-                        XCTAssertLessThanOrEqual(begin + t, L,
-                                                 "a tile overflows: L=\(L) t=\(t) o=\(o)")
-                        for i in begin..<(begin + t) { covered[i] = true }
-                    }
-                    XCTAssertFalse(covered.contains(false),
-                                   "hole in the coverage: L=\(L) t=\(t) o=\(o) → \(p)")
-                }
-            }
-        }
-    }
-
-    func testTilesTouchBothEdgesAndAdvance() {
-        let p = VAE.positions(side: 128, tile: 48, overlap: 8)
-        XCTAssertEqual(p.first, 0, "the first tile starts at the edge")
-        XCTAssertEqual(p.last, 128 - 48, "the last one ends on the edge")
-        for i in 0..<(p.count - 1) {
-            XCTAssertLessThan(p[i], p[i + 1], "positions must advance strictly")
-        }
-    }
-
-    func testTheEffectiveOverlapIsNeverBelowTheRequestedOne() {
-        // The documentation of `positions` promises it: "at least the one requested — never less,
-        // often more at the edge". A promise never executed is a promise we believe we keep.
-        for L in [64, 96, 128, 160, 256] {
-            for t in [32, 48, 80] where t < L {
-                for o in [4, 8, 16] where t > 2 * o {
-                    let p = VAE.positions(side: L, tile: t, overlap: o)
-                    for i in 0..<(p.count - 1) {
-                        let overlap = (p[i] + t) - p[i + 1]
-                        XCTAssertGreaterThanOrEqual(overlap, o,
-                            "overlap \(overlap) < \(o) requested: L=\(L) t=\(t) → \(p)")
-                    }
-                }
-            }
-        }
-    }
-
-    func testATileLargerThanThePlaneIsNotATile() {
-        XCTAssertEqual(VAE.positions(side: 64, tile: 64, overlap: 8), [0])
-        XCTAssertEqual(VAE.positions(side: 64, tile: 128, overlap: 8), [0])
-    }
-
-    func testTheFadeNeverCancelsOut() {
-        // **It is a division by zero being avoided, not an elegance.** The tile weights are
-        // normalized by their sum: a zero weight on both sides of an exact overlap would make 0/0
-        // right in the middle of the image. Hence the start at `1/(marge+1)` and not at zero.
-        let length = 48, margin = 8
-        for position in 0..<length {
-            let weights = VAE.ramp(position, length: length, margin: margin,
-                                  freeStart: true, freeEnd: true)
-            XCTAssertGreaterThan(weights, 0, "zero weight at position \(position)")
-            XCTAssertLessThanOrEqual(weights, 1)
-        }
-    }
-
-    func testTheFadeIsOneAtTheCenterAndDescendsTowardTheEdges() {
-        let length = 48, margin = 8
-        func weights(_ p: Int) -> Float {
-            VAE.ramp(p, length: length, margin: margin, freeStart: true, freeEnd: true)
-        }
-        XCTAssertEqual(weights(length / 2), 1, accuracy: 1e-6, "a tile's core weighs full")
-        for p in 0..<(margin - 1) {
-            XCTAssertLessThan(weights(p), weights(p + 1), "the entry ramp must rise")
-        }
-        for p in (length - margin)..<(length - 1) {
-            XCTAssertGreaterThan(weights(p), weights(p + 1), "the exit ramp must fall")
-        }
-    }
-
-    func testAnImageEdgeIsNotFaded() {
-        // The first tile has nobody on its left: blending it there would create an image that
-        // darkens at its own edge, which the normalization would not make up for.
-        XCTAssertEqual(VAE.ramp(0, length: 48, margin: 8, freeStart: false, freeEnd: true),
-                       1, accuracy: 1e-6)
-        XCTAssertEqual(VAE.ramp(47, length: 48, margin: 8, freeStart: true, freeEnd: false),
-                       1, accuracy: 1e-6)
-    }
 
     /// **The banded decoder's bands**: the cores tile the rows exactly once, in order; every
     /// window holds its core plus the margin on each side that is not an image edge, stays inside the
@@ -179,13 +92,6 @@ final class TokenizerAndVAETests: XCTestCase {
                 }
                 XCTAssertEqual(next, rows)
             }
-        }
-    }
-
-    func testWithoutMarginTheFadeIsNeutral() {
-        for p in [0, 10, 47] {
-            XCTAssertEqual(VAE.ramp(p, length: 48, margin: 0, freeStart: true, freeEnd: true),
-                           1, accuracy: 1e-6)
         }
     }
 

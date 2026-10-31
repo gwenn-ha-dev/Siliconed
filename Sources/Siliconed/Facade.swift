@@ -58,8 +58,9 @@ extension Engine {
     /// element of a successful render; an error ends the stream by throwing — always an `EngineError`.
     /// Stopping iteration — or cancelling the `Task` that iterates — cancels the render, and the
     /// stream then ends without throwing (`AsyncThrowingStream`'s rule). The
-    /// buffer is **unbounded** so as to lose neither a step nor an image: events are rare (a few
-    /// dozen); only the previews weigh (64 KB per preview at 1024²).
+    /// buffer is **unbounded** so as to lose neither a step nor an image, and bounded all the same by the request:
+    /// events are rare (a few per evaluation, `Request.maximumSteps` of them at most per image); only the previews weigh
+    /// (64 KB each at 1024²), so a consumer that stopped reading holds a few MB, never more.
     package func events(_ request: Request, seeds: [UInt64]? = nil,
                            model: Model) -> AsyncThrowingStream<Event, Error> {
         let cancellation = Cancellation()

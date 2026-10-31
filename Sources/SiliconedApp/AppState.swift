@@ -102,18 +102,23 @@ final class AppState {
             }
         }
     }
-    private static let fasterRenderingKey = "fasterRendering"
-    /// **Faster Rendering** (Settings, on by default): at 1024² and above, the first evaluations of every
-    /// family on the half grid (`Spectral.halfSizeStart`; three of eight, Krea 2 four) — a quarter to a
-    /// third faster, another image than the recipe at full size, judged clean by eye per family. Not
-    /// with a LoRA, Detail or an edit (each plan's rules). The engine reads it at every plan, so time
-    /// estimates follow at once.
-    var fasterRendering = UserDefaults.standard.object(forKey: AppState.fasterRenderingKey) as? Bool ?? true {
-        didSet {
-            guard fasterRendering != oldValue else { return }
-            UserDefaults.standard.set(fasterRendering, forKey: Self.fasterRenderingKey)
-            Spectral.halfSizeStart = fasterRendering
-        }
+    private static let fasterRenderingKey = "fasterRenderingChoices"
+    /// **Faster Rendering, per model and version** (Settings): at 1024² and above, the first evaluations of the family on the
+    /// half grid (`Request.fasterRendering`; three of eight, Krea 2 four) — a quarter to a third faster, another image than the
+    /// recipe at full size, judged clean by eye per family. Not with a LoRA, Detail or an edit (each plan's rules). What the user
+    /// chose; absent, the version's default (`Variant.fasterRenderingByDefault`: off on the Standard, on on the Compact and the
+    /// Light), as the Neural Engine does. A new key: the single switch of earlier builds is not read.
+    /// Every request carries the value and every history image keeps it (`RenderSettings.fasterRendering`): a redo is the same
+    /// image whatever the switch says by then.
+    var fasterRenderingChoices = UserDefaults.standard.dictionary(forKey: AppState.fasterRenderingKey) as? [String: Bool] ?? [:] {
+        didSet { UserDefaults.standard.set(fasterRenderingChoices, forKey: Self.fasterRenderingKey) }
+    }
+    func fasterRendering(for id: String) -> Bool {
+        guard let card = cards.first(where: { $0.id == id }) else { return false }
+        return fasterRenderingChoices[neuralEngineKey(card)] ?? (!card.isImported && library.variant(of: card.family).fasterRenderingByDefault)
+    }
+    func setFasterRendering(_ on: Bool, for id: String) {
+        if let card = cards.first(where: { $0.id == id }) { fasterRenderingChoices[neuralEngineKey(card)] = on }
     }
     private static let exportFormatKey = "exportFormat"
     /// **The file format the last export used** (PNG, JPEG or HEIC): the next Save and Export open on it.
@@ -131,6 +136,7 @@ final class AppState {
     /// designate its plan (`EngineSettings.load` refuses it). Follows a new measure (`settingsEpoch`).
     var neuralEngineOffered: Bool { _ = settingsEpoch; return settingsRead && EngineSettings.effective.plan.usesANE }
     /// The key of a choice: the model and its installed version — another version starts from its own default.
+    /// (Also the key of Faster Rendering's choice.)
     private func neuralEngineKey(_ card: ModelCard) -> String {
         card.isImported ? card.id : "\(card.id) \(library.variant(of: card.family).rawValue)"
     }
@@ -520,7 +526,6 @@ final class AppState {
         readySet = Set(library.models().map(\.id))
         occupancy = library.occupancy()
         identifier = defaultIdentifier
-        Spectral.halfSizeStart = fasterRendering
         readEditors()
         // The machine profile, read in THIS library, with the capacity map — once per process, and only
         // with a current map: the app builds only one `AppState` (see `App.swift`). Without one (none yet,
@@ -637,7 +642,7 @@ final class AppState {
     /// **Reads the engine's settings**, once: the profile of THIS library and `map`.
     private func readSettings(map: Diagnostic.Report) {
         do {
-            try EngineSettings.load(from: library, map: map)
+            try EngineSettings.load(map: map)
             profileWarnings = EngineSettings.effective.warnings.map(Library.withoutHome)
             mapInUse = map
             planGeneration = EngineSettings.generation

@@ -210,7 +210,7 @@ extension Diagnostic {
 
         /// What the report is valid for: the machine and the binary that measured it.
         package var fingerprint: Fingerprint { Fingerprint(machine) }
-        /// **The report is a map of this process's machine and build**: schema 15 and the same fingerprint — what an app checks before
+        /// **The report is a map of this process's machine and build**: the current schema and the same fingerprint — what an app checks before
         /// designating its plan; when it does not, the app offers to measure again.
         package var isCurrent: Bool { schema == Diagnostic.schema && fingerprint == .current }
 

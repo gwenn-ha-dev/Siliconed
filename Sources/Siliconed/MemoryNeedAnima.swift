@@ -86,7 +86,7 @@ extension MemoryNeed {
 
         /// The maps this card renders with: its own DiT (an imported one) or the library's installed
         /// version (Standard, Compact or Light), and that version's encoder. `nil` when one cannot be read.
-        package init?(card: ModelCard, library: Library = .processWide) {
+        package init?(card: ModelCard, library: Library) {
             let ditPath = card.map ?? library.map(library.ditMap(.anima))
             let encoderPath = library.map(library.encoderMap(.anima))
             let maps = AnimaMaps.installed(InstalledFiles(paths: [ditPath, encoderPath])) { () -> AnimaMaps? in

@@ -46,7 +46,7 @@ package enum CapacitySolver {
 
     /// The rows from which an engine or a form is worth asking: the model's lines start at ≈ 4 GFLOP.
     package struct Limits: Sendable, Equatable {
-        /// The AMX's floor, the previous map's `amx_min`: what its predictions and its render check still read by default.
+        /// The AMX's floor, the AMX's floor in rows (`amx_min` of earlier builds): what its predictions and its render check still read by default.
         package static let defaultAMXRows = 512
         package var amxRows = Limits.defaultAMXRows
         package var aneRows = 1024

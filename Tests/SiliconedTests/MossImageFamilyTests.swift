@@ -133,32 +133,30 @@ final class MossImageFamilyTests: XCTestCase {
         XCTAssertEqual(dit.solvers, [.euler])
         XCTAssertFalse(dit.acceptsStartImage)
         XCTAssertEqual(dit.maxReferences, 0)
-        let plan = dit.plan(height: 64, width: 64, steps: 8, start: 0, withLoRA: false)
+        let plan = dit.plan(height: 64, width: 64, steps: 8, start: 0, withLoRA: false, faster: false)
         XCTAssertEqual(plan.evaluations, 8)
         XCTAssertEqual(plan.reduced, 0)
         // A dense schedule has fewer evaluations than steps (the σ are snapped to the training grid, then deduplicated).
-        XCTAssertEqual(dit.plan(height: 64, width: 64, steps: 250, start: 0, withLoRA: false).evaluations, 246)
+        XCTAssertEqual(dit.plan(height: 64, width: 64, steps: 250, start: 0, withLoRA: false, faster: false).evaluations, 246)
     }
 
     /// **The half-size start** (Faster Rendering): `halfSizeSteps` where the half grid stays at 512 px (16-px cells:
     /// 1024², 1024×1536), never under the floor, a request's LoRA, another schedule, a start past 0 or off the eight.
     func testTheHalfSizeStartFollowsTheOthersRules() throws {
         try XCTSkipIf(Spectral.forced != nil, "SILICONED_SPECTRAL forces k")
-        defer { Spectral.halfSizeStart = false }
         let dit = MossImageDenoisingModule(map: "", turbo: "")
-        Spectral.halfSizeStart = true
-        let half = dit.plan(height: 64, width: 64, steps: 8, start: 0, withLoRA: false)
+        let half = dit.plan(height: 64, width: 64, steps: 8, start: 0, withLoRA: false, faster: true)
         XCTAssertEqual(half.reduced, MossImageDenoisingModule.halfSizeSteps)
         XCTAssertEqual([half.reducedHeight, half.reducedWidth], [32, 32])
         XCTAssertEqual(half.evaluations, 8)
-        XCTAssertEqual(dit.plan(height: 96, width: 64, steps: 8, start: 0, withLoRA: false).reduced,
+        XCTAssertEqual(dit.plan(height: 96, width: 64, steps: 8, start: 0, withLoRA: false, faster: true).reduced,
                        MossImageDenoisingModule.halfSizeSteps)
-        XCTAssertEqual(dit.plan(height: 64, width: 64, steps: 8, start: 0, withLoRA: true).reduced, 0)
-        XCTAssertEqual(dit.plan(height: 64, width: 64, steps: 8, start: 1, withLoRA: false).reduced, 0)
-        XCTAssertEqual(dit.plan(height: 64, width: 64, steps: 12, start: 0, withLoRA: false).reduced, 0)
+        XCTAssertEqual(dit.plan(height: 64, width: 64, steps: 8, start: 0, withLoRA: true, faster: true).reduced, 0)
+        XCTAssertEqual(dit.plan(height: 64, width: 64, steps: 8, start: 1, withLoRA: false, faster: true).reduced, 0)
+        XCTAssertEqual(dit.plan(height: 64, width: 64, steps: 12, start: 0, withLoRA: false, faster: true).reduced, 0)
         // 512² and 832×1216: a half side under 512 px.
-        XCTAssertEqual(dit.plan(height: 32, width: 32, steps: 8, start: 0, withLoRA: false).reduced, 0)
-        XCTAssertEqual(dit.plan(height: 76, width: 52, steps: 8, start: 0, withLoRA: false).reduced, 0)
+        XCTAssertEqual(dit.plan(height: 32, width: 32, steps: 8, start: 0, withLoRA: false, faster: true).reduced, 0)
+        XCTAssertEqual(dit.plan(height: 76, width: 52, steps: 8, start: 0, withLoRA: false, faster: true).reduced, 0)
     }
 
     /// 512² and up, on a multiple of 16 — the DiT's cell.

@@ -113,7 +113,7 @@ package enum CapacityClasses {
         /// Pixels.
         package var width: Int
         package var height: Int
-        /// « Faster Rendering » (`Spectral.halfSizeStart`): the family's first evaluations on the half grid.
+        /// « Faster Rendering » (`Request.fasterRendering`): the family's first evaluations on the half grid.
         package var fasterRendering: Bool
         /// The prompt's tokens (the benchmarks' prompt: 11).
         package var promptTokens: Int
@@ -227,9 +227,14 @@ package enum CapacityClasses {
     /// **The passes of a render**: `(image tokens, evaluations)`, the half grid's first, the full grid's last.
     package static func passes(_ r: Request) -> [(tokens: Int, evaluations: Int)] {
         let factor = latentFactor(r.family)
-        let halvable = Spectral.divisible(height: r.height / factor, width: r.width / factor, by: 2,
-                                          floor: Spectral.floor(factor: factor))
-        let k = r.fasterRendering && halvable ? min(r.halfSteps ?? halfSizeSteps(r.family), max(r.steps - 1, 0)) : 0
+        let (height, width, floor) = (r.height / factor, r.width / factor, Spectral.floor(factor: factor))
+        // A render that did its half-size evaluations says how many (`halfSteps`); a catalogue asked for a request applies the
+        // engine's own rule (`Spectral.reducedEvaluations`) — its step count taken as the family's recipe.
+        let k = r.halfSteps.map { r.fasterRendering && Spectral.divisible(height: height, width: width, by: 2, floor: floor)
+                ? min($0, max(r.steps - 1, 0)) : 0 }
+            ?? Spectral.reducedEvaluations(faster: r.fasterRendering, height: height, width: width, steps: r.steps, start: 0,
+                                           withLoRA: false, defaultSteps: r.steps, halfSizeSteps: halfSizeSteps(r.family),
+                                           evaluations: max(r.steps, 1), floor: floor)
         var result: [(Int, Int)] = []
         if k > 0 { result.append((imageTokens(width: r.width / 2, height: r.height / 2), k)) }
         result.append((imageTokens(width: r.width, height: r.height), r.steps - k))

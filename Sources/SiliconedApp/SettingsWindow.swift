@@ -76,12 +76,9 @@ struct SettingsView: View {
     /// The state the window shows: the Mac that computes, whose switch and map these are.
     private var shown: AppState { MainWindow.shared.carrier.mirror ?? app }
 
-    /// « Faster Rendering » of the Mac that computes: this one's preference, or the lender's by a message.
+    /// « Faster Rendering »: this Mac's preference, which rides on each job — the lender's own is never touched.
     private var fasterRendering: Binding<Bool> {
-        if let mirrored = MainWindow.shared.carrier.mirror {
-            return Binding(get: { mirrored.fasterRenderingShown }, set: { mirrored.setFasterRenderingOnLender($0) })
-        }
-        return $app.fasterRendering
+        Binding(get: { app.fasterRendering(for: app.identifier) }, set: { app.setFasterRendering($0, for: app.identifier) })
     }
 
     var body: some View {
@@ -103,9 +100,6 @@ struct SettingsView: View {
             Section {
                 Toggle(isOn: fasterRendering) {
                     titled("Faster Rendering", "From 1024² up, the first steps at half size: faster, a slightly different image. Not with a LoRA, Detail or an edit.")
-                }
-                if let name = MainWindow.shared.carrier.mirror?.mirror?.macName {
-                    Text("This is the setting of “\(name)”, the Mac that computes for you.").font(.caption)
                 }
             }
             Section {

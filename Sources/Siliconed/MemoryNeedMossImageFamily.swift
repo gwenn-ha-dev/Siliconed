@@ -60,7 +60,7 @@ extension MemoryNeed {
         }
 
         /// The maps this card renders with: the library's installed version — DiT, encoder, the DMD LoRA.
-        package init?(card: ModelCard, library: Library = .processWide) {
+        package init?(card: ModelCard, library: Library) {
             let ditPath = card.map ?? library.map(library.ditMap(.mossImage))
             let encoderPath = library.map(library.encoderMap(.mossImage))
             let turboPath = Installer(library: library).companionMap(.mossImage) ?? ""
