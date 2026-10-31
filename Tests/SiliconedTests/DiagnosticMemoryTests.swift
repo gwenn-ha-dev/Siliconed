@@ -12,8 +12,8 @@ import Testing
         let needs = Probes.Sizes.tiers.map { Probes.need(sizes: $0) }
         for (big, small) in zip(needs, needs.dropFirst()) { #expect(small.peak < big.peak) }
         for need in needs { #expect(Set(need.steps.keys) == ["widening", "routes"] && need.steps.values.allSatisfy { $0 >= Diagnostic.frameworks }) }
-        // The widest tier holds the chains' long k at 4 096 rows (a weight of 201 MB, its copies and truths): ~4.3 GB, plus the disk probe's staging (~0.2 GB: `CapacityDisk.probeMemoryBytes`); the second ~2.8, the third ~1.6.
-        #expect((3.8e9...5.0e9).contains(Double(needs[0].peak)), "\(needs[0].peak)")
+        // The widest tier holds the chains' long k at 4 096 rows (a weight of 201 MB, its copies and truths): ~4.3 GB, plus the disk probe's staging (~0.2 GB: `CapacityDisk.probeMemoryBytes`) and the ANE's programs of the short-sided products (six shapes, ~0.6 GB with their surfaces); the second ~2.8, the third ~1.6.
+        #expect((3.8e9...5.6e9).contains(Double(needs[0].peak)), "\(needs[0].peak)")
         #expect(Probes.need(sizes: .full, validating: true).peak > needs[0].peak)
     }
 

@@ -295,7 +295,8 @@ extension Engine {
                                   variations: request.variations.filter { $0.effectiveStrength > 0 },
                                   modelName: model.card.name, isImportedModel: model.card.isImported,
                                   loraOrigins: stack?.origins ?? [], neuralEngine: context.neuralEngine,
-                                  fasterRendering: admitted.fasterRendering, classes: classes)
+                                  fasterRendering: admitted.fasterRendering, classes: classes,
+                                  loraRank: stack?.maxRank ?? 0)
                 context.emit(.image(index: n, renderResult))
                 renderResults.append(renderResult)
             }

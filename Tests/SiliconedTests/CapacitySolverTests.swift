@@ -151,29 +151,41 @@ import Testing
         #expect(s.route == "gpu" && s.assignment.path == .widened)
     }
 
-    @Test func aLoRAsProductsHaveNothingToPrepareAndTheSumIsPaidByTheCPUEnginesRows() throws {
+    @Test func aLoRAsProductsHaveNothingToPrepareAndAreTimedByTheThinLines() throws {
         var m = machine(amxRate: 1e12)
         m.preparation[.bf16] = [.widened: 1e-9]
         m.kquantPreparation = 5e-9
         // The stack's operands are expanded beforehand (`CacheLoRA`): no preparation, whatever the model prices for a weight.
         let down = try solve(m, key(3072, 128, 4117, .loraDown))
         #expect(down.preparation == 0)
-        let up = try solve(m, key(128, 16384, 4117, .loraUp))
-        #expect(up.preparation == 0 && up.assignment.path == .widened)
-        // `loraDown` writes; `loraUp` adds the CPU engines' rows to the output, a pass over memory the GPU's own rows do not make.
-        // Without a measured bandwidth nothing is charged; with one, three passes of the AMX's rows × n floats.
-        #expect(up.assignment.amx > 0)
+        // A product with a short side is timed by the thin lines when the probes measured them: t₀ + w·k·n + h·M·(k + n) + FLOP / R, M the rows the GPU computes (tiles of 64).
+        m.thin[gpu] = .init(t0: 1e-4, rate: 2e12, perWeight: 1e-11, perRow: 1e-10)
+        let line = try #require(m.thin[gpu])
+        let expected = line.seconds(rows: CapacityModel.computedRows(gpu, rows: 4117), k: 3072, n: 128)
+        #expect(abs(try #require(m.alone(gpu, rows: 4117, k: 3072, n: 128)) - expected) < 1e-12)
+        #expect(m.alone(gpu, rows: 4117, k: 3072, n: 3072) != expected, "a product with no short side keeps the big products' line")
+        // No set is offered on such a product — the loss of an engine beside another was measured on big ones —: the GPU alone, though
+        // the AMX would be balanced by hand on a big product of the same machine.
+        #expect(try solve(m, key(3072, 128, 4117, .loraDown)).assignment == .gpuAlone(4117))
+        #expect(try solve(m, key(4096, 4096, 4117)).assignment.amx > 0)
+        // An engine alone, when its thin line beats the GPU's: the AMX takes the whole product, and a `loraUp` pays the pass that adds
+        // its rows to the output (three passes of m·n floats at the bandwidth).
+        m.thin[amx] = .init(t0: 1e-5, rate: 8e12)
         m.memoryBandwidth = 100e9
-        let priced = try solve(m, key(128, 16384, 4117, .loraUp))
-        let amxRows = priced.assignment.amx
-        let product = try #require(m.seconds(m: 4117, k: 128, n: 16384, rows: [gpu: priced.assignment.gpu, amx: amxRows], sustained: false))
-        #expect(abs(priced.compute - (product + 3 * 4 * Double(amxRows) * 16384 / 100e9)) < 1e-12, "the product, and three passes of the AMX's rows")
-        // A slow memory makes the sum dearer than the AMX's help: the GPU keeps every row.
+        let up = try solve(m, key(128, 16384, 4117, .loraUp))
+        #expect(up.assignment == ProductAssignment(gpu: 0, amx: 4117))
+        let product = try #require(m.alone(amx, rows: 4117, k: 128, n: 16384))
+        #expect(abs(up.compute - (product + 3 * 4 * 4117 * 16384 / 100e9)) < 1e-12)
+        #expect(try solve(m, key(128, 16384, 4117, .bf16)).compute < up.compute, "the pass is a LoRA's alone")
+        // The GPU's rows read the output once more, in their own kernel.
+        let gpuUp = try solve(machine(), key(128, 16384, 4117, .loraUp))
+        m.memoryBandwidth = 100e9
+        var g = machine(); g.memoryBandwidth = 100e9
+        let withRead = try solve(g, key(128, 16384, 4117, .loraUp))
+        #expect(abs(withRead.compute - (gpuUp.compute + 4 * 4117 * 16384 / 100e9)) < 1e-12)
+        // A slow memory makes the pass dearer than the AMX's help: the GPU keeps the product.
         m.memoryBandwidth = 1e9
-        let slow = try solve(m, key(128, 16384, 4117, .loraUp))
-        #expect(slow.assignment == .gpuAlone(4117) && slow.route == "gpu")
-        // The same product as a weight's (`bf16`) is not charged the sum.
-        #expect(try solve(m, key(128, 16384, 4117, .bf16)).assignment.amx > 0)
+        #expect(try solve(m, key(128, 16384, 4117, .loraUp)).assignment == .gpuAlone(4117))
     }
 
     @Test func aKQuantHasItsOwnPreparation() throws {

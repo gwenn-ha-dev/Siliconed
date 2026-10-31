@@ -40,6 +40,29 @@ extension Diagnostic.CapacityProbes.Context {
         }
     }
 
+    /// **The products with a short side** (`Sizes.thin`), each kernel the solver can give such a product alone: the fp32 routes of the GPU, the
+    /// AMX and the ANE, the GPU's bf16 weights, then the kernels that stage their weight after the fp32 routes (the rounded activations, int8,
+    /// q8). Each is a steady figure (a few milliseconds a run; the ANE's cost is its programs' compile, one per shape); the ANE takes the shapes
+    /// of 256 rows and more (its unit). Kept apart from the solos: the big products' lines never see them.
+    func thinSolos(_ m: inout Fit.Measurements) {
+        guard !sizes.thin.isEmpty else { return }
+        var kept: [Fit.Measurements.Solo] = []
+        for probe in [Probe.gpu_fp32, .amx_fp32, .ane_fp16, .gpu_bf16, .gpu_bf16act, .gpu_int8, .gpu_q8] {
+            for (rows, k, n) in sizes.thin.map({ ($0.m, $0.k, $0.n) }) {
+                if probe == .ane_fp16, rows < NeuralEngine.rowUnit { continue }
+                guard let s = solo(probe, m: rows, k: k, n: n) else { continue }
+                if s.error != nil, s.seconds == 0 {
+                    m.wrong.append(probe.kernel.description)
+                    log?(String(format: "  %@ %dx%dx%d  WRONG, error %.3e", probe.kernel.description, rows, k, n, s.error ?? 0))
+                    continue
+                }
+                kept.append(s)
+                log?(String(format: "  thin %@ %dx%dx%d  %.2f ms  %.2f TFLOP/s", probe.kernel.description, rows, k, n, s.seconds * 1e3, s.flop / s.seconds * 1e-12))
+            }
+        }
+        m.thin = kept
+    }
+
     /// One kernel on one product: judged on its first run, then timed. A kernel that judged wrong returns seconds 0.
     func solo(_ probe: Probe, m: Int, k: Int, n: Int, chained: Bool = false) -> Fit.Measurements.Solo? {
         guard !skipped.contains(probe.kernel) else { return nil }

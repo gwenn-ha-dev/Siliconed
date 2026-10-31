@@ -343,7 +343,7 @@ package struct MemoryNeed: Sendable, Equatable {
                 }
             }
         }
-        let tiers = GEMM.tierBytes(products: products, bounded: bounded)
+        let tiers = GEMM.tierBytes(products: products, bounded: bounded, rank: rank)
         let neural = NeuralEngine.bytes(products: aneProducts, integers: aneIntegers)
         return (tiers > 0 ? [Term("\(name) GEMM tiers", tiers)] : [])
             + (workspace > 0 ? [Term("\(name) conductor workspace", Arena.capacity(for: workspace))] : [])

@@ -287,12 +287,12 @@ private struct ProductSolver {
         return out
     }
 
-    /// **What the CPU engines' rows of a `loraUp` product pay beyond their product**: their `m' × n` result lands in a scratch and a
-    /// pass adds it to the base product's output (the GPU's rows accumulate inside their own kernel) — `m' · n` floats read twice and
-    /// written once, at the memory's bandwidth. 0 for any other class, and where the bandwidth was not measured.
-    func accumulation(_ key: ProductKey, offGPU rows: Int) -> Double {
-        guard key.weight == .loraUp, rows > 0, let bandwidth = model.memoryBandwidth, bandwidth > 0 else { return 0 }
-        return 3 * 4 * Double(rows) * Double(key.n) / bandwidth
+    /// **What a `loraUp` product pays beyond its product, for it adds to the output instead of writing it**: the GPU's rows read the output once
+    /// more (its kernel accumulates, `beta = 1`); the CPU engines' rows land in a scratch and a pass adds it to the output — `m' · n` floats read
+    /// twice and written once. At the memory's bandwidth; 0 for any other class, and where the bandwidth was not measured.
+    func accumulation(_ key: ProductKey, gpu: Int, offGPU rows: Int) -> Double {
+        guard key.weight == .loraUp, let bandwidth = model.memoryBandwidth, bandwidth > 0 else { return 0 }
+        return 4 * Double(gpu + 3 * rows) * Double(key.n) / bandwidth
     }
 
     // MARK: A way to compute one product
@@ -322,7 +322,9 @@ private struct ProductSolver {
             if e > 0, let ane { rows[ane] = e }
             let assignment = ProductAssignment(gpu: g, amx: a, ane: e)
             guard assignment.isRunnable(for: key), let t = seconds(rows, m: m, k: k, n: n) else { return nil }
-            return Option(assignment: assignment, rows: rows, seconds: t + accumulation(key, offGPU: a + e))
+            // A set's loss was measured on products with no short side: none is offered on one (each engine alone is, by its thin line).
+            if rows.count > 1, CapacityModel.isThin(rows: m, k: k, n: n) { return nil }
+            return Option(assignment: assignment, rows: rows, seconds: t + accumulation(key, gpu: g, offGPU: a + e))
         }
 
         if let o = option(m, 0, 0) { out.append(o) }
@@ -375,12 +377,13 @@ private struct ProductSolver {
             return Option(assignment: assignment, rows: [gpu: n - columns, amx: columns], swapped: true, seconds: t)
         }
         if let o = option(0) { out.append(o) }
-        if m >= c.limits.amxRows, let amx = line(.amx, form),
+        let short = CapacityModel.isThin(rows: m, k: k, n: n)     // no set on such a product: its loss was not measured there
+        if m >= c.limits.amxRows, !short, let amx = line(.amx, form),
            let seed = model.split(m: n, k: k, n: m, kernels: [gpu, amx], sustained: c.sustained), let g0 = seed.rows[gpu] {
             let cands = gpuColumns(n: n, balance: Double(g0)).compactMap { option(n - $0) }
             if let b = cands.min(by: { $0.seconds < $1.seconds }) { out.append(b) }
         }
-        if key.weight == .int8, c.allowsANE, key.phase == .denoising, m >= c.limits.aneRows, let ane = line(.ane, .int8) {
+        if key.weight == .int8, c.allowsANE, key.phase == .denoising, m >= c.limits.aneRows, !short, let ane = line(.ane, .int8) {
             func integers(_ rows: Int) -> Option? {
                 let assignment = ProductAssignment(path: .native, gpu: m - rows, ane: rows)
                 guard assignment.isRunnable(for: key) else { return nil }
@@ -468,7 +471,7 @@ private struct ProductSolver {
         guard !rows.isEmpty, let t = seconds(rows, m: m, k: k, n: n, swapped: swapped) else { return nil }
         let prep = preparation(format: key.weight, path: a.path, k: k, n: n)
         return .init(assignment: a, route: a.route(weight: key.weight), rows: rows, preparation: prep,
-                     compute: t + accumulation(key, offGPU: a.amx + a.ane),
+                     compute: t + accumulation(key, gpu: a.gpu, offGPU: a.amx + a.ane),
                      busy: busy(rows, m: m, k: k, n: n, swapped: swapped))
     }
 

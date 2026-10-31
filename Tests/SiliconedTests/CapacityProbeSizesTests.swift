@@ -12,7 +12,7 @@ import Testing
     /// What the probes measured on the M1 Pro in the runs of the report's version (seconds per stage), against which the projection is checked.
     static let measured: [String: Double] = ["preparation": 0.18, "witnesses start": 0.5, "bandwidth": 0.04, "disk": 0.58, "solos fp32": 7.8, "stairs": 1.0,
                                               "attention": 4.0, "sharing": 9.0, "solos 8-bit and rounded": 5.3, "sharing int8": 2.1,
-                                              "witnesses end": 0.43]
+                                              "witnesses end": 0.43, "thin products": 4.0]
     /// The engines alone on the witness (2 048 × 3 840²: 60.4 GFLOP in 17.2, 26.2 and 12.4 ms): TFLOP/s.
     static let m1Pro = Rates(gpu: 3.51e12, amx: 2.30e12, ane: 4.87e12, cpu: 1.0e12)
     /// A Neo's order: a 5-core GPU, the AMX and the ANE of its generation (the fleet's: 1.43 · 1.52 (0.83 hot) · 4.13 TFLOP/s).

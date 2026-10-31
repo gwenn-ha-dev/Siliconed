@@ -78,6 +78,7 @@ package final class GEMM {
         }
         func a(_ floats: Int) -> MTLBuffer { buffer("a", floats) }
         func c(_ floats: Int) -> MTLBuffer { buffer("c", floats) }
+        func mid(_ floats: Int) -> MTLBuffer { buffer("mid", floats) }
     }
     private lazy var tiers = Tiers(device: device)
 
@@ -95,11 +96,13 @@ package final class GEMM {
     /// the need bounds by its bytes) — any height from 8 to it may be the real one, and one of them goes
     /// through: charged whenever the bound reaches 8. A height that becomes a multiple of 64 would
     /// otherwise make the need *fall* as the prompt grows (by 6 MB at Qwen-Image-2.1's MLP width).
-    package static func tierBytes(products: [(m: Int, k: Int, n: Int)], bounded: [(m: Int, k: Int, n: Int)] = []) -> Int {
+    package static func tierBytes(products: [(m: Int, k: Int, n: Int)], bounded: [(m: Int, k: Int, n: Int)] = [],
+                                  rank: Int = 0) -> Int {
         let tiered = products.filter { goesThroughTiers($0.m) } + bounded.filter { $0.m >= poisonedRows.lowerBound }
         guard let k = tiered.map(\.k).max(), let n = tiered.map(\.n).max() else { return 0 }
         let rows = submittedRows
         return Arena.capacity(for: rows * k * 4) + Arena.capacity(for: rows * n * 4)
+            + (rank > 0 ? Arena.capacity(for: rows * rank * 4) : 0)
     }
 
     /// **A GPU submission's height is a multiple of 64, or below 64 — never in between.**
@@ -379,6 +382,61 @@ package final class GEMM {
                           weightIsTransposed: weightIsTransposed)
         (c.contents() + first * n * 4).copyMemory(from: pc.contents(), byteCount: rows * n * 4)
         return time
+    }
+
+    /// **A weight's LoRA stack when the plan leaves both its products to the GPU: `C += (x·down)·up`, in ONE submission.** (A product
+    /// the plan shares with the AMX or the ANE goes through `linear` and `accumulatedLinear` instead.)
+    ///
+    /// The two skinny GEMMs are encoded in the **same** command buffer, and Metal guarantees
+    /// ordering between two encoders of the same buffer. A measurement showed that a LoRA's overhead has a **floor per
+    /// submission**, constant with the rank; making two of them instead of one would double that floor
+    /// for nothing.
+    ///
+    /// **Outside the conductor, and that is deliberate.** The GPU/AMX cut hands rows to
+    /// `BNNSMatMul` while the GPU does the others; it has no way to accumulate onto an
+    /// existing output — it **writes** its slice. Routing this through it would leave `C` partly overwritten
+    /// instead of accumulated, hence a plausible and wrong image. And there would be nothing to gain: at
+    /// `r = 32`, `x·down` is a skinny GEMM limited by latency, not by compute.
+    ///
+    /// - Parameters:
+    ///   - mid: `[m, r]`, the work slice — written then read back in the same buffer.
+    ///   - c: `[m, n]`, the main GEMM's output, **accumulated** and not replaced.
+    @discardableResult
+    package func lora(x: MTLBuffer, down: MTLBuffer, mid: MTLBuffer, up: MTLBuffer, c: MTLBuffer,
+                     m: Int, k: Int, r: Int, n: Int) -> Double {
+        func padded(first: Int, rows: Int) -> Double {
+            let l = GEMM.submittedRows
+            let (px, pc, pm) = (tiers.a(l * k), tiers.c(l * n), tiers.mid(l * r))
+            px.contents().copyMemory(from: x.contents() + first * k * 4, byteCount: rows * k * 4)
+            // Accumulated, so the output goes into the tier before and comes back out after.
+            pc.contents().copyMemory(from: c.contents() + first * n * 4, byteCount: rows * n * 4)
+            let time = lora(x: px, down: down, mid: pm, up: up, c: pc, m: l, k: k, r: r, n: n)
+            (c.contents() + first * n * 4).copyMemory(from: pc.contents(), byteCount: rows * n * 4)
+            return time
+        }
+        if GEMM.poisonedRows.contains(m) { return padded(first: 0, rows: m) }
+        // Heights that are not a multiple of 64: the body here, the tail through the tier
+        // (`rowQuantum`) — the body's prefixes of `x`, `mid` and `c` are its own rows.
+        let (body, tail) = GEMM.rowSplit(m)
+        if tail > 0 {
+            return lora(x: x, down: down, mid: mid, up: up, c: c, m: body, k: k, r: r, n: n)
+                + padded(first: body, rows: tail)
+        }
+        let commands = queue.checkedCommandBuffer()
+        encoder(Shape(m: m, k: k, n: r, transposed: true), into: commands, x, down, mid)
+        encoder(Shape(m: m, k: r, n: n, transposed: true, accumulates: true), into: commands, mid, up, c)
+        commands.commit()
+        commands.waitUntilCompleted()
+        let elapsed = Attention.verdict(commands, what: "LoRA \(m)×\(k)×\(r)→\(n)")
+        let key = "lora \(m)×\(k)×\(r)→\(n)"
+        record(key, elapsed)
+        return elapsed
+    }
+
+    /// Whether the plan leaves the whole product to the GPU in this process (an engine this process did not bring up has no row).
+    package func runsOnGPUAlone(k: Int, n: Int, m: Int, weight: CapacityClasses.WeightFormat) -> Bool {
+        let a = assignment(k: k, n: n, m: m, weight: weight)
+        return a.path != .widened || ((a.amx == 0 || conductor == nil) && (a.ane == 0 || neuralEngine == nil))
     }
 
     /// **A LoRA's second product, `C += A · W`, cut as the plan cuts it** (`weight`: `loraUp`, `m × k · n` with `k` the rank), the weight

@@ -171,6 +171,21 @@ package final class WeightProducts {
             ledger?.add(.product(k: k, n: n, m: m, weight: weight), route: gemm.lastEngines,
                         seconds: Double(DispatchTime.now().uptimeNanoseconds - began) * 1e-9)
         }
+        // Both products wholly the GPU's: one submission, as before the stack was the plan's (the same bits, the same cost). The ledger
+        // shares its seconds between the two classes by their FLOP.
+        if gemm.runsOnGPUAlone(k: k, n: stack.rank, m: m, weight: .loraDown), gemm.runsOnGPUAlone(k: stack.rank, n: n, m: m, weight: .loraUp) {
+            timed("lora wall") {
+                let began = DispatchTime.now().uptimeNanoseconds
+                timings["lora GPU", default: 0] += gemm.lora(x: x, down: stack.down, mid: mid, up: stack.up, c: c,
+                                                            m: m, k: k, r: stack.rank, n: n)
+                if let ledger {
+                    let seconds = Double(DispatchTime.now().uptimeNanoseconds - began) * 1e-9, share = Double(k) / Double(k + n)
+                    ledger.add(.product(k: k, n: stack.rank, m: m, weight: .loraDown), route: "gpu", seconds: seconds * share)
+                    ledger.add(.product(k: stack.rank, n: n, m: m, weight: .loraUp), route: "gpu", seconds: seconds * (1 - share))
+                }
+            }
+            return
+        }
         timed("lora wall") {
             var began = DispatchTime.now().uptimeNanoseconds
             timings["lora GPU", default: 0] += gemm.linear(a: x, b: stack.down, c: mid, m: m, k: k, n: stack.rank,

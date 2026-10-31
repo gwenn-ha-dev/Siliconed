@@ -74,14 +74,14 @@ final class OperatorFootprintTests: XCTestCase {
         let with = MemoryNeed.gemm("g", bounded: shapes, spread: 21, rank: 128, lora: shapes, plan: plan)
         XCTAssertGreaterThan(bytes(with, "Neural Engine"), bytes(without, "Neural Engine"), "the ANE's fp16 operands of the stack's shapes")
         XCTAssertGreaterThanOrEqual(bytes(with, "conductor workspace"), bytes(without, "conductor workspace"))
-        XCTAssertEqual(bytes(with, "GEMM tiers"), bytes(without, "GEMM tiers"), "the tiers are the base products' (the stack's are narrower)")
         let alone = MemoryNeed.gemm("g", bounded: shapes, spread: 21, rank: 128, lora: shapes, plan: .defaults)
-        XCTAssertEqual(alone.map(\.bytes), MemoryNeed.gemm("g", bounded: shapes, spread: 21, plan: .defaults).map(\.bytes),
-                       "the GPU alone: nothing to charge")
+        XCTAssertEqual(alone.filter { !$0.name.hasSuffix("GEMM tiers") }.map(\.bytes),
+                       MemoryNeed.gemm("g", bounded: shapes, spread: 21, plan: .defaults).filter { !$0.name.hasSuffix("GEMM tiers") }.map(\.bytes),
+                       "the GPU alone: no engine to charge (the tiers' `mid` is the one-submission form's)")
     }
 
     /// **The padding tiers are what `GEMM` sends through them**: 8 to 32 rows, or a tail under 64
-    /// rows past a body; `a` and `c` at 64 rows of the widest `k` and `n` among those.
+    /// rows past a body; `a` and `c` at 64 rows of the widest `k` and `n` among those, `mid` at the rank.
     func testTheTiersAreTheRowsSentThroughThem() {
         XCTAssertEqual([1, 7, 8, 32, 33, 63, 64, 128, 4096].map(GEMM.goesThroughTiers),
                        [false, false, true, true, false, false, false, false, false])
@@ -91,7 +91,7 @@ final class OperatorFootprintTests: XCTestCase {
         let encoder = [(100, 2560, 4096), (100, 2560, 1024), (100, 4096, 2560), (100, 2560, 9728), (100, 9728, 2560)]
         XCTAssertEqual(GEMM.tierBytes(products: encoder),
                        Arena.capacity(for: 64 * 9728 * 4) + Arena.capacity(for: 64 * 9728 * 4))
-        // A LoRA's two products are narrower than the one they follow (`k → r`, `r → n`): their tiers are the same buffers.
+        XCTAssertEqual(GEMM.tierBytes(products: encoder, rank: 32) - GEMM.tierBytes(products: encoder), Arena.capacity(for: 64 * 32 * 4))
     }
 
     /// The process's base is read from the process, not charged as a figure; a VAE's `outside` is its
