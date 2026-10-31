@@ -52,9 +52,9 @@ final class AppState {
     /// The token of the copy the model's choice started: a new choice stops it (`warm`).
     @ObservationIgnored var warmCancellation: Cancellation?
     @ObservationIgnored var volumeObservers: [NSObjectProtocol] = []
-    /// The warnings of the machine profile (a profile measured elsewhere, for example).
+    /// The warnings of the engine's settings (a map measured on another Mac or build, for example).
     /// (Set by a mirror from what the lending Mac published.)
-    var profileWarnings: [String] = []
+    var settingsWarnings: [String] = []
     /// All the known models — the publisher's, then the imported ones (`Library.cards()`).
     var cards: [ModelCard] = []
     /// The ready models (all their files present).
@@ -524,7 +524,7 @@ final class AppState {
         occupancy = library.occupancy()
         identifier = defaultIdentifier
         readEditors()
-        // The machine profile, read in THIS library, with the capacity map — once per process, and only
+        // The engine's settings, read with the capacity map — once per process, and only
         // with a current map: the app builds only one `AppState` (see `App.swift`). Without one (none yet,
         // or one of another Mac, macOS or build: an update), the settings stay unread until the measure
         // the first render starts (`next`). **A map of this Mac and this build is read as it stands**: what the measure could not
@@ -597,7 +597,7 @@ final class AppState {
 
     /// The map kept in the preferences, current or not.
     private(set) var storedMap: Diagnostic.Report?
-    /// The map this process's plan comes from — `nil`: not read yet, or read without one (a refusal, `profileWarnings`).
+    /// The map this process's plan comes from — `nil`: not read yet, or read without one (a refusal, `settingsWarnings`).
     /// It changes only between two renders (`EngineSettings.adopt`): a render reads one plan from start to end, and the
     /// next one may differ from the last — another measure of the same Mac can give an image a little different from one seed.
     private(set) var mapInUse: Diagnostic.Report?
@@ -632,19 +632,19 @@ final class AppState {
         let date = EngineSettings.effective.mapRead
         if let date, let stored = storedMap, stored.date == date, mapInUse?.date != date { mapInUse = stored }
         if EngineSettings.generation != planGeneration { planGeneration = EngineSettings.generation; settingsEpoch += 1 }
-        profileWarnings = EngineSettings.effective.warnings.map(Library.withoutHome)
+        settingsWarnings = EngineSettings.effective.warnings.map(Library.withoutHome)
     }
     @ObservationIgnored private var planGeneration = 0
 
-    /// **Reads the engine's settings**, once: the profile of THIS library and `map`.
+    /// **Reads the engine's settings**, once: `map`, and what it warns of.
     private func readSettings(map: Diagnostic.Report) {
         do {
             try EngineSettings.load(map: map)
-            profileWarnings = EngineSettings.effective.warnings.map(Library.withoutHome)
+            settingsWarnings = EngineSettings.effective.warnings.map(Library.withoutHome)
             mapInUse = map
             planGeneration = EngineSettings.generation
         } catch {
-            profileWarnings = [Library.withoutHome(error.localizedDescription)]
+            settingsWarnings = [Library.withoutHome(error.localizedDescription)]
         }
         settingsRead = true
     }

@@ -372,7 +372,7 @@ package enum EngineError: Error, Equatable, Sendable, Codable, LocalizedError, C
         case .renderAlreadyRunning: return "Another render is already running on this machine."
         case .cancelled: return "Cancelled."
         case .nonFiniteImage: return "This render went wrong and its image is unusable: it was not kept."
-        case .settingsAlreadyLoaded: return "The engine settings were already loaded from another profile."
+        case .settingsAlreadyLoaded: return "The engine settings were already read from another measure."
         case let .internalFailure(component, detail): return "Internal engine failure (\(component)): \(detail)"
         }
     }

@@ -46,7 +46,7 @@ package struct RemoteMachine: Codable, Equatable, Sendable {
     /// The map kept in the preferences, and the one this session's settings were read with.
     package var stored: RemoteMap?
     package var inUse: RemoteMap?
-    /// `AppState.profileWarnings`, as the engine words them (the borrower says them in its language).
+    /// `AppState.settingsWarnings`, as the engine words them (the borrower says them in its language).
     package var warnings: [String]
     package var diagnostic: RemoteDiagnostic
     /// `nil`: the lender can measure now.

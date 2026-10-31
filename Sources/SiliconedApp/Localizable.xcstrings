@@ -32047,42 +32047,42 @@
         }
       }
     },
-    "The engine settings were already loaded from another profile." : {
+    "The engine settings were already read from another measure." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Die Engine-Einstellungen wurden bereits aus einem anderen Profil geladen."
+            "value" : "Die Engine-Einstellungen wurden bereits aus einer anderen Messung gelesen."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Los ajustes del motor ya se habían leído de otro perfil."
+            "value" : "Los ajustes del motor ya se habían leído de otra medición."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Les réglages du moteur ont déjà été lus depuis un autre profil."
+            "value" : "Les réglages du moteur ont déjà été lus d’une autre mesure."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Le impostazioni del motore sono già state lette da un altro profilo."
+            "value" : "Le impostazioni del motore sono già state lette da un’altra misura."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "エンジンの設定は、すでに別のプロファイルから読み込まれています。"
+            "value" : "エンジンの設定は、すでに別の測定から読み込まれています。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "引擎设置已从另一个配置文件载入。"
+            "value" : "引擎设置已从另一次测量中载入。"
           }
         }
       }
@@ -33609,86 +33609,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "外观：媒介、色调、光线——不含内容。"
-          }
-        }
-      }
-    },
-    "The machine profile couldn’t be read as it is." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Das Geräteprofil konnte nicht unverändert gelesen werden."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "No se ha podido leer el perfil de la máquina tal cual."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Le profil machine n’a pas pu être lu tel quel."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Impossibile leggere il profilo macchina così com’è."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "マシンプロファイルをそのままでは読み取れませんでした。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "无法按原样读取机器配置文件。"
-          }
-        }
-      }
-    },
-    "The machine profile sets “%@”, which it may not: a profile tunes speed and room, never the image." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Das Geräteprofil setzt „%@“, was ihm nicht zusteht: Ein Profil regelt Geschwindigkeit und Platz, nie das Bild."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "El perfil de la máquina ajusta «%@», y eso no le corresponde: un perfil ajusta la velocidad y el espacio, nunca la imagen."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Le profil machine règle « %@ », ce qui ne lui revient pas : un profil règle la vitesse et la place, jamais l’image."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Il profilo macchina imposta «%@», cosa che non gli spetta: un profilo regola velocità e spazio, mai l’immagine."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "マシンプロファイルが「%@」を設定していますが、これは許されません：プロファイルが調整するのは速度と容量であり、画像ではありません。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "机器配置文件设置了“%@”，而它无权设置：配置文件只调节速度和空间，绝不改变图像。"
           }
         }
       }
@@ -36667,6 +36587,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "这台 Mac 已完成测量。"
+          }
+        }
+      }
+    },
+    "This Mac’s engine settings couldn’t be read as they are." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Engine-Einstellungen dieses Mac konnten nicht unverändert gelesen werden."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se han podido leer tal cual los ajustes del motor de este Mac."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les réglages du moteur de ce Mac n’ont pas pu être lus tels quels."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossibile leggere così come sono le impostazioni del motore di questo Mac."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このMacのエンジン設定をそのままでは読み取れませんでした。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法按原样读取这台 Mac 的引擎设置。"
           }
         }
       }

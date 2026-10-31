@@ -507,8 +507,8 @@ package enum RemoteControlHelp {
 
         faster_rendering   : Faster Rendering of the model in the rack (help set).
         settings           : the engine settings renders run on — read: false until this Mac's measure is; map: the
-                             date of that measure (null: the defaults); warnings: why a measure or profile was
-                             refused. A measure is applied as it stands, whatever it found (see help diagnose). Two
+                             date of that measure (null: the defaults); warnings: why a measure was not
+                             taken (one of another Mac or build). A measure is applied as it stands, whatever it found (see help diagnose). Two
                              series compared across launches compare their measures too.
         stage              : text, image (encoding a reference), denoising, decoding.
         steps_total        : the model's evaluations, not the requested steps (a sketch: those it stops after).
@@ -1263,8 +1263,8 @@ package enum RemoteControlHelp {
 
         faster_rendering   : le rendu plus rapide du modèle du rack (help set).
         settings           : les réglages du moteur des rendus — read : false tant que la mesure de ce Mac ne l'est
-                             pas ; map : la date de cette mesure (null : les défauts) ; warnings : pourquoi une mesure ou
-                             un profil a été refusé. Une mesure s'applique telle quelle, quoi qu'elle ait trouvé (voir
+                             pas ; map : la date de cette mesure (null : les défauts) ; warnings : pourquoi une mesure n'a
+                             pas été prise (celle d'un autre Mac ou d'un autre build). Une mesure s'applique telle quelle, quoi qu'elle ait trouvé (voir
                              help diagnose). Deux séries de deux lancements comparent aussi leurs mesures.
         stage              : text, image (encodage d'une référence), denoising, decoding.
         steps_total        : les évaluations du modèle, pas les pas demandés (une esquisse : celles après lesquelles elle s'arrête).

@@ -47,7 +47,7 @@ final class MachinePublisher {
             chip: machine.chip, hardwareModel: machine.hardwareModel, memoryBytes: machine.memoryBytes, ceiling: app.memoryCeiling,
             ready: app.readySet.sorted(),
             stored: app.storedMap.map(RemoteMap.init), inUse: app.mapInUse.map(RemoteMap.init),
-            warnings: app.profileWarnings, diagnostic: phase,
+            warnings: app.settingsWarnings, diagnostic: phase,
             blocker: app.diagnosticBlock)
     }
 
@@ -91,7 +91,7 @@ final class MachinePublisher {
 extension AppState {
     func receiveMachine(_ m: RemoteMachine) {
         mirrorMachine = m
-        profileWarnings = m.warnings
+        settingsWarnings = m.warnings
         diagnostic = switch m.diagnostic {
         case .idle: .ready
         case .running(let done, let total): .running(done: done, total: total, line: Self.diagnosticLine(done))

@@ -266,7 +266,7 @@ private struct Footer: View {
                     .font(.caption).foregroundStyle(.secondary).lineLimit(2)
                     .help(app.journal.joined(separator: "\n"))
             }
-            ForEach(Array(zip(app.profileLines, app.profileWarnings)), id: \.1) { line, raw in
+            ForEach(Array(zip(app.settingsLines, app.settingsWarnings)), id: \.1) { line, raw in
                 Label(line, systemImage: "info.circle").font(.caption).foregroundStyle(.secondary)
                     .help(raw)
             }

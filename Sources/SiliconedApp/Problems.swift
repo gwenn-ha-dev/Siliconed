@@ -188,7 +188,7 @@ struct Problem: Equatable, Sendable {
         case .nonFiniteImage:                                        // non_finite_image
             return String(localized: "This render went wrong and its image is unusable: it wasn’t kept.")
         case .settingsAlreadyLoaded:                                 // settings_already_loaded
-            return String(localized: "The engine settings were already loaded from another profile.")
+            return String(localized: "The engine settings were already read from another measure.")
         case .internalFailure(let component, _):                     // internal_failure
             return String(localized: "The engine failed (\(component)).")
         }
@@ -309,7 +309,7 @@ struct Problem: Equatable, Sendable {
 // MARK: - The engine's other texts, said by the app
 
 // The engine also writes English text that is not an error: a license's name, the forge's journal,
-// the warnings of a render or of the machine profile. What is a closed set is translated here; what
+// the warnings of a render or of the engine's settings. What is a closed set is translated here; what
 // is free (a developer's warning, a forge's row) is never shown raw in a sentence of the app — a
 // localized line says what happened, and the engine's text stays in its tooltip, like a problem's
 // detail.
@@ -400,14 +400,9 @@ extension AppState {
         journal.isEmpty ? nil : String(localized: "The engine noted something unusual during this render.")
     }
 
-    /// The machine profile's warnings, said by the app (`EngineSettings.warnings`: one known form).
-    var profileLines: [String] {
-        profileWarnings.map { w in
-            if let open = w.range(of: "« "), let close = w.range(of: " » ignored in the profile"), open.upperBound <= close.lowerBound {
-                let key = String(w[open.upperBound..<close.lowerBound])
-                return String(localized: "The machine profile sets “\(key)”, which it may not: a profile tunes speed and room, never the image.")
-            }
-            return String(localized: "The machine profile couldn’t be read as it is.")
-        }
+    /// The engine settings' warnings, said by the app (`EngineSettings.warnings`: a map of another Mac or build,
+    /// a developer's `SILICONED_MAP` or `SILICONED_PLAN`); the engine's own row is the tooltip.
+    var settingsLines: [String] {
+        settingsWarnings.map { _ in String(localized: "This Mac’s engine settings couldn’t be read as they are.") }
     }
 }
