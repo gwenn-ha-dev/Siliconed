@@ -146,7 +146,7 @@ enum Krea2Stages {
 
     static let trajectory = Stage(
         model: model, name: "trajectory",
-        proves: "the schedule, then the 8 Euler steps: each step's velocity from the oracle's latent at that step, at the step's fp64 witness where it exists",
+        proves: "the seed's noise bit for bit, the schedule, then the 8 Euler steps: each step's velocity from the oracle's latent at that step, at the step's fp64 witness where it exists",
         sizes: ["512", "1024"], options: ["--map"],
         oracle: "tools/oracle/krea2.py trajectory --size {size}; witness-step --size {size} --step 0 1 2 3 4 5 6 7", weights: ["DiT"],
         rule: "σ within 1e-6; the rule on each guided velocity, floor 5e-4, at the step's fp64 witness where it exists, clouds when the oracle has draws; the free pass is shown, not judged"
@@ -160,6 +160,14 @@ enum Krea2Stages {
               let textEntry = dit512.entries["txt_in_out"] else {
             throw Skip("\(trajectory.path): the trajectory's inputs are missing")
         }
+        // The starting noise first: `torch.randn` at the manifest's seed, to the bit (`TorchNoise`).
+        guard let seed = (try? invocation.goldens.manifest("krea2/goldens-krea2-trajectory-\(invocation.size)"))?["seed"] as? NSNumber else {
+            throw Skip("the trajectory's manifest holds no seed")
+        }
+        report.add(Judge.identical("noise (seed \(seed))",
+                                   Latent.noise(.qwenImage, height: initEntry.shape[initEntry.shape.count - 2],
+                                                width: initEntry.shape[initEntry.shape.count - 1], seed: seed.uint64Value).values,
+                                   initial))
         let steps = reference.count - 1
         let sigmas = Krea2DiT.sigmas(steps: steps)
         report.add(Judge.schedule(sigmas, reference))

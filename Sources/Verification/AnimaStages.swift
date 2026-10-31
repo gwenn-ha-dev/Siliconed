@@ -119,7 +119,7 @@ enum AnimaStages {
 
     static let trajectory = Stage(
         model: model, name: "trajectory",
-        proves: "the schedule, then the 8 Euler steps: each step's velocity from the oracle's latent at that step",
+        proves: "the seed's noise bit for bit, the schedule, then the 8 Euler steps: each step's velocity from the oracle's latent at that step",
         sizes: ["512", "1024"], options: ["--map"],
         oracle: "tools/oracle/anima.py trajectory --size {size}", weights: ["DiT"],
         rule: "σ within 1e-6; the rule on each guided velocity, floor 5e-4; the free pass is shown with its gain, not judged"
@@ -132,6 +132,14 @@ enum AnimaStages {
               let contextEntry = text.entries["prompt_embeds"] else {
             throw Skip("\(trajectory.path): the trajectory's inputs are missing")
         }
+        // The starting noise first: `torch.randn` at the manifest's seed, to the bit (`TorchNoise`).
+        guard let seed = (try? invocation.goldens.manifest("anima/goldens-anima-trajectory-\(invocation.size)"))?["seed"] as? NSNumber else {
+            throw Skip("the trajectory's manifest holds no seed")
+        }
+        report.add(Judge.identical("noise (seed \(seed))",
+                                   Latent.noise(.qwenImage, height: initEntry.shape[initEntry.shape.count - 2],
+                                                width: initEntry.shape[initEntry.shape.count - 1], seed: seed.uint64Value).values,
+                                   initial))
         let steps = reference.count - 1
         let sigmas = AnimaDiT.sigmas(steps: steps, shift: 3)
         // A badly transcribed shift gives a plausible and wrong trajectory.

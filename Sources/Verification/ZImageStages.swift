@@ -180,7 +180,7 @@ enum ZImageStages {
 
     static let trajectory = Stage(
         model: "z-image", name: "trajectory",
-        proves: "the 8-step sampler: each step's velocity and latent, from the reference's own latent at that step",
+        proves: "the seed's noise bit for bit, then the 8-step sampler: each step's velocity and latent, from the reference's own latent at that step",
         sizes: ["512", "1024"], options: ["--map"],
         oracle: "tools/oracle/z-image.py trajectory --size {size}", weights: ["DiT"],
         rule: "the rule on the guided pass, floor 5e-4; the free pass is shown with its gain, not judged"
@@ -192,7 +192,15 @@ enum ZImageStages {
               let initEntry = reference.entries["latent_init"], let initial = reference.float32("latent_init") else {
             throw Skip("\(reference.path): the trajectory's inputs are missing")
         }
-        // From the reference's `latent_init`: reproducing torch's noise is not the point, the trajectory is.
+        // The starting noise first: `torch.randn` at the manifest's seed, to the bit (`TorchNoise`).
+        guard let seed = (try? invocation.goldens.manifest("goldens-trajectory-\(invocation.size)"))?["seed"] as? NSNumber else {
+            throw Skip("the trajectory's manifest holds no seed")
+        }
+        report.add(Judge.identical("noise (seed \(seed))",
+                                   Latent.noise(.flux, height: initEntry.shape[initEntry.shape.count - 2],
+                                                width: initEntry.shape[initEntry.shape.count - 1], seed: seed.uint64Value).values,
+                                   initial))
+        // Then each step from the reference's `latent_init`.
         let size = initEntry.shape[2], channels = initEntry.shape[1]
         let count = channels * size * size
         let dit = try DiT(artifact: try Artifact(path: try invocation.ditMap(ditMap)), latentHeight: size, latentWidth: size,
