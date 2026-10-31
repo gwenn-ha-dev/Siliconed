@@ -46,6 +46,8 @@ enum LabUnavailable: Equatable, Sendable {
     case notInstalled
     /// One is installed, and does not fit this Mac: `gigabytes` of RAM would.
     case needsMemory(gigabytes: Int)
+    /// The encoder is installed, the writer's head is not: `bytes` is what installing it downloads.
+    case needsHead(bytes: Int64)
     /// Being downloaded or converted.
     case preparing
 }

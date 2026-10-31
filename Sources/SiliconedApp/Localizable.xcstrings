@@ -17018,6 +17018,46 @@
         }
       }
     },
+    "Install the Writer" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Textmodell installieren"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Instalar el redactor"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Installer le rédacteur"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Installa il redattore"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ライターをインストール"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "安装写作器"
+          }
+        }
+      }
+    },
     "Install, import, remove — and what each takes on disk (⇧⌘M)" : {
       "localizations" : {
         "de" : {
@@ -17174,6 +17214,86 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在安装 %@"
+          }
+        }
+      }
+    },
+    "Installing the writer" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Textmodell wird installiert"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Instalando el redactor"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Installation du rédacteur"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Installazione del redattore"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ライターをインストール中"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在安装写作器"
+          }
+        }
+      }
+    },
+    "Installing the writer…" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Textmodell wird installiert …"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Instalando el redactor…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Installation du rédacteur…"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Installazione del redattore…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ライターをインストール中…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在安装写作器…"
           }
         }
       }
@@ -35405,6 +35525,46 @@
         }
       }
     },
+    "The writer is installed" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das Textmodell ist installiert"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El redactor está instalado"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le rédacteur est installé"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il redattore è installato"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ライターをインストールしました"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "写作器已安装"
+          }
+        }
+      }
+    },
     "The writer needs a Mac with %lld GB of memory." : {
       "localizations" : {
         "de" : {
@@ -35441,6 +35601,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "写作模型需要内存为 %lld GB 的 Mac。"
+          }
+        }
+      }
+    },
+    "The writer needs one more download from Qwen-Image-2.1's repository: %@." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das Textmodell braucht einen weiteren Download aus dem Repository von Qwen-Image-2.1: %@."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El redactor necesita una descarga más del repositorio de Qwen-Image-2.1: %@."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le rédacteur a besoin d’un téléchargement de plus, depuis le dépôt de Qwen-Image-2.1 : %@."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il redattore ha bisogno di un altro download dal repository di Qwen-Image-2.1: %@."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ライターにはQwen-Image-2.1のリポジトリからの追加ダウンロードが必要です：%@。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "写作器还需要从 Qwen-Image-2.1 的仓库再下载一个文件：%@。"
           }
         }
       }
@@ -37409,6 +37609,52 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "本次会话按这台 Mac 在 %@ 的测量结果进行规划。"
+          }
+        }
+      }
+    },
+    "This text is too long for the writer: %lld tokens, at most %lld." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dieser Text ist zu lang für das Textmodell: %lld Token, höchstens %lld."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "This text is too long for the writer: %1$lld tokens, at most %2$lld."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Este texto es demasiado largo para el redactor: %lld tokens, como máximo %lld."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce texte est trop long pour le rédacteur : %lld jetons, au plus %lld."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Questo testo è troppo lungo per il redattore: %lld token, al massimo %lld."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このテキストはライターには長すぎます：%lld トークン、上限は %lld です。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此文本对写作器来说太长：%lld 个词元，最多 %lld 个。"
           }
         }
       }

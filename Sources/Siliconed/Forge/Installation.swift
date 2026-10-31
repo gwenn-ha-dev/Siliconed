@@ -67,10 +67,6 @@ package struct Installer {
     // The Light's DiT: unsloth's GGUF Q4_K_M, judged whole at the bit.
     // Z-Image's is in the Compact's repository (`zImageGGUF`), at the same revision.
     static let qwenImage21GGUF = Repository(name: "unsloth/Qwen-Image-2.1-Turbo-GGUF", revision: "5d1f9f759ea877ae556cda88dbec958b62ad3809")
-    /// The writer's head (`Family.writerHead`): `lm_head` and the final norm of the Instruct that Qwen-Image-2.1's
-    /// encoder is. Neither map of the encoder holds them; the Turbo's own `text_encoder/model.safetensors` does
-    /// (750 tensors) but is 17.5 GB in one file.
-    static let qwen3VLInstruct = Repository(name: "Qwen/Qwen3-VL-8B-Instruct", revision: "0c351dd01ed87e9c1b53cbc748cba10e6187ff3b")
     // Anima's Compact and Light DiTs: vanes430's GGUFs of Turbo v1.1 (ComfyUI-GGUF, `cosmos`), the
     // Compact's Q8_0 and the Light's Q4_K_M in one repository; its encoder is the Standard's.
     static let animaGGUF = Repository(name: "vanes430/Anima-Turbo-V1.1-GGUF", revision: "efdf070de980a52fc03027d2f6ed543cc1d87a8f")
@@ -370,34 +366,73 @@ package struct Installer {
         f == .krea2 ? Krea2Published.encoderConfig : nil
     }
 
-    /// **The files of a writer's head** (`Family.writerHead`): the configs, then the one shard of the Instruct that
-    /// holds `lm_head.weight` and `model.language_model.norm.weight` (shard 4 of 4: 2 716 270 024 bytes, with layer
-    /// 35 and the vision tower beside them), pinned by the sha256 and size the Hub announces for that LFS object.
-    /// The index is not downloaded: a folder with this shard alone reads as a single file (`TensorSource(folder:)`).
-    /// Only `lm_head` (1 244 659 712 bytes at offset 41 448) and the norm (8 192 bytes at 1 563 485 160) are used:
-    /// a `Range` download of those two runs would save 1.47 GB, but could not be checked against the shard's sha256.
+    /// **The small files of a writer's head** (`Family.writerHead`): the family's own `text_encoder/config.json` and
+    /// `generation_config.json` (the stop tokens), at the revision the encoder is downloaded from. The two tensors
+    /// themselves are `writerHeadTensors`, fetched by byte range from `writerHeadSource`.
     static func writerHead(_ f: Family) -> [File] {
         guard f == .qwenImage21 else { return [] }
-        return ["config.json", "generation_config.json"].map { File(repository: qwen3VLInstruct, path: $0, destination: nil) }
-            + [File(repository: qwen3VLInstruct, path: "model-00004-of-00004.safetensors", destination: nil,
-                    sha256: "0a88b98e9f96270973f567e6a2c103ede6ccdf915ca3075e21c755604d0377a5", size: 2716270024)]
+        return ["config.json", "generation_config.json"].map { File(repository: qwenImage21Turbo, path: "text_encoder/" + $0, destination: nil) }
     }
 
-    /// **Installs a family's writer head** (`Family.writerHead`): downloaded, forged by `ForgeText.forgeHead`
-    /// into a map of its own, sources thrown away. Already there: nothing.
+    /// **The file the head's tensors are read from**: the Turbo's text encoder as the family already installs it
+    /// (`encoder(.qwenImage21)`: 17 534 340 584 bytes, 750 tensors, safetensors header of 93 184 bytes), of which the
+    /// head is 1.25 GB — `lm_head.weight` and `model.language_model.norm.weight`, which the encoder's own map leaves out.
+    static let writerHeadSource = File(repository: qwenImage21Turbo, path: "text_encoder/model.safetensors", destination: nil,
+                                       sha256: "a1eee8233f3063466dd3b06e857b0a2cf13a77c543908374771d51a546beb2e0", size: 17534340584)
+
+    /// **The two byte ranges of that file, pinned by us**: each sha256 is that of exactly those bytes, computed from a
+    /// complete copy of the file (whose own sha256 is `writerHeadSource`'s) — the Hub announces none for a range. Offsets
+    /// are absolute and end-exclusive; the download refuses a header that no longer says the same (`Downloader.plan`).
+    static let writerHeadTensors: [Downloader.PinnedRange] = [
+        .init(name: "lm_head.weight", begin: 93_192, length: 1_244_659_712,
+              sha256: "a9170f6064e905bb6f9bcbaca6af2c91f9bd44e599a1433188a5cd8926573fd0"),
+        .init(name: "model.language_model.norm.weight", begin: 16_381_555_720, length: 8_192,
+              sha256: "fe204de7e848b92e8a758ab5e27632e9b698f29571ca56057d13ba73d0b2012a"),
+    ]
+
+    /// What installing a writer's head downloads: the two ranges (the configs are a few KB).
+    static var writerHeadDownloadBytes: Int { writerHeadTensors.reduce(0) { $0 + $1.length } }
+
+    /// **Installs a family's writer head** (`Family.writerHead`): the two tensors by `Range` (1.25 GB of a 17.5 GB file),
+    /// each checked against its pinned sha256 before anything is written to the store, laid in a small safetensors
+    /// file beside the configs, and forged by `ForgeText.forgeHead` into a map of its own. Sources thrown away.
+    /// Already there: nothing. The family's licence (the encoder's repository) covers it: it must be accepted.
     package func installWriterHead(_ f: Family) throws {
         guard let name = f.writerHead else { throw Numerics.Failure(description: "\(f.name) has no writer") }
         let path = library.map(name)
         if FileManager.default.fileExists(atPath: path) { journal("✓ \(name) already there"); return }
-        let files = Self.writerHead(f)
-        try checkSpace(files)
-        for x in files { try download(x) }
+        let card = ModelCard.of(f)
+        guard Licenses.implicit || library.isLicenseAccepted(card) else { throw EngineError.licenseNotAccepted(model: card.id) }
+        try cancellation.check()
+        let bytes = Self.writerHeadDownloadBytes
+        // The ranges, then the file laid from them, then the map: the largest moment holds two of the three.
+        try library.checkSpace(2 * bytes + bytes / 50)
+        let configs = Self.writerHead(f)
+        for x in configs { try download(x) }
+        let sourceURL = Downloader.url(Self.writerHeadSource.repository.name, revision: Self.writerHeadSource.repository.revision,
+                                       path: Self.writerHeadSource.path)
+        let plan = try Downloader.plan(Self.writerHeadTensors, remoteHeaderOf: sourceURL)
+        let work = downloads + "/writer-head"
+        let rangesFolder = work + "-ranges"
+        defer { if !keepSources { try? FileManager.default.removeItem(atPath: work); try? FileManager.default.removeItem(atPath: rangesFolder) } }
+        var laid: [(range: Downloader.TensorRange, file: String)] = []
+        for r in plan {
+            let file = rangesFolder + "/" + r.name
+            try Downloader.downloadRange(sourceURL, r, to: file, cancellation: cancellation, journal: journal)
+            laid.append((r, file))
+        }
+        try? FileManager.default.removeItem(atPath: work)
+        try FileManager.default.createDirectory(atPath: work, withIntermediateDirectories: true)
+        for x in configs {
+            try FileManager.default.copyItem(atPath: source(x), toPath: work + "/" + (x.path as NSString).lastPathComponent)
+        }
+        try Downloader.assembleSafetensors(laid.map { ($0.range, $0.file) }, to: work + "/model.safetensors")
+        for (_, file) in laid { try? FileManager.default.removeItem(atPath: file) }
         journal("forging the writer's head → \(name)")
         let begin = Date()
-        let r = try ForgeText.forgeHead(folder: (source(files[0]) as NSString).deletingLastPathComponent, to: path,
-                                         progressHandler: progressHandler)
+        let r = try ForgeText.forgeHead(folder: work, to: path, progressHandler: progressHandler)
         journal(String(format: "  ✓ forged %@ in %.0f s (%d tensors)", name, Date().timeIntervalSince(begin), r.tensors))
-        if !keepSources { for x in files { try? FileManager.default.removeItem(atPath: source(x)) }; cleanDownloads() }
+        if !keepSources { for x in configs { try? FileManager.default.removeItem(atPath: source(x)) }; cleanDownloads() }
     }
 
     // MARK: - Where things live

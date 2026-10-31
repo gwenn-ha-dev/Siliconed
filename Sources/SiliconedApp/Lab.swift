@@ -42,8 +42,9 @@ final class LabModel {
     /// A finished result: `original` is the text it rewrites (the diff's other side), `nil` when there is none.
     struct Result: Equatable { var text: String; var original: String? }
 
-    /// Swapped by the engine's wiring; the sample writer until then.
-    var writer: any LabWriter = FakeLabWriter() { didSet { refresh() } }
+    /// The engine's writer; nothing is read from disk until the first `availability`, and no weight until the first gesture.
+    /// `FakeLabWriter` (`LabWriter.swift`) stands in for previews.
+    var writer: any LabWriter = EngineLabWriter(library: MainWindow.shared.local.library) { didSet { refresh() } }
     private(set) var availability: LabAvailability = .unavailable(.preparing)
 
     var gesture = Gesture.rewrite
@@ -70,7 +71,47 @@ final class LabModel {
 
     var isWriting: Bool { phase != .idle }
 
-    func refresh() { availability = writer.availability }
+    func refresh() {
+        (writer as? EngineLabWriter)?.library = MainWindow.shared.local.library
+        availability = writer.availability
+    }
+
+    // MARK: The writer's head
+
+    /// The head is being downloaded and forged (`Installer.installWriterHead`), through the app's forge: one job at a
+    /// time, no render meanwhile, Stop as for any installation.
+    private(set) var installingHead = false
+    /// The head's installation failed: one sentence.
+    private(set) var headFailure: String?
+
+    private enum HeadOutcome: Sendable { case done, stopped, failed(String) }
+
+    /// **One button**: the encoder's family is installed, so its licence was accepted when it was; the head comes from the
+    /// same repository (two byte ranges of the encoder's file, checked by sha256), and the button says its size.
+    func installHead(_ app: AppState) {
+        guard !installingHead, app.managementPossible, case .unavailable(.needsHead) = availability else { return }
+        installingHead = true; headFailure = nil
+        app.launchForge(String(localized: "Installing the writer"), task: .other) { library, cancellation, journal -> HeadOutcome in
+            var installer = Installer(library: library)
+            installer.cancellation = cancellation; installer.journal = journal
+            do {
+                try installer.installWriterHead(Library.writerFamily)
+                return .done
+            } catch {
+                if EngineError(error) == .cancelled { return .stopped }
+                return .failed(Problem(error).title)
+            }
+        } end: { [self] outcome in
+            installingHead = false
+            switch outcome {
+            case .done: app.flash(String(localized: "The writer is installed"))
+            case .stopped: app.flash(String(localized: "Stopped — the files already downloaded are kept; the one in progress will start over"))
+            case .failed(let why): headFailure = why
+            }
+            refresh()
+        }
+    }
+
 
     // MARK: The render's priority
 
@@ -286,6 +327,8 @@ struct LabView: View {
             case .notInstalled: return ("shippingbox", String(localized: "No writer is installed yet. Install a model to have one."))
             case .needsMemory(let n): return ("memorychip", String(localized: "The writer needs a Mac with \(n) GB of memory."))
             case .preparing: return ("hourglass", String(localized: "The writer is being prepared."))
+            case .needsHead(let bytes):
+                return ("arrow.down.circle", String(localized: "The writer needs one more download from Qwen-Image-2.1's repository: \(Figures.disk(Int(bytes))).")) 
             }
         }
         if target == nil { return ("shippingbox", String(localized: "No writer is installed yet. Install a model to have one.")) }
@@ -426,7 +469,32 @@ struct LabView: View {
                 Label(pause.sentence, systemImage: pause.symbol).font(.caption).foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
+            headInstall
         }
+    }
+
+    /// The writer's head: one button when the encoder is there and the head is not; the progress while it comes; the failure in red.
+    @ViewBuilder private var headInstall: some View {
+        if model.installingHead {
+            HStack(spacing: 8) {
+                if let fraction = Self.percent(rack.forgeJournal.last) { ProgressView(value: fraction) } else { ProgressView().controlSize(.small) }
+                Text("Installing the writer…").font(.caption).foregroundStyle(.secondary)
+                Button("Stop") { rack.cancelForge() }.buttonStyle(.link).font(.caption)
+            }
+        } else if case .unavailable(.needsHead) = model.availability, !followingAnotherMac, !model.rendering {
+            Button("Install the Writer") { model.installHead(rack) }
+                .disabled(!rack.managementPossible)
+        }
+        if let why = model.headFailure {
+            Text(why).font(.caption).foregroundStyle(Palette.failure)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    /// `  … 40 %`, the line the installer's journal writes while a file comes.
+    static func percent(_ line: String?) -> Double? {
+        guard let line, line.hasSuffix(" %"), let n = line.split(separator: " ").dropLast().last.flatMap({ Int($0) }) else { return nil }
+        return Double(n) / 100
     }
 
     private var current: LabModel.Result? { model.results[model.gesture] }

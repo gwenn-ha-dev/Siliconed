@@ -330,16 +330,21 @@ final class PromptWriterTests: XCTestCase {
         XCTAssertEqual(map.residentCapacity, 0, "a cancelled load keeps nothing")
     }
 
-    /// The head's files are pinned from the Hub's API (LFS oid and size of shard 4 of the Instruct); the family's map
-    /// is counted with its encoder and removed with it, and a family without a writer has none.
+    /// The head's files are the family's own (the Turbo's `text_encoder/` configs) and two pinned byte ranges of its encoder
+    /// file; the family's map is counted with its encoder and removed with it, and a family without a writer has none.
     func testTheHeadIsPinnedAndManaged() throws {
         let files = Installer.writerHead(.qwenImage21)
-        XCTAssertEqual(files.map(\.path), ["config.json", "generation_config.json", "model-00004-of-00004.safetensors"])
-        XCTAssertEqual(Set(files.map(\.repository.name)), ["Qwen/Qwen3-VL-8B-Instruct"])
-        XCTAssertEqual(files[0].repository.revision, "0c351dd01ed87e9c1b53cbc748cba10e6187ff3b")
-        XCTAssertEqual(files[2].sha256?.count, 64)
-        XCTAssertEqual(files[2].size, 2_716_270_024)
+        XCTAssertEqual(files.map(\.path), ["text_encoder/config.json", "text_encoder/generation_config.json"])
+        XCTAssertEqual(Set(files.map(\.repository.name)), ["Qwen/Qwen-Image-2.1-Turbo"])
+        XCTAssertEqual(files[0].repository.revision, "d65dbc9a7e8f6b5479e33dee6030eaab2a906509")
         XCTAssertNil(files[0].sha256)
+        let source = Installer.writerHeadSource
+        XCTAssertEqual(source.repository.revision, files[0].repository.revision)
+        XCTAssertEqual(source.sha256, "a1eee8233f3063466dd3b06e857b0a2cf13a77c543908374771d51a546beb2e0")
+        XCTAssertEqual(Installer.writerHeadTensors.map(\.name), ["lm_head.weight", "model.language_model.norm.weight"])
+        XCTAssertEqual(Installer.writerHeadTensors.map(\.length), [1_244_659_712, 8_192])
+        XCTAssertTrue(Installer.writerHeadTensors.allSatisfy { $0.sha256.count == 64 && $0.begin + $0.length <= source.size! })
+        XCTAssertEqual(Installer.writerHeadDownloadBytes, 1_244_667_904)
         for f in Family.allCases where f != .qwenImage21 { XCTAssertTrue(Installer.writerHead(f).isEmpty); XCTAssertNil(f.writerHead) }
         let library = Library(root: root.appendingPathComponent("lib"))
         try FileManager.default.createDirectory(atPath: library.map(""), withIntermediateDirectories: true)
@@ -468,5 +473,101 @@ final class PromptWriterTests: XCTestCase {
         var withBase = short
         withBase.base = 700_000_000
         XCTAssertEqual(withBase.peak - short.peak, 700_000_000)
+    }
+
+    // ── the head by byte range ───────────────────────────────────────────────────────────────
+
+    /// A synthetic text encoder: three tensors, the header padded as the real one is.
+    private func encoderFile() throws -> (path: String, bytes: [UInt8], header: [String: Any], headerLength: Int, ranges: [String: (Int, Int)]) {
+        let a = bf16(10, seed: 1), norm = bf16(8, seed: 3), head = bf16(6 * 8, seed: 5)
+        let path = root.appendingPathComponent("encoder-\(UUID()).safetensors").path
+        try safetensors([("a.weight", [10], a), ("lm_head.weight", [6, 8], head), ("model.language_model.norm.weight", [8], norm)], to: path)
+        let bytes = [UInt8](try Data(contentsOf: URL(fileURLWithPath: path)))
+        let n = Int(bytes[0...7].enumerated().reduce(UInt64(0)) { $0 | UInt64($1.element) << (8 * UInt64($1.offset)) })
+        let header = try JSONSerialization.jsonObject(with: Data(bytes[8..<(8 + n)])) as! [String: Any]
+        var ranges: [String: (Int, Int)] = [:]
+        for (name, v) in header where name != "__metadata__" {
+            let o = (v as! [String: Any])["data_offsets"] as! [Int]
+            ranges[name] = (8 + n + o[0], o[1] - o[0])
+        }
+        return (path, bytes, header, n, ranges)
+    }
+
+    private func sha(_ bytes: ArraySlice<UInt8>) throws -> String {
+        let p = root.appendingPathComponent("hash-\(UUID())").path
+        try Data(bytes).write(to: URL(fileURLWithPath: p))
+        return try Downloader.sha256(p)
+    }
+
+    /// **The range plan reads offsets from the header** (data starts at `8 + header length`), and refuses a header that
+    /// no longer says what the pin says.
+    func testTheRangePlanFollowsTheHeader() throws {
+        let f = try encoderFile()
+        let (hb, hl) = f.ranges["lm_head.weight"]!, (nb, nl) = f.ranges["model.language_model.norm.weight"]!
+        let pins = [Downloader.PinnedRange(name: "lm_head.weight", begin: hb, length: hl, sha256: "x"),
+                    Downloader.PinnedRange(name: "model.language_model.norm.weight", begin: nb, length: nl, sha256: "y")]
+        let plan = try Downloader.plan(pins, headerLength: f.headerLength, header: f.header, file: "synthetic")
+        XCTAssertEqual(plan.map(\.begin), [hb, nb])
+        XCTAssertEqual(plan[0].shape, [6, 8])
+        XCTAssertEqual(plan[0].dtype, "BF16")
+        XCTAssertEqual(plan[0].last, hb + hl - 1)
+        var moved = pins; moved[0] = .init(name: "lm_head.weight", begin: hb + 2, length: hl, sha256: "x")
+        XCTAssertThrowsError(try Downloader.plan(moved, headerLength: f.headerLength, header: f.header, file: "synthetic"))
+        var shorter = pins; shorter[1] = .init(name: pins[1].name, begin: nb, length: nl - 2, sha256: "y")
+        XCTAssertThrowsError(try Downloader.plan(shorter, headerLength: f.headerLength, header: f.header, file: "synthetic"))
+        XCTAssertThrowsError(try Downloader.plan([.init(name: "absent", begin: 0, length: 1, sha256: "z")],
+                                                 headerLength: f.headerLength, header: f.header, file: "synthetic"))
+    }
+
+    /// **A range is used only if its bytes are the pinned ones**: one wrong bit, or a missing byte, removes the file.
+    func testAWrongByteInARangeIsRefused() throws {
+        let f = try encoderFile()
+        let (b, l) = f.ranges["lm_head.weight"]!
+        let range = Downloader.TensorRange(name: "lm_head.weight", dtype: "BF16", shape: [6, 8], begin: b, length: l,
+                                           sha256: try sha(f.bytes[b..<(b + l)]))
+        let good = root.appendingPathComponent("good").path
+        try Data(f.bytes[b..<(b + l)]).write(to: URL(fileURLWithPath: good))
+        XCTAssertNoThrow(try Downloader.verify(good, range))
+        var wrong = Array(f.bytes[b..<(b + l)]); wrong[17] ^= 1
+        let bad = root.appendingPathComponent("bad").path
+        try Data(wrong).write(to: URL(fileURLWithPath: bad))
+        XCTAssertThrowsError(try Downloader.verify(bad, range))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: bad), "a refused range is not kept")
+        let short = root.appendingPathComponent("short").path
+        try Data(f.bytes[b..<(b + l - 1)]).write(to: URL(fileURLWithPath: short))
+        XCTAssertThrowsError(try Downloader.verify(short, range))
+    }
+
+    /// **The head forged from two ranged tensors** equals the one forged from the whole shard: the ranges laid in a small
+    /// safetensors file beside the configs, the same bits in the map.
+    func testTheHeadForgedFromRangesKeepsTheBits() throws {
+        let f = try encoderFile()
+        var laid: [(Downloader.TensorRange, String)] = []
+        for name in ["lm_head.weight", "model.language_model.norm.weight"] {
+            let (b, l) = f.ranges[name]!
+            let shape = ((f.header[name] as! [String: Any])["shape"] as! [Int])
+            let file = root.appendingPathComponent("range-" + name).path
+            try Data(f.bytes[b..<(b + l)]).write(to: URL(fileURLWithPath: file))
+            laid.append((Downloader.TensorRange(name: name, dtype: "BF16", shape: shape, begin: b, length: l, sha256: try sha(f.bytes[b..<(b + l)])), file))
+        }
+        let c = try checkpoint()
+        let folder = root.appendingPathComponent("ranged-\(UUID())").path
+        try FileManager.default.createDirectory(atPath: folder, withIntermediateDirectories: true)
+        for name in ["config.json", "generation_config.json"] {
+            try FileManager.default.copyItem(atPath: c.folder + "/" + name, toPath: folder + "/" + name)
+        }
+        try Downloader.assembleSafetensors(laid, to: folder + "/model.safetensors")
+        let whole = root.appendingPathComponent("whole.silicon").path, ranged = root.appendingPathComponent("ranged.silicon").path
+        _ = try ForgeText.forgeHead(folder: c.folder, to: whole)
+        let tally = try ForgeText.forgeHead(folder: folder, to: ranged)
+        XCTAssertEqual(tally.tensors, 2)
+        let a = try Artifact(path: ranged)
+        XCTAssertEqual(a.header["eos_token_ids"] as? [Int], [151645, 151643])
+        XCTAssertEqual(a.tensors["lm_head.weight"]?.shape, [6, 8])
+        // The checkpoint's bits and the ranged file's differ (other seeds): the ranged map holds the ranged file's.
+        let (b, l) = f.ranges["lm_head.weight"]!
+        XCTAssertEqual(Array(UnsafeRawBufferPointer(start: a.pointer("lm_head.weight"), count: l)), Array(f.bytes[b..<(b + l)]))
+        let (nb, nl) = f.ranges["model.language_model.norm.weight"]!
+        XCTAssertEqual(Array(UnsafeRawBufferPointer(start: a.pointer("norm.weight"), count: nl)), Array(f.bytes[nb..<(nb + nl)]))
     }
 }
