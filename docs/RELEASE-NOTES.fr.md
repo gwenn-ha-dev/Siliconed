@@ -2,6 +2,39 @@
 
 # Siliconed — notes de version
 
+## 0.18
+
+### La carte mesure le Mac, puis planifie chaque calcul à partir de là
+
+- **Un modèle des moteurs de ce Mac, et non plus une table de routes** : la carte mesure ce que le GPU,
+  l'unité matricielle du CPU et le Neural Engine calculent chacun, selon la forme (la longueur des
+  poids compte, et leur montée sur le Neural Engine aussi), et la part de sa vitesse que chacun garde
+  à côté des autres. Chaque produit matriciel et chaque attention d'un rendu sont alors répartis sur
+  les moteurs selon ce modèle, jusqu'aux lignes, avant le premier calcul. Chaque rendu compare ce
+  qu'a pris chaque sorte de calcul à ce que la carte prévoyait.
+- **Le Neural Engine lit les poids int8 tels que publiés** : sur la Compact de Krea 2, de
+  Qwen-Image-2.1 et de MOSS-Image, une part des produits tourne sur lui en 8 bits, à côté du GPU. Sur
+  un M1 Pro en 1024², ces trois Compact prennent un quart de temps de moins qu'avant : Krea 2 99,9 s
+  (135,8), Qwen-Image-2.1 72,8 s (100,2), MOSS-Image 80,2 s (107,7). Z-Image (79,6 s), Anima (32,4 s)
+  et les Standard gardent leurs temps ([Les chiffres](ENGINE.fr.md#les-chiffres)).
+- **Une mesure donne toujours une carte** : plus rien n'est orange. La confiance qu'on peut avoir dans
+  le chiffre de chaque moteur est écrite à côté (± quelques pour cent), et ce que la mesure a trouvé
+  est dit avec son effet sur le plan. Une route qui a mal calculé, ou dont le chargement a arrêté le
+  processus de mesure, est écartée, et la mesure continue sans elle.
+- **Juste dans la vraie vie** : la carte ne demande plus de laisser le Mac tranquille. Le Moniteur
+  d'activité ou une autre fenêtre qui se dessine à côté ne déplacent plus ses chiffres ; les appels
+  qui ne s'accordent pas sont lus de leur côté rapide. La mesure lancée par l'app lit maintenant le GPU
+  et le Neural Engine ensemble aussi bien qu'une mesure lancée depuis le Terminal.
+- **Moins d'une minute** sur le Mac le plus lent, sans aucun modèle.
+
+### Aussi
+
+- **Le Mac sur lequel on calcule, à côté de Chaîne** : son icône, comme dans « À propos de ce Mac »,
+  grisée tant qu'il n'est pas mesuré ; celle de l'autre Mac quand on calcule dessus.
+- **Partager la carte est une option** : sous Partager… dans Mesurer ce Mac, jamais le bouton par défaut.
+- **Le rendu plus rapide, mesuré** : en 1024², il retire un tiers du temps d'un rendu sur Krea 2, un
+  cinquième à un quart sur Z-Image, Qwen-Image-2.1 et Anima, et 6 à 9 % sur MOSS-Image.
+
 ## 0.17
 
 ### Calculer sur un autre Mac

@@ -5,11 +5,11 @@
 <link rel="icon" href="images/icon-small.svg" type="image/svg+xml">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Siliconed — your Mac, mapped: local AI image generation and editing for Apple silicon</title>
-<meta name="description" content="Free, open-source macOS app that runs Krea 2 Turbo, Z-Image Turbo, Qwen-Image-2.1 and Anima Turbo natively in Swift and Metal on Apple silicon. It measures your Mac before its first render and picks the kernels that win on that chip, across the GPU, the CPU's matrix unit and the Neural Engine. Text-to-image and AI image editing, offline, fp32, checked against diffusers, within a fixed memory budget.">
+<meta name="description" content="Free, open-source macOS app that runs Krea 2 Turbo, Z-Image Turbo, Qwen-Image-2.1 and Anima Turbo natively in Swift and Metal on Apple silicon. It measures your Mac before its first render and plans every computation from what it measured, across the GPU, the CPU's matrix unit and the Neural Engine. Text-to-image and AI image editing, offline, fp32, checked against diffusers, within a fixed memory budget.">
 <link rel="canonical" href="https://gwenn-ha-dev.github.io/Siliconed/">
 <meta property="og:type" content="website">
 <meta property="og:title" content="Siliconed — your Mac, mapped">
-<meta property="og:description" content="Krea 2 Turbo, Z-Image Turbo, Qwen-Image-2.1 and Anima Turbo, native in Swift and Metal. Every kernel chosen for this chip, measured — GPU, CPU matrix unit, Neural Engine. Offline, fp32, checked against the reference, within a fixed memory budget.">
+<meta property="og:description" content="Krea 2 Turbo, Z-Image Turbo, Qwen-Image-2.1 and Anima Turbo, native in Swift and Metal. Every computation planned for this chip, from a measure of its engines — GPU, CPU matrix unit, Neural Engine. Offline, fp32, checked against the reference, within a fixed memory budget.">
 <meta property="og:url" content="https://gwenn-ha-dev.github.io/Siliconed/">
 <meta property="og:image" content="https://gwenn-ha-dev.github.io/Siliconed/images/social-preview.jpg">
 <meta property="og:image:width" content="1280">
@@ -19,7 +19,7 @@
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"SoftwareApplication","name":"Siliconed",
  "operatingSystem":"macOS 26 or later (Apple silicon)","applicationCategory":"MultimediaApplication",
- "description":"Local text-to-image generation and AI image editing on Apple silicon Macs: Krea 2 Turbo, Z-Image Turbo, Qwen-Image-2.1 and Anima Turbo in Swift and Metal, on GPU, CPU matrix unit and Neural Engine kernels chosen by a measure of each Mac.",
+ "description":"Local text-to-image generation and AI image editing on Apple silicon Macs: Krea 2 Turbo, Z-Image Turbo, Qwen-Image-2.1 and Anima Turbo in Swift and Metal, on the GPU, the CPU matrix unit and the Neural Engine, each computation planned from a measure of each Mac.",
  "offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"license":"https://www.apache.org/licenses/LICENSE-2.0",
  "downloadUrl":"https://github.com/gwenn-ha-dev/Siliconed/releases/latest",
  "codeRepository":"https://github.com/gwenn-ha-dev/Siliconed","image":"https://gwenn-ha-dev.github.io/Siliconed/images/window.jpg"}
@@ -202,8 +202,8 @@
     </g>
   </svg>
   <p class="eyebrow h-fade">v0.16 · free · open source · Apple silicon</p>
-  <h1 class="h-fade d1"><span class="grad">Your Mac, mapped.</span><span class="sub">Every kernel chosen for <em>this</em> chip.</span></h1>
-  <p class="lead h-fade d2">Siliconed measures your Mac, then runs five image models on the kernels that won there:
+  <h1 class="h-fade d1"><span class="grad">Your Mac, mapped.</span><span class="sub">Every computation planned for <em>this</em> chip.</span></h1>
+  <p class="lead h-fade d2">Siliconed measures what your Mac's engines do, then spreads five image models over them:
     GPU, CPU matrix unit, Neural Engine. Full fp32, checked against the reference, inside a fixed memory
     budget. No Python. No server. No cloud.</p>
   <div class="cta h-fade d3">
@@ -231,8 +231,8 @@
       <p>Standard, Compact or Light, from open copies proven identical to Krea's files. No account, no
         sign-in. Krea 2 Community license: commercial use under $1M of annual revenue, a content filter when deployed.</p>
       <ul class="stats">
-        <li><b>135.8 s</b>1024² on an M1 Pro, Compact</li>
-        <li><b>147.8 s</b>the same, in full precision</li>
+        <li><b>99.9 s</b>1024² on an M1 Pro, Compact</li>
+        <li><b>147.1 s</b>the same, in full precision</li>
         <li><b>2.6·10⁻⁴</b>from the fp32 reference</li>
       </ul>
     </div>
@@ -257,7 +257,7 @@
       <tr><td><a href="https://huggingface.co/circlestone-labs/Anima">Anima Turbo</a></td><td>text-to-image (illustration, painting, anime), LoRA</td><td>CircleStone Labs Non-Commercial (the images may be used commercially)</td></tr>
       <tr><td><a href="https://huggingface.co/OpenMOSS-Team/MOSS-Image-SFT">MOSS-Image</a></td><td>text-to-image, LoRA; beta, under the community's 8-step LoRA</td><td>Apache 2.0</td></tr>
     </table></div>
-    <p class="times">1024², 8 steps, seed 42, on an M1 Pro with 16 GB, app 0.15, Faster Rendering on (the default). Compact, the default: Krea 2 Turbo 135.8 s, Z-Image Turbo 83.1 s, Qwen-Image-2.1 Turbo 100.2 s, Anima Turbo 33.1 s; MOSS-Image 107.7 s (app 0.16). Standard, the publisher's bf16 in fp32: 147.8 s, 82.4 s, 110.4 s, 34.3 s; 107.3 s. Light: 145.0 s, 87.5 s, 103.7 s, 34.7 s; none for MOSS-Image. Every step at full size (Standard, 0.12): 221.1 s, 117.7 s, 142.7 s, 44.4 s. An edit with one reference: 211 s (0.10).</p>
+    <p class="times">1024², 8 steps, seed 42, on an M1 Pro with 16 GB, app 0.18, Faster Rendering on (the default). Compact, the default: Krea 2 Turbo 99.9 s, Z-Image Turbo 79.6 s, Qwen-Image-2.1 Turbo 72.8 s, Anima Turbo 32.4 s, MOSS-Image 80.2 s. Standard, the publisher's bf16 in fp32: 147.1 s, 85.4 s, 108.4 s, 32.2 s, 105.5 s. Every step at full size: Compact 150.6 s, 100.0 s, 88.2 s, 39.0 s, 85.6 s; Standard 217.2 s, 112.4 s, 136.9 s, 42.0 s, 115.7 s. Light (0.15): 145.0 s, 87.5 s, 103.7 s, 34.7 s; none for MOSS-Image. An edit with one reference: 211 s (0.10).</p>
   </div>
   <div class="split rev" id="moss" style="margin-top:clamp(64px, 9vw, 112px)">
     <div class="text reveal">
@@ -269,8 +269,8 @@
         LoRAs on top, ComfyUI's and ai-toolkit's too. Beta until OpenMOSS ships its own fast version.
         Apache 2.0.</p>
       <ul class="stats">
-        <li><b>107.7 s</b>1024² on an M1 Pro, Compact</li>
-        <li><b>107.3 s</b>the same, in full precision</li>
+        <li><b>80.2 s</b>1024² on an M1 Pro, Compact</li>
+        <li><b>105.5 s</b>the same, in full precision</li>
         <li><b>2.4 GiB</b>peak memory of the app at 1024²</li>
       </ul>
     </div>
@@ -297,42 +297,43 @@
       <p class="kicker">The adaptive engine</p>
       <h2>It measures<br><span class="grad">before it draws.</span></h2>
       <p class="punch">Under a minute. No model. No guesswork.</p>
-      <p>Before the first render after each install or update, Siliconed gets to know your Mac. It runs
-        the real matrix products of the models' blocks on the GPU, on the CPU's matrix unit (AMX), on the
-        Neural Engine and on the GPU beside each; attention through three kernels; products straight on
-        published int8 and Q8_0 weights; bf16 on the GPU's tensor units. Every output is checked against
-        the exact result.</p>
-      <p>That becomes your Mac's map. A kernel turns on only if it computed right and beats the default
-        by at least 5 % (more if the machine drifted during the measure). No kernel is switched on by chip
-        name: another Mac draws its own map. The speed changes; the picture does not move beyond the arithmetic
-        it checked. Help → Measure This Mac shows it, and lets you share it.</p>
+      <p>Before the first render after each install or update, Siliconed gets to know your Mac. It times
+        what each engine does, the GPU, the CPU's matrix unit (AMX) and the Neural Engine, alone and together,
+        on matrix products and attention of every shape the models are made of, in fp32, in bf16 and on
+        published 8-bit weights. Every output is checked against the exact result.</p>
+      <p>That becomes your Mac's map: what each engine computes, and how much of its speed it keeps beside
+        the others. Each computation of a render is then split over the engines by that map, down to the rows
+        of each matrix product. No route is chosen by chip name: another Mac, or a newer chip, draws its own
+        map. How sure the measure is of each figure is written beside it, and a measure always gives a map.
+        The speed changes; the picture does not move beyond the arithmetic it checked. Help → Measure This
+        Mac shows it.</p>
     </div>
-    <div class="map reveal" role="img" aria-label="The capacity map's decisions on an M1 Pro, 23 October 2026: GPU and AMX co-execution on, times 1.26; the Neural Engine beside the GPU on, times 1.42; attention split by heads on, times 1.48; flash attention off, times 1.03, inside the margin; Q8_0 products off, times 0.37; bf16 tensor products off, times 0.47">
-      <p class="head">map · MacBook Pro M1 Pro · 23/10/2026</p>
-      <div class="row"><span>GPU + AMX co-execution</span><span class="on">ON</span><span class="gain">×1.26</span></div>
-      <div class="row"><span>Neural Engine beside the GPU</span><span class="on">ON</span><span class="gain">×1.42</span></div>
-      <div class="row"><span>attention split by heads</span><span class="on">ON</span><span class="gain">×1.48</span></div>
-      <div class="row"><span>flash attention</span><span class="off">OFF</span><span class="gain">×1.03</span></div>
-      <div class="row"><span>Q8_0 weight products</span><span class="off">OFF</span><span class="gain">×0.37</span></div>
-      <div class="row"><span>bf16 tensor products</span><span class="off">OFF</span><span class="gain">×0.47</span></div>
-      <p class="note">Flash gains 3 %: inside the margin, so it stays off. One Mac's map; yours decides for itself.</p>
+    <div class="map reveal" role="img" aria-label="The capacity map of an M1 Pro, 31 October 2026: GPU fp32 products 3.5 TFLOP/s; CPU matrix unit 2.2 TFLOP/s, plus or minus 1.1 %; Neural Engine fp16 9.2 TFLOP/s, plus or minus 1.7 %; Neural Engine on int8 weights 10.5 TFLOP/s, plus or minus 2.7 %; the GPU beside the Neural Engine keeps 86 % and the Neural Engine 67 % of their speeds, plus or minus 1.0 %; the GPU beside the AMX keeps 92 % and the AMX 81 %, plus or minus 2.0 %">
+      <p class="head">map · MacBook Pro M1 Pro · 31/10/2026</p>
+      <div class="row"><span>GPU · fp32 products</span><span class="on">3.5 TFLOP/s</span><span class="gain"></span></div>
+      <div class="row"><span>CPU matrix unit · fp32</span><span class="on">2.2 TFLOP/s</span><span class="gain">±1.1 %</span></div>
+      <div class="row"><span>Neural Engine · fp16</span><span class="on">9.2 TFLOP/s</span><span class="gain">±1.7 %</span></div>
+      <div class="row"><span>Neural Engine · int8 weights</span><span class="on">10.5 TFLOP/s</span><span class="gain">±2.7 %</span></div>
+      <div class="row"><span>GPU beside the Neural Engine</span><span class="off">keeps 86 % · 67 %</span><span class="gain">±1.0 %</span></div>
+      <div class="row"><span>GPU beside the AMX</span><span class="off">keeps 92 % · 81 %</span><span class="gain">±2.0 %</span></div>
+      <p class="note">Measured in the app in 31.8 s. One Mac's map; yours measures itself.</p>
     </div>
   </div>
   <div class="wrap" style="margin-top:clamp(56px, 8vw, 96px)">
     <div class="text reveal" style="max-width:780px">
       <p class="kicker">The Neural Engine</p>
       <h2>As fast, or faster.<br><span class="grad">16 to 26 % less energy.</span></h2>
-      <p>Where the map turns it on, the Neural Engine takes part of the denoiser's matrix products beside
-        the GPU, shape by shape, wherever it keeps 90 % of the CPU matrix unit's speed. It computes in
-        fp16: each weight column and each activation row is lifted by a power of two into fp16's range,
-        then brought back in fp32, and rows that overflow go back to the GPU. Your choice, per model: off by default on the Standard, which stays the
+      <p>Where your Mac's map gives it rows, the Neural Engine takes part of the denoiser's matrix products
+        beside the GPU, shape by shape. It computes in fp16: each weight column and each activation row is
+        lifted by a power of two into fp16's range, then brought back in fp32, and rows that overflow go back
+        to the GPU. On int8 weights it reads them as published and widens them itself. Your choice, per model: off by default on the Standard, which stays the
         reference-checked fp32 image; on by default on Compact and Light. The tag reads
         <code>fp32 · ANE</code> when it is on.</p>
     </div>
     <ul class="stats reveal">
       <li><b>−16 to −26 %</b>energy per image, M1 Pro, 1024², Standard</li>
-      <li><b>135–137 s</b>Krea 2, instead of 144.6–144.9 s (0.14, the library prompt)</li>
-      <li><b>83–84 s</b>Z-Image, instead of 86.8–93.9 s (0.14, the library prompt)</li>
+      <li><b>99.9 s</b>Krea 2, Compact, instead of 135.8 s (0.15)</li>
+      <li><b>72.8 s</b>Qwen-Image-2.1, Compact, instead of 100.2 s (0.15)</li>
     </ul>
   </div>
 </section>

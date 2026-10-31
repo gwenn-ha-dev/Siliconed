@@ -2,6 +2,39 @@ English · [Français](RELEASE-NOTES.fr.md)
 
 # Siliconed — release notes
 
+## 0.18
+
+### The map measures the Mac, then plans every computation from it
+
+- **A model of this Mac's engines, no longer a table of routes**: the map times what the GPU, the CPU's
+  matrix unit and the Neural Engine each compute, by shape (the weight's length counts, so does its
+  lift onto the Neural Engine), and how much of its speed each keeps beside the others. Every matrix
+  product and attention of a render is then split over the engines by that model, down to the rows,
+  before its first computation. Each render compares what each kind of computation took with what the
+  map predicted.
+- **The Neural Engine reads int8 weights as published**: on the Compact of Krea 2, Qwen-Image-2.1 and
+  MOSS-Image, part of the products run on it in 8 bits, beside the GPU's. On an M1 Pro at 1024² those
+  three Compacts take a quarter less time than before: Krea 2 99.9 s (135.8), Qwen-Image-2.1 72.8 s
+  (100.2), MOSS-Image 80.2 s (107.7). Z-Image (79.6 s), Anima (32.4 s) and the Standards keep their
+  times ([Numbers](ENGINE.md#numbers)).
+- **A measure always gives a map**: nothing is orange any more. How sure the measure is of each
+  engine's figure is written beside it (± a few percent), and what it found is said with its effect on
+  the plan. A route that computed wrong, or whose load ended the measuring process, is left out, and
+  the measure goes on without it.
+- **Right in real life**: the map no longer asks you to leave the Mac alone. Activity Monitor or
+  another window drawing beside it no longer moves its figures; calls that disagree are read on their
+  fast side. The measure launched by the app now reads the GPU and the Neural Engine together as well
+  as one launched from the Terminal.
+- **Under a minute** on the slowest Mac, without any model.
+
+### Also
+
+- **The Mac you compute on, beside Chain**: its own icon, as in About This Mac, greyed until it is
+  measured; another Mac's when you compute on it.
+- **Sharing the map is an option**: under Share… in Measure This Mac, never the default button.
+- **Faster Rendering, measured**: at 1024² it takes a third off a render on Krea 2, a fifth to a
+  quarter on Z-Image, Qwen-Image-2.1 and Anima, and 6 to 9 % on MOSS-Image.
+
 ## 0.17
 
 ### Render on another Mac
