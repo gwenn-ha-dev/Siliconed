@@ -161,10 +161,12 @@ extension Diagnostic.CapacityProbes {
             // The short-sided products: the GPU's forms steady, the AMX's and the ANE's, the truths.
             let thinFlop = thin.reduce(0) { $0 + flop($1) }
             let gpuForms = 1 + ["bf16", "bf16act", "int8", "q8"].reduce(0) { $0 + 1 / Self.formRatio[$1]! }
-            // The ANE compiles a program per shape (≈ 0.5 s each, M1 Pro); the GPU's and the AMX's runs are a few milliseconds.
+            // The ANE compiles a program per shape it takes (those of a whole unit of rows: ≈ 0.37 s each on the M1 Pro, the stage measured
+            // 2.53 s); the GPU's and the AMX's runs are a few milliseconds.
+            let aneShapes = thin.filter { $0.m >= NeuralEngine.rowUnit }.count
             p["thin products"] = Self.runs * thinFlop * gpuForms / g + truth(thin, kinds: 4)
                 + (x.map { Self.runs * thinFlop / $0 + 0.1 } ?? 0)
-                + (a.map { Self.runs * thinFlop / $0 + Double(thin.count) * 0.5 } ?? 0)
+                + (a.map { Self.runs * thinFlop / $0 + Double(aneShapes) * 0.37 } ?? 0)
             let stairFlop = stairRows.reduce(0) { $0 + 2 * Double($1) * Double(Self.stair.k) * Double(Self.stair.n) }
             p["stairs"] = a.map { Self.runs * stairFlop / $0 + Double(stairRows.count) * (0.03 + truth([(1, Self.stair.k, Self.stair.n)])) } ?? 0
             let (h, d) = (Double(Self.attentionHeads), Double(Self.attentionHeadDim))
