@@ -62,6 +62,8 @@ package final class Block: BoundaryRecording, PhaseTiming {
     /// the plan assigns no split (below `HeadSplitAttention.minimumSequence`, where the text blocks run at 32 tokens, or a
     /// model that measures it slower): MPSGraph there.
     private var builtHeadSplit: HeadSplitAttention?
+    /// The three stages by tiles of query rows, when the plan assigns them (`tiles`, `tiles16`).
+    private var builtTiles: TiledAttention?
     private let arena: Arena
     private let artifact: Artifact
     private var prefix: String = ""
@@ -215,13 +217,22 @@ package final class Block: BoundaryRecording, PhaseTiming {
         }
     }
 
+    /// The tiled attention, or `nil` when the plan assigns another kernel (or this machine refuses the kernel: said once).
+    private func tiled() -> TiledAttention? {
+        guard attentionAssignment.usesTiles else { return nil }
+        if let existing = builtTiles { return existing }
+        builtTiles = TiledAttention.make(attentionAssignment, device: gemm.device, queue: gemm.queue, heads: shapes.heads,
+                                         sequence: shapes.sequence, headDim: shapes.headDim)
+        return builtTiles
+    }
+
     /// The head split, or `nil` when it does not apply.
     private func headSplit() throws -> HeadSplitAttention? {
         let sequence = shapes.sequence
         guard attentionAssignment.splits else { return nil }
         if let existing = builtHeadSplit { return existing }
         let built = try HeadSplitAttention(device: gemm.device, queue: gemm.queue, heads: shapes.heads,
-                                       sequence: sequence, headDim: shapes.headDim, cpuHeads: attentionAssignment.cpuHeads)
+                                       sequence: sequence, headDim: shapes.headDim, cpuHeads: attentionAssignment.cpuHeads, gpuKernel: attentionAssignment.gpuKernel)
         builtHeadSplit = built
         return built
     }
@@ -309,10 +320,13 @@ package final class Block: BoundaryRecording, PhaseTiming {
         // for what this CPU copy cost.
         let ob = try gemm.wrap(UnsafeMutableRawPointer(merged), bytes: shapes.sequence * d * 4, name: "sdpaOut")
         let flash = flash()
-        let split = flash == nil ? try headSplit() : nil
+        let tiled = tiled()
+        let split = flash == nil && tiled == nil ? try headSplit() : nil
         timed("sdpa wall") {
             if let flash {
                 ownTimings["sdpa GPU", default: 0] += flash.run(q: qb, k: kb, v: vb, into: ob)
+            } else if let tiled {
+                ownTimings["sdpa GPU", default: 0] += tiled.run(q: qb, k: kb, v: vb, into: ob)
             } else if let split {
                 let (gpu, cpu) = split.run(q: qb, k: kb, v: vb, into: ob, q: qHeads, k: kHeads, v: vHeads, out: merged)
                 ownTimings["sdpa GPU", default: 0] += gpu

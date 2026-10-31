@@ -7345,6 +7345,86 @@
         }
       }
     },
+    "Attention, three stages by tiles" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Attention, drei Stufen in Kacheln"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Atención, tres etapas por teselas"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Attention, trois étapes par tuiles"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Attenzione, tre fasi a tessere"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アテンション、タイル単位の3段階"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "注意力，分块三阶段"
+          }
+        }
+      }
+    },
+    "Attention, three stages by tiles, half-precision operands" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Attention, drei Stufen in Kacheln, Operanden in halber Genauigkeit"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Atención, tres etapas por teselas, operandos en media precisión"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Attention, trois étapes par tuiles, opérandes en demi-précision"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Attenzione, tre fasi a tessere, operandi in mezza precisione"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アテンション、タイル単位の3段階、半精度オペランド"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "注意力，分块三阶段，半精度操作数"
+          }
+        }
+      }
+    },
     "Automatic" : {
       "localizations" : {
         "de" : {

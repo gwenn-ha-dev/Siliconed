@@ -43,6 +43,7 @@ On our MacBook Pro M1 Pro:
 ✓ kernels elementwise · 7 measures
 ✓ kernels gelu · 1 measure
 ✓ kernels sdpa S=4128 · 17 measures
+✓ kernels sdpa-tiles S=4128 · 9 measures
 ✓ kernels gemm-split · 9 measures
 ✓ kernels rope · 13 measures
 ✓ kernels resample · 6 measures
@@ -387,6 +388,7 @@ The output of `siliconed check list --markdown`. `{size}` is 512, 1024 or a rect
 | `kernels elementwise` | the GPU's SwiGLU, gate and gated residual are as close to double precision as the CPU's; the residual rounds twice, as torch | GPU worst ulp ≤ max(CPU's, 1), mean ≤ CPU's + 5 %; residual bit for bit | — | — |
 | `kernels gelu` | the GPU's GELU (erf) is as close to double precision as the CPU's, over one bit pattern in 64 of [−12, 12] | GPU worst deviation ≤ the CPU's, in ulp of the operand | — | — |
 | `kernels sdpa` | the attention cut by heads (GPU + CPU), by query blocks, past maxMatrix and the matrix kernel return the whole graph's result; a head width padded to 128 (the vision tower's 72) returns a float64 witness's | against the whole graph: query blocks ≤ 1e-6 per channel; head cut ≤ 1e-5 with the GPU heads bit for bit; matrix kernel ≤ 1e-5; padded width ≤ 1e-5 against float64 | — | — |
+| `kernels sdpa-tiles` | the attention in three stages by tiles of query rows (Metal 4 matmul2d) returns the float64 attention — in fp32, and with fp16 operands and fp32 sums — on a self-attention, a cross-attention over few keys, grouped k/v heads and a length that tiles nothing | against float64, per channel: fp32 ≤ 1e-5 and ≤ the graph's own error + 25 % on the golden tensors' amplitudes (saturated softmax); fp16 operands ≤ 1.25 × the error of rounding the same exact output to bf16 (invariant 3, the ANE's bar), on the map's amplitudes | — | — |
 | `kernels gemm-split` | the token-wise split of a GEMM between the GPU and the AMX stitches back cblas_sgemm's product | against cblas_sgemm, per row: the GPU's rows bit for bit, the AMX's ≤ 1e-5 (another summation order over k = 3 840) | — | — |
 | `kernels rope` | every RoPE table of the engine is the reference's, value by value (13 tables, 5 bit for bit) | max \|Δ\| per table within its bound, in units of 2⁻²⁴: 0 where the reference is bit-reproducible, 1 to 64 where torch uses SLEEF's cos, sin, pow | `tools/oracle/kernels.py rope` | — |
 | `kernels resample` | the spectral schedule's nearest-exact decimation and bilinear upsampling are torch's, on a square and a rectangle | decimation bit for bit (and the even decimation, its counter-test, must differ); bilinear within one ulp of the input's scale | `tools/oracle/kernels.py resample` | — |

@@ -221,6 +221,7 @@ package final class QwenImage21DiT: BoundaryRecording, PhaseTiming {
     private var attentions: [String: Attention] = [:]
     /// The target's SDPA cut by heads between the GPU and the CPU (`HeadSplitAttention`), by shape.
     private var headSplits: [String: HeadSplitAttention] = [:]
+    private var tileKernels: [String: TiledAttention] = [:]
 
     /// `merged` (the SDPA's output) **is** `normed`: the norm's output is consumed by q/k/v before the
     /// attention writes, and rewritten after `to_out` has read it. `q` **is** `h1`: the queries die with
@@ -819,7 +820,7 @@ package final class QwenImage21DiT: BoundaryRecording, PhaseTiming {
     /// The plan's answer for an attention of the target's queries: the split or the graph (no flash). The memory need reads the same.
     package static func attentionAssignment(_ plan: CapacityPlan, rows: Int, keys: Int, heads: Int, headDim: Int) -> AttentionAssignment {
         let a = plan.assign(AttentionKey(sequence: rows, keys: keys, heads: heads, headDim: headDim))
-        return a.splits ? a : .graph
+        return a.splits || a.usesTiles ? a : .graph
     }
 
     /// Queries `[queries, queries + count)` of the joint sequence (held from `first`) against the keys
@@ -848,7 +849,7 @@ package final class QwenImage21DiT: BoundaryRecording, PhaseTiming {
                 let split: HeadSplitAttention
                 if let existing = headSplits[key] { split = existing } else {
                     split = try HeadSplitAttention(device: gemm.device, queue: gemm.queue, heads: heads, sequence: rows,
-                                               headDim: config.headDim, keys: visible, cpuHeads: cut.cpuHeads)
+                                               headDim: config.headDim, keys: visible, cpuHeads: cut.cpuHeads, gpuKernel: cut.gpuKernel)
                     headSplits[key] = split
                 }
                 timed("sdpa wall") {
@@ -858,6 +859,15 @@ package final class QwenImage21DiT: BoundaryRecording, PhaseTiming {
                     ownTimings["sdpa CPU", default: 0] += cpu
                 }
                 continue
+            }
+            if cut.usesTiles && !causal {
+                let tiled = tileKernels[key] ?? TiledAttention.make(cut, device: gemm.device, queue: gemm.queue, heads: heads, sequence: rows,
+                                                                    headDim: config.headDim, keys: visible)
+                if let tiled {
+                    tileKernels[key] = tiled
+                    timed("sdpa wall") { ownTimings["sdpa GPU", default: 0] += tiled.run(q: qb, k: kb, v: vb, into: ob) }
+                    continue
+                }
             }
             let attention: Attention
             if let a = attentions[key] { attention = a } else {

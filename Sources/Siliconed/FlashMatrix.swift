@@ -75,6 +75,8 @@ package final class FlashMatrix {
     package let keysPerTile: Int           // Bc
     package let blocksPerGroup: Int
     package let heads: Int
+    /// The heads computed: the first `computed` of `heads` (the head split composes with it; the others' columns are untouched).
+    package let computed: Int
     package let sequence: Int
 
     private let queue: MTLCommandQueue
@@ -318,7 +320,8 @@ package final class FlashMatrix {
 
     package init(device: MTLDevice, queue: MTLCommandQueue, heads: Int, sequence: Int, headDim: Int,
                 rowsPerSimdgroup: Int = 8, dimsPerSimdgroup: Int = 64,
-                keysPerTile: Int = 16, blocksPerGroup: Int = 8) throws {
+                keysPerTile: Int = 16, blocksPerGroup: Int = 8, computed: Int? = nil) throws {
+        self.computed = computed ?? heads
         guard headDim == FlashMatrix.headDim else {
             throw Failure.unsupported("Dh = \(headDim), the kernel is written for 128")
         }
@@ -380,6 +383,13 @@ package final class FlashMatrix {
     package func run(q: MTLBuffer, k: MTLBuffer, v: MTLBuffer, into out: MTLBuffer) -> Double {
         let clock = ProductLedger.attention(sequence: sequence, heads: heads, headDim: FlashMatrix.headDim, route: "flash")
         defer { clock?.finish() }
+        let commands = submit(q: q, k: k, v: v, into: out)
+        commands.waitUntilCompleted()
+        return Attention.verdict(commands, what: "matrix flash S=\(sequence) H=\(computed)/\(heads)")
+    }
+
+    /// Committed, not awaited: the head split's CPU heads run meanwhile.
+    package func submit(q: MTLBuffer, k: MTLBuffer, v: MTLBuffer, into out: MTLBuffer) -> MTLCommandBuffer {
         let commands = queue.checkedCommandBuffer()
         let encoder = commands.checkedEncoder()
         encoder.label = "flash_sdpa_matrix"
@@ -392,12 +402,11 @@ package final class FlashMatrix {
                             scale: 1 / Float(FlashMatrix.headDim).squareRoot())
         encoder.setBytes(&params, length: MemoryLayout<Params>.stride, index: 4)
         let blocks = (sequence + rowsPerGroup - 1) / rowsPerGroup
-        encoder.dispatchThreadgroups(MTLSize(width: blocks, height: heads, depth: 1),
+        encoder.dispatchThreadgroups(MTLSize(width: blocks, height: computed, depth: 1),
                                      threadsPerThreadgroup: MTLSize(width: threadsPerGroup,
                                                                     height: 1, depth: 1))
         encoder.endEncoding()
         commands.commit()
-        commands.waitUntilCompleted()
-        return Attention.verdict(commands, what: "matrix flash S=\(sequence) H=\(heads)")
+        return commands
     }
 }

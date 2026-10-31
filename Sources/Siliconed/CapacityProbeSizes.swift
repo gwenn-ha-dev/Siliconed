@@ -120,6 +120,9 @@ extension Diagnostic.CapacityProbes {
         static let formRatio: [String: Double] = ["bf16": 0.62, "bf16act": 0.49, "int8": 0.97, "q8": 0.31]
         /// Attention kernels' rates to the GPU's product (M1 Pro: the system graph 0.40, the flash kernel 0.46).
         static let graphRatio = 0.40, flashRatio = 0.46
+        /// The three stages by tiles, fp32 and fp16 operands (M1 Pro: 0.43 and 0.49 of the GPU's product; the matrix units of a bigger GPU
+        /// are another figure, and the projection only prices the stage).
+        static let tilesRatio = 0.43, tiles16Ratio = 0.49
 
         /// **The seconds each stage is projected to take** (the names of `m.budget`), from the engines' rates: `FLOP / rate` of each
         /// timed run, the truths the judge computes on the CPU, and the stages' constants (a program's compile, a pipeline's build).
@@ -153,8 +156,8 @@ extension Diagnostic.CapacityProbes {
             p["stairs"] = a.map { Self.runs * stairFlop / $0 + Double(stairRows.count) * (0.03 + truth([(1, Self.stair.k, Self.stair.n)])) } ?? 0
             let (h, d) = (Double(Self.attentionHeads), Double(Self.attentionHeadDim))
             let attentionFlop = attention.reduce(0) { $0 + 4 * Double($1) * Double($1) * h * d }
-            // The three kernels alone, then the graph beside the CPU's heads at their balance.
-            p["attention"] = Self.runs * attentionFlop * (1 / (g * Self.graphRatio) + 1 / (g * Self.flashRatio) + 1 / rates.cpu
+            // The five kernels alone, then the graph beside the CPU's heads at their balance.
+            p["attention"] = Self.runs * attentionFlop * (1 / (g * Self.graphRatio) + 1 / (g * Self.flashRatio) + 1 / (g * Self.tilesRatio) + 1 / (g * Self.tiles16Ratio) + 1 / rates.cpu
                                                           + 1 / (g * Self.graphRatio + rates.cpu)) + Double(attention.count) * 0.08
             // A chain per set and pass (the pairs with the GPU, the three, the AMX beside the ANE; a pass 3 where a long k is run), at the sets' rate.
             let setRate = 0.75 * (g + (x ?? 0) + (a ?? 0))

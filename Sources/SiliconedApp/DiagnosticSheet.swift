@@ -175,7 +175,7 @@ private struct ReportView: View {
     private static let order: [CapacityModel.Kernel] = [
         .init(.gpu, .fp32), .init(.amx, .fp32), .init(.ane, .fp16),
         .init(.gpu, .bf16), .init(.gpu, .bf16act), .init(.gpu, .int8), .init(.ane, .int8), .init(.gpu, .q8),
-        .init(.gpu, .graph), .init(.gpu, .flash), .init(.cpu, .heads)]
+        .init(.gpu, .graph), .init(.gpu, .flash), .init(.gpu, .tiles), .init(.gpu, .tiles16), .init(.cpu, .heads)]
 
     /// The label of a route, as a person reads it.
     static func label(for kernel: CapacityModel.Kernel) -> String {
@@ -190,13 +190,15 @@ private struct ReportView: View {
         case (.gpu, .q8): String(localized: "Matrix products on the GGUF 8-bit weights, read as published")
         case (.gpu, .graph): String(localized: "Attention, system kernel")
         case (.gpu, .flash): String(localized: "Attention, Siliconed kernel")
+        case (.gpu, .tiles): String(localized: "Attention, three stages by tiles")
+        case (.gpu, .tiles16): String(localized: "Attention, three stages by tiles, half-precision operands")
         case (.cpu, .heads): String(localized: "Attention, split between GPU and CPU")
         default: engineName(kernel.engine) + " · " + kernel.form.rawValue
         }
     }
 
     /// An attention kernel: the peak of the matrix products says nothing of it.
-    private static func isAttention(_ kernel: CapacityModel.Kernel) -> Bool { [.graph, .flash, .heads].contains(kernel.form) }
+    private static func isAttention(_ kernel: CapacityModel.Kernel) -> Bool { [.graph, .flash, .heads, .tiles, .tiles16].contains(kernel.form) }
 
     /// The kernels to list: every route the model has a figure for, then those the judge left out without one.
     static func kernels(of report: Diagnostic.Report) -> [CapacityModel.Kernel] {

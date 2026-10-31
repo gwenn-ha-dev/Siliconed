@@ -354,6 +354,7 @@ package final class AnimaDiT: BoundaryRecording, PhaseTiming {
         case graph(Attention)
         case split(HeadSplitAttention)
         case flash(FlashMatrix)
+        case tiles(TiledAttention)
     }
     private var selfPath: AttentionPath?
     private var crossPath: AttentionPath?
@@ -375,9 +376,12 @@ package final class AnimaDiT: BoundaryRecording, PhaseTiming {
         }
         if let flash {
             p = .flash(flash)
+        } else if assigned.usesTiles, let tiled = TiledAttention.make(assigned, device: gemm.device, queue: gemm.queue, heads: config.heads,
+                                                                      sequence: s, headDim: config.headDim) {
+            p = .tiles(tiled)
         } else if assigned.splits {
             p = .split(try HeadSplitAttention(device: gemm.device, queue: gemm.queue, heads: config.heads,
-                                              sequence: s, headDim: config.headDim, cpuHeads: assigned.cpuHeads))
+                                              sequence: s, headDim: config.headDim, cpuHeads: assigned.cpuHeads, gpuKernel: assigned.gpuKernel))
         } else {
             p = .graph(Attention(device: gemm.device, queue: gemm.queue, heads: config.heads,
                                  sequence: s, headDim: config.headDim))
@@ -391,9 +395,12 @@ package final class AnimaDiT: BoundaryRecording, PhaseTiming {
         let p: AttentionPath
         // The cross-attention reads the text's keys: its own class, no flash.
         let assigned = gemm.assignment(AttentionKey(sequence: s, keys: textLength, heads: config.heads, headDim: config.headDim, cross: true))
-        if assigned.splits {
+        if assigned.usesTiles, let tiled = TiledAttention.make(assigned, device: gemm.device, queue: gemm.queue, heads: config.heads,
+                                                               sequence: s, headDim: config.headDim, keys: textLength) {
+            p = .tiles(tiled)
+        } else if assigned.splits {
             p = .split(try HeadSplitAttention(device: gemm.device, queue: gemm.queue, heads: config.heads,
-                                              sequence: s, headDim: config.headDim, keys: textLength, cpuHeads: assigned.cpuHeads))
+                                              sequence: s, headDim: config.headDim, keys: textLength, cpuHeads: assigned.cpuHeads, gpuKernel: assigned.gpuKernel))
         } else {
             p = .graph(Attention(device: gemm.device, queue: gemm.queue, heads: config.heads,
                                  sequence: s, headDim: config.headDim, keySequence: textLength))
@@ -414,6 +421,7 @@ package final class AnimaDiT: BoundaryRecording, PhaseTiming {
                 switch path {
                 case .graph(let a): ownTimings["sdpa GPU", default: 0] += a.run(q: qb, k: kb, v: vb, into: ob)
                 case .flash(let f): ownTimings["sdpa GPU", default: 0] += f.run(q: qb, k: kb, v: vb, into: ob)
+                case .tiles(let t): ownTimings["sdpa GPU", default: 0] += t.run(q: qb, k: kb, v: vb, into: ob)
                 case .split(let h):
                     let (gpu, cpu) = h.run(q: qb, k: kb, v: vb, into: ob, q: q, k: k, v: v, out: merged)
                     ownTimings["sdpa GPU", default: 0] += gpu

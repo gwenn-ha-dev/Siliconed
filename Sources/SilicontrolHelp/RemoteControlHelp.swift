@@ -275,7 +275,7 @@ package enum RemoteControlHelp {
         was aberrant and what was uncertain — never a reason to refuse it.
 
           {"type": "started", "stages": ["weight preparation", …]}
-          {"ok": true, "report": {"schema": 16, "machine": {…, "inventory": {…}},
+          {"ok": true, "report": {"schema": 17, "machine": {…, "inventory": {…}},
             "model": {"lines": {"gpu/fp32": {"t0": 0.0003, "rate": 3.5e12}, …},
                       "sharing": {"gpu+ane": {"keep": {"gpu": 0.88, "ane": 0.74}, …}, …}, "crest": {…}, "heat": {…}, …},
             "measurements": {…}, "judge": {"ane/fp16": {"error": …, "threshold": …, "excluded": false}, …},
@@ -1029,7 +1029,7 @@ package enum RemoteControlHelp {
         manquait, ce qui détonnait et ce qui restait incertain — jamais une raison de la refuser.
 
           {"type": "started", "stages": ["weight preparation", …]}
-          {"ok": true, "report": {"schema": 16, "machine": {…, "inventory": {…}},
+          {"ok": true, "report": {"schema": 17, "machine": {…, "inventory": {…}},
             "model": {"lines": {"gpu/fp32": {"t0": 0.0003, "rate": 3.5e12}, …},
                       "sharing": {"gpu+ane": {"keep": {"gpu": 0.88, "ane": 0.74}, …}, …}, "crest": {…}, "heat": {…}, …},
             "measurements": {…}, "judge": {"ane/fp16": {"error": …, "threshold": …, "excluded": false}, …},
