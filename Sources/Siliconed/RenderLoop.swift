@@ -62,7 +62,7 @@ package enum RenderLoop {
                                        fasterRendering: render.spectral > 0,
                                        promptTokens: CapacityClasses.promptTokens(family, renderTokens: render.tokens),
                                        steps: render.evaluations, includesEncoder: false,
-                                       halfSteps: render.spectral > 0 ? render.spectral : nil)
+                                       halfSteps: render.spectral > 0 ? render.spectral : nil, loraRank: render.loraRank)
     }
 
     /// **The prediction, class by class**, for the denoising of `request` under `plan`: the assignment the plan gives each class, timed by

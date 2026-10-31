@@ -112,7 +112,17 @@ final class CapacityEngineLedgerTests: XCTestCase {
         "product:128x3072@4096 7",
         "product:3072x128@4096 7",
         "product:3072x128@1024 1",
-        "product:128x3072@1024 1"
+        "product:128x3072@1024 1",
+        // The DMD LoRA's two products on each of the 252 modules, every evaluation (`WeightProducts.lora`, since the stack is the plan's):
+        // q, k, v, o and the fused gate+up read 3 072 columns, the down projection 8 192; the fused up writes 16 384, the others 3 072.
+        "product:3072x128@4117~loraDown 1470",
+        "product:8192x128@4117~loraDown 294",
+        "product:128x3072@4117~loraUp 1470",
+        "product:128x16384@4117~loraUp 294",
+        "product:3072x128@1045~loraDown 210",
+        "product:8192x128@1045~loraDown 42",
+        "product:128x3072@1045~loraUp 210",
+        "product:128x16384@1045~loraUp 42"
     ]
 
     // MARK: reading both sides

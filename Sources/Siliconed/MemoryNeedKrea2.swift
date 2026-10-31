@@ -221,7 +221,8 @@ extension MemoryNeed {
                                            assignment: cut, threads: request.threads, group: dit.heads / dit.kvHeads)
             // The image's rows are exact; the sequence's follow the prompt's bound.
             + gemm("DiT", products: [(s, dit.channels, d), (s, d, dit.channels)],
-                   bounded: [(n, d, d), (n, d, kv), (n, d, hidden), (n, hidden, d)], spread: t, rank: rank, plan: request.ditPlan,
+                   bounded: [(n, d, d), (n, d, kv), (n, d, hidden), (n, hidden, d)], spread: t, rank: rank,
+                   lora: [(n, d, d), (n, d, kv), (n, d, hidden), (n, hidden, d)], plan: request.ditPlan,
                    weight: maps.ditFormat)
         terms += running
         // The tabulation runs right after the DiT is built and before its first evaluation: the arena is

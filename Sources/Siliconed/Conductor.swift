@@ -38,6 +38,8 @@ package final class Conductor: @unchecked Sendable {
     /// the two separated by the rendezvous — hence no race, and no lock.
     private struct Job {
         var rows = 0, k = 0, n = 0, offset = 0
+        /// The row of the output the AMX's first row lands on (`offset` unless the output is another buffer's).
+        var outputOffset = 0
         var transposeWeight = false
         var stop = false
     }
@@ -178,7 +180,7 @@ package final class Conductor: @unchecked Sendable {
     private func amx(_ j: Job) {
         guard j.rows > 0 else { return }
         let (status, size) = Conductor.multiply(a: aPointer.advanced(by: j.offset * j.k * 4), b: bPointer,
-                                                c: cPointer.advanced(by: j.offset * j.n * 4), rows: j.rows,
+                                                c: cPointer.advanced(by: j.outputOffset * j.n * 4), rows: j.rows,
                                                 k: j.k, n: j.n, transposeWeight: j.transposeWeight,
                                                 workspace: &workspace)
         lastWorkspace = size
@@ -286,15 +288,19 @@ package final class Conductor: @unchecked Sendable {
     /// A side with no rows is not run: the AMX alone is `gpuRows` 0 (the GPU's `multiply` is not called), the GPU alone does
     /// not need a conductor. *A path that silently decides not to apply is a path of which we will not know, later, whether it was
     /// used*: hence the `rendezvous` counter.
+    ///
+    /// `output`: the AMX's rows are written to this buffer from its row `row` on, not to `c` (the GPU's `multiply` still has its own
+    /// destination): a product that is added to an output instead of written to it (`GEMM.accumulatedLinear`).
     package func linear(a: MTLBuffer, b: MTLBuffer, c: MTLBuffer, gpuRows: Int, amxRows: Int,
-                        k: Int, n: Int, weightIsTransposed: Bool, multiply: (Int) -> Double) -> Double {
+                        k: Int, n: Int, weightIsTransposed: Bool, output: (buffer: MTLBuffer, row: Int)? = nil,
+                        multiply: (Int) -> Double) -> Double {
         let m = gpuRows + amxRows
         let key = "\(k)×\(n)"
 
         aPointer = a.contents()
         bPointer = b.contents()
-        cPointer = c.contents()
-        job.pointee = Job(rows: amxRows, k: k, n: n, offset: gpuRows,
+        cPointer = (output?.buffer ?? c).contents()
+        job.pointee = Job(rows: amxRows, k: k, n: n, offset: gpuRows, outputOffset: output?.row ?? gpuRows,
                           transposeWeight: !weightIsTransposed, stop: false)
 
         let began = DispatchTime.now().uptimeNanoseconds
