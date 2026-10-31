@@ -37489,46 +37489,6 @@
         }
       }
     },
-    "This is the setting of “%@”, the Mac that computes for you." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Dies ist die Einstellung von „%@“, dem Mac, der für Sie rechnet."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Es el ajuste de «%@», el Mac que calcula por usted."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "C’est le réglage de « %@ », le Mac qui calcule pour vous."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "È l’impostazione di «%@», il Mac che calcola per te."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "これは、あなたのために計算する「%@」の設定です。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "这是“%@”的设置，即为你计算的那台 Mac。"
-          }
-        }
-      }
-    },
     "This measures “%@”, the Mac that computes for you." : {
       "localizations" : {
         "de" : {
