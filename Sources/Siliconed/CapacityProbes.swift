@@ -642,8 +642,10 @@ extension Diagnostic {
                 try stage("disk") {
                     // The volume the render's stream reads: the library's, or this Mac's working copy of it (`CapacityDisk.streamFolder`).
                     let folder = CapacityDisk.streamFolder(for: Library.processWide)
-                    m.diskBandwidth = CapacityDisk.measure(in: FileManager.default.isWritableFile(atPath: folder.path)
-                                                           ? folder : FileManager.default.temporaryDirectory)
+                    let readings = CapacityDisk.measureClasses(in: FileManager.default.isWritableFile(atPath: folder.path)
+                                                               ? folder : FileManager.default.temporaryDirectory)
+                    m.diskBandwidth = readings?[.standard]?.rate
+                    m.diskClasses = Dictionary(uniqueKeysWithValues: (readings ?? [:]).map { ($0.key.rawValue, $0.value) })
                 }
                 try stage("solos fp32") { solos([.gpu_fp32], &m, shapes: sizes.product); solos([.amx_fp32, .ane_fp16], &m, shapes: sizes.product, chained: true); solos([.ane_fp16], &m, shapes: sizes.small, chained: true); solos([.gpu_bf16], &m) }
                 try stage("stairs") { stairs(&m) }

@@ -89,6 +89,11 @@ package final class CapacityPlan: Sendable {
         return min(resources.amx ? limits.amxRows : .max, resources.ane ? limits.aneRows : .max)
     }
 
+    /// What the solver was given to answer for this plan: the same limits, sustained rate, refused kernels and ANE permission.
+    package var constraints: CapacitySolver.Constraints {
+        CapacitySolver.Constraints(limits: limits, sustained: sustained, excluded: excluded, allowsANE: allowsANE)
+    }
+
     private let limits: CapacitySolver.Limits
     private let sustained: Bool
     private let excluded: Set<CapacityModel.Kernel>
@@ -180,6 +185,7 @@ package final class CapacityPlan: Sendable {
         for (e, h) in model.heat.sorted(by: { $0.key < $1.key }) { parts.append("heat \(e.rawValue) \(h)") }
         for (e, c) in model.crest.sorted(by: { $0.key < $1.key }) { parts.append("crest \(e.rawValue) \(c)") }
         parts.append("memory \(model.memoryBandwidth.map { "\($0)" } ?? "-") disk \(model.diskBandwidth.map { "\($0)" } ?? "-")")
+        for (c, r) in model.diskClasses.sorted(by: { $0.key < $1.key }) { parts.append("diskclass \(c) \(r.rate) \(r.mean)") }
         for (kind, paths) in model.preparation.sorted(by: { $0.key.rawValue < $1.key.rawValue }) {
             parts.append("prep \(kind.rawValue) " + paths.sorted { $0.key.rawValue < $1.key.rawValue }.map { "\($0.key.rawValue)=\($0.value)" }.joined(separator: ","))
         }

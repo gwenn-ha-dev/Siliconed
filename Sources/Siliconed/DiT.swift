@@ -217,6 +217,7 @@ package final class DiT: BoundaryRecording {
             try artifact.streamTail(blocks: [], slots: 0)
         } else {
             try artifact.streamUnits(layers: layerBlocks, from: released, prefix: DiT.layerPrefix, suffixes: DiT.consumptionOrder)
+            artifact.setStreamPhase(family: .zImage, tokens: imagePadded, textRows: capPadded)
         }
 
         // The front end first: while the step embedding is computed, the disk brings in

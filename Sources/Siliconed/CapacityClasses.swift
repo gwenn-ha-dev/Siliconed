@@ -294,6 +294,16 @@ package enum CapacityClasses {
         }
     }
 
+    /// **The prompt's tokens that give `rows` text rows** (the exact inverse of `textRows`, for a DiT that knows its rows and not the prompt).
+    package static func promptTokens(_ family: Family, textRows rows: Int) -> Int {
+        switch family {
+        case .zImage, .qwenImage21: return max(1, rows - 8)
+        case .krea2: return max(1, rows - 5)
+        case .mossImage: return max(1, rows - 10)
+        case .anima: return 1
+        }
+    }
+
     // MARK: - Encoders
 
     /// A text encoder's dimensions (published; the maps carry them in their headers).
@@ -474,6 +484,18 @@ package enum CapacityClasses {
         var b = Builder()
         evaluation(&b, r, format, tokens: all[index].tokens, times: all[index].evaluations)
         return sorted(b.order.map { Class(phase: $0.phase, shape: $0.shape, executions: [r.family: b.counts[$0]!]) })
+    }
+
+    /// **The classes of one denoising evaluation at `tokens` image rows** (a pass's per-evaluation work), for a weight in `format` — what the
+    /// engine knows at a forward (the map's format, the grid, the prompt), without a `Request`'s width or step count. `nil` for a format no
+    /// version of the family has.
+    package static func evaluationClasses(family: Family, format: WeightFormat, tokens: Int, promptTokens: Int) -> [Class]? {
+        let variant: Variant = format == .bf16 ? .standard : (format == .q4k ? .light : .compact)
+        guard weightFormat(family, variant) == format else { return nil }
+        let r = Request(family: family, variant: variant, promptTokens: promptTokens)
+        var b = Builder()
+        evaluation(&b, r, format, tokens: tokens, times: 1)
+        return sorted(b.order.map { Class(phase: $0.phase, shape: $0.shape, executions: [family: b.counts[$0]!]) })
     }
 
     /// **Identical classes of different families, merged** (same phase, same shape: the same k×n, weight format and

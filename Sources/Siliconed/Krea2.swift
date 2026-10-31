@@ -281,6 +281,8 @@ package final class Krea2DiT: BoundaryRecording, PhaseTiming {
         } else {
             try artifact.streamUnits(layers: layerBlocks, from: released, prefix: Krea2DiT.layerPrefix,
                                      suffixes: Krea2DiT.consumptionOrder)
+            // The readers' priority for this phase (the half grid's evaluations and the full grid's differ): the map's equation.
+            artifact.setStreamPhase(family: .krea2, tokens: s, textRows: t)
         }
         prefetcher.request(layerBlocks[0])
 

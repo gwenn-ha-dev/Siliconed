@@ -266,6 +266,7 @@ package final class MossImageDiT: BoundaryRecording, PhaseTiming {
         } else {
             try artifact.streamUnits(layers: layerBlocks, from: released, prefix: MossImageDiT.layerPrefix,
                                      suffixes: MossImageDiT.consumptionOrder)
+            artifact.setStreamPhase(family: .mossImage, tokens: s, textRows: t)
         }
         prefetcher.request(layerBlocks[0])
 
