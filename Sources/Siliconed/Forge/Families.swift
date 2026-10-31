@@ -129,6 +129,16 @@ package enum Family: String, CaseIterable, Sendable, Codable {
     package static let supersededQwenImage21Maps = ["qwen-image-2.1-dit.v0.silicon", "qwen-image-2.1-dit.compact.v0.silicon",
                                                     "qwen-image-2.1-dit.light.v0.silicon"]
 
+    /// **The language head of the family's writer** (`PromptWriter`): the final norm and `lm_head` its encoder
+    /// map leaves out, in a map of their own so that the encoder map stays the same to the byte. `nil`: the
+    /// family has no writer. Not a model: counted with the family's encoder on disk, removed with the family.
+    package var writerHead: String? {
+        switch self {
+        case .qwenImage21: return ForgeText.qwen3VLHeadMap
+        default: return nil
+        }
+    }
+
     package init?(ditKind: String) {
         guard let f = Family.allCases.first(where: { $0.ditKind == ditKind }) else { return nil }
         self = f

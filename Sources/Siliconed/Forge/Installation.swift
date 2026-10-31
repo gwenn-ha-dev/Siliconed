@@ -67,6 +67,10 @@ package struct Installer {
     // The Light's DiT: unsloth's GGUF Q4_K_M, judged whole at the bit.
     // Z-Image's is in the Compact's repository (`zImageGGUF`), at the same revision.
     static let qwenImage21GGUF = Repository(name: "unsloth/Qwen-Image-2.1-Turbo-GGUF", revision: "5d1f9f759ea877ae556cda88dbec958b62ad3809")
+    /// The writer's head (`Family.writerHead`): `lm_head` and the final norm of the Instruct that Qwen-Image-2.1's
+    /// encoder is. Neither map of the encoder holds them; the Turbo's own `text_encoder/model.safetensors` does
+    /// (750 tensors) but is 17.5 GB in one file.
+    static let qwen3VLInstruct = Repository(name: "Qwen/Qwen3-VL-8B-Instruct", revision: "0c351dd01ed87e9c1b53cbc748cba10e6187ff3b")
     // Anima's Compact and Light DiTs: vanes430's GGUFs of Turbo v1.1 (ComfyUI-GGUF, `cosmos`), the
     // Compact's Q8_0 and the Light's Q4_K_M in one repository; its encoder is the Standard's.
     static let animaGGUF = Repository(name: "vanes430/Anima-Turbo-V1.1-GGUF", revision: "efdf070de980a52fc03027d2f6ed543cc1d87a8f")
@@ -364,6 +368,36 @@ package struct Installer {
     /// The encoder's `config.json` when it is not downloaded beside its weights (`encoder(_:_:)`).
     package static func publishedEncoderConfig(_ f: Family) -> OrderedJSON? {
         f == .krea2 ? Krea2Published.encoderConfig : nil
+    }
+
+    /// **The files of a writer's head** (`Family.writerHead`): the configs, then the one shard of the Instruct that
+    /// holds `lm_head.weight` and `model.language_model.norm.weight` (shard 4 of 4: 2 716 270 024 bytes, with layer
+    /// 35 and the vision tower beside them), pinned by the sha256 and size the Hub announces for that LFS object.
+    /// The index is not downloaded: a folder with this shard alone reads as a single file (`TensorSource(folder:)`).
+    /// Only `lm_head` (1 244 659 712 bytes at offset 41 448) and the norm (8 192 bytes at 1 563 485 160) are used:
+    /// a `Range` download of those two runs would save 1.47 GB, but could not be checked against the shard's sha256.
+    static func writerHead(_ f: Family) -> [File] {
+        guard f == .qwenImage21 else { return [] }
+        return ["config.json", "generation_config.json"].map { File(repository: qwen3VLInstruct, path: $0, destination: nil) }
+            + [File(repository: qwen3VLInstruct, path: "model-00004-of-00004.safetensors", destination: nil,
+                    sha256: "0a88b98e9f96270973f567e6a2c103ede6ccdf915ca3075e21c755604d0377a5", size: 2716270024)]
+    }
+
+    /// **Installs a family's writer head** (`Family.writerHead`): downloaded, forged by `ForgeText.forgeHead`
+    /// into a map of its own, sources thrown away. Already there: nothing.
+    package func installWriterHead(_ f: Family) throws {
+        guard let name = f.writerHead else { throw Numerics.Failure(description: "\(f.name) has no writer") }
+        let path = library.map(name)
+        if FileManager.default.fileExists(atPath: path) { journal("✓ \(name) already there"); return }
+        let files = Self.writerHead(f)
+        try checkSpace(files)
+        for x in files { try download(x) }
+        journal("forging the writer's head → \(name)")
+        let begin = Date()
+        let r = try ForgeText.forgeHead(folder: (source(files[0]) as NSString).deletingLastPathComponent, to: path,
+                                         progressHandler: progressHandler)
+        journal(String(format: "  ✓ forged %@ in %.0f s (%d tensors)", name, Date().timeIntervalSince(begin), r.tensors))
+        if !keepSources { for x in files { try? FileManager.default.removeItem(atPath: source(x)) }; cleanDownloads() }
     }
 
     // MARK: - Where things live

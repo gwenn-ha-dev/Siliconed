@@ -219,4 +219,50 @@ package enum ForgeText {
         if n.hasPrefix("layers.") { return (2, index(1), 0) }
         return n == "norm.weight" ? (3, 0, 0) : (1, 0, 0)
     }
+
+    /// The name of the head map of Qwen-Image-2.1's encoder (`Qwen3VLGenerator`).
+    package static let qwen3VLHeadMap = "qwen3-vl-8b-head.v0.silicon"
+
+    /// **The language head of a published `Qwen3VLForConditionalGeneration`**: the final RMSNorm
+    /// (`model.language_model.norm.weight`) and `lm_head.weight` — what the encoder map leaves out —
+    /// in a map of their own, so that the encoder map, which Qwen-Image-2.1 reads, stays the same to the
+    /// byte. `lm_head` is NOT transposed: decoding reads it by rows, like `embed_tokens`. Bits as
+    /// published (bf16). The header carries the stop tokens of `generation_config.json`.
+    package static func forgeHead(folder: String, to path: String,
+                                  progressHandler: ((Int, Int, String) -> Void)? = nil) throws -> MapWriter.Tally {
+        let source = try TensorSource(folder: folder)
+        let published = try OrderedJSON.read(folder + "/config.json")
+        guard let text = published["text_config"] else { throw Numerics.Failure(description: "text_config absent") }
+        guard published["tie_word_embeddings"]?.boolean == false else {
+            throw Numerics.Failure(description: "tie_word_embeddings is not false: lm_head would be embed_tokens")
+        }
+        let generation = try OrderedJSON.read(folder + "/generation_config.json")
+        let eos = generation["eos_token_id"].map { $0.elements?.compactMap(\.integer) ?? $0.integer.map { [$0] } ?? [] } ?? []
+        guard !eos.isEmpty else { throw Numerics.Failure(description: "generation_config.json: eos_token_id absent") }
+        let names = [("norm.weight", "model.language_model.norm.weight"), ("lm_head.weight", "lm_head.weight")]
+        var tensors: [MapWriter.Tensor] = []
+        for (name, origin) in names {
+            guard let shape = source.shape(origin), let dtype = source.dtype(origin) else {
+                throw Numerics.Failure(description: "\(origin) absent from the source")
+            }
+            let p = Provenance(shape: shape, dtypeSource: dtype) { try source.read(origin) }.quantized(source, origin) { $0 }
+                .bits { try source.read16(origin) }
+            let (t, outcome) = try ForgeDiT.tensor(name, p, .init(transposed: false, named: .bfloat16, rowOrder: nil,
+                                                                  measuresAbsMax: false))
+            guard outcome == .asNamed, t.dtype == .bfloat16 else {
+                throw Numerics.Failure(description: "\(origin): \(dtype) published, a bf16 head expected")
+            }
+            tensors.append(t)
+        }
+        let files = source.files.map { ($0.path as NSString).lastPathComponent }
+        return try MapWriter.write(to: path, tensors: tensors, header: { _ in [
+            .init("format", 1), .init("kind", "qwen3-vl-lm-head"), .init("page", .integer(MapWriter.page)),
+            .init("map_dtype", "bfloat16"), .init("linear_weights_transposed", false),
+            .init("config", text.withoutPrivateKeys), .init("eos_token_ids", .list(eos.map { .integer($0) })),
+            .init("source", .object([.init("directory", .string((folder as NSString).lastPathComponent)),
+                                    .init("shards", .list(files.map { .string($0) })),
+                                    .init("tensors", .list(names.map { .string($0.1) }))])),
+            .init("order", .list(names.map { .string($0.0) })),
+        ] }, progressHandler: progressHandler)
+    }
 }
