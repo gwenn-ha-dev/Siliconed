@@ -22,9 +22,10 @@ struct StageBox<Content: View>: View {
         VStack(alignment: .leading, spacing: 9) {
             BoxTitle(title: title, symbol: symbol, tint: state == .active ? Palette.live : .secondary,
                      explanation: explanation) {
+                // No spinner while working: the edge and the wash say it, and the one under the image
+                // says the render runs — three turning at once was noise.
                 switch state {
-                case .idle: EmptyView()
-                case .active: ProgressView().controlSize(.mini)
+                case .idle, .active: EmptyView()
                 case .done: Image(systemName: "checkmark").font(.caption2.weight(.bold)).foregroundStyle(.secondary)
                 case .failed: Image(systemName: "exclamationmark.triangle.fill").font(.caption).foregroundStyle(Palette.failure)
                 }

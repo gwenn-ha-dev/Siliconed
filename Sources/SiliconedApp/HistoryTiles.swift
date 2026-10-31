@@ -119,8 +119,6 @@ private struct LiveTile: View {
             Color.primary.opacity(0.08)
             if let p = app.preview {
                 Image(decorative: p, scale: 1).resizable().interpolation(.medium).scaledToFill()
-            } else {
-                ProgressView().controlSize(.small).frame(maxHeight: .infinity)
             }
             GeometryReader { g in
                 Capsule().fill(Palette.live)

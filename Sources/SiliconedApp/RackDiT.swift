@@ -112,17 +112,25 @@ struct DiTBox: View {
                 }
                 .pickerStyle(.segmented).labelsHidden().fixedSize()
                 // What this Mac cannot render is greyed out ahead, with the Mac it needs (B, `macNeeded`).
-                Picker("Size", selection: $app.format) {
-                    ForEach(app.pickerFormats, id: \.self) { f in
-                        if let n = app.macNeeded(f, images: app.subjectImageCount) {
-                            Text("\(String(f.width)) × \(String(f.height)) — needs a Mac with \(String(n)) GB")
-                                .tag(f).disabled(true)
-                        } else {
-                            Text(verbatim: "\(f.width) × \(f.height)").tag(f)
+                // **Its width is a plain size's, never its longest entry's**: a menu picker sizes to its
+                // widest item, and the squares list « 2048 × 2048 — needs a Mac with 32 GB » — each switch
+                // to square widened the rack's column. A hidden one-item picker sets the width; the real
+                // one is laid over it, so its list never reaches the layout.
+                Picker("Size", selection: .constant(0)) { Text(verbatim: "0000 × 0000").tag(0) }
+                    .labelsHidden().fixedSize().hidden().accessibilityHidden(true)
+                    .overlay(alignment: .trailing) {
+                        Picker("Size", selection: $app.format) {
+                            ForEach(app.pickerFormats, id: \.self) { f in
+                                if let n = app.macNeeded(f, images: app.subjectImageCount) {
+                                    Text("\(String(f.width)) × \(String(f.height)) — needs a Mac with \(String(n)) GB")
+                                        .tag(f).disabled(true)
+                                } else {
+                                    Text(verbatim: "\(f.width) × \(f.height)").tag(f)
+                                }
+                            }
                         }
+                        .labelsHidden()
                     }
-                }
-                .labelsHidden().fixedSize()
                 Button { customSize = true } label: { Image(systemName: "pencil") }
                     .buttonStyle(.borderless)
                     .help("Type a size (width × height)")
