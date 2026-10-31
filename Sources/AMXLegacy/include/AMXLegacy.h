@@ -4,7 +4,8 @@
 // equal throughput on the engine's shapes, but `BNNSGraph` requires a compiled CoreML model per
 // GEMM shape. So we keep `BNNSMatMul` (2.26 TFLOP/s against 1.99 for `cblas_sgemm`, measured),
 // and the deprecation is acknowledged here, once, instead of a warning at every call.
-// Both functions pass their arguments through unchanged: same calls, same bits.
+// The two matrix functions pass their arguments through unchanged: same calls, same bits. The third, the softmax's
+// NEON pass, lives here because Swift's SIMD types ran it five times slower.
 #pragma once
 #include <Accelerate/Accelerate.h>
 #include <stdbool.h>

@@ -464,27 +464,4 @@ final class MemoryNeedQwenTests: XCTestCase {
                                                                   "intermediate_size": 16]]
         XCTAssertNil(QwenImage21Maps(dit: ["config": [String: Any]()], encoder: encoder, tokenizerTables: 1))
     }
-
-    /// **The figures of the report**: generation 1024², edit 1024² with 3 references of
-    /// 1024², per phase, default and lean plans; the library prompt (27 tokens, +6 per reference).
-    func testPrintTheNeeds() {
-        let points: [(String, MemoryNeed.Request)] = [
-            ("generation 1024²", Self.request(1024, 1024)),
-            ("edit 1024², 3 refs", Self.request(1024, 1024, references: [(1024, 1024), (1024, 1024), (1024, 1024)])),
-            ("generation 1024×1536", Self.request(1024, 1536)),
-            ("edit 1024×1536, 3 refs", Self.request(1024, 1536, references: [(1024, 1024), (1024, 1024), (1024, 1024)])),
-        ]
-        for (name, request) in points {
-            for lean in [false, true] {
-                let need = Self.need(lean ? request.lean : request)
-                let phases = need.phases.map {
-                    String(format: "%@ %.0f (ours %.0f, outside %.0f)", $0.kind.rawValue as NSString, Double($0.bytes) / 1e6,
-                           Double($0.own) / 1e6, Double($0.outside) / 1e6)
-                }
-                print(String(format: "Q %@%@: peak %.0f MB (crossing %.1f, base %.1f) — %@", name as NSString,
-                             (lean ? " lean" : "") as NSString, Double(need.peak) / 1e6, Double(need.crossing) / 1e6,
-                             Double(need.base) / 1e6, phases.joined(separator: ", ") as NSString))
-            }
-        }
-    }
 }

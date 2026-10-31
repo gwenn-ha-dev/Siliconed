@@ -3,7 +3,7 @@ import XCTest
 
 /// Qwen-Image-2.1-Turbo's pipeline without a byte of weights: the schedule, the noise, the sizes, the wire.
 /// The expected bits are diffusers 0.41.0's (`retrieve_timesteps(sigmas=sample_sigmas, mu=μ)` with the
-/// Turbo's `scheduler_config.json`, run in the venv: `tools/turbo_survey.py schedule`) and PyTorch 2.14's
+/// Turbo's `scheduler_config.json`) and PyTorch 2.14's
 /// (`torch.randn` on a CPU generator), printed by the venv.
 final class QwenImage21PipelineTests: XCTestCase {
     private func bits(_ v: [Float]) -> [UInt32] { v.map(\.bitPattern) }

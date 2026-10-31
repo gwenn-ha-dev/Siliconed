@@ -42,8 +42,7 @@ let package = Package(
         // reference implementation's goldens (`docs/VERIFY.md`). The stages live in `Verification`, which the
         // maintainer's tool links too; the executable target is named apart because the file system does
         // not tell `Siliconed` from `siliconed`.
-        .target(name: "Verification", dependencies: ["Siliconed", "AMXLegacy"],
-                cSettings: [.define("ACCELERATE_NEW_LAPACK")]),
+        .target(name: "Verification", dependencies: ["Siliconed"]),
         .executableTarget(name: "SiliconedCommand", dependencies: ["Verification"]),
         // **The remote control's help**, Foundation only: one text for both sides — `silicontrol`
         // answers `help` without launching the app, the app answers it on its socket.
