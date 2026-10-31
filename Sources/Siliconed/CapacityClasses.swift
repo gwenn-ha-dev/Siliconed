@@ -419,6 +419,18 @@ package enum CapacityClasses {
         return sorted(b.order.map { Class(phase: $0.phase, shape: $0.shape, executions: [r.family: b.counts[$0]!]) })
     }
 
+    /// **The classes of one pass of the render alone** (`passes(r)[index]`: the half grid's, the full grid's): the denoising's evaluations at
+    /// that pass's rows, without the encoder and without what is computed once — what the weight stream's read runs beside, evaluation by
+    /// evaluation (`CapacityStream`). `nil` for a version that does not exist or a pass that does not.
+    package static func classes(for r: Request, pass index: Int) -> [Class]? {
+        guard let format = weightFormat(r.family, r.variant) else { return nil }
+        let all = passes(r)
+        guard all.indices.contains(index) else { return nil }
+        var b = Builder()
+        evaluation(&b, r, format, tokens: all[index].tokens, times: all[index].evaluations)
+        return sorted(b.order.map { Class(phase: $0.phase, shape: $0.shape, executions: [r.family: b.counts[$0]!]) })
+    }
+
     /// **Identical classes of different families, merged** (same phase, same shape: the same k×n, weight format and
     /// height; the same attention), their executions kept per family.
     package static func merge(_ lists: [[Class]]) -> [Class] {

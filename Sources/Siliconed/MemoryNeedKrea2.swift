@@ -73,6 +73,8 @@ extension MemoryNeed {
         /// The largest tensor's staging run in the DiT's map (`Artifact.largestRun`): what one of the stream's
         /// buffers holds (`TailStream.unitSlots` of them).
         package let ditUnitStaging: Int
+        /// Each DiT layer's bytes in the map and the map's, from the header (`Artifact.layerSpans`): what the stream reads per evaluation.
+        package let ditLayerSpans: [Int], ditMapBytes: Int
         /// The largest encoder layer's staging run: what one of its buffers holds.
         package let encoderLayerStaging: Int
         /// The largest timestep weight the tabulation widens (`Krea2Exact.linears`: a weight not
@@ -97,6 +99,8 @@ extension MemoryNeed {
             self.dit = config; self.encoder = encoderConfig
             ditUnitStaging = Artifact.largestRun(header: dit, prefixes: (0..<config.layers).map(Krea2DiT.layerPrefix),
                                                  fileSize: ditSize)
+            ditLayerSpans = Artifact.layerSpans(header: dit, prefixes: (0..<config.layers).map(Krea2DiT.layerPrefix), fileSize: ditSize)
+            ditMapBytes = Artifact.mapBytes(header: dit)
             ditLayerStaging = ditStaging; encoderLayerStaging = encoderStaging
             timestepWidening = Krea2DiT.timestepWidening(header: dit, config: config)
             encoderRotationScratch = Widen.rotationScratchBytes(header: encoder, prefixes: TextEncoder.layerPrefixes(encoderConfig))
@@ -120,6 +124,12 @@ extension MemoryNeed {
 
         /// The maps read, by their files' stamps.
         private static let installed = ShapeMemo<InstalledFiles, Krea2Maps?>(capacity: 8)
+
+        /// **The bytes the DiT's stream reads from the disk at each evaluation** under `plan` (`MemoryPlan.streamedBytes`); `fraction`: the
+        /// model's own split (`generationTail`).
+        package func ditStreamedBytes(plan: MemoryPlan.Render, fraction: Double) -> Int {
+            MemoryPlan.streamedBytes(spans: ditLayerSpans, mapBytes: ditMapBytes, plan: plan, fraction: fraction)
+        }
     }
 
     /// **Krea 2's need** on the installed maps.

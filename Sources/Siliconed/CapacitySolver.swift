@@ -119,6 +119,12 @@ package enum CapacitySolver {
         package var compute: Double
         /// Seconds each engine is busy over all the executions (the overlap's input).
         package var busy: [CapacityModel.Engine: Double]
+        /// **The disk's share (`CapacityStream`)**, only on the block that stands for a pass's weight stream: the seconds its reads take over
+        /// all the evaluations, the seconds of computation they run beneath (the pass's own), and what no computation hides. The block
+        /// computes nothing (`seconds` 0); the overlap is `combine`'s.
+        package var reading = 0.0
+        package var beneath = 0.0
+        package var exposed = 0.0
         package var seconds: Double { preparation + compute }
     }
 

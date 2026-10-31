@@ -681,6 +681,17 @@ extension Artifact {
         stagingSpans(header: header, prefixes: prefixes, fileSize: fileSize).compactMap { $0 }.max() ?? 0
     }
 
+    /// **Each layer's bytes in the map**, from the header alone: the run `stagingBytes` takes the largest of, one per prefix (0 for a layer
+    /// without a tensor). What the stream reads of a layer at each evaluation, and what `MemoryPlan.released` sizes the head with.
+    package static func layerSpans(header: [String: Any], prefixes: [String], fileSize: Int) -> [Int] {
+        stagingSpans(header: header, prefixes: prefixes, fileSize: fileSize).map { $0 ?? 0 }
+    }
+
+    /// The bytes of every tensor of the map, from the header alone (what `MemoryPlan.released` compares with B).
+    package static func mapBytes(header: [String: Any]) -> Int {
+        (header["tensors"] as? [String: [String: Any]])?.values.reduce(0) { $0 + ($1["bytes"] as? Int ?? 0) } ?? 0
+    }
+
     /// Each block's run alone (`nil`: no tensor, or no tensor table) — the header's table read once for
     /// all of them; `stagingBytes` is their largest.
     private static func stagingSpans(header: [String: Any], prefixes: [String], fileSize: Int) -> [Int?] {

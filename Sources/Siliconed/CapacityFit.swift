@@ -176,6 +176,8 @@ package enum CapacityFit {
         package var trials: [Trial] = []
         package var witnesses: [Witness] = []
         package var memoryBandwidth: Double?
+        /// Bytes per second the weight stream's own read gets from the library's volume (`CapacityDisk.measure`).
+        package var diskBandwidth: Double?
         /// Seconds per value to bring a weight to the form a kernel reads, by kind then by path (`"int8": {"widened": …}`).
         package var preparation: [String: [String: Double]] = [:]
         /// Kernels the judge refused (a wrong route fills nothing).
@@ -197,6 +199,7 @@ package enum CapacityFit {
             }
             m.witnesses = witnesses.map { Witness(engine: $0.engine, before: r($0.before), after: r($0.after)) }
             m.memoryBandwidth = memoryBandwidth.map(r)
+            m.diskBandwidth = diskBandwidth.map(r)
             m.preparation = preparation.mapValues { $0.mapValues(r) }
             return m
         }
@@ -475,6 +478,7 @@ package enum CapacityFit {
             if let e = CapacityModel.Engine(rawValue: w.engine), w.before > 0, w.after > 0 { model.heat[e] = max(1, w.after / w.before) }
         }
         model.memoryBandwidth = m.memoryBandwidth
+        model.diskBandwidth = m.diskBandwidth
         for (kindName, paths) in m.preparation {
             guard let kind = WeightKind(rawValue: kindName) else { continue }
             for (pathName, seconds) in paths { if let path = WeightPath(rawValue: pathName) { model.preparation[kind, default: [:]][path] = seconds } }
