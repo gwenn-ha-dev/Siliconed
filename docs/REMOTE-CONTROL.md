@@ -4,7 +4,7 @@ English · [Français](REMOTE-CONTROL.fr.md)
 
 **The reference is in the app.** `silicontrol help` gives the overview, `silicontrol help <command>` or
 `silicontrol <command> --help` one page, `silicontrol help all` the whole reference (contract, JSON
-answers, error codes, recipes). To put an AI to work, tell it "look at `silicontrol help`". This file
+answers, error codes, recipes). To put an agent to work, tell it “look at `silicontrol help`”. This file
 only explains how the thing is built; it does not repeat the help, so the two cannot diverge.
 
 ## The idea
@@ -29,8 +29,8 @@ from the app's field or from `silicontrol add`: both go through `PromptAlternati
 parser refuses (error `prompt`), and each job carries its expanded prompt and its `choices`. The
 syntax and the answer are in `silicontrol help add`.
 
-**A grid is jobs, then an image.** `silicontrol grid --x … [--y …]` and the app's « Exploration »
-window (Render > Exploration, ⌥⌘G) both check the grid with the library (`RenderGrid`,
+**A grid is jobs, then an image.** `silicontrol grid --x … [--y …]` and the app's “Exploration”
+window (Render › Exploration, ⌥⌘G) both check the grid with the library (`RenderGrid`,
 `Sources/Siliconed/RenderGrid.swift`) and queue it through `AppState.enqueueGrid`: one ordinary job per cell, in the sheet's reading
 order, plus a `GridRun` that only remembers which job is which cell (`Sources/SiliconedApp/Grid.swift`).
 The axes are a `{…}` group of the prompt, the seed, the steps, a LoRA's strength, LoRAs to compare
@@ -48,20 +48,20 @@ never multiplied. The syntax is in `silicontrol help grid`.
 stops as a sketch (`Request.sketch`) at 512 on the short side (512², 512×768,
 768×512): about three quarters of the time of a finished image. Its sketches stay in the window, not in the
 history, until the next exploration, which replaces it (its waiting cells leave the queue, the
-running one stops). On a cell, « Finish This Image » renders it to its end — same seed, same size —
-into the history, the image the sketch announced; « Reuse These Settings » gives the rack its model,
-prompt, steps, LoRA strengths and seed, not its size. The sheet joins the history only on « Add Sheet
-to History ».
+running one stops). On a cell, “Finish This Image” renders it to its end — same seed, same size —
+into the history, the image the sketch announced; “Reuse These Settings” gives the rack its model,
+prompt, steps, LoRA strengths and seed, not its size. The sheet joins the history only on “Add Sheet
+to History”.
 
 **Variations are the menu's.** `silicontrol vary i7 subtle|strong [--batch N]` and an image's
-« Variations » menu (the button under the image, its context menu) both call `AppState.vary`: as
-many ordinary jobs as the rack's « Images » (1 by default; `--batch` overrides it), with exactly that image's settings and seed, each adding one variation seed drawn at random
+“Variations” menu (the button under the image, its context menu) both call `AppState.vary`: as
+many ordinary jobs as the rack's “Images” (1 by default; `--batch` overrides it), with exactly that image's settings and seed, each adding one variation seed drawn at random
 (`Request.variations`, `Sources/Siliconed/Variation.swift`) at the family's strength (`Variation.Amount`), never a
 number the command passes. A variation of a variation appends to the chain, so it varies *that*
 image. Refused on a grid's sheet, a sketch, or a model that is not ready (`model`). Each image's
 `variation` lists its variation seeds in order; `silicontrol help vary` has the answer.
 
-**Enlarging is the menu's too.** `silicontrol enlarge i7 [--download]` and « Enlarge ×4 » both call
+**Enlarging is the menu's too.** `silicontrol enlarge i7 [--download]` and “Enlarge ×4” both call
 `AppState.enlarged`: macOS's super-resolution (VideoToolbox, macOS 26), no prompt, outside the
 queue — refused while a render runs —, answered with the new image once it is in the history.
 Apple's model is downloaded by macOS only with `--download` (else `download_required`);
@@ -78,7 +78,7 @@ before back at the end, even when the series fails. Off is full size, the same b
 ## The command
 
 `silicontrol` ships inside the app, at `Siliconed.app/Contents/Helpers/silicontrol` (target `Silicontrol`,
-`Sources/Silicontrol/main.swift`). Settings → Advanced → Command Line ("Install…") links it into
+`Sources/Silicontrol/main.swift`). Settings › Advanced › Command Line (“Install…”) links it into
 `/usr/local/bin`. It is a pipe: Foundation and the system's frameworks only, it does not link the engine. If the app is not
 running, any command but the help launches it and waits for its socket (30 s at most); `silicontrol open`
 does only that. The help (`help`, `help <topic>`, `<command> --help`, no argument) is answered by the

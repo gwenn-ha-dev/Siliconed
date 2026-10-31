@@ -4,22 +4,25 @@
 <meta charset="utf-8">
 <link rel="icon" href="images/icon-small.svg" type="image/svg+xml">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Siliconed — your Mac, mapped: local AI image generation and editing for Apple silicon</title>
-<meta name="description" content="Free, open-source macOS app that runs Krea 2 Turbo, Z-Image Turbo, Qwen-Image-2.1 and Anima Turbo natively in Swift and Metal on Apple silicon. It measures your Mac before its first render and plans every computation from what it measured, across the GPU, the CPU's matrix unit and the Neural Engine. Text-to-image and AI image editing, offline, fp32, checked against diffusers, within a fixed memory budget.">
+<title>Siliconed — your Mac, mapped: local image generation and editing for Apple silicon</title>
+<meta name="description" content="Free, open-source macOS app that runs Krea 2 Turbo, Z-Image Turbo, Qwen-Image-2.1, Anima Turbo and MOSS-Image natively in Swift and Metal on Apple silicon. It measures your Mac before its first render and plans every computation from what it measured, across the GPU, the CPU's matrix unit and the Neural Engine. Text-to-image and image editing, offline, fp32, checked against diffusers, within a fixed memory budget.">
 <link rel="canonical" href="https://gwenn-ha-dev.github.io/Siliconed/">
 <meta property="og:type" content="website">
 <meta property="og:title" content="Siliconed — your Mac, mapped">
-<meta property="og:description" content="Krea 2 Turbo, Z-Image Turbo, Qwen-Image-2.1 and Anima Turbo, native in Swift and Metal. Every computation planned for this chip, from a measure of its engines — GPU, CPU matrix unit, Neural Engine. Offline, fp32, checked against the reference, within a fixed memory budget.">
+<meta property="og:description" content="Krea 2 Turbo, Z-Image Turbo, Qwen-Image-2.1, Anima Turbo and MOSS-Image, native in Swift and Metal. Every computation planned for this chip, from a measure of its engines — GPU, CPU matrix unit, Neural Engine. Offline, fp32, checked against the reference, within a fixed memory budget.">
 <meta property="og:url" content="https://gwenn-ha-dev.github.io/Siliconed/">
 <meta property="og:image" content="https://gwenn-ha-dev.github.io/Siliconed/images/social-preview.jpg">
 <meta property="og:image:width" content="1280">
 <meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="Siliconed: your Mac, mapped. Every computation planned for this chip.">
+<meta property="og:site_name" content="Siliconed">
+<meta name="theme-color" content="#0D1028">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:image" content="https://gwenn-ha-dev.github.io/Siliconed/images/social-preview.jpg">
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"SoftwareApplication","name":"Siliconed",
  "operatingSystem":"macOS 26 or later (Apple silicon)","applicationCategory":"MultimediaApplication",
- "description":"Local text-to-image generation and AI image editing on Apple silicon Macs: Krea 2 Turbo, Z-Image Turbo, Qwen-Image-2.1 and Anima Turbo in Swift and Metal, on the GPU, the CPU matrix unit and the Neural Engine, each computation planned from a measure of each Mac.",
+ "description":"Local text-to-image generation and image editing on Apple silicon Macs: Krea 2 Turbo, Z-Image Turbo, Qwen-Image-2.1, Anima Turbo and MOSS-Image in Swift and Metal, on the GPU, the CPU matrix unit and the Neural Engine, each computation planned from a measure of each Mac.",
  "offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"license":"https://www.apache.org/licenses/LICENSE-2.0",
  "downloadUrl":"https://github.com/gwenn-ha-dev/Siliconed/releases/latest",
  "codeRepository":"https://github.com/gwenn-ha-dev/Siliconed","image":"https://gwenn-ha-dev.github.io/Siliconed/images/window.jpg"}
@@ -201,7 +204,7 @@
       <path d="M 40 830 L 560 830 A 310 310 0 0 0 560 210 A 310 310 0 0 0 250 520"/>
     </g>
   </svg>
-  <p class="eyebrow h-fade">v0.16 · free · open source · Apple silicon</p>
+  <p class="eyebrow h-fade">v0.18 · free · open source · Apple silicon</p>
   <h1 class="h-fade d1"><span class="grad">Your Mac, mapped.</span><span class="sub">Every computation planned for <em>this</em> chip.</span></h1>
   <p class="lead h-fade d2">Siliconed measures what your Mac's engines do, then spreads five image models over them:
     GPU, CPU matrix unit, Neural Engine. Full fp32, checked against the reference, inside a fixed memory
@@ -216,7 +219,7 @@
     <figcaption>A photo by Krea 2 Turbo. Then Qwen-Image-2.1 after one sentence: “Convert this photo to a western comic book style with cel shading.” Seed 42, 215 s on an M1 Pro.</figcaption>
   </figure>
   <div class="strip" aria-label="Models and principles">
-    <span>Krea 2 Turbo</span><span>Qwen-Image-2.1</span><span>Z-Image Turbo</span><span>Anima Turbo</span><span>measured per Mac</span><span>fp32</span><span>offline</span>
+    <span>Krea 2 Turbo</span><span>Qwen-Image-2.1</span><span>Z-Image Turbo</span><span>Anima Turbo</span><span>MOSS-Image</span><span>measured per Mac</span><span>fp32</span><span>offline</span>
   </div>
 </header>
 
@@ -261,7 +264,7 @@
   </div>
   <div class="split rev" id="moss" style="margin-top:clamp(64px, 9vw, 112px)">
     <div class="text reveal">
-      <p class="kicker">New in 0.16 · beta</p>
+      <p class="kicker">Beta · since 0.16</p>
       <h2><span class="grad">MOSS-Image.</span><br>Fast, thanks to its community.</h2>
       <p class="punch">5.1 billion parameters, read by a 9-billion-parameter language model.</p>
       <p>OpenMOSS released no fast version; lodestones did: an 8-step DMD LoRA, kept beside the weights
@@ -305,8 +308,8 @@
         the others. Each computation of a render is then split over the engines by that map, down to the rows
         of each matrix product. No route is chosen by chip name: another Mac, or a newer chip, draws its own
         map. How sure the measure is of each figure is written beside it, and a measure always gives a map.
-        The speed changes; the picture does not move beyond the arithmetic it checked. Help → Measure This
-        Mac shows it.</p>
+        The speed changes; the picture does not move beyond the arithmetic it checked. Help › Measure This
+        Mac… shows it.</p>
     </div>
     <div class="map reveal" role="img" aria-label="The capacity map of an M1 Pro, 31 October 2026: GPU fp32 products 3.5 TFLOP/s; CPU matrix unit 2.2 TFLOP/s, plus or minus 1.1 %; Neural Engine fp16 9.2 TFLOP/s, plus or minus 1.7 %; Neural Engine on int8 weights 10.5 TFLOP/s, plus or minus 2.7 %; the GPU beside the Neural Engine keeps 86 % and the Neural Engine 67 % of their speeds, plus or minus 1.0 %; the GPU beside the AMX keeps 92 % and the AMX 81 %, plus or minus 2.0 %">
       <p class="head">map · MacBook Pro M1 Pro · 31/10/2026</p>
@@ -327,8 +330,8 @@
         beside the GPU, shape by shape. It computes in fp16: each weight column and each activation row is
         lifted by a power of two into fp16's range, then brought back in fp32, and rows that overflow go back
         to the GPU. On int8 weights it reads them as published and widens them itself. Your choice, per model: off by default on the Standard, which stays the
-        reference-checked fp32 image; on by default on Compact and Light. The tag reads
-        <code>fp32 · ANE</code> when it is on.</p>
+        reference-checked fp32 image; on by default on Compact and Light. The label in the rack reads
+        <code>computes fp32 · ANE</code> when it is on; click it to switch.</p>
     </div>
     <ul class="stats reveal">
       <li><b>−16 to −26 %</b>energy per image, M1 Pro, 1024², Standard</li>
@@ -346,7 +349,7 @@
       <p class="punch">One to three images, one sentence.</p>
       <p>“Convert this photo to a western comic book style with cel shading.” “Put the dog of image 2
         next to her.” Qwen-Image-2.1's encoder sees the images. Then drag the curtain across the result
-        and its original to see exactly what changed.</p>
+        and its original to see exactly what changed, or flip between the two with Switch.</p>
     </div>
     <figure class="shot reveal">
       <img src="images/edit.jpg" width="1600" height="1064" alt="An edit by Qwen-Image-2.1 in the Siliconed window: the Krea 2 photo of the Irish surfer as image 1, the instruction in the prompt, the cel-shaded western comic book result in the canvas" loading="lazy">
@@ -371,7 +374,7 @@
     <p class="kicker">Exploration</p>
     <h2>Sketch a grid.<br><span class="grad">Finish the one you love.</span></h2>
     <p style="color:var(--muted)">Seeds, steps, LoRA strengths, models or the alternatives written in braces in
-      the prompt, drawn as quick sketches in the canvas with the axes as labels. « Finish This Image » renders
+      the prompt, drawn as quick sketches in the canvas with the axes as labels. “Finish This Image” renders
       the chosen cell to the end, with the same seed: the image its sketch announced. Here, Anima Turbo
       with the inCase LoRA: the wetsuit's colour across, the LoRA's strength down.</p>
   </div>
@@ -394,9 +397,10 @@
     <div class="card reveal"><h3>Checked against the original</h3><p>Every stage is compared channel by channel with diffusers and transformers in fp32, and rounds where they round. What cannot be checked against the reference does not ship.</p></div>
     <div class="card reveal"><h3>34 GB of model, 16 GB of Mac</h3><p>Weights stream from disk as needed. Never more than ¾ of the Mac's memory minus 2 GB (10 GB on a 16 GB Mac): each render computes what it needs before it starts.</p></div>
     <div class="card reveal"><h3>Eight bits against eight bits</h3><p>Z-Image Turbo Compact (GGUF Q8_0), 1024², 8 steps, Faster Rendering and the Neural Engine as by default: 81–83 s on an M1 Pro. Draw Things' engine with its default 8-bit <code>q8p</code>, on the same Mac: 135–144 s. Wall-clock, not identical arithmetic: the samplers and the images differ.</p></div>
-    <div class="card reveal"><h3>Private by construction</h3><p>Nothing leaves your Mac but what you send to another of yours, encrypted; it works offline once a model is installed, and the render cache is gone when you quit.</p></div>
-    <div class="card reveal"><h3>Built to be driven by an AI</h3><p><code>silicontrol</code> drives the running app from a terminal with JSON output; <code>silicontrol help</code> is all an agent needs.</p></div>
+    <div class="card reveal"><h3>Private by construction</h3><p>Nothing leaves your Mac but the model downloads you accepted and what you send to another Mac of yours, encrypted. It works offline once a model is installed, and the render cache is gone when you quit.</p></div>
+    <div class="card reveal"><h3>Scriptable, agents included</h3><p><code>silicontrol</code> drives the running app from a terminal, with JSON lines out; <code>silicontrol help</code> is all a script or a coding agent needs.</p></div>
     <div class="card reveal"><h3>Reproducible to the bit</h3><p>Same prompt, seed, settings and version on the same Mac: the same image, byte for byte.</p></div>
+    <div class="card reveal" style="grid-column:1/-1"><h3>A prompt writer, if you want one (beta)</h3><p>The Prompt Lab (Window › Prompt Lab) rewrites a short prompt the way each model likes it, or describes an image you drop on it. The writer is Qwen-Image-2.1's own text encoder, made to write, so there is nothing more to download but its 1.25 GB output layer. It keeps every element of your prompt, never moralizes, and steps aside the moment an image starts rendering. Its greedy output matches transformers, token for token.</p></div>
     <div class="card reveal" style="grid-column:1/-1"><h3>Render on another Mac</h3><p>The MacBook in the living room computes on the Mac mini next door: Render › Compute On moves the whole window there. Paired once with a six-digit code, TLS with a key per Mac.</p></div>
     <div class="card reveal" style="grid-column:1/-1"><h3>Faster Rendering. On by default.</h3><p>From 1024 px on each side, the first steps run on a half-size grid, the rest at full size: a quarter to a third off the clock, still all 8 evaluations of the recipe. The trick is in the noise: the small grid gets the averaged picture plus the low band of the noise, and the step brought back to full size clears the fine noise exactly as a full step would, so no grain, no cracks; freckles and book spines survive. Another picture than the full-size one, not a blurrier one. Switch it off and you get the full-size recipe, bit for bit, the one checked against diffusers.</p></div>
   </div>
@@ -424,7 +428,7 @@
       <p>The publisher's weights, 8-bit versions, or a 4-to-6-bit transformer. The 8-bit Compact is
         preselected: as fast or faster on an M1 Pro, half the disk. Every file is pinned to a
         revision and checked by sha256, and downloads resume where they stopped. The next file downloads
-        while the previous one is prepared: Qwen-Image-2.1 installs in about 6½ minutes on a fast connection.</p>
+        while the previous one is prepared.</p>
     </div>
     <figure class="shot reveal"><img src="images/models.jpg" width="1600" height="1065" alt="The Models window: the five publishers' models installed in Compact, MOSS-Image marked beta, each with its license and size on disk, and the LoRAs below" loading="lazy"></figure>
   </div>
@@ -453,7 +457,10 @@
 </section>
 
 <footer class="wrap">
-  Siliconed · Apache 2.0 · <a href="https://github.com/gwenn-ha-dev/Siliconed">github.com/gwenn-ha-dev/Siliconed</a>
+  Siliconed · Apache 2.0 · <a href="https://github.com/gwenn-ha-dev/Siliconed">github.com/gwenn-ha-dev/Siliconed</a> ·
+  <a href="https://github.com/gwenn-ha-dev/Siliconed/blob/main/docs/APP.md">The app</a> ·
+  <a href="https://github.com/gwenn-ha-dev/Siliconed/blob/main/docs/ENGINE.md">The engine</a> ·
+  <a href="https://github.com/gwenn-ha-dev/Siliconed/blob/main/docs/RELEASE-NOTES.md">Release notes</a>
 </footer>
 </body>
 </html>

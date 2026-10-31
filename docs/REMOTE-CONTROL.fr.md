@@ -4,7 +4,7 @@
 
 **La référence est dans l'app.** `silicontrol help` donne la vue d'ensemble, `silicontrol help <commande>`
 ou `silicontrol <commande> --help` une page, `silicontrol help all` toute la référence (contrat, réponses
-JSON, codes d'erreur, recettes). Pour mettre une IA au travail, il suffit de lui dire « regarde
+JSON, codes d'erreur, recettes). Pour mettre un agent au travail, il suffit de lui dire « regarde
 `silicontrol help` ». Ce fichier n'explique que comment c'est fait ; il ne répète pas l'aide, pour
 qu'elles ne puissent pas diverger.
 
@@ -32,7 +32,7 @@ que le parseur refuse (erreur `prompt`), et chaque travail porte son prompt dév
 `choices`. La syntaxe et la réponse sont dans `silicontrol help add`.
 
 **Une grille, ce sont des travaux, puis une image.** `silicontrol grid --x … [--y …]` et la fenêtre
-« Exploration » de l'app (Rendu > Exploration, ⌥⌘G) vérifient toutes deux la grille avec la
+« Exploration » de l'app (Rendu › Exploration, ⌥⌘G) vérifient toutes deux la grille avec la
 bibliothèque (`RenderGrid`, `Sources/Siliconed/RenderGrid.swift`) et la mettent en file par
 `AppState.enqueueGrid` : un travail ordinaire par case, dans l'ordre de lecture de la planche, plus
 un `GridRun` qui retient seulement quel travail est quelle case (`Sources/SiliconedApp/Grid.swift`).
@@ -86,7 +86,7 @@ d'avant à la fin, même si la série échoue. Éteint, c'est la pleine taille, 
 ## La commande
 
 `silicontrol` est livrée dans l'app, `Siliconed.app/Contents/Helpers/silicontrol` (cible `Silicontrol`,
-`Sources/Silicontrol/main.swift`). Réglages → Avancé → Ligne de commande (« Installer… ») la lie
+`Sources/Silicontrol/main.swift`). Réglages › Avancé › Ligne de commande (« Installer… ») la lie
 dans `/usr/local/bin`. Ce n'est qu'un tuyau : Foundation et les frameworks du système seulement, elle ne lie pas le moteur. Si
 l'app n'est pas lancée, toute commande sauf l'aide la lance et attend sa prise (30 s au plus) ;
 `silicontrol open` ne fait que cela. L'aide (`help`, `help <sujet>`, `<commande> --help`, aucun
