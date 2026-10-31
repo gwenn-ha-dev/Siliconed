@@ -10,7 +10,7 @@ import Siliconed
 // loaded; the set runs in seconds and is what continuous integration can run.
 
 enum KernelStages {
-    static let all: [Stage] = [widen, arena, elementwise, gelu, sdpa, gemmSplit, rope, resample]
+    static let all: [Stage] = [widen, arena, elementwise, gelu, sdpa, sdpaTiles, gemmSplit, rope, resample]
 
     // MARK: - The widener and the arena
 
@@ -316,6 +316,102 @@ enum KernelStages {
             report.add(Judge.bound("head width \(d) padded to \(Attention.workingHeadDim(d)), \(h) heads", worst, 1e-5, unit: "per channel"))
         }
         withExtendedLifetime(arena) {}
+        return report
+    }
+
+    // MARK: - Attention in three stages, by tiles of query rows
+
+    static let sdpaTiles = Stage(
+        model: "kernels", name: "sdpa-tiles",
+        proves: "the attention in three stages by tiles of query rows (Metal 4 matmul2d) returns the float64 attention — in fp32, and with fp16 operands and fp32 sums — on a self-attention, a cross-attention over few keys, grouped k/v heads and a length that tiles nothing",
+        options: ["--sequence"],
+        oracle: nil, weights: [],
+        rule: "against float64, per channel: fp32 ≤ 1e-5 and ≤ the graph's own error + 25 % on the golden tensors' amplitudes (saturated softmax); fp16 operands ≤ 1.25 × the error of rounding the same exact output to bf16 (invariant 3, the ANE's bar), on the map's amplitudes"
+    ) { invocation in
+        let sequence = try invocation.integer("--sequence", 4128)
+        let report = Report(title: "kernels sdpa-tiles S=\(sequence)")
+        guard let device = MTLCreateSystemDefaultDevice(), let queue = device.makeCommandQueue() else { throw GEMM.Failure.noDevice }
+        var state: UInt64 = 0x5D9A
+        func noise(_ amplitude: Float) -> Float {
+            state ^= state << 13; state ^= state >> 7; state ^= state << 17
+            return amplitude * Float(Int32(truncatingIfNeeded: state)) / Float(Int32.max)
+        }
+        func bf16(_ x: Float) -> Float {
+            let bits = x.bitPattern
+            return Float(bitPattern: UInt32(UInt16(truncatingIfNeeded: (bits &+ 0x7FFF &+ ((bits >> 16) & 1)) >> 16)) << 16)
+        }
+        // Two regimes of data. The golden tensors' amplitudes (q peaking at 8.9, k at 11.5, v at 189, as `sdpa`): the logits run to ±100, the
+        // softmax saturates, and an fp16 operand's rounding (2⁻¹¹) moves a logit by 0.02 — 3× bf16's own rounding of the output, which is
+        // why the fp16 kernel is not judged there: whether a model's attention is that conditioned is the DiT check's to say, against
+        // diffusers in bf16. The map's amplitudes (q, k at 3, v at 1): what the diagnostic judges every Mac's kernels on.
+        let regimes: [(label: String, q: Float, k: Float, v: Float, fp16: Bool)] = [("golden amplitudes", 8.9, 11.5, 188.9, false), ("map's amplitudes", 3, 3, 1, true)]
+        // (queries, keys, heads, k/v heads, head dimension, label): the DiTs' self-attention, Anima's cross-attention, Krea 2's grouped heads.
+        let cases = [(sequence, sequence, 30, 30, 128, "self"), (1000, 77, 24, 24, 128, "cross"), (777, 777, 12, 3, 128, "grouped k/v heads")]
+        for regime in regimes {
+        for (s, keys, heads, kvHeads, headDim, label) in cases {
+            let width = heads * headDim, kvWidth = kvHeads * headDim
+            func buffer(_ n: Int, _ amplitude: Float) -> (UnsafeMutablePointer<Float>, MTLBuffer) {
+                let b = device.makeBuffer(length: n * 4, options: .storageModeShared)!
+                let p = b.contents().assumingMemoryBound(to: Float.self)
+                for i in 0..<n { p[i] = noise(amplitude) }
+                return (p, b)
+            }
+            let (q, qb) = buffer(s * width, regime.q), (k, kb) = buffer(keys * kvWidth, regime.k), (v, vb) = buffer(keys * kvWidth, regime.v)
+            let rows = [0, 1, 2, 3, s / 3, s / 2, s - 4, s - 3, s - 2, s - 1].filter { $0 >= 0 && $0 < s }
+            // The float64 attention of those rows, every head: [rows, width].
+            var exact = [Double](repeating: 0, count: rows.count * width)
+            let scale = 1 / Double(headDim).squareRoot()
+            exact.withUnsafeMutableBufferPointer { out in
+                nonisolated(unsafe) let out = out.baseAddress!
+                DispatchQueue.concurrentPerform(iterations: rows.count * heads) { c in
+                    let r = c / heads, head = c % heads, kv = head / (heads / kvHeads)
+                    var scores = [Double](repeating: 0, count: keys)
+                    let query = q + rows[r] * width + head * headDim
+                    var top = -Double.infinity
+                    for j in 0..<keys {
+                        let key = k + j * kvWidth + kv * headDim
+                        var dot = 0.0
+                        for x in 0..<headDim { dot += Double(query[x]) * Double(key[x]) }
+                        scores[j] = dot * scale
+                        top = max(top, scores[j])
+                    }
+                    var total = 0.0
+                    for j in 0..<keys { scores[j] = exp(scores[j] - top); total += scores[j] }
+                    let target = out + r * width + head * headDim
+                    for j in 0..<keys {
+                        let p = scores[j] / total, value = v + j * kvWidth + kv * headDim
+                        for x in 0..<headDim { target[x] += p * Double(value[x]) }
+                    }
+                }
+            }
+            func error(_ out: UnsafeMutablePointer<Float>) -> Double {
+                var got = [Float](repeating: 0, count: rows.count * width)
+                for (r, row) in rows.enumerated() { for c in 0..<width { got[r * width + c] = out[row * width + c] } }
+                return got.allSatisfy(\.isFinite) ? exact.withUnsafeBufferPointer { channelError(got, $0, columns: width).worst } : .infinity
+            }
+            let floor = exact.withUnsafeBufferPointer { channelError(exact.map { bf16(Float($0)) }, $0, columns: width).worst }
+            // The graph's own error on the same data: the fp32 kernel goes no further from float64 than the graph, + 25 %.
+            let (graphOut, graphBuffer) = buffer(s * width, 0)
+            _ = Attention(device: device, queue: queue, heads: heads, sequence: s, headDim: headDim, keySequence: keys,
+                          kvHeads: kvHeads == heads ? nil : kvHeads).run(q: qb, k: kb, v: vb, into: graphBuffer)
+            let graphError = error(graphOut)
+            for precision in [TiledAttention.Precision.fp32, .fp16] where precision == .fp32 || regime.fp16 {
+                let name = "\(label) S=\(s)/\(keys) \(heads)/\(kvHeads) heads, " + (precision == .fp32 ? "fp32" : "fp16 operands") + ", \(regime.label)"
+                let (out, ob) = buffer(s * width, 0)
+                memset(out, 0xFF, s * width * 4)            // NaN: a row nobody wrote cannot pass
+                let kernel = try TiledAttention(device: device, queue: queue, heads: heads, sequence: s, headDim: headDim, keys: keys,
+                                                kvHeads: kvHeads, precision: precision)
+                _ = kernel.run(q: qb, k: kb, v: vb, into: ob)
+                if precision == .fp32 {
+                    report.add(Judge.bound(name, error(out), max(1e-5, 1.25 * graphError), unit: "per channel",
+                                           note: String(format: "the graph's own %.2e", graphError)))
+                } else {
+                    report.add(Judge.bound(name, error(out), max(1e-5, 1.25 * floor), unit: "per channel",
+                                           note: String(format: "bf16's own rounding %.2e", floor)))
+                }
+            }
+        }
+        }
         return report
     }
 

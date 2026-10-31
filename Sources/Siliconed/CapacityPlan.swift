@@ -53,8 +53,11 @@ package final class CapacityPlan: Sendable {
         /// GPU's int8 kernel. It needs both engines — the ANE built, and `TensorGEMM` with its int8 kernel, which reads the same
         /// reserve — so it is never set without `ane` and `int8Weights` (the initializer enforces it).
         package var aneInt8 = false
+        /// **The attention may run in fp16 operands** (`tiles16`): the denoiser's attention rounds Q, K, V and the probabilities to half.
+        package var halfAttention = false
         package init(amx: Bool = false, ane: Bool = false, bf16Weights: Bool = false, int8Weights: Bool = false,
-                     q8Weights: Bool = false, roundedActivations: Bool = false, aneInt8: Bool = false) {
+                     q8Weights: Bool = false, roundedActivations: Bool = false, aneInt8: Bool = false, halfAttention: Bool = false) {
+            self.halfAttention = halfAttention
             self.amx = amx; self.ane = ane; self.bf16Weights = bf16Weights; self.int8Weights = int8Weights
             self.q8Weights = q8Weights; self.roundedActivations = roundedActivations
             self.aneInt8 = aneInt8 && ane && int8Weights
@@ -63,7 +66,7 @@ package final class CapacityPlan: Sendable {
         package var usesTensor: Bool { bf16Weights || int8Weights || q8Weights || roundedActivations }
         /// Some product may compute in half precision (the ANE's fp16, the activation rounded to bf16): the checks then
         /// judge against the reference run in bf16 (`HalfPrecisionReference`).
-        package var halfPrecision: Bool { ane || roundedActivations }
+        package var halfPrecision: Bool { ane || roundedActivations || halfAttention }
     }
 
     /// A rule that forces answers: given a key, an assignment, or `nil` to let the plan answer.
@@ -124,7 +127,8 @@ package final class CapacityPlan: Sendable {
         self.allowsANE = allowsANE
         resources = Resources(amx: has(.amx, .fp32), ane: allowsANE && has(.ane, .fp16),
                               bf16Weights: has(.gpu, .bf16), int8Weights: has(.gpu, .int8), q8Weights: has(.gpu, .q8),
-                              roundedActivations: has(.gpu, .bf16act), aneInt8: allowsANE && has(.ane, .int8))
+                              roundedActivations: has(.gpu, .bf16act), aneInt8: allowsANE && has(.ane, .int8),
+                              halfAttention: allowsANE && has(.gpu, .tiles16))
         override = nil; attentionOverride = nil
         identity = "model " + Self.fingerprint(model) + (allowsANE ? "" : " no-ane")
     }
@@ -382,17 +386,34 @@ package struct AttentionKey: Hashable, Sendable, Codable, CustomStringConvertibl
 
 /// **What runs an attention**: the kernel, and for the split the heads the CPU takes (whole kv groups).
 package struct AttentionAssignment: Equatable, Sendable, Codable, CustomStringConvertible {
-    package enum Kernel: String, Codable, Sendable { case graph, flash, split }
+    /// `tiles`: the three stages by tiles of query rows, fp32 throughout (`TiledAttention`); `tiles16`: the same with fp16 operands and
+    /// fp32 sums — a request's permission (`Constraints.allowsHalf`), the ANE's.
+    package enum Kernel: String, Codable, Sendable { case graph, flash, split, tiles, tiles16 }
     package var kernel: Kernel
     /// The CPU's heads under `split`; 0 otherwise.
     package var cpuHeads: Int
-    package init(kernel: Kernel, cpuHeads: Int = 0) { self.kernel = kernel; self.cpuHeads = cpuHeads }
+    /// **The kernel of the GPU's heads under `split`** — graph, flash, tiles or tiles16: the head split composes with the GPU's best
+    /// kernel (each engine its own best); `graph` (what the split always ran) otherwise.
+    package var gpuKernel: Kernel
+    package init(kernel: Kernel, cpuHeads: Int = 0, gpuKernel: Kernel = .graph) {
+        self.kernel = kernel; self.cpuHeads = cpuHeads; self.gpuKernel = gpuKernel
+    }
+    package var gpuUsesTiles: Bool { splits && (gpuKernel == .tiles || gpuKernel == .tiles16) }
+    package var gpuUsesFlash: Bool { splits && gpuKernel == .flash }
+    package var gpuTilePrecision: TiledAttention.Precision { gpuKernel == .tiles16 ? .fp16 : .fp32 }
 
     package static let graph = AttentionAssignment(kernel: .graph)
     package static let flash = AttentionAssignment(kernel: .flash)
+    package static let tiles = AttentionAssignment(kernel: .tiles)
+    package static let tiles16 = AttentionAssignment(kernel: .tiles16)
     package var splits: Bool { kernel == .split }
     package var usesFlash: Bool { kernel == .flash }
-    package var description: String { kernel == .split ? "split \(cpuHeads)" : kernel.rawValue }
+    /// The three stages by tiles, in either precision: what the caller builds a `TiledAttention` for.
+    package var usesTiles: Bool { kernel == .tiles || kernel == .tiles16 }
+    package var tilePrecision: TiledAttention.Precision { kernel == .tiles16 ? .fp16 : .fp32 }
+    package var description: String {
+        kernel == .split ? "split \(cpuHeads)" + (gpuKernel == .graph ? "" : " + \(gpuKernel.rawValue)") : kernel.rawValue
+    }
 
     /// **The engine's defaults**: the cut by heads from `HeadSplitAttention.minimumSequence` rows at the reference share, the
     /// GPU keeping at least one group; the MPSGraph SDPA below. What every process ran before a plan existed.
@@ -405,8 +426,16 @@ package struct AttentionAssignment: Equatable, Sendable, Codable, CustomStringCo
     /// Whether the engines can run it for `key`: the CPU takes whole groups and the GPU keeps one at least.
     package func isRunnable(for key: AttentionKey) -> Bool {
         switch kernel {
-        case .graph, .flash: return cpuHeads == 0
-        case .split: return cpuHeads >= 0 && cpuHeads % key.group == 0 && cpuHeads < key.heads
+        case .graph, .flash: return cpuHeads == 0 && gpuKernel == .graph
+        case .tiles, .tiles16: return cpuHeads == 0 && gpuKernel == .graph && TiledAttention.runs(headDim: key.headDim, heads: key.heads, kvHeads: key.kvHeads)
+        case .split:
+            guard cpuHeads >= 0 && cpuHeads % key.group == 0 && cpuHeads < key.heads else { return false }
+            switch gpuKernel {
+            case .graph: return true
+            case .flash: return key.headDim == FlashMatrix.headDim && key.kvHeads == key.heads
+            case .tiles, .tiles16: return TiledAttention.runs(headDim: key.headDim, heads: key.heads, kvHeads: key.kvHeads)
+            case .split: return false
+            }
         }
     }
 }
@@ -424,18 +453,34 @@ extension CapacityPlan {
     ///   - `amx`: the AMX beside the GPU on every widened product of 512 rows or more, the GPU keeping 0.631 of the rows on 256-row
     ///     tiles — **the split the judges' md5s were taken with**;
     ///   - `flash`: the flash kernel for every attention whose caller tries it (it falls back by itself on a length it does not
-    ///     tile).
+    ///     tile);
+    ///   - `tiles`, `tiles16`: the three stages by tiles of query rows for every attention the plan speaks of (fp32; fp16 operands with
+    ///     fp32 sums, whose checks judge against the half-precision reference like the ANE's).
     package static func forcing(neuralEngine: Bool = false, bf16Activations: Bool = false, amx: Bool = false, flash: Bool = false,
-                                aneInt8: Bool = false, int8: Bool = false, aneMinimumRows: Int = 2 * NeuralEngine.rowUnit,
+                                tiles: Bool = false, tiles16: Bool = false, cut: Bool = false, aneInt8: Bool = false, int8: Bool = false, aneMinimumRows: Int = 2 * NeuralEngine.rowUnit,
                                 roundingMinimumRows: Int = 256) -> CapacityPlan {
         let neuralEngine = neuralEngine || aneInt8
         let resources = Resources(amx: amx, ane: neuralEngine, bf16Weights: bf16Activations, int8Weights: aneInt8 || int8,
-                                  roundedActivations: bf16Activations, aneInt8: aneInt8)
+                                  roundedActivations: bf16Activations, aneInt8: aneInt8, halfAttention: tiles16)
         let label = "forcing" + (neuralEngine ? " ane≥\(aneMinimumRows)" : "") + (aneInt8 ? " aneint8" : "") + (int8 ? " int8" : "")
             + (bf16Activations ? " bf16act≥\(roundingMinimumRows)" : "")
-            + (amx ? " amx 0.631" : "") + (flash ? " flash" : "")
+            + (amx ? " amx 0.631" : "") + (flash ? " flash" : "") + (tiles16 ? " tiles16" : tiles ? " tiles" : "") + (cut && (tiles || tiles16) ? " cut" : "")
         var attention: AttentionOverride?
-        if flash { attention = { (_: AttentionKey, tries: Bool) -> AttentionAssignment? in tries ? AttentionAssignment.flash : nil } }
+        if tiles16 || tiles {
+            // Every attention the plan speaks of (the encoders', which no caller asks it, stay the graph's); a flash caller takes tiles too.
+            let forced = tiles16 ? AttentionAssignment.tiles16 : AttentionAssignment.tiles
+            // `cut`: the engine's default cut by heads where it applies, its GPU heads on the forced kernel (the composition).
+            attention = { (key: AttentionKey, _: Bool) -> AttentionAssignment? in
+                if cut {
+                    var split = AttentionAssignment.defaults(key)
+                    if split.splits {
+                        split.gpuKernel = forced.kernel
+                        return split.isRunnable(for: key) ? split : nil
+                    }
+                }
+                return forced.isRunnable(for: key) ? forced : nil
+            }
+        } else if flash { attention = { (_: AttentionKey, tries: Bool) -> AttentionAssignment? in tries ? AttentionAssignment.flash : nil } }
         return CapacityPlan(resources: resources, label: label, override: { (key: ProductKey) -> ProductAssignment? in
             if key.phase == .denoising {
                 if bf16Activations, key.weight == .bf16, key.m >= roundingMinimumRows {
@@ -467,16 +512,18 @@ extension CapacityPlan {
         }, attentionOverride: attention)
     }
 
-    /// **The forcing a developer names** (`SILICONED_PLAN`, a comma list of `amx`, `flash`, `ane`, `aneint8`, `int8`, `bf16act`): the
+    /// **The forcing a developer names** (`SILICONED_PLAN`, a comma list of `amx`, `flash`, `tiles`, `tiles16`, `ane`, `aneint8`, `int8`,
+    /// `bf16act`; `tiles16` before `tiles` when both are named; `cut` with one of them: the default cut by heads, its GPU heads on that kernel): the
     /// previous switches of the checks and the judges, in one place. `aneint8` is `ane` with the published int8 weights read as they
     /// are by the ANE's int8 program beside the GPU's int8 kernel; `int8` reads them as published by the GPU's kernel everywhere
     /// else (`aneint8,int8` is the integers' route at every height, as the former `gemm_int8` + `gemm_ane` + `ane_int8` ran it).
     /// `nil` for an empty list; a word it does not know makes the whole list unread.
     package static func forcing(named list: String) -> CapacityPlan? {
         let words = Set(list.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces).lowercased() }.filter { !$0.isEmpty })
-        guard !words.isEmpty, words.isSubset(of: ["amx", "flash", "ane", "aneint8", "int8", "bf16act"]) else { return nil }
+        guard !words.isEmpty, words.isSubset(of: ["amx", "flash", "tiles", "tiles16", "cut", "ane", "aneint8", "int8", "bf16act"]) else { return nil }
         return forcing(neuralEngine: words.contains("ane"), bf16Activations: words.contains("bf16act"),
-                       amx: words.contains("amx"), flash: words.contains("flash"), aneInt8: words.contains("aneint8"),
+                       amx: words.contains("amx"), flash: words.contains("flash"), tiles: words.contains("tiles"),
+                       tiles16: words.contains("tiles16"), cut: words.contains("cut"), aneInt8: words.contains("aneint8"),
                        int8: words.contains("int8"))
     }
 }

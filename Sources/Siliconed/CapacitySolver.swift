@@ -13,6 +13,7 @@ import Foundation
 ///         ▼
 ///     the least t, the simplest set on a tie        ──▶  ProductAssignment
 ///     attention (S, keys, heads, kv heads, dim, cross) ──▶ graph · flash (where the caller tries it) · split (whole kv groups on the CPU)
+///                                                          · tiles (three stages by tiles of rows, fp32) · tiles16 (fp16 operands: the ANE's permission)
 ///
 /// What sets it apart — what a solver written by analogy with "choose the fastest route per class" would get wrong:
 ///
@@ -64,10 +65,14 @@ package enum CapacitySolver {
         package var excluded: Set<CapacityModel.Kernel>
         /// The ANE may be asked for: this process brings it up (never the Standard's, fp32 products).
         package var allowsANE: Bool
+        /// **The fp16 attention may be asked for** (`tiles16`: Q, K, V and P rounded to half, fp32 sums): the ANE's permission, the
+        /// request's — the Compact and the Light, never the Standard. `nil` at `init`: whatever `allowsANE` says.
+        package var allowsHalf: Bool
 
         package init(limits: Limits = .init(), sustained: Bool = true, excluded: Set<CapacityModel.Kernel> = [],
-                     allowsANE: Bool = true) {
+                     allowsANE: Bool = true, allowsHalf: Bool? = nil) {
             self.limits = limits; self.sustained = sustained; self.excluded = excluded; self.allowsANE = allowsANE
+            self.allowsHalf = allowsHalf ?? allowsANE
         }
 
         /// The constraints of a request: the ANE for the versions that publish a non-bf16 weight.
@@ -485,8 +490,13 @@ private struct ProductSolver {
         case .graph:
             guard let g = line(.gpu, .graph) else { return nil }
             rows = [g: key.heads]
+        case .tiles, .tiles16:
+            guard a.kernel == .tiles || c.allowsHalf, let t = line(.gpu, a.kernel == .tiles ? .tiles : .tiles16) else { return nil }
+            rows = [t: key.heads]
         case .split:
-            guard let g = line(.gpu, .graph), let cpu = line(.cpu, .heads), model.measures([.gpu, .cpu]) else { return nil }
+            // The GPU's heads run the kernel the assignment names (the best of those allowed, `solve`); the pair's sharing was measured
+            // beside the graph and is taken for every GPU kernel (the same two engines).
+            guard let g = gpuLine(a.gpuKernel), let cpu = line(.cpu, .heads), model.measures([.gpu, .cpu]) else { return nil }
             rows = [g: key.heads - a.cpuHeads, cpu: a.cpuHeads]
         }
         guard let t = model.seconds(m: key.heads, k: per, n: 1, rows: rows, sustained: c.sustained) else { return nil }
@@ -494,13 +504,31 @@ private struct ProductSolver {
         return (a.kernel.rawValue, rows, t, Dictionary(b.map { ($0.key.engine, $0.value) }, uniquingKeysWith: +))
     }
 
+    /// The line of the kernel that computes the GPU's heads under a split; the fp16 one only where the request allows half precision.
+    func gpuLine(_ k: AttentionAssignment.Kernel) -> Kernel? {
+        switch k {
+        case .graph: return line(.gpu, .graph)
+        case .flash: return line(.gpu, .flash)
+        case .tiles: return line(.gpu, .tiles)
+        case .tiles16: return c.allowsHalf ? line(.gpu, .tiles16) : nil
+        case .split: return nil
+        }
+    }
+
     func solve(_ key: AttentionKey, flash: Bool) -> CapacitySolver.AttentionSolution? {
         var options: [AttentionAssignment] = [.graph]
         if flash, line(.gpu, .flash) != nil { options.append(.flash) }
+        // The three stages by tiles: a candidate wherever the map has its line (fp16 only where the request allows half precision).
+        if line(.gpu, .tiles) != nil { options.append(.tiles) }
+        if c.allowsHalf, line(.gpu, .tiles16) != nil { options.append(.tiles16) }
         let groups = key.kvHeads
-        if key.sequence >= HeadSplitAttention.minimumSequence, groups >= 2, line(.cpu, .heads) != nil, line(.gpu, .graph) != nil,
-           model.measures([.gpu, .cpu]) {
-            for cpu in 1..<groups { options.append(AttentionAssignment(kernel: .split, cpuHeads: cpu * key.group)) }
+        if key.sequence >= HeadSplitAttention.minimumSequence, groups >= 2, line(.cpu, .heads) != nil, model.measures([.gpu, .cpu]) {
+            // The GPU's heads with each kernel the engine can give them: the cut composes with the best of them.
+            var gpuKernels: [AttentionAssignment.Kernel] = [.graph, .tiles, .tiles16]
+            if flash { gpuKernels.insert(.flash, at: 1) }
+            for gpu in gpuKernels where gpuLine(gpu) != nil {
+                for cpu in 1..<groups { options.append(AttentionAssignment(kernel: .split, cpuHeads: cpu * key.group, gpuKernel: gpu)) }
+            }
         }
         var best: (AttentionAssignment, (route: String, rows: [Kernel: Int], seconds: Double, busy: [Engine: Double]))?
         for o in options where o.isRunnable(for: key) {

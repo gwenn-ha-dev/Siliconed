@@ -107,15 +107,18 @@ package final class Krea2DiT: BoundaryRecording, PhaseTiming {
     /// The common share, 0.4, gives 5 of the 12 groups to the CPU: swept at 1024² (3, 4, 5 groups), 5 is
     /// ahead, SDPA 7.04–7.17 → 4.59–4.76 s an evaluation; no constant of Krea 2's own.
     private var splits: [Int: HeadSplitAttention] = [:]
+    private var tiles: [Int: TiledAttention] = [:]
 
-    /// **Where Krea 2 cuts its attention by heads**: where the plan assigns the split, from `headSplitRows` rows — **a bound of
+    /// **Where Krea 2 cuts its attention by heads** (or runs it in tiles, the cut with its GPU heads in tiles too): where the plan assigns
+    /// one of them, from `headSplitRows` rows — the bound holds for the tiled kernels as it does for the cut, until the trajectory's
+    /// clouds' judge lifts it (with `tiles` forced at 512², `block27_out` reaches 98 % of its bar) — **a bound of
     /// precision, not a setting**: at 512² (1,024 image rows) the cut saves 0.18 s of 7.6 an evaluation and
     /// tips the ill-conditioned step 3 of the 512² trajectory past its clouds' bar (median 5.47·10⁻⁴
     /// against 5.38); at 1024² it saves ~2.5 s of 29 and the trajectory holds. Krea 2 does not try the flash kernel. The memory need
     /// reads the same function.
     package static func attentionAssignment(_ plan: CapacityPlan, sequence: Int, heads: Int, kvHeads: Int, headDim: Int) -> AttentionAssignment {
         let a = plan.assign(AttentionKey(sequence: sequence, heads: heads, kvHeads: kvHeads, headDim: headDim))
-        return a.splits && sequence >= headSplitRows ? a : .graph
+        return (a.usesTiles || a.splits) && sequence >= headSplitRows ? a : .graph
     }
     package static let headSplitRows = 2048
 
@@ -478,7 +481,7 @@ package final class Krea2DiT: BoundaryRecording, PhaseTiming {
             let split: HeadSplitAttention
             if let s = splits[n] { split = s } else {
                 split = try HeadSplitAttention(device: gemm.device, queue: gemm.queue, heads: config.heads, sequence: n,
-                                               headDim: config.headDim, kvHeads: config.kvHeads, cpuHeads: cut.cpuHeads)
+                                               headDim: config.headDim, kvHeads: config.kvHeads, cpuHeads: cut.cpuHeads, gpuKernel: cut.gpuKernel)
                 splits[n] = split
             }
             let qb = try gemm.wrap(UnsafeMutableRawPointer(q), bytes: maxRows * d * 4, name: "q")
@@ -491,6 +494,19 @@ package final class Krea2DiT: BoundaryRecording, PhaseTiming {
                 ownTimings["sdpa CPU", default: 0] += cpu
             }
             return
+        }
+        if cut.usesTiles {
+            let tiled = tiles[n] ?? TiledAttention.make(cut, device: gemm.device, queue: gemm.queue, heads: config.heads, sequence: n,
+                                                        headDim: config.headDim, kvHeads: config.kvHeads)
+            if let tiled {
+                tiles[n] = tiled
+                let qb = try gemm.wrap(UnsafeMutableRawPointer(q), bytes: maxRows * d * 4, name: "q")
+                let kb = try gemm.wrap(UnsafeMutableRawPointer(k), bytes: maxRows * kv * 4, name: "k")
+                let vb = try gemm.wrap(UnsafeMutableRawPointer(v), bytes: maxRows * kv * 4, name: "v")
+                let ob = try gemm.wrap(UnsafeMutableRawPointer(merged), bytes: maxRows * d * 4, name: "merged")
+                timed("sdpa wall") { ownTimings["sdpa GPU", default: 0] += tiled.run(q: qb, k: kb, v: vb, into: ob) }
+                return
+            }
         }
         let attention: Attention
         if let a = attentions[n] { attention = a } else {

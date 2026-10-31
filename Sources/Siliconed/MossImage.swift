@@ -98,12 +98,13 @@ package final class MossImageDiT: BoundaryRecording, PhaseTiming {
     package let gridHeight, gridWidth, imageTokens, maxText, maxRows: Int
     private var attentions: [Int: Attention] = [:]
     private var splits: [Int: HeadSplitAttention] = [:]
+    private var tiles: [Int: TiledAttention] = [:]
 
     /// Where the SDPA is cut by heads between the GPU and the CPU: Krea 2's rule (the plan's split, from `headSplitRows` rows — a
-    /// bound of precision) — the memory need reads the same function.
+    /// bound of precision, which the tiled kernels keep too until a check lifts it) — the memory need reads the same function.
     package static func attentionAssignment(_ plan: CapacityPlan, sequence: Int, heads: Int, headDim: Int) -> AttentionAssignment {
         let a = plan.assign(AttentionKey(sequence: sequence, heads: heads, headDim: headDim))
-        return a.splits && sequence >= headSplitRows ? a : .graph
+        return (a.usesTiles || a.splits) && sequence >= headSplitRows ? a : .graph
     }
     package static let headSplitRows = 2048
 
@@ -495,7 +496,7 @@ package final class MossImageDiT: BoundaryRecording, PhaseTiming {
             let split: HeadSplitAttention
             if let s = splits[n] { split = s } else {
                 split = try HeadSplitAttention(device: gemm.device, queue: gemm.queue, heads: config.heads, sequence: n,
-                                               headDim: config.headDim, cpuHeads: cut.cpuHeads)
+                                               headDim: config.headDim, cpuHeads: cut.cpuHeads, gpuKernel: cut.gpuKernel)
                 splits[n] = split
             }
             timed("sdpa wall") {
@@ -504,6 +505,15 @@ package final class MossImageDiT: BoundaryRecording, PhaseTiming {
                 ownTimings["sdpa CPU", default: 0] += cpu
             }
             return
+        }
+        if cut.usesTiles {
+            let tiled = tiles[n] ?? TiledAttention.make(cut, device: gemm.device, queue: gemm.queue, heads: config.heads, sequence: n,
+                                                        headDim: config.headDim)
+            if let tiled {
+                tiles[n] = tiled
+                timed("sdpa wall") { ownTimings["sdpa GPU", default: 0] += tiled.run(q: qb, k: kb, v: vb, into: ob) }
+                return
+            }
         }
         let attention: Attention
         if let a = attentions[n] { attention = a } else {

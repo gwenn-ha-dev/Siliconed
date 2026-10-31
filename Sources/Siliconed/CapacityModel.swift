@@ -61,8 +61,9 @@ package struct CapacityModel: Codable, Sendable, Equatable {
         /// input, scale per column or for the tensor, the rotation on the activation); fp16 (the ANE's programs, from the
         /// widened weight).
         case fp32, bf16, bf16act, int8, q8, fp16
-        /// Attentions: the MPSGraph graph, the flash kernel, a share of the heads on the CPU.
-        case graph, flash, heads
+        /// Attentions: the MPSGraph graph, the flash kernel, a share of the heads on the CPU, the three stages by tiles of query rows
+        /// (`tiles`: fp32 throughout; `tiles16`: fp16 operands, fp32 sums).
+        case graph, flash, heads, tiles, tiles16
     }
 
     /// One engine computing one form: `gpu/fp32`, `ane/fp16`, `cpu/heads`.

@@ -279,7 +279,10 @@ extension Diagnostic {
             let attention = sizes.attention.map { s -> Int in
                 let split = HeadSplitAttention.hostBytes(heads: h, sequence: s, headDim: d, cpuHeads: h - 1)
                     + OperatorFootprint.sdpaQueries(rows: s, heads: 1, headDim: d)
-                return 4 * Arena.capacity(for: s * h * d * 4) + max(split, OperatorFootprint.sdpaQueries(rows: s, heads: h, headDim: d))
+                // The tiled kernels (one alive at a time, the fp16 variant the larger): the scores of a pass, the probabilities, the half operands.
+                let tiled = TiledAttention.bytes(heads: h, kvHeads: h, sequence: s, keys: s, headDim: d, precision: .fp16)
+                    .asTotal
+                return 4 * Arena.capacity(for: s * h * d * 4) + max(split, OperatorFootprint.sdpaQueries(rows: s, heads: h, headDim: d), tiled)
                     + sampledQueries * h * d * 8 * 2
             }.max() ?? 0
             let truths = 160 << 20

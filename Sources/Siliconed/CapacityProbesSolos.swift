@@ -150,21 +150,22 @@ extension Diagnostic.CapacityProbes.Context {
                 let rows = Diagnostic.sampleRows(s, count: Diagnostic.sampledQueries)
                 let exact = Diagnostic.exactAttention(q: pages.q.floats(), k: pages.k.floats(), v: pages.v.floats(), sequence: s, heads: h, headDim: d, rows: rows)
                 let flop = 4.0 * Double(s) * Double(s) * Double(h) * Double(d)
-                func verdict(_ kernel: String) -> (pass: Bool, error: Double) {
+                func verdict(_ kernel: String, threshold: Double) -> (pass: Bool, error: Double) {
                     let width = h * d, vectors = rows.count * h
                     var got = [Float](repeating: 0, count: vectors * d)
                     for (i, row) in rows.enumerated() {
                         for head in 0..<h { for x in 0..<d { got[x * vectors + i * h + head] = out[row * width + head * d + x] } }
                     }
-                    let judged = Diagnostic.judge(got, exact, columns: vectors, threshold: Diagnostic.fp32Threshold)
-                    keep(kernel, error: judged.error, threshold: Diagnostic.fp32Threshold, pass: judged.pass)
+                    let judged = Diagnostic.judge(got, exact, columns: vectors, threshold: threshold)
+                    keep(kernel, error: judged.error, threshold: threshold, pass: judged.pass)
                     return judged
                 }
+                func verdict(_ kernel: String) -> (pass: Bool, error: Double) { verdict(kernel, threshold: Diagnostic.fp32Threshold) }
                 func poison() { for row in rows { (out + row * h * d).update(repeating: .nan, count: h * d) } }
-                func record(_ kernel: Kernel, flop: Double, run: () -> Bool, shape: [Int]) {
+                func record(_ kernel: Kernel, flop: Double, threshold: Double = Diagnostic.fp32Threshold, run: () -> Bool, shape: [Int]) {
                     poison()
                     guard run() else { return }
-                    let v = verdict(kernel.description)
+                    let v = verdict(kernel.description, threshold: threshold)
                     guard v.pass else { measurements.wrong.append(kernel.description); return }
                     guard let t = guarded("\(kernel.description) S=\(s)", { CapacityProbes.steady(run) }) else { return }
                     measurements.solos.append(.init(kernel: kernel.description, shape: shape, flop: flop, seconds: t, error: v.error))
@@ -176,6 +177,23 @@ extension Diagnostic.CapacityProbes.Context {
                 RouteBeacon.announce("gpu/flash")
                 if !skipped.contains(Kernel(.gpu, .flash)), let flash = try? FlashMatrix(device: bench.device, queue: bench.queue, heads: h, sequence: s, headDim: d) {
                     record(Kernel(.gpu, .flash), flop: flop, run: { _ = flash.run(q: buffers.q, k: buffers.k, v: buffers.v, into: buffers.out); return true }, shape: [s, h, d])
+                }
+                // The three stages by tiles of query rows. fp32: the graph's bar. fp16 operands (Q, K, V, P rounded to half, fp32 sums): the
+                // bar of every fp16 route — 1.25 × what rounding the exact output to bf16 does (invariant 3; the ANE's, `aneThreshold`) —
+                // and only on a machine that runs it (the probe measures it everywhere: the permission is the request's, at the solver).
+                for (kernel, precision) in [(Kernel(.gpu, .tiles), TiledAttention.Precision.fp32), (Kernel(.gpu, .tiles16), .fp16)] {
+                    RouteBeacon.announce(kernel.description)
+                    guard !skipped.contains(kernel),
+                          let tiled = try? TiledAttention(device: bench.device, queue: bench.queue, heads: h, sequence: s, headDim: d, precision: precision)
+                    else { continue }
+                    var bar = Diagnostic.fp32Threshold
+                    if precision == .fp16 {
+                        let floor = Diagnostic.judge(exact.map { Double(Diagnostic.Half.bf16.round(Float($0))) }.map(Float.init), exact,
+                                                     columns: rows.count * h, threshold: 1).error
+                        bar = max(Diagnostic.fp32Threshold, Diagnostic.floorMargin * floor)
+                    }
+                    record(kernel, flop: flop, threshold: bar,
+                           run: { _ = tiled.run(q: buffers.q, k: buffers.k, v: buffers.v, into: buffers.out); return true }, shape: [s, h, d])
                 }
                 // The CPU's heads: all but one of them, the figure being the CPU part's own wall.
                 RouteBeacon.announce("cpu/heads")
