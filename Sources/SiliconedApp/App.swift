@@ -173,6 +173,9 @@ private struct AppCommands: Commands {
         CommandGroup(after: .windowList) {
             Button("Statistics") { window.toggleStatistics() }
                 .keyboardShortcut("i", modifiers: [.command, .option])
+            // By its character, never its key code: the same letter on an AZERTY keyboard. Free in the menus.
+            Button("Prompt Lab") { LabWindow.shared.show() }
+                .keyboardShortcut("l", modifiers: [.command, .option])
         }
     }
 }
