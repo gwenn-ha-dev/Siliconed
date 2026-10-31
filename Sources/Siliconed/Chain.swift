@@ -101,19 +101,15 @@ package struct Latent: Sendable {
         self.space = space; self.height = height; self.width = width; self.values = values
     }
 
-    /// The starting noise. `Noise` does not reproduce `torch.randn`: a seed gives an image of the
-    /// model, not diffusers'. It is drawn in planar order: a square therefore yields the same bits
-    /// as before rectangles arrived. **Qwen-Image-2.1 is the exception**: its noise is
-    /// `torch.randn((1, 1, 64, h, w))` to the bit (`TorchNoise`), so a seed gives diffusers' image.
+    /// The starting noise: **`torch.randn` on the CPU, to the bit** (`TorchNoise`), for the five families, so a seed
+    /// gives diffusers' image. It is drawn in planar order `[channels, height, width]`, which is the order each
+    /// pipeline draws its tensor in (`(1, 1, 64, h, w)` Qwen-Image-2.1, `(1, 16, h, w)` Z-Image and Krea 2 — Krea 2
+    /// packs it afterwards —, `(1, 16, 1, h, w)` Anima, `(1, 128, h, w)` MOSS-Image): a square yields the same bits as
+    /// before rectangles arrived. Every space has at least 16 channels, so a latent always takes the block path.
     package static func noise(_ space: LatentSpace, height: Int, width: Int, seed: UInt64) -> Latent {
         var values = [Float](repeating: 0, count: space.channels * height * width)
-        if space == .qwenImage21 || space == .flux2 {
-            var noise = TorchNoise(seed: seed)
-            values.withUnsafeMutableBufferPointer { noise.fill($0.baseAddress!, count: $0.count) }
-        } else {
-            var noise = Noise(seed: seed)
-            values.withUnsafeMutableBufferPointer { noise.fill($0.baseAddress!, count: $0.count) }
-        }
+        var noise = TorchNoise(seed: seed)
+        values.withUnsafeMutableBufferPointer { noise.fill($0.baseAddress!, count: $0.count) }
         return Latent(space: space, height: height, width: width, values: values)
     }
 }

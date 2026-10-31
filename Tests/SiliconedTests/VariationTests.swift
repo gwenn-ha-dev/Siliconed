@@ -10,7 +10,7 @@ final class VariationTests: XCTestCase {
     private func bits(_ l: Latent) -> [UInt32] { l.values.map(\.bitPattern) }
 
     /// Strength 0 — alone, or among others — and no variation at all: the seed's noise, to the bit,
-    /// for both generators (`Noise` and Qwen's `TorchNoise`).
+    /// on two spaces (16 channels at 8 pixels per cell, and Qwen-Image-2.1's 64).
     func testStrengthZeroIsTheOriginalNoiseToTheBit() {
         for space in [LatentSpace.flux, .qwenImage21] {
             let plain = Latent.noise(space, height: 16, width: 24, seed: 42)

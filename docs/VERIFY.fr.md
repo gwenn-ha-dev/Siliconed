@@ -374,6 +374,8 @@ Les LoRA ne sont pas couvertes ici : ce sont des fichiers que vous choisissez, 
 
 La même graine donne les mêmes pixels (le même md5) d'un rendu à l'autre sur un même Mac, avec une même version de l'app et une même mesure de la machine. Elle ne les donne pas d'un Mac à l'autre, ni d'une mesure à l'autre : le plan tire d'autres lignes d'autres nombres, et d'autres lignes somment dans un autre ordre. Ce qui passe d'un Mac à l'autre, c'est la règle ci-dessus, pas les bits.
 
+**Une graine est la graine de diffusers, sur les cinq modèles.** Le bruit de départ est celui de PyTorch : `torch.randn` sur le CPU en float32 (`torch.Generator("cpu").manual_seed(graine)`, Mersenne Twister puis Box-Muller par blocs de 16), reproduit au bit près, tiré dans la forme que tire le `prepare_latents` de chaque pipeline — le latent plan par plan, comme le moteur le range. `swift test` garde les premières valeurs, celles du milieu et les dernières de ce bruit pour chaque modèle, à 512² et sur un rectangle, relevées une fois avec diffusers ; les étages de trajectoire de Qwen-Image-2.1 et de MOSS-Image le comparent aussi au `latent_init` de l'oracle. La même graine et le même prompt partent donc du bruit dont part diffusers ; l'image qui suit se juge par les règles ci-dessus, étage par étage. Une variation tourne ce bruit vers celui d'une seconde graine, tiré de la même façon. Le rendu plus rapide et le bruit frais des solveurs (Euler a) ne sont pas la recette de diffusers et ne le prétendent pas.
+
 ## Toutes les étapes
 
 La sortie de `siliconed check list --markdown`, telle que la commande l'écrit, en anglais. `{size}` vaut 512, 1024 ou un rectangle comme 768x512 ; les étapes sans taille se contrôlent à celle de la référence.

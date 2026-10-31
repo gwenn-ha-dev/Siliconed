@@ -61,6 +61,13 @@
 - **Les touches restent au contrôle qui les a** : avec un curseur, un stepper ou un bouton actif, les flèches et Espace sont les siennes, pas celles de l'historique.
 - **Petites choses** : « Revenir à 0,8 » dans le menu contextuel d'une LoRA ; le pied du rack et l'interrupteur de l'aperçu disent ce qu'ils changent (l'aperçu ne change pas l'image) ; les durées suivent le format du système.
 
+### Une graine, l’image de diffusers, sur les cinq modèles
+
+- **La même graine donne désormais le même bruit de départ que diffusers sur Z-Image, Anima et Krea 2**,
+  comme Qwen-Image-2.1 et MOSS-Image le faisaient déjà : le `torch.randn` de PyTorch, reproduit au bit
+  près. La même graine donne donc une autre image sur ces trois, une fois, et c’est maintenant celle
+  dont part diffusers. Qwen-Image-2.1 et MOSS-Image ne bougent pas d’un bit.
+
 ### Corrigé
 
 - **L'édition avec une image de référence plantait sur certains Mac (M4, macOS 26.6)** : les têtes d'attention de 72 de large de Qwen3-VL tournent maintenant complétées à 128, exactement. Le diagnostic du rapporteur désignait directement la cause. ([#11](https://github.com/gwenn-ha-dev/Siliconed/issues/11))

@@ -1,14 +1,8 @@
 import Foundation
 
-/// The initial noise of a trajectory, reproducible from a seed.
-///
-/// **This is not PyTorch's generator, and that is deliberate** — for every family but Qwen-Image-2.1 (whose
-/// pipeline `TorchNoise` below reproduces to the bit): reproducing `randn_tensor` is not the point, reproducing the *trajectory*
-/// is. The checks therefore start from the reference's `latent_init`, re-read and not removed; this generator is only for free
-/// prompts, where there is no reference to compare against.
-///
-/// **A consequence to know**: for those families the same seed gives the same image with us and **another** image with
-/// `diffusers`. It is a choice, not a defect: matching it takes `TorchNoise`'s Mersenne Twister and block Box-Muller per family.
+/// **A stream of normal values that is not PyTorch's** — only for what diffusers leaves to a scheduler's
+/// generator and the engine draws step by step: the fresh noise of the ancestral solver (`Solver`, and the
+/// samplers that feed it). The *starting* noise of every family is `TorchNoise` below (`Latent.noise`).
 package struct Noise {
     /// `splitmix64` — a single-state generator, with no table, no warm-up, and where each
     /// output bit depends on all the state bits. It is more than enough: what we ask of
@@ -49,10 +43,11 @@ package struct Noise {
     }
 }
 
-/// **PyTorch's CPU `randn`, to the bit** — for Qwen-Image-2.1 only, whose pipeline (`prepare_latents`)
-/// draws `randn((1, 1, 64, h, w), generator=torch.Generator("cpu").manual_seed(seed))`: the same seed
-/// gives the reference's starting noise, so a free render can be put next to diffusers' and the
-/// trajectory check starts from the engine's own noise instead of a golden one.
+/// **PyTorch's CPU `randn`, to the bit** — the starting noise of the five families. Each pipeline
+/// (`prepare_latents`) draws `randn(shape, generator=torch.Generator("cpu").manual_seed(seed))`, the shape being the
+/// planar latent (Qwen-Image-2.1 `(1, 1, 64, h, w)`, Z-Image and Krea 2 `(1, 16, h, w)`, Anima `(1, 16, 1, h, w)`,
+/// MOSS-Image `(1, 128, h, w)`): the same seed gives the reference's starting noise, so a free render can be put
+/// next to diffusers' and a trajectory check can start from the engine's own noise instead of a golden one.
 ///
 /// What `at::normal_fill` (`ATen/native/cpu/DistributionTemplates.h`, the path of a contiguous fp32
 /// tensor of at least 16 values) does, and a port by analogy would miss:

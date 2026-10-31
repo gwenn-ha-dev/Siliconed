@@ -61,6 +61,13 @@ English · [Français](RELEASE-NOTES.fr.md)
 - **Keys stay with the control that has them**: with a slider, a stepper or a button focused, the arrows and Space are the control's, not the history's.
 - **Smaller things**: “Reset to 0.8” in a LoRA's context menu; the rack's footnote and the preview switch say what they change (the preview does not change the image); durations follow the system's format.
 
+### One seed, diffusers' image, on all five models
+
+- **The same seed now gives the same starting noise as diffusers on Z-Image, Anima and Krea 2**, as
+  Qwen-Image-2.1 and MOSS-Image already did: PyTorch's own `torch.randn`, reproduced to the bit. So the
+  same seed gives a different image on those three, once, and it is now the one diffusers starts from.
+  Qwen-Image-2.1 and MOSS-Image do not change by a bit.
+
 ### Fixed
 
 - **Editing with a reference image crashed on some Macs (M4, macOS 26.6)**: Qwen3-VL's 72-wide attention heads now run padded to 128, exactly. The reporter's own diagnosis pointed straight at it. ([#11](https://github.com/gwenn-ha-dev/Siliconed/issues/11))

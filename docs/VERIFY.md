@@ -374,6 +374,8 @@ LoRAs are not covered here: they are files you choose, not part of what Silicone
 
 The same seed gives the same pixels (the same md5) from one render to the next on one Mac, with one version of the app and one measure of that machine. It does not give them from one Mac to another, nor from one measure to another: the plan works out other rows from other numbers, and other rows sum in another order. What carries from Mac to Mac is the rule above, not the bits.
 
+**A seed is diffusers' seed, on all five models.** The starting noise is PyTorch's own: `torch.randn` on the CPU in float32 (`torch.Generator("cpu").manual_seed(seed)`, Mersenne Twister then Box-Muller by blocks of 16), reproduced bit for bit, drawn in the shape each pipeline's `prepare_latents` draws — the latent plane by plane, as the engine stores it. `swift test` holds the first, middle and last values of that noise for each model, at 512² and on a rectangle, read once from diffusers; the trajectory stages of Qwen-Image-2.1 and MOSS-Image also compare it to the oracle's `latent_init`. The same seed and the same prompt therefore start from the noise diffusers starts from; the image that follows is judged by the rules above, stage by stage. A variation turns that noise towards a second seed's, drawn the same way. Faster Rendering and the solvers' fresh noise (Euler a) are not diffusers' recipe and do not claim it.
+
 ## Every stage
 
 The output of `siliconed check list --markdown`. `{size}` is 512, 1024 or a rectangle such as 768x512; the stages that take no size are checked at the reference's own.

@@ -18,8 +18,8 @@ import Foundation
 ///     channel and column, over the rows — so its variance is 1 only where ω happens to be π/2; ours
 ///     takes ω = π/2, its expectation, and is exact in distribution. At ω = π/2 the two coincide.
 ///   - **the second noise comes from the same generator, at the same shape**, as the first
-///     (`Latent.noise`): `Noise` (splitmix64 + Box-Muller) for the other families, `TorchNoise`
-///     (PyTorch's CPU `randn`) for Qwen-Image-2.1. A variation is therefore defined on the latent, not on pixels:
+///     (`Latent.noise`), `TorchNoise` (PyTorch's CPU `randn`) for every family: both draws are
+///     diffusers' noises for their seeds. A variation is therefore defined on the latent, not on pixels:
 ///     the same pair of seeds at another format is another image.
 ///   - **strength 0 is the original noise to the bit** — a special case, not `cos 0 · a + sin 0 · b`
 ///     (which would also be `a`, but only by the grace of `sin 0 = 0` and `−0` arithmetic; the
