@@ -331,7 +331,9 @@ private struct Footer: View {
     /// The running render: where its batch is, the time left, and a stop that leaves the queue going.
     private func running(_ job: Job) -> some View {
         HStack(spacing: 8) {
-            ProgressView().controlSize(.mini).frame(width: 14)
+            // Still, not a spinner: the one under the image is the render's only one.
+            Image(systemName: "play.fill").font(.system(size: 8, weight: .bold))
+                .foregroundStyle(Palette.live).frame(width: 14)
             VStack(alignment: .leading, spacing: 1) {
                 Text(job.settings.prompt).font(.caption).lineLimit(1).truncationMode(.tail)
                 Text(app.batchSize > 1

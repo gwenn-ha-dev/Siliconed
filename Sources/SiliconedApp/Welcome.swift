@@ -123,11 +123,9 @@ struct Waiting: View {
     var body: some View {
         ZStack {
             Palette.well
-            VStack(spacing: 8) {
-                ProgressView().controlSize(.small)
-                Text(stage?.label ?? String(localized: "Preparing…"))
-                    .font(.callout).foregroundStyle(.secondary)
-            }
+            // The stage in words only: the spinner of the render is in the progress under this frame.
+            Text(stage?.label ?? String(localized: "Preparing…"))
+                .font(.callout).foregroundStyle(.secondary)
         }
     }
 }
