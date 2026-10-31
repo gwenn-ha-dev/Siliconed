@@ -13,7 +13,7 @@ import Siliconed
 // the block-causal mask judges both; the VAE decodes RGBA.
 
 enum QwenImageStages {
-    static let all: [Stage] = [text, vision, references, dit, trajectory, vae, vaeEncode]
+    static let all: [Stage] = [text, vision, references, dit, trajectory, vae, vaeEncode] + QwenImageWriterStages.all
 
     static let model = "qwen-image-2.1"
     /// Generation, then editing with one and two pictures: what the oracle's `all` writes for a stage.

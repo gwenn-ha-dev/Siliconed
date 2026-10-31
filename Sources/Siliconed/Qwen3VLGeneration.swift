@@ -115,6 +115,20 @@ package final class Qwen3VLGenerator {
     /// The top-1 / top-2 logit gap of each token the last `generate` chose, in order: 0 is a tie, a small one is where
     /// two engines' roundings could choose differently.
     package private(set) var gaps: [Float] = []
+
+    /// **Teacher forcing, for the check against the reference**: the sequence continues with `tokens` (the
+    /// reference's) whatever the engine would choose, and `observe` hears each step's engine choice (its
+    /// argmax, the first maximum) and the whole row of logits, before the next pass. The engine's tokens equal
+    /// the reference's exactly when every step's choice does: a free run never leaves the forced path before
+    /// the first difference, so the one run proves both the tokens and the logits. Nil: a free run.
+    package struct Teacher {
+        package let tokens: [Int]
+        package let observe: (_ step: Int, _ choice: Int, _ logits: UnsafeBufferPointer<Float>) -> Void
+        package init(tokens: [Int], observe: @escaping (_ step: Int, _ choice: Int, _ logits: UnsafeBufferPointer<Float>) -> Void) {
+            self.tokens = tokens; self.observe = observe
+        }
+    }
+    package var teacher: Teacher?
     /// Seconds, by phase: `vision`, `prefill`, `decode`, `head` (`lm_head`, inside the other two).
     package private(set) var timings: [String: Double] = [:]
     /// Passes over the 36 layers: each reads every layer once.
@@ -297,6 +311,8 @@ package final class Qwen3VLGenerator {
         var nextPosition = Qwen3VLChat.firstGeneratedPosition(request.positions)
         var processed = 0
         var generated: [Int] = [], stopped = false
+        let rowOfLogits: UnsafeMutablePointer<Float>? = teacher.map { _ in .allocate(capacity: vocabulary) }
+        defer { rowOfLogits?.deallocate() }
 
         /// The token chosen, appended where the next pass reads it.
         func accept(_ pick: Int, gap: Float) throws {
@@ -307,6 +323,14 @@ package final class Qwen3VLGenerator {
             nextPosition += 1
             stopped = stops.contains(pick)
             try onToken?(pick)
+        }
+
+        /// With a teacher, the engine's choice and its row of logits are heard, and the reference's token goes on;
+        /// on either path, the GPU's logits being the decoder's own buffer (`logitValues`).
+        func taught(_ choice: Int, logits row: UnsafePointer<Float>?) -> Int {
+            guard let teacher, let row else { return choice }
+            teacher.observe(generated.count, choice, UnsafeBufferPointer(start: row, count: vocabulary))
+            return generated.count < teacher.tokens.count ? teacher.tokens[generated.count] : choice
         }
 
         while !stopped && generated.count < maxNewTokens {
@@ -327,7 +351,7 @@ package final class Qwen3VLGenerator {
                 timings["gpu", default: 0] += gpu.lastStep.gpu
                 passes += 1
                 processed += 1
-                try accept(pick.id, gap: pick.gap)
+                try accept(taught(pick.id, logits: gpu.logitValues), gap: pick.gap)
                 timings["decode", default: 0] += Date().timeIntervalSince(passStarted)
                 continue
             }
@@ -402,10 +426,11 @@ package final class Qwen3VLGenerator {
                 } else {
                     last.update(from: x + (used - 1) * h, count: h)
                     Ops.rmsNorm(last, weight: finalNorm, into: last, rows: 1, columns: h, eps: config.eps)
-                    best = try greedy(last, headRows: headRows, logits: logits)
+                    best = try greedy(last, headRows: headRows, logits: logits, row: rowOfLogits)
                 }
                 timings["head", default: 0] += Date().timeIntervalSince(headStarted)
-                try accept(best.id, gap: best.value - best.second)
+                try accept(taught(best.id, logits: gpu?.logitValues ?? rowOfLogits.map { UnsafePointer($0) }),
+                           gap: best.value - best.second)
             }
             timings[prefill ? "prefill" : "decode", default: 0] += Date().timeIntervalSince(passStarted)
             if prefill && processed == count { features = [] }   // read by the prompt's passes, not by a step
@@ -421,7 +446,7 @@ package final class Qwen3VLGenerator {
     /// `lm_head` on the normalized row, block of rows by block of rows (widened, then one product),
     /// and the argmax — the first maximum, as `torch.argmax`.
     private func greedy(_ hidden: UnsafePointer<Float>, headRows: UnsafeMutablePointer<Float>,
-                        logits: UnsafeMutablePointer<Float>) throws -> Top2 {
+                        logits: UnsafeMutablePointer<Float>, row: UnsafeMutablePointer<Float>? = nil) throws -> Top2 {
         let h = config.hidden
         var best = Top2()
         var first = 0
@@ -431,6 +456,7 @@ package final class Qwen3VLGenerator {
             cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasTrans, 1, Int32(n), Int32(h), 1,
                         hidden, Int32(h), headRows, Int32(h), 0, logits, Int32(n))
             best.scan(logits, count: n, base: first)
+            if let row { (row + first).update(from: logits, count: n) }
             first += n
         }
         return best
