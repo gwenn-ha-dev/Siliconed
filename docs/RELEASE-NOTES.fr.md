@@ -41,7 +41,7 @@
 - **Le rédacteur est un modèle déjà installé** : l’encodeur de texte de Qwen-Image-2.1, Qwen3-VL-8B, mis
   à écrire. Seule sa couche de sortie manque au modèle installé : Installer le rédacteur la télécharge
   du même dépôt, 1,25 Go, par plages d’octets. Il faut Qwen-Image-2.1 installé ; en Compact, un Mac de
-  16 Go (la Standard demande 24 Go).
+  16 Go (la Standard en demande davantage).
 - **Nos consignes, une par modèle**, tirées de ce que chaque éditeur dit de ses prompts : chaque élément
   du prompt est gardé, le texte entre guillemets mot pour mot, rien n’est retiré, adouci ni moralisé.
 - **Jamais pendant un rendu** : une image qui démarre arrête le rédacteur, et l’atelier attend.

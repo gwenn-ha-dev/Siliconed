@@ -41,7 +41,7 @@ English · [Français](RELEASE-NOTES.fr.md)
 - **The writer is a model you already have**: Qwen-Image-2.1's text encoder, Qwen3-VL-8B, made to write.
   Only its output layer is missing from the installed model: Install the Writer downloads it from the
   same repository, 1.25 GB, by byte range. It needs Qwen-Image-2.1 installed; on its Compact, a 16 GB
-  Mac (the Standard asks for 24 GB).
+  Mac (the Standard needs a bigger one).
 - **Our instructions, one per model**, drawn from what each publisher says of its prompts: every element
   of your prompt is kept, quoted text word for word, nothing removed, softened or moralized.
 - **Never during a render**: an image that starts stops the writer, and the lab waits.
