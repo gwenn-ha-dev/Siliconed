@@ -170,4 +170,55 @@ extension CapacityFitTests {
         let back = try JSONDecoder().decode(Diagnostic.CapacityProbes.Massive.self, from: JSONEncoder().encode(massive))
         #expect(back.kernel == massive.kernel && back.columns == massive.columns && back.columnError == massive.columnError && back.pass)
     }
+
+    /// **The products with a short side have their own line**: the forms' bytes at the memory's bandwidth plus the arithmetic of the rows the GPU
+    /// computes (tiles of 64), `R` the big products' rate (the engine's ceiling) — `t₀` and the bandwidth's share recovered from probes of the thin
+    /// family (`Sizes.thin`), and right outside them, on a LoRA's `4 117 × 3 072 · 128` and a prompt's 19 rows. Written in the model and read back,
+    /// and used by `alone` only where a side is short.
+    @Test func theThinLineIsFoundFromTheThinFamilyAndOnlyTimesShortSides() throws {
+        let arithmetic = M.Line(t0: 5e-4, rate: 6e12)
+        let bandwidth = 150e9, share = 1.2, t0 = 2e-4
+        let kernel = M.Kernel(.gpu, .fp32)
+        let (wb, ab) = M.streamedBytes(.fp32)
+        func truth(_ m: Int, _ k: Int, _ n: Int) -> Double {
+            let rows = Double(M.computedRows(kernel, rows: m))
+            return t0 + share * (wb * Double(k * n) + ab * rows * Double(k + n)) / bandwidth + 2 * rows * Double(k * n) / arithmetic.rate
+        }
+        let solos = Diagnostic.CapacityProbes.Sizes.full.thin.map { s -> F.Measurements.Solo in
+            F.Measurements.Solo(kernel: kernel.description, shape: [s.m, s.k, s.n], flop: 2 * Double(s.m * s.k * s.n), seconds: truth(s.m, s.k, s.n))
+        }
+        let line = try #require(F.thinLine(kernel: kernel, solos: solos, arithmetic: arithmetic, bandwidth: bandwidth))
+        func predicted(_ m: Int, _ k: Int, _ n: Int) -> Double {
+            line.seconds(rows: M.computedRows(kernel, rows: m), k: k, n: n)
+        }
+        for s in Diagnostic.CapacityProbes.Sizes.full.thin + [(m: 4117, k: 3072, n: 128), (m: 4117, k: 128, n: 16384), (m: 19, k: 4096, n: 12288)] {
+            #expect(abs(predicted(s.m, s.k, s.n) / truth(s.m, s.k, s.n) - 1) < 1e-6)
+        }
+        #expect(M.computedRows(kernel, rows: 19) == 64 && M.computedRows(kernel, rows: 4117) == 4160 && M.computedRows(M.Kernel(.amx, .fp32), rows: 19) == 19)
+        #expect(F.thinLine(kernel: kernel, solos: Array(solos.prefix(2)), arithmetic: arithmetic, bandwidth: bandwidth) == nil, "too few shapes to tell the terms apart")
+        #expect(F.thinLine(kernel: kernel, solos: solos, arithmetic: nil, bandwidth: bandwidth) == nil, "no ceiling without the big products' line")
+        #expect(F.thinLine(kernel: kernel, solos: solos, arithmetic: arithmetic, bandwidth: nil) == nil, "no streaming without the memory's bandwidth")
+        // A shape the kernel runs at over twice its time (a cliff of the kernel) is not the line's to hold.
+        var cliff = solos
+        cliff[1].seconds *= 6
+        let held = try #require(F.thinLine(kernel: kernel, solos: cliff, arithmetic: arithmetic, bandwidth: bandwidth))
+        #expect(abs(held.seconds(rows: 2048, k: 3072, n: 3072) / predicted(2048, 3072, 3072) - 1) < 1e-6)
+        var m = F.Measurements()
+        m.memoryBandwidth = bandwidth
+        m.solos = [(2048, 3840, 3840), (1024, 3840, 3840), (4096, 6144, 6144)].map { (r, k, n) in
+            .init(kernel: kernel.description, shape: [r, k, n], flop: 2 * Double(r * k * n), seconds: arithmetic.seconds(rows: r, k: k, n: n))
+        }
+        m.thin = solos
+        let model = F.model(from: m)
+        let fitted = try #require(model.thin[kernel])
+        #expect(abs(fitted.rate / arithmetic.rate - 1) < 1e-6, "the thin line's rate is the big products'")
+        let back = try JSONDecoder().decode(M.self, from: JSONEncoder().encode(model))
+        #expect(back.thin == model.thin && back.lines == model.lines)
+        let thin = try #require(model.alone(kernel, rows: 19, k: 4096, n: 12288))
+        let big = try #require(model.alone(kernel, rows: 2048, k: 3072, n: 3072))
+        #expect(abs(thin / truth(19, 4096, 12288) - 1) < 1e-6)
+        #expect(abs(big / (model.lines[kernel]!.fixed(k: 3072, n: 3072) + 2 * 2048 * 3072 * 3072 / model.lines[kernel]!.rate) - 1) < 1e-9)
+        var without = model; without.thin = [:]
+        #expect(without.alone(kernel, rows: 19, k: 4096, n: 12288) != thin, "without the thin line the big products' is extrapolated")
+    }
 }

@@ -53,6 +53,9 @@ extension Diagnostic.CapacityProbes {
         /// The ANE's fewest rows, taken as chains (fp16 and integers): a call costs it a fixed part whatever its rows, which products of 1 024 rows and
         /// more cannot tell from the host's passes — and the half grid's classes give it 256 to 768 rows.
         package var small: [Shape]
+        /// **The products with a short side** (`CapacityModel.thinSide`), each kernel alone on each (one weight for all: a probe re-reads the same operand, a render does not): a short `k` or a short `n` at 2 048 rows (a LoRA's
+        /// `x · down` and `mid · up`, whatever the model), few rows through a wide weight (a short prompt, a half grid's last rows). Generic shapes: no model's, no LoRA's rank — 128 and 256 are the sides the line is asked about.
+        package var thin: [Shape]
         /// The ANE's integer route taken as chains (`ane/int8`): the products' shapes but one — the host's passes over the activation and the output are told
         /// from the weight's lift and the engine's rate by a thin product (n = 1 536) and a cut K (k = 8 192, 12 288).
         package var integers: [Shape]
@@ -74,6 +77,7 @@ extension Diagnostic.CapacityProbes {
             Sizes(tier: 0, solo: [(512, 2048, 2048), (1024, 3840, 3840), (4096, 6144, 6144)],
                   product: [(2048, 2048, 4096), (2048, 3840, 3840), (4096, 3840, 3840), (1024, 12288, 4096), (2048, 8192, 1536)],
                   small: [(512, 3840, 3840)],
+                  thin: [(256, 3072, 8192), (2048, 3072, 128), (2048, 128, 3072), (2048, 256, 8192), (32, 3072, 8192), (256, 1536, 3072)],
                   integers: [(2048, 2048, 4096), (2048, 3840, 3840), (1024, 12288, 4096), (2048, 8192, 1536)],
                   chains: [(4096, 3840, 3840), (4096, 12288, 4096)],
                   sharing: [(1024, 3840, 3840), (2048, 3840, 3840), (4096, 3840, 3840)], attention: [1024, 4096],
@@ -81,6 +85,7 @@ extension Diagnostic.CapacityProbes {
             Sizes(tier: 1, solo: [(512, 2048, 2048), (1024, 3840, 3840), (2048, 4096, 4096)],
                   product: [(1024, 2048, 4096), (2048, 3840, 3840), (1024, 12288, 4096), (1024, 8192, 1536)],
                   small: [(512, 3840, 3840)],
+                  thin: [(256, 3072, 8192), (2048, 3072, 128), (2048, 128, 3072), (32, 3072, 8192), (256, 1536, 3072)],
                   integers: [(1024, 2048, 4096), (2048, 3840, 3840), (1024, 12288, 4096), (1024, 8192, 1536)],
                   chains: [(2048, 3840, 3840), (2048, 12288, 4096)],
                   sharing: [(1024, 3840, 3840), (2048, 3840, 3840)], attention: [1024, 2048],
@@ -88,6 +93,7 @@ extension Diagnostic.CapacityProbes {
             Sizes(tier: 2, solo: [(512, 2048, 2048), (1024, 3840, 3840)],
                   product: [(1024, 2048, 4096), (1024, 3840, 3840), (2048, 3840, 3840), (1024, 8192, 1536)],
                   small: [(512, 3840, 3840)],
+                  thin: [(256, 3072, 8192), (2048, 3072, 128), (2048, 128, 3072), (32, 3072, 8192), (256, 1536, 3072)],
                   integers: [(1024, 2048, 4096), (1024, 3840, 3840), (2048, 3840, 3840), (1024, 8192, 1536)], chains: [(2048, 3840, 3840)], sharing: [(1024, 3840, 3840)], attention: [1024],
                   stairRows: [768, 1024, 1792, 2048]),
         ]
@@ -97,7 +103,7 @@ extension Diagnostic.CapacityProbes {
 
         /// Every product the tier runs through the engines (the witness's included): what the operands and the engines' surfaces are sized to.
         package var products: [Shape] {
-            solo + product + integers + small + chains + sharing + stairRows.map { (m: $0, k: Self.stair.k, n: Self.stair.n) } + [Self.witness]
+            solo + product + integers + small + thin + chains + sharing + stairRows.map { (m: $0, k: Self.stair.k, n: Self.stair.n) } + [Self.witness]
         }
 
         /// A lower tier's operands are inside the allocated ones: every dimension of `a`, `b`, `c` is no larger.
@@ -152,6 +158,13 @@ extension Diagnostic.CapacityProbes {
             }
             let smallTime = a.map { rate in small.reduce(0) { $0 + chain(flop($1), rate: rate) + 0.1 } + truth(small) } ?? 0
             p["solos fp32"] = productTime + smallTime + Self.runs * soloFlop / (g * Self.formRatio["bf16"]!) + truth(product + solo, kinds: a == nil ? 1 : 2)
+            // The short-sided products: the GPU's forms steady, the AMX's and the ANE's, the truths.
+            let thinFlop = thin.reduce(0) { $0 + flop($1) }
+            let gpuForms = 1 + ["bf16", "bf16act", "int8", "q8"].reduce(0) { $0 + 1 / Self.formRatio[$1]! }
+            // The ANE compiles a program per shape (≈ 0.5 s each, M1 Pro); the GPU's and the AMX's runs are a few milliseconds.
+            p["thin products"] = Self.runs * thinFlop * gpuForms / g + truth(thin, kinds: 4)
+                + (x.map { Self.runs * thinFlop / $0 + 0.1 } ?? 0)
+                + (a.map { Self.runs * thinFlop / $0 + Double(thin.count) * 0.5 } ?? 0)
             let stairFlop = stairRows.reduce(0) { $0 + 2 * Double($1) * Double(Self.stair.k) * Double(Self.stair.n) }
             p["stairs"] = a.map { Self.runs * stairFlop / $0 + Double(stairRows.count) * (0.03 + truth([(1, Self.stair.k, Self.stair.n)])) } ?? 0
             let (h, d) = (Double(Self.attentionHeads), Double(Self.attentionHeadDim))

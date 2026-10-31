@@ -199,7 +199,10 @@ extension MemoryNeed {
           + gemm("DiT", products: [(image, inDim, d)],
                  bounded: [(sequence, d, d), (sequence, d, hidden), (sequence, hidden, d), (capPadded, dit.capDim, d),
                            (sequence, d, inDim)],
-                 spread: capPadded, step: dit.seqMultiple, rank: rank, plan: request.ditPlan, weight: Artifact.weightFormat(header: maps.dit)))
+                 spread: capPadded, step: dit.seqMultiple, rank: rank,
+                 lora: [(image, d, d), (image, d, hidden), (image, hidden, d), (capPadded, d, d), (capPadded, d, hidden),
+                        (capPadded, hidden, d), (sequence, d, d), (sequence, d, hidden), (sequence, hidden, d)],
+                 plan: request.ditPlan, weight: Artifact.weightFormat(header: maps.dit)))
 
         // ── decoding: the decoder's two heaps and the image it returns; the latent it reads crosses ──
         let band = request.minimumBands ? min(VAE.bandElements, MemoryPlan.fluxMinimumBand) : VAE.bandElements

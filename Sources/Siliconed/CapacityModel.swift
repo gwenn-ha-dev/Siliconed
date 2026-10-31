@@ -210,6 +210,14 @@ package struct CapacityModel: Codable, Sendable, Equatable {
 
     package var crest: [Engine: Double] = [:]
     package var lines: [Kernel: Line] = [:]
+    /// **The lines of the products with a short side** (`thinSide`): a kernel's seconds on a product of at most `thinSide` rows, or whose `k` or `n`
+    /// is, are not the big products' line extrapolated — a LoRA's `m × 3072 · 128`, a prompt of 19 rows through a 4096 × 12288 weight. They stream
+    /// the activation and the output (or the whole weight) more than they compute: `t = t₀ + w·k·n + h·M·(k + n) + 2·M·k·n / R`, `M` the rows computed, `R` the big
+    /// products' rate (the engine's ceiling), the streaming terms the forms' bytes at the memory's bandwidth, scaled by what the probes of that family of shapes measured (`CapacityFit.thinLine`), the rows those of the tile (`computedRows`). A kernel
+    /// without one is timed by its `lines` everywhere, as before.
+    package var thin: [Kernel: Line] = [:]
+    /// The longest short side the `thin` lines speak for.
+    package static let thinSide = 256
     package var aneRowUnit = 256
     /// Keyed by the set's engines in order, joined by `+` (`gpu+ane`), or by its kernels (`gpu/int8+ane/int8`) where the form
     /// changes the loss: a dictionary keyed by a set does not survive JSON.
@@ -235,7 +243,7 @@ package struct CapacityModel: Codable, Sendable, Equatable {
     // MARK: - JSON
 
     private enum CodingKeys: String, CodingKey {
-        case crest, lines, aneRowUnit, sharing, heat, memoryBandwidth, diskBandwidth, diskClasses, preparation, kquantPreparation
+        case crest, lines, thin, aneRowUnit, sharing, heat, memoryBandwidth, diskBandwidth, diskClasses, preparation, kquantPreparation
     }
 
     /// The engines of a dictionary keyed by their names.
@@ -263,6 +271,12 @@ package struct CapacityModel: Codable, Sendable, Equatable {
             }
             lines[kernel] = line
         }
+        for (name, line) in try c.decodeIfPresent([String: Line].self, forKey: .thin) ?? [:] {
+            guard let kernel = Kernel(name) else {
+                throw DecodingError.dataCorruptedError(forKey: .thin, in: c, debugDescription: "kernel « \(name) »")
+            }
+            thin[kernel] = line
+        }
         aneRowUnit = try c.decodeIfPresent(Int.self, forKey: .aneRowUnit) ?? 256
         sharing = try c.decodeIfPresent([String: Sharing].self, forKey: .sharing) ?? [:]
         heat = try Self.engines(try c.decodeIfPresent([String: Double].self, forKey: .heat) ?? [:], codingPath: c.codingPath + [CodingKeys.heat])
@@ -288,6 +302,7 @@ package struct CapacityModel: Codable, Sendable, Equatable {
         var c = encoder.container(keyedBy: CodingKeys.self)
         try c.encode(Dictionary(uniqueKeysWithValues: crest.map { ($0.key.rawValue, $0.value) }), forKey: .crest)
         try c.encode(Dictionary(uniqueKeysWithValues: lines.map { ($0.key.description, $0.value) }), forKey: .lines)
+        if !thin.isEmpty { try c.encode(Dictionary(uniqueKeysWithValues: thin.map { ($0.key.description, $0.value) }), forKey: .thin) }
         try c.encode(aneRowUnit, forKey: .aneRowUnit)
         try c.encode(sharing, forKey: .sharing)
         try c.encode(Dictionary(uniqueKeysWithValues: heat.map { ($0.key.rawValue, $0.value) }), forKey: .heat)
@@ -308,6 +323,7 @@ package struct CapacityModel: Codable, Sendable, Equatable {
         var m = self
         m.crest = crest.mapValues(r)
         m.lines = lines.mapValues { Line(t0: r($0.t0), rate: r($0.rate), perWeight: $0.perWeight.map(r), rateByK: $0.rateByK?.map { .init(k: $0.k, rate: r($0.rate)) }, rowsFrom: $0.rowsFrom, perRow: $0.perRow.map(r)) }
+        m.thin = thin.mapValues { Line(t0: r($0.t0), rate: r($0.rate), perWeight: $0.perWeight.map(r), rateByK: $0.rateByK?.map { .init(k: $0.k, rate: r($0.rate)) }, rowsFrom: $0.rowsFrom, perRow: $0.perRow.map(r)) }
         m.sharing = sharing.mapValues { Sharing(overhead: r($0.overhead), keep: $0.keep.mapValues(r), sustained: $0.sustained.map(r), keepByK: $0.keepByK?.map { .init(k: $0.k, keep: $0.keep.mapValues(r)) }, kFrom: $0.kFrom, kTo: $0.kTo) }
         m.heat = heat.mapValues(r)
         m.memoryBandwidth = memoryBandwidth.map(r); m.diskBandwidth = diskBandwidth.map(r)
@@ -342,7 +358,9 @@ package struct CapacityModel: Codable, Sendable, Equatable {
 
     /// **The rate of `kernel` on a `k×n` weight** with the host's passes in it (`Line.perRow`): the ANE's parts of K are the engine's own cut
     /// (`NeuralEngine.parts`), its int8 program reading convrot groups of 256 and rotating the activation.
-    package func rate(_ kernel: Kernel, line: Line, k: Int, n: Int) -> Double {
+    package func rate(_ kernel: Kernel, line: Line, k: Int, n: Int, short: Bool = false) -> Double {
+        // A thin line's host term is the activation and the output streamed once (`k + n` per row), whatever the engine.
+        if short { return line.rate(atK: k, n: n) }
         guard line.perRow != nil, kernel.engine == .ane else { return line.rate(atK: k) }
         let int8 = kernel.form == .int8
         return line.rate(atK: k, n: n, parts: NeuralEngine.parts(k: k, n: n, int8: int8, alignment: int8 ? Widen.largestRotationGroup : 64), rotated: int8)
@@ -351,11 +369,45 @@ package struct CapacityModel: Codable, Sendable, Equatable {
     /// **A kernel's seconds alone on `rows` rows of a `k×n` weight** (the ANE's rounded up to its unit), at the sustained rate
     /// (`heat`, on the rate: the lift of the weight and the launch do not slow) when asked. `nil` where the kernel has no line.
     package func alone(_ kernel: Kernel, rows: Int, k: Int, n: Int, sustained: Bool = false) -> Double? {
-        guard let line = lines[kernel], line.rate > 0, rows > 0, rows >= (line.rowsFrom ?? 0) else { return nil }
+        guard let (line, short) = line(for: kernel, rows: rows, k: k, n: n), line.rate > 0, rows > 0, rows >= (line.rowsFrom ?? 0) else { return nil }
         var here = rows
         if kernel.engine == .ane { here = (here + aneRowUnit - 1) / aneRowUnit * aneRowUnit }
+        if short { here = Self.computedRows(kernel, rows: here) }
         let slow = sustained ? max(1, heat[kernel.engine] ?? 1) : 1
-        return line.fixed(k: k, n: n) + 2 * Double(here) * Double(k) * Double(n) / (rate(kernel, line: line, k: k, n: n) / slow)
+        return line.fixed(k: k, n: n) + 2 * Double(here) * Double(k) * Double(n) / (rate(kernel, line: line, k: k, n: n, short: short) / slow)
+    }
+
+    /// **The rows a kernel computes when it is given `rows`**: the GPU's work in tiles of `GEMM.rowQuantum` rows (MPS's, and the 64-row tile of
+    /// `matmul2d`), so a prompt of 19 rows costs 64 — the figure a short product's seconds are made of (a 19-row product through a 4 096 × 12 288
+    /// int8 weight took 3.1 ms, the 64-row arithmetic 1.9 and the weight's pass the rest, against 0.8 for 19 rows' arithmetic). The AMX and the
+    /// ANE (whose unit `alone` applies) compute what they are given.
+    package static func computedRows(_ kernel: Kernel, rows: Int) -> Int {
+        guard kernel.engine == .gpu, rows > 0 else { return rows }
+        return (rows + GEMM.rowQuantum - 1) / GEMM.rowQuantum * GEMM.rowQuantum
+    }
+
+    /// **The bytes a form moves, an element each**: `(weight, activation)` — the weight as the kernel reads it (fp32, bf16 as published, int8 with its
+    /// scales a rounding error beside it, Q8_0's fp32 scale per block of 64 rows of K), the activation in and the output out (fp32 each)
+    /// beside the passes the form adds: the int8 route rotates the activation and scales the output (a read and a write of fp32 each), a rounded
+    /// activation is read and written once before the product (half of that on each side of `k + n`).
+    package static func streamedBytes(_ form: Form) -> (weight: Double, activation: Double) {
+        switch form {
+        case .bf16, .fp16: return (2, 4)
+        case .bf16act: return (2, 8)
+        case .int8: return (1, 12)
+        case .q8: return (1 + 4.0 / 64, 4)
+        default: return (4, 4)
+        }
+    }
+
+    /// Whether a product of `rows` rows of a `k×n` weight has a short side: what the `thin` lines speak for.
+    package static func isThin(rows: Int, k: Int, n: Int) -> Bool { min(rows, k, n) <= thinSide }
+
+    /// **The line that times `kernel` on this product**: its `thin` line where the product has a short side and the probes measured one, else
+    /// its `lines`. `short`: it is the thin one.
+    package func line(for kernel: Kernel, rows: Int, k: Int, n: Int) -> (Line, short: Bool)? {
+        if Self.isThin(rows: rows, k: k, n: n), let t = thin[kernel], t.rate > 0 { return (t, true) }
+        return lines[kernel].map { ($0, false) }
     }
 
     /// The speed of a kernel inside the set that is active, over its speed alone.
@@ -419,9 +471,9 @@ package struct CapacityModel: Codable, Sendable, Equatable {
             let set = sharing(active)
             var rate: [Kernel: Double] = [:], fixed: [Kernel: Double] = [:], kappa: [Kernel: Double] = [:]
             for kernel in active {
-                guard let line = lines[kernel], line.rate > 0 else { return nil }
+                guard let (line, short) = self.line(for: kernel, rows: m, k: k, n: n), line.rate > 0 else { return nil }
                 let slow = sustained ? max(1, heat[kernel.engine] ?? 1) : 1
-                rate[kernel] = self.rate(kernel, line: line, k: k, n: n) / slow
+                rate[kernel] = self.rate(kernel, line: line, k: k, n: n, short: short) / slow
                 fixed[kernel] = line.fixed(k: k, n: n)
                 kappa[kernel] = speed(kernel, in: set, k: k)
             }

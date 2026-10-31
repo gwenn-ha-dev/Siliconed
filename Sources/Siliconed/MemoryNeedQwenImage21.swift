@@ -354,7 +354,9 @@ package struct QwenImage21Need {
         let running = attentions + MemoryNeed.gemm("DiT", products: [(largestImage, dit.channels, d)],
                                                    bounded: [(scratch, d, d), (mlpRows, d, h), (mlpRows, h, d),
                                                              (textRows, dit.context, d)],
-                                                   spread: textRows, rank: rank, plan: request.ditPlan, weight: maps.ditFormat)
+                                                   spread: textRows, rank: rank,
+                                                   lora: [(scratch, d, d), (mlpRows, d, h), (mlpRows, h, d)],
+                                                   plan: request.ditPlan, weight: maps.ditFormat)
         let widened = Krea2Exact.widenedBytes(inputs: d, outputs: 4 * d)
             + (rank > 0 ? Arena.capacity(for: d * rank * 4) + Arena.capacity(for: rank * 4 * d * 4) : 0)
         let runningBytes = running.reduce(0) { $0 + $1.bytes }

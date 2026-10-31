@@ -623,7 +623,7 @@ extension Diagnostic {
                 /// The progress group each probe belongs to: the app names it in the user's language.
                 let groups: [String: Diagnostic.Stage] = [
                     "preparation": .widening, "witnesses start": .witness, "bandwidth": .witness, "disk": .witness, "solos fp32": .engines, "stairs": .engines,
-                    "attention": .engines, "sharing": .sharing, "solos 8-bit and rounded": .forms, "witnesses end": .regime,
+                    "attention": .engines, "sharing": .sharing, "solos 8-bit and rounded": .forms, "thin products": .forms, "witnesses end": .regime,
                 ]
                 func stage(_ name: String, _ body: () throws -> Void) throws {
                     try bench.check()
@@ -652,6 +652,7 @@ extension Diagnostic {
                 try stage("attention") { try attention(&m) }
                 try stage("sharing") { sharing(&m) }
                 try stage("solos 8-bit and rounded") { solos([.gpu_bf16act, .gpu_int8, .gpu_q8], &m); solos([.ane_int8], &m, shapes: sizes.integers + sizes.small, chained: true) }
+                try stage("thin products") { thinSolos(&m) }
                 try stage("sharing int8") { sharingInt8(&m) }
                 d.massive = massives
                 try stage("witnesses end") {

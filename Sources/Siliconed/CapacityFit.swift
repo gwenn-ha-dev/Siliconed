@@ -171,6 +171,9 @@ package enum CapacityFit {
         }
 
         package var solos: [Solo] = []
+        /// **Products with a short side** (`CapacityModel.thinSide`), taken apart from the `solos` so that the big products' lines never see them:
+        /// each kernel at the shapes of `Sizes.thin`. `nil` in a report that predates them.
+        package var thin: [Solo]?
         package var stairShape: [Int] = []
         package var stairs: [Stair] = []
         package var trials: [Trial] = []
@@ -193,6 +196,7 @@ package enum CapacityFit {
             var m = self
             m.solos = solos.map { Solo(kernel: $0.kernel, shape: $0.shape, flop: $0.flop, seconds: r($0.seconds),
                                        error: $0.error.map { Diagnostic.significant($0, 3) }) }
+            m.thin = thin?.map { Solo(kernel: $0.kernel, shape: $0.shape, flop: $0.flop, seconds: r($0.seconds), error: $0.error.map { Diagnostic.significant($0, 3) }) }
             m.stairs = stairs.map { Stair(rows: $0.rows, seconds: r($0.seconds)) }
             m.trials = trials.map { t in
                 Trial(set: t.set, shape: t.shape, pass: t.pass,
@@ -379,6 +383,47 @@ package enum CapacityFit {
         }
     }
 
+    /// **The line of a kernel on the products with a short side**: `t = t₀ + s·(Bw·k·n + Ba·M·(k + n)) / BW + 2·M·k·n / R` — the weight read once
+    /// (`Bw` bytes an element, the form's), the activation and the output streamed once (`Ba` bytes an element: fp32 each, plus the passes the form
+    /// makes over them), at the memory's bandwidth `BW`, then the arithmetic. `M` is the rows the kernel *computes*, not the rows it is given
+    /// (`CapacityModel.computedRows`: a GPU kernel works in tiles of 64 rows, so a prompt of 19 rows costs 64).
+    ///
+    /// Two numbers are fitted, `t₀` and the bandwidth's share `s` (1 when the kernel streams at the memory's rate; 0.9 to 1.25 for the GPU's forms on
+    /// the M1 Pro); the bytes are the forms', the rate `R` the big products' (the engine's ceiling). The earlier forms of this line fitted
+    /// the streaming terms free — four terms on six shapes, then three — and reproduced the probed shapes with a rate twice the silicon's, which
+    /// missed a LoRA's `4 117 × 3 072 · 128` by a third; what the two numbers here cannot hold is the kernel's, not the line's. Fitted on the
+    /// relative error (a 1 ms shape counts as much as a 12 ms one), a shape that comes out at over twice its time is left out of the second pass —
+    /// the GPU's int8 and rounded-activation kernels run 8 times slower at `n = 128` (a cliff of the kernel, which no class falls in).
+    ///
+    /// `nil` without the big products' line or the memory's bandwidth, or unless the shapes tell the two apart (three distinct at least).
+    package static func thinLine(kernel: Kernel, solos: [Measurements.Solo], arithmetic: CapacityModel.Line?, bandwidth: Double?) -> CapacityModel.Line? {
+        guard let arithmetic, arithmetic.rate > 0, let bandwidth, bandwidth > 0 else { return nil }
+        let used = solos.filter { $0.shape.count == 3 && $0.seconds > 0 && $0.flop > 0 }
+        guard used.count >= 3, Set(used.map { $0.shape }).count >= 3 else { return nil }
+        let (weightBytes, activationBytes) = CapacityModel.streamedBytes(kernel.form)
+        func terms(_ s: Measurements.Solo) -> (stream: Double, arithmetic: Double) {
+            let (k, n) = (Double(s.shape[1]), Double(s.shape[2]))
+            let rows = Double(CapacityModel.computedRows(kernel, rows: s.shape[0]))
+            return ((weightBytes * k * n + activationBytes * rows * (k + n)) / bandwidth, 2 * rows * k * n / arithmetic.rate(atK: s.shape[1]))
+        }
+        func solve(_ kept: [Measurements.Solo]) -> (t0: Double, share: Double)? {
+            let rows = kept.map { s -> (features: [Double], seconds: Double) in
+                let t = terms(s)
+                return ([1 / s.seconds, t.stream / s.seconds], (s.seconds - t.arithmetic) / s.seconds)
+            }
+            guard let x = regressNonNegative(rows), x[1] > 0 else { return nil }
+            return (x[0], x[1])
+        }
+        guard var fit = solve(used) else { return nil }
+        func time(_ s: Measurements.Solo) -> Double { fit.t0 + fit.share * terms(s).stream + terms(s).arithmetic }
+        let kept = used.filter { $0.seconds < 2 * time($0) }
+        if kept.count < used.count, kept.count >= 3, let again = solve(kept) { fit = again }
+        var line = CapacityModel.Line(t0: fit.t0, rate: arithmetic.rate, perWeight: fit.share * weightBytes / bandwidth, rateByK: arithmetic.rateByK,
+                                      perRow: fit.share * activationBytes / bandwidth)
+        if kernel.engine == .amx || kernel.engine == .ane, let fewest = used.map({ $0.shape[0] }).min() { line.rowsFrom = max(1, fewest / 2) }
+        return line
+    }
+
     // MARK: - Sharing as an overlap
 
     /// **Each engine's κ in a set from one chain** (the speed inside the set over its speed alone, the speed alone read off the line at
@@ -463,6 +508,9 @@ package enum CapacityFit {
             if products.contains(k.form), let l = productLine(kernel: k, solos: m.solos.filter { $0.kernel == k.description && !m.wrong.contains($0.kernel) }) {
                 model.lines[k] = l
             } else if let l = line(p) { model.lines[k] = l }
+        }
+        for (name, group) in Dictionary(grouping: (m.thin ?? []).filter({ !m.wrong.contains($0.kernel) && $0.seconds > 0 }), by: \.kernel) {
+            if let kernel = Kernel(name), let line = thinLine(kernel: kernel, solos: group, arithmetic: model.lines[kernel], bandwidth: m.memoryBandwidth) { model.thin[kernel] = line }
         }
         // The unit the ANE *charges* can be finer than the one an engine *allocates* (rows are given in whole
         // `allocationUnit`s): the model's rounding is the larger.

@@ -108,6 +108,55 @@ final class CapacityClassesTests: XCTestCase {
         XCTAssertEqual(executions(m, .mossImage, k: 4096, n: 3072, rows: 21), 8)
     }
 
+    /// **A LoRA's products are classes**: MOSS-Image's DMD (rank 128) rides every layer projection, two products each, `x · down` at
+    /// `k → 128` and `mid · up` at `128 → n`; 2.46 TFLOP an evaluation at 1024² (the figure the plan's lot was decided on). A
+    /// request's LoRAs add their rank to the stack; Qwen-Image-2.1's merged stack is not carried.
+    func testMossImageCarriesItsDMDLoRAAsTwoProductsPerProjection() {
+        func lora(_ cs: [CC.Class], _ format: CC.WeightFormat, k: Int, n: Int, rows: Int) -> Int {
+            cs.filter { if case let .product(kk, nn, r, f) = $0.shape { return kk == k && nn == n && r == rows && f == format } else { return false } }
+                .reduce(0) { $0 + ($1.executions[.mossImage] ?? 0) }
+        }
+        let m = classes(.mossImage, faster: false)
+        // q, k, v, o and the fused gate+up read the 3 072 columns of x: five `loraDown` of 3 072 → 128 per layer; the down projection reads 8 192.
+        XCTAssertEqual(lora(m, .loraDown, k: 3072, n: 128, rows: 4117), 5 * 42 * 8)
+        XCTAssertEqual(lora(m, .loraDown, k: 8192, n: 128, rows: 4117), 42 * 8)
+        XCTAssertEqual(lora(m, .loraUp, k: 128, n: 3072, rows: 4117), 5 * 42 * 8, "q, k, v, o and the down projection")
+        XCTAssertEqual(lora(m, .loraUp, k: 128, n: 16384, rows: 4117), 42 * 8)
+        XCTAssertEqual(lora(m, .loraDown, k: 3072, n: 128, rows: 21), 0, "the text blocks are bf16 products the stack does not reach")
+        XCTAssertNotNil(m.first { $0.id == "product:3072x128@4117~loraDown" })
+        XCTAssertNotNil(m.first { $0.id == "product:128x16384@4117~loraUp" })
+        let flop = m.filter { if case let .product(_, _, rows, f) = $0.shape { return f.isLoRA && rows == 4117 } else { return false } }
+            .reduce(0.0) { $0 + $1.flop * Double($1.executions[.mossImage] ?? 0) } / 8
+        XCTAssertEqual(flop / 1e12, 2.45, accuracy: 0.02, "the DMD LoRA's FLOP per evaluation at 1024²")
+        // The half grid's evaluations carry it at their own rows.
+        XCTAssertGreaterThan(lora(classes(.mossImage), .loraUp, k: 128, n: 3072, rows: 1045), 0)
+        // A request's LoRA adds its rank to the stack's.
+        let more = CC.classes(for: .init(family: .mossImage, fasterRendering: false, includesEncoder: false, loraRank: 32))!
+        XCTAssertEqual(lora(more, .loraDown, k: 3072, n: 160, rows: 4117), 5 * 42 * 8)
+        XCTAssertEqual(lora(more, .loraDown, k: 3072, n: 128, rows: 4117), 0)
+        XCTAssertEqual(CC.stackRank(.init(family: .mossImage, loraRank: 32)), 160)
+    }
+
+    func testARequestsLoRAReachesTheLayerProjectionsOfTheOtherFamilies() {
+        func loras(_ family: Family, rank: Int) -> [CC.Class] {
+            (CC.classes(for: .init(family: family, fasterRendering: false, includesEncoder: false, loraRank: rank)) ?? [])
+                .filter { if case let .product(_, _, _, f) = $0.shape { return f.isLoRA } else { return false } }
+        }
+        for family in [Family.zImage, .anima, .krea2] {
+            XCTAssertTrue(loras(family, rank: 0).isEmpty, "\(family): no LoRA, no class")
+            let cs = loras(family, rank: 32)
+            XCTAssertFalse(cs.isEmpty, "\(family)")
+            for c in cs {
+                guard case let .product(k, n, _, f) = c.shape else { continue }
+                XCTAssertEqual(f == .loraDown ? n : k, 32, "\(family) \(c.id)")
+            }
+        }
+        XCTAssertTrue(loras(.qwenImage21, rank: 32).isEmpty, "Qwen-Image-2.1's stack is merged where that is cheaper: not carried")
+        // The Compact's formats do not touch the LoRA's operand: it is the stack's fp32.
+        XCTAssertFalse((CC.classes(for: .init(family: .krea2, variant: .compact, includesEncoder: false, loraRank: 32)) ?? [])
+            .filter { if case let .product(_, _, _, f) = $0.shape { return f.isLoRA } else { return false } }.isEmpty)
+    }
+
     func testTheEncoderAtSmallM() {
         let z = CC.classes(for: .init(family: .zImage, includesEncoder: true))!
         let enc = z.filter { $0.phase == .encoding }

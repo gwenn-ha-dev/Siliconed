@@ -63,6 +63,23 @@ final class OperatorFootprintTests: XCTestCase {
                                        Arena.capacity(for: Conductor.columnWorkspaceBytes(m: 4096, k: 3840, n: 10240, width: 2560)))])
     }
 
+    /// **A LoRA's products are charged by the plan's own answers**: with the engines forced onto every product, the stack's `loraDown` and
+    /// `loraUp` bring their ANE operands and BNNS workspace into the need, and nothing else grows (the CPU engines' rows of the second
+    /// land in the weight reserve the model already holds). A plan that gives them no row charges nothing.
+    func testALoRAStacksProductsAreChargedAsTheyAreAsked() {
+        let plan = CapacityPlan.forcing(neuralEngine: true, amx: true)
+        let shapes = [(m: 4117, k: 3072, n: 3072), (m: 4117, k: 3072, n: 16384), (m: 4117, k: 8192, n: 3072)]
+        func bytes(_ terms: [MemoryNeed.Term], _ name: String) -> Int { terms.filter { $0.name.hasSuffix(name) }.reduce(0) { $0 + $1.bytes } }
+        let without = MemoryNeed.gemm("g", bounded: shapes, spread: 21, plan: plan)
+        let with = MemoryNeed.gemm("g", bounded: shapes, spread: 21, rank: 128, lora: shapes, plan: plan)
+        XCTAssertGreaterThan(bytes(with, "Neural Engine"), bytes(without, "Neural Engine"), "the ANE's fp16 operands of the stack's shapes")
+        XCTAssertGreaterThanOrEqual(bytes(with, "conductor workspace"), bytes(without, "conductor workspace"))
+        let alone = MemoryNeed.gemm("g", bounded: shapes, spread: 21, rank: 128, lora: shapes, plan: .defaults)
+        XCTAssertEqual(alone.filter { !$0.name.hasSuffix("GEMM tiers") }.map(\.bytes),
+                       MemoryNeed.gemm("g", bounded: shapes, spread: 21, plan: .defaults).filter { !$0.name.hasSuffix("GEMM tiers") }.map(\.bytes),
+                       "the GPU alone: no engine to charge (the tiers' `mid` is the one-submission form's)")
+    }
+
     /// **The padding tiers are what `GEMM` sends through them**: 8 to 32 rows, or a tail under 64
     /// rows past a body; `a` and `c` at 64 rows of the widest `k` and `n` among those, `mid` at the rank.
     func testTheTiersAreTheRowsSentThroughThem() {
@@ -74,8 +91,7 @@ final class OperatorFootprintTests: XCTestCase {
         let encoder = [(100, 2560, 4096), (100, 2560, 1024), (100, 4096, 2560), (100, 2560, 9728), (100, 9728, 2560)]
         XCTAssertEqual(GEMM.tierBytes(products: encoder),
                        Arena.capacity(for: 64 * 9728 * 4) + Arena.capacity(for: 64 * 9728 * 4))
-        XCTAssertEqual(GEMM.tierBytes(products: encoder, rank: 32) - GEMM.tierBytes(products: encoder),
-                       Arena.capacity(for: 64 * 32 * 4))
+        XCTAssertEqual(GEMM.tierBytes(products: encoder, rank: 32) - GEMM.tierBytes(products: encoder), Arena.capacity(for: 64 * 32 * 4))
     }
 
     /// The process's base is read from the process, not charged as a figure; a VAE's `outside` is its

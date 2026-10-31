@@ -116,6 +116,9 @@ package final class Engine: Sendable {
         /// attention of this image's evaluations, with the executions and wall seconds of each — what the capacity
         /// map's prediction is compared with (`RenderLoop`). Empty for a render that was not recorded (a test's).
         package var classes: [ProductLedger.Tally] = []
+        /// **The cumulative rank of the request's LoRAs** (`LoRA.maxRank`; 0 without): the two products of their stack are classes of the
+        /// render (`CapacityClasses.Request.loraRank`). MOSS-Image's own DMD is not in it: the catalogue adds it.
+        package var loraRank = 0
 
         /// **The generation metadata**, as `png()` writes it (`iTXt` chunks). ASCII keys, readable
         /// values; **no date** — two identical renders must remain two identical files.

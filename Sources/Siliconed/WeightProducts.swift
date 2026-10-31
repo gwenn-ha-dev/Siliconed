@@ -18,8 +18,8 @@ import Metal
 ///              │                                (`ProductAssignment.ane` on a native weight)   beside the GPU's rows
 ///              └─ path widened                 widened on the CPU (`Artifact.materialize`) ─▶ MPS (+ AMX, + ANE rows)
 ///          ─▶ C = A · W
-///          ─▶ + the LoRA stack:  C += (A · down) · up          after the product, or
-///                                W += down · up, then C = A · W  merged, where it costs fewer FLOPs
+///          ─▶ + the LoRA stack:  mid = A · down, then C += mid · up      after the product, each one a product of the plan (`lora`), or
+///                                W += down · up, then C = A · W  merged, where it costs fewer FLOPs (the GPU's)
 ///
 /// Every path computes in fp32 from the published values (a bf16 widening is a shift, an 8-bit one a
 /// single multiplication): they differ in the order of the sums, hence the last bits, never in what is
@@ -27,7 +27,10 @@ import Metal
 ///
 /// What sets it apart — what a model writing its own product would get wrong:
 ///
-///   - **the LoRA stack is added after the product, whichever path made it**: so a bf16-weight product
+///   - **the LoRA stack is added after the product, whichever path made it, as two products of the plan**: the classes
+///     `loraDown` (`m × k · r`) and `loraUp` (`m × r · n`, added to the output), cut by rows between the GPU, the AMX and the ANE's fp16
+///     like any widened product, in fp32 beside the weights (its small deltas would be lost otherwise). The CPU engines' rows of
+///     the second go to the reserve, dead once the base product is made, and are added to the output in one pass. A bf16-weight product
 ///     takes a LoRA like any other (the guard that kept Krea 2 under a LoRA widened was such a
 ///     local exception). The merge (`mergesLoRA`, Qwen-Image-2.1's: a rank-256 stack after the GEMM cost
 ///     2.0 s per 1024² evaluation, ∝ rows) needs an fp32 weight to add into: under `gemm_tensor` it falls
@@ -154,10 +157,44 @@ package final class WeightProducts {
         if let failure { throw Artifact.Failure.badHeader(failure) }
         if !merged, let stack, let mid {
             let mb = try gemm.wrap(UnsafeMutableRawPointer(mid), bytes: midFloats * 4, name: "loraMid")
+            lora(x: a, stack: stack, mid: mb, c: c, scratch: w, m: m, k: k, n: n)
+        }
+    }
+
+    /// **The stack's two products, each one the plan's**: `mid = x · down` (`loraDown`, written) then `C += mid · up` (`loraUp`,
+    /// accumulated: the GPU's rows inside its kernel, the CPU engines' through the reserve the product has just left, `GEMM.accumulatedLinear`).
+    /// Each is a class of the render, in the ledger with the route it took.
+    private func lora(x: MTLBuffer, stack: (down: MTLBuffer, up: MTLBuffer, rank: Int), mid: MTLBuffer, c: MTLBuffer,
+                      scratch: MTLBuffer, m: Int, k: Int, n: Int) {
+        let ledger = ProductLedger.current
+        func record(_ weight: CapacityClasses.WeightFormat, k: Int, n: Int, began: UInt64) {
+            ledger?.add(.product(k: k, n: n, m: m, weight: weight), route: gemm.lastEngines,
+                        seconds: Double(DispatchTime.now().uptimeNanoseconds - began) * 1e-9)
+        }
+        // Both products wholly the GPU's: one submission, as before the stack was the plan's (the same bits, the same cost). The ledger
+        // shares its seconds between the two classes by their FLOP.
+        if gemm.runsOnGPUAlone(k: k, n: stack.rank, m: m, weight: .loraDown), gemm.runsOnGPUAlone(k: stack.rank, n: n, m: m, weight: .loraUp) {
             timed("lora wall") {
-                timings["lora GPU", default: 0] += gemm.lora(x: a, down: stack.down, mid: mb, up: stack.up, c: c,
-                                                             m: m, k: k, r: stack.rank, n: n)
+                let began = DispatchTime.now().uptimeNanoseconds
+                timings["lora GPU", default: 0] += gemm.lora(x: x, down: stack.down, mid: mid, up: stack.up, c: c,
+                                                            m: m, k: k, r: stack.rank, n: n)
+                if let ledger {
+                    let seconds = Double(DispatchTime.now().uptimeNanoseconds - began) * 1e-9, share = Double(k) / Double(k + n)
+                    ledger.add(.product(k: k, n: stack.rank, m: m, weight: .loraDown), route: "gpu", seconds: seconds * share)
+                    ledger.add(.product(k: stack.rank, n: n, m: m, weight: .loraUp), route: "gpu", seconds: seconds * (1 - share))
+                }
             }
+            return
+        }
+        timed("lora wall") {
+            var began = DispatchTime.now().uptimeNanoseconds
+            timings["lora GPU", default: 0] += gemm.linear(a: x, b: stack.down, c: mid, m: m, k: k, n: stack.rank,
+                                                          weightIsTransposed: true, weight: .loraDown)
+            record(.loraDown, k: k, n: stack.rank, began: began)
+            began = DispatchTime.now().uptimeNanoseconds
+            timings["lora GPU", default: 0] += gemm.accumulatedLinear(a: mid, b: stack.up, c: c, m: m, k: stack.rank, n: n,
+                                                                     weight: .loraUp, scratch: scratch)
+            record(.loraUp, k: stack.rank, n: n, began: began)
         }
     }
 

@@ -43,10 +43,12 @@ import Foundation
 ///     (Light) have a single route, the widening: they carry no `WeightKind`.
 ///   - **Merged across families, executions stay per family**: a class common to two families (the same k×n at the same
 ///     height) is one class with two executions counts.
+///   - **A LoRA's two products are classes** (`loraDown`, `loraUp`: `x · down` at `k → r`, `mid · up` at `r → n`, fp32, the stack's
+///     expansion), on every layer projection the stack touches — MOSS-Image's DMD always (`mossTurboRank`), a request's LoRAs
+///     (`Request.loraRank`) on Z-Image, Anima and Krea 2; Qwen-Image-2.1's stack, merged where that is cheaper, is not carried.
 ///   - **What is not a class**: the modulation and time-embedding gemv (m = 1, the CPU), the norms and elementwise
 ///     kernels, the VAE (one route), the weights' widening and reading, attentions over fewer than 64 rows (no route
-///     decides them), the encoder's attention and DeltaNet recurrence (m < 64), MOSS's LoRA (rank 128, fp32, applied
-///     after the product), the embedders other than Z-Image's, Anima's adapter and Krea 2's text fusion, W_b/W_a of the
+///     decides them), the encoder's attention and DeltaNet recurrence (m < 64), the embedders other than Z-Image's, Anima's adapter and Krea 2's text fusion, W_b/W_a of the
 ///     MOSS encoder. They are small (each under 1 % of a render), or have no route to choose among.
 ///   - **Unread from code**: Krea 2's text encoder runs up to its last tap (36 layers is the Qwen3-VL-4B text model's
 ///     count, an upper bound); MOSS's encoder FFN width (12 288) is the Qwen3.5-9B card's, not read in the code. Which weights a Light leaves
@@ -67,6 +69,11 @@ package enum CapacityClasses {
         case bf16, int8, q8
         /// Q4_K to Q6_K: a single route (widening on the CPU).
         case q4k
+        /// **A LoRA's two products are classes of the plan like any other**, their operand not a published weight but the stack's
+        /// fp32 expansion (`CacheLoRA`): `loraDown` is `mid = x · down` (`m × k · r`, written), `loraUp` is `C += mid · up`
+        /// (`m × r · n`, accumulated into the base product's output — what the CPU engines' rows pay a pass of memory for). Nothing
+        /// to prepare, a single route (fp32, widened): the GPU, the AMX, the ANE's fp16 where the version allows it.
+        case loraDown, loraUp
 
         /// **The convrot group of the format's rotation**, `nil` for none: every int8 DiT of the catalogue is Comfy's `int8_tensorwise`
         /// convrot of group 256 (the headers of the three Compact maps, checked), so the plan reasons on 256 — what the ANE's int8
@@ -80,9 +87,12 @@ package enum CapacityClasses {
             case .bf16: return .bf16
             case .int8: return .int8
             case .q8: return .q8
-            case .q4k: return nil
+            case .q4k, .loraDown, .loraUp: return nil
             }
         }
+
+        /// The operand of a LoRA's product (`loraDown`, `loraUp`): fp32 as the stack expands it, no preparation.
+        package var isLoRA: Bool { self == .loraDown || self == .loraUp }
     }
 
     // MARK: - Versions
@@ -123,19 +133,39 @@ package enum CapacityClasses {
         /// The half-grid evaluations a render actually did, when it is not the family's rule (`SILICONED_SPECTRAL`);
         /// `nil`: the family's own count.
         package var halfSteps: Int?
+        /// **The cumulative rank of the LoRAs the request adds** to the family's own (MOSS-Image's DMD is always there, `mossTurboRank`):
+        /// each layer projection then carries the two products of the stack at this rank (`loraDown`, `loraUp`). 0: none.
+        package var loraRank: Int
 
         package init(family: Family, variant: Variant = .standard, width: Int = 1024, height: Int = 1024,
                      fasterRendering: Bool = true, promptTokens: Int = 11, steps: Int = 8, includesEncoder: Bool = true,
-                     halfSteps: Int? = nil) {
+                     halfSteps: Int? = nil, loraRank: Int = 0) {
             self.family = family; self.variant = variant; self.width = width; self.height = height
             self.fasterRendering = fasterRendering; self.promptTokens = promptTokens; self.steps = steps
-            self.includesEncoder = includesEncoder; self.halfSteps = halfSteps
+            self.includesEncoder = includesEncoder; self.halfSteps = halfSteps; self.loraRank = loraRank
         }
     }
 
     // MARK: - Classes
 
-    /// `product:KxN@M`, then `~int8`, `~q8`, `~q4k` for a weight not in bf16.
+    /// **The rank of MOSS-Image's DMD LoRA** (`lodestones/MOSS-Image-SFT-8-steps-dmd`, 252 modules), applied at every evaluation of every
+    /// render: its two products are classes of the family whatever the request carries. (The map's own rank is read by the memory
+    /// need, `MossMaps.turboRank`; the catalogue reads no header.)
+    package static let mossTurboRank = 128
+
+    /// **The rank of the stack a family's DiT runs under** in this request: MOSS-Image's always-on LoRA plus the request's; the
+    /// request's alone elsewhere. Qwen-Image-2.1 counts none: its stack is merged into the widened weight where that costs fewer
+    /// FLOPs (`LoRA.merges`, by rows) and is a product of the plan only after the GEMM, a split of the classes by height that the
+    /// catalogue does not carry.
+    package static func stackRank(_ r: Request) -> Int {
+        switch r.family {
+        case .mossImage: return mossTurboRank + r.loraRank
+        case .qwenImage21: return 0
+        default: return r.loraRank
+        }
+    }
+
+    /// `product:KxN@M`, then `~int8`, `~q8`, `~q4k`, `~loraDown`, `~loraUp` for a weight not in bf16.
     package static func productID(k: Int, n: Int, m: Int, format: WeightFormat) -> String {
         "product:\(k)x\(n)@\(m)" + (format == .bf16 ? "" : "~" + format.rawValue)
     }
@@ -325,8 +355,17 @@ package enum CapacityClasses {
     private static func evaluation(_ b: inout Builder, _ r: Request, _ f: WeightFormat, tokens t: Int, times: Int) {
         let text = textRows(r.family, promptTokens: r.promptTokens)
         let plain = plainFormat(r, f)
+        let rank = stackRank(r)
+        /// The two products of the LoRA stack on a projection (`k → n`), after its product.
+        func lora(_ k: Int, _ n: Int, _ rows: Int, _ count: Int) {
+            guard rank > 0 else { return }
+            b.product(.denoising, k, rank, rows, .loraDown, times: count * times)
+            b.product(.denoising, rank, n, rows, .loraUp, times: count * times)
+        }
         /// A product of the version's 8-bit blocks.
-        func p(_ k: Int, _ n: Int, _ rows: Int, _ count: Int) { b.product(.denoising, k, n, rows, f, times: count * times) }
+        func p(_ k: Int, _ n: Int, _ rows: Int, _ count: Int) {
+            b.product(.denoising, k, n, rows, f, times: count * times); lora(k, n, rows, count)
+        }
         /// A product by a weight the version leaves as published.
         func q(_ k: Int, _ n: Int, _ rows: Int, _ count: Int) { b.product(.denoising, k, n, rows, plain, times: count * times) }
         switch r.family {
@@ -337,6 +376,7 @@ package enum CapacityClasses {
                 b.product(.denoising, c.dim, c.dim, rows, format, times: 4 * layers * times)
                 b.product(.denoising, c.dim, c.hidden, rows, format, times: 2 * layers * times)
                 b.product(.denoising, c.hidden, c.dim, rows, format, times: layers * times)
+                if quantized { lora(c.dim, c.dim, rows, 4 * layers); lora(c.dim, c.hidden, rows, 2 * layers); lora(c.hidden, c.dim, rows, layers) }
             }
             block(m, c.layers, quantized: true)                                  // the layers
             block(t, c.refiners, quantized: false); block(text, c.refiners, quantized: false)   // noise and context refiners
