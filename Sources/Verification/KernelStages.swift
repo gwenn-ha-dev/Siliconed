@@ -176,10 +176,10 @@ enum KernelStages {
 
     static let sdpa = Stage(
         model: "kernels", name: "sdpa",
-        proves: "the attention cut by heads (GPU + CPU), by query blocks, past maxMatrix and the matrix kernel return the whole graph's result",
+        proves: "the attention cut by heads (GPU + CPU), by query blocks, past maxMatrix and the matrix kernel return the whole graph's result; a head width padded to 128 (the vision tower's 72) returns a float64 witness's",
         options: ["--sequence"],
         oracle: nil, weights: [],
-        rule: "against the whole graph: query blocks ≤ 1e-6 per channel; head cut ≤ 1e-5 with the GPU heads bit for bit; matrix kernel ≤ 1e-5"
+        rule: "against the whole graph: query blocks ≤ 1e-6 per channel; head cut ≤ 1e-5 with the GPU heads bit for bit; matrix kernel ≤ 1e-5; padded width ≤ 1e-5 against float64"
     ) { invocation in
         let sequence = try invocation.integer("--sequence", 4128)
         let report = Report(title: "kernels sdpa S=\(sequence)")
@@ -270,6 +270,50 @@ enum KernelStages {
             report.add(Judge.bound("head cut, \(Attention.groupedSlices(heads: gpuHeads, rows: sequence, keys: sequence, limit: limit)) query slices",
                                    values.allSatisfy(\.isFinite) ? channelError(values, referenceBuffer, columns: width).worst : .infinity,
                                    1e-6, unit: "per channel"))
+        }
+        // A head width that is not a multiple of 32 — the vision tower's, 16 heads of 72 — runs padded to 128 in
+        // the graph (`Attention.workingHeadDim`; MPS's tile kernel did not compile at 72 on an M4 under macOS
+        // 26.6, issue #11), against a float64 witness, at a 512² reference's 1,024 patches.
+        do {
+            let (h, d, s) = (16, 72, 1024)
+            let w = h * d, n = s * w
+            guard let qb = device.makeBuffer(length: n * 4, options: .storageModeShared),
+                  let kb = device.makeBuffer(length: n * 4, options: .storageModeShared),
+                  let vb = device.makeBuffer(length: n * 4, options: .storageModeShared),
+                  let ob = device.makeBuffer(length: n * 4, options: .storageModeShared) else { throw GEMM.Failure.noDevice }
+            let (q, k, v) = (qb.contents().assumingMemoryBound(to: Float.self), kb.contents().assumingMemoryBound(to: Float.self),
+                             vb.contents().assumingMemoryBound(to: Float.self))
+            for i in 0..<n { q[i] = noise(8.9); k[i] = noise(11.5); v[i] = noise(188.9) }
+            _ = Attention(device: device, queue: queue, heads: h, sequence: s, headDim: d).run(q: qb, k: kb, v: vb, into: ob)
+            let values = Array(UnsafeBufferPointer(start: ob.contents().assumingMemoryBound(to: Float.self), count: n))
+            var witness = [Double](repeating: 0, count: n)
+            let scale = 1 / Double(d).squareRoot()
+            witness.withUnsafeMutableBufferPointer { out in
+                let out = out.baseAddress!
+                DispatchQueue.concurrentPerform(iterations: h) { head in
+                    var scores = [Double](repeating: 0, count: s)
+                    for i in 0..<s {
+                        let row = q + i * w + head * d
+                        var top = -Double.infinity
+                        for j in 0..<s {
+                            let key = k + j * w + head * d
+                            var dot = 0.0
+                            for c in 0..<d { dot += Double(row[c]) * Double(key[c]) }
+                            scores[j] = dot * scale
+                            top = max(top, scores[j])
+                        }
+                        var total = 0.0
+                        for j in 0..<s { scores[j] = exp(scores[j] - top); total += scores[j] }
+                        let target = out + i * w + head * d
+                        for j in 0..<s {
+                            let p = scores[j] / total, value = v + j * w + head * d
+                            for c in 0..<d { target[c] += p * Double(value[c]) }
+                        }
+                    }
+                }
+            }
+            let worst = witness.withUnsafeBufferPointer { values.allSatisfy(\.isFinite) ? channelError(values, $0, columns: w).worst : .infinity }
+            report.add(Judge.bound("head width \(d) padded to \(Attention.workingHeadDim(d)), \(h) heads", worst, 1e-5, unit: "per channel"))
         }
         withExtendedLifetime(arena) {}
         return report

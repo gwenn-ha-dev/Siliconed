@@ -283,7 +283,10 @@ final class MemoryNeedQwenTests: XCTestCase {
         // The vision tower is sized for the largest image (4 096 patches each here: 78·52 = 4 056).
         XCTAssertEqual(Self.phase(full, .vision)!.bytes("vision arena"),
                        Qwen3VLVision.arenaBytes(config: need.vision, patches: 4096))
-        XCTAssertEqual(Self.phase(full, .vision)!.bytes("vision SDPA queries"), 4096 * 16 * 72 * 4)
+        // Its 72-wide heads run padded to 128 (`Attention.workingHeadDim`, issue #11): the queries' copy and the
+        // padded q, k, v and output at that width.
+        XCTAssertEqual(Self.phase(full, .vision)!.bytes("vision SDPA queries"), 4096 * 16 * 128 * 4)
+        XCTAssertEqual(Self.phase(full, .vision)!.bytes("vision head padding"), 4 * 4096 * 16 * 128 * 4)
         // More than the same with three 1024² references? The prefix is shorter (4 056 + 4 056 + 4 096).
         let squares = Self.need(Self.request(1024, 1536, references: [(1024, 1024), (1024, 1024), (1024, 1024)]))
         XCTAssertLessThan(Self.phase(full, .denoising)!.own, Self.phase(squares, .denoising)!.own)
@@ -342,13 +345,14 @@ final class MemoryNeedQwenTests: XCTestCase {
                        Attention.maskBytes(sequence: need.encoderTokens, keys: need.encoderTokens))
     }
 
-    /// **No fitted term remains**: the outside terms are the shapes' copies only — MPSGraph's queries
-    /// and the VAEs' SDPA — and no constant of the frameworks (`OperatorFootprint`) is charged.
+    /// **No fitted term remains**: the outside terms are the shapes' copies only — MPSGraph's queries, the
+    /// vision tower's padded heads and the VAEs' SDPA — and no constant of the frameworks (`OperatorFootprint`) is charged.
     func testNoFittedTermRemains() {
         for request in [Self.request(1024, 1024), Self.request(1024, 1536, references: [(1024, 1024), (640, 640)], ranks: [64])] {
             let need = Self.need(request)
             for term in need.phases.flatMap(\.terms) where term.outside {
-                XCTAssertTrue(term.name.hasSuffix("SDPA queries") || term.name.hasSuffix(" outside"), term.name)
+                XCTAssertTrue(term.name.hasSuffix("SDPA queries") || term.name.hasSuffix("head padding")
+                              || term.name.hasSuffix(" outside"), term.name)
             }
             XCTAssertFalse(need.phases.flatMap(\.terms).contains { $0.name.contains("executable") || $0.name.contains("MPS GEMM") })
             XCTAssertEqual(need.base, 0)

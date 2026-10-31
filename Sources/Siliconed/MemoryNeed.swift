@@ -234,20 +234,28 @@ package struct MemoryNeed: Sendable, Equatable {
         let split = assignment.splits
         // The GPU's heads: all of them in one MPSGraph SDPA, or what the head split leaves it.
         let gpu = split ? heads - assignment.cpuHeads : heads
+        // The width the graph runs at: the head split's is the caller's; a single graph pads a width that is
+        // not a multiple of 32 (`Attention.workingHeadDim`, the vision tower's 72 → 128).
+        let width = split ? headDim : Attention.workingHeadDim(headDim)
         // Past `Attention.maxMatrix` the unmasked graph runs in query slices, which MPSGraph concatenates:
         // one more copy of the GPU heads' output (`Attention.init`, `HeadSplitAttention.init`). A causal
         // graph is never sliced (its mask is built whole).
         let sliced = !causal && Attention.groupedSlices(heads: gpu, rows: rows, keys: keys) > 1
-        let concatenation = sliced ? [Term("\(name) SDPA concatenation", rows * gpu * headDim * 4, outside: true)] : []
+        let concatenation = sliced ? [Term("\(name) SDPA concatenation", rows * gpu * width * 4, outside: true)] : []
         if split {
             return [Term("\(name) head split", HeadSplitAttention.hostBytes(heads: heads, sequence: rows, keys: keys,
                                                                            headDim: headDim, cpuHeads: assignment.cpuHeads, threads: threads)),
                     Term("\(name) SDPA queries", OperatorFootprint.sdpaQueries(rows: rows, heads: gpu, headDim: headDim),
                          outside: true)] + concatenation
         }
-        return [Term("\(name) SDPA queries", OperatorFootprint.sdpaQueries(rows: rows, heads: heads, headDim: headDim),
+        // A padded width: the queries' copy at that width, and the padded q, k, v and output MPSGraph holds
+        // around the SDPA.
+        let padding = width == headDim ? []
+            : [Term("\(name) head padding", (2 * rows * heads + 2 * keys * (heads / group)) * width * 4, outside: true)]
+        return [Term("\(name) SDPA queries", OperatorFootprint.sdpaQueries(rows: rows, heads: heads, headDim: width),
                      outside: true)]
-            + (causal ? [Term("\(name) causal mask", Attention.maskBytes(sequence: rows, keys: keys))] : []) + concatenation
+            + (causal ? [Term("\(name) causal mask", Attention.maskBytes(sequence: rows, keys: keys))] : [])
+            + concatenation + padding
     }
 
     /// **One model's `GEMM` over a phase**: its padding tiers (`GEMM.tierBytes`: what a height of 8 to

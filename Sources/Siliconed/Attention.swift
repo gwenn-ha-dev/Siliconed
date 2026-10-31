@@ -37,6 +37,8 @@ package final class Attention {
     package let headDim: Int
     /// The split into query blocks, `0` for the original graph.
     private let queryChunk: Int
+    /// Does the SDPA run at a padded head width (`workingHeadDim`)?
+    private let padded: Bool
 
     /// **The transposition is in the graph, not on the CPU.** The engine holds `q`, `k` and `v` as
     /// `[S, H·Dh]` — the layout the GEMM produces. The SDPA wants them as `[H, S, Dh]`. We long
@@ -123,6 +125,8 @@ package final class Attention {
         self.headDim = headDim
         // The mask only exists in the causal case, and it is built for the whole sequence.
         self.queryChunk = causal ? 0 : queryChunk
+        let width = Attention.workingHeadDim(headDim)
+        self.padded = width != headDim
         // What the caller has in memory: `[1, S, H, Dh]`, contiguous.
         let tokenShape: [NSNumber] = [1, NSNumber(value: sequence),
                                       NSNumber(value: heads), NSNumber(value: headDim)]
@@ -133,9 +137,14 @@ package final class Attention {
         let v = graph.placeholder(shape: keyShape, dataType: .float32, name: "v")
         self.q = q; self.k = k; self.v = v
 
-        /// `[1, S, H, Dh]` → `[1, H, S, Dh]`.
+        /// `[1, S, H, Dh]` → `[1, H, S, width]`: zeros appended to each head when its width is padded
+        /// (`workingHeadDim`), then the transposition.
         func headsFirst(_ tensor: MPSGraphTensor) -> MPSGraphTensor {
-            graph.transposeTensor(tensor, dimension: 1, withDimension: 2, name: nil)
+            let wide = width == headDim ? tensor
+                : graph.padTensor(tensor, with: .zero, leftPadding: [0, 0, 0, 0],
+                                  rightPadding: [0, 0, 0, NSNumber(value: width - headDim)],
+                                  constantValue: 0, name: nil)
+            return graph.transposeTensor(wide, dimension: 1, withDimension: 2, name: nil)
         }
         // `scale = None` in the reference, hence 1/√headDim.
         var mask: MPSGraphTensor? = nil
@@ -154,6 +163,7 @@ package final class Attention {
             maskFeed = (mask!, MPSGraphTensorData(buffer, shape: shape, dataType: .float32), pages)
         }
         maskInput = maskFeed
+        // The true width's scale, padded or not: the zeros add nothing to a score.
         let scale = 1 / Float(headDim).squareRoot()
         let attended: MPSGraphTensor
         var isSplit = false
@@ -163,9 +173,9 @@ package final class Attention {
             // [1, Hkv, 1, S, Dh], which the SDPA broadcasts over the g axis.
             let g = heads / kvHeads
             let n = { (x: Int) in NSNumber(value: x) }
-            let qg = graph.reshape(headsFirst(q), shape: [1, n(kvHeads), n(g), n(sequence), n(headDim)], name: nil)
-            let kh = graph.reshape(headsFirst(k), shape: [1, n(kvHeads), 1, n(keys), n(headDim)], name: nil)
-            let vh = graph.reshape(headsFirst(v), shape: [1, n(kvHeads), 1, n(keys), n(headDim)], name: nil)
+            let qg = graph.reshape(headsFirst(q), shape: [1, n(kvHeads), n(g), n(sequence), n(width)], name: nil)
+            let kh = graph.reshape(headsFirst(k), shape: [1, n(kvHeads), 1, n(keys), n(width)], name: nil)
+            let vh = graph.reshape(headsFirst(v), shape: [1, n(kvHeads), 1, n(keys), n(width)], name: nil)
             // The query rows per SDPA: all of them, as long as the attention matrix fits under
             // `maxMatrix`; otherwise equal slices that fit.
             let rows = sequence
@@ -182,12 +192,8 @@ package final class Attention {
             }
             isSplit = pieceTensors.count > 1
             let grouped = isSplit ? graph.concatTensors(pieceTensors, dimension: 3, name: nil) : pieceTensors[0]
-            // [1, Hkv, g, S, Dh] → [1, H, S, Dh] → [1, S, H, Dh], the common transposition.
-            let mergedHeads = graph.reshape(grouped, shape: [1, n(heads), n(sequence), n(headDim)], name: nil)
-            let returned = graph.transposeTensor(mergedHeads, dimension: 1, withDimension: 2, name: nil)
-            self.isSplit = isSplit
-            out = returned
-            return
+            // [1, Hkv, g, S, Dh] → [1, H, S, Dh], then the common transposition.
+            attended = graph.reshape(grouped, shape: [1, n(heads), n(sequence), n(width)], name: nil)
         } else if queryChunk > 0, mask == nil {
             let qh = headsFirst(q), kh = headsFirst(k), vh = headsFirst(v)   // [1, H, S, Dh]
             var perHead: [MPSGraphTensor] = []
@@ -235,8 +241,24 @@ package final class Attention {
                                                        value: headsFirst(v), mask: mask,
                                                        scale: scale, name: "sdpa")
         }
-        out = graph.transposeTensor(attended, dimension: 1, withDimension: 2, name: nil)
+        // [1, H, S, width] → [1, S, H, width], and back to the caller's width: the padded columns are
+        // `Σ p·0 = 0`, dropped.
+        let tokensFirst = graph.transposeTensor(attended, dimension: 1, withDimension: 2, name: nil)
+        out = width == headDim ? tokensFirst
+            : graph.sliceTensor(tokensFirst, dimension: 3, start: 0, length: headDim, name: nil)
         self.isSplit = isSplit
+    }
+
+    /// **The head width the SDPA runs at**: the caller's, or the next multiple of 128 when it is not a
+    /// multiple of 32 — the zeros padded in the graph, the caller's `[S, H·Dh]` buffers unchanged.
+    ///
+    /// MPS's tile-based SDPA kernel failed to *compile* at Qwen3-VL's vision width, 72 (1152 / 16), on an
+    /// M4 under macOS 26.6.2: an assertion in `MPSKey_Compile`, so a crash on every edit, not an error
+    /// (issue #11). 128 — every DiT's and text encoder's width — compiles on every Mac reported. The
+    /// padding is exact: each score gains `0·0` terms and keeps `1/√headDim` as its scale, and each padded
+    /// output column is `Σ p·0`. The widths that are multiples of 32 keep their graph, bit for bit.
+    package static func workingHeadDim(_ headDim: Int) -> Int {
+        headDim % 32 == 0 ? headDim : (headDim + 127) / 128 * 128
     }
 
     /// **The largest attention matrix that a single SDPA receives**, in bytes — Krea 2's
@@ -287,7 +309,10 @@ package final class Attention {
         // The price is that the returned time becomes **wall-clock** and not GPU. That is accepted: for a
         // graph that splits into a hundred and twenty submissions, the GPU time of a single buffer no
         // longer means anything, and it is the wall-clock time that decides anyway.
-        if queryChunk > 0 || isSplit {
+        //
+        // A padded graph goes the same way: with its pad and slice around the SDPA, MPSGraph committed
+        // the buffer itself on the M4 of issue #11, and the caller's `commit()` failed validation.
+        if queryChunk > 0 || isSplit || padded {
             let started = DispatchTime.now().uptimeNanoseconds
             graph.run(with: queue, feeds: feeds, targetOperations: nil,
                       resultsDictionary: [out: data(outBuffer, sequence)])

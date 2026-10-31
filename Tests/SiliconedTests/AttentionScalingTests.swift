@@ -7,6 +7,24 @@ final class AttentionScalingTests: XCTestCase {
     /// The four families' heads: (name, q heads, k/v heads), all of 128.
     private let families = [("Z-Image", 30, 30), ("Qwen-Image-2.1", 32, 32), ("Anima", 16, 16), ("Krea 2", 48, 12)]
 
+    /// Issue #11: MPS's tile SDPA did not compile at the vision tower's 72 on an M4. A width that is not a multiple of
+    /// 32 runs padded to the next multiple of 128; every other width keeps its graph, and the memory need charges the
+    /// padded tensors only where the graph pads.
+    func testAHeadWidthOffThe32GridIsPaddedTo128AndChargedThere() {
+        for width in [32, 64, 96, 128, 256, 512] { XCTAssertEqual(Attention.workingHeadDim(width), width) }
+        XCTAssertEqual(Attention.workingHeadDim(72), 128)
+        XCTAssertEqual(Attention.workingHeadDim(80), 128)
+        XCTAssertEqual(Attention.workingHeadDim(136), 256)
+        func bytes(_ headDim: Int) -> [String: Int] {
+            Dictionary(uniqueKeysWithValues: MemoryNeed.attention("vision", heads: 16, rows: 1024, keys: 1024, headDim: headDim,
+                                                                  causal: false, threads: 8).map { ($0.name, $0.bytes) })
+        }
+        XCTAssertEqual(bytes(72)["vision SDPA queries"], 1024 * 16 * 128 * 4)
+        XCTAssertEqual(bytes(72)["vision head padding"], 4 * 1024 * 16 * 128 * 4)
+        XCTAssertEqual(bytes(128)["vision SDPA queries"], 1024 * 16 * 128 * 4)
+        XCTAssertNil(bytes(128)["vision head padding"])
+    }
+
     func testTheSoftmaxPassIsExpToFloatPrecisionAndSumsTheRow() {
         // Arguments in [−87.3, 0] as a row after the maximum gives them, and the sizes that leave a tail of 0…7.
         for count in [1, 7, 8, 9, 63, 4096, 4101] {
