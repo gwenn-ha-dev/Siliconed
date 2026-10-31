@@ -55,6 +55,11 @@ import Metal
 ///   - **Decoding reads every weight at every token**: 7 GB of int8 (13.9 GB of bf16) and `lm_head`'s 1.24 GB.
 ///     Through the page cache or streamed from the disk (~3 GB/s) that is seconds a token, so the writer
 ///     keeps them resident (`load`, `Artifact.keepResident`) and the memory need charges them.
+///   - **A step reads them where they lie** (`Qwen3VLDecoder`, `DecodeKernels`): the resident pages are wrapped as GPU
+///     buffers without a copy, and a token is a few command buffers — the product kernels widen the int8 in registers
+///     and accumulate in fp32, the rotation goes to the activation, `lm_head` is a bf16 × fp32 GEMV on the GPU with the
+///     argmax. The prompt (many rows, compute-bound) keeps the passes below, and so does a map the kernels do not read
+///     (`decoder` is `nil`) or `decodesOnGPU = false`.
 package final class Qwen3VLGenerator {
     /// The sequence to continue: the prompt's identifiers and 3D positions (`Qwen3VLChat.prepare`) and
     /// its images, in slot order.
@@ -100,6 +105,16 @@ package final class Qwen3VLGenerator {
     private let freezeCut: Bool
 
     package var cancellation: Cancellation?
+    /// A decode step runs on the GPU from the resident weights when `load` could build the decoder; the CPU's passes
+    /// otherwise. `SILICONED_WRITER_CPU_DECODE=1` keeps the CPU's (to compare the two on the same prompt).
+    package var decodesOnGPU = ProcessInfo.processInfo.environment["SILICONED_WRITER_CPU_DECODE"] != "1"
+    /// The GPU decoder over the resident tensors, built by `load` (`nil`: not resident, or a map it does not read).
+    package private(set) var decoder: Qwen3VLDecoder?
+    /// Why `load` left `decoder` unset (the maps the kernels do not read, no GPU), `nil` when it is built.
+    package private(set) var decoderNote: String?
+    /// The top-1 / top-2 logit gap of each token the last `generate` chose, in order: 0 is a tie, a small one is where
+    /// two engines' roundings could choose differently.
+    package private(set) var gaps: [Float] = []
     /// Seconds, by phase: `vision`, `prefill`, `decode`, `head` (`lm_head`, inside the other two).
     package private(set) var timings: [String: Double] = [:]
     /// Passes over the 36 layers: each reads every layer once.
@@ -157,10 +172,15 @@ package final class Qwen3VLGenerator {
         let heads = Double(Artifact.residentBytes(header: head.header, prefixes: prefixes.head))
         try encoder.keepResident(prefixes: prefixes.encoder, cancellation: cancellation) { progress?($0 * layers / (layers + heads)) }
         try head.keepResident(prefixes: prefixes.head, cancellation: cancellation) { progress?((layers + $0 * heads) / (layers + heads)) }
+        decoder = nil; decoderNote = nil
+        guard decodesOnGPU else { decoderNote = "GPU decoding switched off"; return }
+        do { decoder = try Qwen3VLDecoder.make(encoder: encoder, head: head, config: config, vocabulary: vocabulary) } catch {
+            decoderNote = "\(error)"   // the CPU's passes decode instead, slowly: said, not hidden
+        }
     }
 
-    /// Gives the pages back.
-    package func unload() { encoder.releaseResident(); head.releaseResident() }
+    /// Gives the pages back (the GPU's views of them first).
+    package func unload() { decoder = nil; encoder.releaseResident(); head.releaseResident() }
 
     // MARK: - Memory
 
@@ -175,6 +195,11 @@ package final class Qwen3VLGenerator {
                 ("attended", r * a), ("gate", r * i), ("up", r * i), ("swiglu", r * i), ("freqs", r * config.headDim),
                 ("scratch", max(h, config.headDim)), ("finalNorm", h), ("reserve", h * i),
                 ("last", h), ("headRows", headBlock * h), ("logits", headBlock)]
+    }
+
+    /// The GPU decoder's scratch (`Qwen3VLDecoder.scratchBytes`): alive from `load` to `unload`, whatever the prompt.
+    package static func decoderBytes(config: TextEncoder.Config, vocabulary: Int) -> Int {
+        Qwen3VLDecoder.scratchBytes(.init(config, vocabulary: vocabulary))
     }
 
     /// The arena `generate` maps for a prompt of `prompt` tokens.
@@ -202,7 +227,7 @@ package final class Qwen3VLGenerator {
     /// `onToken` hears each identifier as it is chosen (the stop token included), before the next pass.
     package func generate(_ request: Request, maxNewTokens: Int,
                           onToken: ((Int) throws -> Void)? = nil) throws -> Output {
-        timings = [:]; passes = 0
+        timings = [:]; passes = 0; gaps = []
         let started = Date()
         let h = config.hidden, a = config.attentionWidth, kv = config.kvWidth, i = config.intermediate
         let dh = config.headDim
@@ -262,6 +287,9 @@ package final class Qwen3VLGenerator {
         func keys(_ layer: Int) -> UnsafeMutablePointer<Float> { cache.floats() + layer * layerStride }
         func values(_ layer: Int) -> UnsafeMutablePointer<Float> { cache.floats() + (config.layers + layer) * layerStride }
         let scores = Pages(bytes: Self.attentionScratchBytes(longest: capacity))
+        let gpu = decodesOnGPU ? decoder : nil
+        try gpu?.attach(cache: cache, layerStride: layerStride)
+        defer { gpu?.detachCache() }   // before `cache` is given back
         try widenExactly(head, "norm.weight", count: h, into: finalNorm)
         let embedRows = encoder.tensors["embed_tokens.weight"]!.shape[0]
 
@@ -270,12 +298,39 @@ package final class Qwen3VLGenerator {
         var processed = 0
         var generated: [Int] = [], stopped = false
 
+        /// The token chosen, appended where the next pass reads it.
+        func accept(_ pick: Int, gap: Float) throws {
+            generated.append(pick)
+            gaps.append(gap)
+            ids.append(pick)
+            for axis in 0..<3 { positions[axis].append(nextPosition) }
+            nextPosition += 1
+            stopped = stops.contains(pick)
+            try onToken?(pick)
+        }
+
         while !stopped && generated.count < maxNewTokens {
             try cancellation.check()
             // ── the pass's rows ──────────────────────────────────────────────────────────────────
             let start = processed, used = min(ids.count - processed, rows)
             let prefill = start < count
             let passStarted = Date()
+
+            // ── a decode step, on the GPU from the resident weights: the layers, the head and the argmax ──
+            if let gpu, !prefill {
+                let id = ids[start]
+                guard id >= 0, id < embedRows else { throw Failure.incomplete("token \(id) outside the embedding table") }
+                try encoder.materializeRows("embed_tokens.weight", first: id, count: 1, into: gpu.hidden)
+                TextEncoder.writeRope(into: gpu.frequencies, positions: (0..<3).map { [positions[$0][start]] }, count: 1,
+                                      theta: config.theta, headDim: dh, sections: config.mropeSections)
+                let pick = try gpu.step(row: start)
+                timings["gpu", default: 0] += gpu.lastStep.gpu
+                passes += 1
+                processed += 1
+                try accept(pick.id, gap: pick.gap)
+                timings["decode", default: 0] += Date().timeIntervalSince(passStarted)
+                continue
+            }
             var axes: [[Int]] = [[], [], []]
             for r in 0..<used {
                 let t = start + r, destination = x + r * h
@@ -338,16 +393,19 @@ package final class Qwen3VLGenerator {
             // ── the next token, once every row has been read ─────────────────────────────────────
             if processed == ids.count {
                 let headStarted = Date()
-                last.update(from: x + (used - 1) * h, count: h)
-                Ops.rmsNorm(last, weight: finalNorm, into: last, rows: 1, columns: h, eps: config.eps)
-                let pick = try greedy(last, headRows: headRows, logits: logits)
+                let best: Top2
+                if let gpu {
+                    // The prompt's last row: the final norm, `lm_head` and the argmax on the GPU.
+                    gpu.hidden.update(from: x + (used - 1) * h, count: h)
+                    let pick = try gpu.pick()
+                    best = Top2(id: pick.id, value: pick.value, second: pick.second)
+                } else {
+                    last.update(from: x + (used - 1) * h, count: h)
+                    Ops.rmsNorm(last, weight: finalNorm, into: last, rows: 1, columns: h, eps: config.eps)
+                    best = try greedy(last, headRows: headRows, logits: logits)
+                }
                 timings["head", default: 0] += Date().timeIntervalSince(headStarted)
-                generated.append(pick)
-                ids.append(pick)
-                for axis in 0..<3 { positions[axis].append(nextPosition) }
-                nextPosition += 1
-                stopped = stops.contains(pick)
-                try onToken?(pick)
+                try accept(best.id, gap: best.value - best.second)
             }
             timings[prefill ? "prefill" : "decode", default: 0] += Date().timeIntervalSince(passStarted)
             if prefill && processed == count { features = [] }   // read by the prompt's passes, not by a step
@@ -363,7 +421,7 @@ package final class Qwen3VLGenerator {
     /// `lm_head` on the normalized row, block of rows by block of rows (widened, then one product),
     /// and the argmax — the first maximum, as `torch.argmax`.
     private func greedy(_ hidden: UnsafePointer<Float>, headRows: UnsafeMutablePointer<Float>,
-                        logits: UnsafeMutablePointer<Float>) throws -> Int {
+                        logits: UnsafeMutablePointer<Float>) throws -> Top2 {
         let h = config.hidden
         var best = Top2()
         var first = 0
@@ -375,7 +433,7 @@ package final class Qwen3VLGenerator {
             best.scan(logits, count: n, base: first)
             first += n
         }
-        return best.id
+        return best
     }
 
     /// **The largest logit and the runner-up**, scanned block after block in id order: a strict `>`
@@ -385,6 +443,7 @@ package final class Qwen3VLGenerator {
         package var value = -Float.infinity
         package var second = -Float.infinity
         package init() {}
+        package init(id: Int, value: Float, second: Float) { self.id = id; self.value = value; self.second = second }
         package mutating func scan(_ values: UnsafePointer<Float>, count: Int, base: Int) {
             for j in 0..<count {
                 let x = values[j]
