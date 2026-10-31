@@ -125,6 +125,9 @@ package struct RemoteJob: Codable, Equatable, Sendable {
     package var previews: Bool
     /// The Neural Engine as the rack chose it; `nil`: the mini's choice for the model.
     package var neuralEngine: Bool?
+    /// « Faster Rendering » as the borrower's switch says it (`Request.fasterRendering`): the render is the borrower's, so is the
+    /// switch. `nil`: the mini's own.
+    package var fasterRendering: Bool?
     /// An edit's images, image 1 first.
     package var references: [RemoteReference]
     /// « Variations »: applied in order over the seed's noise.
@@ -138,7 +141,9 @@ package struct RemoteJob: Codable, Equatable, Sendable {
     package init(ordinal: Int, model: String, modelName: String, prompt: String, width: Int, height: Int, steps: Int,
                  defaultSteps: Int?, loras: [RemoteLoRA], seeds: [UInt64], detail: Detail, solver: Solver,
                  previews: Bool, neuralEngine: Bool?, references: [RemoteReference] = [],
-                 variations: [Variation] = [], modelPrompt: String? = nil, subjectImages: Int? = nil) {
+                 variations: [Variation] = [], modelPrompt: String? = nil, subjectImages: Int? = nil,
+                 fasterRendering: Bool? = nil) {
+        self.fasterRendering = fasterRendering
         self.references = references; self.variations = variations
         self.modelPrompt = modelPrompt; self.subjectImages = subjectImages
         self.ordinal = ordinal; self.model = model; self.modelName = modelName; self.prompt = prompt
@@ -238,16 +243,15 @@ package struct MirrorCatalog: Codable, Equatable, Sendable {
     package var ceiling: Int
     package var settingsRead: Bool
     package var neuralEngineOffered: Bool
-    package var fasterRendering: Bool
     /// macOS's super-resolution is offered there (`SuperResolution.available`).
     package var enlarges: Bool
     package init(ready: [String], traits: [String: RemoteTraits], loras: [String: [RemoteLoRA]], loraNames: [String: String],
-                 needs: [String: [String: Int]] = [:], ceiling: Int, settingsRead: Bool, neuralEngineOffered: Bool, fasterRendering: Bool,
+                 needs: [String: [String: Int]] = [:], ceiling: Int, settingsRead: Bool, neuralEngineOffered: Bool,
                  enlarges: Bool = false) {
         self.enlarges = enlarges
         self.ready = ready; self.traits = traits; self.loras = loras; self.loraNames = loraNames; self.needs = needs
         self.ceiling = ceiling
-        self.settingsRead = settingsRead; self.neuralEngineOffered = neuralEngineOffered; self.fasterRendering = fasterRendering
+        self.settingsRead = settingsRead; self.neuralEngineOffered = neuralEngineOffered
     }
 
     package static func key(_ width: Int, _ height: Int) -> String { "\(width)x\(height)" }

@@ -56,7 +56,7 @@ final class Img2ImgTests: XCTestCase {
         let z = ZImageDenoisingModule(map: "")
         for start in [0, 1, 3] {
             for withLoRA in [false, true] {
-                let plan = z.plan(height: 128, width: 128, steps: 8, start: start, withLoRA: withLoRA)
+                let plan = z.plan(height: 128, width: 128, steps: 8, start: start, withLoRA: withLoRA, faster: false)
                 XCTAssertEqual(plan.reduced, 0)
                 XCTAssertEqual([plan.reducedHeight, plan.reducedWidth], [128, 128])
             }

@@ -112,7 +112,7 @@ package final class Arena {
     ///
     /// The system ends up reclaiming them **under pressure**, which explains why splitting the
     /// arenas by phase still gained 2.4 GB at 1024²: the pressure was real there. But
-    /// "under pressure" is exactly the situation that criterion 4 forbids — we do not want
+    /// "under pressure" is exactly the situation that B forbids — we do not want
     /// room to appear *because* memory runs short.
     ///
     /// Anonymous `mmap` makes release deterministic: `munmap` unmaps, the footprint drops

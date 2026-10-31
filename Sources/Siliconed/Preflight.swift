@@ -186,16 +186,20 @@ package final class RenderLock {
     /// outlive its holder anyway. Another user's file is opened read-only: `flock` does not need to write.
     package static let machine = "/private/tmp/siliconed-render.lock"
 
-    /// The lock, held; `nil` if the file can neither be created nor opened (a machine without a
-    /// writable `/tmp` renders unguarded, as before the lock existed).
+    /// The lock, held; `nil` if the file can neither be created nor opened, or the system refuses `flock` (a machine without a
+    /// writable `/tmp` renders unguarded, as before the lock existed — and the second case says so as a warning).
     package static func acquire(_ path: String) throws(EngineError) -> RenderLock? {
         // 0o644 and read-only: the file another user created stays theirs, and still locks for us.
         let fd = open(path, O_RDONLY | O_CREAT, 0o644)
         guard fd >= 0 else { return nil }
-        guard flock(fd, LOCK_EX | LOCK_NB) == 0 else {
+        var locked = flock(fd, LOCK_EX | LOCK_NB)
+        while locked != 0, errno == EINTR { locked = flock(fd, LOCK_EX | LOCK_NB) }
+        guard locked == 0 else {
             let busy = errno == EWOULDBLOCK
             close(fd)
             if busy { throw .renderAlreadyRunning }
+            // The wall « one render on the machine » stands open for this render: said, not silent.
+            Warnings.emit("⚠ the machine's render lock could not be taken (errno \(errno)): this render runs unguarded")
             return nil
         }
         return RenderLock(fd)

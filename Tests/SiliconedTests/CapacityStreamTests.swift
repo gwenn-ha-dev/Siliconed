@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import XCTest
 @testable import Siliconed
 
 /// **The disk beside the computation** (`CapacityDisk.swift`, `CapacityStream.swift`): the rate a probe reads, the overlap `Combine` makes,
@@ -122,5 +123,36 @@ import Testing
         let model = machine(disk: 5.2e9)
         let decoded = try JSONDecoder().decode(M.self, from: JSONEncoder().encode(model))
         #expect(decoded.diskBandwidth == 5.2e9)
+    }
+}
+
+/// **The disk probe reads where the stream reads, and a failed read is a failure.**
+final class CapacityDiskStreamTests: XCTestCase {
+    func testAShortReadIsAFailureNotAFastDisk() throws {
+        let path = FileManager.default.temporaryDirectory.appendingPathComponent("disk-short-\(UUID().uuidString)").path
+        defer { unlink(path) }
+        let fd = open(path, O_RDWR | O_CREAT, 0o600)
+        XCTAssertGreaterThanOrEqual(fd, 0)
+        defer { close(fd) }
+        let bytes = 1 << 20
+        let buffer = UnsafeMutableRawPointer.allocate(byteCount: bytes, alignment: 16384)
+        defer { buffer.deallocate() }
+        memset(buffer, 7, bytes)
+        XCTAssertEqual(pwrite(fd, buffer, bytes / 2, 0), bytes / 2)       // the file holds half of what the visit asks
+        XCTAssertFalse(CapacityDisk.read(fd, from: 0, to: bytes, into: buffer))
+        XCTAssertTrue(CapacityDisk.read(fd, from: 0, to: bytes / 2, into: buffer))
+    }
+
+    func testTheStreamFolderIsTheLibrarysUnlessAWorkingCopyIsRead() throws {
+        let local = FileManager.default.temporaryDirectory.appendingPathComponent("disk-folder-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: local) }
+        try FileManager.default.createDirectory(at: local, withIntermediateDirectories: true)
+        let library = Library(root: local)
+        let base = local.appendingPathComponent("copies")
+        XCTAssertEqual(CapacityDisk.streamFolder(for: library, copyBase: base), library.root, "a library on this Mac is read in place")
+    }
+
+    func testTheProbeIsChargedToTheDiagnosticsNeed() {
+        XCTAssertGreaterThanOrEqual(CapacityDisk.probeMemoryBytes(), (96 << 20) * max(1, TailStream.unitSlots - 1))
     }
 }

@@ -288,7 +288,7 @@ extension RemoteControl {
                                       loras: stack, references: references.count, detail: d.detail, solver: d.solver)
         let on = mirror.macName
         do {
-            try mirror.explore(g, settings: settings, references: references, stopAfter: 0, neuralEngine: d.neuralEngine,
+            try mirror.explore(g, settings: app.resolvingFaster(settings), references: references, stopAfter: 0, neuralEngine: d.neuralEngine,
                                sketch: d.sketch, previews: d.previews ?? app.previews) { [self] answer in
                 switch answer {
                 case .refused(let text):

@@ -62,8 +62,9 @@ package final class WorkingCopy: @unchecked Sendable {
         }
         self.source = source
         self.folder = folder
-        held = open(folder.appendingPathComponent(".lock").path, O_RDWR | O_CREAT, 0o644)
-        if held >= 0 { _ = flock(held, LOCK_EX | LOCK_NB) }
+        let lock = open(folder.appendingPathComponent(".lock").path, O_RDWR | O_CREAT, 0o644)
+        // A lock we cannot take is no lock: the copy would look abandoned to the next process. Held or not at all.
+        if lock >= 0, flock(lock, LOCK_EX | LOCK_NB) != 0 { close(lock); held = -1 } else { held = lock }
     }
 
     deinit { if held >= 0 { close(held) } }
@@ -77,6 +78,10 @@ package final class WorkingCopy: @unchecked Sendable {
             if fd >= 0 {
                 defer { close(fd) }
                 guard flock(fd, LOCK_EX | LOCK_NB) == 0 else { continue }      // alive
+            } else if let made = (try? fm.attributesOfItem(atPath: folder.path))?[.creationDate] as? Date,
+                      Date().timeIntervalSince(made) < 60 {
+                // No lock yet: a process that is creating its copy right now (`init` makes the folder, then the lock).
+                continue
             }
             try? fm.removeItem(at: folder)
         }

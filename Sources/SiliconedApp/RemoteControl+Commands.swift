@@ -260,10 +260,10 @@ extension RemoteControl {
 
     // ── set ──
 
-    /// **`set faster-rendering on|off`: the Settings switch, from the terminal** — `AppState.fasterRendering`,
-    /// so the preference is written and the window's switch follows, exactly as a click. Only with the queue
-    /// empty: the engine reads it at every plan, and a job started under one value and planned under the
-    /// other would mix two recipes in one series. Setting the value it already has is not a change.
+    /// **`set faster-rendering on|off`: the Settings switch of the current model, from the terminal** —
+    /// `AppState.setFasterRendering(_:for:)`, so the choice is written and the window's switch follows, exactly as a click. Only with the queue
+    /// empty, so that a series is not started under one recipe and finished under the other (a job keeps the value it was queued
+    /// with: `RenderSettings.fasterRendering`). Setting the value it already has is not a change.
     func set(_ arguments: [String]) throws -> [String: Any] {
         guard arguments.count == 2, arguments[0] == "faster-rendering", ["on", "off"].contains(arguments[1]) else {
             throw Refusal("usage", "set faster-rendering on|off")
@@ -272,9 +272,9 @@ extension RemoteControl {
             throw Refusal("busy", String(localized: "a render, an installation or the diagnostic is running"),
                           help: "silicontrol wait, then retry")
         }
-        let previous = app.fasterRendering
-        app.fasterRendering = arguments[1] == "on"
-        return ["ok": true, "faster_rendering": app.fasterRendering, "previous": previous]
+        let previous = app.fasterRendering(for: app.identifier)
+        app.setFasterRendering(arguments[1] == "on", for: app.identifier)
+        return ["ok": true, "faster_rendering": app.fasterRendering(for: app.identifier), "previous": previous]
     }
 
     // ── history, save ──

@@ -13,8 +13,8 @@ import Foundation
 ///    an index of the outputs and the on-screen timings remain the caller's business. A library that
 ///    imposes a working directory cannot be embedded.
 /// 2. **Everything that varies from one request to the next is in `Request`**, or on the module it
-///    concerns. `EngineSettings.effective` stays what the *machine* can do (co-execution, decoder slices);
-///    the prompt, the seed, the resolution, the spectral schedule and reproducibility are call
+///    concerns. `EngineSettings.effective` stays what the *machine* can do that its measure cannot say (the cut's reproducibility, the cache, the map's tail);
+///    the prompt, the seed, the resolution, « Faster Rendering » and reproducibility are call
 ///    parameters. Without that, two requests cannot differ within one process.
 /// 3. **One render at a time, and it is enforced, not recommended.** See `Engine.render`.
 ///
@@ -77,8 +77,8 @@ package final class Engine: Sendable {
         /// **A sketch** (`Request.sketch`): the evaluations it stopped after, the image being the
         /// estimate x̂₀ there. `nil`: the whole render.
         package let sketch: Int?
-        /// The `k` actually applied, which is not the settings' one (a profile is not allowed to
-        /// write it) and which a file name must carry on pain of lying.
+        /// The `k` actually applied — the half-size evaluations the plan took, not what was asked
+        /// (`fasterRendering`) — which a file name must carry on pain of lying.
         package let spectral: Int
         /// The img2img strength; `nil` in txt2img.
         package let strength: Double?
@@ -92,7 +92,6 @@ package final class Engine: Sendable {
         package var detail: Detail = .normal
         /// **The update rule** (`Request.solver`); `euler` writes nothing in the metadata.
         package var solver: Solver = .euler
-        /// **Whose σ** (`Request.schedule`); `official` writes nothing in the metadata.
         /// **The variations its noise was turned by** (`Request.variations`), those of null
         /// strength left out; empty for an ordinary render.
         package var variations: [Variation] = []
@@ -112,6 +111,9 @@ package final class Engine: Sendable {
         /// **Its denoiser's products could take the Neural Engine** (`Request.neuralEngine`, resolved against
         /// the map): fp16 products, another image than fp32's. False writes nothing in the metadata.
         package var neuralEngine = false
+        /// **« Faster Rendering » as the request asked it** (`Request.fasterRendering`): what « Redo » gives back. It is written in the
+        /// metadata only where it moved the image (`spectral` > 0).
+        package var fasterRendering = false
         /// **What the denoising computed, by class and route** (`ProductLedger`): every product by a weight and every
         /// attention of this image's evaluations, with the executions and wall seconds of each — what the capacity
         /// map's prediction is compared with (`RenderLoop`). Empty for a render that was not recorded (a test's).
@@ -137,6 +139,7 @@ package final class Engine: Sendable {
             if detail != .normal { m["detail"] = detail.rawValue }
             if solver != .euler { m["solver"] = solver.rawValue }
             if neuralEngine { m["neural-engine"] = "true" }
+            if fasterRendering && spectral > 0 { m["faster-rendering"] = "true" }
             // `seed` stays the origin's: the variations turn its noise, in order (`Variation.text`).
             if !variations.isEmpty { m["variation"] = Variation.text(variations) }
             if !loras.isEmpty {
@@ -168,7 +171,7 @@ package final class Engine: Sendable {
                                  width: image.width, height: image.height, model: modelName ?? model,
                                  strength: strength, loras: lora,
                                  civitaiModelVersion: isImportedModel ? nil : Infotext.civitaiModelVersion(model: model),
-                                 version: version)
+                                 version: version, fasterRendering: fasterRendering && spectral > 0)
         }
 
         /// The sRGB PNG, metadata included.
@@ -208,6 +211,8 @@ package final class Engine: Sendable {
             /// `Request.neuralEngine`; false when the key is absent (every render before it, and every one
             /// computed in fp32).
             package var neuralEngine = false
+            /// `Request.fasterRendering`; `nil` when the key is absent (the half-size start was not in play, or the image is older).
+            package var fasterRendering: Bool?
             /// The variations its noise was turned by, in order (`Request.variations`); empty for an
             /// ordinary render.
             package var variations: [Variation] = []
@@ -238,6 +243,7 @@ package final class Engine: Sendable {
                 detail = read("detail") { Detail(rawValue: $0) } ?? .normal
                 solver = read("solver") { Solver(rawValue: $0) } ?? .euler
                 neuralEngine = read("neural-engine") { Bool($0) } ?? false
+                fasterRendering = read("faster-rendering") { Bool($0) }
                 variations = read("variation") { Variation.parse($0) } ?? []
                 if let raw = m["lora"] {
                     // `name:0.80,…`, split at the LAST colon: the strength is always written.
@@ -384,7 +390,7 @@ package final class Engine: Sendable {
     ///
     /// **And it is also the right physical answer**: there is one GPU, two AMX blocks and 16 GB.
     /// Two concurrent renders would not share a machine, they would fight over it — and the memory
-    /// peak would double, which criterion 4 forbids. The queue is therefore not a stopgap until
+    /// peak would double, which B forbids. The queue is therefore not a stopgap until
     /// the engine is made reentrant; it is the contract.
     ///
     /// **And it is static: one queue for the whole process, not one per `Engine`.** Everything it
@@ -403,27 +409,35 @@ package final class Engine: Sendable {
 // ── the spectral schedule, which is a product rule ────────────────────────────────────
 
 /// **The spectral schedule is a PRODUCT choice, not a machine one** — the half-size start of Z-Image,
-/// Qwen-Image-2.1, Anima and Krea 2, one switch for all (`Spectral.halfSizeStart`; `Sampler.init(half:…)`,
+/// Qwen-Image-2.1, Anima, Krea 2 and MOSS-Image, one switch for all (`Request.fasterRendering`; `Sampler.init(half:…)`,
 /// `QwenImage21Sampler`, `euler`).
 ///
-/// It is therefore not tuned like the AMX or the VAE slices: a profile cannot write it
-/// (`EngineSettings` refuses), because it does not change the speed at constant image — **it changes
-/// the image**. What judges it is the eye, on free draws, not a stopwatch: a verdict taken on a
+/// It is therefore not tuned like the AMX or the VAE slices, because it does not change the speed at
+/// constant image — **it changes the image**, which is why it is a field of the request and never a
+/// setting of the machine. What judges it is the eye, on free draws, not a stopwatch: a verdict taken on a
 /// single draw is not a verdict, and a rule judged clean on one schedule does not carry over to
 /// another (Z-Image's, clean on its former seven evaluations, left grain on the eight of its recipe).
 /// What lives here are the floors every half-size evaluation obeys, and the measurement's override.
 package enum Spectral {
 
-    /// **The half-size start, one switch for every family** — the app's « Faster Rendering », on by
-    /// default there (`AppState.fasterRendering`); off here, so the CLI, the checks and the judge render
-    /// the recipe at full size. Each family keeps its own count (`halfSizeSteps`: 3, Krea 2 4), judged by
-    /// eye on its own schedule; its plan says where it applies.
-    nonisolated(unsafe) package static var halfSizeStart = false
+    /// **The half-size evaluations of a render — the one rule, for the five denoisers and the catalogue of classes.**
+    /// `faster`: « Faster Rendering » (`Request.fasterRendering`, resolved once per render and carried by `Context`; off for the CLI, the
+    /// checks and the judge, which render the recipe at full size). Only at the recipe's step count, from the first step, on a grid whose
+    /// half stays at `floor` on both sides, never under a LoRA or another schedule (`withLoRA`: never judged under them).
+    /// Each family keeps its own count (`halfSizeSteps`), judged by eye on its own schedule. `SILICONED_SPECTRAL` (`forced`) replaces the
+    /// family's count: a measurement. `evaluations`: the ones the plan runs, of which one at least stays at full size.
+    package static func reducedEvaluations(faster: Bool, height: Int, width: Int, steps: Int, start: Int, withLoRA: Bool,
+                                            defaultSteps: Int, halfSizeSteps: Int, evaluations: Int,
+                                            floor: Int = minimumSide) -> Int {
+        let rule = faster && steps == defaultSteps ? halfSizeSteps : 0
+        guard start == 0, !withLoRA, divisible(height: height, width: width, by: 2, floor: floor) else { return 0 }
+        return min(max(0, forced ?? rule), evaluations - 1)
+    }
 
     /// `SILICONED_SPECTRAL` — read at render time, never at construction; `nil` when nothing forces it.
     /// It forces the half-size start's `k` over its rule, within the floor: a measurement, never the product.
-    /// **Read from the environment, not through `EngineSettings.effective`**: only the environment may set
-    /// it (a profile may not), and the app asks for plans before the capacity map is measured — through
+    /// **Read from the environment, not through `EngineSettings.effective`**, and only by `reducedEvaluations`: it is the
+    /// single point where it counts. The app asks for plans before the capacity map is measured — through
     /// `effective`, that first plan froze the process on the defaults and the map was then refused, the
     /// AMX off for the whole session (+20 % per MOSS step).
     package static var forced: Int? {

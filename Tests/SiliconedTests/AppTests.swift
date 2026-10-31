@@ -160,7 +160,7 @@ final class AppTests: XCTestCase {
             (Request.Failure.emptyPrompt, .emptyPrompt),
             (Request.Failure.steps(0), .invalidSteps(steps: 0, allowed: [])),
             (QwenImage21Pipeline.Failure.steps(6), .invalidSteps(steps: 6, allowed: [8])),
-            (EngineSettings.Failure.alreadyRead(profileRead: "/a", requested: "/b"),
+            (EngineSettings.Failure.alreadyRead(loaded: "/a", requested: "/b"),
              .settingsAlreadyLoaded(loaded: "/a", requested: "/b")),
             (CancellationError(), .cancelled),
             (NSError(domain: NSPOSIXErrorDomain, code: Int(ENOSPC)), .diskFull(needed: nil, available: nil)),
@@ -443,7 +443,7 @@ private struct FakeDenoisingModule: DenoisingModule {
     var space: LatentSpace { .flux }
     var defaultSteps: Int { 2 }
     func sigmas(steps: Int) -> [Float] { [1, 0.5, 0] }
-    func plan(height: Int, width: Int, steps: Int, start: Int, withLoRA: Bool) -> DenoisingPlan {
+    func plan(height: Int, width: Int, steps: Int, start: Int, withLoRA: Bool, faster: Bool) -> DenoisingPlan {
         DenoisingPlan(startStep: 0, startSigma: 1, evaluations: 2, reduced: 0,
                          reducedHeight: height, reducedWidth: width)
     }

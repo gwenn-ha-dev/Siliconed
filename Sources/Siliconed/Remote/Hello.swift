@@ -124,8 +124,6 @@ package enum SessionMessage: Codable, Equatable, Sendable {
     /// « Measure This Mac » of the lender, asked from the borrower's sheet; `stopMeasure` stops it.
     case measure
     case stopMeasure
-    /// The lender's « Faster Rendering » (`Spectral.halfSizeStart` is its process's); the new value shows in the catalog.
-    case setFasterRendering(Bool)
     /// Install, remove, stop, judge a Hub file: the lender's library is common to its clients (`Installing.swift`).
     case libraryAsk(RemoteLibraryRequest)
     /// A file of the Neo to import on the mini: offered, then streamed (`Upload.swift`) if the answer is yes.

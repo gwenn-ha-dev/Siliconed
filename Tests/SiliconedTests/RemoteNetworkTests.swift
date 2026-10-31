@@ -270,7 +270,7 @@ final class RemoteNetworkTests: XCTestCase {
             .catalog(MirrorCatalog(ready: ["z-image"], traits: ["z-image": RemoteTraits(
                 maxReferences: 0, readsImages: false, acceptsDetail: true, steps: Array(1...50),
                 text: "Qwen3", encoding: nil, decoding: "Flux VAE")], loras: [:], loraNames: [:],
-                ceiling: 10 << 30, settingsRead: true, neuralEngineOffered: true, fasterRendering: true)),
+                ceiling: 10 << 30, settingsRead: true, neuralEngineOffered: true)),
         ]
         for m in messages {
             XCTAssertEqual(try JSONDecoder().decode(SessionMessage.self, from: JSONEncoder().encode(m)), m)

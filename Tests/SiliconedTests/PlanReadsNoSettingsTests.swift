@@ -16,16 +16,14 @@ final class PlanReadsNoSettingsTests: XCTestCase {
         let before = EngineSettings.forbiddenReads.load(ordering: .relaxed)
         EngineSettings.$readsForbidden.withValue(true) {
             for halfSize in [false, true] {
-                Spectral.halfSizeStart = halfSize
                 for m in modules {
                     for (h, w) in [(64, 64), (128, 128), (128, 192)] {
-                        _ = m.plan(height: h, width: w, steps: m.defaultSteps, start: 0)
-                        _ = m.plan(height: h, width: w, steps: m.defaultSteps, start: 0, withLoRA: true)
+                        _ = m.plan(height: h, width: w, steps: m.defaultSteps, start: 0, withLoRA: false, faster: halfSize)
+                        _ = m.plan(height: h, width: w, steps: m.defaultSteps, start: 0, withLoRA: true, faster: halfSize)
                     }
                 }
             }
         }
-        Spectral.halfSizeStart = false
         XCTAssertEqual(EngineSettings.forbiddenReads.load(ordering: .relaxed), before,
                        "a plan read EngineSettings.effective")
         #else

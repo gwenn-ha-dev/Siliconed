@@ -106,27 +106,25 @@ final class PureFunctionsTests: XCTestCase {
     /// `halfSizeSteps` there, never under the floor (16-px cells), a LoRA, a start past 0 or off the recipe.
     func testQwenSpectralPlan() throws {
         try XCTSkipIf(Spectral.forced != nil, "SILICONED_SPECTRAL forces k")
-        defer { Spectral.halfSizeStart = false }
         let module = QwenImage21DenoisingModule(map: "", scheduler: .init())
-        let full = module.plan(height: 64, width: 64, steps: 8, start: 0, withLoRA: false)
+        let full = module.plan(height: 64, width: 64, steps: 8, start: 0, withLoRA: false, faster: false)
         XCTAssertEqual(full.reduced, 0)
         XCTAssertEqual([full.reducedHeight, full.reducedWidth], [64, 64])
         XCTAssertEqual(full.evaluations, 8)
-        XCTAssertEqual(module.plan(height: 96, width: 64, steps: 8, start: 0, withLoRA: false).reduced, 0)
+        XCTAssertEqual(module.plan(height: 96, width: 64, steps: 8, start: 0, withLoRA: false, faster: false).reduced, 0)
 
-        Spectral.halfSizeStart = true
-        let half = module.plan(height: 64, width: 64, steps: 8, start: 0, withLoRA: false)
+        let half = module.plan(height: 64, width: 64, steps: 8, start: 0, withLoRA: false, faster: true)
         XCTAssertEqual(half.reduced, QwenImage21DenoisingModule.halfSizeSteps)
         XCTAssertEqual([half.reducedHeight, half.reducedWidth], [32, 32])
         XCTAssertEqual(half.evaluations, 8)
-        XCTAssertEqual(module.plan(height: 96, width: 64, steps: 8, start: 0, withLoRA: false).reduced,
+        XCTAssertEqual(module.plan(height: 96, width: 64, steps: 8, start: 0, withLoRA: false, faster: true).reduced,
                        QwenImage21DenoisingModule.halfSizeSteps)
-        XCTAssertEqual(module.plan(height: 64, width: 64, steps: 8, start: 0, withLoRA: true).reduced, 0)
-        XCTAssertEqual(module.plan(height: 64, width: 64, steps: 8, start: 1, withLoRA: false).reduced, 0)
-        XCTAssertEqual(module.plan(height: 64, width: 64, steps: 12, start: 0, withLoRA: false).reduced, 0)
+        XCTAssertEqual(module.plan(height: 64, width: 64, steps: 8, start: 0, withLoRA: true, faster: true).reduced, 0)
+        XCTAssertEqual(module.plan(height: 64, width: 64, steps: 8, start: 1, withLoRA: false, faster: true).reduced, 0)
+        XCTAssertEqual(module.plan(height: 64, width: 64, steps: 12, start: 0, withLoRA: false, faster: true).reduced, 0)
         // 512² and 832×1216: a half side under 512 px.
-        XCTAssertEqual(module.plan(height: 32, width: 32, steps: 8, start: 0, withLoRA: false).reduced, 0)
-        XCTAssertEqual(module.plan(height: 76, width: 52, steps: 8, start: 0, withLoRA: false).reduced, 0)
+        XCTAssertEqual(module.plan(height: 32, width: 32, steps: 8, start: 0, withLoRA: false, faster: true).reduced, 0)
+        XCTAssertEqual(module.plan(height: 76, width: 52, steps: 8, start: 0, withLoRA: false, faster: true).reduced, 0)
     }
 
     /// **Krea 2's plan**: off by default, every evaluation at full size; the half-size start takes
@@ -134,26 +132,24 @@ final class PureFunctionsTests: XCTestCase {
     /// the floor, a LoRA, another schedule, a start past 0 or off the recipe's eight.
     func testKrea2SpectralPlan() throws {
         try XCTSkipIf(Spectral.forced != nil, "SILICONED_SPECTRAL forces k")
-        defer { Spectral.halfSizeStart = false }
         let module = Krea2DenoisingModule(map: "")
-        let full = module.plan(height: 128, width: 128, steps: 8, start: 0, withLoRA: false)
+        let full = module.plan(height: 128, width: 128, steps: 8, start: 0, withLoRA: false, faster: false)
         XCTAssertEqual(full.reduced, 0)
         XCTAssertEqual([full.reducedHeight, full.reducedWidth], [128, 128])
         XCTAssertEqual(full.evaluations, 8)
 
-        Spectral.halfSizeStart = true
-        let half = module.plan(height: 128, width: 128, steps: 8, start: 0, withLoRA: false)
+        let half = module.plan(height: 128, width: 128, steps: 8, start: 0, withLoRA: false, faster: true)
         XCTAssertEqual(half.reduced, Krea2DenoisingModule.halfSizeSteps)
         XCTAssertEqual([half.reducedHeight, half.reducedWidth], [64, 64])
         XCTAssertEqual(half.evaluations, 8)
-        XCTAssertEqual(module.plan(height: 192, width: 128, steps: 8, start: 0, withLoRA: false).reduced,
+        XCTAssertEqual(module.plan(height: 192, width: 128, steps: 8, start: 0, withLoRA: false, faster: true).reduced,
                        Krea2DenoisingModule.halfSizeSteps)
-        XCTAssertEqual(module.plan(height: 128, width: 128, steps: 8, start: 0, withLoRA: true).reduced, 0)
-        XCTAssertEqual(module.plan(height: 128, width: 128, steps: 8, start: 1, withLoRA: false).reduced, 0)
-        XCTAssertEqual(module.plan(height: 128, width: 128, steps: 12, start: 0, withLoRA: false).reduced, 0)
+        XCTAssertEqual(module.plan(height: 128, width: 128, steps: 8, start: 0, withLoRA: true, faster: true).reduced, 0)
+        XCTAssertEqual(module.plan(height: 128, width: 128, steps: 8, start: 1, withLoRA: false, faster: true).reduced, 0)
+        XCTAssertEqual(module.plan(height: 128, width: 128, steps: 12, start: 0, withLoRA: false, faster: true).reduced, 0)
         // 512² and 832×1216: a half side under 512 px.
-        XCTAssertEqual(module.plan(height: 64, width: 64, steps: 8, start: 0, withLoRA: false).reduced, 0)
-        XCTAssertEqual(module.plan(height: 152, width: 104, steps: 8, start: 0, withLoRA: false).reduced, 0)
+        XCTAssertEqual(module.plan(height: 64, width: 64, steps: 8, start: 0, withLoRA: false, faster: true).reduced, 0)
+        XCTAssertEqual(module.plan(height: 152, width: 104, steps: 8, start: 0, withLoRA: false, faster: true).reduced, 0)
     }
 
     // ── the formats ───────────────────────────────────────────────────────────────────────
@@ -425,18 +421,6 @@ final class PureFunctionsTests: XCTestCase {
     }
 
     // ── the settings ──────────────────────────────────────────────────────────────────────
-
-    func testAProfileHasNoRightToWriteTheImage() {
-        // A profile tunes speed and room, never the image. It is enforced by `EngineSettings.outsideProfile`; this test is here so
-        // that adding an image setting does not forget to register there.
-        for forbidden in ["spectral", "vae_tuile", "amx_spin"] {
-            XCTAssertTrue(EngineSettings.outsideProfile.contains(forbidden),
-                          "\"\(forbidden)\" changes the image: a profile must not be able to write it")
-        }
-        // And the counterpart: `amx_fraction` changes the speed, never the image — each row of the
-        // output is computed by a single engine — so a profile MUST be able to write it.
-        XCTAssertFalse(EngineSettings.outsideProfile.contains("amx_fraction"))
-    }
 
     func testTheSDPAHeadSplitCoversEveryHeadAndEveryRowOnce() {
         // Heads [0, g) on the GPU, [g, H) on the CPU, by blocks of query rows. A head computed

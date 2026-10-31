@@ -77,9 +77,6 @@ package final class VAE {
     private let device: MTLDevice
     private let queue: MTLCommandQueue
     private let latentHeight, latentWidth: Int
-    /// `nil` when decoding in one go. Otherwise a tile's grid and its overlap, in latent.
-    /// A tile is square, except on an axis shorter than it: it takes the whole axis there.
-    private let tile: (height: Int, width: Int, overlap: Int)?
     package var imageHeight: Int { latentHeight * 8 }
     package var imageWidth: Int { latentWidth * 8 }
 
@@ -109,20 +106,6 @@ package final class VAE {
         guard weights.entries["decoder.conv_in.weight"]?.shape.dropFirst().first == config.latentChannels,
               weights.entries["decoder.conv_out.weight"]?.shape.first == 3 else {
             throw Safetensors.Failure.badHeader("\(path): not a Flux VAE with \(config.latentChannels) latent channels")
-        }
-        // **Tiles only apply if they cut something.** A tile larger
-        // than the image is not a tile, and a tile without overlap leaves a hard
-        // seam: both cases are refused here rather than rendering an inexplicable image.
-        let requestedTile = EngineSettings.effective.vaeTile, overlap = max(0, EngineSettings.effective.vaeOverlap)
-        if requestedTile >= 16, requestedTile < max(latentHeight, latentWidth), overlap > 0,
-           requestedTile > 2 * overlap {
-            self.tile = (min(requestedTile, latentHeight), min(requestedTile, latentWidth), overlap)
-        } else {
-            if requestedTile > 0 {
-                Warnings.emit("⚠ tile of \(requestedTile) refused for a latent of \(latentWidth)×\(latentHeight) "
-                                       + "(overlap \(overlap)) — decoding in one piece")
-            }
-            self.tile = nil
         }
     }
 
@@ -267,113 +250,10 @@ package final class VAE {
     }
 
 
-    /// **The tile positions along an axis.** The first starts at 0, the last ends on the
-    /// edge, and the others are spread evenly between the two. The effective overlap is
-    /// therefore **at least** the one requested — never less, often more at the edge, which is the right sense
-    /// for blending: better to overlap too much than to leave a seam.
-    static func positions(side L: Int, tile t: Int, overlap o: Int) -> [Int] {
-        guard t < L else { return [0] }
-        let step = max(1, t - o)
-        let n = max(2, Int((Double(L - o) / Double(step)).rounded(.up)))
-        return (0..<n).map { Int((Double($0) * Double(L - t) / Double(n - 1)).rounded()) }
-    }
-
-    /// **The blend: one weight per pixel, going down toward zero on the overlapped edges.**
-    ///
-    /// The weight is not exactly zero at the very edge — it would be `0` everywhere if two tiles
-    /// overlapped exactly over their margin, and the normalization would divide by zero. So it starts
-    /// from `1/(margin+1)`.
-    /// Internal and not private: it is the only bulwark against a visible seam, and a function
-    /// that decides what we see must be queryable without launching a decoder.
-    static func ramp(_ position: Int, length: Int, margin: Int,
-                      freeStart: Bool, freeEnd: Bool) -> Float {
-        guard margin > 0 else { return 1 }
-        var weights: Float = 1
-        if freeStart, position < margin { weights *= Float(position + 1) / Float(margin + 1) }
-        if freeEnd, position >= length - margin {
-            weights *= Float(length - position) / Float(margin + 1)
-        }
-        return weights
-    }
-
-    /// **Tiled decoding, and what it approximates.**
-    ///
-    /// Each tile goes through the **whole** decoder (`decodeBanded` on the tile's latent), so the peak
-    /// becomes that of **one** tile.
-    ///
-    /// It is not exact, and for two reasons that have nothing to do with the stitching:
-    ///
-    ///   - the **`GroupNorm`s** normalize over the whole plane, so each tile has its own
-    ///     means and variances — those are other numbers, not another split of the same ones;
-    ///   - the **bottleneck attention** is global: a tile only sees its own tokens.
-    ///
-    /// The overlap does not fix that; it only keeps the difference from reading as a
-    /// line. It is `diffusers`' compromise, and it is **measured** — the image check returns the
-    /// PSNR against the single-piece decoding, and `out/diff/` shows the seam if there is one. The
-    /// bands of `decodeBanded` made it useless for room; it stays a setting that changes the
-    /// image, refused in a profile.
-    private func decodePerTiles(_ latent: UnsafePointer<Float>,
-                                  _ t: (height: Int, width: Int, overlap: Int)) throws -> [Float] {
-        let channels = config.latentChannels
-        // Positions are taken **per axis**: a tile that covers a whole axis has only one place there.
-        let rows = VAE.positions(side: latentHeight, tile: t.height, overlap: t.overlap)
-        let columns = VAE.positions(side: latentWidth, tile: t.width, overlap: t.overlap)
-        let (tileHeight, tileWidth) = (t.height * 8, t.width * 8)
-        let (pictureHeight, pictureWidth) = (imageHeight, imageWidth)
-        let margin = t.overlap * 8
-
-        var sum = [Float](repeating: 0, count: 3 * pictureHeight * pictureWidth)
-        var weights = [Float](repeating: 0, count: pictureHeight * pictureWidth)
-        var slice = [Float](repeating: 0, count: channels * t.height * t.width)
-
-        for y0 in rows {
-            for x0 in columns {
-                // The latent slice, channel by channel: `h` contiguous rows of `w` values.
-                for c in 0..<channels {
-                    for rowLine in 0..<t.height {
-                        let source = latent + (c * latentHeight + y0 + rowLine) * latentWidth + x0
-                        slice.withUnsafeMutableBufferPointer {
-                            ($0.baseAddress! + (c * t.height + rowLine) * t.width).update(from: source, count: t.width)
-                        }
-                    }
-                }
-                let piece = try slice.withUnsafeBufferPointer {
-                    try decodeBanded($0.baseAddress!, height: t.height, width: t.width)
-                }
-                // The blend, additive: we accumulate `value × weight` and the weight, and divide at the
-                // end. No assumption about the effective overlap — it can be larger than
-                // requested at the edges, and the normalization copes on its own.
-                let freeTop = y0 > 0, freeBottom = y0 + t.height < latentHeight
-                let freeLeft = x0 > 0, freeRight = x0 + t.width < latentWidth
-                for ly in 0..<tileHeight {
-                    let py = y0 * 8 + ly
-                    let wy = VAE.ramp(ly, length: tileHeight, margin: margin,
-                                       freeStart: freeTop, freeEnd: freeBottom)
-                    for lx in 0..<tileWidth {
-                        let px = x0 * 8 + lx
-                        let w = wy * VAE.ramp(lx, length: tileWidth, margin: margin,
-                                               freeStart: freeLeft, freeEnd: freeRight)
-                        weights[py * pictureWidth + px] += w
-                        for c in 0..<3 {
-                            sum[(c * pictureHeight + py) * pictureWidth + px] +=
-                                w * piece[(c * tileHeight + ly) * tileWidth + lx]
-                        }
-                    }
-                }
-            }
-        }
-        let pixels = pictureHeight * pictureWidth
-        for p in 0..<pixels where weights[p] > 0 {
-            for c in 0..<3 { sum[c * pixels + p] /= weights[p] }
-        }
-        return sum
-    }
-
     /// `latent` as `[16, h, w]` as the sampler returns it. Outputs `[3, 8h, 8w]` in `[-1, 1]`.
     package func decode(latent: UnsafePointer<Float>) throws -> (image: [Float], seconds: Double) {
         let started = Date()
-        let image = try tile.map { try decodePerTiles(latent, $0) }
-            ?? decodeBanded(latent, height: latentHeight, width: latentWidth)
+        let image = try decodeBanded(latent, height: latentHeight, width: latentWidth)
         return (image, Date().timeIntervalSince(started))
     }
 }

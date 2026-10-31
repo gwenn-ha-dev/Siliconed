@@ -2,7 +2,7 @@ import Foundation
 
 /// **The models' root: one folder, and every path derives from it.**
 ///
-///     <root>/store/                       forged maps (DiT, encoders), forged LoRAs, profil.json
+///     <root>/store/                       forged maps (DiT, encoders), forged LoRAs
 ///     <root>/store/composants/<family>/   a family's tokenizers, VAE, configs — the small
 ///                                         published files the engine reads as is
 ///     <root>/store/importes/              the imported DiTs (Civitai checkpoints), one per model
@@ -17,7 +17,7 @@ import Foundation
 /// (`~/Library/Application Support/Siliconed/`, or a folder chosen by the user) and passes it to
 /// `Model.named(_:in:)`; `Library.standard` is its own.
 ///
-/// **What belongs to the Mac lives in `local`**, not with the models: the machine's profile, the
+/// **What belongs to the Mac lives in `local`**, not with the models: the
 /// render cache, the accepted licenses, the remote control's socket, where the library is
 /// (`LibraryPlace.swift`). `local` is `root` itself, unless the library was moved to another
 /// disk: the app's own space keeps them then, and a move never carries them.
@@ -42,10 +42,6 @@ package struct Library: Sendable {
         root.appendingPathComponent("store").appendingPathComponent(name).path
     }
 
-    /// The machine's profile, written by the developer's bench.
-    // on-disk key, kept for existing maps/profiles (file name kept)
-    package var profile: String { local.appendingPathComponent("store/profil.json").path }
-
     /// **The app's socket**: the Unix socket where the app open on this library listens for
     /// `silicontrol …` (`docs/REMOTE-CONTROL.md`). It exists only while the app runs. In `local`:
     /// a socket cannot be made on every disk (exFAT, a network share), and `silicontrol` finds it
@@ -65,7 +61,7 @@ package struct Library: Sendable {
     }
 
     /// `<root>/store/importes/` — the imported DiTs.
-    // on-disk layout, kept for existing libraries (store/importes, store/composants, profil.json)
+    // on-disk layout, kept for existing libraries (store/importes, store/composants)
     package var imported: URL { root.appendingPathComponent("store/importes") }
 
     /// A file (or folder) of a family's components. Throws if it is not there: a missing
@@ -88,8 +84,7 @@ package struct Library: Sendable {
     ///
     /// `SILICONED_ROOT` names the app's space as the app reads it: moved, its library is followed.
     ///
-    /// An app does not depend on it: it builds its own `Library(root:)`, and calls
-    /// `EngineSettings.load(from:)` at startup so the machine's profile is its own.
+    /// An app does not depend on it: it builds its own `Library(root:)`.
     package static let processWide: Library = {
         let fm = FileManager.default
         func hasStore(_ folder: URL) -> Bool {

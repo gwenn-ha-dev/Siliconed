@@ -25,10 +25,9 @@ import Foundation
 // (`useLocal`).
 
 extension Library {
-    /// **What belongs to this Mac, never carried by a move**, relative to `local`: the machine's
-    /// profile, the render cache, the remote control's socket, the licenses its user accepted, and
-    /// where the library is.
-    package static let machineFiles = ["store/profil.json", "cache", "silicontrol.sock", "accepted-licenses.json", locationName]
+    /// **What belongs to this Mac, never carried by a move**, relative to `local`: the render
+    /// cache, the remote control's socket, the licenses its user accepted, and where the library is.
+    package static let machineFiles = ["cache", "silicontrol.sock", "accepted-licenses.json", locationName]
     static let locationName = "library-location"
 
     /// **The library of the app's space `local`**: where its location file says, else `local` itself.
@@ -100,7 +99,7 @@ extension Library {
         }
     }
 
-    /// The library holds models — anything in `store/` but the machine's profile.
+    /// The library holds models — anything in `store/` but a `profil.json` that earlier builds left (no longer read).
     static func holdsModels(_ root: URL) -> Bool {
         let names = (try? FileManager.default.contentsOfDirectory(atPath: root.appendingPathComponent("store").path)) ?? []
         return names.contains { $0 != "profil.json" && $0 != ".DS_Store" }
@@ -256,14 +255,7 @@ package enum LibraryMove {
         let root = source.root
         let kept = source.isElsewhere ? [] : Library.machineFiles
         for name in (try? fm.contentsOfDirectory(atPath: root.path)) ?? [] where !kept.contains(name) {
-            if name == "store", !kept.isEmpty {
-                let store = root.appendingPathComponent("store")
-                for inner in (try? fm.contentsOfDirectory(atPath: store.path)) ?? [] where inner != "profil.json" {
-                    try? fm.removeItem(at: store.appendingPathComponent(inner))
-                }
-            } else {
-                try? fm.removeItem(at: root.appendingPathComponent(name))
-            }
+            try? fm.removeItem(at: root.appendingPathComponent(name))
         }
         if source.isElsewhere, ((try? fm.contentsOfDirectory(atPath: root.path)) ?? []).isEmpty {
             try? fm.removeItem(at: root)

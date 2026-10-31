@@ -51,7 +51,9 @@ import Metal
 ///   - **It holds the machine's render lock** (`RenderLock.machine`) and runs on the engine's queue: never beside a render, of
 ///     this process or another.
 ///
-/// **Deliberately not measured**: the disk (no decision reads it); a model's step (its weights, its plan and the page cache decide
+/// **Measured, but no decision of the product reads it yet**: the disk, as the weight stream reads it (`CapacityDisk`, one second,
+/// in `CapacityModel.diskBandwidth` and the report) — the stream's overlap is planned by `CapacityStream` and judged by developers'
+/// benches (E5). **Deliberately not measured**: a model's step (its weights, its plan and the page cache decide
 /// it, and a render's own figures already say it); the memory (B is a function of the RAM alone, ¾ · RAM − 2 GiB); an SDPA in fp16
 /// (P20: never under bf16, sums in fp32 — a precision the engine refuses is no capacity).
 ///

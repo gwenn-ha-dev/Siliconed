@@ -23,7 +23,9 @@ extension Engine {
     /// two images as everywhere else.
     package func renderBatch(_ request: Request, seeds: [UInt64], model: Model, cancellation: Cancellation? = nil,
                           onProgress: (@Sendable (Event) -> Void)? = nil) throws(EngineError) -> [Render] {
-        try EngineError.boundary {
+        // Called from the engine's own queue (a progress closure, a warning receiver), `sync` below would wait for itself for ever.
+        dispatchPrecondition(condition: .notOnQueue(Engine.file))
+        return try EngineError.boundary {
             try Engine.file.sync { try execute(request, seeds, model, cancellation, onProgress) }
         }
     }
@@ -54,11 +56,15 @@ extension Engine {
         EngineSettings.renderBegan()
         defer { EngineSettings.renderEnded() }
         let chain = model.chain, cache = model.library?.renderCache
-        let space = chain.denoising.space
         guard !seeds.isEmpty else { return [] }
         // A request cancelled while waiting on the queue pays for nothing: neither `start`
         // nor the opening of its LoRA stack.
         try cancellation.check()
+        // **The request's own refusals first, before any computation and before the memory is judged**
+        // (`Admission`, pure): a request the model cannot render is refused for what it is, not for its memory.
+        let admitted = try Admission.judge(request, chain: chain, usesANE: EngineSettings.effective.plan.usesANE)
+        let (space, height, width, steps, start, plan) = (admitted.space, admitted.height, admitted.width, admitted.steps,
+                                                           admitted.start, admitted.plan)
         // Installed, license, format, memory, no other render: the first that fails throws. The
         // lock is held until this function returns, the whole batch.
         // B, this Mac's budget (`MemoryBudget`): the preflight judges the floor against it, and the
@@ -78,54 +84,9 @@ extension Engine {
             promptTokens: MemoryNeed.Request.promptTokens(request.prompt, family: model.card.family,
                                                            references: request.references.count))
         memoryRequest.solver = request.solver
-        memoryRequest.neuralEngine = request.neuralEngine && EngineSettings.effective.plan.usesANE
+        memoryRequest.neuralEngine = admitted.neuralEngine
         memoryRequest.batch = seeds.count
         memoryRequest.library = model.library ?? .processWide
-        // **The request's own refusals first, before any computation and before the memory is judged**:
-        // an empty prompt, a step count, img2img's strength, the references — a request
-        // the model cannot render is refused for what it is, not for its memory.
-        guard !request.prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            throw Request.Failure.emptyPrompt
-        }
-        let height = request.height / space.factor, width = request.width / space.factor
-        let steps = request.steps ?? chain.denoising.defaultSteps
-        guard (1...Request.maximumSteps).contains(steps) else { throw Request.Failure.steps(steps) }
-        // **img2img is judged before any computation, too**: an out-of-range strength, a chain
-        // without an encoder, a strength that leaves no evaluation all throw here.
-        var start = 0
-        if request.image != nil {
-            guard chain.encoding != nil else { throw Strength.Failure.withoutEncoder(model: chain.denoising.model) }
-            guard request.strength > 0, request.strength <= 1 else { throw Strength.Failure.outOfBounds(request.strength) }
-            start = Strength.startStep(steps: steps, strength: request.strength)
-        }
-        if !request.references.isEmpty {
-            guard chain.encoding != nil, request.references.count <= chain.denoising.maxReferences else {
-                throw Request.Failure.references(request.references.count,
-                                              max: chain.encoding == nil ? 0 : chain.denoising.maxReferences)
-            }
-        }
-        try chain.denoising.check(steps: steps, startImage: request.image != nil)
-        guard chain.denoising.solvers.contains(request.solver) else {
-            throw Request.Failure.solver(request.solver, model: chain.denoising.model)
-        }
-        guard request.detail == .normal || chain.denoising.acceptsDetail else {
-            throw Request.Failure.detail(model: chain.denoising.model)
-        }
-        // Detail, like a LoRA, turns Qwen-Image-2.1's spectral schedule off; an edit too
-        // (`QwenImage21DenoisingModule.plan`): the plan cannot see the references, the chain can.
-        var plan = chain.denoising.plan(height: height, width: width, steps: steps, start: start,
-                                          withLoRA: !request.loras.isEmpty || request.detail != .normal)
-        if !request.references.isEmpty { plan = plan.unreduced }
-        guard plan.evaluations > 0 else {
-            // The floor: the last start that keeps an evaluation, `d`, is reached as soon as
-            // `N − N·s < d + 1`, i.e. `s > (N − d − 1)/N`.
-            let last = (0..<steps).last {
-                chain.denoising.plan(height: height, width: width, steps: steps, start: $0,
-                                       withLoRA: !request.loras.isEmpty).evaluations > 0
-            } ?? 0
-            throw Strength.Failure.noEvaluation(strength: request.strength, steps: steps,
-                                               floor: Double(steps - last - 1) / Double(steps))
-        }
         let lock = try Preflight.run(model, width: request.width, height: request.height,
                                      references: request.references.count, ceiling: ceiling, memory: memoryRequest)
         defer { withExtendedLifetime(lock) {} }
@@ -146,7 +107,8 @@ extension Engine {
         let context = Context(reproducible: reproducible, cancellation: cancellation,
                                 previews: request.previews, onProgress: onProgress)
         context.cache = cache
-        context.neuralEngine = request.neuralEngine && EngineSettings.effective.plan.usesANE
+        context.neuralEngine = admitted.neuralEngine
+        context.fasterRendering = admitted.fasterRendering
         // A sketch that reaches the plan's last evaluation is the whole render: no stop, no estimate.
         let sketch = request.sketch.map { max(1, $0) }.flatMap { $0 < plan.evaluations ? $0 : nil }
         context.stopAfter = sketch
@@ -169,6 +131,8 @@ extension Engine {
         // are its caller's — the lean plan, no check.
         let need = memoryPlan.need
         if need == nil, model.library != nil { throw EngineError.memoryNeedUnknown(model: model.card.id) }
+        // A hand-composed chain is the caller's: said in the render's warnings, so that nobody takes it for the product's.
+        let outsideContract = model.library == nil
         PhaseBoundary.begin()
         defer { _ = PhaseBoundary.end() }
         return try MemoryPlan.during(memoryPlan) { try Warnings.during(warn) {
@@ -176,6 +140,7 @@ extension Engine {
             // was already said by an earlier render (`Attention.report` says each cause once).
             let gpuFailures = Attention.failures
             defer { Attention.summarize(since: gpuFailures) }
+            if outsideContract { Warnings.emit("⚠ a hand-composed chain: outside the memory contract (no need, no lock, no license check)") }
             let totalStart = Date()
             context.footprints.start = Arena.processFootprint()
             PhaseBoundary.mark("start")
@@ -330,7 +295,8 @@ extension Engine {
                                   detail: request.detail, solver: request.solver,
                                   variations: request.variations.filter { $0.effectiveStrength > 0 },
                                   modelName: model.card.name, isImportedModel: model.card.isImported,
-                                  loraOrigins: stack?.origins ?? [], neuralEngine: context.neuralEngine, classes: classes)
+                                  loraOrigins: stack?.origins ?? [], neuralEngine: context.neuralEngine,
+                                  fasterRendering: admitted.fasterRendering, classes: classes)
                 context.emit(.image(index: n, renderResult))
                 renderResults.append(renderResult)
             }

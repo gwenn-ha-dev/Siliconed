@@ -138,7 +138,7 @@ package final class CapacityPlan: Sendable {
         self.attentionOverride = attentionOverride
     }
 
-    /// **A probe's plan** (the previous map's balancing, a bench's solos): the engines it builds, every product on the GPU alone
+    /// **A probe's plan** (a probe's solos, a bench's solos): the engines it builds, every product on the GPU alone
     /// until a key is `pin`ned to the exact rows to measure.
     package static func probing(amx: Bool = false, ane: Bool = false, bf16Weights: Bool = false, int8Weights: Bool = false,
                                 q8Weights: Bool = false, roundedActivations: Bool = false) -> CapacityPlan {

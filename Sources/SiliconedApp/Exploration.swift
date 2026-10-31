@@ -73,7 +73,7 @@ extension AppState {
             guard let m = model(id) else { return (id, steps, nil) }
             let d = m.chain.denoising, f = d.space.factor
             let plan = d.plan(height: format.height / f, width: format.width / f, steps: steps, start: 0,
-                              withLoRA: withLoRA || (detail != .normal && d.acceptsDetail))
+                              withLoRA: withLoRA || (detail != .normal && d.acceptsDetail), faster: fasterRendering(for: id))
             let stop = exploreStop > 0 ? exploreStop : m.sketchEvaluations(steps: steps, width: format.width, height: format.height)
             return (id, steps, plan.sketched(stop))
         }
@@ -151,7 +151,7 @@ extension AppState {
                                       references: references.count, detail: effectiveDetail, solver: effectiveSolver)
         followsRender = false
         if let mirror {
-            do { try mirror.explore(g, settings: settings, references: references, stopAfter: exploreStop, neuralEngine: nil) }
+            do { try mirror.explore(g, settings: resolvingFaster(settings), references: references, stopAfter: exploreStop, neuralEngine: nil) }
             catch { problem = Problem(error); flash(Problem(error).text); return }
         } else {
             enqueueGrid(g, settings: settings, references: references, previews: true, sketch: true, stopAfter: exploreStop)

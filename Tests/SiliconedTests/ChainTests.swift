@@ -90,7 +90,6 @@ final class ChainTests: XCTestCase {
     func testTheLibraryDerivesItsPaths() {
         let b = Library(root: URL(fileURLWithPath: "/Modèles/Siliconed"))
         XCTAssertEqual(b.map("anima-turbo-dit.v0.silicon"), "/Modèles/Siliconed/store/anima-turbo-dit.v0.silicon")
-        XCTAssertEqual(b.profile, "/Modèles/Siliconed/store/profil.json")
         XCTAssertEqual(b.imported.path, "/Modèles/Siliconed/store/importes")
         XCTAssertThrowsError(try b.component(.krea2, "vae.safetensors")) {
             XCTAssertEqual(($0 as? MissingFile)?.path, "/Modèles/Siliconed/store/composants/krea2/vae.safetensors")

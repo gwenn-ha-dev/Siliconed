@@ -199,7 +199,8 @@ enum MirrorProjection {
                   width: s.format.width, height: s.format.height, steps: s.steps, defaultSteps: defaultSteps,
                   loras: s.loras.map { RemoteLoRA(path: $0.path, strength: $0.strength) }, seeds: seeds,
                   detail: s.detail, solver: s.solver, previews: previews, neuralEngine: neuralEngine,
-                  variations: s.variations, modelPrompt: s.modelPrompt, subjectImages: s.subjectImages > 0 ? s.subjectImages : nil)
+                  variations: s.variations, modelPrompt: s.modelPrompt, subjectImages: s.subjectImages > 0 ? s.subjectImages : nil,
+                  fasterRendering: s.fasterRendering)
     }
 
     static func settings(_ r: RemoteJob) -> RenderSettings {
@@ -208,6 +209,7 @@ enum MirrorProjection {
                                loras: r.loras.map { LoRASlot(path: $0.path, strength: $0.strength) },
                                detail: r.detail, solver: r.solver)
         s.neuralEngine = r.neuralEngine ?? false
+        s.fasterRendering = r.fasterRendering
         s.variations = r.variations
         s.modelPrompt = r.modelPrompt
         s.subjectImages = r.subjectImages ?? 0
@@ -274,7 +276,6 @@ extension AppState {
             mirrorQuotes = [:]; link.asked = []
             readySet = Set(c.ready)
             memoryCeiling = c.ceiling
-            // Not `fasterRendering`: its setter writes this Mac's preference and the engine's switch.
             settingsRead = c.settingsRead
             if !readySet.contains(identifier),
                let first = visibleReady.first?.id { identifier = first }

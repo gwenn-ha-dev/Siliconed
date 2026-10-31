@@ -1,5 +1,6 @@
 import Darwin
 import Foundation
+import Synchronization
 
 /// **The disk as a resource of the map: its rate as the weight stream reads it, and the arithmetic of a stream beside the computation.**
 /// The probe (`Diagnostic.CapacityProbes`) calls `measure`; the solver reads `CapacityModel.diskBandwidth` and `pass`.
@@ -46,11 +47,15 @@ package enum CapacityDisk {
 
     /// **One visit read as `TailStream` reads one**: `[start, end)` of the file cut in `TailStream.lanes` lanes (a multiple of 16 KiB, at
     /// least `smallest`), each lane `pread` in pieces of `TailStream.piece`. Blocks until the visit is in `buffer`.
-    static func read(_ descriptor: Int32, from start: Int, to end: Int, into buffer: UnsafeMutableRawPointer) {
+    /// **A short read is a failure** (`false`): a visit that returned fewer bytes than asked must not count as read, or the rate
+    /// of a disk that errors would be read as a fast one.
+    @discardableResult
+    static func read(_ descriptor: Int32, from start: Int, to end: Int, into buffer: UnsafeMutableRawPointer) -> Bool {
         let lane = max(((end - start) / TailStream.lanes + (1 << 14) - 1) / (1 << 14) * (1 << 14), TailStream.smallest)
         var firsts: [Int] = []
         var first = start
         while first < end { firsts.append(first); first += lane }
+        let failed = Atomic<Bool>(false)
         DispatchQueue.concurrentPerform(iterations: firsts.count) { index in
             var offset = firsts[index]
             let last = min(offset + lane, end)
@@ -59,12 +64,38 @@ package enum CapacityDisk {
                 var done = 0
                 while done < length {
                     let n = pread(descriptor, buffer + (offset - start) + done, length - done, off_t(offset + done))
-                    if n <= 0 { return }
+                    if n <= 0 { failed.store(true, ordering: .relaxed); return }
                     done += n
                 }
                 offset += length
             }
         }
+        return !failed.load(ordering: .relaxed)
+    }
+
+    /// **The folder whose volume the weight stream reads from**: the library's own, unless a render reads a working copy
+    /// (`WorkingCopy.isNeeded`: a library on another disk or a share), in which case this Mac's cache folder — the disk the
+    /// stream really meets. Created if missing, since the probe writes there.
+    package static func streamFolder(for library: Library, copyBase: URL = WorkingCopy.base) -> URL {
+        if WorkingCopy.isNeeded(for: library, base: copyBase) {
+            try? FileManager.default.createDirectory(at: copyBase, withIntermediateDirectories: true)
+            return copyBase
+        }
+        return library.root
+    }
+
+    /// **The memory the probe holds while it reads**: the staging slots of the visits in flight and the scratch piece it writes
+    /// from — what `CapacityProbes.need` charges to the stage, so that B holds for the diagnostic itself.
+    package static func probeMemoryBytes(visit unit: Int = visit) -> Int {
+        Arena.capacity(for: unit) * max(1, TailStream.unitSlots - 1) + Arena.capacity(for: scratchPiece)
+    }
+    static let scratchPiece = 8 << 20
+
+    /// A raised flag shared with the reads in flight.
+    private final class Failure: @unchecked Sendable {
+        private let flag = Atomic<Bool>(false)
+        func raise() { flag.store(true, ordering: .relaxed) }
+        var raised: Bool { flag.load(ordering: .relaxed) }
     }
 
     /// **Measures the disk under `directory`**: writes the scratch file (without the cache, then `fsync`), reads it `passes` times,
@@ -75,7 +106,7 @@ package enum CapacityDisk {
         guard fd >= 0 else { return nil }
         defer { close(fd); unlink(path) }
         _ = fcntl(fd, F_NOCACHE, 1)
-        let piece = 8 << 20
+        let piece = scratchPiece
         guard let scratch = mmap(nil, piece, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0), scratch != MAP_FAILED else { return nil }
         defer { munmap(scratch, piece) }
         // Incompressible bytes: a volume that compresses on write must not be read faster than it reads.
@@ -107,15 +138,20 @@ package enum CapacityDisk {
         let visits = (0..<((bytes + unit - 1) / unit)).map { (start: $0 * unit, end: min(bytes, ($0 + 1) * unit)) }
         let queue = DispatchQueue(label: "siliconed.disk-probe", attributes: .concurrent)
         var seconds: [Double] = []
+        let failed = Failure()
         for _ in 0..<count {
             let started = DispatchTime.now().uptimeNanoseconds
             let room = DispatchSemaphore(value: flying), group = DispatchGroup()
             for (index, v) in visits.enumerated() {
                 room.wait()
                 let slot = slots[index % flying]
-                queue.async(group: group) { read(reader, from: v.start, to: v.end, into: slot); room.signal() }
+                queue.async(group: group) {
+                    if !read(reader, from: v.start, to: v.end, into: slot) { failed.raise() }
+                    room.signal()
+                }
             }
             group.wait()
+            if failed.raised { return nil }
             seconds.append(Double(DispatchTime.now().uptimeNanoseconds - started) * 1e-9)
         }
         return rate(bytes: bytes, passes: seconds)

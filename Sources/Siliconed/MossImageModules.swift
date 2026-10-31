@@ -66,16 +66,17 @@ package struct MossImageDenoisingModule: DenoisingModule {
 
     /// **By default every evaluation at full size**: the recipe as published.
     ///
-    /// **The half-size start** (`Spectral.halfSizeStart`, the app's Faster Rendering; `euler`, as Krea 2): the first
+    /// **The half-size start** (`Request.fasterRendering`, the app's Faster Rendering; `euler`, as Krea 2): the first
     /// `halfSizeSteps` evaluations on the half grid. Only at the recipe's eight, from the first step, on a grid that
     /// halves above the 512-px floor (16-px cells: 1024², 1024×1536 and its transpose), never under a request's LoRA —
     /// the turbo one is the recipe, not a request's. `SILICONED_SPECTRAL` forces `k` (a measurement), within the same rules.
-    package func plan(height: Int, width: Int, steps: Int, start: Int, withLoRA: Bool) -> DenoisingPlan {
+    package func plan(height: Int, width: Int, steps: Int, start: Int, withLoRA: Bool, faster: Bool) -> DenoisingPlan {
         let σ = sigmas(steps: steps)
-        let halvable = Spectral.divisible(height: height, width: width, by: 2, floor: Spectral.floor(factor: space.factor))
-        let rule = Spectral.halfSizeStart && steps == defaultSteps ? Self.halfSizeSteps : 0
         let evaluations = σ.count - 1 - start
-        let k = start > 0 || !halvable || withLoRA ? 0 : min(max(0, Spectral.forced ?? rule), evaluations - 1)
+        let k = Spectral.reducedEvaluations(faster: faster, height: height, width: width, steps: steps, start: start,
+                                            withLoRA: withLoRA, defaultSteps: defaultSteps, halfSizeSteps: Self.halfSizeSteps,
+                                            evaluations: evaluations,
+                                            floor: Spectral.floor(factor: space.factor))
         return DenoisingPlan(startStep: start, startSigma: σ[start], evaluations: evaluations,
                              reduced: k, reducedHeight: k > 0 ? height / 2 : height, reducedWidth: k > 0 ? width / 2 : width)
     }
@@ -102,7 +103,8 @@ package struct MossImageDenoisingModule: DenoisingModule {
         let timesteps = told[start..<(σ.count - 1)].map { $0 * Float(MossImageSchedule.trainTimesteps) }
         let stack = try stack(lora)
         let planned = plan(height: latent.height, width: latent.width, steps: steps, start: start,
-                           withLoRA: lora != nil || context.detail != .normal)
+                           withLoRA: lora != nil || context.detail != .normal,
+                           faster: context.fasterRendering)
         // The modulation depends on σ alone: both grids, and the following images of a batch, read the first's table.
         let key = "moss-image.modulation " + map
         // **Two DiTs, one at a time** (Krea 2's rule): the half grid's — its own RoPE grid, arena and sequence

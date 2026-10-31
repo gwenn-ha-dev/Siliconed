@@ -21,7 +21,7 @@ final class RemoteMachineTests: XCTestCase {
             m.blocker = b
             messages.append(.machine(m))
         }
-        messages += [.measure, .stopMeasure, .setFasterRendering(true), .setFasterRendering(false),
+        messages += [.measure, .stopMeasure,
                      .refused(.app(.machineBusy))]
         for message in messages {
             XCTAssertEqual(try JSONDecoder().decode(SessionMessage.self, from: JSONEncoder().encode(message)), message)

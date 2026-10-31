@@ -22,7 +22,7 @@ extension CapacitySolver {
 
     /// **What the engine reads from the disk at each evaluation of the denoiser.**
     package struct Streaming: Sendable, Equatable {
-        /// The bytes of the visits the stream reads, per evaluation (`Artifact.streamedBytes`).
+        /// The bytes of the visits the stream reads, per evaluation (`MemoryPlan.streamedBytes`).
         package var bytesPerEvaluation: Double
         /// The bytes of the first visit(s): read at the start of an evaluation, with nothing to compute beneath them.
         package var firstBytes: Double
@@ -77,7 +77,7 @@ extension CapacitySolver.Streaming {
     /// do not give their layers' bytes yet (Z-Image, Anima, MOSS-Image) or whose maps cannot be read. `firstBytes` is 0: the stream starts
     /// reading the next evaluation's first visits when the last one of this evaluation is complete, beneath the final layer and the
     /// evaluation's preamble (measured on Krea 2: the first ask of an evaluation waits 0 to 6 ms).
-    package init?(card: ModelCard, plan: MemoryPlan.Render, library: Library = .processWide) {
+    package init?(card: ModelCard, plan: MemoryPlan.Render, library: Library) {
         switch card.family {
         case .krea2:
             guard let maps = MemoryNeed.Krea2Maps(card: card, library: library) else { return nil }

@@ -6,15 +6,14 @@
 //       diagnostic, B, the ready models; sends           sidebar's warnings read them as if local
 //       `machine` at each join and on each change      OtherMacs.machines: the last one of each Mac,
 //       `measure`, `stopMeasure` ◀── the sheet's           kept for the « On: » menu and the Settings
-//       `setFasterRendering` ◀── Settings, silicontrol
 //
 // - **The measure runs on the lender**, in its child process, as its own button would start it: refused
 //   (`machineBusy`) while it renders, installs or measures — it is never queued behind a render, the
 //   local sheet does not either. Its progress is a rank among `Diagnostic.Stage.allCases`, said here in
 //   this Mac's language; its report crosses whole, and « Copy JSON » or « Open a GitHub Issue » on the
 //   borrower carry the lender's report (it is that machine's).
-// - **« Faster Rendering » is the lender's**: `Spectral.halfSizeStart` is its process's. The borrower's
-//   switch reads the catalog's value and writes by `setFasterRendering`; the local preference is not touched.
+// - **« Faster Rendering » is the borrower's**: it rides on each job (`RemoteJob.fasterRendering`, `Request.fasterRendering`),
+//   so the lender's own preference is never touched and a redo renders the same image.
 // - **Nothing is judged here**: the borrower's `diagnosticBlocker`, `mapStatus` and chip read what was
 //   published; the lender judges again what comes (`handle`).
 
@@ -81,13 +80,6 @@ final class MachinePublisher {
             app.startDiagnostic()
         case .stopMeasure:
             app.cancelDiagnostic()
-        case .setFasterRendering(let on):
-            // The engine reads it at every plan: not while a render, an installation or the measure runs.
-            guard !app.busy, app.forgeInProgress == nil, !app.diagnosticRunning, app.awaitingLicense.isEmpty else {
-                host.send(.refused(.app(.machineBusy)), to: identity)
-                return
-            }
-            app.fasterRendering = on
         default:
             break
         }
@@ -139,11 +131,6 @@ extension AppState {
 
     private static let hardwareModel = Diagnostic.sysctlString("hw.model")
 
-    /// **« Faster Rendering »** as the window shows it: this Mac's, or the lender's in a mirror.
-    var fasterRenderingShown: Bool { mirror != nil ? mirrorCatalog?.fasterRendering ?? true : fasterRendering }
-
-    /// The switch of the lender's, from a mirror; the new value comes back in its catalog.
-    func setFasterRenderingOnLender(_ on: Bool) { mirror?.send(.setFasterRendering(on)) }
 }
 
 struct MapFacts: Equatable {
@@ -172,36 +159,6 @@ extension RemoteBlocker {
         case .measuring: String(localized: "A diagnostic is already running.")
         case .rendering: String(localized: "A render is running: the diagnostic can start once the queue is empty.")
         case .installing: String(localized: "An installation is running: the diagnostic can start once it is done.")
-        }
-    }
-}
-
-// MARK: - silicontrol
-
-extension RemoteControl {
-    /// **`set faster-rendering on|off` on a mirror**: asked of the lender, answered once its catalog says so
-    /// (it refuses while it renders, installs or measures: no answer then, and the command says it).
-    func setOnMirror(_ mirror: MirrorLink, _ arguments: [String], _ c: Connection) throws {
-        guard arguments.count == 2, arguments[0] == "faster-rendering", ["on", "off"].contains(arguments[1]) else {
-            throw Refusal("usage", "set faster-rendering on|off")
-        }
-        if let reason = app.mirrorMachine?.blocker?.sentence {
-            throw Refusal("busy", reason, help: "silicontrol wait, then retry")
-        }
-        let on = arguments[1] == "on", previous = app.fasterRenderingShown
-        func done() -> [String: Any] {
-            ["ok": true, "faster_rendering": on, "previous": previous, "computing_on": mirror.macName]
-        }
-        guard previous != on else { finish(c, done()); return }
-        mirror.send(.setFasterRendering(on))
-        Task { @MainActor [weak self] in
-            for _ in 0..<50 {
-                try? await Task.sleep(for: .milliseconds(100))
-                guard let self, !c.broken else { return }
-                if self.app.fasterRenderingShown == on { self.finish(c, done()); return }
-            }
-            self?.finish(c, Response.failure("busy", String(localized: "a render, an installation or the diagnostic is running"),
-                                             help: "silicontrol wait, then retry"))
         }
     }
 }

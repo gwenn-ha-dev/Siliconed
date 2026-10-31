@@ -96,7 +96,7 @@ final class RemoteControl {
             case "cancel": finish(c, try cancel(arguments))
             case "clear": finish(c, clear())
             case "set":
-                if let mirror = app.mirror { try setOnMirror(mirror, arguments, c) } else { finish(c, try set(arguments)) }
+                finish(c, try set(arguments))
             case "history": finish(c, try history(arguments))
             case "save": finish(c, try save(arguments, cwd: cwd))
             case "vary":
@@ -204,7 +204,7 @@ final class RemoteControl {
     private func state() -> [String: Any] {
         var o: [String: Any] = ["ok": true, "library": app.library.root.path,
                                 "history_images": app.history.count,
-                                "faster_rendering": app.fasterRenderingShown]
+                                "faster_rendering": app.fasterRendering(for: app.identifier)]
         // The settings renders run on: a series compared across launches compares maps too.
         o["settings"] = ["read": app.settingsRead, "map": app.mapFacts.inUse?.date ?? NSNull(),
                          "warnings": app.profileWarnings] as [String: Any]

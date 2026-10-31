@@ -71,16 +71,16 @@ package struct AnimaDenoisingModule: DenoisingModule {
 
     /// **By default every evaluation at full size**, the reference's loop as it stands.
     ///
-    /// **The half-size start** (`halfSizeStart`, off by default; Z-Image's recipe, `Sampler.init(half:…)`):
+    /// **The half-size start** (`Request.fasterRendering`, off by default; Z-Image's recipe, `Sampler.init(half:…)`):
     /// the first `halfSizeSteps` evaluations on the half grid (`denoise`). Only at the recipe's eight,
     /// from the first step, on a grid that halves above the floor (8-px cells, and each half side a
     /// multiple of the ×2 patch: 1024², 1024×1536 and its transpose; a 512² or 832×1216 never halves),
     /// never under a user LoRA or another schedule (`withLoRA`: never judged under them; Anima refuses
     /// Detail). `SILICONED_SPECTRAL` forces `k` (a measurement), within the same rules.
-    package func plan(height: Int, width: Int, steps: Int, start: Int, withLoRA: Bool) -> DenoisingPlan {
-        let halvable = Spectral.divisible(height: height, width: width, by: 2)
-        let rule = Spectral.halfSizeStart && steps == defaultSteps ? Self.halfSizeSteps : 0
-        let k = start > 0 || !halvable || withLoRA ? 0 : min(max(0, Spectral.forced ?? rule), steps - 1)
+    package func plan(height: Int, width: Int, steps: Int, start: Int, withLoRA: Bool, faster: Bool) -> DenoisingPlan {
+        let k = Spectral.reducedEvaluations(faster: faster, height: height, width: width, steps: steps, start: start,
+                                            withLoRA: withLoRA, defaultSteps: defaultSteps, halfSizeSteps: Self.halfSizeSteps,
+                                            evaluations: steps)
         return DenoisingPlan(startStep: start, startSigma: sigmas(steps: steps)[start], evaluations: steps - start,
                              reduced: k, reducedHeight: k > 0 ? height / 2 : height,
                              reducedWidth: k > 0 ? width / 2 : width)
@@ -114,7 +114,8 @@ package struct AnimaDenoisingModule: DenoisingModule {
                           context: Context) throws {
         let (height, width) = (latent.height, latent.width)
         let k = plan(height: height, width: width, steps: steps, start: start,
-                     withLoRA: lora != nil || context.detail != .normal).reduced
+                     withLoRA: lora != nil || context.detail != .normal,
+                           faster: context.fasterRendering).reduced
         // Every σ the DiT will be told (`euler` tells it `context.told`), its modulations computed at once.
         let schedule = sigmas(steps: steps)
         let told = context.told(schedule, start: start)
