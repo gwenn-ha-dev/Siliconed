@@ -282,6 +282,14 @@ private struct ProductSolver {
         return out
     }
 
+    /// **What the CPU engines' rows of a `loraUp` product pay beyond their product**: their `m' × n` result lands in a scratch and a
+    /// pass adds it to the base product's output (the GPU's rows accumulate inside their own kernel) — `m' · n` floats read twice and
+    /// written once, at the memory's bandwidth. 0 for any other class, and where the bandwidth was not measured.
+    func accumulation(_ key: ProductKey, offGPU rows: Int) -> Double {
+        guard key.weight == .loraUp, rows > 0, let bandwidth = model.memoryBandwidth, bandwidth > 0 else { return 0 }
+        return 3 * 4 * Double(rows) * Double(key.n) / bandwidth
+    }
+
     // MARK: A way to compute one product
 
     struct Option {
@@ -309,7 +317,7 @@ private struct ProductSolver {
             if e > 0, let ane { rows[ane] = e }
             let assignment = ProductAssignment(gpu: g, amx: a, ane: e)
             guard assignment.isRunnable(for: key), let t = seconds(rows, m: m, k: k, n: n) else { return nil }
-            return Option(assignment: assignment, rows: rows, seconds: t)
+            return Option(assignment: assignment, rows: rows, seconds: t + accumulation(key, offGPU: a + e))
         }
 
         if let o = option(m, 0, 0) { out.append(o) }
@@ -390,6 +398,8 @@ private struct ProductSolver {
     func preparation(format: CapacityClasses.WeightFormat, path: WeightPath, k: Int, n: Int) -> Double {
         let heat = c.sustained ? max(1, model.heat[.cpu] ?? 1) : 1
         let perValue: Double
+        // A LoRA's operands are the stack's fp32, expanded and cached beforehand (`CacheLoRA`): nothing to prepare at the call.
+        if format.isLoRA { return 0 }
         if let kind = format.kind { perValue = model.preparation[kind]?[path] ?? 0 }
         else { perValue = model.kquantPreparation ?? model.preparation[.bf16]?[.widened] ?? 0 }
         return Double(k) * Double(n) * perValue * heat
@@ -452,7 +462,8 @@ private struct ProductSolver {
         }
         guard !rows.isEmpty, let t = seconds(rows, m: m, k: k, n: n, swapped: swapped) else { return nil }
         let prep = preparation(format: key.weight, path: a.path, k: k, n: n)
-        return .init(assignment: a, route: a.route(weight: key.weight), rows: rows, preparation: prep, compute: t,
+        return .init(assignment: a, route: a.route(weight: key.weight), rows: rows, preparation: prep,
+                     compute: t + accumulation(key, offGPU: a.amx + a.ane),
                      busy: busy(rows, m: m, k: k, n: n, swapped: swapped))
     }
 

@@ -259,8 +259,8 @@ package struct MemoryNeed: Sendable, Equatable {
     }
 
     /// **One model's `GEMM` over a phase**: its padding tiers (`GEMM.tierBytes`: what a height of 8 to
-    /// 32 rows, or one that is not a multiple of 64, sends through them, at the widest such product;
-    /// `rank`: a LoRA's, whose `mid` goes through them too), and what the plan gives the AMX and the ANE — **asked the plan's
+    /// 32 rows, or one that is not a multiple of 64, sends through them, at the widest such product), and what the plan gives the AMX
+    /// and the ANE — **asked the plan's
     /// questions, with the keys the engine asks them with, before the first computation**:
     ///
     ///   - the conductor's BNNS workspace, the largest it grows to over the products the plan gives AMX rows
@@ -277,8 +277,14 @@ package struct MemoryNeed: Sendable, Equatable {
     /// engine will ask for (`GEMM.tierBytes` takes the bound). `step`: the heights are the bound less a multiple of it (Z-Image pads
     /// its caption to 32 rows). The sweep starts no lower than where the plan gives an engine a row (`engineFloor`). `weight`, `phase`:
     /// the class of the products, the DiT's or the encoder's; `plan`: that phase's (`Request.ditPlan`, `.encoderPlan`).
+    ///
+    /// **A LoRA's products are the plan's too** (`rank` > 0, `lora`: the products it follows, `bounded`-like): `m × k · r` and
+    /// `m × r · n` as the classes `loraDown` and `loraUp`, asked of the plan with the keys `WeightProducts` asks them with — their
+    /// conductor workspace and their Neural Engine operands are charged by the same sweep. The CPU engines' rows of the second land
+    /// in the weight reserve, which the model already holds: no term of its own.
     package static func gemm(_ name: String, products: [(m: Int, k: Int, n: Int)] = [],
                              bounded: [(m: Int, k: Int, n: Int)] = [], spread: Int = 0, step: Int = 1, rank: Int = 0,
+                             lora: [(m: Int, k: Int, n: Int)] = [],
                              plan: CapacityPlan, weight: CapacityClasses.WeightFormat = .bf16,
                              phase: CapacityClasses.Phase = .denoising) -> [Term] {
         var workspace = 0
@@ -286,10 +292,12 @@ package struct MemoryNeed: Sendable, Equatable {
         // The products whose weight the ANE reads as published (a native path with ANE rows): the int8 program's shapes, with the
         // weight's rotation group — the plan's exact answer by weight format, not a bound over both inputs.
         var aneIntegers: [(rows: Int, k: Int, n: Int, group: Int?)] = []
-        func charge(_ p: (m: Int, k: Int, n: Int), heights: ClosedRange<Int>, step: Int = 1) {
+        func charge(_ p: (m: Int, k: Int, n: Int), heights: ClosedRange<Int>, step: Int = 1,
+                    format: CapacityClasses.WeightFormat? = nil) {
+            let kind = format ?? weight
             var (amx, columns, ane, integers) = (0, 0, 0, 0)
             for m in Swift.stride(from: heights.upperBound, through: heights.lowerBound, by: -step) {
-                let a = plan.assign(ProductKey(k: p.k, n: p.n, m: m, weight: weight, phase: phase))
+                let a = plan.assign(ProductKey(k: p.k, n: p.n, m: m, weight: kind, phase: phase))
                 (amx, columns) = (max(amx, a.amx), max(columns, a.amxColumns))
                 if a.path == .native { integers = max(integers, a.ane) } else { ane = max(ane, a.ane) }
             }
@@ -300,7 +308,7 @@ package struct MemoryNeed: Sendable, Equatable {
             }
             if columns > 0 { workspace = max(workspace, Conductor.columnWorkspaceBytes(m: heights.upperBound, k: p.k, n: p.n, width: columns)) }
             if ane > 0 { aneProducts.append((ane, p.k, p.n)) }
-            if integers > 0 { aneIntegers.append((integers, p.k, p.n, weight.rotationGroup)) }
+            if integers > 0 { aneIntegers.append((integers, p.k, p.n, kind.rotationGroup)) }
         }
         // A plan that builds neither the AMX nor the ANE gives them no row, at any height: nothing to ask.
         if plan.resources.amx || plan.resources.ane {
@@ -308,8 +316,15 @@ package struct MemoryNeed: Sendable, Equatable {
             for p in bounded where p.m >= plan.engineFloor {
                 charge(p, heights: max(plan.engineFloor, p.m - spread)...p.m, step: max(1, step))
             }
+            if rank > 0 {
+                for p in lora where p.m >= plan.engineFloor {
+                    let heights = max(plan.engineFloor, p.m - spread)...p.m
+                    charge((p.m, p.k, rank), heights: heights, step: max(1, step), format: .loraDown)
+                    charge((p.m, rank, p.n), heights: heights, step: max(1, step), format: .loraUp)
+                }
+            }
         }
-        let tiers = GEMM.tierBytes(products: products, bounded: bounded, rank: rank)
+        let tiers = GEMM.tierBytes(products: products, bounded: bounded)
         let neural = NeuralEngine.bytes(products: aneProducts, integers: aneIntegers)
         return (tiers > 0 ? [Term("\(name) GEMM tiers", tiers)] : [])
             + (workspace > 0 ? [Term("\(name) conductor workspace", Arena.capacity(for: workspace))] : [])
@@ -319,7 +334,7 @@ package struct MemoryNeed: Sendable, Equatable {
     /// **The worst case of a probe's GEMM**: a probe pins the exact rows it measures, of its own choosing, so no plan answer bounds
     /// it. The AMX's slice is taken at most `probeAMXShare` of a product's rows (the GPU keeps a third at least, as the previous
     /// cut's band held it), beside a native 8-bit weight too (`int8`: its columns, the same share). The tiers as `gemm` charges them.
-    package static func gemmBound(_ name: String, products: [(m: Int, k: Int, n: Int)], int8: Bool = false, rank: Int = 0) -> [Term] {
+    package static func gemmBound(_ name: String, products: [(m: Int, k: Int, n: Int)], int8: Bool = false) -> [Term] {
         var workspace = 0
         for p in products where p.m >= CapacitySolver.Limits.defaultAMXRows {
             let rows = Int((Double(p.m) * probeAMXShare).rounded(.up))
@@ -331,7 +346,7 @@ package struct MemoryNeed: Sendable, Equatable {
                 workspace = max(workspace, Conductor.columnWorkspaceBytes(m: p.m, k: p.k, n: p.n, width: min(columns, p.n - 64)))
             }
         }
-        let tiers = GEMM.tierBytes(products: products, rank: rank)
+        let tiers = GEMM.tierBytes(products: products)
         return (tiers > 0 ? [Term("\(name) GEMM tiers", tiers)] : [])
             + (workspace > 0 ? [Term("\(name) conductor workspace", Arena.capacity(for: workspace))] : [])
     }

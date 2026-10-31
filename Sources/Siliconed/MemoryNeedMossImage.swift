@@ -128,7 +128,8 @@ extension MemoryNeed {
         // `n`'s, which this one never exceeds.
         terms += gemm("DiT", products: [(s, config.channels, d), (s, d, config.channels)],
                       bounded: [(t, config.textDim, d), (t, d, 3 * d), (n, d, d), (n, d, 2 * hidden), (n, hidden, d)],
-                      spread: t, rank: rank, plan: request.ditPlan, weight: Artifact.weightFormat(header: header))
+                      spread: t, rank: rank, lora: [(n, d, d), (n, d, 2 * hidden), (n, hidden, d)],
+                      plan: request.ditPlan, weight: Artifact.weightFormat(header: header))
         let tabulating = MossImageDiT.tabulationBytes(config: config, count: Siliconed.Request.maximumSteps, rank: rank)
             + MossImageDiT.timestepWidening(header: header, config: config)
             + terms.filter { $0.name.hasPrefix("LoRA") }.reduce(0) { $0 + $1.bytes }

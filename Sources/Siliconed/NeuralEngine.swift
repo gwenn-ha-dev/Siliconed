@@ -256,9 +256,11 @@ package final class NeuralEngine: @unchecked Sendable {
 
     /// **Rows `first ..< first + rows` of `C = A · W`** on the ANE, `W` fp32 `[k, n]`. `false` when the rows
     /// must be computed elsewhere: the program refused, or a non-finite output (`C`'s rows then undefined).
+    /// `into`: where the rows land instead of `c`'s own (`rows · n` floats, the first row at `into`) — a product that is added to an
+    /// output rather than written to it (a LoRA's, `GEMM.accumulatedLinear`) keeps the output's rows untouched.
     package func product(a: UnsafePointer<Float>, w: UnsafePointer<Float>, c: UnsafeMutablePointer<Float>,
-                         first: Int, rows: Int, k: Int, n: Int) -> Bool {
-        run(a: a, weight: .widened(w), c: c, first: first, rows: rows, k: k, n: n)
+                         first: Int, rows: Int, k: Int, n: Int, into: UnsafeMutablePointer<Float>? = nil) -> Bool {
+        run(a: a, weight: .widened(w), c: c, first: first, rows: rows, k: k, n: n, into: into)
     }
 
     /// **The same product on a published int8 weight**, the integers the program's input (`Int8Weight`).
@@ -270,7 +272,7 @@ package final class NeuralEngine: @unchecked Sendable {
     }
 
     private func run(a: UnsafePointer<Float>, weight: Weight, c: UnsafeMutablePointer<Float>,
-                     first: Int, rows: Int, k: Int, n: Int) -> Bool {
+                     first: Int, rows: Int, k: Int, n: Int, into: UnsafeMutablePointer<Float>? = nil) -> Bool {
         products += 1
         var int8: Int8Weight?
         if case let .int8(i) = weight { int8 = i }
@@ -342,7 +344,7 @@ package final class NeuralEngine: @unchecked Sendable {
             }
             guard finiteInput else { fallbacks += 1; return false }
         }
-        nonisolated(unsafe) let y = c + first * n
+        nonisolated(unsafe) let y = into ?? c + first * n
 
         // Part by part: its weight rows and input columns into the surfaces, the program, its output added
         // into C's rows in fp32.

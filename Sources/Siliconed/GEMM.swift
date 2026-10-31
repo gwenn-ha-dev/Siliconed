@@ -78,12 +78,11 @@ package final class GEMM {
         }
         func a(_ floats: Int) -> MTLBuffer { buffer("a", floats) }
         func c(_ floats: Int) -> MTLBuffer { buffer("c", floats) }
-        func mid(_ floats: Int) -> MTLBuffer { buffer("mid", floats) }
     }
     private lazy var tiers = Tiers(device: device)
 
     /// Whether `m` rows go through the padding tiers: 8 to 32 (`poisonedRows`), or a tail under 64 rows
-    /// past a body (`rowSplit`) — what `linear` and `lora` do.
+    /// past a body (`rowSplit`) — what `linear` and `accumulatedLinear` do.
     package static func goesThroughTiers(_ m: Int) -> Bool { poisonedRows.contains(m) || rowSplit(m).tail > 0 }
 
     /// **The tiers' bytes over these products** — what `Tiers` grows to: `a` at `submittedRows · k`, `c`
@@ -96,13 +95,11 @@ package final class GEMM {
     /// the need bounds by its bytes) — any height from 8 to it may be the real one, and one of them goes
     /// through: charged whenever the bound reaches 8. A height that becomes a multiple of 64 would
     /// otherwise make the need *fall* as the prompt grows (by 6 MB at Qwen-Image-2.1's MLP width).
-    package static func tierBytes(products: [(m: Int, k: Int, n: Int)], bounded: [(m: Int, k: Int, n: Int)] = [],
-                                  rank: Int = 0) -> Int {
+    package static func tierBytes(products: [(m: Int, k: Int, n: Int)], bounded: [(m: Int, k: Int, n: Int)] = []) -> Int {
         let tiered = products.filter { goesThroughTiers($0.m) } + bounded.filter { $0.m >= poisonedRows.lowerBound }
         guard let k = tiered.map(\.k).max(), let n = tiered.map(\.n).max() else { return 0 }
         let rows = submittedRows
         return Arena.capacity(for: rows * k * 4) + Arena.capacity(for: rows * n * 4)
-            + (rank > 0 ? Arena.capacity(for: rows * rank * 4) : 0)
     }
 
     /// **A GPU submission's height is a multiple of 64, or below 64 — never in between.**
@@ -384,60 +381,90 @@ package final class GEMM {
         return time
     }
 
-    /// **A weight's LoRA stack: `C += (x·down)·up`, in ONE submission.**
+    /// **A LoRA's second product, `C += A · W`, cut as the plan cuts it** (`weight`: `loraUp`, `m × k · n` with `k` the rank), the weight
+    /// stored `[input, output]`, `A` (`mid`) and `W` (`up`) fp32. The rows go where the plan assigned them, as `linear`'s do, but the
+    /// output is *added to*, which only the GPU's kernel does by itself:
     ///
-    /// The two skinny GEMMs are encoded in the **same** command buffer, and Metal guarantees
-    /// ordering between two encoders of the same buffer. A measurement showed that a LoRA's overhead has a **floor per
-    /// submission**, constant with the rank; making two of them instead of one would double that floor
-    /// for nothing.
+    ///     rows 0 ..< g          the GPU        MPS with `beta = 1` onto `C`'s own rows
+    ///     rows g ..< g + a      the AMX        BNNS into `scratch`, then one pass `C += scratch` (BNNS writes, it does not accumulate)
+    ///     rows g + a ..< m      the ANE        its fp16 program into `scratch` after the AMX's rows, the same pass
     ///
-    /// **Outside the conductor, and that is deliberate.** The GPU/AMX cut hands rows to
-    /// `BNNSMatMul` while the GPU does the others; it has no way to accumulate onto an
-    /// existing output — it **writes** its slice. Routing this through it would leave `C` partly overwritten
-    /// instead of accumulated, hence a plausible and wrong image. And there would be nothing to gain: at
-    /// `r = 32`, `x·down` is a skinny GEMM limited by latency, not by compute.
-    ///
-    /// - Parameters:
-    ///   - mid: `[m, r]`, the work slice — written then read back in the same buffer.
-    ///   - c: `[m, n]`, the main GEMM's output, **accumulated** and not replaced.
-    @discardableResult
-    package func lora(x: MTLBuffer, down: MTLBuffer, mid: MTLBuffer, up: MTLBuffer, c: MTLBuffer,
-                     m: Int, k: Int, r: Int, n: Int) -> Double {
-        func padded(first: Int, rows: Int) -> Double {
-            let l = GEMM.submittedRows
-            let (px, pc, pm) = (tiers.a(l * k), tiers.c(l * n), tiers.mid(l * r))
-            px.contents().copyMemory(from: x.contents() + first * k * 4, byteCount: rows * k * 4)
-            // Accumulated, so the output goes into the tier before and comes back out after.
-            pc.contents().copyMemory(from: c.contents() + first * n * 4, byteCount: rows * n * 4)
-            let time = lora(x: px, down: down, mid: pm, up: up, c: pc, m: l, k: k, r: r, n: n)
-            (c.contents() + first * n * 4).copyMemory(from: pc.contents(), byteCount: rows * n * 4)
-            return time
+    /// The three at the same time, each row one engine's; the pass runs once they are all done, on every core. `scratch` is the weight
+    /// reserve of the product this one follows — dead by now, and the model's already: its `(a + e) · n` floats must fit, or the
+    /// CPU engines' rows go to the GPU (`foldedAccumulations`: the plan was not told the reserve's size). An ANE that refuses its
+    /// program, or returns a non-finite value, gives its rows to the CPU's `cblas` (the AMX's own library) — never half a row.
+    /// - Returns: the wall seconds.
+    package func accumulatedLinear(a x: MTLBuffer, b w: MTLBuffer, c: MTLBuffer, m: Int, k: Int, n: Int,
+                                   weight: CapacityClasses.WeightFormat, scratch: MTLBuffer) -> Double {
+        var plan = assignment(k: k, n: n, m: m, weight: weight)
+        if plan.path != .widened || plan.rows != m { plan = .gpuAlone(m) }
+        // The engines this process did not bring up take none of the rows. The ANE's rows go after the AMX's, so what leaves the ANE
+        // joins the AMX's (contiguous), or the GPU's when the AMX has none.
+        if plan.amx > 0 && conductor == nil { plan.gpu += plan.amx; plan.amx = 0 }
+        if plan.ane > 0 && (neuralEngine == nil || !(neuralEngine!.accepts(rows: plan.ane, k: k, n: n))) {
+            if plan.amx > 0 { plan.amx += plan.ane } else { plan.gpu += plan.ane }
+            plan.ane = 0
         }
-        if GEMM.poisonedRows.contains(m) { return padded(first: 0, rows: m) }
-        // Heights that are not a multiple of 64: the body here, the tail through the tier
-        // (`rowQuantum`) — the body's prefixes of `x`, `mid` and `c` are its own rows.
-        let (body, tail) = GEMM.rowSplit(m)
-        if tail > 0 {
-            return lora(x: x, down: down, mid: mid, up: up, c: c, m: body, k: k, r: r, n: n)
-                + padded(first: body, rows: tail)
+        if (plan.amx + plan.ane) * n > scratch.length / MemoryLayout<Float>.size {
+            plan.gpu += plan.amx + plan.ane; plan.amx = 0; plan.ane = 0
+            Self.foldedAccumulations.withLock { $0 += 1 }
         }
-        let commands = queue.checkedCommandBuffer()
-        encoder(Shape(m: m, k: k, n: r, transposed: true), into: commands, x, down, mid)
-        encoder(Shape(m: m, k: r, n: n, transposed: true, accumulates: true), into: commands, mid, up, c)
-        commands.commit()
-        commands.waitUntilCompleted()
-        let elapsed = Attention.verdict(commands, what: "LoRA \(m)×\(k)×\(r)→\(n)")
-        let key = "lora \(m)×\(k)×\(r)→\(n)"
-        record(key, elapsed)
-        return elapsed
+        let (g, rowsAMX, rowsANE) = (plan.gpu, plan.amx, plan.ane)
+        if rowsAMX == 0 && rowsANE == 0 {
+            lastEngines = "gpu"
+            return accumulatedLinear(a: x, b: w, c: c, m: m, k: k, n: n)
+        }
+        let began = DispatchTime.now().uptimeNanoseconds
+        let delta = scratch.contents().assumingMemoryBound(to: Float.self)
+        nonisolated(unsafe) let (px, pw, pc) = (x.contents().assumingMemoryBound(to: Float.self),
+                                                w.contents().assumingMemoryBound(to: Float.self),
+                                                c.contents().assumingMemoryBound(to: Float.self))
+        nonisolated(unsafe) var computed = rowsANE == 0
+        let group = DispatchGroup()
+        if rowsANE > 0, let ane = neuralEngine {
+            nonisolated(unsafe) let target = delta + rowsAMX * n
+            DispatchQueue.global(qos: .userInitiated).async(group: group) {
+                computed = ane.product(a: px, w: pw, c: pc, first: m - rowsANE, rows: rowsANE, k: k, n: n, into: target)
+            }
+        }
+        if rowsAMX > 0, let conductor {
+            _ = conductor.linear(a: x, b: w, c: c, gpuRows: g, amxRows: rowsAMX, k: k, n: n, weightIsTransposed: true,
+                                 output: (scratch, 0), multiply: { rows in accumulatedLinear(a: x, b: w, c: c, m: rows, k: k, n: n) })
+        } else if g > 0 {
+            _ = accumulatedLinear(a: x, b: w, c: c, m: g, k: k, n: n)
+        }
+        group.wait()
+        Self.neuralEngineTally.withLock { if rowsANE > 0 { $0.handed += 1; if !computed { $0.givenBack += 1 } } }
+        var ownANE = rowsANE
+        if !computed {
+            cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, Int32(rowsANE), Int32(n), Int32(k), 1,
+                        px + (m - rowsANE) * k, Int32(k), pw, Int32(n), 0, delta + rowsAMX * n, Int32(n))
+            ownANE = 0
+        }
+        // The CPU engines' rows, added to the output they were not written to.
+        let count = (rowsAMX + rowsANE) * n
+        nonisolated(unsafe) let (source, target) = (UnsafePointer(delta), pc + g * n)
+        let chunks = 16, per = (count + chunks - 1) / chunks
+        DispatchQueue.concurrentPerform(iterations: chunks) { chunk in
+            let lower = chunk * per, upper = min(count, lower + per)
+            if upper > lower { vDSP_vadd(target + lower, 1, source + lower, 1, target + lower, 1, vDSP_Length(upper - lower)) }
+        }
+        lastEngines = Self.engines(gpu: g, amx: computed ? rowsAMX : rowsAMX + rowsANE, ane: ownANE)
+        let wall = Double(DispatchTime.now().uptimeNanoseconds - began) * 1e-9
+        record("\(m)×\(k)×\(n)ᵀ+‖", wall)
+        return wall
     }
+
+    /// The LoRA accumulations whose CPU rows the reserve could not hold, given to the GPU (a plan that outran the reserve): a check says
+    /// whether the plan it judged is the one that ran.
+    package static let foldedAccumulations = Mutex<Int>(0)
 
     /// **`C += A · W`** — a GEMM that accumulates instead of writing, weight stored `[input, output]`.
     ///
-    /// Qwen-Image-2.1's merged LoRA, `W += down · up` (`m` = the weight's `k`). Outside the conductor, like `lora` and for the
-    /// same reason: the GPU/AMX cut writes its slice, it does not accumulate.
+    /// Qwen-Image-2.1's merged LoRA, `W += down · up` (`m` = the weight's `k`), and the GPU's part of a LoRA's second product
+    /// (`accumulatedLinear(…weight:scratch:)`). Outside the conductor here: the GPU/AMX cut writes its slice, it does not accumulate.
     ///
-    /// Its rows split like `linear`'s and `lora`'s (`rowSplit`): a body, a multiple of 64, then a tail
+    /// Its rows split like `linear`'s (`rowSplit`): a body, a multiple of 64, then a tail
     /// through the padding tier, accumulated there — MPS's fast kernel returns NaN at the heights in
     /// between. Qwen-Image-2.1's weights have `k` = 4 096 or 12 288, multiples of 64: one submission,
     /// the tier never grown.
@@ -466,7 +493,7 @@ package final class GEMM {
         return elapsed
     }
 
-    /// A memoized encoding, without submission — the common body of `submit` and `lora`.
+    /// A memoized encoding, without submission — the common body of `submit` and the accumulating products.
     ///
     /// `transposed: true` means "the weight is already stored `[input, output]`", so nothing to
     /// transpose: it is the forge's layout, and the one `LoRA` produces.

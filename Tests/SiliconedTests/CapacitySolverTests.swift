@@ -151,6 +151,31 @@ import Testing
         #expect(s.route == "gpu" && s.assignment.path == .widened)
     }
 
+    @Test func aLoRAsProductsHaveNothingToPrepareAndTheSumIsPaidByTheCPUEnginesRows() throws {
+        var m = machine(amxRate: 1e12)
+        m.preparation[.bf16] = [.widened: 1e-9]
+        m.kquantPreparation = 5e-9
+        // The stack's operands are expanded beforehand (`CacheLoRA`): no preparation, whatever the model prices for a weight.
+        let down = try solve(m, key(3072, 128, 4117, .loraDown))
+        #expect(down.preparation == 0)
+        let up = try solve(m, key(128, 16384, 4117, .loraUp))
+        #expect(up.preparation == 0 && up.assignment.path == .widened)
+        // `loraDown` writes; `loraUp` adds the CPU engines' rows to the output, a pass over memory the GPU's own rows do not make.
+        // Without a measured bandwidth nothing is charged; with one, three passes of the AMX's rows × n floats.
+        #expect(up.assignment.amx > 0)
+        m.memoryBandwidth = 100e9
+        let priced = try solve(m, key(128, 16384, 4117, .loraUp))
+        let amxRows = priced.assignment.amx
+        let product = try #require(m.seconds(m: 4117, k: 128, n: 16384, rows: [gpu: priced.assignment.gpu, amx: amxRows], sustained: false))
+        #expect(abs(priced.compute - (product + 3 * 4 * Double(amxRows) * 16384 / 100e9)) < 1e-12, "the product, and three passes of the AMX's rows")
+        // A slow memory makes the sum dearer than the AMX's help: the GPU keeps every row.
+        m.memoryBandwidth = 1e9
+        let slow = try solve(m, key(128, 16384, 4117, .loraUp))
+        #expect(slow.assignment == .gpuAlone(4117) && slow.route == "gpu")
+        // The same product as a weight's (`bf16`) is not charged the sum.
+        #expect(try solve(m, key(128, 16384, 4117, .bf16)).assignment.amx > 0)
+    }
+
     @Test func aKQuantHasItsOwnPreparation() throws {
         var m = machine()
         m.preparation[.bf16] = [.widened: 1e-11]

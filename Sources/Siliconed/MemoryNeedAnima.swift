@@ -179,7 +179,8 @@ extension MemoryNeed {
           // Every height is exact: the image's tokens, and the text's `L`.
           + gemm("DiT", products: [(s, inDim, d), (s, d, d), (s, d, hidden), (s, hidden, d), (s, d, outDim),
                                    (textRows, dit.textDim, d)],
-                 rank: rank, plan: request.ditPlan, weight: maps.ditFormat))
+                 rank: rank, lora: [(s, d, d), (s, d, hidden), (s, hidden, d), (textRows, dit.textDim, d)],
+                 plan: request.ditPlan, weight: maps.ditFormat))
 
         // ── decoding: the decoder's two heaps and the image it returns; the latent it reads crosses ──
         let plan = animaDecoderPlans([latentHeight, latentWidth]) {
