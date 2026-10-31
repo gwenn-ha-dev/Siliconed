@@ -107,7 +107,9 @@ package struct PromptWriterNeed: Sendable {
         let pixels = patches.map { Arena.capacity(for: $0 * v.patchValues * 4) } ?? 0
         let features = patches.map { Qwen3VLVision.featureBytes(tokens: $0 / (v.merge * v.merge), output: v.output,
                                                                 levels: v.deepstack.count) } ?? 0
-        resident = [MemoryNeed.Term("resident layers", maps.residentLayers), MemoryNeed.Term("resident head", maps.residentHead)]
+        // The decoder is built at `load`, whatever the prompt, and lives as long as the weights: it is resident, not a phase's.
+        resident = [MemoryNeed.Term("resident layers", maps.residentLayers), MemoryNeed.Term("resident head", maps.residentHead),
+                    MemoryNeed.Term("GPU decoder scratch", Qwen3VLGenerator.decoderBytes(config: e, vocabulary: maps.vocabulary))]
         var list: [MemoryNeed.Phase] = []
         if let largest = patches {
             let (d, vi, m, o) = (v.hidden, v.intermediate, v.merged, v.output)
