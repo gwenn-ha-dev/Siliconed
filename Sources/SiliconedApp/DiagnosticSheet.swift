@@ -436,17 +436,21 @@ private struct ReportView: View {
             let kernels = parts.map { CapacityModel.Kernel($0) }
             let members = parts.compactMap { part in CapacityModel.Kernel(part)?.engine ?? CapacityModel.Engine(rawValue: part) }
             guard members.count >= 2 else { return nil }
+            // The CPU shares only the attention (whole kv groups beside the GPU's graph): its set is that attention, and the GPU's
+            // speed alone in it is the graph's, not its matrix products'.
+            let attention = members.contains(.cpu)
             var keeps: [(engine: CapacityModel.Engine, keep: Double)] = []
             var sum = 0.0, joint = 0.0
             for (member, kernel) in zip(members, kernels) {
                 guard let keep = sharing.keep[member] else { continue }
                 keeps.append((member, keep))
-                if let rate = report.model.lines[alone(member, named: kernel)]?.rate {
+                let solo = attention && member == .gpu ? CapacityModel.Kernel(.gpu, .graph) : alone(member, named: kernel)
+                if let rate = report.model.lines[solo]?.rate {
                     sum += rate; joint += rate * keep
                 }
             }
             guard !keeps.isEmpty else { return nil }
-            var name = members.map(engineName).joined(separator: " + ")
+            var name = attention ? String(localized: "Attention, split between GPU and CPU") : members.map(engineName).joined(separator: " + ")
             if kernels.contains(where: { $0?.form == .int8 }) { name += ", " + String(localized: "8-bit weights") }
             return Together(name: name, keeps: keeps.sorted { engines.firstIndex(of: $0.engine)! < engines.firstIndex(of: $1.engine)! },
                             ofSum: sum > 0 ? joint / sum : nil)

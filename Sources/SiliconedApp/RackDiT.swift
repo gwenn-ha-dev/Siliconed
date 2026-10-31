@@ -38,9 +38,19 @@ struct DiTBox: View {
                     }
                 } else {
                     // The labels on one line when they fit; the license alone above the others when not.
+                    // The labels on one line when they fit; else what is stored and what computes stay together on a line of
+                    // their own, the license and the latent on another, then each pair alone — a label is never truncated.
                     ViewThatFits(in: .horizontal) {
-                        HStack(spacing: 5) { license(card); technical }
-                        VStack(alignment: .leading, spacing: 5) { license(card); HStack(spacing: 5) { technical } }
+                        HStack(spacing: 5) { license(card); precision; latent }
+                        VStack(alignment: .leading, spacing: 5) {
+                            HStack(spacing: 5) { precision }
+                            HStack(spacing: 5) { license(card); latent }
+                        }
+                        VStack(alignment: .leading, spacing: 5) {
+                            HStack(spacing: 5) { precision }
+                            license(card)
+                            latent
+                        }
                     }
                     Divider().padding(.vertical, 2)
                     // The LoRA first: what changes the image most, under the model it modifies.
@@ -65,7 +75,7 @@ struct DiTBox: View {
                   : String(localized: "Non-commercial: personal and research use only"))
     }
 
-    @ViewBuilder private var technical: some View {
+    @ViewBuilder private var precision: some View {
         // What is stored, then what computes: two labels, two words, so that « int8 » and « fp32 » are never one thing.
         WeightsTag(format: app.weightFormats?.dit)
         if app.neuralEngineOffered {
@@ -81,6 +91,9 @@ struct DiTBox: View {
             Tag(text: Text("computes \("fp32")"))
                 .help("The products of the DiT are computed in fp32, the image verified against the reference.")
         }
+    }
+
+    @ViewBuilder private var latent: some View {
         if let space = app.chain?.denoising.space {
             Tag(text: Text("latent · \(space.channels) ch"), dot: WireKind.latent.color)
                 .help(Text(verbatim: "\(space.name) · ÷\(space.factor)"))
