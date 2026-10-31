@@ -16,6 +16,7 @@ import MetalPerformanceShadersGraph
 ///      ├─ preparation              the weights' widening and copy rates                                              (measureWidening)
 ///      ├─ witnesses, start         one product on the GPU, the AMX, the ANE                                          → heat, the rates the tier is projected from
 ///      ├─ bandwidth                a copy kernel on the GPU                                                          → memoryBandwidth
+///      ├─ disk                     the weight stream's read of a scratch file on the library's volume                → diskBandwidth
 ///      ├─ solos                    each kernel alone at ≈ 4, 30, 300 GFLOP                                           → lines
 ///      ├─ stairs                   the ANE alone at 8 row counts, one k × n                                          → aneRowUnit
 ///      ├─ attention                graph, flash, the CPU's heads, alone at two sequences                            → lines
@@ -608,7 +609,7 @@ extension Diagnostic {
             func probes(_ m: inout Fit.Measurements, _ d: inout Details) throws {
                 /// The progress group each probe belongs to: the app names it in the user's language.
                 let groups: [String: Diagnostic.Stage] = [
-                    "preparation": .widening, "witnesses start": .witness, "bandwidth": .witness, "solos fp32": .engines, "stairs": .engines,
+                    "preparation": .widening, "witnesses start": .witness, "bandwidth": .witness, "disk": .witness, "solos fp32": .engines, "stairs": .engines,
                     "attention": .engines, "sharing": .sharing, "solos 8-bit and rounded": .forms, "witnesses end": .regime,
                 ]
                 func stage(_ name: String, _ body: () throws -> Void) throws {
@@ -625,6 +626,11 @@ extension Diagnostic {
                 try stage("witnesses start") { m.witnesses = witnesses().map { .init(engine: $0.key, before: $0.value, after: 0) } }
                 project(m.witnesses)
                 try stage("bandwidth") { m.memoryBandwidth = bandwidth() }
+                try stage("disk") {
+                    let root = Library.processWide.root
+                    m.diskBandwidth = CapacityDisk.measure(in: FileManager.default.isWritableFile(atPath: root.path)
+                                                           ? root : FileManager.default.temporaryDirectory)
+                }
                 try stage("solos fp32") { solos([.gpu_fp32], &m, shapes: sizes.product); solos([.amx_fp32, .ane_fp16], &m, shapes: sizes.product, chained: true); solos([.ane_fp16], &m, shapes: sizes.small, chained: true); solos([.gpu_bf16], &m) }
                 try stage("stairs") { stairs(&m) }
                 try stage("attention") { try attention(&m) }

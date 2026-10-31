@@ -79,6 +79,8 @@ package struct QwenImage21Maps: Sendable {
     package let ditLayerStaging: Int
     /// The largest tensor's staging run in the DiT's map (`Artifact.largestRun`): what one buffer of its stream holds.
     package let ditUnitStaging: Int
+    /// Each DiT layer's bytes in the map and the map's, from the header (`Artifact.layerSpans`): what the stream reads per evaluation.
+    package let ditLayerSpans: [Int], ditMapBytes: Int
     /// The largest layer's staging run in the encoder's map: what one of its buffers holds.
     package let encoderLayerStaging: Int
     /// What the tokenizer's two tables map (`Tokenizer.tableBytes`).
@@ -104,6 +106,8 @@ package struct QwenImage21Maps: Sendable {
         self.dit = ditConfig; self.encoder = encoderConfig; self.vision = vision
         ditUnitStaging = Artifact.largestRun(header: dit, prefixes: (0..<ditConfig.layers).map(QwenImage21DiT.layerPrefix),
                                              fileSize: ditSize)
+        ditLayerSpans = Artifact.layerSpans(header: dit, prefixes: (0..<ditConfig.layers).map(QwenImage21DiT.layerPrefix), fileSize: ditSize)
+        ditMapBytes = Artifact.mapBytes(header: dit)
         ditLayerStaging = ditStaging; encoderLayerStaging = encoderStaging; self.tokenizerTables = tokenizerTables
         encoderRotationScratch = Widen.rotationScratchBytes(header: encoder)
         ditRotationScratch = Widen.rotationScratchBytes(header: dit, prefixes: (0..<ditConfig.layers).map(QwenImage21DiT.layerPrefix))
@@ -130,6 +134,12 @@ package struct QwenImage21Maps: Sendable {
 
     /// The maps read, by their files' stamps.
     private static let installed = ShapeMemo<MemoryNeed.InstalledFiles, QwenImage21Maps?>(capacity: 8)
+
+    /// **The bytes the DiT's stream reads from the disk at each evaluation** under `plan` (`MemoryPlan.streamedBytes`); `fraction`: the
+    /// model's own split (`generationTail`).
+    package func ditStreamedBytes(plan: MemoryPlan.Render, fraction: Double) -> Int {
+        MemoryPlan.streamedBytes(spans: ditLayerSpans, mapBytes: ditMapBytes, plan: plan, fraction: fraction)
+    }
 }
 
 /// **The shapes of one Qwen-Image-2.1 render**, derived from a `MemoryNeed.Request` as the engine

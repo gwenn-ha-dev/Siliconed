@@ -277,6 +277,15 @@ package enum MemoryPlan {
         return released < layers ? (released, true) : (layers, false)
     }
 
+    /// **What the DiT's stream reads from the disk at each evaluation**, computed as the engine decides it (`ditTail`): the layers `released`
+    /// from the front of the sequence are read again at every evaluation — the tail, each layer's `spans` — and the head stays in the cache.
+    /// 0 where the map fits B whole (`!streamed`: read once, cold, not per evaluation). Pure; `mapBytes` is the whole map.
+    package static func streamedBytes(spans: [Int], mapBytes: Int, plan render: Render, fraction: Double) -> Int {
+        let (released, streamed) = Self.released(spans: spans, mapBytes: mapBytes, ceiling: render.ceiling,
+                                                 streamed: render.denoisingStreamed, cached: render.denoisingCached, fraction: fraction)
+        return streamed ? spans[released...].reduce(0, +) : 0
+    }
+
     // ── the verdict, without a render ──────────────────────────────────────────────────────
 
     /// **What a request gets in a given B, decided as the preflight and the plan decide it** — no

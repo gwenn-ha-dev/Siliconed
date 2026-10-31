@@ -10,7 +10,7 @@ import Testing
     typealias Rates = Diagnostic.CapacityProbes.Rates
 
     /// What the probes measured on the M1 Pro in the runs of the report's version (seconds per stage), against which the projection is checked.
-    static let measured: [String: Double] = ["preparation": 0.18, "witnesses start": 0.5, "bandwidth": 0.04, "solos fp32": 7.8, "stairs": 1.0,
+    static let measured: [String: Double] = ["preparation": 0.18, "witnesses start": 0.5, "bandwidth": 0.04, "disk": 0.58, "solos fp32": 7.8, "stairs": 1.0,
                                               "attention": 2.68, "sharing": 9.0, "solos 8-bit and rounded": 5.3, "sharing int8": 2.1,
                                               "witnesses end": 0.43]
     /// The engines alone on the witness (2 048 × 3 840²: 60.4 GFLOP in 17.2, 26.2 and 12.4 ms): TFLOP/s.

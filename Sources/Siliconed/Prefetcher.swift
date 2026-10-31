@@ -185,12 +185,13 @@ package final class TailStream {
     private let visitsOf: [String: [Int]]                   // name → the visits that use it, ascending
     private var frontier = 0                                // the first visit the engine has not completed
     private var cursor = 0                                  // sequential: the next visit to read ahead
+    private var evaluation = 0                              // whole sweeps of the sequence completed (the trace's)
     private let mapped: Int                                 // the map's base address, for the fallback copy
     private let lock = NSLock()
     private let queue = DispatchQueue(label: "siliconed.tail", attributes: .concurrent)
     private let reads = DispatchGroup()
     /// Measured: four lanes, slices of 64 MiB; a run under 4 MiB is one read.
-    private static let lanes = 4, piece = 64 << 20, smallest = 4 << 20
+    package static let lanes = 4, piece = 64 << 20, smallest = 4 << 20
 
     /// - Parameter buffer: the buffers' size, for a sequence of visits (`nil`: the largest visit).
     init(artifact: Artifact, blocks: [[String]], slots count: Int, sequential: Bool = false, buffer: Int? = nil) throws {
@@ -342,7 +343,15 @@ package final class TailStream {
             }
         }
         reads.enter()
-        group.notify(queue: queue) { [reads] in reads.leave() }
+        if StreamTrace.enabled {
+            let started = StreamTrace.now(), bytes = visits[b].runs.reduce(0) { $0 + $1.end - $1.start }, evaluation = evaluation
+            group.notify(queue: queue) { [reads] in
+                StreamTrace.shared.read(visit: b, evaluation: evaluation, bytes: bytes, started: started, ended: StreamTrace.now())
+                reads.leave()
+            }
+        } else {
+            group.notify(queue: queue) { [reads] in reads.leave() }
+        }
         staged[b] = Staged(slot: slot, group: group)
         state[b] = .staged
         left[b] = visits[b].uses
@@ -351,6 +360,7 @@ package final class TailStream {
 
     /// The staged copy of a tensor once its block is read, or `nil` if it is not staged.
     func pointer(_ name: String, offset: Int) -> UnsafeRawPointer? {
+        let asked = StreamTrace.enabled ? StreamTrace.now() : 0
         lock.lock()
         guard visitsOf[name] != nil else { lock.unlock(); return nil }
         var found = visit(of: name)
@@ -364,8 +374,17 @@ package final class TailStream {
         }
         guard let b = found, let entry = staged[b] else { fallbacks += 1; lock.unlock(); return nil }
         let place = visits[b].offsets[name]!
+        let evaluation = self.evaluation
         lock.unlock()
-        entry.group.wait()
+        if StreamTrace.enabled {
+            // Was the visit read when the engine asked? Then it waits for nothing; else it waits for the rest of the read.
+            let ready = entry.group.wait(timeout: .now()) == .success
+            if !ready { entry.group.wait() }
+            StreamTrace.shared.consume(name: name, visit: b, evaluation: evaluation, asked: asked, ready: StreamTrace.now(),
+                                       readBefore: ready)
+        } else {
+            entry.group.wait()
+        }
         return UnsafeRawPointer(slots[entry.slot]) + place
     }
 
@@ -377,6 +396,7 @@ package final class TailStream {
         var all = true
         for name in names {
             guard visitsOf[name] != nil else { all = false; continue }
+            if StreamTrace.enabled { StreamTrace.shared.release(name: name, at: StreamTrace.now()) }
             guard let b = visit(of: name), state[b] == .staged, left[b][name, default: 0] > 0 else {
                 // Released already (a layer's last call after its tensors' own): nothing to do.
                 if !done.contains(name) { all = false }
@@ -392,7 +412,7 @@ package final class TailStream {
                 while state[frontier] == .complete {
                     frontier = (frontier + 1) % visits.count
                     // A whole evaluation is complete: the next one starts from the first visit.
-                    if frontier == 0 { for v in visits.indices where state[v] == .complete { state[v] = .pending } }
+                    if frontier == 0 { evaluation += 1; for v in visits.indices where state[v] == .complete { state[v] = .pending } }
                 }
                 if sequential { advance() }
             }
@@ -402,4 +422,48 @@ package final class TailStream {
 
     /// Whether the name belongs to the streamed tail (staged or not).
     package func contains(_ name: String) -> Bool { visitsOf[name] != nil }
+}
+
+
+/// **What the weight stream did, instant by instant** — for the disk's question: does the engine wait for pages, and where?
+/// Off unless a tool turns it on (`enabled`); the engine pays one branch per tensor. Not a policy and not an input of the plan.
+///
+///     read      a visit's bytes, from the first `pread` issued to the last one back
+///     consume   the engine asks for a tensor (`asked`), gets it (`ready`), has copied it and gives its buffer back (`released`)
+///     waited = ready − asked          the engine (hence the GPU, which the engine feeds) stood still for the disk
+///     copied = released − ready       the staging copy, also before the product, also with the GPU idle
+package final class StreamTrace: @unchecked Sendable {
+    package static let shared = StreamTrace()
+    nonisolated(unsafe) package static var enabled = false
+    package static func now() -> UInt64 { DispatchTime.now().uptimeNanoseconds }
+
+    package struct Read: Sendable { package var visit: Int, evaluation: Int, bytes: Int, started: UInt64, ended: UInt64 }
+    package struct Consume: Sendable {
+        package var name: String, visit: Int, evaluation: Int
+        package var asked: UInt64, ready: UInt64, released: UInt64 = 0
+        /// The visit was entirely read when the engine asked.
+        package var readBefore: Bool
+        package var waited: Double { Double(ready &- asked) * 1e-9 }
+        package var copied: Double { released >= ready ? Double(released - ready) * 1e-9 : 0 }
+    }
+    private let lock = NSLock()
+    package private(set) var reads: [Read] = []
+    package private(set) var consumes: [Consume] = []
+    private var open: [String: Int] = [:]
+
+    package func reset() { lock.lock(); reads = []; consumes = []; open = [:]; lock.unlock() }
+    func read(visit: Int, evaluation: Int, bytes: Int, started: UInt64, ended: UInt64) {
+        lock.lock(); reads.append(Read(visit: visit, evaluation: evaluation, bytes: bytes, started: started, ended: ended)); lock.unlock()
+    }
+    func consume(name: String, visit: Int, evaluation: Int, asked: UInt64, ready: UInt64, readBefore: Bool) {
+        lock.lock()
+        open[name] = consumes.count
+        consumes.append(Consume(name: name, visit: visit, evaluation: evaluation, asked: asked, ready: ready, readBefore: readBefore))
+        lock.unlock()
+    }
+    func release(name: String, at time: UInt64) {
+        lock.lock()
+        if let i = open.removeValue(forKey: name) { consumes[i].released = time }
+        lock.unlock()
+    }
 }

@@ -137,6 +137,7 @@ extension Diagnostic.CapacityProbes {
             p["witnesses start"] = witnessTime
             p["witnesses end"] = witnessTime
             p["bandwidth"] = 0.02
+            p["disk"] = 0.6
             // A chain's seconds: the ramp, the window, at most the cap — or the calls it needs where they are long (`chainCalls` after `chainWarmCalls`).
             func chain(_ flop: Double, rate: Double) -> Double {
                 typealias P = Diagnostic.CapacityProbes
