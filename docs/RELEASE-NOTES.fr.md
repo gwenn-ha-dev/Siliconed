@@ -33,8 +33,26 @@
 - **Une mesure s’applique au rendu suivant**, plus au lancement suivant : jamais à un rendu en cours, si bien qu’un rendu lit toujours un seul plan, du début à la fin. À partir de là, une même graine peut donner une image un peu différente de celle d’avant la mesure.
 - **Le rack dit comment les poids sont stockés** : une étiquette sur le DiT, l’encodeur de texte et le VAE (`int8`, `Q8_0`, `Q4_K_M`, `bf16`…), lue sur ce qui est installé, à côté de celle qui dit ce qui calcule (« calcule en fp32 »). Un Mac prêté les publie aussi.
 
+### Atelier de prompts (bêta)
+
+- **Une fenêtre à part, dans le menu Fenêtre (⌥⌘L)** : Réécrire fait d’un prompt court un prompt écrit
+  pour le modèle choisi ; Décrire fait d’une image déposée un prompt. Envoyer au rack met le résultat
+  dans le prompt du rack ; rien ne s’applique seul.
+- **Le rédacteur est un modèle déjà installé** : l’encodeur de texte de Qwen-Image-2.1, Qwen3-VL-8B, mis
+  à écrire. Seule sa couche de sortie manque au modèle installé : Installer le rédacteur la télécharge
+  du même dépôt, 1,25 Go, par plages d’octets. Il faut Qwen-Image-2.1 installé ; en Compact, un Mac de
+  16 Go (la Standard demande 24 Go).
+- **Nos consignes, une par modèle**, tirées de ce que chaque éditeur dit de ses prompts : chaque élément
+  du prompt est gardé, le texte entre guillemets mot pour mot, rien n’est retiré, adouci ni moralisé.
+- **Jamais pendant un rendu** : une image qui démarre arrête le rédacteur, et l’atelier attend.
+- **Vérifié contre la référence** : le décodage glouton donne les mêmes jetons que transformers en fp32
+  (`siliconed check qwen-image-2.1 writer`). Environ 18 jetons par seconde sur un M1 Pro, sur le GPU,
+  depuis les poids gardés en mémoire.
+
 ### Aussi
 
+- **Une seule roue par rendu**, dans la progression sous l’image ; le panneau de gauche garde sa
+  largeur quand la taille passe au carré.
 - **Le Mac sur lequel on calcule, à côté de Chaîne** : son icône, comme dans « À propos de ce Mac »,
   grisée tant qu'il n'est pas mesuré ; celle de l'autre Mac quand on calcule dessus.
 - **Partager la carte est une option** : sous Partager… dans Mesurer ce Mac, jamais le bouton par défaut.

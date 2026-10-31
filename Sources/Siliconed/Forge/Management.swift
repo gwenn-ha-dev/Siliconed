@@ -83,7 +83,8 @@ extension Library {
                 .filter { $0 != f.encoderMap(current) }
                 .reduce(0) { $0 + Self.size(map($1)) }
             return .init(family: f, components: Self.size(i.componentsFolder(f)) - partialBytes(in: i.componentsFolder(f)),
-                         encoder: Self.size(map(encoderMap(f))) + otherEncoder,
+                         encoder: Self.size(map(encoderMap(f))) + otherEncoder
+                            + (f.writerHead.map { Self.size(map($0)) } ?? 0),
                          dit: Self.size(dit) + Self.size(adapterPath(fromMap: dit)) + otherDiT
                             + (f == .qwenImage21 ? Family.supersededQwenImage21Maps.reduce(0) { $0 + Self.size(map($1)) } : 0),
                          variant: own ? variant(of: f) : nil,
@@ -106,6 +107,7 @@ extension Library {
     package func uninstall(_ f: Family) throws(EngineError) {
         let fm = FileManager.default
         var targets = [Installer(library: self).componentsFolder(f)] + Installer(library: self).supersededFiles(f)
+            + (f.writerHead.map { [map($0)] } ?? [])
         for v in f.variants {
             let dit = map(f.ditMap(v))
             targets += [dit, adapterPath(fromMap: dit)]
@@ -113,6 +115,11 @@ extension Library {
             if !targets.contains(encoder) { targets.append(encoder) }
         }
         for c in targets where Self.exists(c) { try EngineError.boundary { try fm.removeItem(atPath: c) } }
+    }
+
+    /// **The writer's head map** (`Family.writerHead`), when it is installed; `nil` otherwise.
+    package func writerHeadMap(_ f: Family) -> String? {
+        f.writerHead.map { map($0) }.flatMap { Self.exists($0) ? $0 : nil }
     }
 
     // MARK: - Versions

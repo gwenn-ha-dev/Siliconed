@@ -392,6 +392,7 @@ package final class Artifact {
     deinit {
         stream = nil   // its reads finish before the descriptor closes
         through = nil
+        resident = nil
         munmap(UnsafeMutableRawPointer(mutating: base), size)
         close(descriptor)
     }
@@ -402,6 +403,7 @@ package final class Artifact {
     package func pointer(_ name: String) -> UnsafeRawPointer? {
         guard let t = tensors[name] else { return nil }
         if let stream, let staged = stream.pointer(name, offset: t.offset) { return staged }
+        if let resident, let kept = resident.pointer(name) { return kept }
         if let through { return through.read(name, t, page: page) }
         return base.advanced(by: t.offset)
     }
@@ -423,6 +425,64 @@ package final class Artifact {
         through = ReadThrough(descriptor: fd)
     }
     private var through: ReadThrough?
+
+    /// **Tensors kept in the process's own pages** (`keepResident`), read once with `pread` + `F_NOCACHE`
+    /// — so they are counted in the footprint, once, and the page cache holds no second copy — and
+    /// served by `pointer` in place of the mapping. For a model that reads all its weights at every
+    /// step (a writer's decoding) and runs alone: the kernel cannot evict them to the disk and read
+    /// them back, and the memory need charges them (`residentBytes`). Nothing else changes: every
+    /// reader (`materialize`, `stage`, `stageInt8`, `materializeRows`) reaches the weight through `pointer`.
+    private var resident: ResidentTensors?
+
+    /// **The bytes `keepResident` maps for these tensors**, from the header alone: each tensor's bytes
+    /// rounded to the page, as the region lays them out.
+    package static func residentBytes(header: [String: Any], names: [String]) -> Int {
+        guard let table = header["tensors"] as? [String: [String: Any]], let page = header["page"] as? Int, page > 0 else { return 0 }
+        let rounded = names.reduce(0) { $0 + ((table[$1]?["bytes"] as? Int ?? 0) + page - 1) / page * page }
+        return Arena.capacity(for: rounded)
+    }
+
+    /// `residentBytes` of every tensor whose name starts with one of `prefixes`.
+    package static func residentBytes(header: [String: Any], prefixes: [String]) -> Int {
+        guard let table = header["tensors"] as? [String: [String: Any]] else { return 0 }
+        return residentBytes(header: header, names: table.keys.filter { name in prefixes.contains { name.hasPrefix($0) } })
+    }
+
+    /// **Reads these tensors into one anonymous region** and serves them from it from now on (a tensor
+    /// already kept is not read again). `progress` is called with the fraction read, between two
+    /// tensors; the cancellation is consulted there too, and a cancelled or failed load keeps nothing.
+    package func keepResident(prefixes: [String], cancellation: Cancellation? = nil,
+                              progress: ((Double) -> Void)? = nil) throws {
+        let wanted = order.filter { name in prefixes.contains { name.hasPrefix($0) } && resident?.pointer(name) == nil }
+        guard !wanted.isEmpty else { return }
+        let fd = open(path, O_RDONLY)
+        guard fd >= 0 else { throw Failure.cannotOpen(path, errno) }
+        defer { close(fd) }
+        _ = fcntl(fd, F_NOCACHE, 1)
+        let sizes = wanted.map { (tensors[$0]!.bytes + page - 1) / page * page }
+        let store = ResidentTensors(names: wanted, sizes: sizes)
+        let total = Double(sizes.reduce(0, +))
+        var done = 0.0
+        for (name, length) in zip(wanted, sizes) {
+            try cancellation.check()
+            let t = tensors[name]!, destination = store.writable(name)!
+            var read = 0
+            while read < t.bytes {
+                let n = pread(fd, destination + read, t.bytes - read, off_t(t.offset + read))
+                guard n > 0 else { throw Failure.truncated("\(name): \(read) of \(t.bytes) bytes read") }
+                read += n
+            }
+            done += Double(length)
+            progress?(done / total)
+        }
+        resident = resident.map { $0.joined(with: store) } ?? store
+    }
+
+    /// Gives the kept tensors back (their pages are unmapped at once).
+    package func releaseResident() { resident = nil }
+
+    /// The bytes held by `keepResident`.
+    package var residentCapacity: Int { resident?.capacity ?? 0 }
 
     /// The pointer into the map itself, never a staging copy: for the prefetcher's `madvise`.
     package func mappedPointer(_ name: String) -> UnsafeRawPointer? {
@@ -619,6 +679,35 @@ package final class Artifact {
                              scale: tensor.scale.map { source + $0.offset }, scaleType: tensor.scale?.dtype ?? .float32,
                              layout: tensor.scale?.layout ?? .tensor, firstRow: first, into: destination)
         }
+    }
+}
+
+/// `Artifact.keepResident`'s region: tensors laid end to end, each on a page boundary, in `Pages`.
+private final class ResidentTensors {
+    private let regions: [Pages]
+    private let offsets: [String: (region: Int, offset: Int)]
+
+    init(names: [String], sizes: [Int]) {
+        let total = sizes.reduce(0, +)
+        regions = [Pages(bytes: total)]
+        var at = 0, table: [String: (region: Int, offset: Int)] = [:]
+        for (name, size) in zip(names, sizes) { table[name] = (0, at); at += size }
+        offsets = table
+    }
+
+    private init(regions: [Pages], offsets: [String: (region: Int, offset: Int)]) {
+        self.regions = regions; self.offsets = offsets
+    }
+
+    var capacity: Int { regions.reduce(0) { $0 + $1.capacity } }
+    func writable(_ name: String) -> UnsafeMutableRawPointer? { offsets[name].map { regions[$0.region].base + $0.offset } }
+    func pointer(_ name: String) -> UnsafeRawPointer? { writable(name).map { UnsafeRawPointer($0) } }
+
+    /// Both stores' regions, neither copied.
+    func joined(with other: ResidentTensors) -> ResidentTensors {
+        var table = offsets
+        for (name, place) in other.offsets { table[name] = (place.region + regions.count, place.offset) }
+        return ResidentTensors(regions: regions + other.regions, offsets: table)
     }
 }
 

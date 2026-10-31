@@ -5817,6 +5817,46 @@
         }
       }
     },
+    "Action" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aktion"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Acción"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Action"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Azione"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "操作"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "操作"
+          }
+        }
+      }
+    },
     "Add" : {
       "localizations" : {
         "de" : {
@@ -8177,6 +8217,46 @@
         }
       }
     },
+    "Choose Another…" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Andere wählen …"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Elegir otra…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choisir une autre…"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scegline un’altra…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "別の画像を選択…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选择其他…"
+          }
+        }
+      }
+    },
     "Choose Euler." : {
       "localizations" : {
         "de" : {
@@ -8653,6 +8733,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "请选择更小的尺寸或更少的图像。"
+          }
+        }
+      }
+    },
+    "Choose an Image…" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bild wählen …"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Elegir una imagen…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choisir une image…"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scegli un’immagine…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "画像を選択…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选择图像…"
           }
         }
       }
@@ -11457,6 +11577,46 @@
         }
       }
     },
+    "Describe" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Beschreiben"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Describir"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Décrire"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Descrivi"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "説明する"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "描述"
+          }
+        }
+      }
+    },
     "Describe an image, then press ⌘↩" : {
       "localizations" : {
         "de" : {
@@ -12275,6 +12435,46 @@
         }
       }
     },
+    "Drop an image here" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bild hier ablegen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Suelta una imagen aquí"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Déposez une image ici"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trascina qui un’immagine"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ここに画像をドロップ"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "将图像拖放到此处"
+          }
+        }
+      }
+    },
     "Drop an image here to edit it." : {
       "localizations" : {
         "de" : {
@@ -12591,6 +12791,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "每条路径单独运行的速度，单位为每秒万亿次运算（TFLOP/s）。条形表示占 GPU 峰值（由其核心数和时钟频率得出）的比例；只有 GPU 有峰值，也只有它的矩阵乘积与之比较。✓：结果与精确结果的差距在其阈值之内。"
+          }
+        }
+      }
+    },
+    "Edit" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bearbeiten"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Editar"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modifier"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modifica"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "編集"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "编辑"
           }
         }
       }
@@ -16778,6 +17018,46 @@
         }
       }
     },
+    "Install the Writer" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Textmodell installieren"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Instalar el redactor"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Installer le rédacteur"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Installa il redattore"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ライターをインストール"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "安装写作器"
+          }
+        }
+      }
+    },
     "Install, import, remove — and what each takes on disk (⇧⌘M)" : {
       "localizations" : {
         "de" : {
@@ -16934,6 +17214,86 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在安装 %@"
+          }
+        }
+      }
+    },
+    "Installing the writer" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Textmodell wird installiert"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Instalando el redactor"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Installation du rédacteur"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Installazione del redattore"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ライターをインストール中"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在安装写作器"
+          }
+        }
+      }
+    },
+    "Installing the writer…" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Textmodell wird installiert …"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Instalando el redactor…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Installation du rédacteur…"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Installazione del redattore…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ライターをインストール中…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在安装写作器…"
           }
         }
       }
@@ -20740,6 +21100,46 @@
         }
       }
     },
+    "No writer is installed yet. Install a model to have one." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Es ist noch kein Textmodell installiert. Installiere ein Modell, um eines zu haben."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Todavía no hay ningún redactor instalado. Instala un modelo para tener uno."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun rédacteur n’est installé. Installez un modèle pour en avoir un."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nessun redattore è ancora installato. Installa un modello per averne uno."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "文章を書くモデルがまだインストールされていません。モデルをインストールしてください。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "尚未安装写作模型。请安装一个模型。"
+          }
+        }
+      }
+    },
     "Nobody answered on that Mac: nothing was removed." : {
       "localizations" : {
         "de" : {
@@ -23034,6 +23434,46 @@
         }
       }
     },
+    "Paused while an image renders." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pausiert, während ein Bild gerendert wird."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En pausa mientras se genera una imagen."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En pause pendant le rendu d’une image."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "In pausa mentre si genera un’immagine."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "画像のレンダリング中は一時停止しています。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "图像渲染期间已暂停。"
+          }
+        }
+      }
+    },
     "Peak read from the silicon: %@" : {
       "localizations" : {
         "de" : {
@@ -23276,6 +23716,46 @@
         }
       }
     },
+    "Preparing the writer…" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Textmodell wird vorbereitet …"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Preparando el redactor…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Préparation du rédacteur…"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Preparazione del redattore…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ライターを準備しています…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在准备写作模型…"
+          }
+        }
+      }
+    },
     "Preparing…" : {
       "localizations" : {
         "de" : {
@@ -23472,6 +23952,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "提示词"
+          }
+        }
+      }
+    },
+    "Prompt Lab" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prompt-Labor"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Laboratorio de prompts"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Atelier de prompts"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Laboratorio dei prompt"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "プロンプトラボ"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "提示词实验室"
           }
         }
       }
@@ -25666,6 +26186,46 @@
         }
       }
     },
+    "Replaces the rack's prompt. ⌘Z in the prompt field brings the old one back." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ersetzt den Prompt im Rack. ⌘Z im Prompt-Feld holt den alten zurück."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sustituye el prompt del rack. ⌘Z en el campo del prompt recupera el anterior."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remplace le prompt du rack. ⌘Z dans le champ du prompt rétablit l’ancien."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sostituisce il prompt del rack. ⌘Z nel campo del prompt ripristina il precedente."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ラックのプロンプトを置き換えます。プロンプト欄で⌘Zを押すと元に戻ります。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "替换机架中的提示词。在提示词栏中按 ⌘Z 可恢复原来的内容。"
+          }
+        }
+      }
+    },
     "Replace…" : {
       "localizations" : {
         "de" : {
@@ -25786,6 +26346,46 @@
         }
       }
     },
+    "Result" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ergebnis"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Resultado"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Résultat"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Risultato"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "結果"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "结果"
+          }
+        }
+      }
+    },
     "Resumed at the next installation, or discarded." : {
       "localizations" : {
         "de" : {
@@ -25902,6 +26502,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "复用此网格"
+          }
+        }
+      }
+    },
+    "Rewrite" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Umschreiben"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reescribir"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Réécrire"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Riscrivi"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "書き直す"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "改写"
           }
         }
       }
@@ -26306,6 +26946,46 @@
         }
       }
     },
+    "Send to Rack" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "An Rack senden"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enviar al rack"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Envoyer au rack"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Invia al rack"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ラックに送る"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "发送到机架"
+          }
+        }
+      }
+    },
     "Sending %@" : {
       "localizations" : {
         "de" : {
@@ -26388,6 +27068,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在发送 %@：%@"
+          }
+        }
+      }
+    },
+    "Sent" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gesendet"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enviado"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Envoyé"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Inviato"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "送信しました"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已发送"
           }
         }
       }
@@ -26828,6 +27548,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "请缩短提示词。"
+          }
+        }
+      }
+    },
+    "Show Changes" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Änderungen zeigen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ver cambios"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voir les changements"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostra le modifiche"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "変更を表示"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示更改"
           }
         }
       }
@@ -28902,6 +29662,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已停止。"
+          }
+        }
+      }
+    },
+    "Stopped: an image started rendering." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Angehalten: Ein Bild wird jetzt gerendert."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Detenido: ha empezado a generarse una imagen."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Interrompu : un rendu d’image a commencé."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Interrotto: è iniziata la generazione di un’immagine."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "停止しました：画像のレンダリングが始まりました。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已停止：图像开始渲染。"
           }
         }
       }
@@ -31679,6 +32479,86 @@
         }
       }
     },
+    "The image to describe" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das zu beschreibende Bild"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La imagen que describir"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’image à décrire"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’immagine da descrivere"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "説明する画像"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要描述的图像"
+          }
+        }
+      }
+    },
+    "The image to describe." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das zu beschreibende Bild."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La imagen que describir."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’image à décrire."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’immagine da descrivere."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "説明する画像です。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要描述的图像。"
+          }
+        }
+      }
+    },
     "The image to edit — or drop or paste it here (⌘V)" : {
       "localizations" : {
         "de" : {
@@ -31755,6 +32635,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "要编辑的图像：提示词说明要改什么（“把她的夹克改成红色”）。"
+          }
+        }
+      }
+    },
+    "The lab works on this Mac only." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das Labor arbeitet nur auf diesem Mac."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El laboratorio solo trabaja en este Mac."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’atelier ne travaille que sur ce Mac."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il laboratorio lavora solo su questo Mac."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ラボはこのMacでのみ動作します。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "实验室仅在这台 Mac 上工作。"
           }
         }
       }
@@ -33445,6 +34365,46 @@
         }
       }
     },
+    "The result appears here." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das Ergebnis erscheint hier."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El resultado aparece aquí."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le résultat apparaît ici."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il risultato appare qui."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "結果はここに表示されます。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "结果会显示在这里。"
+          }
+        }
+      }
+    },
     "The same seed and steps under each solver: Euler is the one this model was distilled for" : {
       "localizations" : {
         "de" : {
@@ -34521,6 +35481,166 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "此措辞是暂定的：将通过一系列生成结果凭肉眼确定。"
+          }
+        }
+      }
+    },
+    "The writer is being prepared." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das Textmodell wird gerade vorbereitet."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El redactor se está preparando."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le rédacteur est en cours de préparation."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il redattore è in preparazione."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ライターを準備しています。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "写作模型正在准备中。"
+          }
+        }
+      }
+    },
+    "The writer is installed" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das Textmodell ist installiert"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El redactor está instalado"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le rédacteur est installé"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il redattore è installato"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ライターをインストールしました"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "写作器已安装"
+          }
+        }
+      }
+    },
+    "The writer needs a Mac with %lld GB of memory." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das Textmodell braucht einen Mac mit %lld GB Arbeitsspeicher."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El redactor necesita un Mac con %lld GB de memoria."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le rédacteur demande un Mac avec %lld Go de mémoire."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il redattore richiede un Mac con %lld GB di memoria."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ライターには%lld GBのメモリを搭載したMacが必要です。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "写作模型需要内存为 %lld GB 的 Mac。"
+          }
+        }
+      }
+    },
+    "The writer needs one more download from Qwen-Image-2.1's repository: %@." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das Textmodell braucht einen weiteren Download aus dem Repository von Qwen-Image-2.1: %@."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El redactor necesita una descarga más del repositorio de Qwen-Image-2.1: %@."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le rédacteur a besoin d’un téléchargement de plus, depuis le dépôt de Qwen-Image-2.1 : %@."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il redattore ha bisogno di un altro download dal repository di Qwen-Image-2.1: %@."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ライターにはQwen-Image-2.1のリポジトリからの追加ダウンロードが必要です：%@。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "写作器还需要从 Qwen-Image-2.1 的仓库再下载一个文件：%@。"
           }
         }
       }
@@ -35635,6 +36755,46 @@
         }
       }
     },
+    "This image could not be read." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dieses Bild konnte nicht gelesen werden."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se ha podido leer esta imagen."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette image n’a pas pu être lue."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossibile leggere questa immagine."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この画像を読み込めませんでした。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法读取这张图像。"
+          }
+        }
+      }
+    },
     "This image could not be varied" : {
       "localizations" : {
         "de" : {
@@ -36453,6 +37613,52 @@
         }
       }
     },
+    "This text is too long for the writer: %lld tokens, at most %lld." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dieser Text ist zu lang für das Textmodell: %lld Token, höchstens %lld."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "This text is too long for the writer: %1$lld tokens, at most %2$lld."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Este texto es demasiado largo para el redactor: %lld tokens, como máximo %lld."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce texte est trop long pour le rédacteur : %lld jetons, au plus %lld."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Questo testo è troppo lungo per il redattore: %lld token, al massimo %lld."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このテキストはライターには長すぎます：%lld トークン、上限は %lld です。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此文本对写作器来说太长：%lld 个词元，最多 %lld 个。"
+          }
+        }
+      }
+    },
     "Thumbnail size" : {
       "localizations" : {
         "de" : {
@@ -37105,6 +38311,46 @@
         }
       }
     },
+    "Type or paste a prompt to improve" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prompt eingeben oder einfügen, der verbessert werden soll"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escribe o pega un prompt para mejorarlo"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saisissez ou collez un prompt à améliorer"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scrivi o incolla un prompt da migliorare"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "改善したいプロンプトを入力またはペースト"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "输入或粘贴要改进的提示词"
+          }
+        }
+      }
+    },
     "Under a minute; done before the first render and after each update. A new measure applies to the next render." : {
       "localizations" : {
         "de" : {
@@ -37427,6 +38673,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "使用这台 Mac 的资源库"
+          }
+        }
+      }
+    },
+    "Use the Rack's Prompt" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prompt aus dem Rack verwenden"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Usar el prompt del rack"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Utiliser le prompt du rack"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Usa il prompt del rack"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ラックのプロンプトを使う"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用机架中的提示词"
           }
         }
       }
@@ -38763,6 +40049,86 @@
         }
       }
     },
+    "Write for" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Schreiben für"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escribir para"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Écrire pour"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scrivi per"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "対象モデル"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "撰写对象"
+          }
+        }
+      }
+    },
+    "Write for %@" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Schreiben für %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escribir para %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Écrire pour %@"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scrivi per %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@向けに書く"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "为 %@ 撰写"
+          }
+        }
+      }
+    },
     "Write {brunette|blonde|red-haired} to make a group an axis." : {
       "localizations" : {
         "de" : {
@@ -38799,6 +40165,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "写成 {brunette|blonde|red-haired}，即可让一个组成为一个轴。"
+          }
+        }
+      }
+    },
+    "Writer: %@" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Textmodell: %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Redactor: %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rédacteur : %@"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Redattore: %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ライター：%@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "写作模型：%@"
           }
         }
       }

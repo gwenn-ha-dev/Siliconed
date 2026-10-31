@@ -33,8 +33,26 @@ English · [Français](RELEASE-NOTES.fr.md)
 - **A measure applies to the next render**, no longer to the next launch: never to a render under way, so that a render still reads one plan from start to end. From then on, one seed can give an image a little different from before the measure.
 - **The rack says how the weights are stored**: a label on the DiT, the text encoder and the VAE (`int8`, `Q8_0`, `Q4_K_M`, `bf16`…), read from what is installed, beside the label that says what computes (« computes fp32 »). A borrowed Mac publishes them too.
 
+### Prompt Lab (beta)
+
+- **A window of its own, in the Window menu (⌥⌘L)**: Rewrite turns a short prompt into one written for
+  the model you pick; Describe turns a dropped image into a prompt. Send to Rack puts the result in the
+  rack's prompt; nothing is applied on its own.
+- **The writer is a model you already have**: Qwen-Image-2.1's text encoder, Qwen3-VL-8B, made to write.
+  Only its output layer is missing from the installed model: Install the Writer downloads it from the
+  same repository, 1.25 GB, by byte range. It needs Qwen-Image-2.1 installed; on its Compact, a 16 GB
+  Mac (the Standard asks for 24 GB).
+- **Our instructions, one per model**, drawn from what each publisher says of its prompts: every element
+  of your prompt is kept, quoted text word for word, nothing removed, softened or moralized.
+- **Never during a render**: an image that starts stops the writer, and the lab waits.
+- **Checked against the reference**: greedy decoding gives the same tokens as transformers in fp32
+  (`siliconed check qwen-image-2.1 writer`). About 18 tokens a second on an M1 Pro, on the GPU, from the
+  weights kept in memory.
+
 ### Also
 
+- **One spinner per render**, in the progress under the image; the sidebar keeps its width when the
+  size turns square.
 - **The Mac you compute on, beside Chain**: its own icon, as in About This Mac, greyed until it is
   measured; another Mac's when you compute on it.
 - **Sharing the map is an option**: under Share… in Measure This Mac, never the default button.

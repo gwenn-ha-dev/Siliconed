@@ -71,6 +71,9 @@ package final class Tokenizer {
     /// no deliberate case would have.
     private let addedByFirst: [Unicode.Scalar: [(scalars: [Unicode.Scalar], id: Int)]]
     private let addedIdentifiers: [Int: String]
+    /// The added tokens the file marks `special` (`<|im_end|>`, `<|endoftext|>`, `<|image_pad|>`…): what
+    /// `skip_special_tokens` leaves out of a generated text. `<think>` and `<tool_call>` are added, not special.
+    package let specialIdentifiers: Set<Int>
 
     private let normalizeNFC: Bool
 
@@ -180,6 +183,7 @@ package final class Tokenizer {
 
         var byFirst: [Unicode.Scalar: [(scalars: [Unicode.Scalar], id: Int)]] = [:]
         var identifiers: [Int: String] = [:]
+        var specials = Set<Int>()
         for entry in (root["added_tokens"] as? [[String: Any]] ?? []) {
             guard let content = entry["content"] as? String, let id = entry["id"] as? Int,
                   let first = content.unicodeScalars.first else {
@@ -195,6 +199,7 @@ package final class Tokenizer {
             }
             byFirst[first, default: []].append((Array(content.unicodeScalars), id))
             identifiers[id] = content
+            if entry["special"] as? Bool == true { specials.insert(id) }
         }
         for key in byFirst.keys { byFirst[key]?.sort { $0.scalars.count > $1.scalars.count } }
 
@@ -204,6 +209,7 @@ package final class Tokenizer {
         self.splitter = try NSRegularExpression(pattern: pattern)
         self.addedByFirst = byFirst
         self.addedIdentifiers = identifiers
+        self.specialIdentifiers = specials
     }
 
     /// What the two tables map, from the file's counts — released with the tokenizer.
@@ -490,4 +496,85 @@ package final class Tokenizer {
         flush()
         return out
     }
+
+    // MARK: - Token bytes, for a stream
+
+    /// **The bytes each identifier decodes to**, in two flat regions (`TokenBytes`): what an incremental
+    /// detokenizer needs, since one byte-level token may hold half a UTF-8 character and `decode` of
+    /// a single identifier would replace it. `rows`: the identifiers that exist (a model's logits);
+    /// those the tokenizer does not know decode to nothing. Added tokens are their content's bytes.
+    package func tokenBytes(rows: Int) -> TokenBytes {
+        var scalarByte: [Unicode.Scalar: UInt8] = [:]
+        for (byte, symbol) in Self.byteSymbols.enumerated() { scalarByte[symbol.unicodeScalars.first!] = UInt8(byte) }
+        var lengths = [Int](repeating: 0, count: rows)
+        vocabulary.forEach { symbol, id in if id >= 0, id < rows { lengths[id] = symbol.unicodeScalars.count } }
+        for (id, content) in addedIdentifiers where id >= 0 && id < rows { lengths[id] = content.utf8.count }
+        let result = TokenBytes(lengths: lengths)
+        vocabulary.forEach { symbol, id in
+            guard id >= 0, id < rows else { return }
+            result.fill(id) { out in for (i, scalar) in symbol.unicodeScalars.enumerated() { out[i] = scalarByte[scalar] ?? 0 } }
+        }
+        for (id, content) in addedIdentifiers where id >= 0 && id < rows {
+            result.fill(id) { out in for (i, byte) in content.utf8.enumerated() { out[i] = byte } }
+        }
+        return result
+    }
+
+    /// **What `tokenBytes(rows:)` maps, bounded from the file alone** (a scan, like `tableBytes(file:)`): the
+    /// offsets exactly, the bytes by the text of `model.vocab` and of `added_tokens` — a token decodes to
+    /// at most as many bytes as its spelling has UTF-8 bytes, quotes and ids included.
+    package static func detokenizationBytes(file path: String, rows: Int) throws -> Int {
+        guard FileManager.default.fileExists(atPath: path) else { throw Failure.fileNotFound(path) }
+        let data = try Data(contentsOf: URL(fileURLWithPath: path), options: .alwaysMapped)
+        return try data.withUnsafeBytes { raw throws -> Int in
+            let json = TokenizerJSON(bytes: raw)
+            do {
+                guard let model = try json.members(of: 0, ["model"])["model"], raw[model.lowerBound] == 0x7B,
+                      let vocab = try json.members(of: model.lowerBound, ["vocab"])["vocab"] else { throw Failure.malformed("no model.vocab") }
+                let added = try json.members(of: 0, ["added_tokens"])["added_tokens"]?.count ?? 0
+                return TokenBytes.mappedBytes(rows: rows, spelledBytes: vocab.count + added)
+            } catch let error as TokenizerJSON.Malformed {
+                throw Failure.malformed("not JSON at byte \(error.at)")
+            }
+        }
+    }
+}
+
+/// **Identifier → bytes**: `offsets[id] ..< offsets[id + 1]` into one blob, both in `Pages` (unmapped with the
+/// value, never in `malloc`).
+package struct TokenBytes {
+    private let offsets: Pages
+    private let blob: Pages
+    package let rows: Int
+
+    init(lengths: [Int]) {
+        rows = lengths.count
+        offsets = Pages(bytes: (lengths.count + 1) * MemoryLayout<UInt32>.size)
+        blob = Pages(bytes: max(1, lengths.reduce(0, +)))
+        let table = offsets.base.assumingMemoryBound(to: UInt32.self)
+        var at = 0
+        for (id, n) in lengths.enumerated() { table[id] = UInt32(at); at += n }
+        table[lengths.count] = UInt32(at)
+    }
+
+    func fill(_ id: Int, _ write: (UnsafeMutablePointer<UInt8>) -> Void) {
+        let table = offsets.base.assumingMemoryBound(to: UInt32.self)
+        write(blob.base.assumingMemoryBound(to: UInt8.self) + Int(table[id]))
+    }
+
+    /// The bytes of `id`; empty outside the table.
+    package func bytes(of id: Int) -> UnsafeBufferPointer<UInt8> {
+        guard id >= 0, id < rows else { return UnsafeBufferPointer(start: nil, count: 0) }
+        let table = offsets.base.assumingMemoryBound(to: UInt32.self)
+        return UnsafeBufferPointer(start: blob.base.assumingMemoryBound(to: UInt8.self) + Int(table[id]),
+                                   count: Int(table[id + 1] - table[id]))
+    }
+
+    /// What a table of `rows` identifiers whose spellings take `spelledBytes` maps at most.
+    package static func mappedBytes(rows: Int, spelledBytes: Int) -> Int {
+        Arena.capacity(for: (rows + 1) * MemoryLayout<UInt32>.size) + Arena.capacity(for: max(1, spelledBytes))
+    }
+
+    /// What this table maps.
+    package var mapped: Int { offsets.capacity + blob.capacity }
 }
