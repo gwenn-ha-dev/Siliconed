@@ -66,7 +66,7 @@ import Testing
         #expect(stuck.disturbances.map(\.kind) == [.threads] && stuck.disturbances[0].steps == ["b"])
     }
 
-    // ── the verdict ─────────────────────────────────────────────────────────────────────────
+    // ── the findings ────────────────────────────────────────────────────────────────────────
 
     func report(_ regime: Regime?) -> Diagnostic.Report {
         let base = R.report()
@@ -78,27 +78,32 @@ import Testing
         return r
     }
 
-    @Test func aMeasureThatStayedBusyIsOrangeAndSaysWhat() throws {
+    @Test func aMeasureThatStayedBusyIsAMapThatSaysWhatItSaw() throws {
         let busy = report(regime([pulse("a"), pulse("sharing gpu+ane", crowd: 1.42)], spreads: ["ane/fp16 2048x3840x3840": 0.4]))
-        #expect(!busy.verdict.green)
-        #expect(busy.verdict.defects.map(\.kind) == [.disturbed, .disturbed])
-        #expect(busy.verdict.defects.map(\.subject) == ["threads", "calls"])
-        let text = busy.verdict.defects.map(\.text)
+        #expect(busy.findings.map(\.kind) == [.disturbed, .disturbed])
+        #expect(busy.findings.map(\.subject) == ["threads", "calls"])
+        #expect(busy.findings.allSatisfy { $0.effect == .fastSide }, "an uncertainty: the figures are read on their quick side")
+        let text = busy.findings.map(\.text)
         #expect(text[0].contains("70 % of their cores") && text[0].contains("1 step") && text[0].contains("sharing gpu+ane"))
-        #expect(text[1].contains("40 %") && text[1].contains("15 %"))
-        for defect in busy.verdict.defects { #expect(defect.cause(excluding: []) == .disturbed) }
+        #expect(text[1].contains("40 %") && text[1].contains("15 %") && text[1].contains("fast side"))
+        for finding in busy.findings { #expect(finding.cause(excluding: []) == .disturbed) }
+        // …and it is the map all the same: current, designated, its uncertainty written beside the figure it belongs to.
+        var mine = busy
+        mine.machine = Diagnostic.machine()
+        #expect(mine.isCurrent && EngineSettings.designation(of: mine).plan != nil)
+        #expect(busy.uncertainty.first { $0.subject == "ane/fp16" }?.plusMinus == 0.2)
         // It crosses the JSON whole, the regime with it.
         let back = try #require(Diagnostic.Report.read(try busy.json()))
         #expect(back == busy && back.regime?.pulses.count == 2)
     }
 
-    /// A free Mac's report, a report without a regime (an older one) and a step measured again are green: what the guard redid is not a defect.
-    @Test func aFreeMacIsGreenWhateverTheGuardRedid() {
-        #expect(report(regime([pulse("a"), pulse("b")], spreads: ["a": 0.03])).verdict.green)
-        #expect(report(nil).verdict.green)
+    /// A free Mac's report, a report without a regime (an older one) and a step measured again find nothing: what the guard redid is not a finding.
+    @Test func aFreeMacFindsNothingWhateverTheGuardRedid() {
+        #expect(report(regime([pulse("a"), pulse("b")], spreads: ["a": 0.03])).findings.isEmpty)
+        #expect(report(nil).findings.isEmpty)
         var redone = regime([pulse("a"), pulse("b", crowd: 1.6), pulse("b", attempt: 2)])
         redone.repeated = 1; redone.repeatedSeconds = 1.4
-        #expect(report(redone).verdict.green)
+        #expect(report(redone).findings.isEmpty)
     }
 
     // ── the cards recorded on the M1 Pro ────────────────────────────────────────────────────

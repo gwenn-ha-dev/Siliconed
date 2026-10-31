@@ -260,20 +260,24 @@ package enum RemoteControlHelp {
         and a route that computed wrong is left out. After each step it checks that the Mac was
         free (the threads still had their cores, the GPU answered promptly, identical calls took
         the same time) and measures the step again, while the minute leaves seconds; what stayed
-        busy is in the verdict ("disturbed"), the cores the others used in "regime". It runs in a
+        busy is kept, its chains read on their quick side (a disturbance only adds time), and said
+        in "findings" ("disturbed") with how far identical calls differed ("regime"."spreads") and
+        the cores the others used ("regime"."foreign"). It runs in a
         process of its own: a route whose load kills that process (a program the Neural Engine
         refuses) is left out, the measure starts again without it, and "judge" says
         {"excluded": true, "reason": "died"}. The queue waits for it, and it for the
         queue. The report is the model of this Mac: from the next launch, the engine works out
         from its "model" how many rows each engine takes at every product and every attention;
-        before it, the defaults. Its "verdict" is green, or lists what is missing or aberrant.
+        before it, the defaults. A finished measure is always applied: its "findings" say, each with
+        its effect on the plan ("fact", "left out", "bounded", "fast side"), what was missing, what
+        was aberrant and what was uncertain — never a reason to refuse it.
 
           {"type": "started", "stages": ["weight preparation", …]}
-          {"ok": true, "report": {"schema": 15, "machine": {…, "inventory": {…}},
+          {"ok": true, "report": {"schema": 16, "machine": {…, "inventory": {…}},
             "model": {"lines": {"gpu/fp32": {"t0": 0.0003, "rate": 3.5e12}, …},
                       "sharing": {"gpu+ane": {"keep": {"gpu": 0.88, "ane": 0.74}, …}, …}, "crest": {…}, "heat": {…}, …},
             "measurements": {…}, "judge": {"ane/fp16": {"error": …, "threshold": …, "excluded": false}, …},
-            "memory": {…}, "stages": {…}, "verdict": {"green": true, "defects": []}, …}}
+            "memory": {…}, "stages": {…}, "findings": [], …}}
 
         --issue   then opens GitHub's issue form in the browser, prefilled with the report (the
                   sheet's « Open the Issue »); the user submits it. "issue_url_length" says how
@@ -497,16 +501,13 @@ package enum RemoteControlHelp {
            "installing": {"title": "Installing Z-Image Turbo", "last": "forging the DiT → …"} | null,
            "queue_remaining_s": 66.5, "remaining_complete": true,
            "history_images": 12, "library": "/Users/…/Siliconed", "faster_rendering": true,
-           "settings": {"read": true, "map": "2026-10-26T14:43:50Z", "green": true,
-                        "remeasuring": false, "warnings": []}}
+           "settings": {"read": true, "map": "2026-10-26T14:43:50Z", "warnings": []}}
 
         faster_rendering   : the Settings switch (help set).
         settings           : the engine settings renders run on — read: false until this Mac's measure is; map: the
-                             date of that measure (null: the defaults); green: it is complete (every engine has its
-                             lines and every set its sharing, nothing aberrant, its memory under B, its minute) — false:
-                             it is measured again at the next launch; remeasuring: this launch measures again before its
-                             first render; warnings: why a measure or profile was refused. Two series compared across
-                             launches compare their measures too.
+                             date of that measure (null: the defaults); warnings: why a measure or profile was
+                             refused. A measure is applied as it stands, whatever it found (see help diagnose). Two
+                             series compared across launches compare their measures too.
         stage              : text, image (encoding a reference), denoising, decoding.
         steps_total        : the model's evaluations, not the requested steps (a sketch: those it stops after).
         remaining_s        : null until the app has a measurement for this render.
@@ -1009,20 +1010,24 @@ package enum RemoteControlHelp {
         résultat exact, et une route qui a mal calculé est écartée. Après chaque étape elle vérifie
         que le Mac était libre (les fils avaient encore leurs cœurs, le GPU répondait sans attendre,
         des appels identiques prenaient le même temps) et refait l'étape tant que la minute laisse
-        des secondes ; ce qui est resté occupé est dans le verdict ("disturbed"), les cœurs qu'ont
-        pris les autres dans "regime". Elle tourne dans un processus à part : une route dont le
+        des secondes ; ce qui est resté occupé est gardé, ses chaînes lues du côté rapide (une
+        perturbation n'ajoute que du temps), et dit dans "findings" ("disturbed") avec l'écart des
+        appels identiques ("regime"."spreads") et les cœurs qu'ont pris les autres ("regime"."foreign").
+        Elle tourne dans un processus à part : une route dont le
         chargement tue ce processus (un programme que le Neural Engine refuse) est écartée, la mesure
         repart sans elle, et "judge" dit {"excluded": true, "reason": "died"}. La file l'attend, et
         lui attend la file. Le rapport est le modèle de ce Mac : dès le lancement suivant, le moteur
         tire de son "model" combien de lignes prend chaque moteur à chaque produit et à chaque
-        attention ; avant, les défauts. Son "verdict" est vert, ou liste ce qui manque ou détonne.
+        attention ; avant, les défauts. Une mesure finie est toujours appliquée : ses "findings" disent,
+        chacun avec son effet sur le plan ("fact", "left out", "bounded", "fast side"), ce qui
+        manquait, ce qui détonnait et ce qui restait incertain — jamais une raison de la refuser.
 
           {"type": "started", "stages": ["weight preparation", …]}
-          {"ok": true, "report": {"schema": 15, "machine": {…, "inventory": {…}},
+          {"ok": true, "report": {"schema": 16, "machine": {…, "inventory": {…}},
             "model": {"lines": {"gpu/fp32": {"t0": 0.0003, "rate": 3.5e12}, …},
                       "sharing": {"gpu+ane": {"keep": {"gpu": 0.88, "ane": 0.74}, …}, …}, "crest": {…}, "heat": {…}, …},
             "measurements": {…}, "judge": {"ane/fp16": {"error": …, "threshold": …, "excluded": false}, …},
-            "memory": {…}, "stages": {…}, "verdict": {"green": true, "defects": []}, …}}
+            "memory": {…}, "stages": {…}, "findings": [], …}}
 
         --issue   ouvre ensuite le formulaire d'issue GitHub dans le navigateur, prérempli avec le
                   rapport (« Ouvrir le signalement » de la feuille) ; c'est l'utilisateur qui l'envoie.
@@ -1248,16 +1253,13 @@ package enum RemoteControlHelp {
            "installing": {"title": "Installing Z-Image Turbo", "last": "forging the DiT → …"} | null,
            "queue_remaining_s": 66.5, "remaining_complete": true,
            "history_images": 12, "library": "/Users/…/Siliconed", "faster_rendering": true,
-           "settings": {"read": true, "map": "2026-10-26T14:43:50Z", "green": true,
-                        "remeasuring": false, "warnings": []}}
+           "settings": {"read": true, "map": "2026-10-26T14:43:50Z", "warnings": []}}
 
         faster_rendering   : l'interrupteur des Réglages (help set).
         settings           : les réglages du moteur des rendus — read : false tant que la mesure de ce Mac ne l'est
-                             pas ; map : la date de cette mesure (null : les défauts) ; green : elle est complète
-                             (chaque moteur a ses droites et chaque ensemble son partage, rien d'aberrant, sa mémoire
-                             sous B, sa minute) — false : elle se refait au prochain lancement ; remeasuring : ce
-                             lancement mesure à nouveau avant son premier rendu ; warnings : pourquoi une mesure ou un
-                             profil a été refusé. Deux séries de deux lancements comparent aussi leurs mesures.
+                             pas ; map : la date de cette mesure (null : les défauts) ; warnings : pourquoi une mesure ou
+                             un profil a été refusé. Une mesure s'applique telle quelle, quoi qu'elle ait trouvé (voir
+                             help diagnose). Deux séries de deux lancements comparent aussi leurs mesures.
         stage              : text, image (encodage d'une référence), denoising, decoding.
         steps_total        : les évaluations du modèle, pas les pas demandés (une esquisse : celles après lesquelles elle s'arrête).
         remaining_s        : null tant que l'app n'a pas de mesure pour ce rendu.

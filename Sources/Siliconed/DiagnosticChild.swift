@@ -1,3 +1,4 @@
+import Darwin
 import Foundation
 import Synchronization
 
@@ -39,6 +40,9 @@ package enum RouteBeacon {
 ///     failed), and never a route that was already excluded (that would loop).
 ///   - **The reference engine cannot be excluded**: the GPU's product and its attention are what everything is measured against, and
 ///     nothing is planned without them; their death is a failure said as such.
+///   - **The child declares its role** (`claimRole`): launched by an app or a launchd job, a process that says nothing about itself reads
+///     the pair of the GPU and the Neural Engine 20–50 % noisier than the same executable launched from a terminal; as a foreground
+///     application, like the render it measures for, it reads the same.
 ///   - **The restart is bounded**: one restart per route that died, three at most — a Mac whose every route kills is a Mac to
 ///     tell the user about, not to loop on.
 extension Diagnostic {
@@ -84,9 +88,12 @@ extension Diagnostic {
         // MARK: The child's side
 
         /// **Measures and says so on the standard output**, then exits: `0` with the report, `1` with an `error` line. `onRoute`
-        /// is told each route after the line is written (a test's crash switch hangs there); `skipping` is the routes to leave out.
-        package static func serve(skipping skipped: Set<CapacityModel.Kernel>, onRoute: (@Sendable (String) -> Void)? = nil) -> Never {
+        /// is told each route after the line is written (a test's crash switch hangs there); `skipping` is the routes to leave out;
+        /// `claimingRole` is `false` for a bench that measures what the launcher's role does (`claimRole`).
+        package static func serve(skipping skipped: Set<CapacityModel.Kernel>, claimingRole: Bool = true,
+                                  onRoute: (@Sendable (String) -> Void)? = nil) -> Never {
             setvbuf(stdout, nil, _IOLBF, 0)   // a line reaches the other side as it is written, and the last one survives a crash
+            if claimingRole { Self.claimRole() }
             let last = Mutex("")
             RouteBeacon.listen { route in
                 let isNew = last.withLock { old -> Bool in
@@ -106,6 +113,36 @@ extension Diagnostic {
                 print("error \(e.code) " + e.description.replacingOccurrences(of: "\n", with: " "))
                 exit(1)
             }
+        }
+
+        /// **The child is a foreground application, whoever launched it.** A process that sets no role takes the one of where it was
+        /// launched: a child of the terminal runs as the terminal's, a child of an app opened through LaunchServices or of a launchd job gets
+        /// less of the chip when the GPU and the Neural Engine work at once — the same executable on the same Mac, identical calls of that
+        /// pair 20–50 % apart instead of 1–8 %, the ANE's side of a set 20 % slower. The role the app itself holds while it renders for a
+        /// user who waits is the foreground's; the measure takes it, so that it reads the silicon a render reads and not the launcher's
+        /// company. Another role (the default application's, `taskpolicy -a`, the throughput tiers, QoS classes, an activity held for
+        /// the measure) did not move it. Returns whether the system took it.
+        @discardableResult
+        package static func claimRole() -> Bool {
+            var policy = task_category_policy(role: TASK_FOREGROUND_APPLICATION)
+            return withUnsafeMutablePointer(to: &policy) {
+                $0.withMemoryRebound(to: integer_t.self, capacity: 1) {
+                    task_policy_set(mach_task_self_, task_policy_flavor_t(TASK_CATEGORY_POLICY), $0, 1)
+                }
+            } == KERN_SUCCESS
+        }
+
+        /// The task role this process holds now (`TASK_FOREGROUND_APPLICATION` is 1), or `nil` when the system does not say.
+        package static var role: Int32? {
+            var policy = task_category_policy(role: TASK_UNSPECIFIED)
+            var count = mach_msg_type_number_t(1)
+            var isDefault: boolean_t = 0
+            let status = withUnsafeMutablePointer(to: &policy) {
+                $0.withMemoryRebound(to: integer_t.self, capacity: 1) {
+                    task_policy_get(mach_task_self_, task_policy_flavor_t(TASK_CATEGORY_POLICY), $0, &count, &isDefault)
+                }
+            }
+            return status == KERN_SUCCESS ? Int32(policy.role.rawValue) : nil
         }
 
         /// The routes a process was asked to leave out (`--skip-route <kernel>`, repeated).
@@ -236,3 +273,4 @@ extension Diagnostic {
         }
     }
 }
+

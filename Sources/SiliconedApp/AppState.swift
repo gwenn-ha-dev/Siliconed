@@ -525,21 +525,14 @@ final class AppState {
         // The machine profile, read in THIS library, with the capacity map — once per process, and only
         // with a current map: the app builds only one `AppState` (see `App.swift`). Without one (none yet,
         // or one of another Mac, macOS or build: an update), the settings stay unread until the measure
-        // the first render starts (`next`).
-        // An orange map (not complete: a missing or aberrant figure, its memory, its swap or its minute) is measured again at the
-        // next launch, whatever the heat: a fanless Mac is never at rest after a minute of load, and the measure
-        // holds through it anyway. Once per orange map: one orange again for a lasting cause serves
-        // until the next (`retriedMapKey`). A render's gap to the prediction never asks for a new one: the plan stays what the
-        // model made it, and the bits of an image with it.
+        // the first render starts (`next`). **A map of this Mac and this build is read as it stands**: what the measure could not
+        // give is said in its findings and the plan does without it, how far its identical calls agreed is written beside each
+        // engine, and nothing asks to measure again. A render's gap to the prediction never asks for a new one either: the plan
+        // stays what the model made it, and the bits of an image with it.
         let stored = Self.readStoredMap()
         storedMap = stored
         if let stored, stored.isCurrent {
-            let orange = !stored.isGreen
-            if orange && stored.date != UserDefaults.standard.string(forKey: Self.retriedMapKey) {
-                remeasuringOrange = true
-            } else {
-                readSettings(map: stored)
-            }
+            readSettings(map: stored)
             // The last render's note against this very map travels with the next report.
             renderNote = Self.readRenderNote(of: stored)
         }
@@ -555,9 +548,6 @@ final class AppState {
     /// another `fingerprint` (another Mac, macOS build or app build) —, said in the sidebar, never in the background; the user can
     /// also measure again (« Measure This Mac »), which then applies from the next launch.
     private static let capacityMapKey = "capacityMap"
-    /// The date of a map measured again because the one before was orange, and orange itself:
-    /// it is not measured again at each launch.
-    private static let retriedMapKey = "capacityMapRetried"
 
     /// The stored report; an older schema is not a map (`Report.read`).
     private static func readStoredMap() -> Diagnostic.Report? {
@@ -575,7 +565,8 @@ final class AppState {
     func checkMap(_ render: Engine.Render, model: Model, references: Int) {
         guard let map = mapInUse,
               let check = RenderLoop.check(render, variant: model.library?.variant(of: model.family) ?? .standard,
-                                           references: references, plan: EngineSettings.effective.plan, mapDate: map.date) else { return }
+                                           references: references, plan: EngineSettings.effective.plan, mapDate: map.date,
+                                           thresholds: .init(uncertainty: map)) else { return }
         renderNote = check.note
         if let data = try? JSONEncoder().encode(check.note) { UserDefaults.standard.set(data, forKey: Self.renderNoteKey) }
         noteDrift(check.verdict, check.note)
@@ -611,8 +602,6 @@ final class AppState {
     /// **The engine's settings were read** (`EngineSettings.load`), the map with them: renders may run,
     /// and the memory needs be computed — they read the settings (`amx` adds the AMX's operands).
     var settingsRead = false
-    /// The kept map is current but orange (`Diagnostic.Report.isGreen`): the first render measures again rather than read it.
-    private(set) var remeasuringOrange = false
     /// **The last render against the model it ran under** (`RenderLoop`): what « Report my configuration » carries. It acts on nothing.
     @ObservationIgnored private(set) var renderNote: RenderLoop.Note?
     private static let renderNoteKey = "capacityMapRenderNote"
@@ -623,20 +612,8 @@ final class AppState {
         UserDefaults.standard.set(data, forKey: Self.capacityMapKey)
         if report.date != renderNote?.map { renderNote = nil; UserDefaults.standard.removeObject(forKey: Self.renderNoteKey) }
         drift = nil
-        if remeasuringOrange, !report.isGreen {
-            UserDefaults.standard.set(report.date, forKey: Self.retriedMapKey)
-        }
-        remeasuringOrange = false
         storedMap = report
         if !settingsRead { readSettings(map: report) }
-    }
-
-    /// **A measure taken again failed or was stopped**: the provisional map kept serves this session
-    /// rather than leave the queue waiting — it is current, only taken off rest.
-    func fallBackOnStoredMap() {
-        guard remeasuringOrange, !settingsRead, let stored = storedMap, stored.isCurrent else { return }
-        remeasuringOrange = false
-        readSettings(map: stored)
     }
 
     /// **Reads the engine's settings**, once: the profile of THIS library and `map`.

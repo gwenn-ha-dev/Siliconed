@@ -66,16 +66,23 @@ import Testing
 
     // ── a route that died is excluded, and said ─────────────────────────────────────────────
 
+    /// **The child declares its role**: whoever launched it, it is a foreground application when it measures — the role the launcher gave
+    /// it (an app opened through LaunchServices, a launchd job) made the pair of the GPU and the Neural Engine read 20–50 % noisier.
+    @Test func theChildClaimsTheForegroundRole() {
+        #expect(Diagnostic.Child.claimRole())
+        #expect(Diagnostic.Child.role == Int32(TASK_FOREGROUND_APPLICATION.rawValue))
+    }
+
     /// A route that died is left out of the plan like a route the judge refused, and is not a reason for orange: the Mac was not slow,
     /// the route is not there. The report says it died.
-    @Test func aRouteThatDiedIsExcludedSaidAndNotOrange() throws {
+    @Test func aRouteThatDiedIsExcludedAndSaid() throws {
         var judge = R.judge()
         judge["ane/fp16"] = .init(error: 0, threshold: 0, excluded: true, reason: .died)
         var m = R.measurements(dropping: ["ane/fp16"])
         m.trials.removeAll { $0.set.contains("ane") }
         let report = R.report(measurements: m, judge: judge)
         #expect(report.excluded.contains(R.ane))
-        #expect(report.verdict.green, "\(report.verdict.reasons)")
+        #expect(report.findings.isEmpty, "\(report.findings.map(\.text))")
         #expect(!report.plan().resources.ane, "no render loads a route the map has not seen load")
         #expect(report.judge["ane/fp16"]?.reason == .died)
         #expect(report.judge["gpu/fp32"]?.reason == nil)

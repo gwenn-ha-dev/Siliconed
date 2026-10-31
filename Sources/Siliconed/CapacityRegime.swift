@@ -2,7 +2,7 @@ import Foundation
 import Metal
 
 /// **What the measure says of the Mac it ran on, from the inside**: was something else using the Mac while it measured? Three
-/// readings, none of them a load average, written beside the model in the report and read by the verdict (`DiagnosticVerdict`):
+/// readings, none of them a load average, written beside the model in the report and read by its findings (`DiagnosticFindings`):
 ///
 ///     pulse    after every step of the probes, a few milliseconds: do as many threads as the performance cores still get a
 ///              core each (a fixed loop, the median thread's time over one thread alone), and how long does an empty submission
@@ -10,10 +10,11 @@ import Metal
 ///     spread   (p90 − p10) / median of the calls of a chain, and of the runs of a steady figure: identical work that takes
 ///              different times                                                             (`Regime.spreads`)
 ///     system   the host's busy ticks minus this process's own CPU, over the run and per stage: the others' cores — the *cause*,
-///              written for whoever reads the report, not what the verdict stands on        (`LoadWatch`)
+///              written for whoever reads the report, not what the findings stand on       (`LoadWatch`)
 ///
 /// A step whose pulse or spread says the Mac was busy is measured again (`CapacityProbes.Context.guarded`), after a wait for a
-/// quiet pulse, while the minute leaves time; what the minute could not redo is what the verdict calls disturbed.
+/// quiet pulse, while the minute leaves time; what the minute could not redo is kept, its chains read on their fast side
+/// (`CapacityProbes.figure`), and said by the findings as disturbed — an uncertainty, never a reason to refuse the map.
 ///
 /// What sets it apart — what a "was the Mac busy?" written by analogy with a load average would get wrong:
 ///
@@ -338,5 +339,22 @@ extension Diagnostic.CapacityProbes {
         let median = CapacityFit.median(s)
         guard median > 0 else { return 0 }
         return (s[Int(Double(s.count - 1) * 0.9)] - s[Int(Double(s.count - 1) * 0.1)]) / median
+    }
+
+    /// **A chain's figure: the median of its calls, or — when they disagree — the median of its quickest third.** Identical calls on a
+    /// Mac nobody else uses take the same time (0.02–0.06 apart, p90 − p10 over the median), and the median is their figure. When they
+    /// differ by more than the rule (`Regime.Rules.spread`) something else was using the Mac, and **a disturbance only adds time**: the
+    /// quick calls are the engine's own, the slow ones are the company it kept. A chain that agrees reads as it always did, bit for bit.
+    static func figure(_ times: [Double]) -> Double {
+        let used = quick(times.map { (wall: $0, within: [String: Double]()) }).map(\.wall)
+        return CapacityFit.median(used)
+    }
+
+    /// The calls a chain's figure is read from: all of them when they agree, the quickest third (three at least) when they do not.
+    /// The sides of a set are read from the same calls as its wall, so that the balance and the keeps stay one measure.
+    static func quick(_ samples: [(wall: Double, within: [String: Double])]) -> [(wall: Double, within: [String: Double])] {
+        guard spread(samples.map(\.wall)) > Diagnostic.Regime.Rules.spread else { return samples }
+        let fastest = samples.sorted { $0.wall < $1.wall }
+        return Array(fastest.prefix(max(3, samples.count / 3)))
     }
 }

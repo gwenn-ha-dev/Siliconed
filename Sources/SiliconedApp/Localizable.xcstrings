@@ -4491,42 +4491,42 @@
         }
       }
     },
-    "A figure that looks wrong, probably because the Mac was busy." : {
+    "A figure that looks wrong, probably because the Mac was busy: the plan bounds it or leaves it out." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Eine Zahl, die falsch aussieht, vermutlich weil der Mac beschäftigt war."
+            "value" : "Ein Wert, der falsch aussieht, wahrscheinlich weil der Mac beschäftigt war: Der Plan begrenzt ihn oder lässt ihn weg."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Una cifra que parece errónea, probablemente porque el Mac estaba ocupado."
+            "value" : "Una cifra que parece errónea, probablemente porque el Mac estaba ocupado: el plan la acota o la deja fuera."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Un chiffre qui paraît faux, sans doute parce que le Mac était occupé."
+            "value" : "Un chiffre qui semble faux, sans doute parce que le Mac était occupé : le plan le borne ou l’écarte."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Una cifra che sembra sbagliata, probabilmente perché il Mac era occupato."
+            "value" : "Un valore che sembra sbagliato, probabilmente perché il Mac era occupato: il piano lo limita o lo esclude."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "数値がおかしく見えます。Macがほかの処理で忙しかったのかもしれません。"
+            "value" : "値がおかしく見えます。Macが使用中だったためと思われます：プランはこの値を範囲内に収めるか、使いません。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "数值看起来不对，很可能是因为 Mac 当时很忙。"
+            "value" : "这个数值看起来不对，可能是因为 Mac 当时很忙：计划会限定它的范围，或者不采用它。"
           }
         }
       }
@@ -14932,6 +14932,46 @@
         }
       }
     },
+    "How sure the measure is" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wie genau die Messung ist"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Qué tan precisa es la medición"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La précision de la mesure"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quanto è precisa la misura"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "測定の確かさ"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "测量的可靠程度"
+          }
+        }
+      }
+    },
     "Hugging Face doesn't list %@ any more." : {
       "localizations" : {
         "de" : {
@@ -14968,6 +15008,86 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Hugging Face 不再列出 %@。"
+          }
+        }
+      }
+    },
+    "Identical calls agreed to within these margins." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Identische Aufrufe stimmten innerhalb dieser Spannen überein."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Las llamadas idénticas coincidieron dentro de estos márgenes."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Des appels identiques ont concordé à ces marges près."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le chiamate identiche sono concordate entro questi margini."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同じ処理の呼び出しは、この範囲内で一致しました。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "相同的调用在这些误差范围内保持一致。"
+          }
+        }
+      }
+    },
+    "Identical calls differed by more than a free Mac's: those figures are read on their quick side." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Identische Aufrufe wichen stärker ab als auf einem freien Mac: Diese Werte werden von der schnellen Seite gelesen."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Las llamadas idénticas difirieron más que en un Mac libre: esas cifras se leen por su lado rápido."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Des appels identiques ont différé plus que sur un Mac libre : ces chiffres sont lus du côté rapide."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le chiamate identiche sono differite più che su un Mac libero: quei valori sono letti dal lato veloce."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同じ処理の呼び出しの差が、空いているMacより大きくなりました：これらの値は速いほうの側から読み取っています。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "相同调用之间的差异比空闲的 Mac 更大：这些数值取自较快的一侧。"
           }
         }
       }
@@ -16578,42 +16698,42 @@
         }
       }
     },
-    "It computed wrong, and nothing can be planned without it." : {
+    "It computed wrong: the plan has no model of it, and the engine's defaults answer." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Falsch gerechnet: Ohne diese Recheneinheit lässt sich nichts planen."
+            "value" : "Er hat falsch gerechnet: Der Plan hat kein Modell dafür, und die Standardwerte der Recheneinheit antworten."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Calculó mal, y sin este motor no se puede planificar nada."
+            "value" : "Calculó mal: el plan no tiene un modelo de él, y responden los valores por defecto del motor."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Calcul faux : rien ne peut être planifié sans ce moteur."
+            "value" : "Il a mal calculé : le plan n’en a aucun modèle, et ce sont les défauts du moteur qui répondent."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ha calcolato in modo errato, e senza questo motore non si può pianificare nulla."
+            "value" : "Ha calcolato male: il piano non ne ha un modello, e rispondono i valori predefiniti del motore."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "計算結果が誤っており、これなしでは何も計画できません。"
+            "value" : "計算結果が誤っていました：プランにはこれのモデルがなく、演算装置の既定値が代わりに答えます。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "计算结果有误，没有它就无法制定任何计划。"
+            "value" : "它的计算结果有误：计划中没有它的模型，由引擎的默认值来决定。"
           }
         }
       }
@@ -19980,42 +20100,42 @@
         }
       }
     },
-    "No figure was measured." : {
+    "No figure was measured: the plan does not offer it." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Es wurde keine Zahl gemessen."
+            "value" : "Es wurde kein Wert gemessen: Der Plan bietet ihn nicht an."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "No se midió ninguna cifra."
+            "value" : "No se midió ninguna cifra: el plan no lo ofrece."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Aucun chiffre n’a été mesuré."
+            "value" : "Aucun chiffre n’a été mesuré : le plan ne le propose pas."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Non è stata misurata alcuna cifra."
+            "value" : "Non è stato misurato alcun valore: il piano non lo offre."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "測定値が得られませんでした。"
+            "value" : "値が測定されませんでした：プランはこれを使いません。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "没有测得任何数值。"
+            "value" : "没有测得数值：计划不会提供它。"
           }
         }
       }
@@ -22110,6 +22230,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "其他程序"
+          }
+        }
+      }
+    },
+    "Other programs used %@ cores while it measured." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Andere Programme haben während der Messung %@ Kerne genutzt."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Otros programas usaron %@ núcleos durante la medición."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "D’autres programmes ont utilisé %@ cœurs pendant la mesure."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Altri programmi hanno usato %@ core durante la misura."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "測定中、ほかのプログラムが %@ コアを使っていました。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "测量期间，其他程序使用了 %@ 个核心。"
           }
         }
       }
@@ -29473,6 +29633,46 @@
         }
       }
     },
+    "The Mac was busy while it was measured: the figures that differed are read on their quick side." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Der Mac war während der Messung beschäftigt: Die Werte, die abwichen, werden von der schnellen Seite gelesen."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El Mac estaba ocupado durante la medición: las cifras que diferían se leen por su lado rápido."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le Mac était occupé pendant la mesure : les chiffres qui différaient sont lus du côté rapide."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il Mac era occupato durante la misura: i valori che differivano sono letti dal lato veloce."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "測定中、Macは使用中でした：差が出た値は速いほうの側から読み取っています。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "测量期间 Mac 比较忙：有差异的数值取自较快的一侧。"
+          }
+        }
+      }
+    },
     "The cells still waiting leave the queue; the running one stops" : {
       "localizations" : {
         "de" : {
@@ -31405,46 +31605,6 @@
         }
       }
     },
-    "The machine is busy: the timings are better left undisturbed." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Der Mac ist beschäftigt: Die Zeitmessungen sollten nicht gestört werden."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "La máquina está ocupada: mejor no perturbar los tiempos."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "La machine travaille : mieux vaut ne pas déranger les chronos."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "La macchina è occupata: meglio non disturbare i tempi."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "マシンが処理中です：計測は邪魔しないほうがよいでしょう。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "机器正忙：最好不要打扰计时。"
-          }
-        }
-      }
-    },
     "The machine profile couldn't be read as it is." : {
       "localizations" : {
         "de" : {
@@ -31525,46 +31685,6 @@
         }
       }
     },
-    "The measure is incomplete." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Die Messung ist unvollständig."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "La medición está incompleta."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "La mesure est incomplète."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "La misura è incompleta."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "測定は完了していません。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "测量不完整。"
-          }
-        }
-      }
-    },
     "The measure needs more memory than this Mac allows." : {
       "localizations" : {
         "de" : {
@@ -31601,46 +31721,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "测量所需的内存超过了这台 Mac 的允许值。"
-          }
-        }
-      }
-    },
-    "The measure of %@ was incomplete: it is measured again before the next render." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Die Messung vom %@ war unvollständig: Sie wird vor dem nächsten Rendern wiederholt."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "La medición del %@ estaba incompleta: se repite antes de la próxima imagen."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "La mesure du %@ était incomplète : elle est refaite avant le prochain rendu."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "La misura del %@ era incompleta: viene ripetuta prima della prossima immagine."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ の測定は完了していません。次のレンダリングの前に再測定します。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ 的测量不完整：将在下次生成之前重新测量。"
           }
         }
       }
@@ -33623,82 +33703,42 @@
         }
       }
     },
-    "They kept the Mac busy while it was measured, so the figures are not its own. Quit them and measure again." : {
+    "They were not measured together: the plan does not offer them as a set." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Sie haben den Mac während der Messung ausgelastet, die Zahlen sind also nicht seine eigenen. Beenden Sie sie und messen Sie erneut."
+            "value" : "Sie wurden nicht zusammen gemessen: Der Plan bietet sie nicht als Gruppe an."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Mantuvieron el Mac ocupado durante la medición, así que las cifras no son las suyas. Ciérralos y vuelve a medir."
+            "value" : "No se midieron juntos: el plan no los ofrece como conjunto."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ils ont occupé le Mac pendant la mesure : les chiffres ne sont pas les siens. Quittez-les et mesurez de nouveau."
+            "value" : "Ils n’ont pas été mesurés ensemble : le plan ne les propose pas en ensemble."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Hanno tenuto occupato il Mac durante la misura, quindi le cifre non sono le sue. Chiudili e misura di nuovo."
+            "value" : "Non sono stati misurati insieme: il piano non li offre come insieme."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "測定中にこれらがMacを占有していたため、数値はこのMac本来のものではありません。終了してから、もう一度測定してください。"
+            "value" : "一緒には測定されませんでした：プランはこれらを組み合わせとしては使いません。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "测量期间它们占用了 Mac，因此这些数字并不代表它本身的性能。请退出它们后重新测量。"
-          }
-        }
-      }
-    },
-    "They were not measured together." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sie wurden nicht zusammen gemessen."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "No se midieron juntos."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ils n’ont pas été mesurés ensemble."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Non sono stati misurati insieme."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "同時には測定できませんでした。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "没有一起测量。"
+            "value" : "它们没有一起测量：计划不会把它们作为组合提供。"
           }
         }
       }
@@ -35329,46 +35369,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "本次会话按这台 Mac 在 %@ 的测量结果进行规划。"
-          }
-        }
-      }
-    },
-    "This session uses the measure of %@, which was incomplete: it is measured again at its next launch." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Diese Sitzung verwendet die Messung vom %@, die unvollständig war: Sie wird beim nächsten Start wiederholt."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Esta sesión usa la medición del %@, que estaba incompleta: se repite en su próximo inicio."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cette session utilise la mesure du %@, qui était incomplète : elle est refaite à son prochain lancement."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Questa sessione usa la misura del %@, che era incompleta: viene ripetuta al prossimo avvio."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "このセッションは %@ の測定を使っていますが、完了していませんでした。次回の起動時に再測定します。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "本次会话使用的是 %@ 的测量结果，它并不完整：将在下次启动时重新测量。"
           }
         }
       }
@@ -37153,6 +37153,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "模型读取的内容"
+          }
+        }
+      }
+    },
+    "What the measure found" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Was die Messung ergeben hat"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lo que encontró la medición"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce que la mesure a trouvé"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cosa ha trovato la misura"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "測定でわかったこと"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "测量发现了什么"
           }
         }
       }

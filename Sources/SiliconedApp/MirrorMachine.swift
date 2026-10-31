@@ -47,7 +47,7 @@ final class MachinePublisher {
         return RemoteMachine(
             chip: machine.chip, memoryBytes: machine.memoryBytes, ceiling: app.memoryCeiling, ready: app.readySet.sorted(),
             stored: app.storedMap.map(RemoteMap.init), inUse: app.mapInUse.map(RemoteMap.init),
-            remeasuring: app.remeasuringOrange, warnings: app.profileWarnings, diagnostic: phase,
+            warnings: app.profileWarnings, diagnostic: phase,
             blocker: app.diagnosticBlock)
     }
 
@@ -122,14 +122,13 @@ extension AppState {
     /// **The map, as the sheet and the settings say it**: this Mac's own, or the lender's as it published it.
     var mapFacts: MapFacts {
         if mirror != nil {
-            return MapFacts(inUse: mirrorMachine?.inUse, stored: mirrorMachine?.stored, remeasuring: mirrorMachine?.remeasuring ?? false)
+            return MapFacts(inUse: mirrorMachine?.inUse, stored: mirrorMachine?.stored)
         }
-        return MapFacts(inUse: mapInUse.map(RemoteMap.init), stored: storedMap.map(RemoteMap.init), remeasuring: remeasuringOrange,
-                        drift: drift)
+        return MapFacts(inUse: mapInUse.map(RemoteMap.init), stored: storedMap.map(RemoteMap.init), drift: drift)
     }
 
-    /// A current map taken at rest is kept, and the last render did not run off it (the chip of « Chain » is green).
-    var mapMeasured: Bool { mapFacts.stored.map { $0.current && $0.green } == true && mapFacts.drift == nil }
+    /// A map of this Mac and this build is kept (the chip of « Chain » is green): whatever it found, it is the map.
+    var mapMeasured: Bool { mapFacts.stored?.current == true }
 
     /// **« Faster Rendering »** as the window shows it: this Mac's, or the lender's in a mirror.
     var fasterRenderingShown: Bool { mirror != nil ? mirrorCatalog?.fasterRendering ?? true : fasterRendering }
@@ -141,7 +140,6 @@ extension AppState {
 struct MapFacts: Equatable {
     var inUse: RemoteMap?
     var stored: RemoteMap?
-    var remeasuring: Bool
     /// The last render ran off the model in use (`RenderLoop.Verdict.drift`): this Mac's own, never a lender's.
     var drift: RenderLoop.Note?
 }

@@ -4,15 +4,15 @@
 //
 // Three states in one sheet: what the diagnostic does and how long (under a minute, no model needed; it occupies
 // the GPU and the CPU, so it waits for an empty queue — and the queue waits for it); its progress; then
-// the report as a person reads it — the verdict first (green; or orange, and what exactly is missing or aberrant, said
-// simply), then per engine what it reaches against the peak the silicon announces (a bar where the inventory read one) and
-// ✓/✗ (computed right against the exact or not), the memory and the duration, and the last render's gap to the model's
-// prediction, which goes with the report. « Open the issue » copies the report and opens GitHub's form
+// the report as a person reads it — the map first (always: a finished measure is a map, applied as it stands), then how sure
+// each engine's figure is and what the measure found, said plainly, with no grade; then per engine what it reaches against the
+// peak the silicon announces (a bar where the inventory read one) and ✓/✗ (computed right against the exact or not), the memory
+// and the duration, and the last render's gap to the model's prediction, which goes with the report. « Open the issue » copies the report and opens GitHub's form
 // (`report.issueURL()`), where the user pastes it; « Copy JSON » alone serves whoever has no GitHub account. Nothing is
 // sent without a click, and the issue is submitted in the browser, by the user.
 //
-// **The colour is where it happens**: the verdict's card is green or orange, the bars are the accent, the rest is the
-// system's. No chip is named in a decision here — the chip's name is a label, read from the report.
+// **The colour is where it happens**: the map's card is green, the bars are the accent, the rest is the
+// system's. Nothing here is orange: an uncertainty is a number beside a figure, a finding a sentence. No chip is named in a decision here — the chip's name is a label, read from the report.
 
 import AppKit
 import Siliconed
@@ -82,15 +82,9 @@ struct DiagnosticSheet: View {
             if let drift = map.drift, let predicted = drift.predicted {
                 return driftSentence(measured: drift.measured, predicted: predicted)
             }
-            if used == map.stored, !used.green {
-                return "This session uses the measure of \(day(used.date)), which was incomplete: it is measured again at its next launch."
-            }
             return used == map.stored
                 ? "This session plans with this Mac's measure of \(day(used.date))."
                 : "This session plans with the measure of \(day(used.date)); the newer one applies from the next launch."
-        }
-        if map.remeasuring, let stored = map.stored {
-            return "The measure of \(day(stored.date)) was incomplete: it is measured again before the next render."
         }
         if let stored = map.stored, !stored.current {
             return "The measure of \(day(stored.date)) was taken with another macOS or another version of Siliconed: this Mac is measured again before the next render."
@@ -114,15 +108,13 @@ struct DiagnosticSheet: View {
 
     private func running(done: Int, total: Int, line: String) -> some View {
         VStack(alignment: .leading, spacing: 10) {
+            // The bar moves when a stage ends, and nothing else moves: no wheel turning beside the timings.
             ProgressView(value: Double(done), total: Double(max(total, 1)))
             HStack(spacing: 8) {
-                ProgressView().controlSize(.small)
                 Text(line).font(.callout)
                 Spacer()
                 Text(verbatim: "\(done + 1)/\(total)").font(.callout).monospacedDigit().foregroundStyle(.secondary)
             }
-            Text("The machine is busy: the timings are better left undisturbed.")
-                .font(.caption).foregroundStyle(.secondary)
         }
         .padding(20)
     }
@@ -163,7 +155,7 @@ struct DiagnosticSheet: View {
     }
 }
 
-/// **The report, as a person reads it** — the verdict (green, or orange with what exactly is missing or aberrant), then one line per
+/// **The report, as a person reads it** — the map, how sure each engine's figure is, what the measure found, then one line per
 /// kernel: what it reaches (TFLOP/s, and a bar against the peak the inventory read where there is one) and ✓ when it computed right,
 /// ✗ when the judge left it out; the memory the measure held, its duration, the last render's gap; the machine. The JSON says the rest.
 private struct ReportView: View {
@@ -187,92 +179,149 @@ private struct ReportView: View {
     }
 
     var body: some View {
-        // The verdict first: the sheet opens on it, whatever the list below it holds.
+        // The map first: the sheet opens on it, whatever the list below it holds.
         ScrollViewReader { proxy in
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
-                    verdictCard.id("verdict")
+                    mapCard.id("map")
+                    assurance
+                    found
                     reached
                     facts
                     machine
                 }
                 .padding(20)
             }
-            .onAppear { proxy.scrollTo("verdict", anchor: .top) }
+            .onAppear { proxy.scrollTo("map", anchor: .top) }
         }
     }
 
-    // ── the verdict ──
+    // ── the map ──
 
-    private var tint: Color { report.verdict.green ? .green : .orange }
-
-    /// **Green, or orange and why**: the card carries the colour — it is where the answer is. The reasons name the engine or the set
-    /// and say the trouble in a sentence; the verdict's own words (English, exact) are the tooltip, and what a report on an issue carries.
-    private var verdictCard: some View {
+    /// **The map, always**: the card carries the colour — it is where the answer is. A finished measure is applied as it stands; what it
+    /// found, and how sure each figure is, come below it as plain facts.
+    private var mapCard: some View {
         HStack(alignment: .top, spacing: 12) {
-            Image(systemName: report.verdict.green ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
-                .font(.title2).foregroundStyle(tint)
+            Image(systemName: "checkmark.circle.fill").font(.title2).foregroundStyle(.green)
             VStack(alignment: .leading, spacing: 8) {
-                Text(report.verdict.green ? "This Mac is measured." : "The measure is incomplete.").font(.headline)
-                if !report.verdict.green { reasons }
+                Text("This Mac is measured.").font(.headline)
                 Text(status).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 0)
         }
         .padding(14)
-        .background(tint.opacity(0.10), in: boxShape)
-        .overlay(boxShape.strokeBorder(tint.opacity(0.35), lineWidth: 1))
+        .background(Color.green.opacity(0.10), in: boxShape)
+        .overlay(boxShape.strokeBorder(Color.green.opacity(0.35), lineWidth: 1))
     }
 
-    private var reasons: some View {
-        Grid(alignment: .topLeading, horizontalSpacing: 12, verticalSpacing: 4) {
-            ForEach(Array(report.verdict.defects.enumerated()), id: \.offset) { _, defect in
-                let words = Self.words(defect, in: report)
-                GridRow {
-                    Text(words.subject).fontWeight(.medium).frame(maxWidth: 230, alignment: .leading)
-                    Text(words.sentence).fixedSize(horizontal: false, vertical: true)
-                        .help(Text(verbatim: defect.text))
+    // ── how sure it is ──
+
+    /// **How sure each figure is**, as the measure saw it: the plus-or-minus of the engines and the sets (half the spread of the identical
+    /// calls of their chains, the worst of them), and the cores the other programs used. A free Mac reads ±1–3 %; where the calls differed
+    /// more than that the figure is read on its quick side — a disturbance only adds time —, and the line says so.
+    @ViewBuilder private var assurance: some View {
+        let rows = Self.margins(report)
+        VStack(alignment: .leading, spacing: 6) {
+            Text("How sure the measure is").font(.headline)
+            Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 4) {
+                ForEach(rows, id: \.name) { row in
+                    GridRow {
+                        Text(verbatim: row.name).foregroundStyle(.secondary)
+                        Text(verbatim: "± " + Figures.percent(Int((100 * row.plusMinus).rounded()))).monospacedDigit()
+                    }
                 }
             }
+            .font(.callout)
+            if rows.contains(where: { $0.plusMinus > Diagnostic.Regime.Rules.spread / 2 }) {
+                Text("Identical calls differed by more than a free Mac's: those figures are read on their quick side.")
+                    .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            } else {
+                Text("Identical calls agreed to within these margins.")
+                    .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            }
+            if let cores = report.foreignCores {
+                Text("Other programs used \(cores.formatted(.number.precision(.fractionLength(1)))) cores while it measured.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
         }
-        .font(.callout)
         .textSelection(.enabled)
     }
 
-    /// **A defect in words**: what it concerns (an engine, a kernel, two or three engines together, the memory, the minute) and the
-    /// trouble, one sentence that stands alone — no engine's name inside it, so that no language has to agree with it.
-    static func words(_ defect: Diagnostic.Verdict.Defect, in report: Diagnostic.Report) -> (subject: String, sentence: String) {
-        let cause = defect.cause(excluding: report.excluded)
+    /// The margin of each engine and each set, by the words the sheet uses: the worst plus-or-minus of the chains that name them (the
+    /// integers' pair with the fp32 one). Sorted as the engines are, alone first.
+    static func margins(_ report: Diagnostic.Report) -> [(name: String, plusMinus: Double)] {
+        var worst: [String: (order: Int, plusMinus: Double)] = [:]
+        for u in report.uncertainty {
+            let engines = u.subject.split(separator: "+").compactMap { part -> CapacityModel.Engine? in
+                CapacityModel.Kernel(String(part))?.engine ?? CapacityModel.Engine(rawValue: String(part))
+            }
+            guard !engines.isEmpty else { continue }
+            let name = engines.contains(.cpu) ? String(localized: "Attention, split between GPU and CPU")
+                                              : engines.map(engineName).joined(separator: " + ")
+            let order = engines.count * 10 + (engines.map { [CapacityModel.Engine.gpu, .amx, .ane, .cpu].firstIndex(of: $0) ?? 0 }.min() ?? 0)
+            let current = worst[name]
+            worst[name] = (order, max(current?.plusMinus ?? 0, u.plusMinus))
+        }
+        return worst.sorted { ($0.value.order, $0.key) < ($1.value.order, $1.key) }.map { (name: $0.key, plusMinus: $0.value.plusMinus) }
+    }
+
+    // ── what it found ──
+
+    /// **What the measure found**, one sentence each and what the plan does with it: not a grade, not an alarm. Nothing when it found nothing.
+    @ViewBuilder private var found: some View {
+        if !report.findings.isEmpty {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("What the measure found").font(.headline)
+                Grid(alignment: .topLeading, horizontalSpacing: 12, verticalSpacing: 4) {
+                    ForEach(Array(report.findings.enumerated()), id: \.offset) { _, finding in
+                        let words = Self.words(finding, in: report)
+                        GridRow {
+                            Text(words.subject).fontWeight(.medium).frame(maxWidth: 230, alignment: .leading)
+                            Text(words.sentence).fixedSize(horizontal: false, vertical: true)
+                                .help(Text(verbatim: finding.text))
+                        }
+                    }
+                }
+                .font(.callout)
+            }
+            .textSelection(.enabled)
+        }
+    }
+
+    /// **A finding in words**: what it concerns (an engine, a kernel, two or three engines together, the memory, the minute) and what the
+    /// plan does with it, one sentence that stands alone — no engine's name inside it, so that no language has to agree with it.
+    static func words(_ finding: Diagnostic.Finding, in report: Diagnostic.Report) -> (subject: String, sentence: String) {
+        let cause = finding.cause(excluding: report.excluded)
         let subject: String
         switch cause {
-        case .noFigure, .computedWrong, .notShared, .implausible: subject = name(of: defect)
+        case .noFigure, .computedWrong, .notShared, .implausible: subject = name(of: finding)
         case .disturbed: subject = String(localized: "Other programs")
         case .memoryOverNeed, .memoryOverBudget, .swapGrew: subject = String(localized: "Memory")
         case .tookTooLong: subject = String(localized: "Duration")
         }
         let sentence = switch cause {
-        case .noFigure: String(localized: "No figure was measured.")
-        case .computedWrong: String(localized: "It computed wrong, and nothing can be planned without it.")
-        case .notShared: String(localized: "They were not measured together.")
-        case .implausible: String(localized: "A figure that looks wrong, probably because the Mac was busy.")
+        case .noFigure: String(localized: "No figure was measured: the plan does not offer it.")
+        case .computedWrong: String(localized: "It computed wrong: the plan has no model of it, and the engine's defaults answer.")
+        case .notShared: String(localized: "They were not measured together: the plan does not offer them as a set.")
+        case .implausible: String(localized: "A figure that looks wrong, probably because the Mac was busy: the plan bounds it or leaves it out.")
         case .memoryOverNeed: String(localized: "The measure used more memory than had been counted for it.")
         case .memoryOverBudget: String(localized: "The measure needs more memory than this Mac allows.")
         case .swapGrew: String(localized: "The Mac swapped during the measure: other apps held its memory.")
         case .tookTooLong: String(localized: "The measure took longer than a minute.")
-        case .disturbed: String(localized: "They kept the Mac busy while it was measured, so the figures are not its own. Quit them and measure again.")
+        case .disturbed: String(localized: "The Mac was busy while it was measured: the figures that differed are read on their quick side.")
         }
         return (subject, sentence)
     }
 
     /// The engine's name for a product kernel (the form it reads is in the tooltip), the row's label for an attention kernel — an
     /// attention and a product of one engine are two things to the reader —; two or three engines together, joined by « + ».
-    private static func name(of defect: Diagnostic.Verdict.Defect) -> String {
-        if let kernel = defect.kernel {
+    private static func name(of finding: Diagnostic.Finding) -> String {
+        if let kernel = finding.kernel {
             if [.graph, .flash, .heads].contains(kernel.form), let row = rows.first(where: { $0.kernel == kernel }) { return row.label }
             return engineName(kernel.engine)
         }
-        if defect.engines.contains(.cpu) { return String(localized: "Attention, split between GPU and CPU") }
-        return defect.engines.map(engineName).joined(separator: " + ")
+        if finding.engines.contains(.cpu) { return String(localized: "Attention, split between GPU and CPU") }
+        return finding.engines.map(engineName).joined(separator: " + ")
     }
 
     static func engineName(_ engine: CapacityModel.Engine) -> String {

@@ -55,11 +55,20 @@ extension RenderLoop {
         /// The share of the render the matched classes must carry for the check to speak.
         package var minimumCoverage = 0.80
         package init() {}
+
+        /// **The band a map's own uncertainty widens.** A prediction read on the quick side of identical calls that disagreed by ±x %
+        /// (`Report.uncertainty`) is not held to better than x %: a render beside a busy Mac is not a drifting model. A map of a free Mac
+        /// (±1–5 %) keeps the 10 %.
+        package init(uncertainty report: Diagnostic.Report) {
+            self.init()
+            tolerance = max(tolerance, report.uncertainty.map(\.plusMinus).max() ?? 0)
+        }
     }
 
     // MARK: - The rule
 
-    /// **The verdict on a comparison.**
+    /// **The verdict on a comparison.** The tolerance is the band's 10 %, wider where the map says its own figures are less sure
+    /// (`Thresholds(uncertainty:)`).
     package static func verdict(_ comparison: Comparison, thresholds t: Thresholds = Thresholds()) -> Verdict {
         guard comparison.predicted != nil else { return .unjudged(.noModel) }
         guard let gap = comparison.error, comparison.coverage >= t.minimumCoverage else { return .unjudged(.uncovered) }

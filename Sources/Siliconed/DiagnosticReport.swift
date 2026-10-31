@@ -1,4 +1,4 @@
-// The diagnostic's report: the JSON types (machine, conditions, judge, memory, stages), the report itself of schema 15 and the
+// The diagnostic's report: the JSON types (machine, conditions, judge, memory, stages), the report itself of schema 16 and the
 // issue link. Split from `Diagnostic.swift`, which says what the diagnostic is.
 
 import CryptoKit
@@ -87,7 +87,7 @@ extension Diagnostic {
 
     /// **What the judge said of one kernel (or of a set of engines)**: the worst channel error it was seen with, the threshold of that
     /// product, and whether it is left out of the plan. Judged against the exact result (fp64) by the checks' rule — the fp32
-    /// threshold, the ANE within 1.25 × bf16's own rounding (invariant 3). A kernel is excluded, never a reason for orange.
+    /// threshold, the ANE within 1.25 × bf16's own rounding (invariant 3). A kernel is excluded; the map stays a map.
     package struct Judge: Codable, Sendable, Equatable {
         package var error: Double
         package var threshold: Double
@@ -106,7 +106,7 @@ extension Diagnostic {
 
     /// **What the probes were allowed, computed, and took**: B, the process's base when it started, the need the memory plan counted
     /// before the first product (bytes, without the base) and the peak `phys_footprint` read (with it, the kernel's interval maximum).
-    /// A peak above `base + need` is a defect of the code.
+    /// A peak above `base + need` is a defect of the code, written as such (`Findings`).
     package struct Memory: Codable, Sendable, Equatable {
         package var budget: Int
         package var base: Int
@@ -130,9 +130,10 @@ extension Diagnostic {
 
     // ── the report ──────────────────────────────────────────────────────────────────────────
 
-    /// **The report of schema 15**: the machine and what it announces, the model the probes fitted — what the engine plans with —,
+    /// **The report of schema 16**: the machine and what it announces, the model the probes fitted — what the engine plans with —,
     /// the raw measurements it was fitted on (so that anyone can replay the fit: `refit`), what the judge said of each kernel, the heat
-    /// and the memory, each stage's seconds beside its projection, and the verdict.
+    /// and the memory, each stage's seconds beside its projection, and what the measure found (`findings`, `uncertainty`). A finished
+    /// report is always a map: it is applied as it stands.
     ///
     /// **A sober JSON**: it is the one a user shares. Keys sorted, numbers to five or six significant digits, each dictionary keyed by
     /// what it holds (`"gpu/fp32"`, `"gpu+ane"`).
@@ -163,7 +164,8 @@ extension Diagnostic {
         package var memory: Memory
         /// Seconds of each stage, with its projection.
         package var stages: [String: StageTime]
-        package var verdict: Verdict
+        /// **What the measure found**, in words and with its effect on the plan (`Findings`): never a reason to refuse the map.
+        package var findings: [Finding]
         /// **The last render against this model's prediction** (`RenderLoop.Note`): the report an app sends carries it; the
         /// model itself is kept without it.
         package var render: RenderLoop.Note?
@@ -173,31 +175,33 @@ extension Diagnostic {
         package init(schema: Int = Diagnostic.schema, date: String, seconds: Double, machine: Machine, cpuFeatures: [String: Int],
                     settings: [String: String] = [:], before: Conditions, after: Conditions, model: CapacityModel,
                     measurements: CapacityFit.Measurements, judge: [String: Judge], memory: Memory, stages: [String: StageTime],
-                    verdict: Verdict, render: RenderLoop.Note? = nil, regime: Regime? = nil) {
+                    findings: [Finding], render: RenderLoop.Note? = nil, regime: Regime? = nil) {
             self.schema = schema; self.date = date; self.seconds = Diagnostic.significant(seconds, 3)
             self.machine = machine; self.cpuFeatures = cpuFeatures; self.settings = settings; self.before = before; self.after = after
             self.model = model; self.measurements = measurements; self.judge = judge; self.memory = memory; self.stages = stages
-            self.verdict = verdict; self.render = render; self.regime = regime
+            self.findings = findings; self.render = render; self.regime = regime
         }
 
-        /// **A report from the probes' run**: the measurements rounded, the model fitted on them (so that `refit` gives it back), the
-        /// verdict judged on all of it.
+        /// **A report from the probes' run**: the measurements rounded, the model fitted on them (so that `refit` gives it back), what
+        /// the measure found said of the fit as the probes gave it, before its aberrant figures are bounded.
         package init(date: String, seconds: Double, machine: Machine, cpuFeatures: [String: Int], settings: [String: String],
                     before: Conditions, after: Conditions, probes: CapacityProbes.Result) {
             let measurements = probes.measurements.rounded()
             let model = Self.fit(measurements, machine: machine)
-            let verdict = Verdict(model: model, measurements: measurements, judge: probes.judge, machine: machine,
-                                  memory: probes.memory, before: before, after: after, seconds: seconds, regime: probes.regime)
+            let found = Findings.of(model: Self.fit(measurements, machine: machine, bounded: false), measurements: measurements,
+                                    judge: probes.judge, machine: machine, memory: probes.memory, before: before, after: after,
+                                    seconds: seconds, regime: probes.regime)
             self.init(date: date, seconds: seconds, machine: machine, cpuFeatures: cpuFeatures, settings: settings, before: before,
                       after: after, model: model, measurements: measurements, judge: probes.judge, memory: probes.memory,
-                      stages: probes.stages, verdict: verdict, regime: probes.regime)
+                      stages: probes.stages, findings: found, regime: probes.regime)
         }
 
-        /// The model a set of measurements gives on this machine: the fit, the peak the inventory read, to six digits.
-        package static func fit(_ measurements: CapacityFit.Measurements, machine: Machine) -> CapacityModel {
+        /// The model a set of measurements gives on this machine: the fit, the peak the inventory read, its aberrant figures bounded
+        /// (`Findings.bounded`), to six digits.
+        package static func fit(_ measurements: CapacityFit.Measurements, machine: Machine, bounded: Bool = true) -> CapacityModel {
             var model = CapacityFit.model(from: measurements, allocationUnit: NeuralEngine.rowUnit)
             if let peak = machine.gpuFP32Peak { model.crest[.gpu] = peak }
-            return model.rounded()
+            return (bounded ? Findings.bounded(model) : model).rounded()
         }
 
         /// **The fit replayed from the measurements** — what an offline reading of a fleet's reports does: equal to `model` for a
@@ -210,14 +214,38 @@ extension Diagnostic {
         /// designating its plan; when it does not, the app offers to measure again.
         package var isCurrent: Bool { schema == Diagnostic.schema && fingerprint == .current }
 
-        /// **Green (M6)**: every engine the inventory announces has its lines, every set its sharing, nothing aberrant, the peak under
-        /// the need under B, no swap, the minute held (`Verdict`). Not a question of the hour — heat, the battery, Low Power Mode are
-        /// facts of the regime (`before`, `after`, `model.heat`). A report of an older schema is never green: it is not read.
-        package var isGreen: Bool { schema == Diagnostic.schema && verdict.green }
+        /// The kernels the plan leaves out: those the judge refused, the engines beside the GPU of a set that computed wrong (the plan
+        /// has no sharing for it, and would take the pair for free), and a kernel whose rate was hopelessly under the peak read.
+        package var excluded: Set<CapacityModel.Kernel> {
+            var kernels = Diagnostic.excluded(judge)
+            for f in findings where f.kind == .aberrant && f.effect == .leftOut { if let k = f.kernel { kernels.insert(k) } }
+            return kernels
+        }
 
-        /// The kernels the plan leaves out: those the judge refused, and the engines beside the GPU of a set that computed wrong
-        /// (the plan has no sharing for it, and would take the pair for free).
-        package var excluded: Set<CapacityModel.Kernel> { Diagnostic.excluded(judge) }
+        /// **How far each kernel's and each set's calls agreed**, as they were measured: (p90 − p10) over the median of the worst of its
+        /// chains — 0.02–0.06 on a free Mac. It is the uncertainty of the figure, not a reason to doubt it: a chain that disagreed more
+        /// than the rule is read on its fast side. Only what was read: a step whose calls were too few or too long to compare (a spread of 0)
+        /// and a step that is neither a kernel nor a set (the staircase) say nothing. Sorted by subject (`ane/fp16`, `gpu+ane`).
+        package var uncertainty: [Uncertainty] {
+            var worst: [String: Double] = [:]
+            for (step, spread) in regime?.spreads ?? [:] where spread > 0 {
+                let subject = String(step.prefix { $0 != " " })
+                guard subject.split(separator: "+").allSatisfy({ CapacityModel.Kernel(String($0)) != nil || CapacityModel.Engine(rawValue: String($0)) != nil })
+                else { continue }
+                worst[subject] = max(worst[subject] ?? 0, spread)
+            }
+            return worst.map { Uncertainty(subject: $0.key, spread: $0.value) }.sorted { $0.subject < $1.subject }
+        }
+        package struct Uncertainty: Sendable, Equatable {
+            /// A kernel (`ane/fp16`) or a set of engines or kernels (`gpu+ane`, `gpu/int8+ane/int8`).
+            package var subject: String
+            package var spread: Double
+            /// The reading's plus-or-minus: half the spread.
+            package var plusMinus: Double { spread / 2 }
+        }
+
+        /// **The cores the other programs used over the measure**, from the system's ticks; `nil` when the report does not say.
+        package var foreignCores: Double? { regime?.foreign["run"] }
 
         /// **The plan of this Mac** (`CapacityPlan(model:)`): what the app designates (`EngineSettings.designate(plan:)`).
         package func plan(allowsANE: Bool = true) -> CapacityPlan {
@@ -240,7 +268,7 @@ extension Diagnostic {
         /// Every kernel judged right ran within its threshold: nothing excluded.
         package var passes: Bool { !judge.values.contains { $0.excluded } }
 
-        /// **Reads a stored or received report**, `nil` for anything that is not a report of schema 15 — an older schema is not a map.
+        /// **Reads a stored or received report**, `nil` for anything that is not a report of schema 16 — an older schema is not a map.
         package static func read(_ data: Data) -> Report? {
             struct Schema: Decodable { var schema: Int }
             guard let s = try? JSONDecoder().decode(Schema.self, from: data), s.schema == Diagnostic.schema else { return nil }
@@ -271,19 +299,20 @@ extension Diagnostic {
         }
     }
 
-    // ── a defect, apart from where it is ────────────────────────────────────────────────────
+    // ── a finding, apart from where it is ───────────────────────────────────────────────────
 
-    /// What kind of trouble a defect of the verdict is, once the kernel or the set it concerns is set aside — so that an app says each in
+    /// What kind of thing a finding is, once the kernel or the set it concerns is set aside — so that an app says each in
     /// its own language, with the name of the engine beside it, without reading the English of `detail`.
     package enum Cause: Sendable, Equatable {
-        /// A kernel the inventory announces has no line (the probe did not run, or gave nothing).
+        /// A kernel the inventory announces has no line (the probe did not run, or gave nothing): the plan does not offer it.
         case noFigure
-        /// The reference engine's kernel computed wrong: nothing can be planned without it.
+        /// The reference engine's kernel computed wrong: the plan has no model of it, and the engine's defaults answer.
         case computedWrong
-        /// A set of engines was not measured together.
+        /// A set of engines was not measured together: the plan does not offer the set.
         case notShared
         /// A figure that cannot be a measure of the silicon: a rate beyond the peak read or hopelessly under it, a fixed cost
-        /// below zero, a keep on the fit's clamp, a staircase of the whole range. The usual cause is a Mac that was busy.
+        /// below zero, a keep on the fit's clamp, a staircase of the whole range. It is bounded, or the kernel is not offered, as the
+        /// finding says; the usual cause is a Mac that was busy.
         case implausible
         /// The probes' peak went over the need the memory plan counted for them.
         case memoryOverNeed
@@ -291,7 +320,8 @@ extension Diagnostic {
         case memoryOverBudget
         case swapGrew
         case tookTooLong
-        /// Something else used the Mac while it was measured, and the minute could not measure the steps again.
+        /// Something else used the Mac while it was measured and the minute could not measure the steps again: their figures are read on the
+        /// fast side.
         case disturbed
     }
 
@@ -318,17 +348,17 @@ extension Diagnostic {
     }
 }
 
-extension Diagnostic.Verdict.Defect {
-    /// The kernel this defect concerns (`ane/fp16`), if it concerns one.
+extension Diagnostic.Finding {
+    /// The kernel this finding concerns (`ane/fp16`), if it concerns one.
     package var kernel: CapacityModel.Kernel? { CapacityModel.Kernel(subject) }
 
-    /// The engines this defect concerns: the kernel's, or those of the set (`gpu+ane`); none for the memory, the swap or the minute.
+    /// The engines this finding concerns: the kernel's, or those of the set (`gpu+ane`); none for the memory, the swap or the minute.
     package var engines: [CapacityModel.Engine] {
         if let kernel { return [kernel.engine] }
         return subject.split(separator: "+").compactMap { CapacityModel.Engine(rawValue: String($0)) }
     }
 
-    /// **What kind of trouble this is**, from the kind and the subject the verdict wrote and the kernels the judge excluded
+    /// **What kind of finding this is**, from the kind and the subject the measure wrote and the kernels the judge excluded
     /// (`Report.excluded`): a missing line of the reference engine is « computed wrong » when the judge left it out.
     package func cause(excluding excluded: Set<CapacityModel.Kernel>) -> Diagnostic.Cause {
         switch kind {

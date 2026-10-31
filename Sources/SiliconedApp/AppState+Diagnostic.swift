@@ -72,10 +72,9 @@ extension AppState {
         diagnosticSupervisor = nil
         if diagnosticStopped || outcome.stopped {
             diagnostic = .ready
-            fallBackOnStoredMap()
         } else if let report = outcome.report {
             diagnostic = .finished(report)
-            keep(report)   // what this Mac uses: from now if nothing read the settings yet, else from the next launch
+            keep(report)   // what this Mac uses: from now if nothing read the settings yet, else from the next launch — whatever it found
         } else {
             // The one refusal the app says in its own words: another process renders.
             let failure = outcome.failure ?? ("internal", "the measuring process did not finish")
@@ -83,7 +82,6 @@ extension AppState {
                 ? Problem(EngineError.renderAlreadyRunning)
                 : Problem(EngineError.internalFailure(component: "diagnostic", detail: failure.detail))
             diagnostic = .failed(problem)
-            fallBackOnStoredMap()
             // A job waits for this measure: the failure is said where the render's would be.
             if !settingsRead, !file.isEmpty { self.problem = problem }
         }

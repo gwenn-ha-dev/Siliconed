@@ -255,4 +255,23 @@ import Testing
         #expect(RenderLoop.Reason.noModel.rawValue == "noModel" && RenderLoop.Verdict.unjudged(.uncovered).name == "unjudged:uncovered")
         #expect(RenderLoop.Verdict.drift.name == "drift" && RenderLoop.Verdict.held.name == "held")
     }
+
+    /// **The band is the map's own uncertainty where that is wider than 10 %**: a prediction read on the quick side of calls that disagreed
+    /// by ±x % is not held to better than x %, and a map of a free Mac keeps the band it had.
+    @Test func theToleranceWidensWithTheMapsOwnUncertainty() {
+        var report = ReportFixtures.report()
+        #expect(RenderLoop.Thresholds(uncertainty: report).tolerance == 0.10, "no regime, nothing to widen")
+        var regime = Diagnostic.Regime()
+        regime.spreads = ["gpu+ane 4096x3840x3840 pass 1": 0.05, "ane/fp16 1024x3840x3840": 0.03]
+        report.regime = regime
+        #expect(RenderLoop.Thresholds(uncertainty: report).tolerance == 0.10, "a free Mac's ±2.5 % keeps the 10 %")
+        regime.spreads["gpu+ane 4096x3840x3840 pass 1"] = 0.40
+        report.regime = regime
+        let widened = RenderLoop.Thresholds(uncertainty: report)
+        #expect(widened.tolerance == 0.20 && widened.minimumCoverage == RenderLoop.Thresholds().minimumCoverage)
+        // A gap of 15 % is a drift on a free Mac's map and holds on a map that says it is ±20 % sure.
+        let p = predictions()
+        let off = RenderLoop.compare(simulated(p) { _ in 1.15 }, predicted: p)
+        #expect(RenderLoop.verdict(off) == .drift && RenderLoop.verdict(off, thresholds: widened) == .held)
+    }
 }
