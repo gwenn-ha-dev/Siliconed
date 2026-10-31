@@ -38,6 +38,10 @@
 - **Le Mac sur lequel on calcule, à côté de Chaîne** : son icône, comme dans « À propos de ce Mac »,
   grisée tant qu'il n'est pas mesuré ; celle de l'autre Mac quand on calcule dessus.
 - **Partager la carte est une option** : sous Partager… dans Mesurer ce Mac, jamais le bouton par défaut.
+- **La molette d’une souris zoome** sur l’image et dans le rideau, vers le curseur ; une molette horizontale
+  déplace toujours l’image, et le trackpad ne change pas. ([#10](https://github.com/gwenn-ha-dev/Siliconed/issues/10))
+- **Alterner**, à côté de Côte à côte et Rideau : deux images une à la fois, au même endroit et au même
+  zoom ; un clic, ou ← →, montre l’autre. ([#10](https://github.com/gwenn-ha-dev/Siliconed/issues/10))
 - **Le rendu plus rapide, mesuré** : en 1024², il retire un tiers du temps d'un rendu sur Krea 2, un
   cinquième à un quart sur Z-Image, Qwen-Image-2.1 et Anima, et 6 à 9 % sur MOSS-Image.
 

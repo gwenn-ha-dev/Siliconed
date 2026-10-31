@@ -9217,6 +9217,46 @@
         }
       }
     },
+    "Click the image, or press ← →, to show one image or the other" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Auf das Bild klicken oder ← → drücken, um das eine oder das andere Bild zu zeigen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Haz clic en la imagen, o pulsa ← →, para mostrar una imagen u otra"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cliquer sur l’image, ou appuyer sur ← →, pour afficher l’une ou l’autre image"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fai clic sull’immagine, o premi ← →, per mostrare l’una o l’altra immagine"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "画像をクリックするか← →を押して、一方の画像ともう一方の画像を切り替えます"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "点击图像，或按 ← →，以显示其中一张图像"
+          }
+        }
+      }
+    },
     "Click to keep this one alone" : {
       "localizations" : {
         "de" : {
@@ -29347,6 +29387,46 @@
         }
       }
     },
+    "Switch" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wechseln"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alternar"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alterner"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alterna"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "切り替え"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "切换"
+          }
+        }
+      }
+    },
     "Switch to %@…" : {
       "localizations" : {
         "de" : {
@@ -29383,6 +29463,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "切换到 %@…"
+          }
+        }
+      }
+    },
+    "Switch: one image at a time, at the same place and zoom — click it, or ← for A and → for B" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wechseln: ein Bild nach dem anderen, an derselben Stelle und im selben Zoom – darauf klicken, oder ← für A und → für B"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alternar: una imagen cada vez, en el mismo lugar y con el mismo zoom — haz clic en ella, o ← para A y → para B"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alterner : une image à la fois, au même endroit et au même zoom — cliquer dessus, ou ← pour A et → pour B"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alterna: un’immagine alla volta, nello stesso punto e allo stesso zoom — fai clic su di essa, o ← per A e → per B"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "切り替え：同じ位置・同じズームで1枚ずつ表示。クリックするか、←でA、→でB"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "切换：在同一位置、同一缩放下一次显示一张图像——点击图像，或按 ← 显示 A、按 → 显示 B"
           }
         }
       }

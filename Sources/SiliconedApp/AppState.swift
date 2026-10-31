@@ -4,7 +4,7 @@
 // process. Nothing is written to disk without an explicit gesture — "Save", "Copy" —,
 // no temporary file, no preference, no log: nothing that Spotlight or recent items
 // could find. **The exceptions**, each a gesture of the user: five preferences — the « Developer
-// Mode » switch, the comparison's curtain or side by side (`Curtain.preferred`), the experimental
+// Mode » switch, the comparison's curtain, switch or side by side (`Curtain.mode`), the experimental
 // « Named Subjects » and « Negative LoRA Strengths » switches (`SubjectLibrary.enabledKey`,
 // `negativeLoRAKey`) and this Mac's capacity map, measured when
 // the user asks (`capacityMapKey`), like the system language the app follows —, the licenses accepted, which the library keeps itself (`<local>/accepted-licenses.json`) because its
@@ -68,7 +68,7 @@ final class AppState {
     private static let developerModeKey = "developerMode"
     /// **Developer Mode**: the solvers (`offeredSolvers`) — and a family not in
     /// front, were there one (none since Krea 2 joined them).
-    /// One of the app's preferences (with `Curtain.preferred`, the named subjects' switch and the capacity
+    /// One of the app's preferences (with `Curtain.mode`, the named subjects' switch and the capacity
     /// map) — written without a render gesture, because the user switched it.
     var developerMode = UserDefaults.standard.bool(forKey: AppState.developerModeKey) {
         didSet {

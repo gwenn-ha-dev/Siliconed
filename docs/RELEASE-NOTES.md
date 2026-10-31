@@ -38,6 +38,10 @@ English · [Français](RELEASE-NOTES.fr.md)
 - **The Mac you compute on, beside Chain**: its own icon, as in About This Mac, greyed until it is
   measured; another Mac's when you compute on it.
 - **Sharing the map is an option**: under Share… in Measure This Mac, never the default button.
+- **A mouse's wheel zooms** on the image and in the curtain, toward the pointer; a horizontal wheel still
+  moves the image, and the trackpad does not change. ([#10](https://github.com/gwenn-ha-dev/Siliconed/issues/10))
+- **Switch**, beside Side by Side and Curtain: two images one at a time, at the same place and zoom; a
+  click, or ← →, shows the other. ([#10](https://github.com/gwenn-ha-dev/Siliconed/issues/10))
 - **Faster Rendering, measured**: at 1024² it takes a third off a render on Krea 2, a fifth to a
   quarter on Z-Image, Qwen-Image-2.1 and Anima, and 6 to 9 % on MOSS-Image.
 

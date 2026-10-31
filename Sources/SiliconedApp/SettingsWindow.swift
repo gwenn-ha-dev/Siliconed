@@ -109,9 +109,10 @@ struct SettingsView: View {
                 }
             }
             Section {
-                Picker(selection: $curtain.preferred) {
-                    Text("Curtain").tag(true)
-                    Text("Side by Side").tag(false)
+                Picker(selection: $curtain.mode) {
+                    Text("Curtain").tag(Curtain.Mode.curtain)
+                    Text("Switch").tag(Curtain.Mode.alternate)
+                    Text("Side by Side").tag(Curtain.Mode.sideBySide)
                 } label: {
                     titled("Comparison", "Also switched from the canvas toolbar.")
                 }

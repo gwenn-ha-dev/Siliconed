@@ -528,7 +528,7 @@ final class MainWindow: NSObject, NSWindowDelegate {
         let mods = Self.chord(event)
         let shift = mods == .shift
         switch Int(event.keyCode) {
-        // The curtain shown, ← → move its line (`Curtain.swift`); ⇧ still marks a run, Esc leaves.
+        // The curtain shown, ← → move its line — the switch shown, show A or B (`Curtain.swift`); ⇧ still marks a run, Esc leaves.
         case 123 where mods.isEmpty && Curtain.shown(app): Curtain.shared.nudge(-1)
         case 124 where mods.isEmpty && Curtain.shown(app): Curtain.shared.nudge(1)
         case 123 where mods.isEmpty || shift: app.chooseAdjacent(-1, extending: shift)  // ←

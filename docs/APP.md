@@ -26,7 +26,8 @@ Each side must be at least 512 and a multiple of 16; there is no fixed ceiling o
 ## Edit
 
 - **Editing by instruction** with Qwen-Image-2.1 Turbo: give it 1 to 3 images and a sentence (“replace the cloudy sky with a blue sky”); its encoder sees the images. In the app an edit is limited to an area of 1024².
-- **Curtain**: drag a line across two images, or across an edit or an enlargement and its original, to see what changed; zoom in toward the pointer to look at a detail.
+- **Curtain**: drag a line across two images, or across an edit or an enlargement and its original, to see what changed; zoom in toward the pointer to look at a detail (pinch, or a mouse's wheel).
+- **Switch**: the same two images one at a time, at the same place and zoom; click the image, or press ← for the first and → for the second.
 - **A history like Photos**: arrows, ⌫ and ⌘Z, multiple selection, side-by-side comparison, export, drag and drop, Share.
 
 ![An edit by Qwen-Image-2.1 in the window: the Krea 2 photo of the surfer as image 1 in the Images box, the instruction “Convert this photo to a western comic book style with cel shading”, the cel-shaded result in the canvas](images/edit.jpg)

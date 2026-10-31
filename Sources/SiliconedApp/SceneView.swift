@@ -11,7 +11,7 @@ import UniformTypeIdentifiers
 struct SceneView: View {
     @Bindable var app: AppState
 
-    // Pinch (or ⌘+ ⌘−) to zoom, drag to pan, double-click (or ⌘0) to return. The zoom is the app's,
+    // Pinch (or a mouse's wheel, or ⌘+ ⌘−) to zoom, drag to pan, double-click (or ⌘0) to return. The zoom is the app's,
     // for the menu to reach it.
     private var zoom: CGFloat { app.zoom }
     @State private var offset: CGSize = .zero
@@ -77,12 +77,13 @@ struct SceneView: View {
         .onDisappear { scrollMonitor.map(NSEvent.removeMonitor); scrollMonitor = nil }
     }
 
-    /// **Two fingers move the image in its zone** (a mouse wheel too): the trackpad's scroll, caught
-    /// while the pointer is over the image's zone; elsewhere — the rack's column — it scrolls as usual.
+    /// **Two fingers move the image in its zone; a mouse's wheel zooms toward the pointer** (`Wheel`, issue #10), its horizontal
+    /// wheel still moves it — caught while the pointer is over the image's zone; elsewhere (the rack's column) it scrolls as usual.
     private func watchScroll() {
         guard scrollMonitor == nil else { return }
         scrollMonitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { event in
             guard hovering, app.currentJob == nil || !app.followsRender, app.selectedImage != nil else { return event }
+            if let z = Wheel.zoom(app.zoom, by: event) { if z != app.zoom { app.zoom = z }; return nil }
             let k: CGFloat = event.hasPreciseScrollingDeltas ? 1 : 10
             offset = clamped(CGSize(width: offset.width + event.scrollingDeltaX * k,
                                     height: offset.height + event.scrollingDeltaY * k))

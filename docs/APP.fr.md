@@ -26,7 +26,8 @@ Chaque côté doit être d'au moins 512 et multiple de 16 ; la surface n'a pas
 ## Éditer
 
 - **L'édition par instruction** avec Qwen-Image-2.1 Turbo : donnez-lui 1 à 3 images et une phrase (« remplace le ciel nuageux par un ciel bleu ») ; son encodeur voit les images. Dans l'app, une édition est plafonnée à une surface de 1024².
-- **Le rideau** : faites glisser une ligne sur deux images, ou sur une édition ou un agrandissement et son original, pour voir ce qui a changé ; zoomez vers le curseur pour regarder un détail.
+- **Le rideau** : faites glisser une ligne sur deux images, ou sur une édition ou un agrandissement et son original, pour voir ce qui a changé ; zoomez vers le curseur pour regarder un détail (en pinçant, ou à la molette d'une souris).
+- **Alterner** : les deux mêmes images, une à la fois, au même endroit et au même zoom ; cliquez sur l'image, ou appuyez sur ← pour la première et → pour la seconde.
 - **Un historique comme dans Photos** : flèches, ⌫ et ⌘Z, sélection multiple, comparaison côte à côte, export, glisser-déposer, Partager.
 
 ![Une édition par Qwen-Image-2.1 dans la fenêtre : la photo Krea 2 de la surfeuse en image 1 dans la boîte Images, l'instruction « Convert this photo to a western comic book style with cel shading », le résultat en cel shading dans le canevas](images/edit.jpg)
