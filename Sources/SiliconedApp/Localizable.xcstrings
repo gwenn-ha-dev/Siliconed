@@ -34285,6 +34285,86 @@
         }
       }
     },
+    "The weights as published, computed in fp32 end to end" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Gewichte wie veröffentlicht, durchgehend in fp32 berechnet"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Los pesos tal como se publicaron, calculados en fp32 de principio a fin"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les poids tels que publiés, calculés en fp32 de bout en bout"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I pesi così come pubblicati, calcolati in fp32 da cima a fondo"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "公開されたままの重みを、エンドツーエンドでfp32で計算"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "按发布原样的权重，端到端以 fp32 计算"
+          }
+        }
+      }
+    },
+    "The weights as published, computed in fp32, except part of the DiT in fp16 on the Neural Engine" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Gewichte wie veröffentlicht, in fp32 berechnet, außer einem Teil des DiT in fp16 auf der Neural Engine"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Los pesos tal como se publicaron, calculados en fp32, salvo una parte del DiT en fp16 en el Neural Engine"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les poids tels que publiés, calculés en fp32, sauf une partie du DiT en fp16 sur le Neural Engine"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I pesi così come pubblicati, calcolati in fp32, salvo una parte del DiT in fp16 sul Neural Engine"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "公開されたままの重みをfp32で計算。ただしDiTの一部はNeural Engineでfp16"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "按发布原样的权重，以 fp32 计算，但 DiT 的一部分在神经网络引擎上以 fp16 运行"
+          }
+        }
+      }
+    },
     "The wording is provisional: it will be settled by eye on a series of renders." : {
       "localizations" : {
         "de" : {
@@ -40403,6 +40483,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "端到端 fp32，每个阶段都对照参考实现验证；如有需要，DiT 的一部分可在神经网络引擎上运行"
+          }
+        }
+      }
+    },
+    "fp32, except part of the DiT in fp16 on the Neural Engine; on request, fp32 end to end, every stage verified against the reference" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "fp32, außer einem Teil des DiT in fp16 auf der Neural Engine; auf Wunsch durchgehend fp32, jede Stufe an der Referenz überprüft"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "fp32, salvo una parte del DiT en fp16 en el Neural Engine; si se pide, fp32 de principio a fin, cada etapa verificada frente a la referencia"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "fp32, sauf une partie du DiT en fp16 sur le Neural Engine ; à la demande, fp32 de bout en bout, chaque étage vérifié contre la référence"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "fp32, salvo una parte del DiT in fp16 sul Neural Engine; su richiesta, fp32 da cima a fondo, ogni stadio verificato rispetto al riferimento"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "fp32。ただしDiTの一部はNeural Engineでfp16。必要に応じてfp32でエンドツーエンド、すべてのステージをリファレンスに対して検証済み"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "fp32，但 DiT 的一部分在神经网络引擎上以 fp16 运行；如有需要，端到端 fp32，每个阶段都对照参考实现验证"
           }
         }
       }

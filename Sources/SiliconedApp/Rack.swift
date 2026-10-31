@@ -264,6 +264,20 @@ struct RackView: View {
         }
     }
 
+    /// **What the chain computes in, for the version installed and the Neural Engine's switch**: the Standard is the publisher's weights in
+    /// fp32, each stage verified against the reference; a Compact or a Light computes in fp32 too, on 8- or 4-bit weights as a third party
+    /// published them, and turns the Neural Engine on by default — « verified against the reference » is not said of them.
+    private var precision: LocalizedStringKey {
+        let ane = app.neuralEngineOffered && app.neuralEngine(for: app.identifier)
+        let quantized = app.card.flatMap { app.installedVariant(of: $0.family) }.map { $0 != .standard } ?? false
+        switch (quantized, ane) {
+        case (false, false): return "fp32 end to end, every stage verified against the reference; on request, part of the DiT on the Neural Engine"
+        case (false, true): return "fp32, except part of the DiT in fp16 on the Neural Engine; on request, fp32 end to end, every stage verified against the reference"
+        case (true, true): return "The weights as published, computed in fp32, except part of the DiT in fp16 on the Neural Engine"
+        case (true, false): return "The weights as published, computed in fp32 end to end"
+        }
+    }
+
     private var legend: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 14) {
@@ -275,7 +289,7 @@ struct RackView: View {
                     }
                 }
             }
-            Text("fp32 end to end, every stage verified against the reference; on request, part of the DiT on the Neural Engine")
+            Text(precision)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .font(.caption2)
