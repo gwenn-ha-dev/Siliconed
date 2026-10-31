@@ -101,9 +101,7 @@ package final class VAE {
         self.config = config
         self.latentHeight = latentHeight
         self.latentWidth = latentWidth
-        guard let device = MTLCreateSystemDefaultDevice(), let queue = device.makeCommandQueue() else {
-            throw GEMM.Failure.noDevice
-        }
+        let (device, queue) = try SystemGPU.open()
         self.device = device
         self.queue = queue
         guard weights.entries["decoder.conv_in.weight"]?.shape.dropFirst().first == config.latentChannels,
@@ -213,7 +211,7 @@ package final class VAE {
                              band: Int = VAE.bandElements) -> VAELayout {
         let memory = VAEMemory()
         let bands = Bands(memory: memory, weights: nil, name: "VAE", groups: config.groups, band: band)
-        _ = try? decodeBanded(nil, height: h, width: w, config: config, bands: bands)
+        do { _ = try decodeBanded(nil, height: h, width: w, config: config, bands: bands) } catch { preconditionFailure("VAE plan walk refused: \(error)") }
         return memory.layout
     }
 

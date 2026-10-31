@@ -404,7 +404,6 @@ enum QwenImageStages {
             }
         }
         var sampler = QwenImage21Sampler(artifact: try Artifact(path: MapCheck.use(invocation.map ?? denoiser.map)), lora: nil)
-        sampler.freezeCut = true
         for i in 0..<(sigmas.count - 1) {
             var latent = i == 0 ? noise.values : planar(trajectory.float32("latent_\(i)")!)
             var velocity: [Float] = []
@@ -417,7 +416,7 @@ enum QwenImageStages {
             }
         }
         // Free: the product's own encoder and VAE encoder, the loop on its own. Shown.
-        let context = Context(reproducible: true, onProgress: nil)
+        let context = Context(onProgress: nil)
         let text = try textModule.encoder(prompt, images: prepared, context: context)
         let references = try prepared.map { try model.chain.encoding!.encoder($0, context: context) }
         var latent = noise.values
@@ -485,7 +484,7 @@ enum QwenImageStages {
                                     witness: witness?.float32("latent_\(i)"), planes: 64))
             if let m = Judge.orientation(output.latent, expected, height: encoder.latentHeight, width: encoder.latentWidth) { report.add(m) }
             let module = try QwenImage21EncodingModule(path: path).encoder(
-                ImageRGB(pixels: Array(image.prefix(3 * H * W)), height: H, width: W), context: Context(reproducible: true, onProgress: nil))
+                ImageRGB(pixels: Array(image.prefix(3 * H * W)), height: H, width: W), context: Context(onProgress: nil))
             report.add(Judge.identity("picture \(i) module (RGB → RGBA)", differing: zip(module.values, output.latent).filter { $0.bitPattern != $1.bitPattern }.count,
                                       of: output.latent.count))
         }

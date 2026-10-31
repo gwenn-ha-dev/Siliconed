@@ -387,10 +387,10 @@ extension Diagnostic {
                 self.validating = validating
                 let all = sizes.products + (validating ? CapacityProbes.validationShapes : [])
                 operands = Operands(Operands.sizes(products: all.map { ($0.m, $0.k, $0.n, WeightKind.q8) }))
-                alone = try GEMM(freezeCut: true, plan: .probing(bf16Weights: true, roundedActivations: true))
-                both = try GEMM(freezeCut: true, plan: .probing(amx: true, int8Weights: true, q8Weights: true))
-                neural = try GEMM(freezeCut: true, plan: .probing(ane: true))
-                three = try GEMM(freezeCut: true, plan: .probing(amx: true, ane: true))
+                alone = try GEMM(plan: .probing(bf16Weights: true, roundedActivations: true))
+                both = try GEMM(plan: .probing(amx: true, int8Weights: true, q8Weights: true))
+                neural = try GEMM(plan: .probing(ane: true))
+                three = try GEMM(plan: .probing(amx: true, ane: true))
                 func wrap(_ g: GEMM, _ o: Operands) throws -> Buffers {
                     Buffers(a: try g.wrap(o.a.base, bytes: o.a.capacity, name: "probe.a"), b: try g.wrap(o.b.base, bytes: o.b.capacity, name: "probe.b"),
                             c: try g.wrap(o.c.base, bytes: o.c.capacity, name: "probe.c"))

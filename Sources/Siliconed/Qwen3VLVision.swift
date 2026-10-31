@@ -141,13 +141,12 @@ package final class Qwen3VLVision {
     package private(set) var boundaries: [String: [Float]] = [:]
 
     /// - Parameter maximumPatches: the largest image's `gh · gw`; the arena is sized for it.
-    package init(artifact: Artifact, config: Config, maximumPatches: Int,
-                 freezeCut: Bool = EngineSettings.effective.frozenCut) throws {
+    package init(artifact: Artifact, config: Config, maximumPatches: Int) throws {
         let n = maximumPatches, d = config.hidden, i = config.intermediate
         let o = config.output
         let largest = Qwen3VLVision.reserves(config).largest
         // The Neural Engine serves the denoisers only: the encoders' output enters the render cache's keys.
-        let gemm = try GEMM(freezeCut: freezeCut, phase: .encoding)
+        let gemm = try GEMM(phase: .encoding)
         let arena = try Arena(capacity: Qwen3VLVision.arenaBytes(config: config, patches: n))
         var slices: [String: UnsafeMutablePointer<Float>] = [:]
         for (name, count) in Qwen3VLVision.slices(config: config, patches: n) {
@@ -212,8 +211,7 @@ package final class Qwen3VLVision {
     }
 
     private func widen(_ name: String, count: Int, into destination: UnsafeMutablePointer<Float>) throws {
-        let got = try artifact.materialize(name, into: destination, capacity: count)
-        guard got == count else { throw Artifact.Failure.badHeader("\(name): \(got) values, \(count) expected") }
+        try artifact.materializeExactly(name, count: count, into: destination)
     }
 
     /// `y = x · W + b`, the weight stored `[input, output]` by the forge.
@@ -333,7 +331,7 @@ package final class Qwen3VLVision {
 
             try layerNorm(p + "norm2", x, into: normed, rows: n, columns: d)
             try linear(p + "mlp.linear_fc1", normedBuf, hiddenBuf, hidden, rows: n, inputs: d, outputs: config.intermediate)
-            Krea2Ops.geluTanh(hidden, count: n * config.intermediate)    // `gelu_pytorch_tanh`
+            Ops.geluTanh(hidden, count: n * config.intermediate)    // `gelu_pytorch_tanh`
             try linear(p + "mlp.linear_fc2", hiddenBuf, projectedBuf, projected, rows: n, inputs: config.intermediate, outputs: d)
             vDSP_vadd(x, 1, projected, 1, x, 1, vDSP_Length(n * d))
             if block == 0 { record("vit_block0_out", x, n * d) }

@@ -5,28 +5,19 @@ import Foundation
 import Metal
 import MetalPerformanceShaders
 
-/// **Stage 3: a GEMM cut by tokens, the GPU and the AMX on it at the same time.**
+/// **A GEMM cut by rows: the GPU and the AMX on it at the same time.**
 ///
-/// This is the biggest lever of the project after the spectral schedule.
-/// A first measurement on two independent GEMMs: **+1.86 TFLOP/s net**, sum 5.333 against 3.478 for
-/// the GPU alone, the AMX keeping 91 % of its solo throughput and costing the GPU only 3.2 %. A second
-/// measured the cut itself — a single GEMM, shared reserve, spinning flag — at **5.360**, hence
-/// *above* the first: reading a single weight instead of two brings in more than the rendezvous costs.
-///
-/// The thermal control framed the first (3.478 before, 3.468 after, −0.3 %): the GPU's drop is indeed
-/// co-execution and nothing else.
+/// The sum of the two engines' throughputs, measured on one GEMM with a shared reserve: 5.360 TFLOP/s against 3.478 for the GPU
+/// alone (the AMX keeping 91 % of its solo throughput, the GPU losing 3.2 %); the thermal control framed it (−0.3 %). Reading a
+/// single weight instead of two brings in more than the rendezvous costs.
 ///
 /// ## What the plan decides, and what this file does
 ///
 /// **The rows are the plan's, whole** (`CapacityPlan`: `ProductAssignment.gpu`, `.amx`): the conductor is given how many rows each
-/// engine takes and cuts nothing itself — no ratio, no quantum, no band. The GPU may have none (the AMX alone) and the AMX none.
-///
-/// The second measurement **froze** the cut at the ratio of the measured throughputs. That was
-/// enough to judge the cut, not to absorb the thermal drift of a two-minute render — a series recorded **13.2 %** between
-/// the first render and the fourth. A frozen cut on a machine that slows down makes the fast
-/// engine wait, and the wait is wall-clock time that neither of them counts as its own.
-/// The conductor therefore *can* servo-control it (`driven`), shape by shape, on the times actually observed — **only toward the
-/// GPU**: the AMX's slice is what the memory need charged from the plan, and it stays the ceiling.
+/// engine takes and cuts nothing itself — no ratio, no quantum, no band, no servo. The cut is a pure function of the shape from
+/// the first GEMM to the last, so two renders of the same seed return the same bits; it is not an approximation either: it
+/// reassociates no sum, each row of `C` being computed entirely by one of the two engines. The GPU may have no rows (the AMX
+/// alone) and the AMX none.
 ///
 /// ## Two things that cannot be guessed
 ///
@@ -82,9 +73,11 @@ package final class Conductor: @unchecked Sendable {
     /// wrong product, **different at every run** (relative error 0.57 then 0.73 then 0.95 on the
     /// same inputs); without it, 1.146·10⁻⁶, which is its summation order and nothing else.
     ///
-    /// The mechanism was not pursued further than the fact: a thread spinning idle
+    /// The mechanism was not pursued further than the fact. What is known: a thread spinning idle
     /// (`while flag.pointee == 0 { }`) occupies a core from the start to the end of the render and never gives
-    /// control back, and Accelerate comes out of it damaged. **It is the fact that decides**, and it is reproducible
+    /// control back, and the flag is a plain `Int32` — no synchronization in Swift's memory model (the compiler may hoist the
+    /// read out of the loop; the result's writes are not ordered by the language). Whether that, or the spinning core, is what
+    /// damages the product is not established; an `Atomic` flag is the experiment that would tell. **It is the fact that decides**, and it is reproducible
     /// both ways.
     ///
     /// The flag stays, behind this name, because it is the **way to make** the check fail
@@ -102,10 +95,6 @@ package final class Conductor: @unchecked Sendable {
     /// The BNNS workspace, outside `malloc`: `Pages`, unmapped with the conductor.
     private var workspace: Pages?
 
-    /// The fraction of rows entrusted to the GPU that the servo learned, **per shape** — `k×n`. Two shapes have neither the same
-    /// throughput ratio nor the same sensitivity to `m`: a single `T` would serve one and penalize the other. Empty when the cut
-    /// is frozen (`driven` false): the plan's rows then stand.
-    package private(set) var fraction: [String: Double] = [:]
     /// What each engine spent waiting for the other. This is the imbalance, and it is invisible
     /// if it is not recorded: neither the GPU nor the AMX counts it as its own.
     package private(set) var idleGPU = 0.0
@@ -114,8 +103,7 @@ package final class Conductor: @unchecked Sendable {
     /// The FLOPs passed through the cut, and the wall-clock time they cost.
     package private(set) var coFLOP = 0.0
     package private(set) var coSeconds = 0.0
-    /// The same, **per shape** (`k×n`): a total hides which shape makes which engine wait — a frozen
-    /// `T` fits the shapes it was measured on, not every model's.
+    /// The same, **per shape** (`k×n`): a total hides which shape makes which engine wait.
     package private(set) var perShape: [String: ShapeRecord] = [:]
     package struct ShapeRecord {
         package var calls = 0
@@ -125,15 +113,7 @@ package final class Conductor: @unchecked Sendable {
         }
     }
 
-    /// **Is the cut servo-controlled?** False by default (reproducible mode): the rows are the plan's from the first GEMM to
-    /// the last, a pure function of the shape — and two renders of the same seed return **the same bits**. It is not an
-    /// approximation: the cut does not reassociate any sum, each row of `C` being computed entirely by just one of the two
-    /// engines. True, `T` follows the thermal drift (recorded at 13.2 % over four renders), the GPU gaining rows the plan gave the
-    /// AMX, never the reverse.
-    package let driven: Bool
-
-    package init(queue: MTLCommandQueue, driven: Bool = true) {
-        self.driven = driven
+    package init(queue: MTLCommandQueue) {
         self.queue = queue
         job.pointee = Job()
         amxSeconds.pointee = 0
@@ -273,7 +253,7 @@ package final class Conductor: @unchecked Sendable {
     /// **The BNNS workspace of an AMX slice of `rows` rows** of `[rows, k] × [k, n]`: what `amx` asks of
     /// BNNS for that job, with the same descriptors — BNNS answers from the shapes alone. A conductor
     /// holds the largest over the slices it ran (`Pages`, rounded to the page); the slice is
-    /// `m − cut(m, T)` rows, at most `m − quantum`. 31 MB at Z-Image's `1536 × 3840 × 3840`, 67 MB at
+    /// the plan's `amx` rows. 31 MB at Z-Image's `1536 × 3840 × 3840`, 67 MB at
     /// `1536 × 10240 × 3840`.
     package static func workspaceBytes(rows: Int, k: Int, n: Int, weightIsTransposed: Bool) -> Int {
         guard rows > 0 else { return 0 }
@@ -299,15 +279,6 @@ package final class Conductor: @unchecked Sendable {
     }
     // ── the cut ──────────────────────────────────────────────────────────────────────────────
 
-    /// **The GPU's rows under the servo**: the plan's, or — once the times observed suggest the GPU should have `learned` of the
-    /// `total` rows — more of them, on the GPU's tile (a continuous servo would build a new `MPSMatrixMultiplication` at almost every
-    /// call: 3.35 → 1.46 TFLOP/s measured), never fewer than the plan's. Defined once, as the check reads it too.
-    package static func servoRows(planned: Int, total: Int, learned: Double?) -> Int {
-        guard let learned, planned < total else { return planned }
-        let q = GEMM.rowQuantum
-        return min(total, max(planned, Int((Double(total) * learned / Double(q)).rounded()) * q))
-    }
-
     /// `C = A × B`, the first `gpuRows + amxRows` rows shared between the GPU (rows `0 ..< gpuRows`) and the AMX (the next
     /// `amxRows`), as the plan assigned them. Returns the **wall-clock time**, which is the only one that makes sense here:
     /// adding up two engines that run together says nothing.
@@ -315,15 +286,10 @@ package final class Conductor: @unchecked Sendable {
     /// A side with no rows is not run: the AMX alone is `gpuRows` 0 (the GPU's `multiply` is not called), the GPU alone does
     /// not need a conductor. *A path that silently decides not to apply is a path of which we will not know, later, whether it was
     /// used*: hence the `rendezvous` counter.
-    ///
-    /// **Servo-controlled** (`driven`): the GPU's rows may grow, by `GEMM.rowQuantum`, toward the share the observed times
-    /// suggest (damped by a quarter), never below the plan's — the AMX's slice, charged by the memory need, is its ceiling.
-    package func linear(a: MTLBuffer, b: MTLBuffer, c: MTLBuffer, gpuRows planned: Int, amxRows plannedAMX: Int,
+    package func linear(a: MTLBuffer, b: MTLBuffer, c: MTLBuffer, gpuRows: Int, amxRows: Int,
                         k: Int, n: Int, weightIsTransposed: Bool, multiply: (Int) -> Double) -> Double {
-        let m = planned + plannedAMX
+        let m = gpuRows + amxRows
         let key = "\(k)×\(n)"
-        let gpuRows = driven ? Conductor.servoRows(planned: planned, total: m, learned: fraction[key]) : planned
-        let amxRows = m - gpuRows
 
         aPointer = a.contents()
         bPointer = b.contents()
@@ -352,35 +318,16 @@ package final class Conductor: @unchecked Sendable {
         perShape[key]!.idleAMX += max(0, wall - amxWall)
         perShape[key]!.flop += 2.0 * Double(m) * Double(k) * Double(n)
 
-        // ── the servo-control ───────────────────────────────────────────────────────────────
-        //
-        // We equalize the **times**, not the rows: `T* = gpu_rate / (gpu_rate + amx_rate)`.
-        // The correction is damped (a quarter of the way) because a whole step on a noisy
-        // measurement oscillates, and an oscillation of `T` makes the two engines wait
-        // alternately — exactly what we are trying to eliminate.
-        if driven, gpuWall > 0, amxWall > 0, amxRows > 0 {
-            let T = Double(gpuRows) / Double(m)
-            let rateGPU = Double(gpuRows) / gpuWall, rateAMX = Double(amxRows) / amxWall
-            let target = rateGPU / (rateGPU + rateAMX)
-            fraction[key] = min(1, max(0, T + 0.25 * (target - T)))
-        }
         return wall
     }
 
     /// What the cut returned, in a word — to display next to the GEMM census.
     package var summary: String {
         guard coSeconds > 0 else { return "co-execution: never applied" }
-        // Frozen cut: `fraction` is empty by construction, so displaying it would say "T =" and
-        // nothing. We write the value that actually served, and the fact that it did not move.
-        let cut = driven
-            ? fraction.sorted { $0.key < $1.key }
-                  .map { "\($0.key) → \(String(format: "%.3f", $0.value))" }
-                  .joined(separator: ", ")
-            : "the plan's rows, frozen (reproducible)"
         return String(format: "co-execution: %.3f TFLOP/s over %.1f s wall, %d rendezvous   ·   "
                             + "GPU idle %.2f s, AMX %.2f s   ·   BNNS: %d refusals, status %d, "
-                            + "workspace %d B   ·   cut: %@",
+                            + "workspace %d B",
                       coFLOP / coSeconds / 1e12, coSeconds, rendezvous, idleGPU, idleAMX,
-                      refusals, Int(lastStatus), lastWorkspace, cut)
+                      refusals, Int(lastStatus), lastWorkspace)
     }
 }

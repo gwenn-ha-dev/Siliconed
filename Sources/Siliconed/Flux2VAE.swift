@@ -75,9 +75,7 @@ package final class Flux2VAE {
               mean.count == config.patchedChannels, variance.count == config.patchedChannels else {
             throw Safetensors.Failure.badHeader("\(path): not the FLUX.2 VAE (decoder \(config.levels), \(config.patchedChannels) latent channels)")
         }
-        guard let device = MTLCreateSystemDefaultDevice(), let queue = device.makeCommandQueue() else {
-            throw GEMM.Failure.noDevice
-        }
+        let (device, queue) = try SystemGPU.open()
         self.device = device; self.queue = queue
         self.weights = weights; self.config = config
         self.scale = Flux2VAE.scale(variance: variance, epsilon: config.batchNormEpsilon)
@@ -184,7 +182,7 @@ package final class Flux2VAE {
                              band: Int = VAE.bandElements) -> VAELayout {
         let memory = VAEMemory()
         let bands = VAE.Bands(memory: memory, weights: nil, name: "VAE Flux2", groups: config.groups, band: band)
-        _ = try? decodeBanded(nil, height: h, width: w, config: config, bands: bands)
+        do { _ = try decodeBanded(nil, height: h, width: w, config: config, bands: bands) } catch { preconditionFailure("VAE plan walk refused: \(error)") }
         return memory.layout
     }
 

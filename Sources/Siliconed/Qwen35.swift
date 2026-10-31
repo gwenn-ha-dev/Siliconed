@@ -144,9 +144,9 @@ package final class Qwen35Encoder {
     package var cancellation: Cancellation?
 
     /// - Parameter sequence: the number of positions computed (the prompt's tokens, ≤ 4096).
-    package init(artifact: Artifact, sequence: Int, freezeCut: Bool = EngineSettings.effective.frozenCut) throws {
+    package init(artifact: Artifact, sequence: Int) throws {
         let config = try Config(header: artifact.header)
-        let gemm = try GEMM(freezeCut: freezeCut, phase: .encoding)
+        let gemm = try GEMM(phase: .encoding)
         let s = sequence, h = config.hidden, i = config.intermediate
         let a = config.attentionWidth, kv = config.kvWidth
         let arena = try Arena(capacity: Qwen35Encoder.arenaBytes(config: config, sequence: s))
@@ -360,38 +360,16 @@ package final class Qwen35Encoder {
     }
 
     private func widen(_ name: String, count: Int, into destination: UnsafeMutablePointer<Float>) throws {
-        let got = try artifact.materialize(name, into: destination, capacity: count)
-        guard got == count else { throw Artifact.Failure.badHeader("\(name): \(got) values, \(count) expected") }
+        try artifact.materializeExactly(name, count: count, into: destination)
     }
 
     /// `RMSNorm` over each head's `headDim`, weight already `1 + w` (the forge folded it).
     private func normHeads(_ t: UnsafeMutablePointer<Float>, weight: UnsafePointer<Float>, heads: Int) {
-        let d = config.headDim, eps = config.eps
-        Parallel.rows(sequence, width: heads * d) { first, howMany in
-            for s in first..<(first + howMany) {
-                for h in 0..<heads {
-                    let row = t + (s * heads + h) * d
-                    var sum: Float = 0
-                    for j in 0..<d { sum += row[j] * row[j] }
-                    let scale = 1 / (sum / Float(d) + eps).squareRoot()
-                    for j in 0..<d { row[j] = row[j] * scale * weight[j] }
-                }
-            }
-        }
+        Ops.normHeads(t, weight: weight, rows: sequence, heads: heads, headDim: config.headDim, eps: config.eps)
     }
 
     private func expandKV(_ source: UnsafePointer<Float>, into destination: UnsafeMutablePointer<Float>) {
-        let d = config.headDim, group = config.groupSize, kvHeads = config.kvHeads
-        Parallel.rows(sequence, width: config.attentionWidth) { first, howMany in
-            for s in first..<(first + howMany) {
-                for kvHead in 0..<kvHeads {
-                    let from = source + (s * kvHeads + kvHead) * d
-                    for repetition in 0..<group {
-                        (destination + (s * (kvHeads * group) + kvHead * group + repetition) * d).update(from: from, count: d)
-                    }
-                }
-            }
-        }
+        Ops.expandKV(source, into: destination, rows: sequence, headDim: config.headDim, group: config.groupSize, kvHeads: config.kvHeads)
     }
 
     /// `y[S, n] = x[S, k] · W[k, n]` for a weight too thin for the GPU path (`in_proj_b`, `in_proj_a`: n = 32),

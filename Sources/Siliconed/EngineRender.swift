@@ -53,6 +53,8 @@ extension Engine {
         // One render, one plan: a measure that ends meanwhile applies to the next one (`EngineSettings.adopt`).
         EngineSettings.renderBegan()
         defer { EngineSettings.renderEnded() }
+        // A render assumes the whole of B: the Prompt Lab's resident weights go back first.
+        PromptWriter.unloadResident()
         let chain = model.chain, cache = model.library?.renderCache
         let space = chain.denoising.space
         guard !seeds.isEmpty else { return [] }
@@ -142,8 +144,7 @@ extension Engine {
             try model.card.checkMemory(memoryRequest, ceiling: ceiling)
         }
         // The machine's profile is read HERE, at render time — never at request construction.
-        let reproducible = request.reproducible ?? EngineSettings.effective.frozenCut
-        let context = Context(reproducible: reproducible, cancellation: cancellation,
+        let context = Context(cancellation: cancellation,
                                 previews: request.previews, onProgress: onProgress)
         context.cache = cache
         context.neuralEngine = request.neuralEngine && EngineSettings.effective.plan.usesANE
@@ -198,8 +199,7 @@ extension Engine {
             // The images enter the key only if the encoder sees them.
             let textKey = (chain.text as? any CacheIdentified).flatMap { module in
                 cache.map { _ in RenderCache.textKey(module, prompt: request.prompt,
-                                                     images: chain.text is any ImageTextModule ? prepared : [],
-                                                     reproducible: reproducible) }
+                                                     images: chain.text is any ImageTextModule ? prepared : []) }
             }
             let text: Conditioning
             var cached = false
@@ -322,7 +322,6 @@ extension Engine {
 
                 let renderResult = Render(model: chain.denoising.model, prompt: request.prompt, seed: seed,
                                   steps: steps, loras: request.loras, loraSummary: stack?.summary, image: image,
-                                  reproducible: reproducible,
                                   evaluations: sketch ?? plan.evaluations, sketch: sketch, spectral: plan.reduced,
                                   strength: request.image != nil ? request.strength : nil, startStep: plan.startStep,
                                   startSigma: plan.startSigma,
@@ -354,7 +353,7 @@ extension Engine {
         guard let cache = context.cache, let module = encoding as? any CacheIdentified else {
             return try encoding.encoder(image, context: context)
         }
-        let key = RenderCache.imageKey(module, image: image, reproducible: context.reproducible)
+        let key = RenderCache.imageKey(module, image: image)
         if let kept = cache.latent(key) { return kept }
         let latent = try encoding.encoder(image, context: context)
         cache.store(latent, key: key)

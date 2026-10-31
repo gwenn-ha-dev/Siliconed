@@ -238,7 +238,6 @@ package extension Model {
 /// **Public in name only**: the module protocols cite it, but nothing in it is usable outside the
 /// package (`package`) — only the engine and the CLI checks construct it.
 package final class Context {
-    package let reproducible: Bool
     /// **The denoiser's products may take the Neural Engine** (`Request.neuralEngine`), where this Mac's map
     /// turned it on: resolved at render time. The encoders never do.
     package var neuralEngine = EngineSettings.effective.plan.usesANE
@@ -289,9 +288,9 @@ package final class Context {
     package struct Sketched: Error {}
 
     /// For the checks, which drive one of the product's modules outside a render.
-    package init(reproducible: Bool, cancellation: Cancellation? = nil, previews: Bool = false,
+    package init(cancellation: Cancellation? = nil, previews: Bool = false,
                 onProgress: (@Sendable (Engine.Event) -> Void)?) {
-        self.reproducible = reproducible; self.cancellation = cancellation; self.previews = previews
+        self.cancellation = cancellation; self.previews = previews
         self.onProgress = onProgress
     }
     func emit(_ event: Engine.Event) { onProgress?(event) }

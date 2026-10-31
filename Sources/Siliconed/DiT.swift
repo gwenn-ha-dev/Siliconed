@@ -21,7 +21,7 @@ import Foundation
 /// **Every product by a weight goes through `WeightProducts`**, the front and the head included
 /// (`x_embedder`, `cap_embedder.1`, the final linear): a LoRA on them is applied, as is one on the
 /// `M = 1` products (`t_embedder.mlp.*`, the final modulation), on the CPU beside their `gemv`.
-package final class DiT {
+package final class DiT: BoundaryRecording {
     package struct Config {
         package let dim, heads, hidden, layers, refiners, patch, channels, capDim, adalnDim: Int
         package let eps, theta, timeScale: Float
@@ -51,7 +51,7 @@ package final class DiT {
     }
 
     package let config: Config
-    package private(set) var boundaries: [String: [Float]] = [:]
+    package internal(set) var boundaries: [String: [Float]] = [:]
     package var recordBoundaries = false
     /// The current render's token, consulted between two layers (see `Cancellation`).
     package var cancellation: Cancellation?
@@ -105,18 +105,16 @@ package final class DiT {
     /// in the own arena's `scratch`, with the stack's `loraMid`.
     private let products: WeightProducts
 
-    /// - Parameter freezeCut: the reproducible mode — the GPU/AMX cut is not servo-controlled, so
-    ///   two evaluations of the same inputs return the same bits. See `Conductor.driven`.
     /// - Parameter lora: this request's stack. The arenas are sized for **its** cumulative
     ///   rank — the engine receives the request before building the DiT, so there is no
     ///   maximum to fix in advance and nothing to reload when the stack changes.
     package init(artifact: Artifact, latentHeight: Int, latentWidth: Int, capLength: Int,
-                freezeCut: Bool = EngineSettings.effective.frozenCut, neuralEngine: Bool = EngineSettings.effective.plan.usesANE, lora: LoRA? = nil) throws {
+                neuralEngine: Bool = EngineSettings.effective.plan.usesANE, lora: LoRA? = nil) throws {
         self.lora = lora
         self.artifact = artifact
         self.prefetcher = Prefetcher(artifact: artifact)
         self.config = Config(header: artifact.header)
-        self.gemm = try GEMM(freezeCut: freezeCut, neuralEngine: neuralEngine)
+        self.gemm = try GEMM(neuralEngine: neuralEngine)
         self.rope = RopeTables(axesDims: config.axesDims, axesLens: config.axesLens, theta: config.theta)
         self.latentHeight = latentHeight
         self.latentWidth = latentWidth
@@ -185,11 +183,6 @@ package final class DiT {
     /// `MemoryNeed`'s formula.
     package var arenaCapacity: Int { arena.capacity + blockArenas.reduce(0) { $0 + $1.capacity } }
     package var cacheLoRACapacity: Int { cacheLoRA?.capacity ?? 0 }
-
-    private func record(_ name: String, _ p: UnsafePointer<Float>, _ n: Int) {
-        guard recordBoundaries else { return }
-        boundaries[name] = Array(UnsafeBufferPointer(start: p, count: n))
-    }
 
     /// `latent` as `[C, H, W]`, `caps` as `[L, capDim]`, `sigma` as the scheduler gives it.
     /// Returns the model output as `[C, H, W]` — **before** the negation that the pipeline applies.
@@ -378,10 +371,7 @@ package final class DiT {
     /// A weight of exactly `count` values into `destination` — refused before writing if the map's
     /// is larger (`Artifact.materialize`), after if it is smaller: either is another map.
     private func widen(_ name: String, count: Int, into destination: UnsafeMutablePointer<Float>) throws {
-        let got = try artifact.materialize(name, into: destination, capacity: count)
-        guard got == count else {
-            throw Artifact.Failure.badHeader("\(name): \(got) values, \(count) expected")
-        }
+        try artifact.materializeExactly(name, count: count, into: destination)
     }
 
     /// A `M = 1` product on the CPU (`gemv`), then the stack of `key`: `y += (x · down) · up`, two

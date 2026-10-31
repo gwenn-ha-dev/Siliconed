@@ -93,9 +93,8 @@ package final class AnimaGELU {
     /// In place, on a shared buffer. Returns the GPU time.
     @discardableResult
     package func run(_ buffer: MTLBuffer, count: Int) -> Double {
-        guard let commands = queue.makeCommandBuffer(), let encoder = commands.makeComputeCommandEncoder() else {
-            return 0
-        }
+        let commands = queue.checkedCommandBuffer()
+        let encoder = commands.checkedEncoder()
         var n = UInt32(count)
         encoder.setComputePipelineState(pipeline)
         encoder.setBuffer(buffer, offset: 0, index: 0)
@@ -106,6 +105,6 @@ package final class AnimaGELU {
         encoder.endEncoding()
         commands.commit()
         commands.waitUntilCompleted()
-        return commands.gpuEndTime - commands.gpuStartTime
+        return Attention.verdict(commands, what: "GPU GELU (\(count) values)")
     }
 }

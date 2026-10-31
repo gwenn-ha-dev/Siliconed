@@ -91,7 +91,5 @@ final class VAEMemoryTests: XCTestCase {
     func testTheWeightLists() {
         XCTAssertEqual(WeightList.resnetQwen(96, 96), [96, 96 * 96 * 9, 96, 96, 96 * 96 * 9, 96])
         XCTAssertEqual(WeightList.resnetQwen(96, 192).prefix(2), [192 * 96, 192])
-        XCTAssertEqual(WeightList.resnetFlux(128, 256).suffix(2), [256 * 128, 256])
-        XCTAssertEqual(WeightList.attentionFlux(512).count, 2 + 8)
     }
 }

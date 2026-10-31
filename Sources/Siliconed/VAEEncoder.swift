@@ -100,9 +100,7 @@ package final class VAEEncoder {
         guard height % 8 == 0, width % 8 == 0 else {
             throw EngineError.formatRefused(width: width, height: height, reason: .notMultiple, bound: 8)
         }
-        guard let device = MTLCreateSystemDefaultDevice(), let queue = device.makeCommandQueue() else {
-            throw GEMM.Failure.noDevice
-        }
+        let (device, queue) = try SystemGPU.open()
         self.device = device; self.queue = queue; self.weights = weights
         self.family = family; self.height = height; self.width = width
         guard probes || startingAt != nil || family == .qwenImage else {
@@ -246,7 +244,7 @@ package final class VAEEncoder {
             return Output(latent: latent, moments: moments, probes: [:], seconds: Date().timeIntervalSince(begin))
         }
         let count = entryShape.reduce(1, *)
-        let buffer = device.makeBuffer(length: count * 4, options: .storageModeShared)!
+        let buffer = device.checkedBuffer(length: count * 4)
         buffer.contents().assumingMemoryBound(to: Float.self).update(from: image, count: count)
         let begin = Date()
         var readValues: [String: [Float]] = [:]
@@ -330,7 +328,7 @@ package final class VAEEncoder {
     package static func walk(family: Family, height: Int, width: Int, band: Int = VAE.bandElements) -> VAELayout {
         let memory = VAEMemory()
         let bands = VAE.Bands(memory: memory, weights: nil, name: "Flux encoder", groups: 32, band: band)
-        _ = try? encodeBanded(nil, family: family, height: height, width: width, bands: bands)
+        do { _ = try encodeBanded(nil, family: family, height: height, width: width, bands: bands) } catch { preconditionFailure("VAE plan walk refused: \(error)") }
         return memory.layout
     }
 }

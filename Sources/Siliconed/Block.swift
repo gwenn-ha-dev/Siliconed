@@ -5,18 +5,18 @@ import Foundation
 /// A Z-Image Turbo transformer block, in fp32.
 ///
 ///     scale_msa, gate_msa, scale_mlp, gate_mlp = chunk(adaLN_modulation(adaln), 4)
-///     gate = tanh(gate)   ·   scale = 1 + scale          ← no shift (pitfall 3.3)
+///     gate = tanh(gate)   ·   scale = 1 + scale          ← no shift
 ///     x = x + gate_msa · attention_norm2( attention( attention_norm1(x) · scale_msa ) )
 ///     x = x + gate_mlp · ffn_norm2( feed_forward( ffn_norm1(x) · scale_mlp ) )
 ///
 /// The sandwich-norm is what makes this block impossible in fp16: the sublayer output rises to
-/// 8.7·10⁵ **before** `norm2` divides it back down (pitfall 3.11).
+/// 8.7·10⁵ **before** `norm2` divides it back down.
 ///
 /// Where it runs: the seven GEMMs on the GPU (with the AMX when co-execution is on, `Conductor`), the
 /// SDPA on the GPU with a share of the heads on the CPU (`HeadSplitAttention`), the SwiGLU on
 /// the GPU (`ElementwiseGPU`), the norms, RoPE and residuals on the CPU. The elementwise ops weigh
 /// little in FLOPs, carry all the porting risk, and on the CPU they can be debugged.
-package final class Block {
+package final class Block: BoundaryRecording, PhaseTiming {
     package struct Shapes {
         package let sequence: Int
         package let dim: Int
@@ -29,20 +29,14 @@ package final class Block {
     }
 
     /// What the engine exposes to the oracle: every boundary that the checks know how to judge.
-    package private(set) var boundaries: [String: [Float]] = [:]
+    package internal(set) var boundaries: [String: [Float]] = [:]
     package var recordBoundaries = false
 
     /// The time per phase, accumulated over all the blocks. We measure instead of deducing: the
     /// arithmetic count gave 25 s out of 48 measured, and the gap could not be guessed by anyone.
     /// The weight products' phases (`WeightProducts`) added to the block's own.
     package var timings: [String: Double] { ownTimings.merging(products.timings, uniquingKeysWith: +) }
-    private var ownTimings: [String: Double] = [:]
-    private func timed<T>(_ phase: String, _ body: () throws -> T) rethrows -> T {
-        let started = DispatchTime.now().uptimeNanoseconds
-        let result = try body()
-        ownTimings[phase, default: 0] += Double(DispatchTime.now().uptimeNanoseconds - started) * 1e-9
-        return result
-    }
+    var ownTimings: [String: Double] = [:]
     package func resetTimings() { ownTimings.removeAll(); products.resetTimings() }
 
     private let shapes: Shapes
@@ -194,11 +188,6 @@ package final class Block {
         }
     }
 
-    private func record(_ name: String, _ pointer: UnsafePointer<Float>, _ count: Int) {
-        guard recordBoundaries else { return }
-        boundaries[name] = Array(UnsafeBufferPointer(start: pointer, count: count))
-    }
-
     /// **The plan's answer for this block's attention** (the self-attention of the sizing length; the block tries flash before the
     /// split): the kernel it runs and, for the split, the heads the CPU takes.
     private var attentionAssignment: AttentionAssignment {
@@ -255,7 +244,7 @@ package final class Block {
         let d = shapes.dim, h = shapes.hidden
         let heads = shapes.heads, headDim = shapes.headDim
 
-        // ── modulation: a bare Linear, with bias, four pieces. No SiLU (pitfall 3.3).
+        // ── modulation: a bare Linear, with bias, four pieces. No SiLU.
         let scaleMSA = modulationSlot, gateMSA = modulationSlot + d
         let scaleMLP = modulationSlot + 2 * d, gateMLP = modulationSlot + 3 * d
         if modulation {

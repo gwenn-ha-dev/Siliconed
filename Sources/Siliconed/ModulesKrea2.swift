@@ -25,7 +25,6 @@ package struct Krea2TextModule: TextModule {
         context.footprints.tokenizer = Arena.processFootprint()
         try context.check()
         let hiddenValues = try Krea2Text.hiddenStates(ids, encoder: map, sockets: sockets,
-                                                freezeCut: context.reproducible,
                                                 cancellation: context.cancellation)
         context.footprints.encoder = Arena.processFootprint()
         return Conditioning(format: .krea2, rows: tokens, width: hiddenValues.count / max(1, tokens),
@@ -96,7 +95,7 @@ package struct Krea2DenoisingModule: DenoisingModule {
         let modulationKey = "krea2.modulation " + map
         func build(height: Int, width: Int) throws -> Krea2DiT {
             let dit = try Krea2DiT(artifact: artifact, latentHeight: height, latentWidth: width, maxText: tokens,
-                                   freezeCut: context.reproducible, neuralEngine: context.neuralEngine, lora: lora)
+                                   neuralEngine: context.neuralEngine, lora: lora)
             dit.cancellation = context.cancellation
             try context.check()
             if let table = context.reserve[modulationKey] as? Krea2DiT.ModulationTable { dit.modulations = table }
@@ -141,7 +140,7 @@ package struct Krea2DenoisingModule: DenoisingModule {
             return mergeDone.merged
         }
         let fusion = try Krea2TextFusion(artifact: artifact, maxTokens: text.rows,
-                                         freezeCut: context.reproducible, neuralEngine: context.neuralEngine,
+                                         neuralEngine: context.neuralEngine,
                                          lora: lora)
         fusion.cancellation = context.cancellation
         let merged = try text.values.withUnsafeBufferPointer {

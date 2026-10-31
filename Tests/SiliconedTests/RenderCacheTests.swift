@@ -44,17 +44,16 @@ final class RenderCacheTests: XCTestCase {
         var flipped = image.pixels
         flipped[17] = Float(bitPattern: flipped[17].bitPattern ^ 1)
         let other = ImageRGB(pixels: flipped, height: 4, width: 4)
-        let base = RenderCache.textKey(module, prompt: "p", images: [image], reproducible: true)
-        XCTAssertEqual(base, RenderCache.textKey(module, prompt: "p", images: [image], reproducible: true))
-        XCTAssertNotEqual(base, RenderCache.textKey(module, prompt: "p ", images: [image], reproducible: true))
-        XCTAssertNotEqual(base, RenderCache.textKey(module, prompt: "p", images: [other], reproducible: true))
-        XCTAssertNotEqual(base, RenderCache.textKey(module, prompt: "p", images: [], reproducible: true))
-        XCTAssertNotEqual(base, RenderCache.textKey(module, prompt: "p", images: [image, image], reproducible: true))
-        XCTAssertNotEqual(base, RenderCache.textKey(module, prompt: "p", images: [image], reproducible: false))
+        let base = RenderCache.textKey(module, prompt: "p", images: [image])
+        XCTAssertEqual(base, RenderCache.textKey(module, prompt: "p", images: [image]))
+        XCTAssertNotEqual(base, RenderCache.textKey(module, prompt: "p ", images: [image]))
+        XCTAssertNotEqual(base, RenderCache.textKey(module, prompt: "p", images: [other]))
+        XCTAssertNotEqual(base, RenderCache.textKey(module, prompt: "p", images: []))
+        XCTAssertNotEqual(base, RenderCache.textKey(module, prompt: "p", images: [image, image]))
         // Another module type reading the same files is another key.
         let z = ZImageTextModule(map: map.path, tokenizer: tokenizer.path)
-        XCTAssertNotEqual(RenderCache.textKey(z, prompt: "p", images: [], reproducible: true),
-                          RenderCache.textKey(module, prompt: "p", images: [], reproducible: true))
+        XCTAssertNotEqual(RenderCache.textKey(z, prompt: "p", images: []),
+                          RenderCache.textKey(module, prompt: "p", images: []))
     }
 
     /// A reinstalled file (other size, other date) — of the map or inside the tokenizer folder — is another key.
@@ -65,12 +64,12 @@ final class RenderCacheTests: XCTestCase {
         let json = tokenizer.appendingPathComponent("tokenizer.json")
         try Data("{}".utf8).write(to: json)
         let module = ZImageTextModule(map: map.path, tokenizer: tokenizer.path)
-        let before = RenderCache.textKey(module, prompt: "p", images: [], reproducible: true)
+        let before = RenderCache.textKey(module, prompt: "p", images: [])
         try FileManager.default.setAttributes([.modificationDate: Date(timeIntervalSince1970: 1_000_000)], ofItemAtPath: json.path)
-        let touched = RenderCache.textKey(module, prompt: "p", images: [], reproducible: true)
+        let touched = RenderCache.textKey(module, prompt: "p", images: [])
         XCTAssertNotEqual(before, touched)
         try Data([1, 2, 3, 4]).write(to: map)
-        XCTAssertNotEqual(touched, RenderCache.textKey(module, prompt: "p", images: [], reproducible: true))
+        XCTAssertNotEqual(touched, RenderCache.textKey(module, prompt: "p", images: []))
         XCTAssertTrue(RenderCache.stamp(folder.appendingPathComponent("absent").path).hasSuffix("(missing)"))
     }
 

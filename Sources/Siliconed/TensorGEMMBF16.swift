@@ -125,9 +125,9 @@ package final class BFloatKernels {
     /// `nil` when this macOS's compiler refuses the library or a kernel but the Q8_0 one (kept apart, as
     /// `TensorGEMM`'s: those weights are then widened).
     init?(device: MTLDevice, options: MTLCompileOptions) {
-        guard let library = try? device.makeLibrary(source: Self.source, options: options) else { return nil }
+        guard let library = MetalCompile.library(device, Self.source, options, what: "bf16 activation kernels") else { return nil }
         func pipeline(_ name: String) -> MTLComputePipelineState? {
-            library.makeFunction(name: name).flatMap { try? device.makeComputePipelineState(function: $0) }
+            library.makeFunction(name: name).flatMap { MetalCompile.pipeline(device, $0, what: "bf16 \(name)") }
         }
         guard let round = pipeline("round_bf16"), let byColumns = pipeline("linear_kn"),
               let byRows = pipeline("linear_nk"), let int8 = pipeline("linear_int8") else { return nil }
@@ -160,7 +160,7 @@ extension TensorGEMM {
         let kernels = rounded!
         let pipeline = weightIsTransposed ? kernels.byColumns : kernels.byRows
         let commands = makeCommands()
-        let encoder = commands.makeComputeCommandEncoder()!
+        let encoder = commands.checkedEncoder()
         for first in stride(from: 0, to: m, by: rounding.rows) {
             let rows = min(rounding.rows, m - first)
             encodeRound(encoder, kernels, from: a, first * k * 4, to: rounding.buffer, rounding.offset, count: rows * k)
@@ -192,7 +192,7 @@ extension TensorGEMM {
         let kernels = rounded!
         if block != nil && kernels.blocks == nil { return nil }
         let commands = makeCommands()
-        let encoder = commands.makeComputeCommandEncoder()!
+        let encoder = commands.checkedEncoder()
         let rows = rotation.map { min($0.chunk, rounding.rows) } ?? rounding.rows
         for first in stride(from: 0, to: m, by: rows) {
             let count = min(rows, m - first)

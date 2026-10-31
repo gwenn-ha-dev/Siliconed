@@ -74,8 +74,7 @@ final class NeuralEngineTests: XCTestCase {
         XCTAssertTrue(Variant.compact.neuralEngineByDefault)
         XCTAssertTrue(Variant.light.neuralEngineByDefault)
         var render = Engine.Render(model: "krea2", prompt: "woman posing in a library", seed: 42, steps: 8, loras: [],
-                                   loraSummary: nil, image: ImageRGB(pixels: [Float](repeating: 0, count: 3 * 4), height: 2, width: 2),
-                                   reproducible: true, evaluations: 8, sketch: nil, spectral: 0, strength: nil,
+                                   loraSummary: nil, image: ImageRGB(pixels: [Float](repeating: 0, count: 3 * 4), height: 2, width: 2), evaluations: 8, sketch: nil, spectral: 0, strength: nil,
                                    startStep: 0, startSigma: 1, timings: .init(), footprints: .init(), tokens: 1)
         XCTAssertNil(render.metadata["neural-engine"])
         XCTAssertEqual(Engine.Render.Recipe(metadata: render.metadata)?.neuralEngine, false)
@@ -84,7 +83,7 @@ final class NeuralEngineTests: XCTestCase {
         XCTAssertTrue(recipe.neuralEngine)
         XCTAssertEqual(recipe.unreadable, [])
         XCTAssertFalse(EngineSettings.effective.plan.usesANE)
-        XCTAssertEqual(RenderCache.numerics(reproducible: true, neuralEngine: true), RenderCache.numerics(reproducible: true))
+        XCTAssertEqual(RenderCache.numerics(neuralEngine: true), RenderCache.numerics())
     }
 
     // MARK: - the int8 program

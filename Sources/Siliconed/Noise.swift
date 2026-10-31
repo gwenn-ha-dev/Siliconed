@@ -2,15 +2,13 @@ import Foundation
 
 /// The initial noise of a trajectory, reproducible from a seed.
 ///
-/// **This is not PyTorch's generator, and that is deliberate**:
-/// reproducing its `randn_tensor` is not the point — reproducing the *trajectory* is. The
-/// checks therefore start from the reference's `latent_init`, re-read and not removed; this generator
-/// is only for free prompts, where there is no reference to compare against.
+/// **This is not PyTorch's generator, and that is deliberate** — for every family but Qwen-Image-2.1 (whose
+/// pipeline `TorchNoise` below reproduces to the bit): reproducing `randn_tensor` is not the point, reproducing the *trajectory*
+/// is. The checks therefore start from the reference's `latent_init`, re-read and not removed; this generator is only for free
+/// prompts, where there is no reference to compare against.
 ///
-/// **A consequence to know**: the same seed gives the same image with us and **another**
-/// image with `diffusers`. This is a property of the engine, not a defect to fix — fixing it
-/// would require porting PyTorch's Mersenne Twister and its rejection-based normal, for zero
-/// value.
+/// **A consequence to know**: for those families the same seed gives the same image with us and **another** image with
+/// `diffusers`. It is a choice, not a defect: matching it takes `TorchNoise`'s Mersenne Twister and block Box-Muller per family.
 package struct Noise {
     /// `splitmix64` — a single-state generator, with no table, no warm-up, and where each
     /// output bit depends on all the state bits. It is more than enough: what we ask of

@@ -11,7 +11,7 @@ import Synchronization
 ///
 /// Hence four rules:
 ///
-/// 1. **These settings are what a Mac's measure cannot say**: the cut's reproducibility, the spinning flag's fault injector,
+/// 1. **These settings are what a Mac's measure cannot say**: the spinning flag's fault injector,
 ///    the spectral schedule, the tiles, the page cache. Every *route* — which engine takes which rows of which product, which
 ///    kernel runs which attention — is the plan's (`plan`, `CapacityPlan`): exact rows asked at every product, never a
 ///    switch read once. A path that is dead (read by nothing) or wrong (a probe that renders a false image) has no reason
@@ -36,32 +36,6 @@ package struct EngineSettings: Sendable {
     /// The spinning flag, which returns **wrong** results. It serves only to make the check
     /// fail, and it has no place in a profile.
     package var amxSpin = false
-    /// **The frozen cut** (`SILICONED_REPRODUCIBLE`): the GPU/AMX rows are the plan's, from the first GEMM to the last. Two renders
-    /// of the same seed then yield the same bits.
-    ///
-    /// **And it is a profile setting, which calls for a justification** — the rule of profiles says a
-    /// profile tunes speed and room, never the image. This setting does change the image's last
-    /// bits, as the plan itself does when it hands rows to the AMX. The
-    /// forbidden family is that of the **approximations** — `spectral`, `vae_tuile` —
-    /// which change what one sees. Here the deviation is that of fp32 summation order, 2.5·10⁻⁵,
-    /// and freezing it makes the image **stable** rather than making it different: what is
-    /// unstable is the servo.
-    ///
-    /// ## Default **true**, and a measurement decided it
-    ///
-    /// An A/B/A/B barrage on an entire 1024² render: `servo 114.4 / 116.6 s`, `frozen
-    /// 116.2 / 116.4 s`. **+0.7 %** — when the gap between the two *servo* renders is **1.9 %** by
-    /// itself. The cost is smaller than the variance of what it is compared to.
-    ///
-    /// What is bought for that price: the two frozen renders yield a PNG **identical byte for
-    /// byte** (`md5 1fdd37f0…` twice), the two servo ones do not. A render becomes replayable
-    /// again — hence verifiable by someone else, on the same machine, without taking our word.
-    ///
-    /// The servo is not buried for all that: `SILICONED_REPRODUCIBLE=0` turns it back on, and it
-    /// keeps its reason for being — absorbing a thermal drift that 116 s do not show. **It only gives the GPU more rows than the
-    /// plan did, never fewer** (`Conductor.linear`): the AMX's slice, which the memory need charges from the plan, stays its ceiling.
-    package var frozenCut = true
-
     /// **The plan the process runs under** (`CapacityPlan`): what the engine asks, product by product and attention by attention —
     /// exact rows per engine and the kernel of each attention. The engine's defaults without a model; an app designates the model of
     /// its Mac (`designate(plan:)`) before anything reads the settings, and a check designates its strictest case the same way.
@@ -390,7 +364,6 @@ package struct EngineSettings: Sendable {
         }
         // The keys (second argument) are those of `store/profil.json`: on-disk keys, kept for existing profiles.
         read("SILICONED_AMX_SPIN", "amx_spin")
-        read("SILICONED_REPRODUCIBLE", "coupe_figee")
         read("SILICONED_SPECTRAL", "spectral")
         read("SILICONED_VAE_BLOCK", "vae_bloc_requetes")
         read("SILICONED_VAE_TILE", "vae_tuile")
@@ -473,7 +446,6 @@ package struct EngineSettings: Sendable {
             target = d; provenance[key] = source
         }
         flag("amx_spin", &amxSpin)
-        flag("coupe_figee", &frozenCut)
         integer("spectral", &spectral)
         integer("vae_bloc_requetes", &vaeRequestBlock)
         integer("vae_tuile", &vaeTile)
@@ -514,7 +486,6 @@ package struct EngineSettings: Sendable {
     package var rows: [(key: String, value: String, source: Provenance)] {
         let rows: [(String, String)] = [
             ("amx_spin", "\(amxSpin)"),
-            ("coupe_figee", "\(frozenCut)"),
             ("spectral", "\(spectral)"),
             ("vae_bloc_requetes", "\(vaeRequestBlock)"),
             ("vae_tuile", vaeTile == 0 ? "no" : "\(vaeTile) (overlap \(vaeOverlap))"),
@@ -528,7 +499,6 @@ package struct EngineSettings: Sendable {
     /// The dictionary of active values, to write into a profile.
     package var values: [String: Any] {
         [
-            "coupe_figee": frozenCut,
             "spectral": spectral, "vae_bloc_requetes": vaeRequestBlock,
             "parallel": parallel, "map_tail": mapTail,
         ]

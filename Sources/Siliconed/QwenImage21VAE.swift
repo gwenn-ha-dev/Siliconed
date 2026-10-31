@@ -429,12 +429,7 @@ package enum QwenImage21VAE {
         ]
     }
 
-    static func device() throws -> (MTLDevice, MTLCommandQueue) {
-        guard let device = MTLCreateSystemDefaultDevice(), let queue = device.makeCommandQueue() else {
-            throw GEMM.Failure.noDevice
-        }
-        return (device, queue)
-    }
+    static func device() throws -> (MTLDevice, MTLCommandQueue) { try SystemGPU.open() }
 }
 
 // ── the decoder ─────────────────────────────────────────────────────────────────────────────
@@ -497,8 +492,10 @@ package final class QwenImage21VAEDecoder {
     package static func walk(config: QwenImage21VAE.Config, latentHeight h: Int, latentWidth w: Int,
                              bandPixels: Int = QwenImage21VAEDecoder.bandPixels) -> VAELayout {
         let memory = VAEMemory()
-        _ = try? decode(nil, config: config, latentHeight: h, latentWidth: w, bandPixels: bandPixels, weights: nil,
-                        memory: memory)
+        do {
+            _ = try decode(nil, config: config, latentHeight: h, latentWidth: w, bandPixels: bandPixels, weights: nil,
+                           memory: memory)
+        } catch { preconditionFailure("VAE plan walk refused: \(error)") }
         return memory.layout
     }
 
@@ -735,7 +732,7 @@ package final class QwenImage21VAEEncoder {
     /// `plan`, walked every time: what the memory keeps, and what the tests compare it with.
     package static func walk(config: QwenImage21VAE.Config, height: Int, width: Int) -> VAELayout {
         let memory = VAEMemory()
-        _ = try? encode(nil, config: config, height: height, width: width, weights: nil, memory: memory)
+        do { _ = try encode(nil, config: config, height: height, width: width, weights: nil, memory: memory) } catch { preconditionFailure("VAE plan walk refused: \(error)") }
         return memory.layout
     }
 

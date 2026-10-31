@@ -70,8 +70,6 @@ package final class Engine: Sendable {
         package let loraSummary: String?
         /// The image, planar `[3, height, width]`, fp32 around `[-1, 1]` (not clamped).
         package let image: ImageRGB
-        /// Was the GPU/AMX split frozen (`Request.reproducible`, resolved at render time)?
-        package let reproducible: Bool
         /// The evaluations done — for a sketch, those it stopped after.
         package let evaluations: Int
         /// **A sketch** (`Request.sketch`): the evaluations it stopped after, the image being the
@@ -120,14 +118,13 @@ package final class Engine: Sendable {
         /// **The generation metadata**, as `png()` writes it (`iTXt` chunks). ASCII keys, readable
         /// values; **no date** — two identical renders must remain two identical files.
         ///
-        /// Enough to redo a **txt2img** on the same machine and the same version (`reproducible`
-        /// says whether the bits will match). **Not an img2img**: the source image is not included
+        /// Enough to redo a **txt2img** on the same machine and the same version. **Not an img2img**: the source image is not included
         /// (the `image` key says so), and a LoRA appears only by its file name. `parameters` says the
         /// same render again for Civitai (`Infotext`), with the app's version: identical renders of
         /// one version stay identical files.
         package var metadata: [String: String] {
             var m = ["prompt": prompt, "seed": "\(seed)", "model": model, "steps": "\(steps)",
-                     "format": "\(image.width)x\(image.height)", "reproducible": "\(reproducible)",
+                     "format": "\(image.width)x\(image.height)",
                      "Software": "Siliconed"]
             if let strength {
                 m["strength"] = String(format: "%.2f", strength)
@@ -200,7 +197,6 @@ package final class Engine: Sendable {
             package var strength: Double?
             /// An img2img: the image it started from is not in the file.
             package var sourceImageMissing = false
-            package var reproducible: Bool?
             /// `Request.detail`; `normal` when the key is absent (every render before it).
             package var detail: Detail = .normal
             /// `Request.solver`; `euler` when the key is absent (every render before it).
@@ -234,7 +230,6 @@ package final class Engine: Sendable {
                 }
                 strength = read("strength") { Double($0).flatMap { $0 > 0 && $0 <= 1 ? $0 : nil } }
                 sourceImageMissing = strength != nil || m["image"] != nil
-                reproducible = read("reproducible") { Bool($0) }
                 detail = read("detail") { Detail(rawValue: $0) } ?? .normal
                 solver = read("solver") { Solver(rawValue: $0) } ?? .euler
                 neuralEngine = read("neural-engine") { Bool($0) } ?? false

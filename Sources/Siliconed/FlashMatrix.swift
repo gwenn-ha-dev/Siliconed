@@ -380,8 +380,8 @@ package final class FlashMatrix {
     package func run(q: MTLBuffer, k: MTLBuffer, v: MTLBuffer, into out: MTLBuffer) -> Double {
         let clock = ProductLedger.attention(sequence: sequence, heads: heads, headDim: FlashMatrix.headDim, route: "flash")
         defer { clock?.finish() }
-        let commands = queue.makeCommandBuffer()!
-        let encoder = commands.makeComputeCommandEncoder()!
+        let commands = queue.checkedCommandBuffer()
+        let encoder = commands.checkedEncoder()
         encoder.label = "flash_sdpa_matrix"
         encoder.setComputePipelineState(pipeline)
         encoder.setBuffer(q, offset: 0, index: 0)

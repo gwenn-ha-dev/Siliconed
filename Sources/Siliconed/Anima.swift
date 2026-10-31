@@ -42,7 +42,7 @@ import Foundation
 /// (`Conductor`, ~3.0 s, at the pair's ceiling), the self- and cross-attention cut by heads between the GPU
 /// and the CPU (`HeadSplitAttention`, ~1.9 s), the GELU on the GPU (`AnimaGELU`); the norms, QK-Norm with
 /// RoPE (one pass), the residuals and the modulations (in double) on the CPU, ~0.4 s.
-package final class AnimaDiT {
+package final class AnimaDiT: BoundaryRecording, PhaseTiming {
     package struct Config {
         package let dim, heads, headDim, hidden, layers, channels, patch, adalnLoRA, textDim: Int
         package let ropeScale: [Double]
@@ -79,13 +79,13 @@ package final class AnimaDiT {
     }
 
     package let config: Config
-    package private(set) var boundaries: [String: [Float]] = [:]
+    package internal(set) var boundaries: [String: [Float]] = [:]
     package var recordBoundaries = false
     /// The token of the render in progress, consulted between two layers (see `Cancellation`).
     package var cancellation: Cancellation?
     /// The weight products' phases (`WeightProducts`) added to the DiT's own.
     package var timings: [String: Double] { ownTimings.merging(products.timings, uniquingKeysWith: +) }
-    private var ownTimings: [String: Double] = [:]
+    var ownTimings: [String: Double] = [:]
     package var conductor: Conductor? { gemm.conductor }
     package var census: [String: (count: Int, seconds: Double, best: Double)] { gemm.census }
 
@@ -135,7 +135,7 @@ package final class AnimaDiT {
     ///   padding its output with zeros up to that. The zeros **count**: the reference does not
     ///   mask cross-attention, so each zero row takes its share of the softmax.
     package init(artifact: Artifact, latentHeight: Int, latentWidth: Int, textLength: Int = 512,
-                freezeCut: Bool = EngineSettings.effective.frozenCut, neuralEngine: Bool = EngineSettings.effective.plan.usesANE, lora: LoRA? = nil) throws {
+                neuralEngine: Bool = EngineSettings.effective.plan.usesANE, lora: LoRA? = nil) throws {
         guard artifact.header["kind"] as? String == "anima-turbo-dit" else {
             throw Artifact.Failure.badHeader("map \(artifact.header["kind"] ?? "?"): anima-turbo-dit expected")
         }
@@ -152,7 +152,7 @@ package final class AnimaDiT {
                                             reason: .sideTooLong, bound: side)
         }
         self.prefetcher = Prefetcher(artifact: artifact)
-        self.gemm = try GEMM(freezeCut: freezeCut, neuralEngine: neuralEngine)
+        self.gemm = try GEMM(neuralEngine: neuralEngine)
         self.gelu = try AnimaGELU(device: gemm.device, queue: gemm.queue)
         self.transposed = artifact.linearWeightsTransposed
         self.latentHeight = latentHeight
@@ -206,17 +206,6 @@ package final class AnimaDiT {
 
     /// The bytes this DiT's arena maps — what the tests compare with `AnimaDiT.arenaBytes`.
     package var arenaCapacity: Int { arena.capacity }
-
-    private func record(_ name: String, _ p: UnsafePointer<Float>, _ n: Int) {
-        guard recordBoundaries else { return }
-        boundaries[name] = Array(UnsafeBufferPointer(start: p, count: n))
-    }
-
-    private func timed<T>(_ phase: String, _ body: () throws -> T) rethrows -> T {
-        let started = DispatchTime.now().uptimeNanoseconds
-        defer { ownTimings[phase, default: 0] += Double(DispatchTime.now().uptimeNanoseconds - started) * 1e-9 }
-        return try body()
-    }
 
     /// `latent` as `[16, H, W]`, `context` as `[textLength, 1024]` (the conditioner output,
     /// padded), `sigma` as the scheduler gives it — the pipeline passes `t / 1000`, `t = σ·1000`, which
@@ -746,7 +735,7 @@ package enum AnimaOps {
         let chunk = 1 << 16
         let pieces = (count + chunk - 1) / chunk
         nonisolated(unsafe) let x = x   // disjoint slices, one per thread
-        DispatchQueue.concurrentPerform(iterations: pieces) { piece in
+        Parallel.perform(pieces) { piece in
             let start = piece * chunk, end = min(start + chunk, count)
             for i in start..<end {
                 let value = x[i]

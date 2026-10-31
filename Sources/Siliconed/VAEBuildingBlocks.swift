@@ -312,17 +312,8 @@ enum WeightList {
     static func rms(_ c: Int) -> [Int] { [c] }
     static func projection(_ rows: Int, _ inputs: Int) -> [Int] { [rows * inputs, rows] }
 
-    /// `VAEBuildingBlocks.resnetFlux`: norm1, conv1, norm2, conv2, then the shortcut.
-    static func resnetFlux(_ i: Int, _ o: Int) -> [Int] {
-        groupNorm(i) + conv(o, i) + groupNorm(o) + conv(o, o) + (i == o ? [] : conv(o, i, kernel: 1))
-    }
-
     /// `VAEBuildingBlocks.resnetQwen`: the shortcut first, then norm1, conv1, norm2, conv2.
     static func resnetQwen(_ i: Int, _ o: Int) -> [Int] {
         (i == o ? [] : conv(o, i, kernel: 1)) + rms(i) + conv(o, i) + rms(o) + conv(o, o)
     }
-
-    /// Flux's bottleneck attention: its `GroupNorm`, q, k, v, the output projection.
-    static func attentionFlux(_ c: Int) -> [Int] { groupNorm(c) + Array([[Int]](repeating: projection(c, c), count: 4).joined()) }
-
 }

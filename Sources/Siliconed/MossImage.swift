@@ -52,7 +52,7 @@ import Foundation
 ///     per module, `diffusion_model.` prefix), and `time_embedding.*`, `shared_block_modulation`,
 ///     `video_head_modulation` through the double path. The distilled model's own time embedding
 ///     (`time_embedding.safetensors`, a different sampler) is not this route.
-package final class MossImageDiT {
+package final class MossImageDiT: BoundaryRecording, PhaseTiming {
     package struct Config {
         package let dim, heads, headDim, hidden, layers, textDim, timeDim, channels, textBlocks: Int
         package let ropeBase: Double
@@ -78,14 +78,14 @@ package final class MossImageDiT {
     package static let eps: Float = 1e-6
 
     package let config: Config
-    package private(set) var boundaries: [String: [Float]] = [:]
+    package internal(set) var boundaries: [String: [Float]] = [:]
     package var recordBoundaries = false
     /// The blocks whose output `boundaries` keeps (`block<N>_out`).
     package var recordedBlocks: Set<Int> = [0, 1, 21, 41]
     /// The token of the render in progress, consulted between two layers (see `Cancellation`).
     package var cancellation: Cancellation?
     package var timings: [String: Double] { ownTimings.merging(products.timings, uniquingKeysWith: +) }
-    private var ownTimings: [String: Double] = [:]
+    var ownTimings: [String: Double] = [:]
     package func resetTimings() { ownTimings.removeAll(); products.resetTimings() }
     package var census: [String: (count: Int, seconds: Double, best: Double)] { gemm.census }
 
@@ -123,7 +123,7 @@ package final class MossImageDiT {
     ///   - expanded: the stack's expanded weights from a DiT given back, taken over rather than filled again (the
     ///     half-size start's, handed to the full one: the turbo LoRA's 1.19 GB of fp32 read once).
     package init(artifact: Artifact, gridHeight: Int, gridWidth: Int, maxText: Int = 512,
-                 freezeCut: Bool = EngineSettings.effective.frozenCut, neuralEngine: Bool = EngineSettings.effective.plan.usesANE,
+                 neuralEngine: Bool = EngineSettings.effective.plan.usesANE,
                  lora: LoRA? = nil, expanded: CacheLoRA? = nil) throws {
         guard artifact.header["kind"] as? String == MossImageDiT.kind else {
             throw Artifact.Failure.badHeader("map \(artifact.header["kind"] ?? "?"): \(MossImageDiT.kind) expected")
@@ -134,7 +134,7 @@ package final class MossImageDiT {
         self.artifact = artifact
         self.config = Config(header: artifact.header)
         self.prefetcher = Prefetcher(artifact: artifact)
-        self.gemm = try GEMM(freezeCut: freezeCut, neuralEngine: neuralEngine)
+        self.gemm = try GEMM(neuralEngine: neuralEngine)
         self.elementwise = try ElementwiseGPU(device: gemm.device, queue: gemm.queue)
         self.kernels = try MossImageKernels(device: gemm.device, queue: gemm.queue)
         self.gridHeight = gridHeight; self.gridWidth = gridWidth
@@ -219,11 +219,6 @@ package final class MossImageDiT {
         return blockLinears.contains(String(rest[rest.index(after: dot)...]))
     }
 
-    private func record(_ name: String, _ p: UnsafePointer<Float>, _ n: Int) {
-        guard recordBoundaries else { return }
-        boundaries[name] = Array(UnsafeBufferPointer(start: p, count: n))
-    }
-
     /// Rows `[text T | image S]` of a tensor `width` wide, recorded in the reference's order: image rows, then text rows.
     private func recordRows(_ name: String, _ p: UnsafePointer<Float>, width: Int, text t: Int) {
         guard recordBoundaries else { return }
@@ -234,12 +229,6 @@ package final class MossImageDiT {
             (o.baseAddress! + s * width).update(from: p, count: t * width)
         }
         boundaries[name] = out
-    }
-
-    private func timed<T>(_ phase: String, _ body: () throws -> T) rethrows -> T {
-        let started = DispatchTime.now().uptimeNanoseconds
-        defer { ownTimings[phase, default: 0] += Double(DispatchTime.now().uptimeNanoseconds - started) * 1e-9 }
-        return try body()
     }
 
     // MARK: - one evaluation
@@ -330,7 +319,7 @@ package final class MossImageDiT {
             Ops.rmsNorm(x + t * d, weight: reserve, into: normed, rows: s, columns: d, eps: MossImageDiT.eps)
         }
         record("final_norm_out", normed, s * d)
-        timed("norm") { Krea2Ops.modulate(normed, scale: m + d, shift: m, rows: s, columns: d) }
+        timed("norm") { Ops.modulate(normed, scale: m + d, shift: m, rows: s, columns: d) }
         try linearGPU("final_linear_video.weight", a: normed, into: projected, m: s, k: d, n: c)
 
         var out = [Float](repeating: 0, count: c * s)
@@ -484,7 +473,7 @@ package final class MossImageDiT {
     private func modulatedNorm(_ name: String, _ source: UnsafePointer<Float>, rows: Int,
                                scale: UnsafePointer<Float>, shift: UnsafePointer<Float>) throws {
         try plainNorm(name, source, rows: rows)
-        timed("norm") { Krea2Ops.modulate(normed, scale: scale, shift: shift, rows: rows, columns: config.dim) }
+        timed("norm") { Ops.modulate(normed, scale: scale, shift: shift, rows: rows, columns: config.dim) }
     }
 
     /// QK-Norm: RMSNorm over `head_dim`.
@@ -496,12 +485,7 @@ package final class MossImageDiT {
 
     private func addBias(_ name: String, to c: UnsafeMutablePointer<Float>, rows: Int, columns: Int) throws {
         try artifact.materialize(name, into: reserve, capacity: reserveCapacity)
-        let bias = UnsafePointer(reserve)
-        Parallel.rows(rows, width: columns) { first, howMany in
-            for row in first..<(first + howMany) {
-                vDSP_vadd(c + row * columns, 1, bias, 1, c + row * columns, 1, vDSP_Length(columns))
-            }
-        }
+        Ops.addBias(c, bias: reserve, rows: rows, columns: columns)
     }
 
     private func attend(rows n: Int) throws {
@@ -681,6 +665,8 @@ package enum MossImageExact {
     package static func sinusoid(timestep: Float, dim: Int) -> [Float] {
         let half = dim / 2
         var out = [Float](repeating: 0, count: dim)
+        // `pow`, not `Sinusoid.frequencies`: the two differ in the last bit of most entries (`SinusoidTests`), which is the
+        // checkpoint's reference's own arithmetic here.
         for j in 0..<half {
             let angle = Double(timestep) * pow(10000, -Double(j) / Double(half))
             out[j] = Float(cos(angle))

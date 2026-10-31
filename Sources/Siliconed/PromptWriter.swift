@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 
 /// **The lab's writer**: a prompt in, a prompt out, written by the installed text encoder made to write
 /// (Qwen-Image-2.1's Qwen3-VL-8B, `Qwen3VLGenerator`). Rewrite turns a text into another following an
@@ -13,14 +14,18 @@ import Foundation
 ///
 /// What the lab's use asks of it, and what a caller would get wrong:
 ///
-///   - **It never runs during a render.** The app cancels the lab and awaits `release()` before a render's
-///     first computation; the writer's resident weights (8.2 GB at the Compact's width) are not in any render's
-///     need, which assumes the whole of B.
-///   - **One thing at a time**: a run waits for the one before it on a serial queue; two never share the pages.
+///   - **It never runs during a render, and the engine sees to it.** A run is a job of the engine's queue (`Engine.file`) and holds
+///     the machine's render lock (`RenderLock.machine`): the exclusion with a render, in this process and in any other, is the
+///     engine's, not a convention of the app. The writer's resident weights (8.2 GB at the Compact's width) are not in any
+///     render's need, which assumes the whole of B: a render's first act, on that same queue, is `unloadResident()`.
+///   - **One thing at a time**: a run waits for the one before it on the engine's queue; two never share the pages. A run still
+///     waiting is cancelled by `cancel()` and `release()` as well as the one in flight.
 ///   - **The plan is chosen before the first token**: the need is computed from the prompt's actual size
 ///     (`PromptWriterNeed`) and compared with B (`MemoryBudget.machineCeiling`), after the process's base, read
 ///     once, before the writer holds anything of its own. Above B, the writer is unavailable, with the Mac
 ///     that would hold it; a prompt over `Limits.promptTokens` is refused with its count.
+///   - **The base is read at every run**, never kept: the app's footprint changes between two runs; what the writer itself holds
+///     resident is taken out of it (it is in the need).
 ///   - **A cancelled stream ends with `.cancelled`, not an error**; a consumer that stops reading cancels the run.
 ///   - **The text is cumulative**, and never ends inside a character (`UTF8Stream`).
 ///   - **Greedy**, whatever the Instruct's `generation_config.json` recommends: ties to the lowest id.
@@ -64,20 +69,39 @@ package final class PromptWriter: @unchecked Sendable {
     private let encoderPath: String, headPath: String, tokenizerPath: String
     private let limits: PromptWriterNeed.Limits
     private let ceiling: () -> Int
-    private let queue = DispatchQueue(label: "siliconed.prompt-writer")
     private let lock = NSLock()
-    private var current: Cancellation?
+    /// Every run not yet finished, queued or in flight: the tokens `cancel()` reaches.
+    private var pending: [ObjectIdentifier: Cancellation] = [:]
 
-    // Owned by `queue`.
+    // Owned by the engine's queue (`Engine.file`).
     private var generator: Qwen3VLGenerator?
     private var tokenizer: Tokenizer?
     private var tokenBytes: TokenBytes?
-    private var base: Int?
+
+    /// The writers that may hold weights: a render unloads them on the engine's queue before its first computation.
+    private static let live = Mutex<[ObjectIdentifier: Weak]>([:])
+    private struct Weak { weak var writer: PromptWriter? }
 
     package init(maps: PromptWriterMaps, encoderPath: String, headPath: String, tokenizerPath: String,
                  limits: PromptWriterNeed.Limits = .init(), ceiling: @escaping () -> Int = { MemoryBudget.machineCeiling() }) {
         self.maps = maps; self.encoderPath = encoderPath; self.headPath = headPath; self.tokenizerPath = tokenizerPath
         self.limits = limits; self.ceiling = ceiling
+        PromptWriter.live.withLock { $0[ObjectIdentifier(self)] = Weak(writer: self) }
+    }
+
+    deinit { let id = ObjectIdentifier(self); PromptWriter.live.withLock { _ = $0.removeValue(forKey: id) } }
+
+    /// **A render's first act**, on the engine's queue: every writer gives its weights back. The resident layers and head are
+    /// not in any render's need.
+    static func unloadResident() {
+        dispatchPrecondition(condition: .onQueue(Engine.file))
+        let writers = live.withLock { $0.values.compactMap(\.writer) }
+        for writer in writers { writer.unload() }
+    }
+
+    private func unload() {
+        generator?.unload()
+        generator = nil; tokenizer = nil; tokenBytes = nil
     }
 
     /// The writer of Qwen-Image-2.1 in `library`; `nil` while its encoder, head or tokenizer is not installed.
@@ -100,11 +124,16 @@ package final class PromptWriter: @unchecked Sendable {
     package func write(_ request: Request) -> AsyncThrowingStream<Event, Error> {
         AsyncThrowingStream { continuation in
             let token = Cancellation()
+            // Registered now, not when the run starts: a run still queued is cancelled too.
+            let id = ObjectIdentifier(token)
+            lock.withLock { pending[id] = token }
             continuation.onTermination = { _ in token.cancel() }
-            queue.async { [self] in
-                lock.withLock { current = token }
-                defer { lock.withLock { current = nil } }
+            Engine.file.async { [self] in
+                defer { lock.withLock { _ = pending.removeValue(forKey: id) } }
                 do {
+                    // The machine's lock, as a render takes it: another process rendering refuses this run by name.
+                    let machine = try RenderLock.acquire(RenderLock.machine)
+                    defer { withExtendedLifetime(machine) {} }
                     try run(request, cancellation: token) { continuation.yield($0) }
                     continuation.finish()
                 } catch EngineError.cancelled {
@@ -117,32 +146,25 @@ package final class PromptWriter: @unchecked Sendable {
         }
     }
 
-    /// Stops the run in flight, between two layers.
-    package func cancel() { lock.withLock { current }?.cancel() }
+    /// Stops the run in flight, between two layers, and the runs still waiting.
+    package func cancel() { lock.withLock { Array(pending.values) }.forEach { $0.cancel() } }
 
     /// **Cancels, then gives the weights back** once the run has stopped: the resident layers and head, the
     /// tokenizer. Awaited before a render starts.
     package func release() async {
         cancel()
         await withCheckedContinuation { (done: CheckedContinuation<Void, Never>) in
-            queue.async { [self] in
-                generator?.unload()
-                generator = nil; tokenizer = nil; tokenBytes = nil; base = nil
+            Engine.file.async { [self] in
+                unload()
                 done.resume()
             }
         }
     }
 
-    /// Whether the weights are resident.
-    package var isResident: Bool { queue.sync { generator != nil } }
-
     private func run(_ request: Request, cancellation: Cancellation, emit: @escaping (Event) -> Void) throws {
         try cancellation.check()
         let tokenizer = try tokenizer ?? Tokenizer(file: tokenizerPath)
         self.tokenizer = tokenizer
-        // The base is the process's before the writer holds anything: the pages it keeps are in the need.
-        let base = self.base ?? OperatorFootprint.processBase()
-        self.base = base
 
         // ── the prompt, and the need it makes ─────────────────────────────────────────────────────
         let (system, user, image): (String?, String, Qwen3VLImages.RGB8?)
@@ -158,7 +180,9 @@ package final class PromptWriter: @unchecked Sendable {
             throw Failure.promptTooLong(tokens: prepared.ids.count, limit: limits.promptTokens)
         }
         var need = PromptWriterNeed(maps: maps, promptTokens: prepared.ids.count, newTokens: limits.newTokens, patches: pixels?.patches)
-        need.base = base
+        // The process's footprint now, less what this writer holds resident (that is in the need, not in the base).
+        let measured = OperatorFootprint.processBase()
+        need.base = self.generator == nil ? measured : max(0, measured - need.residentBytes)
         let availability = need.availability(ceiling: ceiling())
         guard case .available = availability else { throw Failure.unavailable(availability) }
 

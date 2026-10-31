@@ -78,7 +78,6 @@ package final class Qwen3VLEncoder {
     package let tokenizer: Tokenizer
     package let tokens: Qwen3VLPrompt.Tokens
     package let vision: Qwen3VLVision.Config
-    private let freezeCut: Bool
 
     /// The probes, on request (checks): those of the language model (`layerN_in`, `layerN_out`,
     /// `embed_out`) and of the vision tower (`vit_*`, see `Qwen3VLVision`).
@@ -88,13 +87,11 @@ package final class Qwen3VLEncoder {
     /// Seconds, by phase — `vision`, `language`.
     package private(set) var timings: [String: Double] = [:]
 
-    package init(artifact: Artifact, tokenizer: Tokenizer,
-                 freezeCut: Bool = EngineSettings.effective.frozenCut) throws {
+    package init(artifact: Artifact, tokenizer: Tokenizer) throws {
         self.artifact = artifact
         self.tokenizer = tokenizer
         self.tokens = try Qwen3VLPrompt.Tokens(header: artifact.header, tokenizer: tokenizer)
         self.vision = try Qwen3VLVision.Config(header: artifact.header)
-        self.freezeCut = freezeCut
         guard artifact.header["final_norm"] as? Bool != true else {
             throw Artifact.Failure.badHeader("Qwen3-VL: the output is taken BEFORE the final norm")
         }
@@ -114,7 +111,7 @@ package final class Qwen3VLEncoder {
         if !images.isEmpty {
             let started = Date()
             let tower = try Qwen3VLVision(artifact: artifact, config: vision,
-                                          maximumPatches: images.map(\.patches).max()!, freezeCut: freezeCut)
+                                          maximumPatches: images.map(\.patches).max()!)
             tower.cancellation = cancellation
             for (index, image) in images.enumerated() {
                 tower.recordedNames = recordedNames.map { names in
@@ -135,7 +132,7 @@ package final class Qwen3VLEncoder {
 
         // ── the language model ──────────────────────────────────────────────────────────────
         let started = Date()
-        let encoder = try TextEncoder(artifact: artifact, sequence: sequence, freezeCut: freezeCut)
+        let encoder = try TextEncoder(artifact: artifact, sequence: sequence)
         let h = encoder.config.hidden
         guard h == vision.output else {
             throw Artifact.Failure.badHeader("vision output \(vision.output) for a language model of \(h)")

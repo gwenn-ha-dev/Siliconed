@@ -57,7 +57,7 @@ import Foundation
 /// never read again (sliced off before the final layer). Without mask or padding, each useful row
 /// sees exactly the same keys: same sum. The golden tensors, computed WITH padding, are
 /// the check.
-package final class Krea2DiT {
+package final class Krea2DiT: BoundaryRecording, PhaseTiming {
     package struct Config {
         package let dim, heads, kvHeads, headDim, hidden, layers, channels, timeDim: Int
         package let axes: [Int]
@@ -83,13 +83,13 @@ package final class Krea2DiT {
     }
 
     package let config: Config
-    package private(set) var boundaries: [String: [Float]] = [:]
+    package internal(set) var boundaries: [String: [Float]] = [:]
     package var recordBoundaries = false
     /// The token of the render in progress, consulted between two layers (see `Cancellation`).
     package var cancellation: Cancellation?
     /// The weight products' phases (`WeightProducts`) added to the DiT's own.
     package var timings: [String: Double] { ownTimings.merging(products.timings, uniquingKeysWith: +) }
-    private var ownTimings: [String: Double] = [:]
+    var ownTimings: [String: Double] = [:]
     package var census: [String: (count: Int, seconds: Double, best: Double)] { gemm.census }
     package var conductor: Conductor? { gemm.conductor }
 
@@ -137,7 +137,7 @@ package final class Krea2DiT {
     private let products: WeightProducts
 
     package init(artifact: Artifact, latentHeight: Int, latentWidth: Int, maxText: Int = 512,
-                freezeCut: Bool = EngineSettings.effective.frozenCut, neuralEngine: Bool = EngineSettings.effective.plan.usesANE, lora: LoRA? = nil) throws {
+                neuralEngine: Bool = EngineSettings.effective.plan.usesANE, lora: LoRA? = nil) throws {
         guard artifact.header["kind"] as? String == "krea2-turbo-dit" else {
             throw Artifact.Failure.badHeader("map \(artifact.header["kind"] ?? "?"): krea2-turbo-dit expected")
         }
@@ -149,7 +149,7 @@ package final class Krea2DiT {
         self.artifact = artifact
         self.config = Config(header: artifact.header)
         self.prefetcher = Prefetcher(artifact: artifact)
-        self.gemm = try GEMM(freezeCut: freezeCut, neuralEngine: neuralEngine)
+        self.gemm = try GEMM(neuralEngine: neuralEngine)
         self.elementwise = try ElementwiseGPU(device: gemm.device, queue: gemm.queue)
         self.latentHeight = latentHeight
         self.latentWidth = latentWidth
@@ -246,17 +246,6 @@ package final class Krea2DiT {
             return blockLinears.contains(String(rest[rest.index(after: dot)...]))
         }
         return false
-    }
-
-    private func record(_ name: String, _ p: UnsafePointer<Float>, _ n: Int) {
-        guard recordBoundaries else { return }
-        boundaries[name] = Array(UnsafeBufferPointer(start: p, count: n))
-    }
-
-    private func timed<T>(_ phase: String, _ body: () throws -> T) rethrows -> T {
-        let started = DispatchTime.now().uptimeNanoseconds
-        defer { ownTimings[phase, default: 0] += Double(DispatchTime.now().uptimeNanoseconds - started) * 1e-9 }
-        return try body()
     }
 
     /// `latent` as `[16, H, W]`, `text` as `[T, 6144]` (the output of `txt_in`, without padding), `sigma`
@@ -466,7 +455,7 @@ package final class Krea2DiT {
         try artifact.materialize(name, into: reserve, capacity: reserveCapacity)
         timed("norm") {
             Ops.rmsNorm(source, weight: reserve, into: normed, rows: rows, columns: d, eps: Float(config.eps))
-            Krea2Ops.modulate(normed, scale: scale, shift: shift, rows: rows, columns: d)
+            Ops.modulate(normed, scale: scale, shift: shift, rows: rows, columns: d)
         }
     }
 
@@ -479,12 +468,7 @@ package final class Krea2DiT {
 
     private func addBias(_ name: String, to c: UnsafeMutablePointer<Float>, rows: Int, columns: Int) throws {
         try artifact.materialize(name, into: reserve, capacity: reserveCapacity)
-        let bias = UnsafePointer(reserve)
-        Parallel.rows(rows, width: columns) { first, howMany in
-            for row in first..<(first + howMany) {
-                vDSP_vadd(c + row * columns, 1, bias, 1, c + row * columns, 1, vDSP_Length(columns))
-            }
-        }
+        Ops.addBias(c, bias: reserve, rows: rows, columns: columns)
     }
 
     private func attend(rows n: Int) throws {
@@ -543,10 +527,10 @@ package final class Krea2DiT {
 /// its arena — its own is returned beforehand. Its blocks are pre-norm blocks without RoPE or
 /// modulation, with 20 heads of 128 without GQA, and with the same sigmoid gate as the DiT. Their
 /// attentions are small (12 × 12 per token, T × T at most 512²): they run on the CPU.
-package final class Krea2TextFusion {
+package final class Krea2TextFusion: BoundaryRecording {
     package let dim = Shape.dim, heads = Shape.heads, headDim = Shape.headDim, hidden = Shape.hidden, layers = Shape.layers
     package let outDim: Int
-    package private(set) var boundaries: [String: [Float]] = [:]
+    package internal(set) var boundaries: [String: [Float]] = [:]
     package var recordBoundaries = false
     /// The token of the render in progress, consulted between two layers (see `Cancellation`).
     package var cancellation: Cancellation?
@@ -570,8 +554,7 @@ package final class Krea2TextFusion {
     /// The products by a weight, and their LoRA stack (expanded at each call into `loraBas`/`loraHaut`).
     private let products: WeightProducts
 
-    package init(artifact: Artifact, maxTokens: Int, freezeCut: Bool = EngineSettings.effective.frozenCut,
-                neuralEngine: Bool = EngineSettings.effective.plan.usesANE, lora: LoRA? = nil) throws {
+    package init(artifact: Artifact, maxTokens: Int, neuralEngine: Bool = EngineSettings.effective.plan.usesANE, lora: LoRA? = nil) throws {
         guard artifact.header["kind"] as? String == "krea2-turbo-dit" else {
             throw Artifact.Failure.badHeader("the text fusion lives in the Krea 2 DiT map")
         }
@@ -579,7 +562,7 @@ package final class Krea2TextFusion {
         self.artifact = artifact
         self.outDim = config.dim
         self.eps = Float(config.eps)
-        self.gemm = try GEMM(freezeCut: freezeCut, neuralEngine: neuralEngine)
+        self.gemm = try GEMM(neuralEngine: neuralEngine)
         self.rows = maxTokens * Shape.layers
         let rank = lora?.maxRank ?? 0
         // The arena is its slices (`Krea2TextFusion.slices`), each on its page: the function the memory
@@ -612,11 +595,6 @@ package final class Krea2TextFusion {
 
     /// The arena this fusion mapped — what the tests compare with `arenaBytes`.
     package var arenaCapacity: Int { arena.capacity }
-
-    private func record(_ name: String, _ p: UnsafePointer<Float>, _ n: Int) {
-        guard recordBoundaries else { return }
-        boundaries[name] = Array(UnsafeBufferPointer(start: p, count: n))
-    }
 
     /// `hidden` en `[T, 12, 2560]` → `[T, 6144]`.
     package func fuse(_ hidden: UnsafePointer<Float>, tokens t: Int) throws -> [Float] {
@@ -654,7 +632,7 @@ package final class Krea2TextFusion {
         Ops.rmsNorm(x, weight: reserve, into: normed, rows: t, columns: d, eps: eps)
         try linear("txt_in.linear_1.weight", a: normed, into: merged, m: t, k: d, n: wide)
         try addBias("txt_in.linear_1.bias", merged, rows: t, columns: wide)
-        Krea2Ops.geluTanh(merged, count: t * wide)
+        Ops.geluTanh(merged, count: t * wide)
         try linear("txt_in.linear_2.weight", a: merged, into: o, m: t, k: wide, n: wide)
         try addBias("txt_in.linear_2.bias", o, rows: t, columns: wide)
         record("txt_in_out", o, t * wide)
@@ -779,22 +757,6 @@ package enum Krea2Ops {
         }
     }
 
-    /// `x = x · (1 + scale) + shift`, in place, per row.
-    package static func modulate(_ x: UnsafeMutablePointer<Float>, scale: UnsafePointer<Float>,
-                                shift: UnsafePointer<Float>, rows: Int, columns: Int) {
-        var factor = [Float](repeating: 1, count: columns)
-        vDSP_vadd(scale, 1, factor, 1, &factor, 1, vDSP_Length(columns))
-        factor.withUnsafeBufferPointer { f in
-            let factor = f.baseAddress!
-            Parallel.rows(rows, width: columns) { first, howMany in
-                for row in first..<(first + howMany) {
-                    let r = x + row * columns
-                    Ops.multiplyAdd(r, times: factor, plus: shift, count: columns)   // two roundings, as torch
-                }
-            }
-        }
-    }
-
     /// `x ⊙ σ(gate)` in place — the attention's output gate.
     package static func sigmoidGate(_ x: UnsafeMutablePointer<Float>, gate: UnsafePointer<Float>, count: Int,
                                    scratch: UnsafeMutablePointer<Float>) {
@@ -813,20 +775,6 @@ package enum Krea2Ops {
         }
     }
 
-    /// GELU, `tanh` approximation: `½ x (1 + tanh(√(2/π) (x + 0.044715 x³)))`.
-    package static func geluTanh(_ x: UnsafeMutablePointer<Float>, count: Int) {
-        let c = Float((2 / Double.pi).squareRoot())
-        nonisolated(unsafe) let x = x   // disjoint slices, one per thread
-        DispatchQueue.concurrentPerform(iterations: max(1, count / 65536 + 1)) { piece in
-            let start = piece * 65536, end = min(start + 65536, count)
-            guard start < end else { return }
-            for i in start..<end {
-                let value = x[i]
-                x[i] = 0.5 * value * (1 + tanhf(c * (value + 0.044715 * value * value * value)))
-            }
-        }
-    }
-
     /// SDPA without mask, on the CPU, `[B, L, H·Dh]` → same shape: `B` independent sequences of
     /// length `L`. The fusion's "per-layer" blocks have `B = T`, `L = 12`; the refiners
     /// `B = 1`, `L = T`. The scores accumulate in fp32 through `cblas_sgemm`.
@@ -836,7 +784,7 @@ package enum Krea2Ops {
         let width = heads * headDim, scale = 1 / Float(headDim).squareRoot()
         // Each task (batch, head) reads q, k, v and writes its own columns of `out`.
         nonisolated(unsafe) let (q, k, v, out) = (q, k, v, out)
-        DispatchQueue.concurrentPerform(iterations: batches * heads) { job in
+        Parallel.perform(batches * heads) { job in
             let b = job / heads, h = job % heads
             let base = b * length * width + h * headDim
             var scores = [Float](repeating: 0, count: length * length)
@@ -894,7 +842,7 @@ enum Krea2Exact {
                 y.withUnsafeMutableBufferPointer { out in
                     // Each thread writes its own columns `start..<end` of each `yᵥ`.
                     nonisolated(unsafe) let (weight, x, out) = (weight, x.baseAddress!, out.baseAddress!)
-                    DispatchQueue.concurrentPerform(iterations: pieces) { piece in
+                    Parallel.perform(pieces) { piece in
                         let start = piece * chunk, end = min(start + chunk, outputs)
                         for i in 0..<inputs {
                             let row = weight + i * outputs
@@ -972,8 +920,9 @@ enum Krea2Exact {
         let half = dim / 2
         let t: Float = sigma * 1000, timestep = Double(t / 1000)
         var out = [Float](repeating: 0, count: dim)
+        let frequencies = Sinusoid.frequencies(half: half)
         for j in 0..<half {
-            let angle = timestep * 1000 * exp(-log(1e4) * Double(j) / Double(half))
+            let angle = timestep * 1000 * frequencies[j]
             out[j] = Float(cos(angle))
             out[half + j] = Float(sin(angle))
         }
