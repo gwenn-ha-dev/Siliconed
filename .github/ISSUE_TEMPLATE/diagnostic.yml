@@ -19,7 +19,7 @@
 #   macos     macOS version and build
 #   version   app version and the engine's commit
 #
-# The report itself (schema 15: the machine's capacity model, the measurements it was fitted on, what the
+# The report itself (schema 16: the machine's capacity model, the measurements it was fitted on, what the
 # judge said of each route, the memory, the verdict, and the last render's predicted and measured times)
 # is never in the link: a ~12 KB JSON comes out of GitHub's login redirect broken. The app copies it to
 # the clipboard and says to paste it into the "Diagnostic JSON" field below.

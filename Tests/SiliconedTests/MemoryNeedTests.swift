@@ -384,28 +384,6 @@ final class MemoryNeedTests: XCTestCase {
         XCTAssertLessThan(own(int8, .text), own(bf16, .text))
     }
 
-    /// **The figures of the report**: the need per phase at 512², 1024², 1024×1536 on the
-    /// published bf16 maps, a 50-token prompt, 6 P cores, the default and the lean plans.
-    func testPrintTheNeeds() throws {
-        for (w, h) in [(512, 512), (1024, 1024), (1024, 1536)] {
-            for lean in [false, true] {
-                var request = Self.zRequest(width: w, height: h, promptTokens: 50)
-                if lean { request = request.lean }
-                let n = try XCTUnwrap(MemoryNeed.zImage(request, maps: Self.zImageMaps()))
-                let phases = n.phases.map {
-                    String(format: "%@ %.0f (ours %.0f, outside %.0f)", $0.kind.rawValue as NSString, Double($0.bytes) / 1e6,
-                           Double($0.own) / 1e6, Double($0.outside) / 1e6)
-                }
-                print(String(format: "Z %d×%d%@: peak %.0f MB (crossing %.1f, base %.1f) — %@", w, h,
-                             (lean ? " lean" : "") as NSString, Double(n.peak) / 1e6, Double(n.crossing) / 1e6,
-                             Double(n.base) / 1e6, phases.joined(separator: ", ") as NSString))
-            }
-            for t in phase(try need(w, h), .denoising)!.terms {
-                print(String(format: "    denoising %@ %.1f MB", t.name as NSString, Double(t.bytes) / 1e6))
-            }
-        }
-    }
-
     // ── the need costs milliseconds ──────────────────────────────────────────────────────────
 
     /// **What the memory keeps is what the walk returns**: every VAE plan the need reads, at two formats
