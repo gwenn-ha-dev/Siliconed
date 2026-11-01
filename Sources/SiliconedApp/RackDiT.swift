@@ -78,19 +78,11 @@ struct DiTBox: View {
     @ViewBuilder private var precision: some View {
         // What is stored, then what computes: two labels, two words, so that « int8 » and « fp32 » are never one thing.
         WeightsTag(format: app.weightFormats?.dit)
-        if app.neuralEngineOffered {
-            // The model's choice, per installed version: a click switches it for the next renders.
-            let on = app.neuralEngine(for: app.identifier)
-            Button { app.setNeuralEngine(!on, for: app.identifier) } label: {
-                Tag(text: Text("computes \(on ? "fp32 · ANE" : "fp32")"), symbol: on ? "leaf" : nil)
-            }
-            .buttonStyle(.plain)
-            .help(on ? String(localized: "Part of the DiT runs in fp16 on the Neural Engine: less energy (about a fifth on an M1 Pro), an image a little different from fp32’s. Click for fp32 throughout.")
-                     : String(localized: "The DiT in fp32 throughout, the image verified against the reference. Click to run part of it in fp16 on the Neural Engine: less energy (about a fifth on an M1 Pro), an image a little different."))
-        } else {
-            Tag(text: Text("computes \("fp32")"))
-                .help("The products of the DiT are computed in fp32, the image verified against the reference.")
-        }
+        // A label only: the choice is the switch below, in the settings of the box (`switches`).
+        let on = app.neuralEngineOffered && app.neuralEngine(for: app.identifier)
+        Tag(text: Text("computes \(on ? "fp32 · ANE" : "fp32")"), symbol: on ? "leaf" : nil)
+            .help(on ? String(localized: "fp32, except part of the DiT in fp16 on the Neural Engine")
+                     : String(localized: "The products of the DiT are computed in fp32, the image verified against the reference."))
     }
 
     @ViewBuilder private var latent: some View {
@@ -206,6 +198,49 @@ struct DiTBox: View {
         Toggle("Preview every step", isOn: $app.previews)
             .font(.callout)
             .help("Shows the image taking shape on the canvas after each step. It does not change the image.")
+        switches
+    }
+
+    /// **The two switches that change how the DiT computes**, each in the box of what it changes. A switch that cannot apply is
+    /// greyed and says why, in a sentence, instead of disappearing or turning into a label. The decisions are `DiTSwitches`'s.
+    @ViewBuilder private var switches: some View {
+        let id = app.identifier
+        let aneReason = DiTSwitches.neuralEngineUnavailable(offered: app.neuralEngineOffered)
+        VStack(alignment: .leading, spacing: 2) {
+            Toggle("Neural Engine", isOn: Binding(get: { aneReason == nil && app.neuralEngine(for: id) },
+                                                  set: { app.setNeuralEngine($0, for: id) }))
+                .font(.callout)
+                .disabled(aneReason != nil)
+                .help("Runs part of the DiT in fp16 on the Neural Engine: less energy (about a fifth on an M1 Pro), an image a little different from fp32’s. Off, the DiT is in fp32 throughout, the image verified against the reference.")
+            if aneReason != nil {
+                Text(Self.sentence(.noNeuralEngineRow))
+                    .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        // Faster Rendering is a Beta option: no switch without it.
+        if app.fasterRenderingBeta {
+            let reason = app.fasterRenderingUnavailable
+            VStack(alignment: .leading, spacing: 2) {
+                Toggle("Faster Rendering", isOn: Binding(get: { app.fasterRenderingShown(for: id) },
+                                                         set: { app.setFasterRendering($0, for: id) }))
+                    .font(.callout)
+                    .disabled(reason != nil)
+                    .help("From 1024² up, the first steps at half size: faster, a slightly different image.")
+                if let reason {
+                    Text(Self.sentence(reason)).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+    }
+
+    /// Why Faster Rendering would do nothing for this render, in a sentence.
+    private static func sentence(_ reason: DiTSwitchUnavailable) -> String {
+        switch reason {
+        case .sizeUnder1024: String(localized: "Needs 1024 px or more on each side.")
+        case .withLoRADetailOrEdit: String(localized: "Not with a LoRA, Detail or an edit.")
+        case .stepsOffRecipe: String(localized: "Only at the model’s own step count.")
+        case .noNeuralEngineRow: String(localized: "This Mac’s measure gives the Neural Engine nothing to do: the DiT is computed in fp32.")
+        }
     }
 
     /// **The LoRA stack, in the open** — as reachable as the steps or the seed: a title with « Add »

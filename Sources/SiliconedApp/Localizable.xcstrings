@@ -6385,6 +6385,46 @@
         }
       }
     },
+    "Adds a Faster Rendering switch to the DiT’s box: from 1024² up, the first steps at half size, faster, a slightly different image. Not with a LoRA, Detail or an edit. Off, no render is a faster one." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fügt dem DiT-Kasten einen Schalter für schnelleres Rendering hinzu: ab 1024² die ersten Schritte in halber Größe, schneller, ein etwas anderes Bild. Nicht mit einer LoRA, Detail oder einer Bearbeitung. Aus, ist kein Rendering schneller."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Añade un interruptor de renderizado más rápido a la caja del DiT: desde 1024², los primeros pasos a mitad de tamaño, más rápido, una imagen algo distinta. No con un LoRA, Detalle o una edición. Apagado, ningún render es más rápido."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajoute un interrupteur Rendu plus rapide à la boîte du DiT : dès 1024², les premiers pas à demi-taille, plus rapide, une image un peu différente. Pas avec un LoRA, le Détail ou une édition. Éteint, aucun rendu n’est plus rapide."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aggiunge un interruttore di rendering più veloce alla casella del DiT: da 1024² in su, i primi passi a metà dimensione, più veloce, un’immagine un po’ diversa. Non con un LoRA, Dettaglio o una modifica. Spento, nessun rendering è più veloce."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "DiTのボックスに高速生成のスイッチを追加します。1024²以上では最初のステップを半分のサイズで行い、速くなり、画像がわずかに変わります。LoRA、ディテール、編集では使われません。オフのときは、どのレンダリングも高速になりません。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在 DiT 的方框中加入“更快生成”开关：从 1024² 起，前几步以一半尺寸进行，更快，得到的图像略有不同。不适用于 LoRA、细节或编辑。关闭时，没有任何一次生成会更快。"
+          }
+        }
+      }
+    },
     "Adds fine texture and small details; Most can over-sharpen" : {
       "localizations" : {
         "de" : {
@@ -14610,6 +14650,46 @@
         }
       }
     },
+    "Faster Rendering is offered only when its Beta option is on" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Schnelleres Rendering gibt es nur, wenn seine Beta-Option eingeschaltet ist"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El renderizado más rápido solo se ofrece si su opción Beta está activada"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le rendu plus rapide n’est proposé que si son option Bêta est allumée"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il rendering più veloce è offerto solo se la sua opzione Beta è attiva"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "高速生成は、ベータ版オプションがオンのときだけ使えます"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "只有开启“更快生成”的测试版选项后才能使用"
+          }
+        }
+      }
+    },
     "Fills the rack’s images." : {
       "localizations" : {
         "de" : {
@@ -15094,42 +15174,42 @@
         }
       }
     },
-    "From 1024² up, the first steps at half size: faster, a slightly different image. Not with a LoRA, Detail or an edit." : {
+    "From 1024² up, the first steps at half size: faster, a slightly different image." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ab 1024² die ersten Schritte in halber Größe: schneller, ein etwas anderes Bild. Nicht mit einer LoRA, Detail oder einer Bearbeitung."
+            "value" : "Ab 1024² die ersten Schritte in halber Größe: schneller, ein etwas anderes Bild."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Desde 1024², los primeros pasos a mitad de tamaño: más rápido, una imagen algo distinta. No con un LoRA, Detalle o una edición."
+            "value" : "Desde 1024², los primeros pasos a mitad de tamaño: más rápido, una imagen algo distinta."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Dès 1024², les premiers pas à demi-taille : plus rapide, une image un peu différente. Pas avec un LoRA, le Détail ou une édition."
+            "value" : "Dès 1024², les premiers pas à demi-taille : plus rapide, une image un peu différente."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Da 1024² in su, i primi passi a metà dimensione: più veloce, un’immagine un po’ diversa. Non con un LoRA, Dettaglio o una modifica."
+            "value" : "Da 1024² in su, i primi passi a metà dimensione: più veloce, un’immagine un po’ diversa."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "1024²以上では最初のステップを半分のサイズで行います。速くなり、画像がわずかに変わります。LoRA、ディテール、編集では使われません。"
+            "value" : "1024²以上では最初のステップを半分のサイズで行います。速くなり、画像がわずかに変わります。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "从 1024² 起，前几步以一半尺寸进行：更快，得到的图像略有不同。不适用于 LoRA、细节或编辑。"
+            "value" : "从 1024² 起，前几步以一半尺寸进行：更快，得到的图像略有不同。"
           }
         }
       }
@@ -20949,6 +21029,46 @@
         }
       }
     },
+    "Needs 1024 px or more on each side." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Braucht 1024 px oder mehr auf jeder Seite."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Necesita 1024 px o más en cada lado."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Demande 1024 px ou plus de chaque côté."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Richiede 1024 px o più su ogni lato."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "縦横とも1024px以上が必要です。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "每条边都需要 1024 像素或以上。"
+          }
+        }
+      }
+    },
     "Needs a Mac with %@ GB of memory." : {
       "localizations" : {
         "de" : {
@@ -22482,6 +22602,46 @@
         }
       }
     },
+    "Not with a LoRA, Detail or an edit." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nicht mit einer LoRA, Detail oder einer Bearbeitung."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No con un LoRA, Detalle o una edición."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pas avec un LoRA, le Détail ou une édition."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Non con un LoRA, Dettaglio o una modifica."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "LoRA、ディテール、編集では使われません。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "不适用于 LoRA、细节或编辑。"
+          }
+        }
+      }
+    },
     "Nothing comes with Siliconed. Choose a model: its license and the space it takes are shown before anything is downloaded." : {
       "localizations" : {
         "de" : {
@@ -23199,6 +23359,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "只能导入 .safetensors 或 .gguf 文件。"
+          }
+        }
+      }
+    },
+    "Only at the model’s own step count." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nur bei der eigenen Schrittzahl des Modells."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Solo con el número de pasos propio del modelo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seulement au nombre de pas propre au modèle."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Solo con il numero di passi proprio del modello."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "モデル本来のステップ数のときだけ使われます。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仅在模型自身的步数下有效。"
           }
         }
       }
@@ -24159,46 +24359,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "配对被拒绝。"
-          }
-        }
-      }
-    },
-    "Part of the DiT runs in fp16 on the Neural Engine: less energy (about a fifth on an M1 Pro), an image a little different from fp32’s. Click for fp32 throughout." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ein Teil des DiT läuft in fp16 auf der Neural Engine: weniger Energie (etwa ein Fünftel auf einem M1 Pro), ein etwas anderes Bild als in fp32. Klicken für durchgehend fp32."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Una parte del DiT se ejecuta en fp16 en el Neural Engine: menos energía (alrededor de una quinta parte en un M1 Pro), una imagen algo distinta de la de fp32. Haz clic para todo en fp32."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Une partie du DiT tourne en fp16 sur le Neural Engine : moins d’énergie (environ un cinquième sur un M1 Pro), une image un peu différente de celle en fp32. Cliquer pour tout en fp32."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Una parte del DiT gira in fp16 sul Neural Engine: meno energia (circa un quinto su un M1 Pro), un’immagine un po’ diversa da quella in fp32. Fai clic per tutto in fp32."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "DiTの一部をNeural EngineでFP16で実行します：消費電力が下がり（M1 Proで約5分の1）、画像はfp32のものと少し異なります。クリックするとすべてfp32になります。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "DiT 的一部分在神经网络引擎上以 fp16 运行：更省电（在 M1 Pro 上约省五分之一），图像与 fp32 的略有不同。点按以全程使用 fp32。"
           }
         }
       }
@@ -27592,6 +27752,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "图像渲染期间，“改写”和“描述”会等待。"
+          }
+        }
+      }
+    },
+    "Runs part of the DiT in fp16 on the Neural Engine: less energy (about a fifth on an M1 Pro), an image a little different from fp32’s. Off, the DiT is in fp32 throughout, the image verified against the reference." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lässt einen Teil des DiT in fp16 auf der Neural Engine laufen: weniger Energie (etwa ein Fünftel auf einem M1 Pro), ein etwas anderes Bild als in fp32. Aus, läuft der DiT durchgehend in fp32, das Bild gegen die Referenz geprüft."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ejecuta parte del DiT en fp16 en el Neural Engine: menos energía (cerca de una quinta parte en un M1 Pro), una imagen algo distinta de la de fp32. Apagado, el DiT va en fp32 de principio a fin, con la imagen verificada contra la referencia."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fait tourner une partie du DiT en fp16 sur le Neural Engine : moins d’énergie (environ un cinquième sur un M1 Pro), une image un peu différente de celle du fp32. Éteint, le DiT est en fp32 de bout en bout, l’image vérifiée contre la référence."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esegue una parte del DiT in fp16 sul Neural Engine: meno energia (circa un quinto su un M1 Pro), un’immagine un po’ diversa da quella in fp32. Spento, il DiT è in fp32 per tutto il percorso, con l’immagine verificata rispetto al riferimento."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "DiTの一部をNeural Engine上でfp16で実行します。消費エネルギーが減り(M1 Proで約5分の1)、fp32とは少し異なる画像になります。オフのときは、DiT全体がfp32で動作し、画像は基準実装と照合されています。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "让 DiT 的一部分在Neural Engine上以 fp16 运行：更省电（在 M1 Pro 上约省五分之一），图像与 fp32 略有不同。关闭时，DiT 全程使用 fp32，图像已对照参考实现验证。"
           }
         }
       }
@@ -31715,46 +31915,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "那台 Mac 正忙：其生成、安装或测量完成后，才能更改其资源库。"
-          }
-        }
-      }
-    },
-    "The DiT in fp32 throughout, the image verified against the reference. Click to run part of it in fp16 on the Neural Engine: less energy (about a fifth on an M1 Pro), an image a little different." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Der DiT durchgehend in fp32, das Bild an der Referenz überprüft. Klicken, um einen Teil davon in fp16 auf der Neural Engine laufen zu lassen: weniger Energie (etwa ein Fünftel auf einem M1 Pro), ein etwas anderes Bild."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "El DiT todo en fp32, la imagen verificada frente a la referencia. Haz clic para ejecutar una parte en fp16 en el Neural Engine: menos energía (alrededor de una quinta parte en un M1 Pro), una imagen algo distinta."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Le DiT tout en fp32, l’image vérifiée contre la référence. Cliquer pour en faire tourner une partie en fp16 sur le Neural Engine : moins d’énergie (environ un cinquième sur un M1 Pro), une image un peu différente."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Il DiT tutto in fp32, l’immagine verificata rispetto al riferimento. Fai clic per farne girare una parte in fp16 sul Neural Engine: meno energia (circa un quinto su un M1 Pro), un’immagine un po’ diversa."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "DiTはすべてfp32で、画像はリファレンスに対して検証されています。クリックすると一部をNeural Engineでfp16で実行します：消費電力が下がり（M1 Proで約5分の1）、画像は少し異なります。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "DiT 全程使用 fp32，图像已对照参考实现验证。点按可让其中一部分在神经网络引擎上以 fp16 运行：更省电（在 M1 Pro 上约省五分之一），图像略有不同。"
           }
         }
       }
@@ -37231,6 +37391,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "无法按原样读取这台 Mac 的引擎设置。"
+          }
+        }
+      }
+    },
+    "This Mac’s measure gives the Neural Engine nothing to do: the DiT is computed in fp32." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Messung dieses Macs gibt der Neural Engine nichts zu tun: der DiT wird in fp32 berechnet."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La medición de este Mac no da nada que hacer al Neural Engine: el DiT se calcula en fp32."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La mesure de ce Mac ne donne rien à faire au Neural Engine : le DiT est calculé en fp32."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La misura di questo Mac non dà nulla da fare al Neural Engine: il DiT è calcolato in fp32."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このMacの測定では、Neural Engineに任せる処理がありません。DiTはfp32で計算されます。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此 Mac 的测量没有给Neural Engine分配任何任务：DiT 以 fp32 计算。"
           }
         }
       }
@@ -46679,6 +46879,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "请在“设置”（⌘,）中开启“测试版”→“负 LoRA 强度”"
+          }
+        }
+      }
+    },
+    "turn on Faster Rendering in Settings (⌘,), under Advanced › Beta" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Schnelleres Rendering in den Einstellungen (⌘,) unter Erweitert › Beta einschalten"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "activa el renderizado más rápido en Ajustes (⌘,), en Avanzado › Beta"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "allumez le rendu plus rapide dans Réglages (⌘,), sous Avancé › Bêta"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "attiva il rendering più veloce in Impostazioni (⌘,), sotto Avanzate › Beta"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "設定(⌘,)の「詳細設定」›「ベータ」で高速生成をオンにしてください"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请在“设置”(⌘,) 的“高级”›“测试版”中开启“更快生成”"
           }
         }
       }

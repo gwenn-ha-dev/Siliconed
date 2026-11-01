@@ -104,17 +104,41 @@ final class AppState {
     /// **Faster Rendering, per model and version** (Settings): at 1024² and above, the first evaluations of the family on the
     /// half grid (`Request.fasterRendering`; three of eight, Krea 2 four) — a quarter to a third faster, another image than the
     /// recipe at full size, judged clean by eye per family. Not with a LoRA, Detail or an edit (each plan's rules). What the user
-    /// chose; absent, the version's default (`Variant.fasterRenderingByDefault`: off on the Standard, on on the Compact and the
-    /// Light), as the Neural Engine does. A new key: the single switch of earlier builds is read once, at the first launch after
+    /// chose; absent, the version's default (`Variant.fasterRenderingByDefault`: off on every version since it became a
+    /// Beta option, which gates it). A new key: the single switch of earlier builds is read once, at the first launch after
     /// the update (`adoptEarlierFasterRendering`), then removed.
     /// Every request carries the value and every history image keeps it (`RenderSettings.fasterRendering`): a redo is the same
     /// image whatever the switch says by then.
     var fasterRenderingChoices = UserDefaults.standard.dictionary(forKey: AppState.fasterRenderingKey) as? [String: Bool] ?? [:] {
         didSet { UserDefaults.standard.set(fasterRenderingChoices, forKey: Self.fasterRenderingKey) }
     }
+    /// **Faster Rendering a render of `id` takes**: nothing without the Beta option, whatever the choice kept for the model;
+    /// else its choice, else its version's default (`DiTSwitches.fasterRendering`). The one reading every render path uses.
     func fasterRendering(for id: String) -> Bool {
-        guard let card = cards.first(where: { $0.id == id }) else { return false }
-        return fasterRenderingChoices[neuralEngineKey(card)] ?? (!card.isImported && library.variant(of: card.family).fasterRenderingByDefault)
+        DiTSwitches.fasterRendering(beta: fasterRenderingBeta, choice: fasterRenderingChoice(for: id), versionDefault: fasterRenderingDefault(for: id))
+    }
+    /// What the user chose for `id` (nil: nothing yet) — what the switch of the DiT box shows, Beta on or off.
+    func fasterRenderingChoice(for id: String) -> Bool? {
+        guard let card = cards.first(where: { $0.id == id }) else { return nil }
+        return fasterRenderingChoices[neuralEngineKey(card)]
+    }
+    private func fasterRenderingDefault(for id: String) -> Bool {
+        guard let card = cards.first(where: { $0.id == id }), !card.isImported else { return false }
+        return library.variant(of: card.family).fasterRenderingByDefault
+    }
+    /// What the switch of the DiT box shows: the model's choice, else the default — Beta aside.
+    func fasterRenderingShown(for id: String) -> Bool { fasterRenderingChoice(for: id) ?? fasterRenderingDefault(for: id) }
+    private static let fasterRenderingBetaKey = "fasterRenderingBeta"
+    /// **Faster Rendering, the Beta option** (Settings ▸ Advanced ▸ Beta): off by default. Off, no render is a faster one and the
+    /// DiT box shows no switch; the per-model choices stay in `fasterRenderingChoices` and come back with the option.
+    var fasterRenderingBeta = UserDefaults.standard.bool(forKey: AppState.fasterRenderingBetaKey) {
+        didSet { UserDefaults.standard.set(fasterRenderingBeta, forKey: Self.fasterRenderingBetaKey) }
+    }
+    /// Why Faster Rendering would do nothing for the render being set up in the form (nil: it applies).
+    var fasterRenderingUnavailable: DiTSwitchUnavailable? {
+        DiTSwitches.fasterRenderingUnavailable(width: format.width, height: format.height,
+                                               withLoRA: !loras.isEmpty || detail != .normal, edit: !references.isEmpty,
+                                               atRecipeSteps: steps == (card?.defaultSteps ?? 8))
     }
     func setFasterRendering(_ on: Bool, for id: String) {
         if let card = cards.first(where: { $0.id == id }) { fasterRenderingChoices[neuralEngineKey(card)] = on }

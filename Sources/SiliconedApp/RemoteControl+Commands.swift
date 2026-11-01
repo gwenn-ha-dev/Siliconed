@@ -275,6 +275,12 @@ extension RemoteControl {
             throw Refusal("busy", String(localized: "a render, an installation or the diagnostic is running"),
                           help: "silicontrol wait, then retry")
         }
+        // A Beta option, like --solver's More Solvers: turning it on is refused while the option is off (off stays possible:
+        // it is what a render takes anyway, and `measure` puts a value back through here).
+        if arguments[1] == "on", !app.fasterRenderingBeta {
+            throw Refusal("faster_rendering", String(localized: "Faster Rendering is offered only when its Beta option is on"),
+                          help: String(localized: "turn on Faster Rendering in Settings (⌘,), under Advanced › Beta"))
+        }
         let previous = app.fasterRendering(for: card.id)
         app.setFasterRendering(arguments[1] == "on", for: card.id)
         return ["ok": true, "model": card.id, "faster_rendering": app.fasterRendering(for: card.id), "previous": previous]

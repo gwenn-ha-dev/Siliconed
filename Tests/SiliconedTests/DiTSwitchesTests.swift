@@ -1,0 +1,64 @@
+import XCTest
+@testable import Siliconed
+
+/// **The rules behind the two switches of the app's DiT box** (`DiTSwitches`): pure, no weights.
+final class DiTSwitchesTests: XCTestCase {
+    /// The Beta option is the master: off, nothing is faster whatever was chosen or defaulted; on, the choice, else the default.
+    func testFasterRenderingFollowsBetaThenChoiceThenDefault() {
+        for choice in [nil, false, true] as [Bool?] {
+            for versionDefault in [false, true] {
+                XCTAssertFalse(DiTSwitches.fasterRendering(beta: false, choice: choice, versionDefault: versionDefault))
+            }
+        }
+        XCTAssertTrue(DiTSwitches.fasterRendering(beta: true, choice: true, versionDefault: false))
+        XCTAssertFalse(DiTSwitches.fasterRendering(beta: true, choice: false, versionDefault: true))
+        XCTAssertTrue(DiTSwitches.fasterRendering(beta: true, choice: nil, versionDefault: true))
+        XCTAssertFalse(DiTSwitches.fasterRendering(beta: true, choice: nil, versionDefault: false))
+    }
+
+    /// Off on every version: a user who never chose gets the full-size recipe even with the option on. The Neural Engine's
+    /// default is unchanged (off on the Standard, on on the Compact and the Light).
+    func testNoVersionDefaultsToFasterRendering() {
+        for variant in Variant.allCases { XCTAssertFalse(variant.fasterRenderingByDefault) }
+        XCTAssertFalse(Variant.standard.neuralEngineByDefault)
+        XCTAssertTrue(Variant.compact.neuralEngineByDefault)
+        XCTAssertTrue(Variant.light.neuralEngineByDefault)
+    }
+
+    /// The box greys the switch for the same reasons the plan would not apply it.
+    func testFasterRenderingApplicability() {
+        func reason(_ w: Int, _ h: Int, lora: Bool = false, edit: Bool = false, recipe: Bool = true) -> DiTSwitchUnavailable? {
+            DiTSwitches.fasterRenderingUnavailable(width: w, height: h, withLoRA: lora, edit: edit, atRecipeSteps: recipe)
+        }
+        XCTAssertNil(reason(1024, 1024))
+        XCTAssertNil(reason(1536, 1024))
+        XCTAssertNil(reason(1024, 1536))
+        XCTAssertEqual(reason(832, 1216), .sizeUnder1024)
+        XCTAssertEqual(reason(1216, 832), .sizeUnder1024)
+        XCTAssertEqual(reason(512, 512), .sizeUnder1024)
+        XCTAssertEqual(reason(1024, 1024, lora: true), .withLoRADetailOrEdit)
+        XCTAssertEqual(reason(1024, 1024, edit: true), .withLoRADetailOrEdit)
+        XCTAssertEqual(reason(1024, 1024, recipe: false), .stepsOffRecipe)
+    }
+
+    /// The box's verdict and the engine's agree: where the box says "applies", the engine's rule reduces at least one evaluation.
+    func testBoxAgreesWithEngineRule() {
+        for (w, h) in [(1024, 1024), (1024, 1536), (832, 1216), (2048, 2048), (1216, 832)] {
+            let box = DiTSwitches.fasterRenderingUnavailable(width: w, height: h, withLoRA: false, edit: false, atRecipeSteps: true) == nil
+            let k = Spectral.reducedEvaluations(faster: true, height: h / 8, width: w / 8, steps: 8, start: 0, withLoRA: false,
+                                                defaultSteps: 8, halfSizeSteps: 3, evaluations: 8)
+            XCTAssertEqual(box, k > 0, "\(w)x\(h)")
+        }
+    }
+
+    func testNeuralEngineAvailabilityAndReason() {
+        XCTAssertNil(DiTSwitches.neuralEngineUnavailable(offered: true))
+        XCTAssertEqual(DiTSwitches.neuralEngineUnavailable(offered: false), .noNeuralEngineRow)
+        // Offered: the choice, else the default — the Standard included (off by default there, but available).
+        XCTAssertTrue(DiTSwitches.neuralEngine(offered: true, choice: true, versionDefault: Variant.standard.neuralEngineByDefault))
+        XCTAssertFalse(DiTSwitches.neuralEngine(offered: true, choice: nil, versionDefault: Variant.standard.neuralEngineByDefault))
+        XCTAssertTrue(DiTSwitches.neuralEngine(offered: true, choice: nil, versionDefault: Variant.compact.neuralEngineByDefault))
+        // Not offered: never on, whatever was kept.
+        XCTAssertFalse(DiTSwitches.neuralEngine(offered: false, choice: true, versionDefault: true))
+    }
+}

@@ -203,8 +203,8 @@ package enum RemoteControlHelp {
         neural_engine → the rack's fp32 tag for the installed version: true = part of the DiT
                       on the Neural Engine (--ane, --no-ane of « add »). Only on a Mac whose
                       measure offers it, and once the model is ready
-        faster_rendering → Faster Rendering for the installed version (help set): on by default for
-                      the Compact and the Light, off for the Standard; once the model is ready
+        faster_rendering → Faster Rendering for the installed version (help set): what a render takes,
+                      so false while its Beta option is off; off by default; once the model is ready
         license_urls → the license file(s) on Hugging Face, at the revision the installation takes:
                       the model's, then each component under a license of its own (a Compact: the
                       publisher's, then each third party's model card). Z-Image has none: its model card, which
@@ -566,15 +566,16 @@ package enum RemoteControlHelp {
 
         Flips « Faster Rendering » for one model exactly as a click does: the choice is written, the
         switch in the window follows, the next plan reads it. It is chosen per installed version, like
-        the Neural Engine: on by default for the Compact and the Light, off for the Standard. On, from
-        1024 px the first evaluations run on a grid of half the size: faster, another image than at
+        the Neural Engine, and off by default. It is a Beta option (Settings ▸ Advanced ▸ Beta): "on" is
+        refused ("faster_rendering") while the option is off, and no render is a faster one then. On, from
+        1024 px on each side the first evaluations run on a grid of half the size: faster, another image than at
         full size. Off: full size, the image checked against the reference. Without --model, the
         model in the rack. Only with nothing running or waiting (a job planned under one value and
         finished under the other would mix two recipes): else "busy". « models » tells each model's
         value, « status » the rack's.
 
         Answer: {"ok": true, "model": "krea2", "faster_rendering": false, "previous": true}
-        FAILURES: usage, model, busy.
+        FAILURES: usage, model, busy, faster_rendering ("on" without its Beta option).
         """,
 
         "history": """
@@ -955,8 +956,8 @@ package enum RemoteControlHelp {
         neural_engine → l'étiquette fp32 du rack pour la version installée : true = une part du
                       DiT sur le Neural Engine (--ane, --no-ane de « add »). Seulement sur un Mac
                       dont la mesure l'offre, et le modèle prêt
-        faster_rendering → le rendu plus rapide de la version installée (help set) : allumé par défaut
-                      sur la Compact et la Légère, éteint sur la Standard ; le modèle prêt
+        faster_rendering → le rendu plus rapide de la version installée (help set) : ce qu'un rendu
+                      prend, donc faux tant que son option Bêta est éteinte ; éteint par défaut ; le modèle prêt
         license_urls → le(s) fichier(s) de licence sur Hugging Face, à la révision que l'installation
                       prend : celui du modèle, puis chaque composant sous une licence propre
                       (une Compact : celui de l'éditeur, puis la fiche de chaque tiers). Z-Image n'en a pas : sa
@@ -1323,15 +1324,16 @@ package enum RemoteControlHelp {
 
         Bascule le rendu plus rapide d'un modèle exactement comme un clic : le choix est écrit,
         l'interrupteur de la fenêtre suit, le prochain plan le lit. Il se choisit par version
-        installée, comme le Neural Engine : allumé par défaut sur la Compact et la Légère, éteint sur
-        la Standard. Allumé, dès 1024 px les premières évaluations se font sur une grille de
+        installée, comme le Neural Engine, et éteint par défaut. C'est une option Bêta (Réglages ▸ Avancé ▸ Bêta) :
+        « on » est refusé (« faster_rendering ») tant qu'elle est éteinte, et aucun rendu n'est alors
+        plus rapide. Allumé, dès 1024 px de chaque côté les premières évaluations se font sur une grille de
         demi-taille : plus vite, une autre image qu'en pleine taille. Éteint : pleine taille, l'image
         contrôlée contre la référence. Sans --model, le modèle du rack. Seulement quand rien ne
         tourne ni n'attend (un travail planifié sous une valeur et fini sous l'autre mélangerait deux
         recettes) : sinon « busy ». « models » donne la valeur de chaque modèle, « status » celle du rack.
 
         Réponse : {"ok": true, "model": "krea2", "faster_rendering": false, "previous": true}
-        ÉCHECS : usage, model, busy.
+        ÉCHECS : usage, model, busy, faster_rendering (« on » sans son option Bêta).
         """,
 
         "history": """

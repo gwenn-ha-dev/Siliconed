@@ -5,21 +5,20 @@
 //     ┌──────────────────────────────────────────────────────┐
 //     │        [ General ]  Other Macs   Advanced             │
 //     │ ┌──────────────────────────────────────────────────┐ │
-//     │ │ Faster Rendering   the first steps at half size   │ │
 //     │ │ Models             where the library is, shown in │ │
 //     │ │                    the Finder; moved to another   │ │
 //     │ │                    disk, opened, brought back     │ │
 //     │ └──────────────────────────────────────────────────┘ │
 //     └──────────────────────────────────────────────────────┘
 //
-//     General     what an everyday user touches: Faster Rendering for the model in the rack, the library.
+//     General     what an everyday user touches: the library.
 //     Other Macs  lend this Mac, compute on another (`OtherMacsView.swift`).
 //     Advanced    kept out of the way: This Mac (the capacity map, measured only when asked), Command
-//                 Line (silicontrol, linked into /usr/local/bin), Beta (More Solvers, Negative LoRA
-//                 Strengths: off by default, may change; named subjects moved to the Prompt Lab).
+//                 Line (silicontrol, linked into /usr/local/bin), Beta (More Solvers, Faster Rendering,
+//                 Negative LoRA Strengths: off by default, may change; named subjects moved to the Prompt Lab).
 //                 ┌ This Mac ───── [Measure This Mac…]
 //                 ├ Command Line ─ [Install…]
-//                 └ Beta ───────── More Solvers · Negative LoRA Strengths
+//                 └ Beta ───────── More Solvers · Faster Rendering · Negative LoRA Strengths
 //
 // - **Incognito**: an NSWindow of ours, as `MainWindow` — not SwiftUI's `Settings` scene, which would
 //   keep its frame; not restorable. What it sets are the app's preferences (`AppState`'s header), the
@@ -77,11 +76,6 @@ struct SettingsView: View {
     /// The state the window shows: the Mac that computes, whose switch and map these are.
     private var shown: AppState { MainWindow.shared.carrier.mirror ?? app }
 
-    /// « Faster Rendering »: this Mac's preference, which rides on each job — the lender's own is never touched.
-    private var fasterRendering: Binding<Bool> {
-        Binding(get: { app.fasterRendering(for: app.identifier) }, set: { app.setFasterRendering($0, for: app.identifier) })
-    }
-
     var body: some View {
         // A fixed frame: a TabView takes the size of no tab in particular, and a window that changed
         // size from one tab to the next would jump under the pointer. A tab longer than this scrolls.
@@ -95,14 +89,9 @@ struct SettingsView: View {
         .frame(width: 480, height: 540)
     }
 
-    /// What one comes for: the speed switch, how images are compared, where the models are.
+    /// What one comes for: where the models are.
     private var general: some View {
         Form {
-            Section {
-                Toggle(isOn: fasterRendering) {
-                    SettingLabel("Faster Rendering", "From 1024² up, the first steps at half size: faster, a slightly different image. Not with a LoRA, Detail or an edit.")
-                }
-            }
             Section {
                 LabeledContent {
                     Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([app.library.root]) }
@@ -157,6 +146,9 @@ struct SettingsView: View {
             Section {
                 Toggle(isOn: $app.developerMode) {
                     SettingLabel("More Solvers", "Adds the solvers Euler a, DPM++ 2M and UniPC to the DiT’s box and to the exploration’s axes. The default, Euler, is the one the models were distilled for.")
+                }
+                Toggle(isOn: $app.fasterRenderingBeta) {
+                    SettingLabel("Faster Rendering", "Adds a Faster Rendering switch to the DiT’s box: from 1024² up, the first steps at half size, faster, a slightly different image. Not with a LoRA, Detail or an edit. Off, no render is a faster one.")
                 }
                 Toggle(isOn: $app.negativeLoRAStrengths) {
                     SettingLabel("Negative LoRA Strengths", "Lets a LoRA’s strength go from −1.5 to 1.5, for “slider” LoRAs. An ordinary LoRA is damaged by a negative strength.")

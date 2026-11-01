@@ -348,7 +348,7 @@
         lifted by a power of two into fp16's range, then brought back in fp32, and rows that overflow go back
         to the GPU. On int8 weights it reads them as published and widens them itself. Your choice, per model: off by default on the Standard, which stays the
         reference-checked fp32 image; on by default on Compact and Light. The label in the rack reads
-        <code>computes fp32 · ANE</code> when it is on; click it to switch.</p>
+        <code>computes fp32 · ANE</code> when it is on; a switch in the DiT's box turns it on or off.</p>
     </div>
     <ul class="stats reveal">
       <li><b>−16 to −26 %</b>energy per image, M1 Pro, 1024², Standard (app 0.14)</li>

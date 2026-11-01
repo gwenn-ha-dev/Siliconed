@@ -69,11 +69,11 @@ Apple's model is downloaded by macOS only with `--download` (else `download_requ
 
 **Solvers follow More Solvers.** `--solver` is accepted only with More Solvers on (Settings › Advanced › Beta) and on a model that offers more than Euler; otherwise the answer is a refusal (`solver`) that names the setting.
 
-**Faster Rendering is the app's setting too, one per model.** `silicontrol set faster-rendering on|off
+**Faster Rendering is the app's setting too, one per model, and a Beta option.** `silicontrol set faster-rendering on|off
 [--model ID]` goes through `AppState.setFasterRendering(_:for:)`, keyed per installed version like the
-Neural Engine's choice (on by default for the Compact and the Light, off for the Standard), and the
+Neural Engine's choice, and the
 window's switch follows, as a click; without `--model`, the model in the rack. `models` reports each
-installed model's value, `status` the rack's (`"faster_rendering"`). Refused (`busy`) unless nothing
+installed model's value, `status` the rack's (`"faster_rendering"`). `on` is refused (`faster_rendering`) while the Beta option (Settings › Advanced › Beta) is off, as `--solver` is without More Solvers; `off` always goes through. The value `models` and `status` report is what a render takes, so `false` while the option is off. Refused (`busy`) unless nothing
 runs or waits: a job carries the value it was queued with (`RenderSettings.fasterRendering`), and one
 planned under one value and finished under the other would mix two recipes. It persists like the
 switch does; `silicontrol measure --faster-rendering on|off` sets it for the measured model, writes it

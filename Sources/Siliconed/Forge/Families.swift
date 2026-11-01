@@ -169,9 +169,9 @@ package enum Variant: String, CaseIterable, Sendable, Codable {
     /// save (a fifth of the machine's, M1 Pro, 1024², 23/10/2026).
     package var neuralEngineByDefault: Bool { self != .standard }
 
-    /// **« Faster Rendering »'s default** (`Request.fasterRendering`): off on the Standard, whose promise is the publisher's recipe
-    /// at full size; on on the 8- and 4-bit versions, whose image already differs from the Standard's.
-    package var fasterRenderingByDefault: Bool { self != .standard }
+    /// **« Faster Rendering »'s default** (`Request.fasterRendering`): off on every version. It changes the image, and helps only from
+    /// 1024 px on each side; it is a Beta option now (`DiTSwitches.fasterRendering`), and a model's explicit choice stays its own.
+    package var fasterRenderingByDefault: Bool { false }
 
     /// The physical memory at or below which the Light is preselected: 8 GiB, what an 8 GB Mac reports.
     package static let lightMemory: UInt64 = 8 << 30

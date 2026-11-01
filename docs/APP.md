@@ -13,9 +13,9 @@ The engine behind it, with the measurements: [The Siliconed engine](ENGINE.md).
 ## Create
 
 - **Five models.** Krea 2 Turbo, Z-Image Turbo, Qwen-Image-2.1 Turbo, Anima Turbo and MOSS-Image, each under its own license ([Models](#models)). All five read the prompt with a language model.
-- **The chain, visible.** No hidden pipeline: the rack shows it top to bottom (prompt, encoders, denoiser, decoder), with typed wires and the active stage lit; each stage holds its own settings and shows its time. Under the title, two small labels say what is stored and what computes: `weights int8` (or `Q8_0`, `Q4_K_M`, `bf16`…, read from what is installed) beside `computes fp32`. On the denoiser, `computes fp32 · ANE` means part of its products run on the Neural Engine; click the label to switch ([how](ENGINE.md#the-neural-engine)).
+- **The chain, visible.** No hidden pipeline: the rack shows it top to bottom (prompt, encoders, denoiser, decoder), with typed wires and the active stage lit; each stage holds its own settings and shows its time. Under the title, two small labels say what is stored and what computes: `weights int8` (or `Q8_0`, `Q4_K_M`, `bf16`…, read from what is installed) beside `computes fp32`. On the denoiser, `computes fp32 · ANE` means part of its products run on the Neural Engine; the **Neural Engine** switch in the denoiser's box turns it on or off, and is greyed, with its reason, on a Mac whose measure gives it nothing to do ([how](ENGINE.md#the-neural-engine)).
 - **More detail** with Z-Image and Qwen-Image-2.1: “Detail: Normal · More · Most” adds fine texture, at no extra time.
-- **Faster Rendering**: from 1024 px on each side, the first evaluations on a half-size grid, the rest at full size. 17 to 31 % less time on the Compact at 1024² (7 % for MOSS-Image), still 8 evaluations, a slightly different image. It is a choice per model, like the Neural Engine's: on for the Compact and the Light, off for the Standard, which stays the image checked against the reference. The choice is saved with the image, so Render Again gives the same one. Not with a LoRA, Detail or an edit ([how](ENGINE.md#faster-rendering)).
+- **Faster Rendering**: from 1024 px on each side, the first evaluations on a half-size grid, the rest at full size. 17 to 31 % less time on the Compact at 1024² (7 % for MOSS-Image), still 8 evaluations, a slightly different image. It is a Beta option (Settings › Advanced › Beta), off by default, and it adds a switch to the denoiser's box, next to the Neural Engine's: a choice per model, off for every version unless you turn it on, so the images stay those checked against the reference. With the option off, no render is a faster one; your choices come back when you turn it on again. The switch is greyed, with its reason, when it would do nothing for the size set (a side under 1024 px), a LoRA, Detail or an edit. The choice is saved with the image, so Render Again gives the same one ([how](ENGINE.md#faster-rendering)).
 - **Variations**: cousins of an image, subtle or strong, with the same settings (the button under the image, or its context menu). **Render Again (Same Seed)**, ⌘R, is the other direction: the same image, to check that you are not dreaming. A seed is diffusers' seed on all five models (the same starting noise, bit for bit). How many you get at once is the rack's **Batch**.
 - **Enlarge ×4** with macOS's own super-resolution (macOS 26): no prompt, nothing added, edges and texture sharpened; 1024² becomes 4096² in a second or two once macOS's model is warm. It takes images up to 1920 px a side, and an enlarged image is not enlarged again. The original stays in the history.
 - **LoRAs** on all five models.
@@ -100,7 +100,7 @@ Only recent models whose text encoder is a language model — no Stable Diffusio
 
 ### Krea 2 Turbo, the largest of the five
 
-[Krea 2 Turbo](https://huggingface.co/krea/Krea-2-Turbo), by Krea, is the fourth model, added in 0.12: a 12.9-billion-parameter DiT, the largest of the five, for aesthetic images from photography to painting. It reads the prompt with Qwen3-VL-4B and runs its whole 8-evaluation recipe in fp32 on the publisher's bf16 weights, with [Faster Rendering](ENGINE.md#faster-rendering) on by default (times and deviations: [Numbers](ENGINE.md#numbers)), its weights streamed from disk within the memory budget. It installs as Standard, Compact or Light (sizes: [Model management](#model-management)), from open copies proven to be identical to Krea's files (see below), under the Krea 2 Community license (table above).
+[Krea 2 Turbo](https://huggingface.co/krea/Krea-2-Turbo), by Krea, is the fourth model, added in 0.12: a 12.9-billion-parameter DiT, the largest of the five, for aesthetic images from photography to painting. It reads the prompt with Qwen3-VL-4B and runs its whole 8-evaluation recipe in fp32 on the publisher's bf16 weights, with [Faster Rendering](ENGINE.md#faster-rendering) as a Beta option (times and deviations: [Numbers](ENGINE.md#numbers)), its weights streamed from disk within the memory budget. It installs as Standard, Compact or Light (sizes: [Model management](#model-management)), from open copies proven to be identical to Krea's files (see below), under the Krea 2 Community license (table above).
 
 ![A Krea 2 Turbo photo at 1248×832, low angle: a young Irish woman with long wavy auburn hair and freckles, in a short-sleeved shorty wetsuit, running out of the surf laughing with her surfboard under her arm, backlit by a low golden sun with lens flare, glowing spray, turquoise water and a deep blue sky](images/krea2.jpg)
 
@@ -133,11 +133,11 @@ The other Compact versions use 8-bit weights published by third parties: [unslot
 
 Siliconed › Settings… (⌘,), three tabs.
 
-- **General**: where the models live, with Move Library…, Open Library… and Move Back to This Mac; the Faster Rendering choice sits with it.
+- **General**: where the models live, with Move Library…, Open Library… and Move Back to This Mac.
 - **Other Macs**: lend this Mac, pair with another ([Render on another Mac](#render-on-another-mac)).
-- **Advanced**, in this order: This Mac (the measure); Command Line (installs `silicontrol`, below); and **Beta**, off by default and liable to change: More Solvers (adds the solvers Euler a, DPM++ 2M and UniPC to the denoiser's box and to the exploration's axes; Euler, the default, is the one the models were distilled for), Negative LoRA Strengths (strengths from −1.5 to 1.5, for “slider” LoRAs; an ordinary LoRA is damaged by a negative strength).
+- **Advanced**, in this order: This Mac (the measure); Command Line (installs `silicontrol`, below); and **Beta**, off by default and liable to change: More Solvers (adds the solvers Euler a, DPM++ 2M and UniPC to the denoiser's box and to the exploration's axes; Euler, the default, is the one the models were distilled for), Faster Rendering (adds its switch to the denoiser's box), Negative LoRA Strengths (strengths from −1.5 to 1.5, for “slider” LoRAs; an ordinary LoRA is damaged by a negative strength).
 
-While you compute on another Mac, the measure and the Faster Rendering choice are that Mac's, and the window says so.
+While you compute on another Mac, the measure is that Mac's, and the window says so.
 
 ## Keyboard
 
@@ -176,4 +176,4 @@ silicontrol add --wait --out out "a woman posing in a library"
 silicontrol status
 ```
 
-It also flips a model's Faster Rendering (`silicontrol set faster-rendering on|off --model krea2`) and repeats a timed series of renders on your Mac (`silicontrol measure`); it grids, varies, enlarges, follows a render step by step, and more: `silicontrol help all` lists every command. Output is JSON lines; the last one carries `"ok"`. How it works inside: [REMOTE-CONTROL.md](REMOTE-CONTROL.md).
+It also flips a model's Faster Rendering (`silicontrol set faster-rendering on|off --model krea2`, `on` only with its Beta option on) and repeats a timed series of renders on your Mac (`silicontrol measure`); it grids, varies, enlarges, follows a render step by step, and more: `silicontrol help all` lists every command. Output is JSON lines; the last one carries `"ok"`. How it works inside: [REMOTE-CONTROL.md](REMOTE-CONTROL.md).
