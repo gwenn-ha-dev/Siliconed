@@ -220,11 +220,12 @@ import Testing
         let report = R.report(measurements: m, after: R.conditions(swap: 5), seconds: 310)
         #expect(Set(report.findings.map(\.kind)) == [.line, .swap, .time])
         #expect(report.findings.count == 3)
-        // …and the map is the map all the same: of this Mac, current, designated, its plan made. The live Mac may add findings of its
-        // own (the CI's virtual M1, with 7 GB and three cores, does): the three are said among them.
-        let mine = R.report(machine: Diagnostic.machine(), measurements: m, after: R.conditions(swap: 5), seconds: 310)
-        let kinds: Set<Diagnostic.Finding.Kind> = Set(mine.findings.map(\.kind))
-        #expect(kinds.isSuperset(of: [.line, .swap, .time]), "\(mine.findings.map(\.detail))")
+        // …and the map is the map all the same: of this Mac, current, designated, its plan made. The missing Neural Engine line is a
+        // finding only where the inventory announces one (the CI's virtual M1 announces none).
+        let live = Diagnostic.machine()
+        let mine = R.report(machine: live, measurements: m, after: R.conditions(swap: 5), seconds: 310)
+        let expected: Set<Diagnostic.Finding.Kind> = Diagnostic.Findings.announces(live).ane ? [.line, .swap, .time] : [.swap, .time]
+        #expect(Set(mine.findings.map(\.kind)) == expected, "\(mine.findings.map(\.detail))")
         #expect(mine.isCurrent)
         #expect(EngineSettings.designation(of: mine).plan != nil)
     }
