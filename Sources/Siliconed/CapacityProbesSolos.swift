@@ -161,14 +161,19 @@ extension Diagnostic.CapacityProbes.Context {
 
     func attention(_ measurements: inout Fit.Measurements) throws {
         let (h, d) = (Sizes.attentionHeads, Sizes.attentionHeadDim)
-        let floats = sizes.attention.max()! * h * d
+        func solo(_ kernel: Kernel, at s: Int) -> Fit.Measurements.Solo? {
+            measurements.solos.last { $0.kernel == kernel.description && $0.shape.first == s }
+        }
+        let floats = sizes.attentionRuns.max()! * h * d
         let pages = (q: Pages(bytes: floats * 4), k: Pages(bytes: floats * 4), v: Pages(bytes: floats * 4), out: Pages(bytes: floats * 4))
         Diagnostic.fill(pages.q.floats(), count: floats, scale: 3, seed: 11)
         Diagnostic.fill(pages.k.floats(), count: floats, scale: 3, seed: 12)
         Diagnostic.fill(pages.v.floats(), count: floats, scale: 1, seed: 13)
         let buffers = (q: try bench.buffer(pages.q), k: try bench.buffer(pages.k), v: try bench.buffer(pages.v), out: try bench.buffer(pages.out))
         let out = pages.out.floats()
-        for s in sizes.attention {
+        for s in sizes.attentionRuns {
+            // The tier's sequences run every kernel; the pair's alone (`Sizes.pairSequences`) its two sides and the pair.
+            let kernels = sizes.attention.contains(s)
             autoreleasepool {
                 let rows = Diagnostic.sampleRows(s, count: Diagnostic.sampledQueries)
                 let exact = Diagnostic.exactAttention(q: pages.q.floats(), k: pages.k.floats(), v: pages.v.floats(), sequence: s, heads: h, headDim: d, rows: rows)
@@ -194,11 +199,13 @@ extension Diagnostic.CapacityProbes.Context {
                     measurements.solos.append(.init(kernel: kernel.description, shape: shape, flop: flop, seconds: t, error: v.error))
                     log?(String(format: "  %@ S=%d  %.2f ms  %.2f TFLOP/s", kernel.description, s, t * 1e3, flop / t * 1e-12))
                 }
-                let graph = Attention(device: bench.device, queue: bench.queue, heads: h, sequence: s, headDim: d)
-                RouteBeacon.announce("gpu/graph")
-                record(Kernel(.gpu, .graph), flop: flop, run: { _ = graph.run(q: buffers.q, k: buffers.k, v: buffers.v, into: buffers.out); return true }, shape: [s, h, d])
+                if kernels {
+                    let graph = Attention(device: bench.device, queue: bench.queue, heads: h, sequence: s, headDim: d)
+                    RouteBeacon.announce("gpu/graph")
+                    record(Kernel(.gpu, .graph), flop: flop, run: { _ = graph.run(q: buffers.q, k: buffers.k, v: buffers.v, into: buffers.out); return true }, shape: [s, h, d])
+                }
                 RouteBeacon.announce("gpu/flash")
-                if !skipped.contains(Kernel(.gpu, .flash)), let flash = try? FlashMatrix(device: bench.device, queue: bench.queue, heads: h, sequence: s, headDim: d) {
+                if kernels, !skipped.contains(Kernel(.gpu, .flash)), let flash = try? FlashMatrix(device: bench.device, queue: bench.queue, heads: h, sequence: s, headDim: d) {
                     record(Kernel(.gpu, .flash), flop: flop, run: { _ = flash.run(q: buffers.q, k: buffers.k, v: buffers.v, into: buffers.out); return true }, shape: [s, h, d])
                 }
                 // The three stages by tiles of query rows. fp32: the graph's bar. fp16 operands (Q, K, V, P rounded to half, fp32 sums): the
@@ -206,7 +213,7 @@ extension Diagnostic.CapacityProbes.Context {
                 // and only on a machine that runs it (the probe measures it everywhere: the permission is the request's, at the solver).
                 for (kernel, precision) in [(Kernel(.gpu, .tiles), TiledAttention.Precision.fp32), (Kernel(.gpu, .tiles16), .fp16)] {
                     RouteBeacon.announce(kernel.description)
-                    guard !skipped.contains(kernel),
+                    guard kernels, !skipped.contains(kernel),
                           let tiled = try? TiledAttention(device: bench.device, queue: bench.queue, heads: h, sequence: s, headDim: d, precision: precision)
                     else { continue }
                     var bar = Diagnostic.fp32Threshold
@@ -220,7 +227,7 @@ extension Diagnostic.CapacityProbes.Context {
                 }
                 // The CPU's heads: all but one of them, the figure being the CPU part's own wall.
                 RouteBeacon.announce("cpu/heads")
-                if !skipped.contains(Kernel(.cpu, .heads)), let split = try? HeadSplitAttention(device: bench.device, queue: bench.queue, heads: h, sequence: s, headDim: d,
+                if kernels, !skipped.contains(Kernel(.cpu, .heads)), let split = try? HeadSplitAttention(device: bench.device, queue: bench.queue, heads: h, sequence: s, headDim: d,
                                                        cpuFraction: Double(h - 1) / Double(h)) {
                     nonisolated(unsafe) let (qp, kp, vp, op) = (pages.q.floats(), pages.k.floats(), pages.v.floats(), out)
                     var cpuSeconds = 0.0
@@ -249,10 +256,20 @@ extension Diagnostic.CapacityProbes.Context {
                             measurements.solos.append(.init(kernel: Kernel(.cpu, .heads).description, shape: [s, h, d, split.cpuHeads],
                                                             flop: cpuFlop, seconds: t, error: v.error))
                             log?(String(format: "  cpu/heads S=%d (%d heads)  %.2f ms  %.2f TFLOP/s", s, split.cpuHeads, t * 1e3, cpuFlop / t * 1e-12))
-                            attentionSet(&measurements, sequence: s, cpuSolo: (split.cpuHeads, t), flop: flop, pages: pages, buffers: buffers,
-                                         verdict: verdict, poison: poison)
+                            if Sizes.pairSequences.contains(s), let graph = solo(Kernel(.gpu, .graph), at: s) {
+                                attentionSet(&measurements, sequence: s, cpuSolo: (split.cpuHeads, t), graph: graph.seconds, pages: pages, buffers: buffers,
+                                             verdict: verdict, poison: poison)
+                            }
                         }
                     }
+                }
+                // A sequence only the pair runs at (`Sizes.pairSequences`, above the tier's): its sides alone are the tier's longest scaled by
+                // the work (S²; both lines have no t₀). Only the balance needs them — the fit reads each side through its line (`Fit.overlap`).
+                if !kernels, Sizes.pairSequences.contains(s), !skipped.contains(Kernel(.cpu, .heads)), let s0 = sizes.attention.filter({ $0 < s }).max(),
+                   let graph = solo(Kernel(.gpu, .graph), at: s0), let cpu = solo(Kernel(.cpu, .heads), at: s0), cpu.shape.count == 4 {
+                    let scale = Double(s) * Double(s) / (Double(s0) * Double(s0))
+                    attentionSet(&measurements, sequence: s, cpuSolo: (cpu.shape[3], cpu.seconds * scale), graph: graph.seconds * scale,
+                                 pages: pages, buffers: buffers, verdict: verdict, poison: poison)
                 }
             }
         }
@@ -262,13 +279,12 @@ extension Diagnostic.CapacityProbes.Context {
     /// balance, each side by the clock the split gives it (`HeadSplitAttention.run`: the GPU part's, the CPU part's wall). A side alone is its
     /// solo line scaled to its heads (both are proportional to them: the graph's and the heads' t₀ are nil). The same fit as the products'
     /// sets (`Fit.sharing`): a trial of `heads` rows of `2·S²·Dh` each.
-    func attentionSet(_ measurements: inout Fit.Measurements, sequence s: Int, cpuSolo: (heads: Int, seconds: Double), flop: Double,
+    func attentionSet(_ measurements: inout Fit.Measurements, sequence s: Int, cpuSolo: (heads: Int, seconds: Double), graph: Double,
                       pages: (q: Pages, k: Pages, v: Pages, out: Pages),
                       buffers: (q: MTLBuffer, k: MTLBuffer, v: MTLBuffer, out: MTLBuffer),
                       verdict: (String) -> (pass: Bool, error: Double), poison: () -> Void) {
         let (h, d) = (Sizes.attentionHeads, Sizes.attentionHeadDim)
         let key = CapacityModel.key([.gpu, .cpu])
-        guard let graph = measurements.solos.last(where: { $0.kernel == Kernel(.gpu, .graph).description && $0.shape.first == s })?.seconds else { return }
         // Rates over all the heads: the GPU's (the graph alone), the CPU's (its heads over its wall).
         let cpuRate = Double(cpuSolo.heads) / cpuSolo.seconds, gpuRate = Double(h) / graph
         let fraction = cpuRate / (cpuRate + gpuRate)

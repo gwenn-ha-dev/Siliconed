@@ -477,6 +477,12 @@ package enum CapacityFit {
         fit.overhead = fit.overhead.isFinite ? fit.overhead : 0
         // κ by k where the chains came at more than one: each engine's median at each k.
         if let low = byK.keys.min(), let high = byK.keys.max() { fit.kFrom = max(1, low / 2); fit.kTo = high * 2 }
+        // **The attention's pair has no ceiling.** Its k is a head's work (2·S·keys·Dh), which no probe can follow to the formats (a 1536 × 1024
+        // render is S = 6 144, k = 9.7·10⁹, past the 8.6·10⁹ of the longest S measured; a 2048² one 16 384): a ceiling there takes the cut by
+        // heads off every large format. Above it, the κ is the longest sequence's (`Sharing.keep`): the sides stream no weight — the reason the
+        // products' sets are bounded, where the AMX's κ halves as the weight grows —, and the κ measured rises with S (M1 Pro: 0.94–0.95 at
+        // S = 1 024, 0.96–1.0 at 4 096): held at the longest, it errs on the safe side.
+        if set == CapacityModel.key([.gpu, .cpu]) { fit.kTo = nil }
         if byK.count >= 2 {
             fit.keepByK = byK.keys.sorted().map { k in
                 .init(k: k, keep: Dictionary(uniqueKeysWithValues: byK[k]!.map { ($0.key.rawValue, median($0.value)) }))

@@ -160,7 +160,8 @@ package struct CapacityModel: Codable, Sendable, Equatable {
         package var keepByK: [KeepAt]?
         /// **The set's domain in k**: half of the smallest k and twice the largest the chains came at. Beyond it the κ would be an extrapolation (the
         /// triple's AMX keeps 0.73 at k = 3 840 and a third of it at 12 288: a κ read at one k and clamped over the next class chose a set that ran 20 %
-        /// over its seconds), so the model gives no seconds to the set there. `nil`: no bound.
+        /// over its seconds), so the model gives no seconds to the set there. `nil`: no bound — the attention's pair has no ceiling
+        /// (`CapacityFit.overlap`: it streams no weight, and no probe reaches the sequences of the large formats).
         package var kFrom: Int?, kTo: Int?
         package struct KeepAt: Codable, Sendable, Equatable {
             package var k: Int

@@ -216,6 +216,26 @@ import Testing
         #expect((s.rows[ane] ?? 0) == 0 || (s.rows[ane] ?? 0) >= 512)
     }
 
+    /// **A set's trial gives each side the rows its line speaks for** (`CapacityProbes.trialRows`): the M1 Pro's lines at tier 1 — the AMX's
+    /// t₀ of 2 ms, its domain from 512 rows — left the triple's balance on a 2 048-row chain without the AMX, the trial unrun, the set out of the plan.
+    @Test func aSetTrialGivesEachSideItsFewestRows() throws {
+        var m = M()
+        m.lines[gpu] = .init(t0: 0.00033, rate: 3.436e12)
+        m.lines[amx] = .init(t0: 0.00199, rate: 2.227e12, rowsFrom: 512)
+        m.lines[ane] = .init(t0: 0.00137, rate: 5.496e12, rowsFrom: 256, perRow: 1.445e-10)
+        let triple = [gpu, amx, ane]
+        #expect((m.split(m: 2048, k: 3840, n: 3840, kernels: triple)?.rows.count ?? 0) < 3)          // the balance leaves a side out
+        for (rows, k, n) in [(2048, 3840, 3840), (2048, 12288, 4096)] {
+            let r = try #require(Diagnostic.CapacityProbes.trialRows(triple, model: m, m: rows, k: k, n: n))
+            #expect(r.values.reduce(0, +) == rows && r[amx]! >= 512 && r[ane]! >= 256 && r[ane]! % 256 == 0 && r[gpu]! >= 64, "\(r)")
+        }
+        // Where the balance holds every side, the trial is the balance.
+        let full = try #require(m.split(m: 4096, k: 3840, n: 3840, kernels: triple))
+        #expect(full.rows.count == 3 && Diagnostic.CapacityProbes.trialRows(triple, model: m, m: 4096, k: 3840, n: 3840) == full.rows)
+        // The fewest rows that do not fit: no trial.
+        #expect(Diagnostic.CapacityProbes.trialRows(triple, model: m, m: 768, k: 3840, n: 3840) == nil)
+    }
+
     @Test func aSetIsNotTimedBeyondTheKsItWasMeasuredAt() throws {
         var m = pair(0.9, 0.75)
         m.sharing["gpu+ane"] = .init(keep: [.gpu: 0.9, .ane: 0.75], kFrom: 1920, kTo: 7680)

@@ -276,7 +276,7 @@ extension Diagnostic {
             let ane = engineBytes(points) + programCount(points) * programBytes
             let aneIntegers = engineBytes(points, integers: integers) + programCount(points, integers: integers) * programBytes
             let (h, d) = (Sizes.attentionHeads, Sizes.attentionHeadDim)
-            let attention = sizes.attention.map { s -> Int in
+            let attention = sizes.attentionRuns.map { s -> Int in
                 let split = HeadSplitAttention.hostBytes(heads: h, sequence: s, headDim: d, cpuHeads: h - 1)
                     + OperatorFootprint.sdpaQueries(rows: s, heads: 1, headDim: d)
                 // The tiled kernels (one alive at a time, the fp16 variant the larger): the scores of a pass, the probabilities, the half operands.

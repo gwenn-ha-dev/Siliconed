@@ -32,6 +32,9 @@ import Testing
         #expect(full.solo.map { 2.0 * Double($0.m) * Double($0.k) * Double($0.n) / 1e9 }.map { Int($0.rounded()) } == [4, 30, 309])
         #expect(full.sharing.map { 2.0 * Double($0.m) * Double($0.k) * Double($0.n) / 1e9 }.map { Int($0.rounded()) } == [30, 60, 121])
         #expect(full.attention == [1024, 4096])
+        // The attention's pair runs at the models' sequences in every tier (the half and the full grid of 1024²): a tier that measured it
+        // at 2 048 took the cut by heads off every full-size attention.
+        #expect(Sizes.pairSequences == [1024, 4096] && Sizes.tiers.allSatisfy { Set(Sizes.pairSequences).isSubset(of: $0.attentionRuns) })
         // Every tier keeps a small, a middle and a large product while it can: a line needs a t₀ and a rate.
         #expect(Sizes.tiers.allSatisfy { $0.solo.count >= 2 && $0.stairRows.contains(where: { $0 % 512 != 0 }) })
         #expect(Sizes.tiers.allSatisfy { $0.products.contains { $0.m == Sizes.witness.m && $0.k == Sizes.witness.k && $0.n == Sizes.witness.n } })
