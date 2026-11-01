@@ -14,9 +14,9 @@
   qu'a pris chaque sorte de calcul à ce que la carte prévoyait.
 - **Le Neural Engine lit les poids int8 tels que publiés** : sur la Compact de Krea 2, de
   Qwen-Image-2.1 et de MOSS-Image, une part des produits tourne sur lui en 8 bits, à côté du GPU. Sur
-  un M1 Pro en 1024², ces trois Compact prennent un quart de temps de moins qu'avant : Krea 2 99,9 s
-  (135,8), Qwen-Image-2.1 72,8 s (100,2), MOSS-Image 80,2 s (107,7). Z-Image (79,6 s), Anima (32,4 s)
-  et les Standard gardent leurs temps ([Les chiffres](ENGINE.fr.md#les-chiffres)).
+  un M1 Pro en 1024², toutes les évaluations en pleine taille, ces trois Compact prennent 24 à 37 % de
+  temps de moins que leur Standard : Krea 2 140,9 s (213,3), Qwen-Image-2.1 85,8 s (135,6), MOSS-Image
+  85,0 s (111,7) ([Les chiffres](ENGINE.fr.md#les-chiffres)).
 - **Une mesure donne toujours une carte** : plus rien n'est orange. La confiance qu'on peut avoir dans
   le chiffre de chaque moteur est écrite à côté (± quelques pour cent), et ce que la mesure a trouvé
   est dit avec son effet sur le plan. Une route qui a mal calculé, ou dont le chargement a arrêté le
@@ -104,21 +104,19 @@
 - **Le pied du rack dit en quoi calcule la version installée** : la Standard en fp32 de bout en bout, chaque étage vérifié contre la référence ; une Compact ou une Légère en fp32 sur des poids 8 ou 4 bits tels que publiés, avec une partie du DiT en fp16 sur le Neural Engine quand il est allumé.
 - **La barre de progression du Dock bouge.** Elle ne l'a jamais fait : la vignette dessine maintenant elle-même l'icône et la barre.
 - **Les métadonnées Civitai de MOSS-Image** créditent la page SFT et la LoRA DMD sous laquelle tournent ses 8 pas, si bien qu'un Remix sur Civitai reçoit toute la recette.
-- **Un premier chiffre sur un Mac de 8 Go** : Anima Turbo, 1024², Compact, en 80,1 s sur un MacBook Neo ([Les chiffres](ENGINE.fr.md#les-chiffres)).
 - **Partager la carte est une option** : sous Partager… dans Mesurer ce Mac, jamais le bouton par défaut.
 - **La molette d’une souris zoome** sur l’image et dans le rideau, vers le curseur ; une molette horizontale
   déplace toujours l’image, et le trackpad ne change pas. ([#10](https://github.com/gwenn-ha-dev/Siliconed/issues/10))
 - **Alterner**, à côté de Côte à côte et Rideau : deux images une à la fois, au même endroit et au même
   zoom ; un clic, ou ← →, montre l’autre. ([#10](https://github.com/gwenn-ha-dev/Siliconed/issues/10))
 - **Le rendu plus rapide se choisit par modèle**, comme le Neural Engine : allumé par défaut sur la
-  Compact et la Légère, éteint sur la Standard, qui reste l'image contrôlée contre la référence. Le choix
-  est gardé avec l'image, Rendre à nouveau redonne le même ; `silicontrol set faster-rendering on|off
-  --model ID` règle celui d'un modèle, `silicontrol models` donne celui de chacun. **Sur une Standard,
-  un rendu aux réglages par défaut prend donc plus de temps qu'en 0.17** (un quart à un tiers en 1024²),
-  pour la recette en pleine taille. Si vous aviez éteint le rendu plus rapide, il reste éteint pour vos
-  modèles.
-- **Le rendu plus rapide, mesuré** : en 1024², il retire un tiers du temps d'un rendu sur Krea 2, un
-  cinquième à un quart sur Z-Image, Qwen-Image-2.1 et Anima, et 6 à 9 % sur MOSS-Image.
+  Compact et la Légère, éteint sur la Standard, qui reste l'image contrôlée contre la référence. Le
+  choix est gardé avec l'image, Rendre à nouveau redonne le même ; `silicontrol set faster-rendering
+  on|off --model ID` règle celui d'un modèle, `silicontrol models` donne celui de chacun. **Sur une
+  Standard, un rendu aux réglages par défaut prend donc plus de temps qu'en 0.17**, pour la recette en
+  pleine taille. Si vous aviez éteint le rendu plus rapide, il reste éteint pour vos modèles.
+- **Le rendu plus rapide, mesuré** : sur la Compact en 1024², il retire 31 % du temps d'un rendu sur
+  Krea 2, 21 % sur Z-Image, 17 % sur Qwen-Image-2.1, 19 % sur Anima et 7 % sur MOSS-Image.
 
 ## 0.17
 

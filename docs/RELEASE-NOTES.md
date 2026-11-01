@@ -13,10 +13,10 @@ English · [Français](RELEASE-NOTES.fr.md)
   before its first computation. Each render compares what each kind of computation took with what the
   map predicted.
 - **The Neural Engine reads int8 weights as published**: on the Compact of Krea 2, Qwen-Image-2.1 and
-  MOSS-Image, part of the products run on it in 8 bits, beside the GPU's. On an M1 Pro at 1024² those
-  three Compacts take a quarter less time than before: Krea 2 99.9 s (135.8), Qwen-Image-2.1 72.8 s
-  (100.2), MOSS-Image 80.2 s (107.7). Z-Image (79.6 s), Anima (32.4 s) and the Standards keep their
-  times ([Numbers](ENGINE.md#numbers)).
+  MOSS-Image, part of the products run on it in 8 bits, beside the GPU's. On an M1 Pro at 1024², every
+  evaluation at full size, those three Compacts take 24 to 37 % less time than their Standard: Krea 2
+  140.9 s (213.3), Qwen-Image-2.1 85.8 s (135.6), MOSS-Image 85.0 s (111.7)
+  ([Numbers](ENGINE.md#numbers)).
 - **A measure always gives a map**: nothing is orange any more. How sure the measure is of each
   engine's figure is written beside it (± a few percent), and what it found is said with its effect on
   the plan. A route that computed wrong, or whose load ended the measuring process, is left out, and
@@ -100,7 +100,6 @@ English · [Français](RELEASE-NOTES.fr.md)
 - **The rack's footnote says what the installed version computes in**: the Standard in fp32 end to end, every stage verified against the reference; a Compact or a Light in fp32 on 8- or 4-bit weights as published, with part of the DiT in fp16 on the Neural Engine when it is on.
 - **The Dock icon's progress bar moves**. It never did: the tile now draws the icon and the bar itself.
 - **MOSS-Image's Civitai metadata** credits the SFT page and the DMD LoRA its 8 steps run under, so a Remix on Civitai gets the whole recipe.
-- **A first number on an 8 GB Mac**: Anima Turbo, 1024², Compact, in 80.1 s on a MacBook Neo ([Numbers](ENGINE.md#numbers)).
 - **Sharing the map is an option**: under Share… in Measure This Mac, never the default button.
 - **A mouse's wheel zooms** on the image and in the curtain, toward the pointer; a horizontal wheel still
   moves the image, and the trackpad does not change. ([#10](https://github.com/gwenn-ha-dev/Siliconed/issues/10))
@@ -110,10 +109,10 @@ English · [Français](RELEASE-NOTES.fr.md)
   the Light, off for the Standard, which stays the image checked against the reference. The choice is
   saved with the image, so Render Again gives the same one; `silicontrol set faster-rendering on|off
   --model ID` sets one model's, `silicontrol models` tells each. **On a Standard, a render at the
-  default settings therefore takes longer than in 0.17** (a quarter to a third at 1024²), for the
-  recipe at full size. If you had turned Faster Rendering off, it stays off for the models you have.
-- **Faster Rendering, measured**: at 1024² it takes a third off a render on Krea 2, a fifth to a
-  quarter on Z-Image, Qwen-Image-2.1 and Anima, and 6 to 9 % on MOSS-Image.
+  default settings therefore takes longer than in 0.17**, for the recipe at full size. If you had
+  turned Faster Rendering off, it stays off for the models you have.
+- **Faster Rendering, measured**: on the Compact at 1024² it takes 31 % off a render on Krea 2, 21 %
+  on Z-Image, 17 % on Qwen-Image-2.1, 19 % on Anima and 7 % on MOSS-Image.
 
 ## 0.17
 

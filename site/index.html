@@ -234,8 +234,8 @@
       <p>Standard, Compact or Light, from open copies proven identical to Krea's files. No account, no
         sign-in. Krea 2 Community license: commercial use under $1M of annual revenue, a content filter when deployed.</p>
       <ul class="stats">
-        <li><b>99.9 s</b>1024² on an M1 Pro, Compact</li>
-        <li><b>147.1 s</b>the same, in full precision</li>
+        <li><b>140.9 s</b>1024² on an M1 Pro, Compact</li>
+        <li><b>213.3 s</b>the same, in full precision</li>
         <li><b>2.6·10⁻⁴</b>from the fp32 reference</li>
       </ul>
     </div>
@@ -260,7 +260,7 @@
       <tr><td><a href="https://huggingface.co/circlestone-labs/Anima">Anima Turbo</a></td><td>text-to-image (illustration, painting, anime), LoRA</td><td>CircleStone Labs Non-Commercial (the images may be used commercially)</td></tr>
       <tr><td><a href="https://huggingface.co/OpenMOSS-Team/MOSS-Image-SFT">MOSS-Image</a></td><td>text-to-image, LoRA; beta, under the community's 8-step LoRA</td><td>Apache 2.0</td></tr>
     </table></div>
-    <p class="times">1024², 8 steps, seed 42, on an M1 Pro with 16 GB, app 0.18, Faster Rendering on for the Compact. Compact, the default: Krea 2 Turbo 99.9 s, Z-Image Turbo 79.6 s, Qwen-Image-2.1 Turbo 72.8 s, Anima Turbo 32.4 s, MOSS-Image 80.2 s. Standard, the publisher's bf16 in fp32 (with Faster Rendering switched on, to compare like with like): 147.1 s, 85.4 s, 108.4 s, 32.2 s, 105.5 s. Every step at full size: Compact 150.6 s, 100.0 s, 88.2 s, 39.0 s, 85.6 s; Standard 217.2 s, 112.4 s, 136.9 s, 42.0 s, 115.7 s. Light (0.15): 145.0 s, 87.5 s, 103.7 s, 34.7 s; none for MOSS-Image. An edit with one reference: 211 s (0.10).</p>
+    <p class="times">1024², 8 steps, seed 42, on an M1 Pro with 16 GB, app 0.18, every evaluation at full size. Compact, the default version: Krea 2 Turbo 140.9 s, Z-Image Turbo 101.9 s, Qwen-Image-2.1 Turbo 85.8 s, Anima Turbo 40.1 s, MOSS-Image 85.0 s. Standard, the publisher's bf16 in fp32: 213.3 s, 113.1 s, 135.6 s, 40.9 s, 111.7 s. With Faster Rendering, on by default for the Compact: 97.0 s, 80.8 s, 71.4 s, 32.4 s, 78.9 s.</p>
   </div>
   <div class="split rev" id="moss" style="margin-top:clamp(64px, 9vw, 112px)">
     <div class="text reveal">
@@ -272,8 +272,8 @@
         LoRAs on top, ComfyUI's and ai-toolkit's too. Beta until OpenMOSS ships its own fast version.
         Apache 2.0.</p>
       <ul class="stats">
-        <li><b>80.2 s</b>1024² on an M1 Pro, Compact</li>
-        <li><b>105.5 s</b>the same, in full precision</li>
+        <li><b>85.0 s</b>1024² on an M1 Pro, Compact</li>
+        <li><b>111.7 s</b>the same, in full precision</li>
         <li><b>2.4 GiB</b>peak memory of the app at 1024²</li>
       </ul>
     </div>
@@ -335,8 +335,8 @@
     </div>
     <ul class="stats reveal">
       <li><b>−16 to −26 %</b>energy per image, M1 Pro, 1024², Standard</li>
-      <li><b>99.9 s</b>Krea 2, Compact, instead of 135.8 s (0.15)</li>
-      <li><b>72.8 s</b>Qwen-Image-2.1, Compact, instead of 100.2 s (0.15)</li>
+      <li><b>140.9 s</b>Krea 2, Compact, against 213.3 s for the Standard</li>
+      <li><b>85.8 s</b>Qwen-Image-2.1, Compact, against 135.6 s for the Standard</li>
     </ul>
   </div>
 </section>
@@ -396,13 +396,13 @@
   <div class="grid3">
     <div class="card reveal"><h3>Checked against the original, a bit obsessively</h3><p>Every stage is compared channel by channel with diffusers and transformers in fp32, and rounds where they round. What cannot be checked against the reference does not ship.</p></div>
     <div class="card reveal"><h3>34 GB of model, 16 GB of Mac</h3><p>It sounds like a bad idea; it works. Weights stream from disk as needed. Never more than ¾ of the Mac's memory minus 2 GB (10 GB on a 16 GB Mac): each render computes what it needs before it starts.</p></div>
-    <div class="card reveal"><h3>Eight bits against eight bits</h3><p>Z-Image Turbo Compact (GGUF Q8_0), 1024², 8 steps, Faster Rendering and the Neural Engine both on, as they are for the Compact: 81–83 s on an M1 Pro. Draw Things' engine with its default 8-bit <code>q8p</code>, on the same Mac: 135–144 s. Wall-clock, not identical arithmetic: the samplers and the images differ.</p></div>
+    <div class="card reveal"><h3>Eight bits against eight bits</h3><p>Z-Image Turbo Compact (GGUF Q8_0), 1024², 8 steps, Faster Rendering and the Neural Engine both on, as they are for the Compact: 80.8 s on an M1 Pro (app 0.18). Draw Things' engine with its default 8-bit <code>q8p</code>, on the same Mac: 135–144 s. Wall-clock, not identical arithmetic: the samplers and the images differ.</p></div>
     <div class="card reveal"><h3>Private by construction</h3><p>Nothing leaves your Mac but the model downloads you accepted and what you send to another Mac of yours, encrypted. It works offline once a model is installed, and the render cache is gone when you quit.</p></div>
     <div class="card reveal"><h3>Scriptable, agents included</h3><p><code>silicontrol</code> drives the running app from a terminal, with JSON lines out; <code>silicontrol help</code> is all a script or a coding agent needs.</p></div>
     <div class="card reveal"><h3>Reproducible to the bit</h3><p>Same prompt, seed, settings and version on the same Mac: the same image, byte for byte.</p></div>
     <div class="card reveal" style="grid-column:1/-1"><h3>A prompt writer, if you want one (beta)</h3><p>The Prompt Lab (Window › Prompt Lab) rewrites a short prompt the way each model likes it, or describes an image you drop on it. The writer is Qwen-Image-2.1's own text encoder, made to write, so there is nothing more to download but its 1.25 GB output layer. It keeps every element of your prompt, never moralizes, and steps aside the moment an image starts rendering. Its greedy output matches transformers, token for token.</p></div>
     <div class="card reveal" style="grid-column:1/-1"><h3>Render on another Mac</h3><p>The MacBook in the living room computes on the Mac mini next door: Render › Compute On moves the whole window there. Paired once with a six-digit code, TLS with a key per Mac.</p></div>
-    <div class="card reveal" style="grid-column:1/-1"><h3>Faster Rendering, the honest trick</h3><p>It is a choice per model, like the Neural Engine: on for the Compact and the Light, off for the Standard, which stays the image checked against the reference. From 1024 px on each side, the first steps run on a half-size grid, the rest at full size: a fifth to a third off the clock, still all 8 evaluations of the recipe. The trick is in the noise: the small grid gets the averaged picture plus the low band of the noise, and the step brought back to full size clears the fine noise exactly as a full step would, so no grain, no cracks; freckles and book spines survive. Another picture than the full-size one, not a blurrier one. Switch it off and you get the full-size recipe, bit for bit, the one checked against diffusers. The choice travels with the image, so Render Again gives the same one.</p></div>
+    <div class="card reveal" style="grid-column:1/-1"><h3>Faster Rendering, the honest trick</h3><p>It is a choice per model, like the Neural Engine: on for the Compact and the Light, off for the Standard, which stays the image checked against the reference. From 1024 px on each side, the first steps run on a half-size grid, the rest at full size: 17 to 31 % off the clock at 1024² (7 % on MOSS-Image), still all 8 evaluations of the recipe. The trick is in the noise: the small grid gets the averaged picture plus the low band of the noise, and the step brought back to full size clears the fine noise exactly as a full step would, so no grain, no cracks; freckles and book spines survive. Another picture than the full-size one, not a blurrier one. Switch it off and you get the full-size recipe, bit for bit, the one checked against diffusers. The choice travels with the image, so Render Again gives the same one.</p></div>
   </div>
 </section>
 
