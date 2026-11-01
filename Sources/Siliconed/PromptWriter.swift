@@ -11,7 +11,8 @@ import Synchronization
 ///         decoder on that plan? ─ no: `.loading(0…1)` while it is wired to the maps
 ///         greedy decoding ─ each token's bytes ─ `UTF8Stream` ─ `.text(so far)` ─ `.finished(text, tokens)`
 ///     cancel()    the run in flight stops between two layers: `.cancelled`
-///     release()   cancels, then gives the weights back (a render is about to start)
+///     release()   cancels, then gives everything back (a render is about to start, the window closes)
+///     (every run gives its weights back when its stream ends)
 ///
 /// What the lab's use asks of it, and what a caller would get wrong:
 ///
@@ -22,6 +23,12 @@ import Synchronization
 ///     `unloadResident()`.
 ///   - **One thing at a time**: a run waits for the one before it on the engine's queue; two never share the pages. A run still
 ///     waiting is cancelled by `cancel()` and `release()` as well as the one in flight.
+///   - **The weights go back at the end of every run, not at the next render.** Metal wires the pages the GPU decoder reads in the
+///     maps for as long as the decoder lives (all of them on a plan that streams nothing: 8 GB on the Compact, measured), and they
+///     are freed when it goes, not handed back to the cache: kept between two gestures, they are memory the rest of the Mac waits
+///     for while one reads the text. Kept, the next run's CPU passes over those pages also count them in the process's footprint
+///     (7.3 GB at the peak against 0.97 GB rebuilt, the same tokens). Rebuilding costs the next gesture its pages again: some
+///     seconds before its first word, read from the disk.
 ///   - **The plan is chosen before the first token**: the need is computed from the prompt's actual size
 ///     (`PromptWriterNeed`) and placed in B (`MemoryBudget.machineCeiling`, `PromptWriterNeed.chosen`), after the process's base,
 ///     read once, before the writer holds anything of its own: all the layers in the page cache, or its head there and the tail
@@ -107,9 +114,15 @@ package final class PromptWriter: @unchecked Sendable {
     }
 
     private func unload() {
+        unloadWeights()
+        tokenizer = nil; tokenBytes = nil
+    }
+
+    /// The decoder over the maps and its staging, at the end of every run; the tokenizer and its table stay (small, no weight).
+    private func unloadWeights() {
         held.withLock { $0 = 0 }
         generator?.unload()
-        generator = nil; tokenizer = nil; tokenBytes = nil
+        generator = nil
     }
 
     /// The writer of Qwen-Image-2.1 in `library`; `nil` while its encoder, head or tokenizer is not installed.
@@ -148,6 +161,8 @@ package final class PromptWriter: @unchecked Sendable {
             continuation.onTermination = { _ in token.cancel() }
             Engine.file.async { [self] in
                 defer { lock.withLock { _ = pending.removeValue(forKey: id) } }
+                // After the stream has ended, whatever its end: the weights go back (see the header).
+                defer { unloadWeights() }
                 do {
                     // The machine's lock, as a render takes it: another process rendering refuses this run by name.
                     let machine = try RenderLock.acquire(RenderLock.machine)
@@ -214,8 +229,8 @@ package final class PromptWriter: @unchecked Sendable {
             self.generator = generator
         }
         generator.cancellation = cancellation
-        // The weights are the maps' own pages: taking them is wiring a decoder to the plan, not reading 8 GB. Another plan (a longer
-        // prompt, a smaller base) rebuilds it.
+        // The weights are the maps' own pages: taking them is wiring a decoder to the plan, not reading 8 GB. Built at every run
+        // (the last one gave it back), on the plan this prompt and this base leave.
         if generator.loadedStreamedFrom != need.placement.streamedFrom {
             emit(.loading(0))
             try generator.load(streamedFrom: need.placement.streamedFrom) { emit(.loading($0)) }

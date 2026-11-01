@@ -9,8 +9,10 @@ import Metal
 ///     layer: norm+rotate ─ q, k, v ─ QK-norm, RoPE, K/V appended to the cache ─ attention over it ─ o ─ norm+rotate ─ gate, up ─ SwiGLU ─ down
 ///
 /// The layers' tensors are read where they lie and wrapped as `MTLBuffer`s without a copy (one per tensor: a page-aligned
-/// base and length, each below `maxBufferLength`): the map's own clean pages (the page cache's, nobody's footprint), or
-/// the anonymous pages of `Artifact.keepResident` (tests and checks). The layers from `Tail.first` on are **streamed**:
+/// base and length, each below `maxBufferLength`): the map's own pages, or the anonymous pages of `Artifact.keepResident`
+/// (tests and checks). A mapped tensor's pages are wired by Metal once the GPU has read them, until the buffer goes (measured:
+/// the file cache shrinks by as much as the wired memory grows, and the release frees them rather than handing them back), so
+/// the decoder is memory for as long as it lives: the writer builds one per run (`PromptWriter`). The layers from `Tail.first` on are **streamed**:
 /// each is read with `pread` + `F_NOCACHE` into one of a few staging buffers while the GPU computes the layer before it
 /// (`TailFeeder`), so the cache keeps the head of the map and a token never reads the tail through it. Resident
 /// anonymous buffers are held for the GPU by a `MTLResidencySet` on the decoder's own queue — Metal does not re-validate

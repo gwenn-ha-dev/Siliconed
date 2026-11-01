@@ -5,7 +5,8 @@
 //                                      PromptWriter.write(Request) ─ events, one to one ─▶ LabEvent
 //
 // - **Nothing is read at launch.** The engine writer is built at the first `availability` (headers and the tokenizer's tables,
-//   no weight) and its weights are read by the first gesture; they stay until `release()` — a render starting, the window closing.
+//   no weight); each gesture reads the weights and gives them back when it ends (`PromptWriter`); `release()` (a render starting,
+//   the window closing) stops the gesture in flight and drops the rest.
 // - **Availability is honest** (`PromptWriterStatus`): the encoder missing is « not installed »; the encoder there and the head
 //   not is its own state, with the download's size (the lab offers it); an engine that does not fit says the Mac that would.
 
