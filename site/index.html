@@ -216,7 +216,7 @@
   <p class="req">Apache 2.0 · macOS 26 or later · M1 and later · signed and notarized</p>
   <figure class="stage h-fade d3">
     <div class="glow"><img src="images/curtain.gif" width="800" height="533" alt="Under a sliding curtain: on one side, a sunny Krea 2 Turbo photo of a laughing red-haired Irish woman in a shorty wetsuit running out of the surf, her surfboard under her arm, backlit by a low sun; on the other, the same picture turned into a cel-shaded western comic book by Qwen-Image-2.1"></div>
-    <figcaption>A photo by Krea 2 Turbo. Then Qwen-Image-2.1 after one sentence: “Convert this photo to a western comic book style with cel shading.” Seed 42, 215 s on an M1 Pro.</figcaption>
+    <figcaption>A photo by Krea 2 Turbo. Then Qwen-Image-2.1 after one sentence: “Convert this photo to a western comic book style with cel shading.” Seed 42.</figcaption>
   </figure>
   <div class="strip" aria-label="Models and principles">
     <span>Krea 2 Turbo</span><span>Qwen-Image-2.1</span><span>Z-Image Turbo</span><span>Anima Turbo</span><span>MOSS-Image</span><span>measured per Mac</span><span>fp32</span><span>offline</span>
@@ -241,7 +241,7 @@
     </div>
     <figure class="shot reveal">
       <img src="images/krea2.jpg" width="1248" height="832" alt="A Krea 2 Turbo photo, low angle: a young Irish woman with long wavy auburn hair and freckles, in a short-sleeved shorty wetsuit, running out of the surf laughing with her surfboard under her arm, backlit by a low golden sun, glowing spray, turquoise water, deep blue sky" loading="lazy">
-      <figcaption>Krea 2 Turbo, Standard, 1248×832, 8 steps, seed 3001, 229 s on an M1 Pro: &ldquo;Editorial surf photograph, low angle, of a young Irish woman with long wavy auburn red hair, pale freckled skin and green eyes, in a short-sleeved shorty wetsuit, running out of the surf laughing, surfboard under her arm, on a rare sunny day in the west of Ireland. Golden late-afternoon backlight, sun flare, spray glowing in the light, turquoise water, deep blue sky, high contrast, vivid colors, sharp focus, shot on a 50 mm lens.&rdquo;</figcaption>
+      <figcaption>Krea 2 Turbo, Standard, 1248×832, 8 steps, seed 3001: &ldquo;Editorial surf photograph, low angle, of a young Irish woman with long wavy auburn red hair, pale freckled skin and green eyes, in a short-sleeved shorty wetsuit, running out of the surf laughing, surfboard under her arm, on a rare sunny day in the west of Ireland. Golden late-afternoon backlight, sun flare, spray glowing in the light, turquoise water, deep blue sky, high contrast, vivid colors, sharp focus, shot on a 50 mm lens.&rdquo;</figcaption>
     </figure>
   </div>
 
@@ -279,7 +279,7 @@
     </div>
     <figure class="shot reveal">
       <img src="images/moss.jpg" width="1600" height="1065" alt="The Siliconed window with MOSS-Image in the rack: a 1248×832 close-up portrait of a young Irish woman with long wavy auburn hair and freckles, in a shorty wetsuit, laughing, wet strands of hair blown across her face, raindrops on her skin, the Atlantic breaking behind her under a cloudy sky" loading="lazy">
-      <figcaption>MOSS-Image, Compact, 1248×832, 8 steps, seed 6001, 128 s on an M1 Pro: &ldquo;Close-up portrait of a young Irish woman with long wavy auburn red hair, pale freckled skin and green eyes, in a short-sleeved shorty wetsuit, the wind whipping wet strands of hair across her face, squinting and laughing. Hard low sunlight from the side just after a rain shower, dark storm clouds over the Atlantic behind her, raindrops on her skin, shot on Portra 400, shallow depth of field.&rdquo;</figcaption>
+      <figcaption>MOSS-Image, Compact, 1248×832, 8 steps, seed 6001: &ldquo;Close-up portrait of a young Irish woman with long wavy auburn red hair, pale freckled skin and green eyes, in a short-sleeved shorty wetsuit, the wind whipping wet strands of hair across her face, squinting and laughing. Hard low sunlight from the side just after a rain shower, dark storm clouds over the Atlantic behind her, raindrops on her skin, shot on Portra 400, shallow depth of field.&rdquo;</figcaption>
     </figure>
   </div>
 </section>
@@ -334,7 +334,7 @@
         <code>computes fp32 · ANE</code> when it is on; click it to switch.</p>
     </div>
     <ul class="stats reveal">
-      <li><b>−16 to −26 %</b>energy per image, M1 Pro, 1024², Standard</li>
+      <li><b>−16 to −26 %</b>energy per image, M1 Pro, 1024², Standard (app 0.14)</li>
       <li><b>140.9 s</b>Krea 2, Compact, against 213.3 s for the Standard</li>
       <li><b>85.8 s</b>Qwen-Image-2.1, Compact, against 135.6 s for the Standard</li>
     </ul>
@@ -353,7 +353,7 @@
     </div>
     <figure class="shot reveal">
       <img src="images/edit.jpg" width="1600" height="1064" alt="An edit by Qwen-Image-2.1 in the Siliconed window: the Krea 2 photo of the Irish surfer as image 1, the instruction in the prompt, the cel-shaded western comic book result in the canvas" loading="lazy">
-      <figcaption>Qwen-Image-2.1 Turbo, Standard: &ldquo;Convert this photo to a western comic book style with cel shading&rdquo;, the Krea 2 photo as image 1, 1248×832, seed 42, 215 s.</figcaption>
+      <figcaption>Qwen-Image-2.1 Turbo, Standard: &ldquo;Convert this photo to a western comic book style with cel shading&rdquo;, the Krea 2 photo as image 1, 1248×832, seed 42.</figcaption>
     </figure>
   </div>
   <div class="split rev" style="margin-top:clamp(64px, 9vw, 112px)">
@@ -364,7 +364,7 @@
     </div>
     <figure class="shot reveal">
       <img src="images/outfit.gif" width="800" height="533" alt="Under a sliding curtain, an edit by Qwen-Image-2.1: the Krea 2 surfer running out of the surf in her wetsuit, then in a white linen blouse, her face, hair, surfboard and the sea unchanged" loading="lazy">
-      <figcaption>Qwen-Image-2.1 Turbo, Standard: &ldquo;Replace her wetsuit with a white linen blouse. Keep her face, hair, surfboard, pose and the beach unchanged.&rdquo;, 203 s.</figcaption>
+      <figcaption>Qwen-Image-2.1 Turbo, Standard: &ldquo;Replace her wetsuit with a white linen blouse. Keep her face, hair, surfboard, pose and the beach unchanged.&rdquo;</figcaption>
     </figure>
   </div>
 </section>
@@ -381,11 +381,11 @@
   <div class="pair">
     <figure class="shot reveal">
       <img src="images/grid.jpg" width="1600" height="1086" alt="An exploration with Anima Turbo and the inCase LoRA, filling in: sketches of a laughing red-haired Irish woman on a sunny cliff-top beach, the wetsuit in teal, coral red, mustard yellow and navy across, inCase at 0, 0.5 and 1 down, the last row still rendering" loading="lazy">
-      <figcaption>{teal|coral red|mustard yellow|navy} × inCase 0 / 0.5 / 1: 512×768 sketches, about 16 s each on an M1 Pro.</figcaption>
+      <figcaption>{teal|coral red|mustard yellow|navy} × inCase 0 / 0.5 / 1: 512×768 sketches.</figcaption>
     </figure>
     <figure class="shot reveal">
       <img src="images/anima.jpg" width="1600" height="1064" alt="The finished cell in the window: an Anima Turbo illustration with the inCase LoRA, a laughing young red-haired Irish woman in a navy wetsuit in close-up, sea cliffs and breaking waves behind her" loading="lazy">
-      <figcaption>The chosen cell, finished: navy, inCase at 1, 512×768, seed 4001, 20.8 s.</figcaption>
+      <figcaption>The chosen cell, finished: navy, inCase at 1, 512×768, seed 4001.</figcaption>
     </figure>
   </div>
 </section>
@@ -396,7 +396,7 @@
   <div class="grid3">
     <div class="card reveal"><h3>Checked against the original, a bit obsessively</h3><p>Every stage is compared channel by channel with diffusers and transformers in fp32, and rounds where they round. What cannot be checked against the reference does not ship.</p></div>
     <div class="card reveal"><h3>34 GB of model, 16 GB of Mac</h3><p>It sounds like a bad idea; it works. Weights stream from disk as needed. Never more than ¾ of the Mac's memory minus 2 GB (10 GB on a 16 GB Mac): each render computes what it needs before it starts.</p></div>
-    <div class="card reveal"><h3>Eight bits against eight bits</h3><p>Z-Image Turbo Compact (GGUF Q8_0), 1024², 8 steps, Faster Rendering and the Neural Engine both on, as they are for the Compact: 80.8 s on an M1 Pro (app 0.18). Draw Things' engine with its default 8-bit <code>q8p</code>, on the same Mac: 135–144 s. Wall-clock, not identical arithmetic: the samplers and the images differ.</p></div>
+    <div class="card reveal"><h3>Eight bits against eight bits</h3><p>Z-Image Turbo Compact (GGUF Q8_0), 1024², 8 steps, Faster Rendering and the Neural Engine both on, as they are for the Compact: 81–83 s on an M1 Pro. Draw Things' engine with its default 8-bit <code>q8p</code>, the same day on the same Mac: 135–144 s (23 October 2026, app 0.14). Wall-clock, not identical arithmetic: the samplers and the images differ.</p></div>
     <div class="card reveal"><h3>Private by construction</h3><p>Nothing leaves your Mac but the model downloads you accepted and what you send to another Mac of yours, encrypted. It works offline once a model is installed, and the render cache is gone when you quit.</p></div>
     <div class="card reveal"><h3>Scriptable, agents included</h3><p><code>silicontrol</code> drives the running app from a terminal, with JSON lines out; <code>silicontrol help</code> is all a script or a coding agent needs.</p></div>
     <div class="card reveal"><h3>Reproducible to the bit</h3><p>Same prompt, seed, settings and version on the same Mac: the same image, byte for byte.</p></div>

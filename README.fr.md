@@ -16,7 +16,7 @@ Un développeur, un MacBook Pro de 16 Go et une règle têtue : un résultat qu
 
 ![Une photo ensoleillée de Krea 2 Turbo — une Irlandaise rousse en combinaison shorty qui sort des vagues en riant, sa planche de surf sous le bras, à contre-jour d'un soleil bas — et son édition en bande dessinée western, en cel shading, par Qwen-Image-2.1, sous un rideau qui glisse](docs/images/curtain.gif)
 
-*Une photo de Krea 2 Turbo, éditée par Qwen-Image-2.1 avec une phrase (« Convert this photo to a western comic book style with cel shading », graine 42, 215 s sur un M1 Pro), comparées sous le rideau.*
+*Une photo de Krea 2 Turbo, éditée par Qwen-Image-2.1 avec une phrase (« Convert this photo to a western comic book style with cel shading », graine 42), comparées sous le rideau.*
 
 ## Télécharger (un .dmg, rien d'exotique)
 

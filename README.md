@@ -16,7 +16,7 @@ One developer, one MacBook Pro with 16 GB, and a stubborn rule: if a result cann
 
 ![A sunny Krea 2 Turbo photo — a laughing red-haired Irish woman in a shorty wetsuit running out of the surf, her surfboard under her arm, backlit by a low sun — and its cel-shaded western comic-book edit by Qwen-Image-2.1, under a sliding curtain](docs/images/curtain.gif)
 
-*A photo from Krea 2 Turbo, edited by Qwen-Image-2.1 with one sentence (“Convert this photo to a western comic book style with cel shading”, seed 42, 215 s on an M1 Pro), compared under the curtain.*
+*A photo from Krea 2 Turbo, edited by Qwen-Image-2.1 with one sentence (“Convert this photo to a western comic book style with cel shading”, seed 42), compared under the curtain.*
 
 ## Download (it is a .dmg, nothing exotic)
 

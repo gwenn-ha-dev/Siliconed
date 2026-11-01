@@ -34,11 +34,11 @@ Chaque côté doit être d'au moins 512 et multiple de 16 ; la surface n'a pas
 
 ![Une édition par Qwen-Image-2.1 dans la fenêtre : la photo Krea 2 de la surfeuse en image 1 dans la boîte Images, l'instruction « Convert this photo to a western comic book style with cel shading », le résultat en cel shading dans le canevas](images/edit.jpg)
 
-*Qwen-Image-2.1 Turbo, Standard : « Convert this photo to a western comic book style with cel shading », la photo Krea 2 en image 1, 1248×832, graine 42, 215 s.*
+*Qwen-Image-2.1 Turbo, Standard : « Convert this photo to a western comic book style with cel shading », la photo Krea 2 en image 1, 1248×832, graine 42.*
 
 ![Une édition par Qwen-Image-2.1, sous le rideau qui glisse : la surfeuse de Krea 2 qui sort des vagues en combinaison, puis en chemisier de lin blanc, son visage, ses cheveux, sa planche et la mer inchangés](images/outfit.gif)
 
-*Une édition qui ne change que ce qu'on lui dit : « Replace her wetsuit with a white linen blouse. Keep her face, hair, surfboard, pose and the beach unchanged. », la photo Krea 2 en image 1, 203 s.*
+*Une édition qui ne change que ce qu'on lui dit : « Replace her wetsuit with a white linen blouse. Keep her face, hair, surfboard, pose and the beach unchanged. », la photo Krea 2 en image 1.*
 
 ## Préparer (et laissez un modèle taper)
 
@@ -61,11 +61,11 @@ Le panneau d'exploration construit une grille dans le canevas. Ses axes : les g
 
 ![Une exploration avec Anima Turbo et la LoRA inCase qui se remplit dans le canevas : des esquisses d'une Irlandaise rousse qui rit sur une plage ensoleillée au pied des falaises, la couleur de la combinaison en colonnes (teal, coral red, mustard yellow, navy) et la force de la LoRA en lignes (0 ; 0,5 ; 1), les axes en étiquettes, la dernière ligne encore en cours](images/grid.jpg)
 
-*Une exploration avec Anima Turbo et la LoRA inCase : la couleur de la combinaison écrite entre accolades dans le prompt (`{teal|coral red|mustard yellow|navy}`) en colonnes, inCase à 0, 0,5 et 1 en lignes ; des esquisses en 512×768, environ 16 s chacune sur un M1 Pro.*
+*Une exploration avec Anima Turbo et la LoRA inCase : la couleur de la combinaison écrite entre accolades dans le prompt (`{teal|coral red|mustard yellow|navy}`) en colonnes, inCase à 0, 0,5 et 1 en lignes ; des esquisses en 512×768.*
 
 ![La case finie dans la fenêtre : une illustration d'Anima Turbo avec la LoRA inCase, une jeune Irlandaise rousse qui rit, en combinaison bleu marine, en gros plan, des falaises et des vagues qui déferlent derrière elle](images/anima.jpg)
 
-*La case choisie, finie : Anima Turbo avec la LoRA inCase à 1, « A close-up portrait of a young Irish woman with long wavy auburn red hair, pale freckled skin and green eyes, laughing, wearing a navy shorty wetsuit, on a sunny cliff-top beach in the west of Ireland. Big Atlantic waves breaking into white spray below green sea cliffs, deep blue sky, bright sunlight, wind in her hair. », 512×768, graine 4001, 20,8 s.*
+*La case choisie, finie : Anima Turbo avec la LoRA inCase à 1, « A close-up portrait of a young Irish woman with long wavy auburn red hair, pale freckled skin and green eyes, laughing, wearing a navy shorty wetsuit, on a sunny cliff-top beach in the west of Ireland. Big Atlantic waves breaking into white spray below green sea cliffs, deep blue sky, bright sunlight, wind in her hair. », 512×768, graine 4001.*
 
 ## La gestion des modèles
 
@@ -104,7 +104,7 @@ Seulement des modèles récents dont l'encodeur de texte est un modèle de langa
 
 ![Une photo de Krea 2 Turbo en 1248×832, en contre-plongée : une jeune Irlandaise aux longs cheveux auburn ondulés et aux taches de rousseur, en combinaison shorty à manches courtes, qui sort des vagues en riant, sa planche de surf sous le bras, à contre-jour d'un soleil doré bas avec un reflet d'objectif, des embruns lumineux, une eau turquoise et un ciel bleu profond](images/krea2.jpg)
 
-*Krea 2 Turbo, Standard, 1248×832, 8 pas, graine 3001, 229 s sur un M1 Pro de 16 Go : « Editorial surf photograph, low angle, of a young Irish woman with long wavy auburn red hair, pale freckled skin and green eyes, in a short-sleeved shorty wetsuit, running out of the surf laughing, surfboard under her arm, on a rare sunny day in the west of Ireland. Golden late-afternoon backlight, sun flare, spray glowing in the light, turquoise water, deep blue sky, high contrast, vivid colors, sharp focus, shot on a 50 mm lens. »*
+*Krea 2 Turbo, Standard, 1248×832, 8 pas, graine 3001 : « Editorial surf photograph, low angle, of a young Irish woman with long wavy auburn red hair, pale freckled skin and green eyes, in a short-sleeved shorty wetsuit, running out of the surf laughing, surfboard under her arm, on a rare sunny day in the west of Ireland. Golden late-afternoon backlight, sun flare, spray glowing in the light, turquoise water, deep blue sky, high contrast, vivid colors, sharp focus, shot on a 50 mm lens. »*
 
 Krea 2 Turbo ne télécharge rien de [krea/Krea-2-Turbo](https://huggingface.co/krea/Krea-2-Turbo) : ce dépôt demande un compte Hugging Face, et l'app n'a pas de connexion. Chacun de ses fichiers vient d'une copie ouverte prouvée identique à celle de Krea : le DiT et l'encodeur de texte Qwen3-VL-4B en bf16 de [Comfy-Org/Krea-2](https://huggingface.co/Comfy-Org/Krea-2) (le DiT, le même fichier ; l'encodeur, égal tenseur pour tenseur), le VAE de [Qwen/Qwen-Image](https://huggingface.co/Qwen/Qwen-Image) (le VAE fp32 de Krea est ce bf16 élargi, valeur pour valeur), le tokenizer de [Qwen/Qwen-Image-2.1-Turbo](https://huggingface.co/Qwen/Qwen-Image-2.1-Turbo) (le même fichier) ; les fichiers de configuration de Krea sont embarqués tels que publiés. Sa Compact prend le DiT et l'encodeur de texte en int8 convrot de [Comfy-Org/Krea-2](https://huggingface.co/Comfy-Org/Krea-2) ; sa Légère, le GGUF Q4_K_M de [vantagewithai/Krea-2-Turbo-GGUF](https://huggingface.co/vantagewithai/Krea-2-Turbo-GGUF) avec l'encodeur de texte de la Compact.
 
@@ -114,7 +114,7 @@ Krea 2 Turbo ne télécharge rien de [krea/Krea-2-Turbo](https://huggingface.co/
 
 ![La fenêtre avec MOSS-Image dans le rack : un portrait serré en 1248×832 d'une jeune Irlandaise aux longs cheveux auburn ondulés et aux taches de rousseur, en combinaison shorty, qui rit, des mèches mouillées soufflées sur le visage, des gouttes de pluie sur la peau, l'Atlantique qui déferle derrière elle sous un ciel nuageux](images/moss.jpg)
 
-*MOSS-Image, Compacte, 1248×832, 8 pas, graine 6001, 128 s sur un M1 Pro de 16 Go : « Close-up portrait of a young Irish woman with long wavy auburn red hair, pale freckled skin and green eyes, in a short-sleeved shorty wetsuit, the wind whipping wet strands of hair across her face, squinting and laughing. Hard low sunlight from the side just after a rain shower, dark storm clouds over the Atlantic behind her, raindrops on her skin, shot on Portra 400, shallow depth of field. »*
+*MOSS-Image, Compacte, 1248×832, 8 pas, graine 6001 : « Close-up portrait of a young Irish woman with long wavy auburn red hair, pale freckled skin and green eyes, in a short-sleeved shorty wetsuit, the wind whipping wet strands of hair across her face, squinting and laughing. Hard low sunlight from the side just after a rain shower, dark storm clouds over the Atlantic behind her, raindrops on her skin, shot on Portra 400, shallow depth of field. »*
 
 La Standard prend le DiT, l'encodeur de texte Qwen3.5-9B (son modèle de langage seul, sans la tour de vision), le VAE et le tokenizer d'[OpenMOSS-Team/MOSS-Image-SFT](https://huggingface.co/OpenMOSS-Team/MOSS-Image-SFT), et la LoRA de [lodestones/MOSS-Image-SFT-8-steps-dmd](https://huggingface.co/lodestones/MOSS-Image-SFT-8-steps-dmd). Sa Compact prend le DiT et l'encodeur de texte en int8 convrot de [Comfy-Org/MOSS-Image](https://huggingface.co/Comfy-Org/MOSS-Image), avec la même LoRA, le même VAE et le même tokenizer. Pas encore de Légère : un DiT en 4 bits est publié, mais pas encore vérifié ; sur un Mac de 8 Go, la Compact est présélectionnée, et son pic reste dans le budget de ce Mac.
 
