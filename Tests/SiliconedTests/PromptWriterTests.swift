@@ -370,14 +370,16 @@ final class PromptWriterTests: XCTestCase {
     /// per-column fp32 scales, convrot 256 — or bf16) and four small norms, the embedding table, a vision tower as one bf16 block.
     private func encoderHeader(int8: Bool) -> [String: Any] {
         var tensors: [String: [String: Any]] = [:]
+        var cursor = 16384   // each tensor on its own page, in the order added, as the forge lays a map out
         func add(_ name: String, _ shape: [Int], int8 weight: Bool = false) {
             let count = shape.reduce(1, *)
-            var entry: [String: Any] = ["shape": shape]
+            var entry: [String: Any] = ["shape": shape, "offset": cursor]
             if weight && int8 {
                 entry["dtype"] = "int8"; entry["bytes"] = count + 4 * shape[1]
                 entry["scale"] = ["offset": count, "dtype": "float32", "shape": [shape[1]]]
                 entry["rotation"] = ["kind": "convrot", "group": 256]
             } else { entry["dtype"] = "bfloat16"; entry["bytes"] = 2 * count }
+            cursor += ((entry["bytes"] as! Int) + 16383) / 16384 * 16384
             tensors[name] = entry
         }
         for l in 0..<36 {
@@ -437,6 +439,8 @@ final class PromptWriterTests: XCTestCase {
         XCTAssertEqual(standard.rotationScratch, 0)
 
         let need = PromptWriterNeed.atLimits(maps: compact, plan: .defaults)
+        XCTAssertEqual(need.placement, .cached(layers: 36), "the need at the limits starts from every layer in the cache")
+        XCTAssertEqual(compact.layerSpans.reduce(0, +), compact.residentLayers, "a layer's run is its tensors laid on pages")
         let language = try XCTUnwrap(need.phases.first { $0.kind == .text }), vision = try XCTUnwrap(need.phases.first { $0.kind == .vision })
         // 36 layers × 2 (K, V) × (2048 + 768) tokens × 1024 values × 4 B, to the page.
         XCTAssertEqual(language.bytes("K/V cache"), Qwen3VLGenerator.cacheBytes(config: compact.encoder, length: 2816))
@@ -447,20 +451,23 @@ final class PromptWriterTests: XCTestCase {
         XCTAssertEqual(language.bytes("writer arena"), floats.reduce(0) { $0 + Arena.capacity(for: $1 * 4) })
         XCTAssertLessThan(language.bytes("writer arena"), 500_000_000)
         XCTAssertEqual(vision.bytes("vision features"), Qwen3VLVision.featureBytes(tokens: 1024))
+        // The weights are the cache's, not the writer's: what it holds through its life is the decoder's scratch.
+        XCTAssertEqual(need.residentBytes, Qwen3VLGenerator.decoderBytes(config: compact.encoder, vocabulary: compact.vocabulary))
         XCTAssertGreaterThan(need.peak, need.residentBytes)
         XCTAssertEqual(need.peak, need.residentBytes + max(language.bytes, vision.bytes))
+        XCTAssertEqual(need.cacheBytes, compact.residentLayers + compact.residentHead)
+        XCTAssertEqual(need.streamedBytes, 0)
 
-        // The Mac: 16 GB (B = 10 GiB) holds the Compact; 8 GB (B = 4 GiB) holds nothing; the Standard's bf16 layers want a bigger one.
+        // The Mac: 16 GB (B = 10 GiB) holds the Compact whole in the cache; the Standard's bf16 layers (13.9 GB) do not fit it
+        // whole, and are streamed in part rather than refused.
         let sixteen = MemoryBudget.ceiling(physical: 16 << 30), eight = MemoryBudget.ceiling(physical: 8 << 30)
         XCTAssertEqual([eight, sixteen], [4 << 30, 10 << 30])
         XCTAssertEqual(need.availability(ceiling: sixteen), .available(need: need.peak))
-        guard case let .needsMac(gigabytes: small, need: _) = need.availability(ceiling: eight) else { return XCTFail("8 GB holds the writer") }
-        XCTAssertEqual(small, MemoryBudget.macNeeded(for: need.peak))
-        XCTAssertGreaterThanOrEqual(small, 16)
         let big = PromptWriterNeed.atLimits(maps: standard, plan: .defaults)
-        guard case let .needsMac(gigabytes: larger, need: _) = big.availability(ceiling: sixteen) else { return XCTFail("16 GB holds the Standard's") }
-        XCTAssertGreaterThan(larger, 16)
-        print("PromptWriter need (GB): compact peak \(Double(need.peak) / 1e9) = resident \(Double(need.residentBytes) / 1e9) + language \(Double(language.bytes) / 1e9) / vision \(Double(vision.bytes) / 1e9); standard peak \(Double(big.peak) / 1e9); Mac needed: compact \(small) GB, standard \(larger) GB")
+        XCTAssertGreaterThan(big.total, sixteen)
+        guard case .needsMac = big.availability(ceiling: sixteen) else { return XCTFail("every layer cached does not fit") }
+        XCTAssertTrue(PromptWriterNeed.atLimits(maps: standard, ceiling: sixteen, plan: .defaults).placement.streams)
+        print("PromptWriter need (GB): compact peak \(Double(need.peak) / 1e9) = resident \(Double(need.residentBytes) / 1e9) + language \(Double(language.bytes) / 1e9) / vision \(Double(vision.bytes) / 1e9); cache \(Double(need.cacheBytes) / 1e9); standard peak \(Double(big.peak) / 1e9)")
     }
 
     /// The lab asks `availability` again once the weights are loaded (window key, render end): the footprint then holds
@@ -473,11 +480,106 @@ final class PromptWriterTests: XCTestCase {
         let app = 600_000_000
         let before = writer.availability(base: app)
         guard case .available = before else { return XCTFail("16 GB holds the Compact") }
-        let resident = PromptWriterNeed.atLimits(maps: m, plan: .defaults).residentBytes
+        let resident = PromptWriterNeed.atLimits(maps: m, ceiling: sixteen, plan: .defaults).residentBytes
         writer.noteResident(resident)
         XCTAssertEqual(writer.availability(base: app + resident), before, "loaded: the footprint holds the weights")
         writer.noteResident(0)
-        guard case .needsMac = writer.availability(base: app + resident) else { return XCTFail("unloaded, the same footprint is the app's") }
+        XCTAssertNotEqual(writer.availability(base: app + resident), before, "unloaded, the same footprint is the app's")
+    }
+
+    // ── the plan, chosen in B ──────────────────────────────────────────────────────────────────
+
+    private func plan(_ m: PromptWriterMaps, gigabytes: Int, base: Int = 600_000_000) -> PromptWriterNeed {
+        PromptWriterNeed.atLimits(maps: m, base: base, ceiling: MemoryBudget.ceiling(physical: gigabytes << 30), plan: .defaults)
+    }
+
+    /// **The plan at 8, 16, 32 and 64 GB** (B = 4, 10, 22, 46 GiB), for the Compact's 8-bit layers and the Standard's bf16, with
+    /// the app's 600 MB beside: the layers kept in the cache, the anonymous peak, the cache, what a token reads around it.
+    func testThePlanAtEachMacSize() throws {
+        let compact = try maps(int8: true), standard = try maps(int8: false)
+        var table = ""
+        for (name, m) in [("compact", compact), ("standard", standard)] {
+            var previousCached = -1
+            for gigabytes in [8, 16, 32, 64] {
+                let b = MemoryBudget.ceiling(physical: gigabytes << 30)
+                let chosen = plan(m, gigabytes: gigabytes)
+                XCTAssertLessThanOrEqual(chosen.total, b, "\(name) \(gigabytes) GB: the plan that is taken fits B, cache included")
+                XCTAssertGreaterThanOrEqual(chosen.placement.cachedLayers, previousCached, "a bigger Mac never caches less")
+                previousCached = chosen.placement.cachedLayers
+                // The anonymous side is the decoder's scratch and the staging buffers, none when nothing streams.
+                let staging = chosen.placement.streams ? 2 * Arena.capacity(for: m.layerSpans.max()!) : 0
+                XCTAssertEqual(chosen.residentBytes, Qwen3VLGenerator.decoderBytes(config: m.encoder, vocabulary: m.vocabulary) + staging)
+                XCTAssertEqual(chosen.cacheBytes + chosen.streamedBytes, m.layerSpans.reduce(0, +) + m.residentHead,
+                               "every byte a token reads is the cache's or the stream's")
+                table += String(format: "%@ %2d GB (B %.2f): cached %2d/36 layers, streamed %2d, anonymous %.2f GB, cache %.2f GB, streamed/token %.2f GB\n",
+                                name as NSString, gigabytes, Double(b) / 1e9, chosen.placement.cachedLayers, chosen.placement.streamedLayers,
+                                Double(chosen.peak) / 1e9, Double(chosen.cacheBytes) / 1e9, Double(chosen.streamedBytes) / 1e9)
+            }
+        }
+        print(table)
+        // 16 GB: the Compact whole in the cache (8.2 GB of clean pages), as a render leaves its map; the Standard (14 GB) cannot.
+        XCTAssertFalse(plan(compact, gigabytes: 16).placement.streams)
+        XCTAssertTrue(plan(standard, gigabytes: 16).placement.streams)
+        // 32 and 64: everything is cached, whatever the width.
+        for m in [compact, standard] { for g in [32, 64] { XCTAssertFalse(plan(m, gigabytes: g).placement.streams) } }
+        // 8 GB: the Compact is offered, its tail around the cache, where it used to be refused.
+        let eight = plan(compact, gigabytes: 8)
+        XCTAssertTrue(eight.placement.streams)
+        XCTAssertGreaterThan(eight.placement.cachedLayers, 0)
+        XCTAssertEqual(eight.availability(ceiling: MemoryBudget.ceiling(physical: 8 << 30)), .available(need: eight.peak))
+    }
+
+    /// **Offered if and only if a plan fits B**: from the smallest plan's total, any ceiling gives a writer; a byte under it,
+    /// « needs a Mac with N GB », and the Mac named is one whose B holds that smallest plan.
+    func testTheWriterIsOfferedExactlyWhenAPlanFits() throws {
+        let m = try maps(int8: true)
+        let base = 600_000_000
+        let all = PromptWriterNeed.atLimits(maps: m, base: base, plan: .defaults)
+        let floor = all.placed(streamedFrom: 0)
+        XCTAssertLessThan(floor.total, all.total)
+        XCTAssertEqual(floor.cacheBytes, m.residentHead, "the head is the cache's whatever the plan")
+        XCTAssertEqual(floor.streamedBytes, m.layerSpans.reduce(0, +))
+        for ceiling in [floor.total, floor.total + 1, (floor.total + all.total) / 2, all.total, all.total + 1] {
+            let chosen = all.chosen(ceiling: ceiling)
+            XCTAssertEqual(chosen.availability(ceiling: ceiling), .available(need: chosen.peak), "B \(ceiling)")
+            XCTAssertLessThanOrEqual(chosen.total, ceiling)
+            // The most layers kept that fit: one more would not.
+            if chosen.placement.streams {
+                XCTAssertGreaterThan(all.placed(streamedFrom: chosen.placement.streamedFrom + 1).total, ceiling)
+            }
+        }
+        XCTAssertEqual(all.chosen(ceiling: all.total).placement, .cached(layers: 36))
+        let refused = all.chosen(ceiling: floor.total - 1)
+        XCTAssertEqual(refused.placement.streamedFrom, 0, "nothing smaller to take: the floor is what is refused")
+        guard case let .needsMac(gigabytes, need) = refused.availability(ceiling: floor.total - 1) else { return XCTFail("a plan fits under its floor") }
+        XCTAssertEqual(need, floor.total)
+        XCTAssertGreaterThanOrEqual(MemoryBudget.ceiling(physical: gigabytes << 30), floor.total)
+        XCTAssertEqual(gigabytes, MemoryBudget.macNeeded(for: floor.total))
+        // A Mac that sells today holds the floor: every size from 8 GB (B = 4 GiB) offers the Compact.
+        XCTAssertLessThan(floor.total, MemoryBudget.ceiling(physical: 8 << 30))
+    }
+
+    /// **A token's seconds from the card**, written in memory: cached bytes over the memory's bandwidth, plus streamed bytes over the
+    /// disk's. No figure, no prediction; a plan that streams needs the disk's.
+    func testTheTokenIsPredictedFromTheCard() throws {
+        let m = try maps(int8: true)
+        let all = PromptWriterNeed.atLimits(maps: m, plan: .defaults)
+        var card = CapacityModel()
+        XCTAssertNil(all.tokenSeconds(model: card), "a card without the memory's bandwidth predicts nothing")
+        card.memoryBandwidth = 200e9
+        let cached = try XCTUnwrap(all.tokenSeconds(model: card))
+        XCTAssertEqual(cached, Double(m.residentLayers + m.residentHead) / 200e9, accuracy: 1e-12)
+        XCTAssertEqual(cached, 0.041, accuracy: 0.002, "8.2 GB at 200 GB/s: 41 ms a token")
+        let half = all.placed(streamedFrom: 18)
+        XCTAssertNil(half.tokenSeconds(model: card), "a stream without the disk's rate is not guessed")
+        card.diskBandwidth = 3e9
+        let streamed = try XCTUnwrap(half.tokenSeconds(model: card))
+        XCTAssertEqual(streamed, Double(half.cacheBytes) / 200e9 + Double(half.streamedBytes) / 3e9, accuracy: 1e-12)
+        XCTAssertEqual(streamed, 1.18, accuracy: 0.05, "3.5 GB around the cache at 3 GB/s dominate: about a second a token")
+        // Every layer more around the cache costs more: the prediction is monotone in what is streamed.
+        let seconds = (0...36).map { all.placed(streamedFrom: $0).tokenSeconds(model: card)! }
+        XCTAssertEqual(seconds, seconds.sorted(by: >), "streaming more is never faster")
+        print(String(format: "token: all cached %.3f s, half %.3f s, all streamed %.3f s", seconds[36], seconds[18], seconds[0]))
     }
 
     /// A prompt that grows makes the need grow by its cache; a text rewrite has no vision phase; the cache is the only

@@ -693,10 +693,8 @@ final class Qwen3VLDecoderTests: XCTestCase {
         })
         let map = try Artifact(path: encoderPath), headMap = try Artifact(path: headPath)
         let shape = try TextEncoder.Config(header: map.header)
-        // Not resident: refused, with the reason.
-        XCTAssertThrowsError(try Qwen3VLDecoder.make(encoder: map, head: headMap, config: shape, vocabulary: v)) {
-            XCTAssertTrue("\($0)".contains("not resident"), "\($0)")
-        }
+        // Not kept: the decoder reads the map's own pages, and does not pin them for the GPU.
+        _ = try Qwen3VLDecoder.make(encoder: map, head: headMap, config: shape, vocabulary: v)
         let prefixes = Qwen3VLGenerator.residentPrefixes(config: shape)
         try map.keepResident(prefixes: prefixes.encoder)
         try headMap.keepResident(prefixes: prefixes.head)
@@ -711,6 +709,96 @@ final class Qwen3VLDecoderTests: XCTestCase {
         XCTAssertTrue((0..<v).contains(pick.id)); XCTAssertTrue(pick.value.isFinite); XCTAssertGreaterThanOrEqual(pick.gap, 0)
         XCTAssertTrue((0..<h).allSatisfy { decoder.hidden[$0].isFinite })
         decoder.detachCache()
+    }
+
+    /// **The same bits wherever the bytes come from**: a three-layer map stepped by a decoder over resident copies
+    /// (`keepResident`), over the map's own pages, and with layers 1 and 2 streamed through two staging buffers
+    /// (`pread` + `F_NOCACHE`, `TailFeeder`), then with only layer 2 streamed. Same hidden rows, same cache: the picks, the logits
+    /// and the residual stream are identical to the last bit — the provenance of the bytes is all that changes.
+    func testResidentMappedAndStreamedLayersStepTheSameBits() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("siliconed-decoder-\(UUID())")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let (h, a, kv, i, v, layerCount) = (512, 512, 256, 1024, 1000, 3)
+        var rng = Random(97)
+        func int8(_ name: String, _ k: Int, _ n: Int) -> MapWriter.Tensor {
+            var t = MapWriter.Tensor(name: name, shape: [k, n], dtype: .int8, scale: .init(dtype: .float32, shape: [n]), transposed: true) {
+                var bytes = [UInt8](repeating: 0, count: k * n)
+                self.fillBytes(&bytes, count: k * n, seed: UInt64(k * 31 + n + name.count))
+                let value: Float = 1 / (64 * Float(k).squareRoot())
+                let one: [UInt8] = withUnsafeBytes(of: value.bitPattern.littleEndian) { Array($0) }
+                let scale: [UInt8] = (0..<n).flatMap { (_: Int) -> [UInt8] in one }
+                return .init(values: bytes, scale: scale, absMax: 1)
+            }
+            t.rotation = 256
+            return t
+        }
+        func bf16(_ name: String, _ shape: [Int], scale: Float = 1) -> MapWriter.Tensor {
+            let values = rng.floats(shape.reduce(1, *)).map { $0 * scale }
+            return .init(name: name, shape: shape, dtype: .bfloat16, transposed: nil) { values }
+        }
+        var encoder: [MapWriter.Tensor] = []
+        for l in 0..<layerCount {
+            let p = "layers.\(l)."
+            encoder += [int8(p + "self_attn.q_proj.weight", h, a), int8(p + "self_attn.k_proj.weight", h, kv), int8(p + "self_attn.v_proj.weight", h, kv),
+                        int8(p + "self_attn.o_proj.weight", a, h), int8(p + "mlp.gate_proj.weight", h, i), int8(p + "mlp.up_proj.weight", h, i),
+                        int8(p + "mlp.down_proj.weight", i, h), bf16(p + "input_layernorm.weight", [h]), bf16(p + "post_attention_layernorm.weight", [h]),
+                        bf16(p + "self_attn.q_norm.weight", [128]), bf16(p + "self_attn.k_norm.weight", [128])]
+        }
+        let config: OrderedJSON = .object([.init("hidden_size", .integer(h)), .init("num_attention_heads", .integer(4)),
+                                           .init("num_key_value_heads", .integer(2)), .init("head_dim", .integer(128)),
+                                           .init("intermediate_size", .integer(i)), .init("num_hidden_layers", .integer(layerCount)),
+                                           .init("rms_norm_eps", .real(1e-6)), .init("rope_theta", .real(1e6))])
+        let encoderPath = root.appendingPathComponent("encoder.silicon").path, headPath = root.appendingPathComponent("head.silicon").path
+        _ = try MapWriter.write(to: encoderPath, tensors: encoder, header: { _ in
+            [.init("format", 1), .init("page", .integer(MapWriter.page)), .init("linear_weights_transposed", true),
+             .init("last_layer", .integer(layerCount - 1)), .init("config", config), .init("order", .list(encoder.map { .string($0.name) }))]
+        })
+        let head = [bf16("lm_head.weight", [v, h], scale: 0.1), bf16("norm.weight", [h])]
+        _ = try MapWriter.write(to: headPath, tensors: head, header: { _ in
+            [.init("format", 1), .init("kind", "qwen3-vl-lm-head"), .init("page", .integer(MapWriter.page)),
+             .init("linear_weights_transposed", false), .init("order", .list(head.map { .string($0.name) }))]
+        })
+        let shape = try TextEncoder.Config(header: try Artifact.header(encoderPath))
+        let rows = (0..<2).map { _ in (0..<h).map { _ in rng.unit() } }
+
+        /// Two steps with the same rows; the picks, the logits and the residual stream, as bits.
+        func run(_ build: (Artifact, Artifact) throws -> Qwen3VLDecoder) throws -> (picks: [Qwen3VLDecoder.Pick], logits: [[Float]], hidden: [[Float]]) {
+            let map = try Artifact(path: encoderPath), headMap = try Artifact(path: headPath)
+            let decoder = try build(map, headMap)
+            let cache = pages(2 * layerCount * 4 * 256 * 4)
+            try decoder.attach(cache: cache, layerStride: 4 * 256)
+            defer { decoder.detachCache() }
+            var out: (picks: [Qwen3VLDecoder.Pick], logits: [[Float]], hidden: [[Float]]) = ([], [], [])
+            for (row, values) in rows.enumerated() {
+                for j in 0..<h { decoder.hidden[j] = values[j] }
+                TextEncoder.writeRope(into: decoder.frequencies, positions: [[row]], count: 1, theta: 1_000_000, headDim: 128, sections: nil)
+                out.picks.append(try decoder.step(row: row))
+                out.logits.append(Array(UnsafeBufferPointer(start: decoder.logitValues, count: v)))
+                out.hidden.append(Array(UnsafeBufferPointer(start: decoder.hidden, count: h)))
+            }
+            return out
+        }
+        let resident = try run { map, headMap in
+            let prefixes = Qwen3VLGenerator.residentPrefixes(config: shape)
+            try map.keepResident(prefixes: prefixes.encoder); try headMap.keepResident(prefixes: prefixes.head)
+            return try Qwen3VLDecoder.make(encoder: map, head: headMap, config: shape, vocabulary: v)
+        }
+        func streamed(from first: Int) throws -> (picks: [Qwen3VLDecoder.Pick], logits: [[Float]], hidden: [[Float]]) {
+            try run { map, headMap in
+                let tail = Qwen3VLDecoder.Tail(path: encoderPath, first: first,
+                                               runs: try Qwen3VLDecoder.runs(of: map, layers: first..<layerCount), slots: Qwen3VLGenerator.stagingSlots)
+                return try Qwen3VLDecoder.make(encoder: map, head: headMap, config: shape, vocabulary: v, tail: tail)
+            }
+        }
+        let candidates = [("mapped", try run { try Qwen3VLDecoder.make(encoder: $0, head: $1, config: shape, vocabulary: v) }),
+                          ("streamed from 1", try streamed(from: 1)), ("streamed from 2", try streamed(from: 2)), ("all streamed", try streamed(from: 0))]
+        for (name, got) in candidates {
+            XCTAssertEqual(got.picks, resident.picks, name)
+            XCTAssertEqual(got.logits, resident.logits, "\(name): the logits, bit for bit")
+            XCTAssertEqual(got.hidden, resident.hidden, "\(name): the residual stream, bit for bit")
+        }
+        XCTAssertTrue(resident.logits[0].allSatisfy(\.isFinite))
     }
 
     /// What the decoder charges is what it maps, from shapes: the real model's scratch is a few megabytes.

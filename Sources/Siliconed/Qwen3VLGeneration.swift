@@ -53,9 +53,11 @@ import Metal
 ///   - **A byte-level BPE token may hold half a character**: the text is detokenized incrementally
 ///     (`UTF8Stream`), never one identifier at a time.
 ///   - **Decoding reads every weight at every token**: 7 GB of int8 (13.9 GB of bf16) and `lm_head`'s 1.24 GB.
-///     Through the page cache or streamed from the disk (~3 GB/s) that is seconds a token, so the writer
-///     keeps them resident (`load`, `Artifact.keepResident`) and the memory need charges them.
-///   - **A step reads them where they lie** (`Qwen3VLDecoder`, `DecodeKernels`): the resident pages are wrapped as GPU
+///     Whatever does not stay in the page cache is read again from the disk (~3 GB/s) at every token, so the writer's plan
+///     (`PromptWriterNeed.chosen`) sizes what B leaves to the cache and streams the rest, and predicts a token's seconds from
+///     the card. The weights are the map's clean pages, never a copy of them in the process's own: the kernel can drop a
+///     page and read it back, it cannot swap it.
+///   - **A step reads them where they lie** (`Qwen3VLDecoder`, `DecodeKernels`): the mapped pages are wrapped as GPU
 ///     buffers without a copy, and a token is a few command buffers — the product kernels widen the int8 in registers
 ///     and accumulate in fp32, the rotation goes to the activation, `lm_head` is a bf16 × fp32 GEMV on the GPU with the
 ///     argmax. The prompt (many rows, compute-bound) keeps the passes below, and so does a map the kernels do not read
@@ -176,23 +178,40 @@ package final class Qwen3VLGenerator {
         (TextEncoder.layerPrefixes(config), ["lm_head.weight", "norm.weight"])
     }
 
-    /// Reads the layers and the head into the process's pages (`Artifact.keepResident`); `progress` is the
-    /// fraction of the bytes read. A cancelled load keeps nothing it had not finished.
-    package func load(progress: ((Double) -> Void)? = nil) throws {
-        let prefixes = Self.residentPrefixes(config: config)
-        let layers = Double(Artifact.residentBytes(header: encoder.header, prefixes: prefixes.encoder))
-        let heads = Double(Artifact.residentBytes(header: head.header, prefixes: prefixes.head))
-        try encoder.keepResident(prefixes: prefixes.encoder, cancellation: cancellation) { progress?($0 * layers / (layers + heads)) }
-        try head.keepResident(prefixes: prefixes.head, cancellation: cancellation) { progress?((layers + $0 * heads) / (layers + heads)) }
+    /// **Takes the weights where they lie** and builds the GPU decoder over them. Nothing is copied or read here: the layers
+    /// before `streamedFrom` and the head are the map's own pages (the cache's: clean, dropped and read again under pressure,
+    /// never swapped), the layers from `streamedFrom` on are read at each token into staging buffers (`TailFeeder`).
+    /// `streamedFrom` ≥ the layer count: nothing streamed. Called again with another plan, it rebuilds the decoder — the writer
+    /// chooses its plan at every run, in B, and a longer prompt can leave the cache less room.
+    ///
+    /// `progress` is called with 1 once the decoder is built (there is no longer a long read to report).
+    package func load(streamedFrom: Int? = nil, progress: ((Double) -> Void)? = nil) throws {
+        try cancellation.check()
         decoder = nil; decoderNote = nil
+        let tailFrom = min(streamedFrom ?? config.layers, config.layers)
+        loadedStreamedFrom = tailFrom
+        progress?(1)
         guard decodesOnGPU else { decoderNote = "GPU decoding switched off"; return }
-        do { decoder = try Qwen3VLDecoder.make(encoder: encoder, head: head, config: config, vocabulary: vocabulary) } catch {
+        do {
+            let tail: Qwen3VLDecoder.Tail? = try tailFrom < config.layers
+                ? .init(path: encoder.path, first: tailFrom, runs: try Qwen3VLDecoder.runs(of: encoder, layers: tailFrom..<config.layers),
+                        slots: Self.stagingSlots)
+                : nil
+            decoder = try Qwen3VLDecoder.make(encoder: encoder, head: head, config: config, vocabulary: vocabulary, tail: tail)
+        } catch {
             decoderNote = "\(error)"   // the CPU's passes decode instead, slowly: said, not hidden
         }
     }
 
-    /// Gives the pages back (the GPU's views of them first).
-    package func unload() { decoder = nil; encoder.releaseResident(); head.releaseResident() }
+    /// The first streamed layer of the last `load` (the layer count: none); `nil` before any.
+    package private(set) var loadedStreamedFrom: Int?
+
+    /// The staging buffers a streamed tail reads through: one layer being computed, one being read. (The disk is the pace of a
+    /// streamed token, so a third would only be memory.)
+    package static let stagingSlots = 2
+
+    /// Gives the decoder back (the GPU's views of the pages first).
+    package func unload() { decoder = nil; loadedStreamedFrom = nil; encoder.releaseResident(); head.releaseResident() }
 
     // MARK: - Memory
 
