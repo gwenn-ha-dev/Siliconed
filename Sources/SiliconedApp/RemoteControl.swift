@@ -85,7 +85,10 @@ final class RemoteControl {
             switch command {
             case "status": finish(c, state())
             case "models": finish(c, app.mirror == nil ? models() : mirroredModels())
-            case "install": finish(c, try install(arguments))
+            case "install":
+                finish(c, try arguments.contains("writer") ? installWriter(arguments.filter { $0 != "writer" }) : install(arguments))
+            case "rewrite": try writing(.rewrite, arguments, cwd: cwd, c)
+            case "describe": try writing(.describe, arguments, cwd: cwd, c)
             case "diagnose": try diagnose(arguments, c)
             case "add":
                 if let mirror = app.mirror { try addOnMirror(mirror, arguments, cwd: cwd, c) } else { try add(arguments, cwd: cwd, c) }
@@ -204,7 +207,10 @@ final class RemoteControl {
     private func state() -> [String: Any] {
         var o: [String: Any] = ["ok": true, "library": app.library.root.path,
                                 "history_images": app.history.count,
-                                "faster_rendering": app.fasterRendering(for: app.identifier)]
+                                "faster_rendering": app.fasterRendering(for: app.identifier),
+                                "beta": betaState(), "writer": writerState()]
+        // The rack's Neural Engine choice, on a Mac whose map offers one (elsewhere nothing is chosen).
+        if app.neuralEngineOffered { o["neural_engine"] = app.neuralEngine(for: app.identifier) }
         // The settings renders run on: a series compared across launches compares maps too.
         o["settings"] = ["read": app.settingsRead, "map": app.mapFacts.inUse?.date ?? NSNull(),
                          "warnings": app.settingsWarnings] as [String: Any]

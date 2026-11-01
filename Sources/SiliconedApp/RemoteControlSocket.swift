@@ -18,6 +18,18 @@ final class Connection: @unchecked Sendable {
     /// The client is gone (Ctrl-C during `wait`): we stop writing to it.
     var broken: Bool { lock.withLock { _broken } }
 
+    /// **The client has hung up**, seen without writing to it: its end of the socket is closed (it sent its line and waits, so a
+    /// readable socket that reads zero bytes is a close). For a command that computes a long time before its next line
+    /// (`rewrite` loading the writer): it cancels the gesture instead of finishing it for nobody.
+    var isGone: Bool {
+        if broken { return true }
+        var poll = pollfd(fd: fd, events: Int16(POLLIN), revents: 0)
+        guard Darwin.poll(&poll, 1, 0) > 0 else { return false }
+        if poll.revents & Int16(POLLHUP | POLLERR | POLLNVAL) != 0 { return true }
+        var byte: UInt8 = 0
+        return poll.revents & Int16(POLLIN) != 0 && recv(fd, &byte, 1, MSG_PEEK | MSG_DONTWAIT) == 0
+    }
+
     func send(_ rowLine: Data) {
         writings.async { [self] in
             guard !broken else { return }

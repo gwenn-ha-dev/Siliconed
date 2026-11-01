@@ -29,8 +29,17 @@ enum LabEvent: Sendable, Equatable {
     case loading(Double?)
     /// Everything written so far.
     case text(String)
-    case finished(String)
+    /// The whole text, and the tokens it took (the stop token not counted).
+    case finished(String, tokens: Int)
     case cancelled
+}
+
+/// What went wrong while writing: one sentence in the user's language, and the engine's stable `code` when it has one
+/// (`render_already_running`…) — the window shows the sentence, `silicontrol` the two.
+struct LabWriterFailure: LocalizedError {
+    let errorDescription: String?
+    let code: String?
+    init(_ sentence: String, code: String? = nil) { errorDescription = sentence; self.code = code }
 }
 
 /// **Whether a writer can write now**, and if not, why — in the terms the window says to the user.

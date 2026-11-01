@@ -27,7 +27,7 @@ package enum RemoteControlHelp {
 
     /// The topics in reading order (`help all` follows it).
     static let order = ["contract", "open", "models", "install", "add", "grid", "edit", "wait", "status", "follow",
-                        "cancel", "clear", "set", "history", "save", "vary", "enlarge", "subjects", "diagnose", "measure", "errors", "recipes"]
+                        "cancel", "clear", "set", "history", "save", "vary", "enlarge", "rewrite", "describe", "subjects", "diagnose", "measure", "errors", "recipes"]
     static let aliases = ["examples": "recipes"]
 
     /// French when the user puts it before English. Not `Bundle.main.preferredLocalizations`: the app's
@@ -100,6 +100,7 @@ package enum RemoteControlHelp {
       open                                     launches the app and waits until it answers
       models                                   installed models, formats, LoRAs, default steps
       install ID [--standard|--compact|--light] shows a model's license and size in the app, to accept there
+      install writer                           the Prompt Lab's writer (1.25 GB), no license of its own
       diagnose [--issue]                       measures this Mac (≈ 1 min, no model) → the report's JSON
       measure [options] [-- add options]       times and peak memory of a series of renders → a TSV and its summary
       add [options] "<prompt>" [format] [seed] puts a request in the queue → its job (t3)
@@ -112,10 +113,14 @@ package enum RemoteControlHelp {
       cancel [t3 …]                            stops the running render, or removes jobs
       clear                                    empties the queue and stops the running render
       set faster-rendering on|off [--model ID] a model's Faster Rendering, as a click (queue empty)
+      set neural-engine on|off [--model ID]    a model's Neural Engine, as a click (queue empty)
+      set beta [OPTION on|off]                 the four Beta options of Settings, as a click; alone, reads them
       history [N]                              the session's images (most recent first)
       save i7 [i8 …] DEST                      writes images (.png/.jpg file, or folder)
       vary i7 subtle|strong [--batch N]        variations of an image (same settings, same seed)
       enlarge i7 [--download]                  the image ×4, by macOS's super-resolution → its image (i8)
+      rewrite "<text>" [--for ID]              the Prompt Lab's Rewrite: a prompt rewritten for a model → its text
+      describe <image|i7> [--for ID]           the Prompt Lab's Describe: an image told as a prompt → its text
       help [topic]                             this reference
 
     EDITING: silicontrol add --model qwen-image-2.1 --ref photo.png --ref dog.png "put the dog of image 2 next to her"
@@ -131,7 +136,8 @@ package enum RemoteControlHelp {
            text of a help answer raw.
         2. The LAST line is the verdict: {"ok": true, …} or {"ok": false, …}.
         3. The lines before it exist only for add --wait, grid --wait, wait and follow; they carry
-           "type": added, image, sheet, start, stage, step, end.
+           "type": added, image, sheet, start, stage, step, end. rewrite and describe have their own:
+           started, loading, text (help rewrite).
         4. A failure: {"ok": false, "error": "<code>", "message": "<sentence>", "hint": "<what to do>"}.
            The code is stable (help errors); "hint" is not always there. "message" and "hint" are
            in the app's language; only "error" is meant for programs.
@@ -201,7 +207,7 @@ package enum RemoteControlHelp {
                       null while it is not installed
         formats     → the suggested formats; any valid WxH is accepted (help add)
         neural_engine → the rack's fp32 tag for the installed version: true = part of the DiT
-                      on the Neural Engine (--ane, --no-ane of « add »). Only on a Mac whose
+                      on the Neural Engine (--ane, --no-ane of « add »; help set). Only on a Mac whose
                       measure offers it, and once the model is ready
         faster_rendering → Faster Rendering for the installed version (help set): what a render takes,
                       so false while its Beta option is off; off by default; once the model is ready
@@ -223,6 +229,7 @@ package enum RemoteControlHelp {
 
         "install": """
         silicontrol install ID [--standard|--compact|--light]
+        silicontrol install writer
 
         Opens the app's Models sheet on the model ID (an "id" of « models »), with its license and
         the space it will take on disk. NOTHING is downloaded by the command: the user reads, then
@@ -244,6 +251,20 @@ package enum RemoteControlHelp {
                     the disk cannot hold both, which the app says before the user accepts.
         An imported model's ID installs what it lacks (encoder, VAE) in its family's version
         installed: a flag that contradicts that version is refused.
+
+        install writer is the Prompt Lab's « Install the Writer » button, by the same function: the one thing the Lab
+        needs that a model's installation does not bring, the language model's head (1.25 GB, two byte ranges of
+        Qwen-Image-2.1's text encoder, each checked by sha256). It has no license of its own and no sheet: it is the
+        license of Qwen-Image-2.1, which the encoder's installation had accepted (else "license_not_accepted", and
+        install qwen-image-2.1 shows it). The download starts at once and the answer comes at once:
+          {"ok": true, "installed": false, "installing": true, "download_bytes": 1244668…, "message": "…"}
+          {"ok": true, "installed": true, "message": "already installed"}
+        "status" says the progress ("installing") and the end ("writer": {"state": "ready"}); a failure is in
+        "writer"."failure". Stop it in the app. Like the install of a model, it acts on this Mac: it is refused
+        ("remote") while the window computes on another one.
+        FAILURES (install writer): writer_absent (Qwen-Image-2.1 is not installed: no encoder to give a head to),
+        writer_memory (this Mac is too small for the writer), writer_preparing, license_not_accepted, busy (a render,
+        an installation or the diagnostic is running), remote.
 
         FAILURES: usage (also: --compact or --light for a model that has neither, two version flags
         together, a flag that contradicts the version an imported model's family has), model
@@ -514,9 +535,16 @@ package enum RemoteControlHelp {
            "installing": {"title": "Installing Z-Image Turbo", "last": "forging the DiT → …"} | null,
            "queue_remaining_s": 66.5, "remaining_complete": true,
            "history_images": 12, "library": "/Users/…/Siliconed", "faster_rendering": true,
+           "neural_engine": false, "beta": {"more_solvers": false, "faster_rendering": true, …},
+           "writer": {"state": "ready", "installing": false, "failure": null, "bytes": 17…},
            "settings": {"read": true, "map": "2026-10-26T14:43:50Z", "warnings": []}}
 
         faster_rendering   : Faster Rendering of the model in the rack (help set).
+        neural_engine      : the Neural Engine choice of the model in the rack (help set); only on a Mac whose measure offers it.
+        beta               : the four Beta options of Settings (help set): more_solvers, faster_rendering, size_scales, negative_lora.
+        writer             : the Prompt Lab's writer (help rewrite): "state" is "ready", or the code rewrite would refuse with
+                             (writer_absent, writer_head with "download_bytes", writer_memory with "gigabytes", writer_preparing);
+                             "installing" while the head comes (help install); "failure" the sentence of an install that failed.
         settings           : the engine settings renders run on — read: false until this Mac's measure is; map: the
                              date of that measure (null: the defaults); warnings: why a measure was not
                              taken (one of another Mac or build). A measure is applied as it stands, whatever it found (see help diagnose). Two
@@ -573,19 +601,45 @@ package enum RemoteControlHelp {
 
         "set": """
         silicontrol set faster-rendering on|off [--model ID]
+        silicontrol set neural-engine on|off [--model ID]
+        silicontrol set beta [OPTION on|off]
 
-        Flips « Faster Rendering » for one model exactly as a click does: the choice is written, the
-        switch in the window follows, the next plan reads it. It is chosen per installed version, like
-        the Neural Engine, and off by default. It is a Beta option (Settings ▸ Advanced ▸ Beta): "on" is
+        Settings' switches, from the terminal. Each goes through the function its switch calls, so the choice is
+        written and the window follows, exactly as a click.
+
+        FASTER-RENDERING flips « Faster Rendering » for one model. It is chosen per installed version, like the
+        Neural Engine, and off by default. It is a Beta option (Settings ▸ Advanced ▸ Beta): "on" is
         refused ("faster_rendering") while the option is off, and no render is a faster one then. On, from
         1024 px on each side the first evaluations run on a grid of half the size: faster, another image than at
-        full size. Off: full size, the image checked against the reference. Without --model, the
-        model in the rack. Only with nothing running or waiting (a job planned under one value and
-        finished under the other would mix two recipes): else "busy". « models » tells each model's
-        value, « status » the rack's.
+        full size. Off: full size, the image checked against the reference.
+
+        NEURAL-ENGINE flips the Neural Engine of one model (the DiT box's switch): part of the DiT in fp16 on the
+        Neural Engine, less energy, an image a little different from fp32's; off, the DiT is fp32 throughout. Also
+        per installed version; unless chosen, on for the Compact and the Light, off for the Standard. Refused
+        ("neural_engine"), on or off, on a Mac whose measure gives the Neural Engine nothing to do: the window greys
+        the switch there with that reason, and there is nothing to choose. For one render only: add --ane / --no-ane.
+
+        Both: without --model, the model in the rack. Only with nothing running or waiting (a job planned under
+        one value and finished under the other would mix two recipes): else "busy". « models » tells each model's
+        values, « status » the rack's.
+
+        BETA is the four switches of Settings ▸ Advanced ▸ Beta, off by default:
+          more-solvers      the solvers Euler a, DPM++ 2M and UniPC (--solver of « add »)
+          faster-rendering  the Faster Rendering switch in the DiT box — the master of the per-model choices above
+          size-scales       Size in Two Scales: the Size menu as a proportion, then 1K or 2K (3:4@2K, help add)
+          negative-lora     LoRA strengths from −1.5 to 1.5, for "slider" LoRAs (--lora NAME:-0.5)
+        "set beta" alone reads them; "set beta OPTION on|off" sets one (the setting's own name works too:
+        size-in-two-scales, negative-lora-strengths). The effects are the switch's: turning More Solvers off puts
+        a solver back to Euler; turning Negative LoRA Strengths off brings the strengths already set back to 0.
+        Like the switches, they wait for nothing and apply to what is queued next. They are this Mac's preferences; when
+        the window computes on another Mac, its copy is set too. « status » gives them as "beta".
 
         Answer: {"ok": true, "model": "krea2", "faster_rendering": false, "previous": true}
-        FAILURES: usage, model, busy, faster_rendering ("on" without its Beta option).
+                {"ok": true, "model": "z-image", "neural_engine": true, "previous": false}
+                {"ok": true, "option": "size-scales", "enabled": true, "previous": false,
+                 "beta": {"more_solvers": false, "faster_rendering": false, "size_scales": true, "negative_lora": false}}
+        FAILURES: usage (also: an unknown Beta option, "hint" lists them), model, busy, faster_rendering ("on" without
+        its Beta option), neural_engine (no Neural Engine to choose on this Mac).
         """,
 
         "history": """
@@ -628,6 +682,62 @@ package enum RemoteControlHelp {
         Then: silicontrol save i8 big.png
         FAILURES: usage, unknown_image, refused (macOS before 26, a grid, already enlarged, a render
           running), download_required, download_failed, internal.
+        """,
+
+        "rewrite": """
+        silicontrol rewrite "<text>" [--for ID]
+
+        The Prompt Lab's « Rewrite » (Window ▸ Prompt Lab), from the terminal: a language model installed with the app
+        (Qwen3-VL-8B, the text encoder of Qwen-Image-2.1 made to write) rewrites a prompt the way the model it is aimed
+        at reads best. The writer, its instructions for each model, the protection of the @names and the refusals are
+        the Lab's own: a command and a click give the same text. Nothing is written to disk — the text comes back on
+        the socket only (incognito). The text is one argument, in quotes, like « add »'s prompt.
+
+          silicontrol rewrite "woman posing in a library"
+          silicontrol rewrite --for anima "1girl, library, solo"
+          silicontrol rewrite --for qwen-image-2.1 "@alice reading in a library"
+
+        --for ID   the model to write for: an "id" of « models » (or its family) among the models installed. Without it,
+                   what the Lab takes: the model chosen in its window, else the one in the rack, else the first installed.
+        @names     where the model aimed at reads images (Qwen-Image-2.1), each @name is put aside and put back after the
+                   writer: one it lost or deformed is told ("lost_mentions", "notice"), never dropped in silence. Elsewhere
+                   @ is the model's own (Anima's artists) and the text goes as it is.
+
+        LINES — the first text takes a few seconds, the weights being read; they go back when it ends:
+          {"type": "started", "gesture": "rewrite", "for": "qwen-image-2.1"}
+          {"type": "loading", "fraction": 0.4}        the weights being read (null: not known); once
+          {"type": "text", "text": "A woman…"}        EVERYTHING written so far — cumulative, not a delta: the writer may revise its last word
+        VERDICT:
+          {"ok": true, "gesture": "rewrite", "for": "qwen-image-2.1", "text": "…", "tokens": 112, "lost_mentions": []}
+          with "notice" (a sentence) when a mention was lost or deformed — the text is given anyway, as the Lab gives it.
+
+        One gesture at a time: the writer is the Lab's too. An image that renders has priority, as in the Lab: a render
+        that starts ends the gesture ("stopped"). A client that hangs up cancels it: the sampling stops, the weights go back.
+        FAILURES: usage, model (--for names none of the models installed), busy (an image renders or waits), remote (the
+        window computes on another Mac: the writer is this Mac's), writer_absent (no installed model carries a writer),
+        writer_head (its head is to download: install writer), writer_memory (this Mac is too small), writer_preparing,
+        writer_busy (another Rewrite or Describe is under way, from the terminal or the Lab's window), stopped,
+        prompt_too_long, writer_failed (it failed or wrote nothing; "message" says why), and the engine's codes
+        (render_already_running: another process renders).
+        """,
+
+        "describe": """
+        silicontrol describe <image|i7> [--for ID]
+
+        The Prompt Lab's « Describe », from the terminal: the writer looks at an image and writes the prompt that would
+        make it, in the manner of the model it is aimed at. IMAGE is an image of the history (i7, as « history » names
+        them) or a file — whatever macOS reads, its orientation applied, its transparency laid over white, as the Lab
+        reads a dropped image. Same writer, same instructions, same refusals and same lines as « rewrite » (help rewrite);
+        the verdict has "image" (the history name, or the path) where « rewrite »'s has "lost_mentions".
+
+          silicontrol describe i7
+          silicontrol describe photo.jpg --for anima
+
+          {"ok": true, "gesture": "describe", "for": "z-image", "image": "i7", "text": "A woman…", "tokens": 138}
+
+        --for ID   as in « rewrite ».
+        FAILURES: those of « rewrite »; ref (the file is unreadable or missing, or not an image); unknown_image (an i… that is
+        not in the history).
         """,
 
         "subjects": """
@@ -754,7 +864,7 @@ package enum RemoteControlHelp {
           model                unknown or not installed model
                                                                            → "hint" lists the ready ones; models
           busy                 (install, diagnose, set) a render, an installation or the diagnostic is
-                               running; (add, grid, vary) an installation is running;
+                               running; (rewrite, describe) an image renders or waits; (add, grid, vary) an installation is running;
                                (any) more than 8 connections still sending their command
                                                                            → wait, then retry
           library_absent       (add, grid, vary) the library is on a disk that is not connected
@@ -765,27 +875,42 @@ package enum RemoteControlHelp {
           steps                a step count the model has no schedule for   → its "default_steps"
           edit                 --ref on a model without editing, or more --ref than it reads
                                                                            → a model with "edit": true; its "max_references"
-          ref                  unreadable reference image                   → check the path
+          ref                  unreadable reference image, or image to describe → check the path
           img2img              --image / --strength: not in the app         → leave them out
           solver               --solver without More Solvers, or on a model that walks Euler only
                                                                            → leave it out
           detail               --detail more|most on a model without Detail (Anima, Krea 2)
                                                                            → leave it out
-          neural_engine        --ane on a Mac whose measure does not offer the Neural Engine
-                                                                           → leave it out
+          neural_engine        --ane, or set neural-engine, on a Mac whose measure does not offer the
+                               Neural Engine                               → leave it out: nothing to choose there
           subject              a named subject: unknown, a name taken, too many images, a model
                                that reads none, a grid citing one          → help subjects
           grid                 an axis that does not read, two axes on one setting, a {…} group
                                on no axis, more than 64 cells              → help grid
           queue_full           64 jobs waiting, or no room for every alternative or cell
                                                                            → wait, then retry
+          remote               (install, rewrite, describe) the window computes on another Mac; these act on
+                               this one                                    → Render › Compute On › This Mac
+          writer_absent        (rewrite, describe, install writer) no installed model carries a writer
+                                                                           → install qwen-image-2.1
+          writer_head          (rewrite, describe) the writer's head is to download (1.25 GB)
+                                                                           → install writer
+          writer_memory        (rewrite, describe, install writer) this Mac is too small for the writer
+          writer_preparing     (rewrite, describe, install writer) the writer is being prepared → status
+          writer_busy          (rewrite, describe) another Rewrite or Describe is under way, from the terminal or
+                               the Lab's window                            → wait, then retry
+          writer_failed        (rewrite, describe) the writer failed or wrote nothing; the engine's own code
+                               (render_already_running…) when it has one   → "message"
+          prompt_too_long      (rewrite) the text is longer than the writer reads → shorten it
+          license_not_accepted (install writer) Qwen-Image-2.1's license is not accepted yet
+                                                                           → install qwen-image-2.1
           unsupported          (measure) --faster-rendering on an app older than silicontrol → same build
           unknown_job          this t… (or g…) does not exist in this session → status
           unknown_image        this i… is not in the history                → history
           write                folder or file cannot be written             → check the path
           render               (wait) a job did not finish                  → "outcome", "message" and "code" of each job
-          stopped              (diagnose) the diagnostic was stopped (« Stop » in the sheet)
-                                                                           → diagnose again
+          stopped              (diagnose) the diagnostic was stopped (« Stop » in the sheet); (rewrite,
+                               describe) a render started, which has priority → diagnose again, or wait and retry
           protocol, internal   should not happen                            → report it
         """,
 
@@ -862,6 +987,7 @@ package enum RemoteControlHelp {
       open                                     lance l'app et attend qu'elle réponde
       models                                   modèles installés, formats, LoRA, pas par défaut
       install ID [--standard|--compact|--light] montre dans l'app la licence et la place d'un modèle, à accepter là
+      install writer                           le rédacteur de l'Atelier de prompts (1,25 Go), sans licence propre
       diagnose [--issue]                       mesure ce Mac (≈ 1 min, sans modèle) → le JSON du rapport
       measure [options] [-- options de add]    temps et pic mémoire d'une série de rendus → un TSV et son résumé
       add [options] "<prompt>" [format] [seed] met une demande en file → son travail (t3)
@@ -874,10 +1000,14 @@ package enum RemoteControlHelp {
       cancel [t3 …]                            arrête le rendu en cours, ou retire des travaux
       clear                                    vide la file et arrête le rendu en cours
       set faster-rendering on|off [--model ID] le rendu plus rapide d'un modèle, comme un clic (file vide)
+      set neural-engine on|off [--model ID]    le Neural Engine d'un modèle, comme un clic (file vide)
+      set beta [OPTION on|off]                 les quatre options Bêta des Réglages, comme un clic ; seul, les lit
       history [N]                              les images de la session (la plus récente d'abord)
       save i7 [i8 …] DEST                      écrit des images (fichier .png/.jpg, ou dossier)
       vary i7 subtle|strong [--batch N]        variations d'une image (mêmes réglages, même graine)
       enlarge i7 [--download]                  l'image ×4, par la super-résolution de macOS → son image (i8)
+      rewrite "<texte>" [--for ID]             « Réécrire » de l'Atelier : un prompt réécrit pour un modèle → son texte
+      describe <image|i7> [--for ID]           « Décrire » de l'Atelier : une image racontée en prompt → son texte
       help [sujet]                             cette référence
 
     ÉDITER : silicontrol add --model qwen-image-2.1 --ref photo.png --ref chien.png "put the dog of image 2 next to her"
@@ -894,7 +1024,8 @@ package enum RemoteControlHelp {
            le texte "help" d'une réponse d'aide.
         2. La DERNIÈRE ligne est le verdict : {"ok": true, …} ou {"ok": false, …}.
         3. Les lignes d'avant n'existent que pour add --wait, grid --wait, wait et follow ; elles
-           portent "type" : added, image, sheet, start, stage, step, end.
+           portent "type" : added, image, sheet, start, stage, step, end. rewrite et describe ont les leurs :
+           started, loading, text (help rewrite).
         4. Un échec : {"ok": false, "error": "<code>", "message": "<phrase>", "hint": "<quoi faire>"}.
            Le code est stable (help errors) ; "hint" n'est pas toujours là. "message" et "hint"
            sont dans la langue de l'app ; seul "error" est fait pour les programmes.
@@ -964,7 +1095,7 @@ package enum RemoteControlHelp {
                       null tant qu'il n'est pas installé
         formats     → les formats conseillés ; tout WxH valide est accepté (help add)
         neural_engine → l'étiquette fp32 du rack pour la version installée : true = une part du
-                      DiT sur le Neural Engine (--ane, --no-ane de « add »). Seulement sur un Mac
+                      DiT sur le Neural Engine (--ane, --no-ane de « add » ; help set). Seulement sur un Mac
                       dont la mesure l'offre, et le modèle prêt
         faster_rendering → le rendu plus rapide de la version installée (help set) : ce qu'un rendu
                       prend, donc faux tant que son option Bêta est éteinte ; éteint par défaut ; le modèle prêt
@@ -986,6 +1117,7 @@ package enum RemoteControlHelp {
 
         "install": """
         silicontrol install ID [--standard|--compact|--light]
+        silicontrol install writer
 
         Ouvre la feuille Modèles de l'app sur le modèle ID (un "id" de « models »), avec sa licence
         et la place qu'il prendra sur le disque. La commande ne télécharge RIEN : l'utilisateur lit,
@@ -1008,6 +1140,20 @@ package enum RemoteControlHelp {
                     l'acceptation.
         L'ID d'un modèle importé installe ce qui lui manque (encodeur, VAE) dans la version
         installée de sa famille : un drapeau qui la contredit est refusé.
+
+        install writer est le bouton « Installer le rédacteur » de l'Atelier de prompts, par la même fonction : ce que l'Atelier
+        demande et que l'installation d'un modèle n'apporte pas, la tête du modèle de langage (1,25 Go, deux plages d'octets
+        de l'encodeur de Qwen-Image-2.1, chacune vérifiée par sha256). Elle n'a pas de licence propre ni de feuille : c'est
+        la licence de Qwen-Image-2.1, que l'installation de l'encodeur a fait accepter (sinon « license_not_accepted », et
+        install qwen-image-2.1 la montre). Le téléchargement commence aussitôt et la réponse vient aussitôt :
+          {"ok": true, "installed": false, "installing": true, "download_bytes": 1244668…, "message": "…"}
+          {"ok": true, "installed": true, "message": "already installed"}
+        « status » dit l'avancement ("installing") et la fin ("writer" : {"state": "ready"}) ; un échec est dans
+        "writer"."failure". L'arrêter se fait dans l'app. Comme l'installation d'un modèle, elle agit sur ce Mac : refusée
+        ("remote") tant que la fenêtre calcule sur un autre.
+        ÉCHECS (install writer) : writer_absent (Qwen-Image-2.1 n'est pas installé : pas d'encodeur à qui donner une tête),
+        writer_memory (ce Mac est trop petit pour le rédacteur), writer_preparing, license_not_accepted, busy (un rendu,
+        une installation ou le diagnostic tourne), remote.
 
         ÉCHECS : usage (aussi : --compact ou --light pour un modèle qui n'en a pas, deux drapeaux de
         version ensemble, un drapeau qui contredit la version de la famille d'un modèle importé), model
@@ -1281,9 +1427,16 @@ package enum RemoteControlHelp {
            "installing": {"title": "Installing Z-Image Turbo", "last": "forging the DiT → …"} | null,
            "queue_remaining_s": 66.5, "remaining_complete": true,
            "history_images": 12, "library": "/Users/…/Siliconed", "faster_rendering": true,
+           "neural_engine": false, "beta": {"more_solvers": false, "faster_rendering": true, …},
+           "writer": {"state": "ready", "installing": false, "failure": null, "bytes": 17…},
            "settings": {"read": true, "map": "2026-10-26T14:43:50Z", "warnings": []}}
 
         faster_rendering   : le rendu plus rapide du modèle du rack (help set).
+        neural_engine      : le choix du Neural Engine du modèle du rack (help set) ; seulement sur un Mac dont la mesure l'offre.
+        beta               : les quatre options Bêta des Réglages (help set) : more_solvers, faster_rendering, size_scales, negative_lora.
+        writer             : le rédacteur de l'Atelier (help rewrite) : "state" vaut "ready", ou le code dont rewrite refuserait
+                             (writer_absent, writer_head avec "download_bytes", writer_memory avec "gigabytes", writer_preparing) ;
+                             "installing" tant que la tête arrive (help install) ; "failure" la phrase d'une installation qui a échoué.
         settings           : les réglages du moteur des rendus — read : false tant que la mesure de ce Mac ne l'est
                              pas ; map : la date de cette mesure (null : les défauts) ; warnings : pourquoi une mesure n'a
                              pas été prise (celle d'un autre Mac ou d'un autre build). Une mesure s'applique telle quelle, quoi qu'elle ait trouvé (voir
@@ -1342,19 +1495,46 @@ package enum RemoteControlHelp {
 
         "set": """
         silicontrol set faster-rendering on|off [--model ID]
+        silicontrol set neural-engine on|off [--model ID]
+        silicontrol set beta [OPTION on|off]
 
-        Bascule le rendu plus rapide d'un modèle exactement comme un clic : le choix est écrit,
-        l'interrupteur de la fenêtre suit, le prochain plan le lit. Il se choisit par version
-        installée, comme le Neural Engine, et éteint par défaut. C'est une option Bêta (Réglages ▸ Avancé ▸ Bêta) :
+        Les interrupteurs des Réglages, depuis le terminal. Chacun passe par la fonction que son interrupteur appelle : le
+        choix est écrit et la fenêtre suit, exactement comme un clic.
+
+        FASTER-RENDERING bascule le « rendu plus rapide » d'un modèle. Il se choisit par version installée, comme le
+        Neural Engine, et éteint par défaut. C'est une option Bêta (Réglages ▸ Avancé ▸ Bêta) :
         « on » est refusé (« faster_rendering ») tant qu'elle est éteinte, et aucun rendu n'est alors
         plus rapide. Allumé, dès 1024 px de chaque côté les premières évaluations se font sur une grille de
         demi-taille : plus vite, une autre image qu'en pleine taille. Éteint : pleine taille, l'image
-        contrôlée contre la référence. Sans --model, le modèle du rack. Seulement quand rien ne
-        tourne ni n'attend (un travail planifié sous une valeur et fini sous l'autre mélangerait deux
-        recettes) : sinon « busy ». « models » donne la valeur de chaque modèle, « status » celle du rack.
+        contrôlée contre la référence.
+
+        NEURAL-ENGINE bascule le Neural Engine d'un modèle (l'interrupteur de la boîte DiT) : une part du DiT en fp16 sur le
+        Neural Engine, moins d'énergie, une image un peu différente de celle du fp32 ; éteint, le DiT est en fp32 de bout en
+        bout. Aussi par version installée ; faute de choix, allumé pour la Compacte et la Légère, éteint pour la Standard.
+        Refusé (« neural_engine »), allumé ou éteint, sur un Mac dont la mesure ne donne rien à faire au Neural Engine : la
+        fenêtre y grise l'interrupteur avec cette raison, et il n'y a rien à choisir. Pour un seul rendu : add --ane / --no-ane.
+
+        Les deux : sans --model, le modèle du rack. Seulement quand rien ne tourne ni n'attend (un travail planifié sous
+        une valeur et fini sous l'autre mélangerait deux recettes) : sinon « busy ». « models » donne les valeurs de chaque
+        modèle, « status » celles du rack.
+
+        BETA, ce sont les quatre interrupteurs de Réglages ▸ Avancé ▸ Bêta, éteints par défaut :
+          more-solvers      les solveurs Euler a, DPM++ 2M et UniPC (--solver de « add »)
+          faster-rendering  l'interrupteur du rendu plus rapide dans la boîte DiT — le maître des choix par modèle ci-dessus
+          size-scales       Taille en deux échelles : le menu Taille en proportion, puis 1K ou 2K (3:4@2K, help add)
+          negative-lora     forces de LoRA de −1,5 à 1,5, pour les LoRA « curseur » (--lora NOM:-0.5)
+        « set beta » seul les lit ; « set beta OPTION on|off » en règle une (le nom du réglage marche aussi :
+        size-in-two-scales, negative-lora-strengths). Les effets sont ceux de l'interrupteur : éteindre More Solvers remet un
+        solveur sur Euler ; éteindre Negative LoRA Strengths ramène à 0 les forces déjà réglées. Comme les interrupteurs, elles
+        n'attendent rien et valent pour ce qui se met en file ensuite. Ce sont les préférences de ce Mac ; quand la fenêtre
+        calcule sur un autre, sa copie est réglée aussi. « status » les donne sous "beta".
 
         Réponse : {"ok": true, "model": "krea2", "faster_rendering": false, "previous": true}
-        ÉCHECS : usage, model, busy, faster_rendering (« on » sans son option Bêta).
+                  {"ok": true, "model": "z-image", "neural_engine": true, "previous": false}
+                  {"ok": true, "option": "size-scales", "enabled": true, "previous": false,
+                   "beta": {"more_solvers": false, "faster_rendering": false, "size_scales": true, "negative_lora": false}}
+        ÉCHECS : usage (aussi : une option Bêta inconnue, "hint" les liste), model, busy, faster_rendering (« on » sans son
+        option Bêta), neural_engine (pas de Neural Engine à choisir sur ce Mac).
         """,
 
         "history": """
@@ -1399,6 +1579,63 @@ package enum RemoteControlHelp {
         Puis : silicontrol save i8 grande.png
         ÉCHECS : usage, unknown_image, refused (macOS avant 26, une grille, déjà agrandie, un rendu en
           cours), download_required, download_failed, internal.
+        """,
+
+        "rewrite": """
+        silicontrol rewrite "<texte>" [--for ID]
+
+        « Réécrire » de l'Atelier de prompts (Fenêtre ▸ Atelier de prompts), depuis le terminal : un modèle de langage installé
+        avec l'app (Qwen3-VL-8B, l'encodeur de texte de Qwen-Image-2.1 mis à écrire) réécrit un prompt comme le modèle visé le lit
+        le mieux. Le rédacteur, ses consignes pour chaque modèle, la protection des @noms et les refus sont ceux de l'Atelier :
+        une commande et un clic donnent le même texte. Rien n'est écrit sur disque — le texte ne revient que par la socket
+        (incognito). Le texte est un seul argument, entre guillemets, comme le prompt de « add ».
+
+          silicontrol rewrite "woman posing in a library"
+          silicontrol rewrite --for anima "1girl, library, solo"
+          silicontrol rewrite --for qwen-image-2.1 "@alice reading in a library"
+
+        --for ID   le modèle pour lequel écrire : un "id" de « models » (ou sa famille) parmi les modèles installés. Sans lui,
+                   ce que prend l'Atelier : le modèle choisi dans sa fenêtre, sinon celui du rack, sinon le premier installé.
+        @noms      là où le modèle visé lit des images (Qwen-Image-2.1), chaque @nom est mis de côté puis remis après le
+                   rédacteur : un nom qu'il a perdu ou déformé est dit ("lost_mentions", "notice"), jamais supprimé en silence.
+                   Ailleurs, @ est celui du modèle (les artistes d'Anima) et le texte passe tel quel.
+
+        LIGNES — le premier texte prend quelques secondes, les poids se lisent ; ils repartent à la fin :
+          {"type": "started", "gesture": "rewrite", "for": "qwen-image-2.1"}
+          {"type": "loading", "fraction": 0.4}        les poids en lecture (null : inconnu) ; une fois
+          {"type": "text", "text": "A woman…"}        TOUT ce qui est écrit jusque-là — cumulatif, pas un delta : le rédacteur peut réviser son dernier mot
+        VERDICT :
+          {"ok": true, "gesture": "rewrite", "for": "qwen-image-2.1", "text": "…", "tokens": 112, "lost_mentions": []}
+          avec "notice" (une phrase) quand une mention a été perdue ou déformée — le texte est donné quand même, comme le fait l'Atelier.
+
+        Un geste à la fois : le rédacteur est aussi celui de l'Atelier. Une image qui se rend est prioritaire, comme dans
+        l'Atelier : un rendu qui démarre met fin au geste ("stopped"). Un client qui raccroche l'annule : l'échantillonnage
+        s'arrête, les poids repartent.
+        ÉCHECS : usage, model (--for nomme aucun des modèles installés), busy (une image se rend ou attend), remote (la fenêtre
+        calcule sur un autre Mac : le rédacteur est celui de ce Mac), writer_absent (aucun modèle installé n'a de rédacteur),
+        writer_head (sa tête est à télécharger : install writer), writer_memory (ce Mac est trop petit), writer_preparing,
+        writer_busy (un autre Réécrire ou Décrire est en cours, du terminal ou de la fenêtre de l'Atelier), stopped,
+        prompt_too_long, writer_failed (il a échoué ou n'a rien écrit ; "message" dit pourquoi), et les codes du moteur
+        (render_already_running : un autre processus rend).
+        """,
+
+        "describe": """
+        silicontrol describe <image|i7> [--for ID]
+
+        « Décrire » de l'Atelier de prompts, depuis le terminal : le rédacteur regarde une image et écrit le prompt qui la
+        ferait, à la manière du modèle visé. IMAGE est une image de l'historique (i7, comme « history » les nomme) ou un
+        fichier — tout ce que macOS lit, son orientation appliquée, sa transparence posée sur du blanc, comme l'Atelier lit
+        une image déposée. Même rédacteur, mêmes consignes, mêmes refus et mêmes lignes que « rewrite » (help rewrite) ;
+        le verdict a "image" (le nom de l'historique, ou le chemin) là où celui de « rewrite » a "lost_mentions".
+
+          silicontrol describe i7
+          silicontrol describe photo.jpg --for anima
+
+          {"ok": true, "gesture": "describe", "for": "z-image", "image": "i7", "text": "A woman…", "tokens": 138}
+
+        --for ID   comme dans « rewrite ».
+        ÉCHECS : ceux de « rewrite » ; ref (le fichier est illisible ou absent, ou n'est pas une image) ; unknown_image (un i… qui
+        n'est pas dans l'historique).
         """,
 
         "subjects": """
@@ -1527,7 +1764,7 @@ package enum RemoteControlHelp {
           model                modèle inconnu ou pas installé
                                                                            → "hint" liste les prêts ; models
           busy                 (install, diagnose, set) un rendu, une installation ou le diagnostic
-                               tourne ; (add, grid, vary) une installation tourne ;
+                               tourne ; (rewrite, describe) une image se rend ou attend ; (add, grid, vary) une installation tourne ;
                                (toutes) plus de 8 connexions qui envoient encore leur commande
                                                                            → attendre, puis réessayer
           library_absent       (add, grid, vary) la bibliothèque est sur un disque qui n'est pas branché
@@ -1538,27 +1775,42 @@ package enum RemoteControlHelp {
           steps                un nombre de pas sans calendrier pour ce modèle → son "default_steps"
           edit                 --ref sur un modèle sans édition, ou plus de --ref qu'il n'en lit
                                                                            → un modèle "edit": true ; son "max_references"
-          ref                  image de référence illisible                 → vérifier le chemin
+          ref                  image de référence, ou à décrire, illisible  → vérifier le chemin
           img2img              --image / --strength : pas dans l'app        → les retirer
           solver               --solver hors du mode développeur, ou sur un modèle qui ne fait
                                qu'Euler                                    → le retirer
           detail               --detail more|most sur un modèle sans Détail (Anima, Krea 2)
                                                                            → le retirer
-          neural_engine        --ane sur un Mac dont la mesure n'offre pas le Neural Engine
-                                                                           → le retirer
+          neural_engine        --ane, ou set neural-engine, sur un Mac dont la mesure n'offre pas le
+                               Neural Engine                               → le retirer : rien à choisir là
           subject              un sujet nommé : inconnu, nom déjà pris, trop d'images, modèle qui
                                n'en lit pas, une grille qui en cite un     → help subjects
           grid                 un axe illisible, deux axes sur un même réglage, un groupe {…} sur
                                aucun axe, plus de 64 cases                 → help grid
           queue_full           64 travaux en attente, ou pas de place pour toutes les alternatives ou cases
                                                                            → wait, puis réessayer
+          remote               (install, rewrite, describe) la fenêtre calcule sur un autre Mac ; ces commandes
+                               agissent sur celui-ci                       → Rendu › Calculer sur › Ce Mac
+          writer_absent        (rewrite, describe, install writer) aucun modèle installé n'a de rédacteur
+                                                                           → install qwen-image-2.1
+          writer_head          (rewrite, describe) la tête du rédacteur est à télécharger (1,25 Go)
+                                                                           → install writer
+          writer_memory        (rewrite, describe, install writer) ce Mac est trop petit pour le rédacteur
+          writer_preparing     (rewrite, describe, install writer) le rédacteur se prépare → status
+          writer_busy          (rewrite, describe) un autre Réécrire ou Décrire est en cours, du terminal ou de
+                               la fenêtre de l'Atelier                     → attendre, puis réessayer
+          writer_failed        (rewrite, describe) le rédacteur a échoué ou n'a rien écrit ; le code du moteur
+                               (render_already_running…) quand il en a un  → "message"
+          prompt_too_long      (rewrite) le texte est plus long que ce que le rédacteur lit → le raccourcir
+          license_not_accepted (install writer) la licence de Qwen-Image-2.1 n'est pas encore acceptée
+                                                                           → install qwen-image-2.1
           unsupported          (measure) --faster-rendering avec une app plus ancienne que silicontrol → même build
           unknown_job          ce t… (ou g…) n'existe pas dans cette session → status
           unknown_image        ce i… n'est pas dans l'historique            → history
           write                dossier ou fichier impossible à écrire       → vérifier le chemin
           render               (wait) un travail n'a pas fini               → "outcome", "message" et "code" de chaque travail
-          stopped              (diagnose) le diagnostic a été arrêté (« Arrêter » dans la feuille)
-                                                                           → relancer diagnose
+          stopped              (diagnose) le diagnostic a été arrêté (« Arrêter » dans la feuille) ; (rewrite,
+                               describe) un rendu a démarré, il est prioritaire → relancer diagnose, ou attendre et réessayer
           protocol, internal   ne devrait pas arriver                       → le signaler
         """,
 

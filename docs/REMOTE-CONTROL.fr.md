@@ -15,8 +15,8 @@ relit l'historique : les mêmes fonctions que les boutons (`AppState.enqueue`, 
 `stopAll`). Les demandes de la commande apparaissent dans la fenêtre ; celles de la souris, la
 commande les voit. Il n'y a jamais deux moteurs dans les 16 Go. Quand la fenêtre calcule sur un autre Mac
 (Rendu › Calculer sur), les commandes la suivent : elles ne parlent toujours qu'au socket de ce Mac, mais agissent
-sur la file et l'historique de l'autre Mac, comme les boutons ; `install` y refuse, `diagnose` et
-`set faster-rendering` agissent sur l'autre Mac.
+sur la file et l'historique de l'autre Mac, comme les boutons ; `install` (et `install writer`, `rewrite`, `describe` : le rédacteur est celui de ce Mac) y refuse, `diagnose` et
+`set faster-rendering|neural-engine` agissent sur l'autre Mac.
 
 **Une licence ne s'accepte que dans la fenêtre.** Un travail dont la bibliothèque n'a pas
 enregistré la licence du modèle est refusé par le moteur (`license_not_accepted`) et mis de côté,
@@ -90,6 +90,12 @@ mélangerait deux recettes. Il persiste comme l'interrupteur ; `silicontrol me
 on|off` le pose pour le modèle mesuré, l'inscrit dans le TSV et rend la valeur d'avant à la fin, même si
 la série échoue. Éteint, c'est la pleine taille : l'image contrôlée contre la référence.
 
+**Rien ne dépend d'un clic, sauf l'appairage.** Ce que fait la fenêtre, une commande le fait aussi, **par les mêmes fonctions que les boutons** (`AppState`, le `LabModel` de l'Atelier de prompts), jamais par un chemin à part. Ce qui reste dans la fenêtre exprès : l'appairage d'un Mac, l'acceptation d'une licence, « Prêter ce Mac » et « Oublier ». La partie 1 de cette règle est ci-dessous ; l'historique, l'exploration, les imports, les retraits, Calculer sur et la bibliothèque restent à venir.
+
+**Le rédacteur de l'Atelier de prompts est celui de la fenêtre.** `silicontrol rewrite "<texte>" [--for ID]` et `silicontrol describe <image|i7> [--for ID]` appellent ce qu'appellent les deux boutons de l'Atelier : `EngineLabWriter` sur `PromptWriter`, nos consignes par modèle et par geste (`PromptWriterInstructions`), l'image lue comme l'Atelier lit une image déposée (`PromptWriterImage`), et, pour un modèle qui lit les images, les `@noms` mis de côté puis remis (`LabInputs.MentionGuard`, partagé sous les noms `LabModel.rewriteInput` et `rewritten`). Le modèle pour lequel il écrit est celui que prendrait l'Atelier (`WriterTarget.pick` : le choix de l'Atelier, sinon celui du rack, sinon le premier installé) sauf si `--for` en nomme un. Les refus sont ceux de l'Atelier, dans son ordre (`WriterPause.decide`, une seule règle pour la phrase sous ses boutons et pour le code) : la fenêtre suit un autre Mac (`remote`), une image se rend (`busy`), pas de rédacteur, la tête à télécharger, un Mac trop petit (`writer_absent`, `writer_head`, `writer_memory`, `writer_preparing`) ; et un second geste pendant qu'un écrit (`writer_busy`), du terminal ou de la fenêtre. Les lignes sont `{"type": "started"}`, `{"type": "loading", "fraction"}` et `{"type": "text", "text"}`, qui porte tout ce qui est écrit jusque-là (cumulatif, comme le flux de l'Atelier : le détokeniseur peut réviser son dernier mot) ; le verdict a le `text` entier, les `tokens`, et la `notice` et `lost_mentions` quand le rédacteur a perdu un `@nom`. **Un rendu qui démarre arrête le geste** (`stopped`), comme il arrête celui de l'Atelier. **Un client qui raccroche l'annule** : `Connection.isGone` voit la fermeture sans écrire dans la socket, et `LabModel.cancelRemote` termine le flux, dont la fin arrête l'échantillonnage (`EngineLabWriter.write`, `PromptWriter.cancel`) avant que les poids repartent. Incognito : le texte sort par la socket et nulle part ailleurs. `silicontrol install writer` est « Installer le rédacteur » (`LabModel.installHead`) : la tête de l'encodeur de Qwen-Image-2.1, sans licence propre (c'est celle que l'installation de l'encodeur a fait accepter : `Installer.installWriterHead` la vérifie, et la commande le dit avant de commencer). Les trois agissent sur ce Mac : la fenêtre sur un autre, elles sont refusées (`remote`).
+
+**Le Neural Engine et les options Bêta sont aussi des interrupteurs des Réglages.** `set neural-engine on|off [--model ID]` passe par `AppState.setNeuralEngine(_:for:)`, comme `set faster-rendering` par le sien, avec la même attente (`busy`) et les mêmes clés par version installée ; il est refusé (`neural_engine`) là où la mesure de ce Mac ne donne aucune ligne au Neural Engine, c'est-à-dire quand l'interrupteur est grisé (`DiTSwitches.neuralEngineUnavailable`). `models` et `status` le donnent. `set beta [OPTION on|off]` écrit la propriété à laquelle est lié chacun des quatre interrupteurs de Réglages › Avancé › Bêta (`developerMode` pour Plus de solveurs, `fasterRenderingBeta`, `sizeScalesBeta`, `negativeLoRAStrengths`), si bien que leurs `didSet` font ce que fait un clic ; `status` les donne sous `"beta"`. Ce sont les préférences de ce Mac, et la copie du miroir que montre la fenêtre est réglée avec elles. Les arguments de `rewrite`, `describe` et `set` se lisent dans la bibliothèque (`WriterOrder`, `SetOrder`, `BetaOption`), où les tests les lisent.
+
 ## La commande
 
 `silicontrol` est livrée dans l'app, `Siliconed.app/Contents/Helpers/silicontrol` (cible `Silicontrol`,
@@ -110,7 +116,7 @@ argument) est servie par la commande elle-même, sans lancer l'app.
 - **Une connexion par commande.** Le client écrit une ligne JSON,
   `{"argv": ["add", "--batch", "2", "…"], "cwd": "/dossier/courant"}` ; l'app répond par des lignes
   JSON puis ferme. Les lignes intermédiaires portent `"type"` (`added`, `image`, `sheet`, `start`, `stage`,
-  `step`, `end`) ; la dernière porte `"ok"` (`true` ou `false`, avec `"error"`, `"message"` et
+  `step`, `end` ; `started`, `loading`, `text` pour `rewrite` et `describe`) ; la dernière porte `"ok"` (`true` ou `false`, avec `"error"`, `"message"` et
   souvent `"hint"` en cas d'échec). Sans le client :
   `printf '{"argv":["status"]}\n' | nc -U ~/Library/Application\ Support/Siliconed/silicontrol.sock`.
 - **Toute l'analyse est dans l'app** (`Sources/SiliconedApp/RemoteControl.swift`) : `argv` est la

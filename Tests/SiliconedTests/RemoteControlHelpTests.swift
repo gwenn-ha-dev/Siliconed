@@ -71,3 +71,28 @@ final class RemoteControlHelpTests: XCTestCase {
         }
     }
 }
+
+/// **What `silicontrol` can do that the Prompt Lab and the Settings window do** is documented, in both languages: the commands in the
+/// overview, a page for each new one, and every new refusal code in `help errors`.
+final class RemoteControlWriterHelpTests: XCTestCase {
+    func testTheLabAndTheSwitchesAreDocumented() {
+        for pages in [RemoteControlHelp.english, RemoteControlHelp.french] {
+            for line in ["install writer", "rewrite \"<", "describe <image|i7>", "set neural-engine on|off", "set beta [OPTION on|off]"] {
+                XCTAssertTrue(pages.overview.contains(line), line)
+            }
+            XCTAssertNotNil(RemoteControlHelp.answer(["rewrite", "--help"], pages)?["help"] as? String)
+            XCTAssertNotNil(RemoteControlHelp.answer(["describe", "-h"], pages)?["help"] as? String)
+            let errors = pages.pages["errors"] ?? ""
+            for code in ["remote", "writer_absent", "writer_head", "writer_memory", "writer_preparing", "writer_busy",
+                         "writer_failed", "prompt_too_long", "license_not_accepted"] {
+                XCTAssertTrue(errors.contains(code), code)
+            }
+            for option in ["more-solvers", "faster-rendering", "size-scales", "negative-lora"] {
+                XCTAssertTrue(pages.pages["set"]?.contains(option) == true, option)
+            }
+            XCTAssertTrue(pages.pages["install"]?.contains("install writer") == true)
+            XCTAssertTrue(pages.pages["status"]?.contains("\"writer\"") == true)
+            XCTAssertTrue(pages.pages["contract"]?.contains("loading, text") == true)
+        }
+    }
+}

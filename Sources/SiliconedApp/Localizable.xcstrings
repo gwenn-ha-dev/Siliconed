@@ -7317,6 +7317,46 @@
         }
       }
     },
+    "Another Rewrite or Describe is under way." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ein anderes Umschreiben oder Beschreiben läuft bereits."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ya hay otro Reescribir o Describir en curso."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un autre Réécrire ou Décrire est déjà en cours."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un altro Riscrivi o Descrivi è già in corso."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "別の「書き直す」または「説明する」が実行中です。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "另一个“改写”或“描述”正在进行。"
+          }
+        }
+      }
+    },
     "Another image the prompt can draw from (“the dog of image 2”)." : {
       "localizations" : {
         "de" : {
@@ -7913,6 +7953,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "测试版"
+          }
+        }
+      }
+    },
+    "Beta options: %@" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Beta-Optionen: %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "opciones Beta: %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "options Bêta : %@"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "opzioni Beta: %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ベータ版オプション：%@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "测试版选项：%@"
           }
         }
       }
@@ -37229,6 +37309,86 @@
         }
       }
     },
+    "The writer wrote nothing." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das Textmodell hat nichts geschrieben."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El redactor no ha escrito nada."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le rédacteur n’a rien écrit."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il redattore non ha scritto nulla."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ライターは何も書きませんでした。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "写作器没有写出任何内容。"
+          }
+        }
+      }
+    },
+    "The writer’s head comes with Qwen-Image-2.1, whose license is not accepted yet." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Der Kopf des Textmodells gehört zu Qwen-Image-2.1, dessen Lizenz noch nicht akzeptiert ist."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La cabeza del redactor viene con Qwen-Image-2.1, cuya licencia aún no se ha aceptado."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La tête du rédacteur vient avec Qwen-Image-2.1, dont la licence n’est pas encore acceptée."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La testa del redattore viene con Qwen-Image-2.1, la cui licenza non è ancora stata accettata."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ライターのヘッドは Qwen-Image-2.1 に付属しており、そのライセンスがまだ承諾されていません。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "写作器的头部随 Qwen-Image-2.1 提供，而其许可尚未接受。"
+          }
+        }
+      }
+    },
     "Their face, hair and build — not the clothes or the background." : {
       "localizations" : {
         "de" : {
@@ -43237,6 +43397,46 @@
         }
       }
     },
+    "empty text" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "leerer Text"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "texto vacío"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "texte vide"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "testo vuoto"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "テキストが空"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "文本为空"
+          }
+        }
+      }
+    },
     "enlarged ×%@" : {
       "localizations" : {
         "de" : {
@@ -47135,6 +47335,46 @@
         }
       }
     },
+    "the writer is being installed: silicontrol status says when it is done" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das Textmodell wird installiert: silicontrol status zeigt, wann es fertig ist"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "el redactor se está instalando: silicontrol status dice cuándo termina"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "le rédacteur s’installe : silicontrol status dit quand c’est fini"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "il redattore è in installazione: silicontrol status dice quando ha finito"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ライターをインストール中：完了したかは silicontrol status でわかります"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在安装写作器：silicontrol status 会告知何时完成"
+          }
+        }
+      }
+    },
     "this Mac" : {
       "localizations" : {
         "de" : {
@@ -47531,6 +47771,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "请在“设置”（⌘,）中开启“更多求解器”"
+          }
+        }
+      }
+    },
+    "unknown Beta option: \"%@\"" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "unbekannte Beta-Option: \"%@\""
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "opción Beta desconocida: \"%@\""
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "option Bêta inconnue : \"%@\""
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "opzione Beta sconosciuta: \"%@\""
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "不明なベータ版オプション：\"%@\""
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未知的测试版选项：“%@”"
           }
         }
       }

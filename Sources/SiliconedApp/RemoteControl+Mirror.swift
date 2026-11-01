@@ -6,8 +6,10 @@
 //   answer comes before the verdict, so a refusal is the command's own. An edit with no format typed
 //   leaves its size to the other Mac (image 1's, by its denoiser's rule).
 // - `wait` and `follow` read the signals the mirror gives from what the other Mac publishes.
-// - What acts on this Mac — `install` — refuses; `diagnose` and `set faster-rendering` act on the other Mac's
-//   (`MirrorMachine.swift`, `diagnose` in `RemoteControl+Commands.swift`); the window says where it computes.
+// - What acts on this Mac — `install`, `install writer`, `rewrite` and `describe` (the writer is this Mac's, as the Prompt Lab
+//   says) — refuses; `diagnose` and `set faster-rendering|neural-engine` act on the other Mac's
+//   (`MirrorMachine.swift`, `diagnose` in `RemoteControl+Commands.swift`); `set beta` writes this Mac's preferences and the
+//   mirror's copy of them; the window says where it computes.
 // - `grid` (and `add` of a series with `--sketch`, `--x`, `--y`) is asked whole of the other Mac, which
 //   makes the cells (`MirrorLink.explore`) and answers with them (`gridQueued`); `wait g2` follows it
 //   from what it publishes. `vary` is the window's « Variations » (the same jobs, each answered by the
@@ -43,6 +45,11 @@ extension RemoteControl {
                                     "formats": f.formats.map { "\($0.width)x\($0.height)" },
                                     "commercial_license": f.license.commercial, "license": f.license.text,
                                     "default": f.id == "z-image", "ready": app.readySet.contains(f.id)]
+            // The choices the window's switches hold for this model, the borrower's (they ride on each job): `set` writes them.
+            if app.readySet.contains(f.id) {
+                if app.neuralEngineOffered { o["neural_engine"] = app.neuralEngine(for: f.id) }
+                o["faster_rendering"] = app.fasterRendering(for: f.id)
+            }
             if let t = catalog?.traits[f.id] {
                 o["edit"] = t.maxReferences > 0
                 o["max_references"] = t.maxReferences

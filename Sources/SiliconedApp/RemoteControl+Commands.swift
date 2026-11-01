@@ -256,34 +256,76 @@ extension RemoteControl {
 
     // ── set ──
 
-    /// **`set faster-rendering on|off [--model ID]`: one model's Settings switch, from the terminal** —
-    /// `AppState.setFasterRendering(_:for:)`, so the choice is written and the window's switch follows, exactly as a click. The
-    /// choice is per model (per installed version, like the Neural Engine's), so the model is named; without `--model`, the
-    /// model in the rack. Only with the queue empty, so that a series is not started under one recipe and finished under the
-    /// other (a job keeps the value it was queued with: `RenderSettings.fasterRendering`). Setting the value it already has
-    /// is not a change.
+    /// **`set faster-rendering|neural-engine on|off [--model ID]` and `set beta [OPTION on|off]`: Settings' switches, from the
+    /// terminal.** Each goes through the function its switch calls — `AppState.setFasterRendering(_:for:)`, `setNeuralEngine(_:for:)`,
+    /// the Beta properties — so the choice is written and the window follows, exactly as a click. A model's choice is per
+    /// installed version; without `--model`, the model in the rack. Only with the queue empty, so that a series is not started
+    /// under one recipe and finished under the other (a job keeps the value it was queued with:
+    /// `RenderSettings.fasterRendering`). Setting the value it already has is not a change. The Beta options are the window's
+    /// switches, which have no such wait, and nor do these.
     func set(_ arguments: [String]) throws -> [String: Any] {
-        let usage = Refusal("usage", "set faster-rendering on|off [--model ID]")
-        guard arguments.count == 2 || (arguments.count == 4 && arguments[2] == "--model"),
-              arguments[0] == "faster-rendering", ["on", "off"].contains(arguments[1]) else { throw usage }
-        let id = arguments.count == 4 ? arguments[3] : app.identifier
-        guard let card = app.cards.first(where: { $0.id == id }) else {
-            let visible = visibleCards(app.library).map(\.id).joined(separator: ", ")
-            throw Refusal("model", String(localized: "unknown model: \"\(id)\""), help: String(localized: "models: \(visible)"))
+        let order: SetOrder
+        switch SetOrder.parse(arguments) {
+        case .success(let parsed): order = parsed
+        case .failure(.usage(let line)): throw Refusal("usage", line, help: "silicontrol help set")
+        case .failure(.unknownBeta(let name)):
+            throw Refusal("usage", String(localized: "unknown Beta option: \"\(name)\""),
+                          help: String(localized: "Beta options: \(BetaOption.names)"))
         }
-        guard !app.busy, app.forgeInProgress == nil, !app.diagnosticRunning, app.awaitingLicense.isEmpty else {
-            throw Refusal("busy", String(localized: "a render, an installation or the diagnostic is running"),
-                          help: "silicontrol wait, then retry")
+        switch order {
+        case .betaList: return ["ok": true, "beta": betaState()]
+        case .beta(let option, let on): return setBeta(option, on)
+        case .perModel(let kind, let on, let model):
+            let id = model ?? app.identifier
+            guard let card = app.cards.first(where: { $0.id == id }) else {
+                let visible = visibleCards(app.library).map(\.id).joined(separator: ", ")
+                throw Refusal("model", String(localized: "unknown model: \"\(id)\""), help: String(localized: "models: \(visible)"))
+            }
+            guard !app.busy, app.forgeInProgress == nil, !app.diagnosticRunning, app.awaitingLicense.isEmpty else {
+                throw Refusal("busy", String(localized: "a render, an installation or the diagnostic is running"),
+                              help: "silicontrol wait, then retry")
+            }
+            switch kind {
+            case .fasterRendering:
+                // A Beta option, like --solver's More Solvers: turning it on is refused while the option is off (off stays possible:
+                // it is what a render takes anyway, and `measure` puts a value back through here).
+                if on, !app.fasterRenderingBeta {
+                    throw Refusal("faster_rendering", String(localized: "Faster Rendering is offered only when its Beta option is on"),
+                                  help: String(localized: "turn on Faster Rendering in Settings (⌘,), under Advanced › Beta"))
+                }
+                let previous = app.fasterRendering(for: card.id)
+                app.setFasterRendering(on, for: card.id)
+                return ["ok": true, "model": card.id, "faster_rendering": app.fasterRendering(for: card.id), "previous": previous]
+            case .neuralEngine:
+                // The switch is greyed where this Mac's measure gives the Neural Engine no row (`DiTSwitches`): nothing to choose, either way.
+                if DiTSwitches.neuralEngineUnavailable(offered: app.neuralEngineOffered) != nil {
+                    throw Refusal("neural_engine", String(localized: "This Mac’s measure gives the Neural Engine nothing to do: the DiT is computed in fp32."),
+                                  help: "silicontrol diagnose")
+                }
+                let previous = app.neuralEngine(for: card.id)
+                app.setNeuralEngine(on, for: card.id)
+                return ["ok": true, "model": card.id, "neural_engine": app.neuralEngine(for: card.id), "previous": previous]
+            }
         }
-        // A Beta option, like --solver's More Solvers: turning it on is refused while the option is off (off stays possible:
-        // it is what a render takes anyway, and `measure` puts a value back through here).
-        if arguments[1] == "on", !app.fasterRenderingBeta {
-            throw Refusal("faster_rendering", String(localized: "Faster Rendering is offered only when its Beta option is on"),
-                          help: String(localized: "turn on Faster Rendering in Settings (⌘,), under Advanced › Beta"))
-        }
-        let previous = app.fasterRendering(for: card.id)
-        app.setFasterRendering(arguments[1] == "on", for: card.id)
-        return ["ok": true, "model": card.id, "faster_rendering": app.fasterRendering(for: card.id), "previous": previous]
+    }
+
+    /// The four Beta options as the window's switches hold them (this Mac's preferences, shown by Settings whichever Mac computes).
+    func betaState() -> [String: Any] {
+        var o: [String: Any] = [:]
+        // JSON keys are snake_case; the name typed after `set beta` keeps its hyphens.
+        for option in BetaOption.allCases { o[option.key] = local.beta(option) }
+        return o
+    }
+
+    /// **`set beta OPTION on|off`**: the property the switch is bound to, on this Mac's state — and on the one the window shows,
+    /// when it computes elsewhere, whose copy of the preference would otherwise stay as it was at the switch (the rack there
+    /// reads it). Each option's own effect is its property's (`AppState.developerMode`'s `didSet` takes a solver the models no
+    /// longer offer out of the form; `negativeLoRAStrengths`' brings the strengths back to 0).
+    func setBeta(_ option: BetaOption, _ on: Bool) -> [String: Any] {
+        let previous = local.beta(option)
+        local.setBeta(option, on)
+        if app !== local { app.setBeta(option, on) }
+        return ["ok": true, "option": option.rawValue, "enabled": local.beta(option), "previous": previous, "beta": betaState()]
     }
 
     // ── history, save ──

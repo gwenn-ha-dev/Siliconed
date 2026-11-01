@@ -75,13 +75,13 @@ final class EngineLabWriter: LabWriter, @unchecked Sendable {
                         switch event {
                         case .loading(let fraction): continuation.yield(.loading(fraction))
                         case .text(let text): continuation.yield(.text(text))
-                        case .finished(let text, _): continuation.yield(.finished(text))
+                        case .finished(let text, let tokens): continuation.yield(.finished(text, tokens: tokens))
                         case .cancelled: continuation.yield(.cancelled)
                         }
                     }
                     continuation.finish()
                 } catch {
-                    continuation.finish(throwing: Failure(Self.sentence(error)))
+                    continuation.finish(throwing: Self.failure(error))
                 }
             }
             continuation.onTermination = { [self] _ in
@@ -96,24 +96,20 @@ final class EngineLabWriter: LabWriter, @unchecked Sendable {
         await held?.release()
     }
 
-    /// One sentence, in the user's language, for what can go wrong.
-    private struct Failure: LocalizedError {
-        let errorDescription: String?
-        init(_ sentence: String) { errorDescription = sentence }
-    }
-
-    private static func sentence(_ error: Error) -> String {
+    /// One sentence, in the user's language, for what can go wrong — and the stable code a command says it by.
+    private static func failure(_ error: Error) -> LabWriterFailure {
         switch error {
         case PromptWriter.Failure.notInstalled:
-            return String(localized: "No writer is installed yet. Install a model to have one.")
+            return LabWriterFailure(String(localized: "No writer is installed yet. Install a model to have one."), code: "writer_absent")
         case PromptWriter.Failure.unavailable(.needsMac(let n, _)):
-            return String(localized: "The writer needs a Mac with \(n) GB of memory.")
+            return LabWriterFailure(String(localized: "The writer needs a Mac with \(n) GB of memory."), code: "writer_memory")
         case let PromptWriter.Failure.promptTooLong(tokens, limit):
-            return String(localized: "This text is too long for the writer: \(tokens) tokens, at most \(limit).")
+            return LabWriterFailure(String(localized: "This text is too long for the writer: \(tokens) tokens, at most \(limit)."), code: "prompt_too_long")
         case EngineError.imageUnreadable:
-            return String(localized: "This image could not be read.")
+            return LabWriterFailure(String(localized: "This image could not be read."), code: "ref")
         default:
-            return Problem(error).title
+            let problem = Problem(error)
+            return LabWriterFailure(problem.title, code: problem.code)
         }
     }
 }

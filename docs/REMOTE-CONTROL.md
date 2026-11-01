@@ -14,7 +14,7 @@ reads the history: the same functions as the buttons (`AppState.enqueue`, `cance
 `stopAll`). What the command adds shows up in the window; what the mouse starts, the command sees.
 There are never two engines inside the 16 GB. When the window computes on another Mac (Render › Compute On),
 the commands follow it: they still talk only to this Mac's socket, but act on the other Mac's queue and history,
-as the buttons do; `install` refuses there, `diagnose` and `set faster-rendering` act on the other Mac.
+as the buttons do; `install` (and `install writer`, `rewrite`, `describe`: the writer is this Mac's) refuses there, `diagnose` and `set faster-rendering|neural-engine` act on the other Mac.
 
 **A license is accepted only in the window.** A job whose model's license the library does not
 record is refused by the engine (`license_not_accepted`) and set aside, out of the queue, while the
@@ -82,6 +82,12 @@ switch does; `silicontrol measure --faster-rendering on|off` sets it for the mea
 in the TSV and gives the value from before back at the end, even when the series fails. Off is full
 size: the image checked against the reference.
 
+**Nothing depends on a click, except pairing.** What the window does, a command does too, **by the same functions as the buttons** (`AppState`, the Prompt Lab's `LabModel`), never by a road of its own. What stays in the window on purpose: pairing a Mac, accepting a license, “Lend This Mac” and “Forget”. Part 1 of that rule is below; the history, the exploration, the imports, the removals, Compute On and the library are still to come.
+
+**The Prompt Lab's writer is the window's.** `silicontrol rewrite "<text>" [--for ID]` and `silicontrol describe <image|i7> [--for ID]` call what the Lab's two buttons call: `EngineLabWriter` over `PromptWriter`, our instructions per model and gesture (`PromptWriterInstructions`), the image read as the Lab reads a dropped one (`PromptWriterImage`), and for a model that reads images the `@names` put aside and put back (`LabInputs.MentionGuard`, shared as `LabModel.rewriteInput` and `rewritten`). The model it writes for is the one the Lab would take (`WriterTarget.pick`: the Lab's choice, else the rack's, else the first installed) unless `--for` names one. The refusals are the Lab's, in its order (`WriterPause.decide`, one rule for the sentence under its buttons and for the code): the window follows another Mac (`remote`), an image renders (`busy`), no writer, the head to download, a Mac too small (`writer_absent`, `writer_head`, `writer_memory`, `writer_preparing`); and a second gesture while one writes (`writer_busy`), from the terminal or from the window. The lines are `{"type": "started"}`, `{"type": "loading", "fraction"}` and `{"type": "text", "text"}`, which carries everything written so far (cumulative, as the Lab's stream is: the detokenizer may revise its last word); the verdict has the whole `text`, the `tokens`, and the `notice` and `lost_mentions` when the writer lost an `@name`. **A render that starts stops the gesture** (`stopped`), as it stops the Lab's. **A client that hangs up cancels it**: `Connection.isGone` sees the close without writing to the socket, and `LabModel.cancelRemote` ends the stream, whose termination stops the sampling (`EngineLabWriter.write`, `PromptWriter.cancel`) before the weights go back. Incognito: the text goes out on the socket and nowhere else. `silicontrol install writer` is “Install the Writer” (`LabModel.installHead`): the head of Qwen-Image-2.1's encoder, with no license of its own (it is the one the encoder's installation had accepted: `Installer.installWriterHead` checks it, and the command says so before it starts). All three act on this Mac: with the window on another one they are refused (`remote`).
+
+**The Neural Engine and the Beta options are Settings' switches too.** `set neural-engine on|off [--model ID]` goes through `AppState.setNeuralEngine(_:for:)`, as `set faster-rendering` does through its own, with the same wait (`busy`) and the same keys per installed version; it is refused (`neural_engine`) where this Mac's measure gives the Neural Engine no row, which is when the switch is greyed (`DiTSwitches.neuralEngineUnavailable`). `models` and `status` report it. `set beta [OPTION on|off]` writes the property each of Settings › Advanced › Beta's four switches is bound to (`developerMode` for More Solvers, `fasterRenderingBeta`, `sizeScalesBeta`, `negativeLoRAStrengths`), so their `didSet` do what a click does; `status` gives them as `"beta"`. They are this Mac's preferences, and the copy of the mirror the window shows is set with them. The arguments of `rewrite`, `describe` and `set` are read in the library (`WriterOrder`, `SetOrder`, `BetaOption`), where the tests read them.
+
 ## The command
 
 `silicontrol` ships inside the app, at `Siliconed.app/Contents/Helpers/silicontrol` (target `Silicontrol`,
@@ -102,7 +108,7 @@ command itself, without launching the app.
 - **One connection per command.** The client writes one JSON line,
   `{"argv": ["add", "--batch", "2", "…"], "cwd": "/current/folder"}`, and the app answers with JSON
   lines, then closes. Intermediate lines carry `"type"` (`added`, `image`, `sheet`, `start`, `stage`,
-  `step`, `end`); the last one carries `"ok"` (`true` or `false`, with `"error"`, `"message"` and
+  `step`, `end`; `started`, `loading`, `text` for `rewrite` and `describe`); the last one carries `"ok"` (`true` or `false`, with `"error"`, `"message"` and
   often `"hint"` on failure). Without the client:
   `printf '{"argv":["status"]}\n' | nc -U ~/Library/Application\ Support/Siliconed/silicontrol.sock`.
 - **All parsing is in the app** (`Sources/SiliconedApp/RemoteControl.swift`): `argv` is the command

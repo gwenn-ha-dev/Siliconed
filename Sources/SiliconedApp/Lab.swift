@@ -94,7 +94,12 @@ final class LabModel {
     @ObservationIgnored private var generation = 0
     @ObservationIgnored private var watching = false
 
-    var isWriting: Bool { phase != .idle }
+    /// A gesture of the window, or one `silicontrol` asked: there is one writer, and it writes one text at a time.
+    var isWriting: Bool { phase != .idle || remote != nil }
+
+    /// **The gesture a command asked** (`LabRemote.swift`), if one is under way: it holds the writer like the window's does, and
+    /// a render starting stops it (`stop` is what says so to the command).
+    @ObservationIgnored var remote: (task: Task<Void, Never>, stop: @MainActor () -> Void)?
 
     func refresh() {
         (writer as? EngineLabWriter)?.library = MainWindow.shared.local.library
@@ -117,22 +122,21 @@ final class LabModel {
         return Family.allCases.filter(ready.contains)
     }
 
-    var target: Family? {
-        if let c = chosenTarget, families.contains(c) { return c }
-        if let f = rack.card?.family, families.contains(f) { return f }
-        return families.first
-    }
+    var target: Family? { WriterTarget.pick(chosen: chosenTarget, rack: rack.card?.family, installed: families) }
 
     /// The installed card the rack takes to render for `family`: its own when it is of that family.
-    private func card(for family: Family) -> ModelCard? {
+    func card(for family: Family) -> ModelCard? {
         if let current = rack.card, current.family == family { return current }
         return rack.cards.first { $0.family == family && rack.readySet.contains($0.id) }
     }
 
     /// **How many images the model aimed at reads** (0: none) — from its denoiser here, from the traits the other Mac
     /// published in a mirror.
-    var capacity: Int {
-        guard let family = target else { return 0 }
+    var capacity: Int { capacity(for: target) }
+
+    /// The same, for the model a gesture writes for (`silicontrol rewrite --for`).
+    func capacity(for family: Family?) -> Int {
+        guard let family else { return 0 }
         if following { return rack.promptNamesImages ? rack.maxReferences : 0 }
         guard let card = card(for: family), let model = rack.model(card.id) else { return 0 }
         return model.chain.text.output.readsImages ? model.chain.denoising.maxReferences : 0
@@ -168,7 +172,8 @@ final class LabModel {
         rendering = busy
         if busy {
             // The memory goes back even when nothing was being written: the writer may still be loaded.
-            if isWriting { stop(becauseOfRender: true) }
+            if phase != .idle { stop(becauseOfRender: true) }
+            remote?.stop()
             Task { await writer.release() }
         } else {
             refresh()
@@ -215,20 +220,32 @@ final class LabModel {
 
     /// **Why Rewrite and Describe wait**, in one sentence; `nil` when they can run. They are the only gestures that need the
     /// language model: everything else in the lab works without it, during a render too.
-    var writerPause: (symbol: String, sentence: String)? {
-        if following { return ("macbook", String(localized: "Rewrite and Describe are off while the window follows another Mac.")) }
-        if rendering { return ("pause.circle", String(localized: "Rewrite and Describe wait while an image renders.")) }
-        if case .unavailable(let why) = availability {
-            switch why {
-            case .notInstalled: return ("shippingbox", String(localized: "No writer is installed yet. Install a model to have one."))
-            case .needsMemory(let n): return ("memorychip", String(localized: "The writer needs a Mac with \(n) GB of memory."))
-            case .preparing: return ("hourglass", String(localized: "The writer is being prepared."))
-            case .needsHead(let bytes):
-                return ("arrow.down.circle", String(localized: "The writer needs one more download from Qwen-Image-2.1’s repository: \(Figures.disk(Int(bytes))).")) 
-            }
+    var writerPause: (symbol: String, sentence: String)? { pause(rendering: rendering).map(Self.presentation) }
+
+    /// The decision (`WriterPause.decide`), for the window and for `silicontrol rewrite` and `describe`: the render is passed in
+    /// because the command reads the queue itself, not the copy this model keeps up to date for the window.
+    func pause(rendering: Bool) -> WriterPause? {
+        let installed: WriterPause?
+        switch availability {
+        case .ready: installed = nil
+        case .unavailable(.notInstalled): installed = .notInstalled
+        case .unavailable(.needsMemory(let n)): installed = .needsMemory(gigabytes: n)
+        case .unavailable(.preparing): installed = .preparing
+        case .unavailable(.needsHead(let bytes)): installed = .needsHead(bytes: bytes)
         }
-        if target == nil { return ("shippingbox", String(localized: "No writer is installed yet. Install a model to have one.")) }
-        return nil
+        return WriterPause.decide(following: following, rendering: rendering, installed: installed, hasTarget: target != nil)
+    }
+
+    static func presentation(_ pause: WriterPause) -> (symbol: String, sentence: String) {
+        switch pause {
+        case .following: ("macbook", String(localized: "Rewrite and Describe are off while the window follows another Mac."))
+        case .rendering: ("pause.circle", String(localized: "Rewrite and Describe wait while an image renders."))
+        case .notInstalled: ("shippingbox", String(localized: "No writer is installed yet. Install a model to have one."))
+        case .needsMemory(let n): ("memorychip", String(localized: "The writer needs a Mac with \(n) GB of memory."))
+        case .preparing: ("hourglass", String(localized: "The writer is being prepared."))
+        case .needsHead(let bytes):
+            ("arrow.down.circle", String(localized: "The writer needs one more download from Qwen-Image-2.1’s repository: \(Figures.disk(Int(bytes))).")) 
+        }
     }
 
     var canRewrite: Bool {
@@ -244,21 +261,29 @@ final class LabModel {
     func rewrite() {
         guard canRewrite, let target else { return }
         let typed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        // `@` is a subject's only for a model that reads images; elsewhere it is the model's own (Anima's artists).
-        let guarded = capacity > 0 ? LabInputs.MentionGuard(typed) : nil
-        let input = LabInput.text(guarded?.masked ?? typed)
+        let (input, guarded) = Self.rewriteInput(typed, capacity: capacity)
         begin(input, for: target, gesture: .rewrite, picture: nil, progress: { [self] written in
             changes = Changes(before: typed, after: guarded?.restore(written).text ?? written)
         }) { [self] written in
-            var final = written
-            if let guarded {
-                let back = guarded.restore(written)
-                final = back.text
-                if !back.intact { notice = Self.mentionNotice(lost: back.lost) }
-            }
-            place(Self.splice(final, into: text, at: nil))
+            let back = Self.rewritten(written, guarded: guarded)
+            notice = back.notice
+            place(Self.splice(back.text, into: text, at: nil))
             changes = Changes(before: typed, after: text)
         }
+    }
+
+    /// **What a rewrite sends the writer** — the lab's and `silicontrol rewrite`'s alike. `@` is a subject's only for a model that
+    /// reads images (`capacity` > 0); elsewhere it is the model's own (Anima's artists), and the text goes as it is.
+    static func rewriteInput(_ typed: String, capacity: Int) -> (input: LabInput, guarded: LabInputs.MentionGuard?) {
+        let guarded = capacity > 0 ? LabInputs.MentionGuard(typed) : nil
+        return (.text(guarded?.masked ?? typed), guarded)
+    }
+
+    /// **What a rewrite gives back**: the mentions put back, and the sentence that says which one the writer lost or deformed.
+    static func rewritten(_ written: String, guarded: LabInputs.MentionGuard?) -> (text: String, lost: [String], notice: String?) {
+        guard let guarded else { return (written, [], nil) }
+        let back = guarded.restore(written)
+        return (back.text, back.lost, back.intact ? nil : mentionNotice(lost: back.lost))
     }
 
     /// **Describe**: an image of the zone, or a subject's first picture.
@@ -299,7 +324,7 @@ final class LabModel {
                     switch event {
                     case .loading(let f): phase = .loading(f)
                     case .text(let t): phase = .writing; last = t; progress(t)
-                    case .finished(let t): last = t; end(last, finished)
+                    case .finished(let t, _): last = t; end(last, finished)
                     case .cancelled: self.stop(becauseOfRender: false); return
                     }
                 }
@@ -380,7 +405,9 @@ final class LabModel {
 
     /// The window closes: nothing keeps writing, nothing keeps the memory.
     func windowClosed() {
-        if isWriting { stop() }
+        if phase != .idle { stop() }
+        // A command's gesture is not the window's: closing the window does not take its writer away.
+        guard remote == nil else { return }
         Task { await writer.release() }
     }
 
