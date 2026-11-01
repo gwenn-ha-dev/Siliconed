@@ -5339,42 +5339,42 @@
         }
       }
     },
-    "A negative LoRA strength comes back as 0: turn on Experimental → Negative LoRA Strengths." : {
+    "A negative LoRA strength comes back as 0: turn on Beta → Negative LoRA Strengths." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Eine negative LoRA-Stärke wird zu 0: Experimentell → Negative LoRA-Stärken einschalten."
+            "value" : "Eine negative LoRA-Stärke wird zu 0: Beta → Negative LoRA-Stärken einschalten."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Una intensidad de LoRA negativa vuelve a 0: activa Experimental → Intensidades de LoRA negativas."
+            "value" : "Una intensidad de LoRA negativa vuelve a 0: activa Beta → Intensidades de LoRA negativas."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Une force de LoRA négative revient à 0 : cochez Expérimental → Forces de LoRA négatives."
+            "value" : "Une force de LoRA négative revient à 0 : cochez Bêta → Forces de LoRA négatives."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Un’intensità di LoRA negativa torna a 0: attiva Sperimentale → Intensità LoRA negative."
+            "value" : "Un’intensità di LoRA negativa torna a 0: attiva Beta → Intensità LoRA negative."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "負のLoRA強度は0に戻ります：「実験的」→「負のLoRA強度」をオンにしてください。"
+            "value" : "負のLoRA強度は0に戻ります：「ベータ」→「負のLoRA強度」をオンにしてください。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "负的 LoRA 强度会变回 0：请打开“实验性”→“负 LoRA 强度”。"
+            "value" : "负的 LoRA 强度会变回 0：请打开“测试版”→“负 LoRA 强度”。"
           }
         }
       }
@@ -30312,42 +30312,42 @@
         }
       }
     },
-    "Steps are whole numbers from 1, a grid needs at least one seed, and a negative LoRA strength needs Experimental → Negative LoRA Strengths." : {
+    "Steps are whole numbers from 1, a grid needs at least one seed, and a negative LoRA strength needs Beta → Negative LoRA Strengths." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Schritte sind ganze Zahlen ab 1, ein Raster braucht mindestens einen Seed, und eine negative LoRA-Stärke braucht Experimentell → Negative LoRA-Stärken."
+            "value" : "Schritte sind ganze Zahlen ab 1, ein Raster braucht mindestens einen Seed, und eine negative LoRA-Stärke braucht Beta → Negative LoRA-Stärken."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Los pasos son números enteros a partir de 1, una cuadrícula necesita al menos una semilla, y una intensidad de LoRA negativa necesita Experimental → Intensidades de LoRA negativas."
+            "value" : "Los pasos son números enteros a partir de 1, una cuadrícula necesita al menos una semilla, y una intensidad de LoRA negativa necesita Beta → Intensidades de LoRA negativas."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Les pas sont des nombres entiers à partir de 1, une grille demande au moins une graine, et une force de LoRA négative demande Expérimental → Forces de LoRA négatives."
+            "value" : "Les pas sont des nombres entiers à partir de 1, une grille demande au moins une graine, et une force de LoRA négative demande Bêta → Forces de LoRA négatives."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "I passi sono numeri interi a partire da 1, una griglia richiede almeno un seme, e un’intensità di LoRA negativa richiede Sperimentale → Intensità LoRA negative."
+            "value" : "I passi sono numeri interi a partire da 1, una griglia richiede almeno un seme, e un’intensità di LoRA negativa richiede Beta → Intensità LoRA negative."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ステップは1以上の整数です。グリッドには少なくとも1つのシードが必要で、負のLoRA強度には「実験的」→「負のLoRA強度」が必要です。"
+            "value" : "ステップは1以上の整数です。グリッドには少なくとも1つのシードが必要で、負のLoRA強度には「ベータ」→「負のLoRA強度」が必要です。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "步数为从 1 起的整数，网格至少需要一个种子，负的 LoRA 强度需要“实验性”→“负 LoRA 强度”。"
+            "value" : "步数为从 1 起的整数，网格至少需要一个种子，负的 LoRA 强度需要“测试版”→“负 LoRA 强度”。"
           }
         }
       }
@@ -46643,42 +46643,42 @@
         }
       }
     },
-    "turn on Experimental → Negative LoRA Strengths in Settings (⌘,)" : {
+    "turn on Beta → Negative LoRA Strengths in Settings (⌘,)" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Experimentell → Negative LoRA-Stärken in den Einstellungen (⌘,) einschalten"
+            "value" : "Beta → Negative LoRA-Stärken in den Einstellungen (⌘,) einschalten"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "activa Experimental → Intensidades de LoRA negativas en Ajustes (⌘,)"
+            "value" : "activa Beta → Intensidades de LoRA negativas en Ajustes (⌘,)"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "cochez Expérimental → Forces de LoRA négatives dans les Réglages (⌘,)"
+            "value" : "cochez Bêta → Forces de LoRA négatives dans les Réglages (⌘,)"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "attiva Sperimentale → Intensità LoRA negative nelle Impostazioni (⌘,)"
+            "value" : "attiva Beta → Intensità LoRA negative nelle Impostazioni (⌘,)"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "「設定」（⌘,）で「実験的」→「負のLoRA強度」をオンにしてください"
+            "value" : "「設定」（⌘,）で「ベータ」→「負のLoRA強度」をオンにしてください"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "请在“设置”（⌘,）中开启“实验性”→“负 LoRA 强度”"
+            "value" : "请在“设置”（⌘,）中开启“测试版”→“负 LoRA 强度”"
           }
         }
       }

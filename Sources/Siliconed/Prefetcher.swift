@@ -224,7 +224,6 @@ package final class TailStream {
         lock.lock(); defer { lock.unlock() }
         if StreamPriority.forced == nil { priority = new }
     }
-    package var currentPriority: StreamClass { lock.lock(); defer { lock.unlock() }; return priority }
     private let reads = DispatchGroup()
     /// Measured: four lanes, slices of 64 MiB; a run under 4 MiB is one read.
     package static let lanes = 4, piece = 64 << 20, smallest = 4 << 20

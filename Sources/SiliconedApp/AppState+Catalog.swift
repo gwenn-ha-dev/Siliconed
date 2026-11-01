@@ -130,7 +130,7 @@ extension AppState {
     /// one does. The engine's own check (`ModelCard.checkMemory`), against B.
     func macNeeded(_ format: RecommendedFormat, images: Int) -> Int? {
         _ = settingsEpoch
-        guard settingsRead, let card else { return nil }
+        guard settingsRead, card != nil else { return nil }
         do { try checkNeed(format, images: images) }
         catch {
             guard case let .insufficientMemory(needed, _) = error else { return nil }
@@ -156,7 +156,7 @@ extension AppState {
 
     var memoryRefusal: MemoryRefusal? {
         _ = settingsEpoch
-        guard settingsRead, let card else { return nil }
+        guard settingsRead, card != nil else { return nil }
         let f = outputFormat
         let images = references.count
         do { try checkNeed(f, images: images) } catch {
@@ -178,7 +178,7 @@ extension AppState {
     func nextReferenceRefusal(adding: Int = 0) -> String? {
         let f = references.isEmpty ? RecommendedFormat(1024, 1024) : outputFormat
         let images = references.count + adding + 1
-        guard let card, macNeeded(f, images: images) != nil else { return nil }
+        guard card != nil, macNeeded(f, images: images) != nil else { return nil }
         return need(f, images: images).map(Self.needsMac)
     }
 

@@ -265,7 +265,7 @@ struct Problem: Equatable, Sendable {
             case .groupNotOnAxis:
                 return String(localized: "Make each group an axis, or write its braces as \\{ and \\}.")
             case .sameAxisTwice: return String(localized: "Choose another setting for one of the axes.")
-            case .invalidValue: return String(localized: "Steps are whole numbers from 1, a grid needs at least one seed, and a negative LoRA strength needs Experimental → Negative LoRA Strengths.")
+            case .invalidValue: return String(localized: "Steps are whole numbers from 1, a grid needs at least one seed, and a negative LoRA strength needs Beta → Negative LoRA Strengths.")
             case .unreadableAxis, .emptyAxis, .noSuchGroup, .noSuchLoRA:
                 return String(localized: "Give each axis its values: a group of the prompt, seeds, steps, a LoRA of the stack, models or the edit’s images.")
             case .loraAcrossModels: return String(localized: "Remove the LoRAs, or vary something other than the model.")

@@ -16,7 +16,7 @@
   Qwen-Image-2.1 et de MOSS-Image, une part des produits tourne sur lui en 8 bits, à côté du GPU. Sur
   un M1 Pro en 1024², toutes les évaluations en pleine taille, ces trois Compact prennent 24 à 37 % de
   temps de moins que leur Standard : Krea 2 140,9 s (213,3), Qwen-Image-2.1 85,8 s (135,6), MOSS-Image
-  85,0 s (111,7) ([Les chiffres](ENGINE.fr.md#les-chiffres)).
+  85,0 s (111,7) ([Les chiffres](https://github.com/gwenn-ha-dev/Siliconed/blob/v0.18/docs/ENGINE.fr.md#les-chiffres)).
 - **Une mesure donne toujours une carte** : plus rien n'est orange. La confiance qu'on peut avoir dans
   le chiffre de chaque moteur est écrite à côté (± quelques pour cent), et ce que la mesure a trouvé
   est dit avec son effet sur le plan. Une route qui a mal calculé, ou dont le chargement a arrêté le
@@ -30,17 +30,18 @@
   lent ne mesure plus moins que ce dont son plan a besoin, et un départ chargé ne mesure plus le même
   Mac de deux façons.
 
-### Mesurer ce Mac se lit simplement ; une mesure s’applique au rendu suivant
+### Mesurer ce Mac se lit simplement ; une mesure s’applique au rendu suivant
 
-- **La feuille titre chaque colonne** : la vitesse de chaque route, sa part du pic du GPU (les produits matriciels du GPU seulement, le pic dans le titre), « Exact » (✓), puis ce que chaque moteur garde de sa vitesse quand les moteurs travaillent ensemble. La route 8 bits du Neural Engine est listée avec les autres.
-- **Une mesure s’applique au rendu suivant**, plus au lancement suivant : jamais à un rendu en cours, si bien qu’un rendu lit toujours un seul plan, du début à la fin. À partir de là, une même graine peut donner une image un peu différente de celle d’avant la mesure.
-- **Le rack dit comment les poids sont stockés** : une étiquette sur le DiT, l’encodeur de texte et le VAE (`int8`, `Q8_0`, `Q4_K_M`, `bf16`…), lue sur ce qui est installé, à côté de celle qui dit ce qui calcule (« calcule en fp32 »). Un Mac prêté les publie aussi.
+- **La feuille titre chaque colonne** : la vitesse de chaque route, sa part du pic du GPU (les produits matriciels du GPU seulement, le pic dans le titre), « Exact » (✓), puis ce que chaque moteur garde de sa vitesse quand les moteurs travaillent ensemble. La route 8 bits du Neural Engine est listée avec les autres.
+- **Une mesure s’applique au rendu suivant**, plus au lancement suivant : jamais à un rendu en cours, si bien qu’un rendu lit toujours un seul plan, du début à la fin. À partir de là, une même graine peut donner une image un peu différente de celle d’avant la mesure.
+- **Le rack dit comment les poids sont stockés** : une étiquette sur le DiT, l’encodeur de texte et le VAE (`int8`, `Q8_0`, `Q4_K_M`, `bf16`…), lue sur ce qui est installé, à côté de celle qui dit ce qui calcule (« calcule en fp32 »). Un Mac prêté les publie aussi.
 
 ### Atelier de prompts : les entrées d’un rendu, préparées
 
-- **Une fenêtre à part, dans le menu Fenêtre (⌥⌘L)** : des images d’un côté, un texte de l’autre, et
-  dessous une ligne, « Le rack recevra », qui dit ce qui est porté. Porter dans le rack remplit les
-  boîtes du rack — son Prompt, où ⌘Z dans le champ ramène l’ancien, et ses Images, qui n’ont pas
+- **Une fenêtre à part, dans le menu Fenêtre (⌥⌘L)**, ou par la baguette à côté du Prompt du rack :
+  des images d’un côté, un texte de l’autre, et dessous une ligne, « Le rack recevra », qui dit ce qui
+  est porté. Porter dans le rack remplit les boîtes du rack — son Prompt, où ⌘Z dans le champ (ou
+  Édition › Annuler) ramène l’ancien, et ses Images, qui n’ont pas
   d’annulation et dont la ligne dit qu’elles sont remplacées. Rien ne s’applique seul.
 - **Chaque image a un rôle** : image de départ (l’image 1, celle que change une édition de
   Qwen-Image-2.1 ; elle donne le format), référence, ou décrire seulement. La première image déposée est
@@ -52,8 +53,9 @@
   n’en sait rien. Toujours en mémoire seulement ; `silicontrol subjects` et `add "@nom"` restent. Un
   `@nom` ne peut pas se trouver dans un groupe `{a|b}`. Le PNG du rendu garde le prompt que le modèle a
   lu, comme pour tout rendu du rack.
-- **Réécrire et Décrire se mêlent dans un seul texte** (bêta) : Réécrire travaille sur tout, ajouts et
-  retraits marqués ; Décrire écrit au curseur, ou remplit un texte vide ; ⌘Z annule l’un comme l’autre.
+- **Réécrire et Décrire se mêlent dans un seul texte** (bêta), écrit dans le champ au fil du rédacteur :
+  Réécrire travaille sur tout, ajouts et retraits marqués ; Décrire écrit au curseur, ou remplit un
+  texte vide ; ⌘Z annule l’un comme l’autre.
   Un `@nom` est mis de côté pendant que le rédacteur réécrit, puis remis ; un nom qu’il perd est
   signalé, jamais retiré en silence.
 - **Eux seuls attendent** : pendant un rendu, ou sans rédacteur installé, nommer, cadrer, les rôles et
@@ -63,14 +65,18 @@
   qui rend.
 - **Le rédacteur est un modèle déjà installé** : l’encodeur de texte de Qwen-Image-2.1, Qwen3-VL-8B, mis
   à écrire. Seule sa couche de sortie manque au modèle installé : Installer le rédacteur la télécharge
-  du même dépôt, 1,25 Go, par plages d’octets. Il faut Qwen-Image-2.1 installé ; en Compact, un Mac de
-  16 Go (la Standard en demande davantage).
+  du même dépôt, 1,25 Go, par plages d’octets. Il faut Qwen-Image-2.1 installé, et il lit ses couches
+  selon un plan choisi dans le budget de mémoire avant le premier mot : sur un Mac de 16 Go, toutes
+  celles de la Compact en mémoire ; sur un Mac de 8 Go, ou avec la Standard sur 16 Go, une partie depuis le
+  disque à chaque jeton, plus lentement.
 - **Nos consignes, une par modèle**, tirées de ce que chaque éditeur dit de ses prompts : chaque élément
   du prompt est gardé, le texte entre guillemets mot pour mot, rien n’est retiré, adouci ni moralisé.
 - **Jamais pendant un rendu** : une image qui démarre arrête le rédacteur, et Réécrire et Décrire attendent.
+- **Ses poids sont rendus après chaque geste**, si bien que la mémoire du Mac est libre entre deux :
+  sur un M1 Pro avec la Compact, le premier mot vient après environ 10 s pour Réécrire et 25 s pour
+  Décrire, qui lit d’abord l’image, puis environ 12 jetons par seconde, sur le GPU.
 - **Vérifié contre la référence** : le décodage glouton donne les mêmes jetons que transformers en fp32
-  (`siliconed check qwen-image-2.1 writer`). Environ 18 jetons par seconde sur un M1 Pro, sur le GPU,
-  depuis les poids gardés en mémoire.
+  (`siliconed check qwen-image-2.1 writer`).
 
 ### Menus et Réglages remis en ordre ; VoiceOver peut tout piloter
 
@@ -97,7 +103,7 @@
 
 ### Aussi
 
-- **Une seule roue par rendu**, dans la progression sous l’image ; le panneau de gauche garde sa
+- **Une seule roue par rendu**, dans la progression sous l’image ; le panneau de gauche garde sa
   largeur quand la taille passe au carré.
 - **Le Mac sur lequel on calcule, à côté de Chaîne** : son icône, comme dans « À propos de ce Mac »,
   grisée tant qu'il n'est pas mesuré ; celle de l'autre Mac quand on calcule dessus.
@@ -126,7 +132,7 @@
   un MacBook au salon calcule sur le Mac mini de la pièce d'à côté. La file, l'avancement, l'aperçu,
   l'historique, les modèles, la bibliothèque, les licences et la carte des capacités sont ceux de
   l'autre Mac ; le formulaire, la sélection, les exports et le presse-papiers restent sur le vôtre. Un
-  menu vous ramène. Jamais deux vues à la fois : un menu « Sur : » à côté de Chaîne dit où l'on
+  menu vous ramène. Jamais deux vues à la fois : un menu « Sur : » à côté de Chaîne dit où l'on
   calcule, et le rack porte un liseré bleu tant que la liaison tient.
 - **Appairage par un code à six chiffres** affiché sur les deux écrans et accepté sur le Mac prêteur ;
   puis TLS 1.2 avec une clé par Mac appairé (gardée au Trousseau), rien en clair sur le réseau. Le Mac
@@ -134,7 +140,7 @@
 - **Tout ce que vous faites ici marche là-bas** : rendus, éditions avec vos références, variations,
   grilles et explorations, agrandissement et recadrage, sujets nommés, annulation ; installer un modèle
   ou importer une LoRA sur le Mac prêteur (en retirer un attend un clic sur ce Mac) ; le mesurer.
-  Chaque Mac ne voit que ses propres travaux et images. `silicontrol` suit « Calculer sur ».
+  Chaque Mac ne voit que ses propres travaux et images. `silicontrol` suit « Calculer sur ».
 
 ### La carte des capacités, refaite
 
@@ -151,7 +157,7 @@
   le GPU seul. Avant, tout ce qui sortait des formats mesurés tournait sur le GPU seul.
 - **Le Mac le plus lent tient sa minute** : une route pas encore chronométrée sur une forme se juge
   sur ses temps aux autres, et chaque seconde de la carte va où elle tranche le plus. Sur un MacBook
-  Neo, la carte manquait de temps avant d'atteindre le Neural Engine ; elle le trouve désormais sur
+  Neo, la carte manquait de temps avant d'atteindre le Neural Engine ; elle le trouve désormais sur
   tous les produits qu'elle mesure, 1,7 à 2,7 fois plus vite que le GPU seul.
 - **Mesurée comme un rendu tourne** : chaque route est chronométrée contre la plus simple en
   alternance, si bien qu'un Mac qui chauffe ou tourne sur batterie compare à conditions égales ; les
@@ -180,7 +186,7 @@
   Krea 2, Z-Image, Qwen-Image-2.1 et Anima. Un DiT mono-flux de 5,1 milliards de paramètres qui lit
   le prompt avec Qwen3.5-9B, un modèle de langage hybride (trois couches sur quatre en attention
   linéaire, Gated DeltaNet, nouvelle dans le moteur), et décode avec le VAE de FLUX.2.
-- **MOSS-Image est en bêta**, et l'app le dit (un badge « Bêta » sur sa carte et dans Modèles) : sa
+- **MOSS-Image est en bêta**, et l'app le dit (un badge « Bêta » sur sa carte et dans Modèles) : sa
   recette en 8 pas est la LoRA de la communauté, pas celle de son éditeur. Il sort de bêta quand
   OpenMOSS publie sa propre version rapide.
 - **Sa recette est celle de la communauté** : son éditeur n'a pas publié de version rapide, alors
@@ -193,7 +199,7 @@
   entraînées sur MOSS-Image Base s'appliquent comme la communauté s'en sert. Le ΔW de chaque module
   importé est égal à celui que PyTorch calcule depuis le fichier publié.
 - **Temps** : sur un M1 Pro de 16 Go, graine 42, 8 évaluations, en file dans l'app : 1024² en 107,7 s
-  en Compact, 107,3 s en Standard ; 1024×1536 en 174,2 s dans les deux.
+  en Compact, 107,3 s en Standard ; 1024×1536 en 174,2 s dans les deux.
 - **Le rendu plus rapide n'y prend qu'une évaluation en demi-taille**, pas trois : dès la deuxième,
   MOSS-Image lisse la peau et adoucit le détail fin là où les autres modèles le gardent. 8 % de temps
   en moins à 1024² (116,9 s avec toutes les évaluations en pleine taille).
@@ -215,17 +221,17 @@
 
 ### Sur chaque Mac
 
-- **Le premier lancement après une mise à jour ne va plus moins vite** : quand le premier geste était
+- **Le premier lancement après une mise à jour ne va plus moins vite** : quand le premier geste était
   une exploration, une grille ou `silicontrol add`, la session ignorait la mesure de ce Mac et tournait
   sur les défauts — l'AMX éteint, environ 20 % par pas sur un M1 Pro. `silicontrol status` dit
   désormais la mesure qu'emploie la session.
-- **Une mesure prise hors repos se refait** : mesurés sur un Mac chaud, en mode économie d'énergie ou
+- **Une mesure prise hors repos se refait** : mesurés sur un Mac chaud, en mode économie d'énergie ou
   avec un swap qui monte (une autre app qui presse la mémoire), les choix servent quand même, la puce
   de la Chaîne reste orange, et le prochain lancement au repos mesure à nouveau avant son premier
   rendu — une fois.
-- **Une mise à jour qui ne touche pas le moteur garde la mesure de ce Mac** : la mesure suit les sources
-  du moteur et son compilateur, plus le build de l'app ; une mise à jour du moteur fait mesurer à nouveau.
-- **macOS 26 ou plus** : la seule version sur laquelle Siliconed a jamais été mesuré et contrôlé.
+- **Une mise à jour qui ne touche pas le moteur garde la mesure de ce Mac** : la mesure suit les sources
+  du moteur et son compilateur, plus le build de l'app ; une mise à jour du moteur fait mesurer à nouveau.
+- **macOS 26 ou plus** : la seule version sur laquelle Siliconed a jamais été mesuré et contrôlé.
   L'app ne s'installe plus sur macOS 15.
 
 ## 0.15
@@ -657,7 +663,7 @@ Les temps sont mesurés sur un MacBook Pro M1 Pro de 16 Go.
 
 - **Tous les pas en pleine taille.** Jusqu’ici, une génération 1024² faisait ses deux premiers pas
   en demi-taille, un raccourci à nous : il disparaît, l’image est les 8 pas publiés de la Turbo et rien
-  d’autre. Un 1024² prend 134 s dans l’app (142 s en ligne de commande) au lieu d’environ 120 s sur un M1 Pro 16 Go ;
+  d’autre. Un 1024² prend 134 s dans l’app (142 s en ligne de commande) au lieu d’environ 120 s sur un M1 Pro 16 Go ;
   1024×1536 232 s au lieu de 190 s. Les éditions ne changent pas : elles n’ont jamais pris de pas en demi-taille.
 - **Le calendrier de ComfyUI, pour comparer** (mode développeur) : un interrupteur « ComfyUI
   schedule » parcourt les niveaux de bruit que ComfyUI emploie pour ce modèle — ceux du modèle de
@@ -669,11 +675,11 @@ Les temps sont mesurés sur un MacBook Pro M1 Pro de 16 Go.
   étaient activés (« No subject is called @nom ») : un modèle qui ne lit pas d'images garde maintenant son
   `@` comme du texte, comme le rack le faisait déjà.
 - **Le temps de l'encodeur de texte** dans le rack pouvait afficher « ≈ 0,00 s » après un prompt relu du
-  cache de rendu ; seul un prompt vraiment encodé l'apprend désormais.
+  cache de rendu ; seul un prompt vraiment encodé l'apprend désormais.
 - **Le temps restant** comptait le rendu en cours pour rien jusqu'à son premier pas complet : l'allure
   apprise pour ce modèle et ce format prend maintenant le relais.
 - **La graine du rack** restait sur une ancienne graine fixe après un rendu de `silicontrol` à graine
-  tirée au hasard ; elle dit maintenant « Au hasard ».
+  tirée au hasard ; elle dit maintenant « Au hasard ».
 
 ## 0.9
 
@@ -785,7 +791,7 @@ les cas qu’il manquait.
   avec le Mac qu’il demanderait : « demande un Mac de 24 Go ».
 - **Les lots de Qwen-Image-2.1** ne gardent plus deux copies du modèle à la fois.
 - Mêmes images, au bit près. Mesuré sur le M1 Pro : Z-Image Turbo en 1024² en 81 s,
-  Qwen-Image-2.1 en 1024² en 116 s ; la plus grande édition (1024×1536, trois images) culmine à
+  Qwen-Image-2.1 en 1024² en 116 s ; la plus grande édition (1024×1536, trois images) culmine à
   3,2 Go. *Note (0.8.2) : Z-Image faisait 7 des 8 évaluations de sa recette jusqu’à la 0.8.1 ; ces temps de Z-Image valent pour 7 (voir la 0.8.2).*
 - Le rapport de diagnostic (schéma 4) donne le budget, le besoin de chaque étage et le pic mesuré en
   face.

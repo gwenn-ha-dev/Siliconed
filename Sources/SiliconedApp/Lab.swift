@@ -440,7 +440,7 @@ final class LabModel {
         for url in panel.urls { load(.file(url)) }
     }
 
-    /// « Prendre le prompt du rack ».
+    /// “Use the Rack’s Prompt”.
     func useRackPrompt() { text = rack.prompt }
 
     // MARK: The subjects

@@ -12,11 +12,11 @@ Les chiffres d'ici, et les contrôles, sont ceux du rendu à pleine taille, Rend
 
 ## Mise en place
 
-Il faut l'app (0.17 ou suivante), Python 3.12, et ce dépôt à la version de l'app (Siliconed → À propos de Siliconed l'affiche). `siliconed` est livré dans l'app : c'est le moteur même avec lequel l'app rend, et il tourne sans Xcode.
+Il faut l'app (0.18 ou suivante), Python 3.12, et ce dépôt à la version de l'app (Siliconed → À propos de Siliconed l'affiche). `siliconed` est livré dans l'app : c'est le moteur même avec lequel l'app rend, et il tourne sans Xcode.
 
 ```sh
 alias siliconed=/Applications/Siliconed.app/Contents/Helpers/siliconed
-git clone --branch v0.17 https://github.com/gwenn-ha-dev/Siliconed && cd Siliconed
+git clone --branch v0.18 https://github.com/gwenn-ha-dev/Siliconed && cd Siliconed
 python3.12 -m venv oracle-env && oracle-env/bin/pip install -r tools/oracle/requirements.txt
 ```
 
@@ -235,7 +235,7 @@ Chaque décodeur, celui de Z-Image compris, se juge par plan de l'image contre u
 
 **Le diagnostic de l'app applique la même règle.** **Mesurer ce Mac** ([ENGINE](ENGINE.fr.md#un-moteur-mesuré-sur-votre-mac)) vérifie chaque route qu'il chronomètre contre le résultat exact, calculé en double précision sur le CPU même du Mac, sur des opérandes synthétiques identiques sur tous les Mac, avec le même écart par canal : un produit ou une attention en fp32 peut en être à 10⁻⁵, le produit fp16 du Neural Engine à 1,25 fois l'arrondi propre du bf16. Une route au-delà de son seuil est écartée du plan — le moteur ne la propose jamais — et le rapport la nomme avec l'écart vu ; aucune vitesse ne rachète un résultat faux.
 
-Le débruiteur de Krea 2 a quelques frontières si mal conditionnées qu'un changement d'une unité sur le dernier chiffre de l'entrée déplace la sortie de plus que la règle ne permet, référence comprise. Là, une mesure qui échoue au témoin est jugée par *nuages* : la référence et le moteur tournent tous deux sur des entrées décalées d'un ulp, et l'écart médian du moteur doit rester sous 1,25 fois le pire de la référence. Ce sont les étapes dont la règle dit « clouds when the oracle has draws ».
+Le débruiteur de Krea 2 a quelques frontières si mal conditionnées qu'un changement d'une unité sur le dernier chiffre de l'entrée déplace la sortie de plus que la règle ne permet, référence comprise. Là, une mesure qui échoue au témoin est jugée par *nuages* : la référence et le moteur tournent tous deux sur des entrées décalées d'un ulp, et l'écart médian du moteur doit rester sous 1,25 fois le pire de la référence. Ce sont les étapes dont la règle dit « clouds when the oracle has draws ».
 
 ## Au-delà de `all`
 

@@ -220,12 +220,13 @@ import Testing
         let c = RenderLoop.compare(simulated(p) { _ in 1.1 }, predicted: p)
         let lines = RenderLoop.lines(c, title: "render classes")
         #expect(lines[0] == "render classes")
-        #expect(lines[1].split(separator: "\t", omittingEmptySubsequences: false).map(String.init)
-                == ["#class", "route", "executions", "measured_s", "predicted_s", "error", "predicted_route"])
+        let header: [String] = lines[1].split(separator: "\t", omittingEmptySubsequences: false).map(String.init)
+        #expect(header == ["#class", "route", "executions", "measured_s", "predicted_s", "error", "predicted_route"])
         let body = lines[2..<(2 + c.rows.count)]
         for line in body { #expect(line.split(separator: "\t", omittingEmptySubsequences: false).count == 7, "\(line)") }
         #expect(body.allSatisfy { !$0.hasPrefix("#") })
-        #expect(lines.suffix(4).map { String($0.prefix(while: { $0 != "\t" })) } == ["#total", "#products", "#attention", "#coverage"])
+        let heads: [String] = lines.suffix(4).map { (line: String) -> String in String(line.prefix(while: { $0 != "\t" })) }
+        #expect(heads == ["#total", "#products", "#attention", "#coverage"])
         #expect(body.first!.contains("+10.0%"))
         // Without a model the prediction columns are empty and the lines still parse.
         let bare = RenderLoop.lines(RenderLoop.compare(simulated(p)), title: "t")

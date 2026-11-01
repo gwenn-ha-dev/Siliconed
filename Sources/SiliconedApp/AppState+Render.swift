@@ -659,7 +659,7 @@ extension AppState {
                 notes.append(String(localized: "LoRA not found: \(names)."))
             }
             if !negativeLoRAStrengths, stack.contains(where: { $0.strength < 0 }) {
-                notes.append(String(localized: "A negative LoRA strength comes back as 0: turn on Experimental → Negative LoRA Strengths."))
+                notes.append(String(localized: "A negative LoRA strength comes back as 0: turn on Beta → Negative LoRA Strengths."))
             }
         }
 

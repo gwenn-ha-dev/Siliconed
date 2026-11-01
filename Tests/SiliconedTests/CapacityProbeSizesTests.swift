@@ -29,8 +29,14 @@ import Testing
         }
         // The first tier is what every Mac so far ran: 4, 30 and 309 GFLOP; 30, 60 and 121; S = 1 024 and 4 096.
         let full = Sizes.full
-        #expect(full.solo.map { 2.0 * Double($0.m) * Double($0.k) * Double($0.n) / 1e9 }.map { Int($0.rounded()) } == [4, 30, 309])
-        #expect(full.sharing.map { 2.0 * Double($0.m) * Double($0.k) * Double($0.n) / 1e9 }.map { Int($0.rounded()) } == [30, 60, 121])
+        func gigaflop(m: Int, k: Int, n: Int) -> Int {
+            let flop: Double = 2.0 * Double(m) * Double(k) * Double(n)
+            return Int((flop / 1e9).rounded())
+        }
+        let solo: [Int] = full.solo.map { gigaflop(m: $0.m, k: $0.k, n: $0.n) }
+        let sharing: [Int] = full.sharing.map { gigaflop(m: $0.m, k: $0.k, n: $0.n) }
+        #expect(solo == [4, 30, 309])
+        #expect(sharing == [30, 60, 121])
         #expect(full.attention == [1024, 4096])
         // The attention's pair runs at the models' sequences in every tier (the half and the full grid of 1024²): a tier that measured it
         // at 2 048 took the cut by heads off every full-size attention.

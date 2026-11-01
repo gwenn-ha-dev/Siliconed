@@ -16,7 +16,7 @@ English · [Français](RELEASE-NOTES.fr.md)
   MOSS-Image, part of the products run on it in 8 bits, beside the GPU's. On an M1 Pro at 1024², every
   evaluation at full size, those three Compacts take 24 to 37 % less time than their Standard: Krea 2
   140.9 s (213.3), Qwen-Image-2.1 85.8 s (135.6), MOSS-Image 85.0 s (111.7)
-  ([Numbers](ENGINE.md#numbers)).
+  ([Numbers](https://github.com/gwenn-ha-dev/Siliconed/blob/v0.18/docs/ENGINE.md#numbers)).
 - **A measure always gives a map**: nothing is orange any more. How sure the measure is of each
   engine's figure is written beside it (± a few percent), and what it found is said with its effect on
   the plan. A route that computed wrong, or whose load ended the measuring process, is left out, and
@@ -37,10 +37,11 @@ English · [Français](RELEASE-NOTES.fr.md)
 
 ### Prompt Lab: the inputs of a render, prepared
 
-- **A window of its own, in the Window menu (⌥⌘L)**: images on one side, one text on the other, and a
-  line under them, “The rack will receive”, that says what is carried. Carry to the Rack fills the
-  rack's boxes — its Prompt, where ⌘Z in the field brings the old one back, and its Images, which have
-  no undo and are said to be replaced. Nothing is applied on its own.
+- **A window of its own, in the Window menu (⌥⌘L)**, or from the wand beside the rack's Prompt: images
+  on one side, one text on the other, and a line under them, “The rack will receive”, that says what is
+  carried. Carry to the Rack fills the rack's boxes — its Prompt, where ⌘Z in the field (or Edit › Undo)
+  brings the old one back, and its Images, which have no undo and are said to be replaced. Nothing is
+  applied on its own.
 - **Every image has a role**: starting image (image 1, the one a Qwen-Image-2.1 edit changes; it gives
   the format), reference, or describe only. The first image dropped is the start, the next ones
   references; on the models that read no image they are describe only. Three images at most.
@@ -50,23 +51,28 @@ English · [Français](RELEASE-NOTES.fr.md)
   knows nothing of them. Still in memory only; `silicontrol subjects` and `add "@name"` stay. A `@name`
   cannot sit inside a `{a|b}` group. The PNG of the render keeps the prompt the model read, as for
   any render of the rack.
-- **Rewrite and Describe mix in one text** (beta): Rewrite works on all of it, additions and removals
-  marked; Describe writes at the caret, or fills an empty text; ⌘Z undoes either. A `@name` is put
-  aside while the writer rewrites and put back; one it loses is said, never dropped in silence.
+- **Rewrite and Describe mix in one text** (beta), written into the field as the writer goes: Rewrite
+  works on all of it, additions and removals marked; Describe writes at the caret, or fills an empty
+  text; ⌘Z undoes either. A `@name` is put aside while the writer rewrites and put back; one it loses
+  is said, never dropped in silence.
 - **Only those two wait**: during a render, or without the writer installed, naming, framing, roles and
   Carry go on; Rewrite and Describe wait, under one sentence.
 - **Following another Mac**: Rewrite and Describe are off and say so, while images, roles, subjects
   and Carry fill the rack you see, which sends its references to the Mac that renders.
 - **The writer is a model already installed**: Qwen-Image-2.1's text encoder, Qwen3-VL-8B, made to write.
   Only its output layer is missing from the installed model: Install the Writer downloads it from the
-  same repository, 1.25 GB, by byte range. It needs Qwen-Image-2.1 installed; on its Compact, a 16 GB
-  Mac (the Standard needs a bigger one).
+  same repository, 1.25 GB, by byte range. It needs Qwen-Image-2.1 installed, and reads its layers in a
+  plan chosen within the memory budget before the first word: on a 16 GB Mac, the Compact's all from
+  memory; on an 8 GB Mac, or with the Standard on 16 GB, part of them from the disk at each token, more
+  slowly.
 - **Our instructions, one per model**, drawn from what each publisher says of its prompts: every element
   of your prompt is kept, quoted text word for word, nothing removed, softened or moralized.
 - **Never during a render**: an image that starts stops the writer, and Rewrite and Describe wait.
+- **Its weights go back after every gesture**, so the Mac's memory is free between two of them: on an
+  M1 Pro with the Compact, the first word comes after about 10 s for Rewrite and 25 s for Describe,
+  which reads the image first, then about 12 tokens a second, on the GPU.
 - **Checked against the reference**: greedy decoding gives the same tokens as transformers in fp32
-  (`siliconed check qwen-image-2.1 writer`). About 18 tokens a second on an M1 Pro, on the GPU, from the
-  weights kept in memory.
+  (`siliconed check qwen-image-2.1 writer`).
 
 ### The menus and Settings, tidied; VoiceOver can drive it
 

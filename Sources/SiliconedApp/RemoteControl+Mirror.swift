@@ -136,7 +136,7 @@ extension RemoteControl {
         }
         guard app.negativeLoRAStrengths || !d.loras.contains(where: { $0.strength < 0 }) else {
             throw Refusal("lora", String(localized: "negative LoRA strengths are off"),
-                          help: String(localized: "turn on Experimental → Negative LoRA Strengths in Settings (⌘,)"))
+                          help: String(localized: "turn on Beta → Negative LoRA Strengths in Settings (⌘,)"))
         }
         let forged = app.mirrorCatalog?.loras[d.model] ?? []
         let stack = try d.loras.map { entry -> LoRASlot in

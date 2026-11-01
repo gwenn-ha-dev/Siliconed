@@ -12,14 +12,14 @@
 //     │ └──────────────────────────────────────────────────┘ │
 //     └──────────────────────────────────────────────────────┘
 //
-//     General     what an everyday user touches: the speed switch, the library.
+//     General     what an everyday user touches: Faster Rendering for the model in the rack, the library.
 //     Other Macs  lend this Mac, compute on another (`OtherMacsView.swift`).
 //     Advanced    kept out of the way: This Mac (the capacity map, measured only when asked), Command
-//                 Line (silicontrol, linked into /usr/local/bin), Beta (More Solvers, Named Subjects,
-//                 Negative LoRA Strengths: off by default, may change).
+//                 Line (silicontrol, linked into /usr/local/bin), Beta (More Solvers, Negative LoRA
+//                 Strengths: off by default, may change; named subjects moved to the Prompt Lab).
 //                 ┌ This Mac ───── [Measure This Mac…]
 //                 ├ Command Line ─ [Install…]
-//                 └ Beta ───────── More Solvers · Named Subjects · Negative LoRA Strengths
+//                 └ Beta ───────── More Solvers · Negative LoRA Strengths
 //
 // - **Incognito**: an NSWindow of ours, as `MainWindow` — not SwiftUI's `Settings` scene, which would
 //   keep its frame; not restorable. What it sets are the app's preferences (`AppState`'s header), the
@@ -46,7 +46,8 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
             window.makeKeyAndOrderFront(nil)
             return
         }
-        let host = NSHostingController(rootView: SettingsView(app: app, macs: MainWindow.shared.otherMacs))
+        let view = SettingsView(app: app, macs: MainWindow.shared.otherMacs)
+        let host = NSHostingController(rootView: view)
         host.sizingOptions = [.preferredContentSize]
         let w = NSWindow(contentViewController: host)
         w.title = String(localized: "Settings")

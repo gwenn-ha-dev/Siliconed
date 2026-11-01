@@ -151,7 +151,9 @@ extension Diagnostic.CapacityProbes {
             let g = rates.gpu, x = rates.amx, a = rates.ane
             func flop(_ s: Shape) -> Double { 2 * Double(s.m) * Double(s.k) * Double(s.n) }
             func truth(_ shapes: [Shape], kinds: Double = 1) -> Double {
-                Set(shapes.map { [$0.k, $0.n] }).reduce(0) { $0 + Double($1[0]) * Double($1[1]) } * Self.truthPerValue * kinds
+                let weights: Set<[Int]> = Set(shapes.map { [$0.k, $0.n] })
+                let values: Double = weights.reduce(0.0) { (sum: Double, w: [Int]) -> Double in sum + Double(w[0]) * Double(w[1]) }
+                return values * Self.truthPerValue * kinds
             }
             let soloFlop = solo.reduce(0) { $0 + flop($1) }
             var p: [String: Double] = [:]
