@@ -23523,6 +23523,46 @@
         }
       }
     },
+    "Open the Prompt Lab (⌥⌘L)" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prompt-Labor öffnen (⌥⌘L)"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abrir el laboratorio de prompts (⌥⌘L)"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvrir l’atelier de prompts (⌥⌘L)"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apri il laboratorio dei prompt (⌥⌘L)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "プロンプトラボを開く（⌥⌘L）"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开提示词实验室（⌥⌘L）"
+          }
+        }
+      }
+    },
     "Optional. Add an image and the prompt becomes an instruction: “change her jacket to red”." : {
       "localizations" : {
         "de" : {
@@ -41097,6 +41137,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "把图像所示内容写入文本的光标处。"
+          }
+        }
+      }
+    },
+    "Writing…" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Schreibt …"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escribiendo…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Écriture…"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scrittura in corso…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "書いています…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在书写…"
           }
         }
       }

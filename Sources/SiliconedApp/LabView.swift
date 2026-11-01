@@ -81,11 +81,14 @@ struct LabView: View {
                         .allowsHitTesting(false)
                 }
                 if let changes = model.changes {
-                    // The marks lie over the text, which stays under them: ⌘Z still undoes the rewrite.
+                    // The marks lie over the text, which stays under them: ⌘Z still undoes the gesture. While the writer writes,
+                    // they are the text it has written so far, against the one it started from.
                     ScrollView {
                         Text(Self.shown(PromptDiff.pieces(from: changes.before, to: changes.after)))
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
+                    // While it comes, the last words stay in sight.
+                    .defaultScrollAnchor(model.isWriting ? .bottom : .top)
                     .background(Palette.surface)
                     .allowsHitTesting(false)
                 }
@@ -131,10 +134,10 @@ struct LabView: View {
                 Text("Preparing the writer…").font(.caption).foregroundStyle(.secondary)
             }
         case .writing:
-            HStack(alignment: .top, spacing: 8) {
+            // The text itself comes in the field, marked.
+            HStack(spacing: 8) {
                 ProgressView().controlSize(.small)
-                Text(model.streaming).font(.caption).foregroundStyle(.secondary).lineLimit(3)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                Text("Writing…").font(.caption).foregroundStyle(.secondary)
             }
         case .idle:
             EmptyView()

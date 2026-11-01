@@ -20,9 +20,10 @@
 //   always had: its Prompt (the text translated, the `@names` turned into « image N »; ⌘Z in the field brings the old
 //   prompt back) and its Images box (1 to 3 numbered images, which have no undo — the line says so). The rack does not
 //   know the subjects. The rules are `LabInputs` (`Sources/Siliconed`), pure and tested.
-// - **No tabs, gestures that mix.** Describe writes into the text: it fills it when empty, otherwise it inserts at the
-//   caret or replaces the selection. Rewrite works on all of it, additions and removals marked (« Edit » puts the marks
-//   away). **⌘Z undoes any gesture of the language model**: the text is written through the text system (`PromptTextView.replace`).
+// - **No tabs, gestures that mix, written in the field as they come.** Describe writes into the text: it fills it when empty,
+//   otherwise it inserts at the caret or replaces the selection. Rewrite works on all of it. Both draw their marks token by
+//   token over the field (additions in the accent, removals struck; « Edit » puts them away), and the text lands in the field
+//   once whole. **⌘Z undoes any gesture of the language model**: the text is written through the text system (`PromptTextView.replace`).
 // - **Availability is judged gesture by gesture.** While an image renders, or without an installed writer, only Rewrite
 //   and Describe wait, under one sentence; naming, framing, choosing a role and carrying need no model. **The render always
 //   has priority** (`AppState.busy`): a write under way is cancelled — said once, quietly — and the writer gives its memory back.
@@ -74,7 +75,6 @@ final class LabModel {
     private(set) var changes: Changes?
 
     private(set) var phase = Phase.idle
-    private(set) var streaming = ""
     /// The gesture under way, and the image it describes.
     private(set) var running: Gesture?
     private(set) var describing: Picture.ID?
@@ -239,21 +239,24 @@ final class LabModel {
 
     // MARK: Writing
 
-    /// **Rewrite**: the whole text, its mentions put aside and put back.
+    /// **Rewrite**: the whole text, its mentions put aside and put back. It is written **in the field, as it comes**: the marks
+    /// (additions in the accent, removals struck) follow each token, and stay over the text it leaves.
     func rewrite() {
         guard canRewrite, let target else { return }
         let typed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         // `@` is a subject's only for a model that reads images; elsewhere it is the model's own (Anima's artists).
         let guarded = capacity > 0 ? LabInputs.MentionGuard(typed) : nil
         let input = LabInput.text(guarded?.masked ?? typed)
-        begin(input, for: target, gesture: .rewrite, picture: nil) { [self] written in
+        begin(input, for: target, gesture: .rewrite, picture: nil, progress: { [self] written in
+            changes = Changes(before: typed, after: guarded?.restore(written).text ?? written)
+        }) { [self] written in
             var final = written
             if let guarded {
                 let back = guarded.restore(written)
                 final = back.text
                 if !back.intact { notice = Self.mentionNotice(lost: back.lost) }
             }
-            place(final, replacingAll: true)
+            place(Self.splice(final, into: text, at: nil))
             changes = Changes(before: typed, after: text)
         }
     }
@@ -266,18 +269,27 @@ final class LabModel {
         describe(data: data, id: nil)
     }
 
+    /// Written in the field as it comes, where the caret was (or over the selection) when the gesture began — the field takes no
+    /// key while the writer writes —, marked as an addition.
     private func describe(data: Data, id: Picture.ID?) {
         guard canDescribe, let target else { return }
-        begin(.image(data), for: target, gesture: .describe, picture: id) { [self] written in
-            place(written, replacingAll: false)
+        let before = text
+        // The field off screen: after the text, as a caret at its end would.
+        let selection = PromptTextView.current.flatMap { $0.window == nil ? nil : $0.selectedRange() }
+            ?? NSRange(location: (before as NSString).length, length: 0)
+        begin(.image(data), for: target, gesture: .describe, picture: id, progress: { [self] written in
+            changes = Changes(before: before, after: Self.splice(written, into: before, at: selection).text)
+        }) { [self] written in
+            place(Self.splice(written, into: text, at: selection))
+            changes = Changes(before: before, after: text)
         }
     }
 
     private func begin(_ input: LabInput, for target: Family, gesture: Gesture, picture: Picture.ID?,
-                       finished: @escaping @MainActor (String) -> Void) {
+                       progress: @escaping @MainActor (String) -> Void, finished: @escaping @MainActor (String) -> Void) {
         generation += 1
         let mine = generation
-        phase = .loading(nil); streaming = ""; stopped = false; failure = nil; notice = nil; carried = false
+        phase = .loading(nil); stopped = false; failure = nil; notice = nil; carried = false; changes = nil
         running = gesture; describing = picture
         task = Task { [writer] in
             do {
@@ -286,7 +298,7 @@ final class LabModel {
                     guard mine == self.generation else { return }
                     switch event {
                     case .loading(let f): phase = .loading(f)
-                    case .text(let t): phase = .writing; streaming = t; last = t
+                    case .text(let t): phase = .writing; last = t; progress(t)
                     case .finished(let t): last = t; end(last, finished)
                     case .cancelled: self.stop(becauseOfRender: false); return
                     }
@@ -296,7 +308,7 @@ final class LabModel {
                 if phase != .idle { end(last, finished) }
             } catch {
                 guard mine == self.generation else { return }
-                phase = .idle; streaming = ""; running = nil; describing = nil
+                phase = .idle; running = nil; describing = nil; changes = nil
                 failure = error.localizedDescription
             }
         }
@@ -304,33 +316,47 @@ final class LabModel {
 
     private func end(_ written: String, _ finished: @MainActor (String) -> Void) {
         let clean = written.trimmingCharacters(in: .whitespacesAndNewlines)
-        phase = .idle; streaming = ""; running = nil; describing = nil
+        phase = .idle; running = nil; describing = nil
+        // The marks drawn as it came belong to a text not yet in the field: the gesture's own replace them.
+        changes = nil
         guard !clean.isEmpty else { return }
         finished(clean)
     }
 
+    /// **Where a written text goes, and with what around it**: the whole text (`range` nil and a rewrite, or an empty text),
+    /// else the caret or the selection, the words not glued to the text around. Pure: the live marks and the final placing
+    /// compute the same text.
+    struct Splice: Equatable { var text: String; var range: NSRange; var inserted: String }
+
+    static func splice(_ written: String, into current: String, at selection: NSRange?) -> Splice {
+        let ns = current as NSString
+        guard let selection, ns.length > 0 else {
+            return Splice(text: written, range: NSRange(location: 0, length: ns.length), inserted: written)
+        }
+        let location = min(selection.location, ns.length)
+        let range = NSRange(location: location, length: min(selection.length, ns.length - location))
+        var inserted = written
+        if range.location > 0, !ns.substring(with: NSRange(location: range.location - 1, length: 1)).first!.isWhitespace {
+            inserted = " " + inserted
+        }
+        let end = range.location + range.length
+        if end < ns.length, !ns.substring(with: NSRange(location: end, length: 1)).first!.isWhitespace { inserted += " " }
+        return Splice(text: ns.replacingCharacters(in: range, with: inserted), range: range, inserted: inserted)
+    }
+
     /// The text changes through the text system when the field is on screen: **one undo step per gesture**, which is how ⌘Z
-    /// undoes the writer. A Describe goes to the caret (or replaces the selection) and fills an empty text.
-    private func place(_ written: String, replacingAll: Bool) {
-        guard let view = PromptTextView.current, view.window != nil else {
-            if replacingAll || text.isEmpty { text = written } else { text += (text.last?.isWhitespace == true ? "" : " ") + written }
+    /// undoes the writer.
+    ///
+    /// The field is still locked when the gesture ends (SwiftUI unlocks it at its next update), and a locked `NSTextView` refuses
+    /// `shouldChangeText`: `replace` would then set `string`, which tells no delegate, the binding would keep the old text and
+    /// put it back at the next update — the writer's text lost. So the field is unlocked first.
+    private func place(_ splice: Splice) {
+        guard let view = PromptTextView.current, view.window != nil, view.string == text else {
+            text = splice.text
             return
         }
-        let current = view.string as NSString
-        var range = (replacingAll || current.length == 0) ? NSRange(location: 0, length: current.length) : view.selectedRange()
-        var inserted = written
-        if !replacingAll, current.length > 0 {
-            // Words are not glued to the text around.
-            if range.location > 0, !current.substring(with: NSRange(location: range.location - 1, length: 1)).first!.isWhitespace {
-                inserted = " " + inserted
-            }
-            let end = range.location + range.length
-            if end < current.length, !current.substring(with: NSRange(location: end, length: 1)).first!.isWhitespace {
-                inserted += " "
-            }
-        }
-        if range.location > current.length { range = NSRange(location: current.length, length: 0) }
-        view.replace(range, with: inserted)
+        if !view.isEditable { view.isEditable = true }
+        view.replace(splice.range, with: splice.inserted)
         view.window?.makeFirstResponder(view)
     }
 
@@ -343,7 +369,9 @@ final class LabModel {
     func stop(becauseOfRender: Bool = false) {
         generation += 1
         task?.cancel(); task = nil
-        phase = .idle; streaming = ""; running = nil; describing = nil
+        // Marks still coming are half a text's: the field keeps the one it had.
+        if running != nil { changes = nil }
+        phase = .idle; running = nil; describing = nil
         stopped = becauseOfRender
     }
 

@@ -46,7 +46,7 @@ struct StageBox<Content: View>: View {
     }
 }
 
-/// A box's first line: a small tinted chip with its symbol, its name, and what it says on the right.
+/// A box's first line: its symbol in the wire's color, its name, and what it says on the right.
 private struct BoxTitle<Trailing: View>: View {
     let title: LocalizedStringKey
     let symbol: String
@@ -57,11 +57,11 @@ private struct BoxTitle<Trailing: View>: View {
     var body: some View {
         HStack(spacing: 7) {
             HStack(spacing: 7) {
+                // The bare glyph in the wire's color: no chip around it, so that what is framed in a box's title is a button.
                 Image(systemName: symbol)
-                    .font(.system(size: 10, weight: .semibold))
+                    .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(tint)
                     .frame(width: 20, height: 20)
-                    .background(RoundedRectangle(cornerRadius: 5, style: .continuous).fill(tint.opacity(0.16)))
                 Text(title).font(.callout.weight(.semibold))
                     .lineLimit(2).fixedSize(horizontal: false, vertical: true)
             }
@@ -233,7 +233,8 @@ struct Cost: View {
 
 /// **The prompt is typed in its box**: what to make — or, when editing, what changes. A real text view
 /// (`TextEditor`, an `NSTextView`): ⌘A, ⌘C, ⌘Z, the spelling, a long prompt that scrolls. The grip
-/// under it gives it the height one wants; Esc leaves it (the arrows then walk the strip).
+/// under it gives it the height one wants; Esc leaves it (the arrows then walk the strip). The wand facing
+/// its title opens the Prompt Lab.
 struct PromptNode: View {
     @Bindable var app: AppState
     @FocusState private var typing: Bool
@@ -243,6 +244,19 @@ struct PromptNode: View {
 
     var body: some View {
         PortBox(title: "Prompt", symbol: "text.quote", kind: .text, focused: typing) {
+            // The Prompt Lab, one click from the prompt it prepares (Window ▸ Prompt Lab, ⌥⌘L).
+            // A bezelled button in the prompt's color: the title row's only frame, so it reads as something to click.
+            Button { LabWindow.shared.show() } label: {
+                Image(systemName: "wand.and.sparkles")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(WireKind.text.color)
+                    .padding(.horizontal, 2)
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+            .help("Open the Prompt Lab (⌥⌘L)")
+            .accessibilityLabel(Text("Prompt Lab"))
+        } content: {
             VStack(spacing: 0) {
                 ZStack(alignment: .topLeading) {
                     TextEditor(text: $app.prompt)
