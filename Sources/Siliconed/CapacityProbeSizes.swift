@@ -6,6 +6,7 @@ import Foundation
 ///     tier 0   solos 4 · 30 · 309 GFLOP     sharing 30 · 60 · 121 GFLOP     attention S = 1 024 · 4 096     (the sizes of every Mac so far)
 ///     tier 1   solos 4 · 30 · 69            sharing 30 · 60                  attention S = 1 024 · 2 048
 ///     tier 2   solos 4 · 30                 sharing 30                       attention S = 1 024
+///     every    the attention's pair (the cut by heads, GPU + CPU) at S = 1 024 · 4 096
 ///
 ///     engine rates  ──▶  projection(stage) = Σ runs · FLOP / rate  +  the exact rows' fp64 on the CPU  (+ constants of the stage)
 ///        │
@@ -22,6 +23,12 @@ import Foundation
 ///     what they did.
 ///   - **No tier is a different measure**: each keeps three kinds of size at least for the lines that need them (a small, a middle, a
 ///     large one — a line is fitted on t₀ and a rate), and the verdict's aberrant-line rule judges the fit whatever the tier.
+///   - **A tier never shrinks the attention's pair** (`pairSequences`): the plan offers the cut by heads only from the k's the pair was
+///     measured at (`CapacityFit.overlap`), and its sequences are the models' — 1 024 the half grid of a 1024² render, 4 096 its full grid.
+///     A tier 1 that measured it at 2 048 took the cut off every full-size attention of the five families: the M1 Pro, stepped down by
+///     three stages added the same evening, rendered 8 to 25 % slower. The kernels alone keep the tier's sequences: theirs are lines,
+///     extrapolated like the products'; at a sequence only the pair runs, its sides are the lines' (`CapacityFit.overlap` reads them so).
+///     The point costs ~0.7 s on a hot Neo and keeps it at its tier.
 ///   - **A tier steps down on the projection of what remains**, not on a chip class: the Mac that is slow because it is hot, throttled
 ///     or low on power is served the same way as the Mac that is slow because it is small. A fanless Mac pays `margin` for the heat the
 ///     witnesses measured at the start of the run and the run then adds.
@@ -69,6 +76,10 @@ extension Diagnostic.CapacityProbes {
         /// The ANE's staircase: one k × n, row counts that are odd and even multiples of 256, and two halves of a unit.
         package static let stair = (k: 3840, n: 3840)
         package static let attentionHeads = 24, attentionHeadDim = 128
+        /// The attention's pair, the same in every tier: the half and the full grid of a 1024² render.
+        package static let pairSequences = [1024, 4096]
+        /// Every sequence the attention stage runs: the tier's kernels' and the pair's.
+        package var attentionRuns: [Int] { Array(Set(attention + Self.pairSequences)).sorted() }
         /// The witness: Z-Image's `[3840, 3840]` square at 2 048 rows — big enough for each engine to be timed on a few
         /// milliseconds, small enough to be run fifteen times in a second.
         package static let witness: Shape = (2048, 3840, 3840)
@@ -170,10 +181,11 @@ extension Diagnostic.CapacityProbes {
             let stairFlop = stairRows.reduce(0) { $0 + 2 * Double($1) * Double(Self.stair.k) * Double(Self.stair.n) }
             p["stairs"] = a.map { Self.runs * stairFlop / $0 + Double(stairRows.count) * (0.03 + truth([(1, Self.stair.k, Self.stair.n)])) } ?? 0
             let (h, d) = (Double(Self.attentionHeads), Double(Self.attentionHeadDim))
-            let attentionFlop = attention.reduce(0) { $0 + 4 * Double($1) * Double($1) * h * d }
-            // The five kernels alone, then the graph beside the CPU's heads at their balance.
-            p["attention"] = Self.runs * attentionFlop * (1 / (g * Self.graphRatio) + 1 / (g * Self.flashRatio) + 1 / (g * Self.tilesRatio) + 1 / (g * Self.tiles16Ratio) + 1 / rates.cpu
-                                                          + 1 / (g * Self.graphRatio + rates.cpu)) + Double(attention.count) * 0.08
+            func attentionFlop(_ sequences: [Int]) -> Double { sequences.reduce(0) { $0 + 4 * Double($1) * Double($1) * h * d } }
+            // The five kernels alone at the tier's sequences, then the graph beside the CPU's heads at their balance at the pair's.
+            let kernels = 1 / (g * Self.graphRatio) + 1 / (g * Self.flashRatio) + 1 / (g * Self.tilesRatio) + 1 / (g * Self.tiles16Ratio) + 1 / rates.cpu
+            p["attention"] = Self.runs * (attentionFlop(attention) * kernels + attentionFlop(Self.pairSequences) / (g * Self.graphRatio + rates.cpu))
+                + Double(attentionRuns.count) * 0.08
             // A chain per set and pass (the pairs with the GPU, the three, the AMX beside the ANE; a pass 3 where a long k is run), at the sets' rate.
             let setRate = 0.75 * (g + (x ?? 0) + (a ?? 0))
             let sets = (x != nil ? 1 : 0) + (a != nil ? 1 : 0) + ((x != nil && a != nil) ? 2 : 0)

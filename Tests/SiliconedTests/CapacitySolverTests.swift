@@ -360,6 +360,32 @@ import Testing
         #expect(try solve(m, attentionKey(HeadSplitAttention.minimumSequence)).assignment.splits)
     }
 
+    /// **The attention's pair has no ceiling** (`CapacityFit.overlap`): fitted on the two sequences every tier measures, the cut by heads
+    /// stays a candidate on the longer sequences of the large formats — 1536 × 1024 (S = 6 144), 2048² (16 384) —, at the longest one's κ.
+    @Test func theAttentionPairIsTimedBeyondTheLongestSequenceMeasured() throws {
+        typealias Sizes = Diagnostic.CapacityProbes.Sizes
+        var m = machine()
+        let graph = M.Kernel(.gpu, .graph), heads = M.Kernel(.cpu, .heads)
+        m.lines[graph] = .init(t0: 0, rate: 1.5e12)
+        m.lines[heads] = .init(t0: 0, rate: 0.5e12)
+        var truth = m
+        truth.sharing["gpu+cpu"] = .init(keep: [.gpu: 0.97, .cpu: 0.95])
+        let (h, d) = (Sizes.attentionHeads, Sizes.attentionHeadDim)
+        let trials = Sizes.pairSequences.map { s -> CapacityFit.Measurements.Trial in
+            let (k, rows) = (2 * s * s * d, [graph: h - 10, heads: 10])
+            let ends = truth.busy(m: h, k: k, n: 1, rows: rows)
+            let sides = rows.sorted { $0.key.engine < $1.key.engine }.map {
+                CapacityFit.Measurements.Side(kernel: $0.key.description, rows: $0.value, solo: m.alone($0.key, rows: $0.value, k: k, n: 1)!,
+                                              within: ends[$0.key]!)
+            }
+            return .init(set: "gpu+cpu", shape: [h, k, 1], pass: 2, sides: sides, wall: ends.values.max()!)
+        }
+        let fit = try #require(CapacityFit.overlap(set: "gpu+cpu", trials: trials, model: m)?.sharing)
+        #expect(fit.kFrom == 1024 * 1024 * d && fit.kTo == nil)
+        m.sharing["gpu+cpu"] = fit
+        for s in [4096, 6144, 16384] { #expect(try solve(m, attentionKey(s, heads: h)).assignment.splits, "S = \(s)") }
+    }
+
     // MARK: a render
 
     @Test func aRealRequestIsSolvedClassByClassAndEveryAnswerRuns() throws {

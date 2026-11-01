@@ -94,10 +94,8 @@ extension Diagnostic.CapacityProbes.Context {
 
     // MARK: Sharing
 
-    /// The rows each kernel takes of `m`, from the model's balanced split (the ANE's in units); nil when it gives no ANE row.
     func rows(_ kernels: [Kernel], model: CapacityModel, m: Int, k: Int, n: Int) -> [Kernel: Int]? {
-        guard let s = model.split(m: m, k: k, n: n, kernels: kernels), kernels.allSatisfy({ (s.rows[$0] ?? 0) > 0 }) else { return nil }
-        return s.rows
+        Diagnostic.CapacityProbes.trialRows(kernels, model: model, m: m, k: k, n: n)
     }
 
     /// **The sets, as chains.** Every set of two or more engines that have a line, the smallest first (a set's κ is read through the
@@ -152,9 +150,9 @@ extension Diagnostic.CapacityProbes.Context {
         var fraction = 1.0
         if hasAMX && hasGPU {
             fraction = Double(plan[g]!) / Double(plan[g]! + plan[x]!)
-            // The GPU's rows on MPS's tile, the AMX the rest of the side (it keeps one tile at least).
-            let tile = GEMM.rowQuantum
-            gpuRows = max(tile, min(first - tile, Int((Double(first) * fraction / Double(tile)).rounded()) * tile))
+            // The GPU's rows on MPS's tile, the AMX the rest of the side (it keeps one tile at least, and the rows its line speaks for).
+            let tile = GEMM.rowQuantum, amxFewest = max(tile, model.lines[x]?.rowsFrom ?? 0)
+            gpuRows = max(tile, min(first - amxFewest, Int((Double(first) * fraction / Double(tile)).rounded()) * tile))
             amxRows = first - gpuRows
             fraction = Double(gpuRows) / Double(first)
         }
@@ -221,5 +219,33 @@ extension Diagnostic.CapacityProbes.Context {
             sides.append(.init(kernel: kernel.description, rows: r, solo: solo, within: within.isEmpty ? nil : Fit.median(within)))
         }
         return .init(set: key, shape: [m, k, n], pass: pass, sides: sides, wall: wall, error: verdict.error)
+    }
+}
+
+extension Diagnostic.CapacityProbes {
+    /// **The rows each kernel takes of a set's trial**: the model's balanced split where it gives every kernel at least the rows its line
+    /// speaks for (`Line.rowsFrom`; the ANE's unit; the GPU's tile), else each kernel its fewest and the rest by the lines' rates (the ANE's
+    /// by whole units, the remainder to the GPU). A trial measures the set's κ, and the fit reads it from a chain balanced or not
+    /// (`CapacityFit.overlap`): a set the balance of a short probe leaves a side out of is a set the plan never offers, even on the rows
+    /// of a full-size product — the M1 Pro's GPU + AMX + ANE at tier 1, whose 2 048-row chains gave the AMX ~350 rows under its 512.
+    /// `nil`: the fewest rows do not fit in `m`, or a kernel has no line.
+    package static func trialRows(_ kernels: [CapacityModel.Kernel], model: CapacityModel, m: Int, k: Int, n: Int) -> [CapacityModel.Kernel: Int]? {
+        guard kernels.allSatisfy({ (model.lines[$0]?.rate ?? 0) > 0 }) else { return nil }
+        let fewest = Dictionary(uniqueKeysWithValues: kernels.map { kernel in
+            (kernel, max(model.lines[kernel]?.rowsFrom ?? 0, kernel.engine == .ane ? model.aneRowUnit : GEMM.rowQuantum))
+        })
+        if let s = model.split(m: m, k: k, n: n, kernels: kernels), kernels.allSatisfy({ (s.rows[$0] ?? 0) >= fewest[$0]! }) { return s.rows }
+        let left = m - fewest.values.reduce(0, +)
+        guard left >= 0 else { return nil }
+        let rates = kernels.map { model.lines[$0]!.rate }, total = rates.reduce(0, +)
+        let receiver = kernels.first { $0.engine == .gpu } ?? kernels.first { $0.engine != .ane } ?? kernels[0]
+        var rows = fewest, given = 0
+        for (kernel, rate) in zip(kernels, rates) where kernel != receiver {
+            var extra = Int(Double(left) * rate / total)
+            if kernel.engine == .ane { extra = extra / model.aneRowUnit * model.aneRowUnit }
+            rows[kernel]! += extra; given += extra
+        }
+        rows[receiver]! += left - given
+        return rows
     }
 }
