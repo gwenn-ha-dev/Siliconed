@@ -190,9 +190,13 @@ final class NeuralEngineTests: XCTestCase {
     /// The route end to end, on a small product (a Gaussian activation, integers of the published weights' spread): the ANE's rows
     /// against the fp64 product of the activation with `(R·q)·s`, per sampled row, beside the fp16 route's on the widened weight —
     /// the integers' within 1.25 × the widened weight's, both under fp16's own rounding. Skipped where the ANE's program does not
-    /// load (a Mac without one, a runner). The product is not smaller: under K = 1 024 the ANE's own sums show (4·10⁻³ on
+    /// load (a Mac without one) and in a virtual machine: the CI's "Apple M1 (Virtual)" loads the program and runs it elsewhere than
+    /// on a Neural Engine, 5.3·10⁻³ from the exact product on its fp16 route. The product is not smaller: under K = 1 024 the ANE's own sums show (4·10⁻³ on
     /// 256 × 512 × 256, fp16 route and int8 route alike).
     func testInt8RouteAgainstFloat64() throws {
+        var virtual: Int32 = 0, size = MemoryLayout<Int32>.size
+        try XCTSkipIf(sysctlbyname("kern.hv_vmm_present", &virtual, &size, nil, 0) == 0 && virtual == 1,
+                      "a virtual machine has no Neural Engine of its own")
         let (rows, k, n, group) = (256, 2048, 512, 256)
         var state: UInt64 = 11
         func next() -> UInt64 { state = state &* 6364136223846793005 &+ 1442695040888963407; return state >> 33 }
