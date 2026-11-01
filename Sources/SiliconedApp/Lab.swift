@@ -518,8 +518,8 @@ final class LabModel {
     }
 
     /// **« Carry to the Rack »**: the rack takes the lab's model if it was on another family, its Images box takes the
-    /// numbered images (when the lab sends any), its Prompt the translated text — through the text system, so that ⌘Z in
-    /// the field brings the old one back.
+    /// numbered images (when the lab sends any), its Prompt the translated text — the old one kept by the window's undo
+    /// manager, so that ⌘Z in the field brings it back (`MainWindow.setPrompt`).
     func carry() {
         let receipt = receipt
         guard case .carries(let carry) = receipt.outcome, let family = target else { return }

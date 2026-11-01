@@ -288,28 +288,21 @@ final class MainWindow: NSObject, NSWindowDelegate {
     /// The other Macs of the network (`OtherMacs.swift`).
     private(set) lazy var otherMacs = OtherMacs(local: local)
 
-    /// **Sets the rack's Prompt as a paste would** (the Prompt Lab's « Carry to the Rack »): through the prompt's text
-    /// view, so that ⌘Z in the field brings the old prompt back. Without the field on screen, the value is set as it is —
-    /// and so is it over an empty prompt: there is nothing to bring back, and an empty field being edited elsewhere in the
-    /// window (Size, Seed) would hold the same string as the Prompt's view.
+    /// **Sets the rack's Prompt from the Prompt Lab** (« Carry to the Rack »), and the window's undo manager — the one the
+    /// field's text view uses — takes the old prompt: ⌘Z in the field, or Edit ▸ Undo, brings it back, ⇧⌘Z carries again.
+    /// **The field gives the keyboard up first**: a text view being edited keeps its own text over the binding's, so a
+    /// carry made while the rack's Prompt had the caret (after a ⌘Z there, say) left the old prompt on screen and in the
+    /// form. Writing into the text view itself was the first way, and it lost to that too.
     func setPrompt(_ text: String, of app: AppState) {
-        defer { if app.prompt != text { app.prompt = text } }
-        guard app === self.app, !app.prompt.isEmpty, let root = window?.contentView,
-              let view = Self.promptView(in: root, holding: app.prompt),
-              view.string != text else { return }
-        let all = NSRange(location: 0, length: (view.string as NSString).length)
-        guard view.shouldChangeText(in: all, replacementString: text) else { return }
-        view.textStorage?.replaceCharacters(in: all, with: text)
-        view.didChangeText()
-        view.setSelectedRange(NSRange(location: (text as NSString).length, length: 0))
-    }
-
-    private static func promptView(in view: NSView, holding text: String) -> NSTextView? {
-        if let t = view as? NSTextView, t.isEditable, t.string == text { return t }
-        for sub in view.subviews {
-            if let found = promptView(in: sub, holding: text) { return found }
+        let old = app.prompt
+        guard old != text else { return }
+        if app === self.app, let w = window, w.firstResponder is NSText { w.makeFirstResponder(nil) }
+        app.prompt = text
+        guard let undo = app.undoManager else { return }
+        undo.registerUndo(withTarget: app) { [weak self] app in
+            if let self { self.setPrompt(old, of: app) } else { app.prompt = old }
         }
-        return nil
+        undo.setActionName(String(localized: "Carry to the Rack"))
     }
 
     /// Empties `<root>/cache/` (incognito, `Delegate`). A failure costs nothing but disk: the next
