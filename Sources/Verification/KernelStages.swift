@@ -331,6 +331,8 @@ enum KernelStages {
         let sequence = try invocation.integer("--sequence", 4128)
         let report = Report(title: "kernels sdpa-tiles S=\(sequence)")
         guard let device = MTLCreateSystemDefaultDevice(), let queue = device.makeCommandQueue() else { throw GEMM.Failure.noDevice }
+        // A GPU without Metal 4 (the CI's virtual one) has no such kernel to judge: skipped, as a stage without its device.
+        guard device.supportsFamily(.metal4) else { throw Skip("no Metal 4 on this GPU: the tiled attention needs it") }
         var state: UInt64 = 0x5D9A
         func noise(_ amplitude: Float) -> Float {
             state ^= state << 13; state ^= state >> 7; state ^= state << 17
