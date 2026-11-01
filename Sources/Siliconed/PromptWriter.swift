@@ -77,6 +77,9 @@ package final class PromptWriter: @unchecked Sendable {
     private var generator: Qwen3VLGenerator?
     private var tokenizer: Tokenizer?
     private var tokenBytes: TokenBytes?
+    /// What this writer's pages hold of the process's footprint now (`PromptWriterNeed.residentBytes` once loaded, else 0).
+    /// Read from any thread (`availability` is asked on the main actor), written on the engine's queue.
+    private let held = Mutex<Int>(0)
 
     /// The writers that may hold weights: a render unloads them on the engine's queue before its first computation.
     private static let live = Mutex<[ObjectIdentifier: Weak]>([:])
@@ -100,6 +103,7 @@ package final class PromptWriter: @unchecked Sendable {
     }
 
     private func unload() {
+        held.withLock { $0 = 0 }
         generator?.unload()
         generator = nil; tokenizer = nil; tokenBytes = nil
     }
@@ -114,9 +118,18 @@ package final class PromptWriter: @unchecked Sendable {
 
     /// **Whether the feature can run on this Mac at its limits**, an image included — before any request, from
     /// shapes alone. `base`: the process's footprint (`OperatorFootprint.processBase()`).
+    ///
+    /// The need charges the resident weights itself, so what this writer already holds is taken out of the base: asked
+    /// once the weights are loaded, the footprint would otherwise count them twice (and the lab would ask for a 32 GB Mac).
     package func availability(base: Int = OperatorFootprint.processBase()) -> PromptWriterNeed.Availability {
-        PromptWriterNeed.atLimits(maps: maps, limits: limits, base: base).availability(ceiling: ceiling())
+        PromptWriterNeed.atLimits(maps: maps, limits: limits, base: ownBase(measured: base)).availability(ceiling: ceiling())
     }
+
+    /// The process's footprint less what this writer holds resident (that is in the need, not in the base).
+    private func ownBase(measured: Int) -> Int { max(0, measured - held.withLock { $0 }) }
+
+    /// Records the resident weights as held (the load's last act; tests stand in for a load).
+    package func noteResident(_ bytes: Int) { held.withLock { $0 = bytes } }
 
     // MARK: - Running
 
@@ -181,8 +194,7 @@ package final class PromptWriter: @unchecked Sendable {
         }
         var need = PromptWriterNeed(maps: maps, promptTokens: prepared.ids.count, newTokens: limits.newTokens, patches: pixels?.patches)
         // The process's footprint now, less what this writer holds resident (that is in the need, not in the base).
-        let measured = OperatorFootprint.processBase()
-        need.base = self.generator == nil ? measured : max(0, measured - need.residentBytes)
+        need.base = ownBase(measured: OperatorFootprint.processBase())
         let availability = need.availability(ceiling: ceiling())
         guard case .available = availability else { throw Failure.unavailable(availability) }
 
@@ -195,6 +207,7 @@ package final class PromptWriter: @unchecked Sendable {
             emit(.loading(0))
             try generator.load { emit(.loading($0)) }
             self.generator = generator
+            noteResident(need.residentBytes)
         }
         generator.cancellation = cancellation
         let table = tokenBytes ?? tokenizer.tokenBytes(rows: generator.vocabulary)

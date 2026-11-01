@@ -463,6 +463,23 @@ final class PromptWriterTests: XCTestCase {
         print("PromptWriter need (GB): compact peak \(Double(need.peak) / 1e9) = resident \(Double(need.residentBytes) / 1e9) + language \(Double(language.bytes) / 1e9) / vision \(Double(vision.bytes) / 1e9); standard peak \(Double(big.peak) / 1e9); Mac needed: compact \(small) GB, standard \(larger) GB")
     }
 
+    /// The lab asks `availability` again once the weights are loaded (window key, render end): the footprint then holds
+    /// them, and the need charges them too. A writer that holds its weights takes them out of the base, so the answer
+    /// does not change between the first request and the second (it used to ask for a 32 GB Mac).
+    func testAvailabilityDoesNotCountTheHeldWeightsTwice() throws {
+        let m = try maps(int8: true)
+        let sixteen = MemoryBudget.ceiling(physical: 16 << 30)
+        let writer = PromptWriter(maps: m, encoderPath: "", headPath: "", tokenizerPath: "", ceiling: { sixteen })
+        let app = 600_000_000
+        let before = writer.availability(base: app)
+        guard case .available = before else { return XCTFail("16 GB holds the Compact") }
+        let resident = PromptWriterNeed.atLimits(maps: m, plan: .defaults).residentBytes
+        writer.noteResident(resident)
+        XCTAssertEqual(writer.availability(base: app + resident), before, "loaded: the footprint holds the weights")
+        writer.noteResident(0)
+        guard case .needsMac = writer.availability(base: app + resident) else { return XCTFail("unloaded, the same footprint is the app's") }
+    }
+
     /// A prompt that grows makes the need grow by its cache; a text rewrite has no vision phase; the cache is the only
     /// term that follows the prompt beyond the first 512 rows.
     func testTheNeedFollowsThePrompt() throws {
