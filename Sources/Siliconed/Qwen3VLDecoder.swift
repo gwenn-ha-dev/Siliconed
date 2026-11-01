@@ -8,10 +8,14 @@ import Metal
 ///     hidden (the row's embedding) ─ 36 × layer ─ final RMSNorm ─ lm_head ─ argmax ─▶ Pick (id, top 1, top 2)
 ///     layer: norm+rotate ─ q, k, v ─ QK-norm, RoPE, K/V appended to the cache ─ attention over it ─ o ─ norm+rotate ─ gate, up ─ SwiGLU ─ down
 ///
-/// The layers' tensors are the resident pages of `Artifact.keepResident`, wrapped as `MTLBuffer`s without a copy (one
-/// per tensor: a page-aligned base and length, each below `maxBufferLength`), and held resident for the GPU by a
-/// `MTLResidencySet` on the decoder's own queue — Metal does not re-validate 250 buffers at each command buffer. The
-/// K/V cache is the generator's, wrapped the same way (`attach`). What the decoder owns is small: its scratch arena
+/// The layers' tensors are read where they lie and wrapped as `MTLBuffer`s without a copy (one per tensor: a page-aligned
+/// base and length, each below `maxBufferLength`): the map's own clean pages (the page cache's, nobody's footprint), or
+/// the anonymous pages of `Artifact.keepResident` (tests and checks). The layers from `Tail.first` on are **streamed**:
+/// each is read with `pread` + `F_NOCACHE` into one of a few staging buffers while the GPU computes the layer before it
+/// (`TailFeeder`), so the cache keeps the head of the map and a token never reads the tail through it. Resident
+/// anonymous buffers are held for the GPU by a `MTLResidencySet` on the decoder's own queue — Metal does not re-validate
+/// 250 buffers at each command buffer; the map's pages are not put in it (`Tuning.pinsWeights`: pinning would wire them,
+/// and a wired page is no longer the cache's to drop). The K/V cache is the generator's, wrapped the same way (`attach`). What the decoder owns is small: its scratch arena
 /// (`scratchBytes`, charged by `PromptWriterNeed`) — the row, the rotated copies, the projections' partial sums,
 /// the logits, the norm weights widened once (bf16 → fp32 is exact).
 ///
@@ -83,7 +87,23 @@ package final class Qwen3VLDecoder {
         package var targetGroups = 96
         /// Layers encoded into one command buffer; the buffer is committed as soon as it is encoded.
         package var layersPerCommand = 12
+        /// Whether the weights' buffers are made resident for the GPU (`MTLResidencySet.requestResidency`): right for pages the
+        /// process owns, wrong for the map's — it would wire the cache's pages.
+        package var pinsWeights = true
         package init() {}
+    }
+
+    /// **The streamed layers**: `first` to the last are read from `path` into `slots` staging buffers (`TailFeeder`).
+    /// `runs[l - first]` is layer `l`'s run in the file (page-rounded, `Artifact.stagingRun`); `slotBytes` is the largest.
+    package struct Tail {
+        package let path: String
+        package let first: Int
+        package let runs: [(start: Int, end: Int)]
+        package let slots: Int
+        package var slotBytes: Int { runs.map { $0.end - $0.start }.max() ?? 0 }
+        package init(path: String, first: Int, runs: [(start: Int, end: Int)], slots: Int) {
+            self.path = path; self.first = first; self.runs = runs; self.slots = slots
+        }
     }
 
     package let shape: Shape
@@ -92,6 +112,7 @@ package final class Qwen3VLDecoder {
     private let device: MTLDevice
     private let queue: MTLCommandQueue
     private let layers: [Layer]
+    private let feeder: TailFeeder?
     private let head: MTLBuffer
     private let arena: Arena
     private let residency: MTLResidencySet?
@@ -152,7 +173,7 @@ package final class Qwen3VLDecoder {
     ///   - fillNorms: writes the norm table (`normCount` floats, laid out by `normOffset`) — the layers' widened
     ///     `*_layernorm`, `q_norm` and `k_norm`, then the final norm.
     package init(device: MTLDevice, shape: Shape, layers: [Layer], head: MTLBuffer, tuning: Tuning = Tuning(),
-                 fillNorms: (UnsafeMutablePointer<Float>) throws -> Void) throws {
+                 feeder: TailFeeder? = nil, fillNorms: (UnsafeMutablePointer<Float>) throws -> Void) throws {
         guard shape.headDim == 128 else { throw Failure.unsupported("head dimension \(shape.headDim), 128 expected") }
         guard layers.count == shape.layers else { throw Failure.unsupported("\(layers.count) layers of \(shape.layers)") }
         guard shape.hidden % 512 == 0, shape.hidden <= 8192, shape.attentionWidth % 4 == 0 else {
@@ -169,7 +190,7 @@ package final class Qwen3VLDecoder {
                 throw Failure.unsupported("layer \(n): products sharing an input rotate it by different groups")
             }
         }
-        self.device = device; self.shape = shape; self.tuning = tuning; self.layers = layers; self.head = head
+        self.device = device; self.shape = shape; self.tuning = tuning; self.layers = layers; self.head = head; self.feeder = feeder
         guard let queue = device.makeCommandQueue() else { throw Failure.gpu("no command queue") }
         self.queue = queue
         kernels = try DecodeKernels(device: device)
@@ -203,8 +224,12 @@ package final class Qwen3VLDecoder {
         if let set = try? device.makeResidencySet(descriptor: descriptor) {
             var seen = Set<ObjectIdentifier>()
             func add(_ b: MTLBuffer) { if seen.insert(ObjectIdentifier(b)).inserted { set.addAllocation(b) } }
-            for l in layers { for m in [l.q, l.k, l.v, l.o, l.gate, l.up, l.down] { add(m.buffer); if let s = m.scales { add(s) } } }
-            add(head)
+            if tuning.pinsWeights {
+                for l in layers { for m in [l.q, l.k, l.v, l.o, l.gate, l.up, l.down] { add(m.buffer); if let s = m.scales { add(s) } } }
+                add(head)
+            }
+            // The staging buffers are anonymous and few: always pinned.
+            for slot in feeder?.buffers ?? [] { add(slot) }
             for b in buffers.values { add(b) }
             set.commit(); set.requestResidency()
             queue.addResidencySet(set)
@@ -260,9 +285,15 @@ package final class Qwen3VLDecoder {
             return (commands, e)
         }
         func barrier(_ e: MTLComputeCommandEncoder) { e.memoryBarrier(scope: .buffers) }
-        func submit(_ commands: MTLCommandBuffer, _ e: MTLComputeCommandEncoder) {
-            e.endEncoding(); commands.commit(); buffers.append(commands)
+        func submit(_ commands: MTLCommandBuffer, _ e: MTLComputeCommandEncoder, then: (() -> Void)? = nil) {
+            e.endEncoding()
+            if let then { commands.addCompletedHandler { _ in then() } }
+            commands.commit(); buffers.append(commands)
         }
+        // The streamed tail's reads start with the step: the first layers are read while the cached ones compute. A step that
+        // ends early (an error) lets the reads go (`abort`) so that nothing waits on a layer no one will compute.
+        let pass = withLayers ? feeder?.begin() : nil
+        defer { pass?.abort() }
 
         var (commands, e) = try encoder()
         if withLayers {
@@ -271,6 +302,12 @@ package final class Qwen3VLDecoder {
             let layerBytes = cache.layerStride * 4
             for l in 0..<s.layers {
                 let w = layers[l]
+                let slot = feeder.flatMap { l >= $0.first ? (l - $0.first) % $0.slotCount : nil }
+                if slot != nil, let pass {
+                    // What the GPU has been given so far goes first; the wait for the read is the CPU's, not the GPU's.
+                    if l == feeder!.first && l > 0 { submit(commands, e); (commands, e) = try encoder() }
+                    try pass.wait(layer: l)
+                }
                 let rotation = w.q.group, post = w.gate.group
                 // The residual of the previous layer's down projection is added by this norm.
                 d.normRotate(e, x: xBuffer, parts: l == 0 ? nil : partsDown, count: splitsDown, stride: h,
@@ -310,7 +347,11 @@ package final class Qwen3VLDecoder {
                 barrier(e)
                 d.gemv(e, w.down, x: rotIntermediate, parts: partsDown, splits: splitsDown)
                 barrier(e)
-                if (l + 1) % tuning.layersPerCommand == 0 && l + 1 < s.layers {
+                if let slot, let pass {
+                    // One command buffer a streamed layer: its completion gives the staging buffer back to the reads.
+                    submit(commands, e) { pass.release(slot: slot) }
+                    (commands, e) = try encoder()
+                } else if (l + 1) % tuning.layersPerCommand == 0 && l + 1 < s.layers {
                     submit(commands, e)
                     (commands, e) = try encoder()
                 }
@@ -342,35 +383,57 @@ package final class Qwen3VLDecoder {
 // MARK: - From the maps
 
 extension Qwen3VLDecoder {
-    /// **The decoder over the resident tensors of an encoder map and a head map**; throws `Failure.unsupported` (naming the
-    /// first thing) when this Mac or these maps are not what the kernels read: no GPU, a tensor not resident or not page-aligned,
-    /// not int8 with per-column scales (and a convrot or none) or bf16, a shape other than the config's `[k, n]`. Nothing is read
-    /// from the disk here; the norm weights are widened.
-    package static func make(encoder: Artifact, head: Artifact, config: TextEncoder.Config, vocabulary: Int,
+    /// **The decoder over the tensors of an encoder map and a head map, where they lie**: the pages the map is mapped on (or
+    /// `Artifact.keepResident`'s, if the caller kept them), and, from `tail.first`, the staging buffers the streamed layers are
+    /// read into. Throws `Failure.unsupported` (naming the first thing) when this Mac or these maps are not what the kernels read:
+    /// no GPU, a tensor not page-aligned, not int8 with per-column scales (and a convrot or none) or bf16, a shape other than the
+    /// config's `[k, n]`. Nothing is read from the disk here but the norm weights, which are widened.
+    ///
+    /// The arithmetic does not depend on where the bytes come from: the same kernels read the same values.
+    package static func make(encoder: Artifact, head: Artifact, config: TextEncoder.Config, vocabulary: Int, tail: Tail? = nil,
                              device: MTLDevice? = MTLCreateSystemDefaultDevice(), tuning: Tuning = Tuning()) throws -> Qwen3VLDecoder {
         guard let device else { throw Failure.unsupported("no Metal device") }
-        guard encoder.residentCapacity > 0, head.residentCapacity > 0 else { throw Failure.unsupported("the weights are not resident") }
         let shape = Shape(config, vocabulary: vocabulary)
+        let mapped = (encoder.residentCapacity == 0 || head.residentCapacity == 0)
+        var tuning = tuning
+        // The map's pages are the cache's: the GPU is not asked to keep them.
+        if mapped { tuning.pinsWeights = false }
+        let feeder = try tail.map { try TailFeeder(tail: $0, layers: shape.layers, device: device) }
         func wrap(_ artifact: Artifact, _ name: String) throws -> (MTLBuffer, Artifact.Tensor) {
             guard let tensor = artifact.tensors[name], let pointer = artifact.pointer(name) else {
                 throw Failure.unsupported("\(name) is not in the map")
             }
             guard Int(bitPattern: pointer) % Arena.alignment == 0 else { throw Failure.unsupported("\(name) is not page-aligned") }
-            guard let buffer = device.makeBuffer(bytesNoCopy: UnsafeMutableRawPointer(mutating: pointer),
-                                                 length: (tensor.bytes + Arena.alignment - 1) / Arena.alignment * Arena.alignment,
+            let length = (tensor.bytes + Arena.alignment - 1) / Arena.alignment * Arena.alignment
+            // A mapped tensor's last page is the file's: a buffer longer than the mapping would read past it.
+            guard artifact.residentCapacity > 0 || tensor.offset + length <= (artifact.size + Arena.alignment - 1) / Arena.alignment * Arena.alignment else {
+                throw Failure.unsupported("\(name): \(length) bytes from \(tensor.offset) end beyond the map")
+            }
+            guard let buffer = device.makeBuffer(bytesNoCopy: UnsafeMutableRawPointer(mutating: pointer), length: length,
                                                  options: .storageModeShared, deallocator: nil) else {
                 throw Failure.unsupported("\(name): the GPU refuses its \(tensor.bytes) bytes")
             }
             buffer.label = name
             return (buffer, tensor)
         }
-        func matrix(_ name: String, k: Int, n: Int) throws -> DecodeKernels.Matrix {
-            let (buffer, t) = try wrap(encoder, name)
+        /// `at`: the tensor's place in a streamed layer's staging buffer (`buffer` is then the slot's), 0 where it has its own.
+        func matrix(_ name: String, k: Int, n: Int, layer: Int) throws -> DecodeKernels.Matrix {
+            var buffer: MTLBuffer, t: Artifact.Tensor, at = 0
+            if let tail, layer >= tail.first, let feeder {
+                guard let tensor = encoder.tensors[name] else { throw Failure.unsupported("\(name) is not in the map") }
+                let run = tail.runs[layer - tail.first]
+                guard tensor.offset >= run.start, tensor.offset + tensor.bytes <= run.end else {
+                    throw Failure.unsupported("\(name) lies outside layer \(layer)'s run")
+                }
+                buffer = feeder.buffers[(layer - tail.first) % feeder.slotCount]; t = tensor; at = tensor.offset - run.start
+            } else {
+                (buffer, t) = try wrap(encoder, name)
+            }
             guard t.shape == [k, n] else { throw Failure.unsupported("\(name) is \(t.shape), [\(k), \(n)] expected") }
             switch t.dtype {
             case .bfloat16:
                 guard t.rotation == nil else { throw Failure.unsupported("\(name): a rotated bf16 weight") }
-                return DecodeKernels.Matrix(buffer: buffer, format: .bfloat16, k: k, n: n)
+                return DecodeKernels.Matrix(buffer: buffer, format: .bfloat16, k: k, n: n, offset: at)
             case .int8:
                 guard let scale = t.scale, scale.block == nil, scale.shape == [n] else {
                     throw Failure.unsupported("\(name): scales other than one per column")
@@ -382,8 +445,8 @@ extension Qwen3VLDecoder {
                 case .float16: type = .float16
                 default: throw Failure.unsupported("\(name): scales in \(scale.dtype.rawValue)")
                 }
-                return DecodeKernels.Matrix(buffer: buffer, scales: buffer, scalesOffset: scale.offset, scaleType: type,
-                                            format: .int8, k: k, n: n, group: t.rotation?.group ?? 0)
+                return DecodeKernels.Matrix(buffer: buffer, scales: buffer, scalesOffset: at + scale.offset, scaleType: type,
+                                            format: .int8, k: k, n: n, group: t.rotation?.group ?? 0, offset: at)
             default: throw Failure.unsupported("\(name) is \(t.dtype.rawValue)")
             }
         }
@@ -391,16 +454,16 @@ extension Qwen3VLDecoder {
         let (h, a, kv, i) = (shape.hidden, shape.attentionWidth, shape.kvWidth, shape.intermediate)
         for l in 0..<shape.layers {
             let p = "layers.\(l)."
-            layers.append(Layer(q: try matrix(p + "self_attn.q_proj.weight", k: h, n: a), k: try matrix(p + "self_attn.k_proj.weight", k: h, n: kv),
-                                v: try matrix(p + "self_attn.v_proj.weight", k: h, n: kv), o: try matrix(p + "self_attn.o_proj.weight", k: a, n: h),
-                                gate: try matrix(p + "mlp.gate_proj.weight", k: h, n: i), up: try matrix(p + "mlp.up_proj.weight", k: h, n: i),
-                                down: try matrix(p + "mlp.down_proj.weight", k: i, n: h)))
+            layers.append(Layer(q: try matrix(p + "self_attn.q_proj.weight", k: h, n: a, layer: l), k: try matrix(p + "self_attn.k_proj.weight", k: h, n: kv, layer: l),
+                                v: try matrix(p + "self_attn.v_proj.weight", k: h, n: kv, layer: l), o: try matrix(p + "self_attn.o_proj.weight", k: a, n: h, layer: l),
+                                gate: try matrix(p + "mlp.gate_proj.weight", k: h, n: i, layer: l), up: try matrix(p + "mlp.up_proj.weight", k: h, n: i, layer: l),
+                                down: try matrix(p + "mlp.down_proj.weight", k: i, n: h, layer: l)))
         }
         let (headBuffer, headTensor) = try wrap(head, "lm_head.weight")
         guard headTensor.dtype == .bfloat16, headTensor.shape == [vocabulary, h], h % 512 == 0 else {
             throw Failure.unsupported("lm_head is \(headTensor.dtype.rawValue) \(headTensor.shape)")
         }
-        return try Qwen3VLDecoder(device: device, shape: shape, layers: layers, head: headBuffer, tuning: tuning) { table in
+        return try Qwen3VLDecoder(device: device, shape: shape, layers: layers, head: headBuffer, tuning: tuning, feeder: feeder) { table in
             func widen(_ artifact: Artifact, _ name: String, _ offset: Int, _ count: Int) throws {
                 let got = try artifact.materialize(name, into: table + offset, capacity: count)
                 guard got == count else { throw Artifact.Failure.badHeader("\(name): \(got) values, \(count) expected") }
@@ -413,6 +476,102 @@ extension Qwen3VLDecoder {
                 try widen(encoder, p + "self_attn.k_norm.weight", normOffset(shape, layer: l, part: 3), shape.headDim)
             }
             try widen(head, "norm.weight", finalNormOffset(shape), h)
+        }
+    }
+
+    /// **A layer's run in the file, from the header** — what the streamed layers are read as (`Artifact.stagingRun`).
+    package static func runs(of encoder: Artifact, layers: Range<Int>) throws -> [(start: Int, end: Int)] {
+        try layers.map { l in
+            let prefix = "layers.\(l)."
+            let tensors = encoder.tensors.filter { $0.key.hasPrefix(prefix) }.map { (offset: $0.value.offset, bytes: $0.value.bytes) }
+            guard let run = Artifact.stagingRun(tensors, page: encoder.page, fileSize: encoder.size) else {
+                throw Failure.unsupported("layer \(l) has no tensor")
+            }
+            return run
+        }
+    }
+}
+
+/// **The streamed layers' reads**: `slotCount` anonymous staging buffers, each one layer's run, filled in the order the layers
+/// are computed by `pread` + `F_NOCACHE` (the stream's own lanes: `CapacityDisk.read`), so that the file's pages never enter the
+/// cache and the head of the map stays in it. A read of layer `l` waits for the GPU to be done with layer `l − slotCount`, which
+/// used the same buffer (`Pass.release`); the CPU waits for the read before it encodes the layer (`Pass.wait`).
+package final class TailFeeder: @unchecked Sendable {
+    package let first: Int, slotCount: Int, layerCount: Int
+    package let buffers: [MTLBuffer]
+    private let pages: [Pages]
+    private let runs: [(start: Int, end: Int)]
+    private let descriptor: Int32
+    private let issue = DispatchQueue(label: "siliconed.writer.tail")
+
+    init(tail: Qwen3VLDecoder.Tail, layers: Int, device: MTLDevice) throws {
+        guard tail.first < layers, tail.runs.count == layers - tail.first, tail.slots > 0 else {
+            throw Qwen3VLDecoder.Failure.unsupported("a tail from layer \(tail.first) of \(layers)")
+        }
+        let fd = open(tail.path, O_RDONLY)
+        guard fd >= 0 else { throw Qwen3VLDecoder.Failure.unsupported("\(tail.path) cannot be opened (\(errno))") }
+        _ = fcntl(fd, F_NOCACHE, 1)
+        descriptor = fd; first = tail.first; slotCount = tail.slots; layerCount = layers; runs = tail.runs
+        let slots = (0..<tail.slots).map { _ in Pages(bytes: tail.slotBytes) }
+        pages = slots
+        var made: [MTLBuffer] = []
+        for p in slots {
+            guard let b = device.makeBuffer(bytesNoCopy: p.base, length: p.capacity, options: .storageModeShared, deallocator: nil) else {
+                close(fd)
+                throw Qwen3VLDecoder.Failure.unsupported("the GPU refuses a staging buffer of \(p.capacity) bytes")
+            }
+            b.label = "tail staging"
+            made.append(b)
+        }
+        buffers = made
+    }
+
+    deinit { close(descriptor) }   // the queued reads hold `self`: none is left to run
+
+    /// One step's reads: every streamed layer, in order, as the buffers are given back.
+    func begin() -> Pass {
+        let pass = Pass(feeder: self)
+        for index in 0..<runs.count {
+            issue.async {
+                pass.free[index % self.slotCount].wait()
+                if !pass.isAborted {
+                    let run = self.runs[index]
+                    if !CapacityDisk.read(self.descriptor, from: run.start, to: run.end, into: self.pages[index % self.slotCount].base) {
+                        pass.fail()
+                    }
+                }
+                pass.ready[index].signal()
+            }
+        }
+        return pass
+    }
+
+    final class Pass: @unchecked Sendable {
+        fileprivate let free: [DispatchSemaphore], ready: [DispatchSemaphore]
+        private let feeder: TailFeeder
+        private let lock = NSLock()
+        private var aborted = false, failed = false
+
+        fileprivate init(feeder: TailFeeder) {
+            self.feeder = feeder
+            free = (0..<feeder.slotCount).map { _ in DispatchSemaphore(value: 1) }
+            ready = (0..<(feeder.layerCount - feeder.first)).map { _ in DispatchSemaphore(value: 0) }
+        }
+        fileprivate var isAborted: Bool { lock.withLock { aborted } }
+        fileprivate func fail() { lock.withLock { failed = true } }
+
+        /// Blocks until layer `l` is in its buffer.
+        func wait(layer l: Int) throws {
+            ready[l - feeder.first].wait()
+            if lock.withLock({ failed || aborted }) { throw Qwen3VLDecoder.Failure.gpu("the tail's read of layer \(l) failed") }
+        }
+        /// The GPU is done with the slot's buffer.
+        func release(slot: Int) { free[slot].signal() }
+        /// No more reads: the ones still waiting are let through without reading. The extra signals also keep a semaphore's value
+        /// at least its initial one, which libdispatch requires of one it frees.
+        func abort() {
+            lock.withLock { aborted = true }
+            for s in free { for _ in 0..<ready.count { s.signal() } }
         }
     }
 }

@@ -424,11 +424,14 @@ package final class DecodeKernels {
         package let k: Int, n: Int
         /// The convrot group along K, 0 for none.
         package let group: Int
+        /// Where the weight starts in `buffer`: 0 when the buffer is the tensor's own, the tensor's place in a streamed layer's
+        /// staging buffer otherwise (`scalesOffset` then counts from the buffer's start too).
+        package let offset: Int
 
         package init(buffer: MTLBuffer, scales: MTLBuffer? = nil, scalesOffset: Int = 0, scaleType: ScaleType = .none,
-                     format: Format, k: Int, n: Int, group: Int = 0) {
+                     format: Format, k: Int, n: Int, group: Int = 0, offset: Int = 0) {
             self.buffer = buffer; self.scales = scales; self.scalesOffset = scalesOffset; self.scaleType = scaleType
-            self.format = format; self.k = k; self.n = n; self.group = group
+            self.format = format; self.k = k; self.n = n; self.group = group; self.offset = offset
         }
 
         /// Whether the kernels can read it: columns a multiple of the lane's vector, K cut by the rotation's group.
@@ -456,7 +459,7 @@ package final class DecodeKernels {
                       parts: MTLBuffer, partsOffset: Int = 0, splits: Int) {
         e.setComputePipelineState(m.format == .int8 ? gemvInt8 : gemvBF16)
         e.setBuffer(x, offset: xOffset, index: 0)
-        e.setBuffer(m.buffer, offset: 0, index: 1)
+        e.setBuffer(m.buffer, offset: m.offset, index: 1)
         e.setBuffer(m.scales ?? m.buffer, offset: m.scalesOffset, index: 2)
         e.setBuffer(parts, offset: partsOffset, index: 3)
         var args = SIMD4<UInt32>(UInt32(m.k), UInt32(m.n), UInt32(splits), m.scaleType.rawValue)

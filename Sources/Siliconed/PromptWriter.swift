@@ -7,7 +7,8 @@ import Synchronization
 ///
 ///     write(request) ─▶ AsyncThrowingStream<Event>
 ///         prompt (template, tokenizer, image) ─ need from shapes ≤ B? ─ no: `Failure.unavailable(Mac size)`
-///         weights resident? ─ no: `.loading(0…1)` while the layers and the head are read into pages
+///         plan in B ─ how many layers the page cache keeps (the rest is read around it at each token)
+///         decoder on that plan? ─ no: `.loading(0…1)` while it is wired to the maps
 ///         greedy decoding ─ each token's bytes ─ `UTF8Stream` ─ `.text(so far)` ─ `.finished(text, tokens)`
 ///     cancel()    the run in flight stops between two layers: `.cancelled`
 ///     release()   cancels, then gives the weights back (a render is about to start)
@@ -16,14 +17,16 @@ import Synchronization
 ///
 ///   - **It never runs during a render, and the engine sees to it.** A run is a job of the engine's queue (`Engine.file`) and holds
 ///     the machine's render lock (`RenderLock.machine`): the exclusion with a render, in this process and in any other, is the
-///     engine's, not a convention of the app. The writer's resident weights (8.2 GB at the Compact's width) are not in any
-///     render's need, which assumes the whole of B: a render's first act, on that same queue, is `unloadResident()`.
+///     engine's, not a convention of the app. The writer's own memory (decoder scratch, tail staging) and the pages it asks of the
+///     cache are not in any render's need, which assumes the whole of B: a render's first act, on that same queue, is
+///     `unloadResident()`.
 ///   - **One thing at a time**: a run waits for the one before it on the engine's queue; two never share the pages. A run still
 ///     waiting is cancelled by `cancel()` and `release()` as well as the one in flight.
 ///   - **The plan is chosen before the first token**: the need is computed from the prompt's actual size
-///     (`PromptWriterNeed`) and compared with B (`MemoryBudget.machineCeiling`), after the process's base, read
-///     once, before the writer holds anything of its own. Above B, the writer is unavailable, with the Mac
-///     that would hold it; a prompt over `Limits.promptTokens` is refused with its count.
+///     (`PromptWriterNeed`) and placed in B (`MemoryBudget.machineCeiling`, `PromptWriterNeed.chosen`), after the process's base,
+///     read once, before the writer holds anything of its own: all the layers in the page cache, or its head there and the tail
+///     read around it. Only when not even the smallest plan fits is the writer unavailable, with the Mac that would hold it; a
+///     prompt over `Limits.promptTokens` is refused with its count.
 ///   - **The base is read at every run**, never kept: the app's footprint changes between two runs; what the writer itself holds
 ///     resident is taken out of it (it is in the need).
 ///   - **A cancelled stream ends with `.cancelled`, not an error**; a consumer that stops reading cancels the run.
@@ -77,7 +80,8 @@ package final class PromptWriter: @unchecked Sendable {
     private var generator: Qwen3VLGenerator?
     private var tokenizer: Tokenizer?
     private var tokenBytes: TokenBytes?
-    /// What this writer's pages hold of the process's footprint now (`PromptWriterNeed.residentBytes` once loaded, else 0).
+    /// What this writer holds of the process's footprint now (`PromptWriterNeed.residentBytes` once loaded, else 0): its decoder's
+    /// scratch and its staging buffers, never the weights, which are the cache's.
     /// Read from any thread (`availability` is asked on the main actor), written on the engine's queue.
     private let held = Mutex<Int>(0)
 
@@ -94,8 +98,8 @@ package final class PromptWriter: @unchecked Sendable {
 
     deinit { let id = ObjectIdentifier(self); PromptWriter.live.withLock { _ = $0.removeValue(forKey: id) } }
 
-    /// **A render's first act**, on the engine's queue: every writer gives its weights back. The resident layers and head are
-    /// not in any render's need.
+    /// **A render's first act**, on the engine's queue: every writer gives its decoder, its staging buffers and its tokenizer back.
+    /// None of them is in any render's need.
     static func unloadResident() {
         dispatchPrecondition(condition: .onQueue(Engine.file))
         let writers = live.withLock { $0.values.compactMap(\.writer) }
@@ -119,16 +123,17 @@ package final class PromptWriter: @unchecked Sendable {
     /// **Whether the feature can run on this Mac at its limits**, an image included — before any request, from
     /// shapes alone. `base`: the process's footprint (`OperatorFootprint.processBase()`).
     ///
-    /// The need charges the resident weights itself, so what this writer already holds is taken out of the base: asked
-    /// once the weights are loaded, the footprint would otherwise count them twice (and the lab would ask for a 32 GB Mac).
+    /// The need charges the writer's own memory itself, so what this writer already holds is taken out of the base: asked
+    /// once it is loaded, the footprint would otherwise count it twice.
     package func availability(base: Int = OperatorFootprint.processBase()) -> PromptWriterNeed.Availability {
-        PromptWriterNeed.atLimits(maps: maps, limits: limits, base: ownBase(measured: base)).availability(ceiling: ceiling())
+        let b = ceiling()
+        return PromptWriterNeed.atLimits(maps: maps, limits: limits, base: ownBase(measured: base), ceiling: b).availability(ceiling: b)
     }
 
-    /// The process's footprint less what this writer holds resident (that is in the need, not in the base).
+    /// The process's footprint less what this writer holds (that is in the need, not in the base).
     private func ownBase(measured: Int) -> Int { max(0, measured - held.withLock { $0 }) }
 
-    /// Records the resident weights as held (the load's last act; tests stand in for a load).
+    /// Records what the writer holds as held (the load's last act; tests stand in for a load).
     package func noteResident(_ bytes: Int) { held.withLock { $0 = bytes } }
 
     // MARK: - Running
@@ -162,7 +167,7 @@ package final class PromptWriter: @unchecked Sendable {
     /// Stops the run in flight, between two layers, and the runs still waiting.
     package func cancel() { lock.withLock { Array(pending.values) }.forEach { $0.cancel() } }
 
-    /// **Cancels, then gives the weights back** once the run has stopped: the resident layers and head, the
+    /// **Cancels, then gives its memory back** once the run has stopped: the decoder over the maps, the staging, the
     /// tokenizer. Awaited before a render starts.
     package func release() async {
         cancel()
@@ -193,9 +198,12 @@ package final class PromptWriter: @unchecked Sendable {
             throw Failure.promptTooLong(tokens: prepared.ids.count, limit: limits.promptTokens)
         }
         var need = PromptWriterNeed(maps: maps, promptTokens: prepared.ids.count, newTokens: limits.newTokens, patches: pixels?.patches)
-        // The process's footprint now, less what this writer holds resident (that is in the need, not in the base).
+        // The process's footprint now, less what this writer holds (that is in the need, not in the base).
         need.base = ownBase(measured: OperatorFootprint.processBase())
-        let availability = need.availability(ceiling: ceiling())
+        // The plan, in B, before the first token: how many layers the cache keeps, how many are read around it.
+        let b = ceiling()
+        need = need.chosen(ceiling: b)
+        let availability = need.availability(ceiling: b)
         guard case .available = availability else { throw Failure.unavailable(availability) }
 
         // ── the weights ─────────────────────────────────────────────────────────────────────────
@@ -203,13 +211,16 @@ package final class PromptWriter: @unchecked Sendable {
         if let kept = self.generator { generator = kept } else {
             let encoder = try Artifact(path: encoderPath), head = try Artifact(path: headPath)
             generator = try Qwen3VLGenerator(encoder: encoder, head: head, tokenizer: tokenizer)
-            generator.cancellation = cancellation
-            emit(.loading(0))
-            try generator.load { emit(.loading($0)) }
             self.generator = generator
-            noteResident(need.residentBytes)
         }
         generator.cancellation = cancellation
+        // The weights are the maps' own pages: taking them is wiring a decoder to the plan, not reading 8 GB. Another plan (a longer
+        // prompt, a smaller base) rebuilds it.
+        if generator.loadedStreamedFrom != need.placement.streamedFrom {
+            emit(.loading(0))
+            try generator.load(streamedFrom: need.placement.streamedFrom) { emit(.loading($0)) }
+            noteResident(need.residentBytes)
+        }
         let table = tokenBytes ?? tokenizer.tokenBytes(rows: generator.vocabulary)
         tokenBytes = table
 
