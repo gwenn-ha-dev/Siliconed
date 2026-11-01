@@ -1,23 +1,23 @@
-// **Named subjects in the app — experimental, off by default**.
+// **Named subjects in the Prompt Lab** (`Lab.swift`): the library of named pictures.
 //
-//     the Images box        a switch: Images (1 to 3 numbered images, an edit) or Subjects (a library
-//        │                  of named pictures, as many as one wants) — one or the other, never both;
-//        │                  a click on a subject cites it, a drop or « + » names a new one (`SubjectSheet.swift`)
+//     the lab's Images zone   a library of named pictures, as many as one wants: a drop, « + » or « Name… » on an
+//        │                    image names a new one (`SubjectSheet.swift`); each is a tile (`LabImages.swift`)
 //        ▼
-//     the prompt            `@alice in @red-coat` — each cited subject drawn as a chip in the text
-//        │                  (`PromptField.swift`), completed at `@`, an unknown one underlined; 3 at most
+//     the lab's text          `@alice in @red-coat` — each cited subject drawn as a chip in the text
+//        │                    (`PromptField.swift`), completed at `@`, an unknown one underlined; 3 images at most
 //        ▼
-//     the click             each expanded prompt rewritten (`NamedSubjects.rewrite`): the model's prompt,
-//                           hidden but shown on demand, and the cited subjects' framed pictures sent as
-//                           `Request.references` — the engine is unchanged
+//     « Carry to the Rack »   the text translated (`NamedSubjects.rewrite`, through `LabInputs.carry`): the model's
+//                             prompt goes to the rack's Prompt, the cited subjects' framed pictures to its Images
+//                             box, numbered — the rack knows nothing of subjects, and the engine is unchanged
 //
-// **One switch turns it on** (`SubjectLibrary.enabledKey`, « Experimental » in the settings window); off, the
-// app is exactly the app without it: the prompt is a `TextEditor`, nothing is rewritten, no switch.
-// Only Qwen-Image-2.1 shows it — the one visible family whose encoder reads images.
+// Only Qwen-Image-2.1 reads them — the one visible family whose encoder reads images; for the others `@` stays the
+// model's own character (Anima's artists). `silicontrol subjects` and `silicontrol add "@name"` act on the same
+// library and translate at the `add` (`namedJob`).
 //
 // **Incognito, like the history**: the subjects live in this process and die with it. A picture is
 // read whole into memory when it is named (the file can go afterwards); nothing is written to disk —
-// and the `subjects/` folder an earlier version kept in the library is deleted at launch.
+// and the `subjects/` folder an earlier version kept in the library is deleted at launch, as is the switch
+// that turned the subjects on (they are no longer a beta setting).
 
 import AppKit
 import ImageIO
@@ -39,30 +39,24 @@ enum SubjectSource {
 }
 
 /// **The subjects, as the app holds them — in memory only**: the list, their pictures' bytes, their
-/// thumbnails, the switch.
+/// thumbnails.
 @MainActor @Observable
 final class SubjectLibrary {
-    /// **The switch** — a flag in the product, against the rule « one version lives, no flag in the product »:
-    /// an exception wanted for an experimental feature, so that it ships hidden until its words have
-    /// been judged by eye. One key; off by default. A preference, not the user's content.
-    static let enabledKey = "namedSubjects"
-    var enabled = UserDefaults.standard.bool(forKey: SubjectLibrary.enabledKey) {
-        didSet {
-            guard enabled != oldValue else { return }
-            UserDefaults.standard.set(enabled, forKey: Self.enabledKey)
-        }
-    }
+    /// The retired beta switch (« Named Subjects », 0.17): deleted from the preferences at launch.
+    private static let retiredSwitch = "namedSubjects"
 
     private(set) var all: [NamedSubjects.Subject] = []
-    /// Bumped at each change: the prompt field redraws its chips (a thumbnail, a name changed).
+    /// Bumped at each change: the lab's text redraws its chips (a thumbnail, a name changed).
     private(set) var version = 0
     /// The pictures' bytes, by subject key and picture file (`Picture.file`: a name in memory, `1.jpg`).
     @ObservationIgnored private var bytes: [String: Data] = [:]
     /// The thumbnails, by subject, picture and frame — decoded once, from a 512-px copy.
     @ObservationIgnored private var thumbnails: [String: NSImage] = [:]
+    @ObservationIgnored private var sizes: [String: (width: Int, height: Int)] = [:]
 
     init(library: Library) {
-        // An earlier version kept the subjects on disk: incognito now, the folder goes.
+        // An earlier version kept the subjects on disk: incognito now, the folder goes — and the switch, no more a setting.
+        UserDefaults.standard.removeObject(forKey: Self.retiredSwitch)
         try? FileManager.default.removeItem(at: library.root.appendingPathComponent("subjects", isDirectory: true))
     }
 
@@ -92,11 +86,27 @@ final class SubjectLibrary {
         return image
     }
 
+    /// **A picture's size inside its frame**, upright, in pixels — read from the header, without decoding the picture:
+    /// what the Prompt Lab shows of the format an image 1 gives.
+    func framedSize(_ s: NamedSubjects.Subject, _ p: NamedSubjects.Picture) -> (width: Int, height: Int)? {
+        let key = "\(Self.key(s, p))/\(p.frame.x),\(p.frame.y),\(p.frame.width),\(p.frame.height)"
+        if let known = sizes[key] { return known }
+        guard let data = data(s, p), let source = CGImageSourceCreateWithData(data as CFData, nil),
+              let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
+              let w = properties[kCGImagePropertyPixelWidth] as? Int, let h = properties[kCGImagePropertyPixelHeight] as? Int
+        else { return nil }
+        // Orientations 5 to 8 turn the picture on its side: the frame is in the upright space.
+        let turned = (properties[kCGImagePropertyOrientation] as? Int).map { (5...8).contains($0) } ?? false
+        let px = p.frame.pixels(width: turned ? h : w, height: turned ? w : h)
+        sizes[key] = (px.width, px.height)
+        return sizes[key]
+    }
+
     /// **The references a rewrite places**, in its order: each picture decoded from its bytes, cropped
     /// to its frame. Never dropped, even undecodable: the prompt's numbers count every picture — the
     /// render then fails naming it.
-    func references(_ r: NamedSubjects.Rewritten) -> [ReferenceImage] {
-        r.placed.map { placed in
+    func references(_ placed: [NamedSubjects.Placed]) -> [ReferenceImage] {
+        placed.map { placed in
             let picture = placed.subject.pictures.firstIndex(of: placed.picture) ?? 0
             let image = upright(placed.subject, placed.picture).flatMap { SubjectPictures.crop($0, placed.picture.frame) }
             return ReferenceImage(source: .subject(image, name: "@" + placed.subject.name),
@@ -174,6 +184,7 @@ final class SubjectLibrary {
     private func changed() {
         all.sort { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
         thumbnails = [:]
+        sizes = [:]
         version += 1
     }
 }
@@ -278,7 +289,7 @@ extension Problem {
         switch f {
         case .unknownSubject(let name):
             self.init(String(localized: "No subject is called @\(name)."),
-                      suggestion: String(localized: "Name it first: drop an image under Subjects, in the Images box."))
+                      suggestion: String(localized: "Name it first: in the Prompt Lab, drop an image and choose Name…"))
         case let .tooManyImages(count, max):
             self.init(String(localized: "This prompt takes \(String(count)) images: a render takes \(String(max)) at most."),
                       suggestion: String(localized: "A subject with two pictures counts twice."))
@@ -301,53 +312,23 @@ extension NamedSubjects.NameProblem {
     }
 }
 
-// MARK: - The rack's and the render's side
+// MARK: - The remote control's side
 
 extension AppState {
-    /// **The Images box offers its Subjects mode**: the switch is on and the chosen model's encoder
-    /// reads images (Qwen-Image-2.1).
-    var subjectsAvailable: Bool { subjects.enabled && promptNamesImages && maxReferences > 0 }
-    /// **The subjects are shown, and `@names` are read**: the box is in its Subjects mode.
-    var subjectsActive: Bool { subjectsAvailable && referenceMode == .subjects }
-
-    /// **One expanded prompt, rewritten** — `nil` when the feature is off or the prompt cites nobody.
-    /// For the rack's model and edit images by default; the remote control passes its request's — a
-    /// `model` it holds, or in a mirror (no model chain here) the `capacity` the other Mac published.
+    /// **One expanded prompt, rewritten** for `silicontrol add` — `nil` when the prompt cites nobody. For a `model`
+    /// it holds, or in a mirror (no model chain here) the `capacity` the other Mac published; `editImages` are the
+    /// images the request brings itself, the subjects taking the places after them. The rack itself rewrites nothing:
+    /// the lab translates, and the rack receives the translation.
     func rewrite(_ expanded: String, model: Model? = nil, capacity given: Int? = nil,
                  editImages: Int? = nil) -> Result<NamedSubjects.Rewritten, NamedSubjects.Failure>? {
-        // The rack reads `@names` in its Subjects mode only; the remote control, which brings its own
-        // images, whenever the switch is on — and, like the rack, only for a model that reads images:
-        // elsewhere `@` is the model's own (Anima's card writes an artist `@incase`).
-        guard model == nil && given == nil ? subjectsActive : subjects.enabled, !NamedSubjects.mentions(in: expanded).isEmpty else { return nil }
-        let capacity = given ?? model.map { $0.chain.text.output.readsImages ? $0.chain.denoising.maxReferences : 0 }
-            ?? (promptNamesImages ? maxReferences : 0)
-        guard capacity > 0 else { return nil }
+        guard !NamedSubjects.mentions(in: expanded).isEmpty else { return nil }
+        // Only for a model that reads images: elsewhere `@` is the model's own (Anima's card writes an artist `@incase`).
+        guard let capacity = given ?? model.map({ $0.chain.text.output.readsImages ? $0.chain.denoising.maxReferences : 0 }),
+              capacity > 0 else { return nil }
         let first = (editImages ?? references.count) + 1
         return Result { () throws(NamedSubjects.Failure) in
             try NamedSubjects.rewrite(expanded, subjects: subjects.all, capacity: capacity, first: first)
         }
-    }
-
-    /// **The rewrite the rack shows**: the first expanded prompt's (a series cites the same subjects
-    /// unless a group holds one — each job is rewritten on its own at the click).
-    var shownRewrite: Result<NamedSubjects.Rewritten, NamedSubjects.Failure>? {
-        rewrite((try? alternatives.get().prompts.first) ?? prompt)
-    }
-
-    /// What the subjects refuse, said like the rest of the form — the first refusal of any expansion.
-    var subjectsBlocker: String? {
-        guard subjectsActive, let prompts = try? alternatives.get().prompts else { return nil }
-        for p in prompts {
-            if case .failure(let f)? = rewrite(p) { return Problem(f).title }
-        }
-        return nil
-    }
-
-    /// The images the subjects add to the next render (the first expansion's): what the cost, the
-    /// plan and the learned speed count with the edit's own.
-    var subjectImageCount: Int {
-        if case .success(let r)? = shownRewrite { return r.placed.count }
-        return 0
     }
 
     /// **The job's prompt and references for one expanded prompt**: rewritten when it cites subjects,
@@ -357,71 +338,10 @@ extension AppState {
                   model: Model? = nil, capacity: Int? = nil) -> [ReferenceImage] {
         guard case .success(let r)? = rewrite(expanded, model: model, capacity: capacity, editImages: edit.count),
               !r.placed.isEmpty else { return edit }
-        let placed = subjects.references(r)
+        let placed = subjects.references(r.placed)
         settings.modelPrompt = r.prompt
         settings.subjectImages = placed.count
         settings.references = edit.count + placed.count
         return edit + placed
-    }
-
-    /// **`@name` inserted where the prompt's caret is** (a click on a chip) — appended when the field
-    /// is not on screen. A space before it when it would glue to a word.
-    func cite(_ s: NamedSubjects.Subject) {
-        if let field = PromptTextView.current, field.window != nil {
-            field.insertMention(s.name)
-            return
-        }
-        let glue = prompt.last.map { !$0.isWhitespace } ?? false
-        prompt += (glue ? " " : "") + "@\(s.name) "
-    }
-
-    // ── the sheet ──
-
-    /// The open panel, then the sheet: an image to name.
-    func chooseSubjectImage() {
-        let panel = NSOpenPanel()
-        panel.allowedContentTypes = [.image]
-        panel.prompt = String(localized: "Choose")
-        panel.message = String(localized: "An image to name: a person, a garment, an object, a place or a style.")
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        nameSubject(.file(url))
-    }
-
-    /// A file or PNG bytes dropped on the subjects shelf: the sheet opens on it.
-    func nameSubject(_ source: SubjectSource) {
-        guard let draft = SubjectDraft(new: source, taken: subjects.all.map(\.name)) else {
-            flash(String(localized: "This image can’t be read"))
-            return
-        }
-        subjectDraft = draft
-    }
-
-    func editSubject(_ s: NamedSubjects.Subject) {
-        subjectDraft = SubjectDraft(editing: s, library: subjects)
-    }
-
-    func deleteSubject(_ s: NamedSubjects.Subject) {
-        subjects.delete(s)
-        flash(String(localized: "@\(s.name) deleted"))
-    }
-
-    /// Asked first: prompts that cite it are refused afterwards.
-    func confirmDeletion(_ s: NamedSubjects.Subject) {
-        let alert = NSAlert()
-        alert.messageText = String(localized: "Delete @\(s.name)?")
-        alert.informativeText = String(localized: "Prompts that cite it will be refused.")
-        alert.addButton(withTitle: String(localized: "Delete"))
-        alert.addButton(withTitle: String(localized: "Cancel"))
-        alert.buttons[0].hasDestructiveAction = true
-        if alert.runModal() == .alertFirstButtonReturn { deleteSubject(s) }
-    }
-
-    /// A subject renamed: the prompt's mentions of it follow.
-    func renameMentions(_ old: String, to new: String) {
-        var text = prompt
-        for m in NamedSubjects.mentions(in: prompt).reversed() where NamedSubjects.key(m.name) == NamedSubjects.key(old) {
-            if let r = Range(NSRange(m.range, in: prompt), in: text) { text.replaceSubrange(r, with: "@" + new) }
-        }
-        prompt = text
     }
 }

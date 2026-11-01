@@ -33,18 +33,35 @@ English · [Français](RELEASE-NOTES.fr.md)
 - **A measure applies to the next render**, no longer to the next launch: never to a render under way, so that a render still reads one plan from start to end. From then on, one seed can give an image a little different from before the measure.
 - **The rack says how the weights are stored**: a label on the DiT, the text encoder and the VAE (`int8`, `Q8_0`, `Q4_K_M`, `bf16`…), read from what is installed, beside the label that says what computes (“computes fp32”). A borrowed Mac publishes them too.
 
-### Prompt Lab (beta)
+### Prompt Lab: the inputs of a render, prepared
 
-- **A window of its own, in the Window menu (⌥⌘L)**: Rewrite turns a short prompt into one written for
-  the model you pick; Describe turns a dropped image into a prompt. Send to Rack puts the result in the
-  rack's prompt; nothing is applied on its own.
-- **The writer is a model you already have**: Qwen-Image-2.1's text encoder, Qwen3-VL-8B, made to write.
+- **A window of its own, in the Window menu (⌥⌘L)**: images on one side, one text on the other, and a
+  line under them, “The rack will receive”, that says what is carried. Carry to the Rack fills the
+  rack's boxes — its Prompt, where ⌘Z in the field brings the old one back, and its Images, which have
+  no undo and are said to be replaced. Nothing is applied on its own.
+- **Every image has a role**: starting image (image 1, the one a Qwen-Image-2.1 edit changes; it gives
+  the format), reference, or describe only. The first image dropped is the start, the next ones
+  references; on the models that read no image they are describe only. Three images at most.
+- **Named subjects move here**, out of the rack and out of Settings, where they were a beta switch:
+  name an image, cite it as `@name` in the text, and the lab hands the rack the prompt translated
+  (“the person in image 3”) and the pictures, numbered after the start and the references. The rack
+  knows nothing of them. Still in memory only; `silicontrol subjects` and `add "@name"` stay. A `@name`
+  cannot sit inside a `{a|b}` group. The PNG of the render keeps the prompt the model read, as for
+  any render of the rack.
+- **Rewrite and Describe mix in one text** (beta): Rewrite works on all of it, additions and removals
+  marked; Describe writes at the caret, or fills an empty text; ⌘Z undoes either. A `@name` is put
+  aside while the writer rewrites and put back; one it loses is said, never dropped in silence.
+- **Only those two wait**: during a render, or without the writer installed, naming, framing, roles and
+  Carry go on; Rewrite and Describe wait, under one sentence.
+- **Following another Mac**: Rewrite and Describe are off and say so, while images, roles, subjects
+  and Carry fill the rack you see, which sends its references to the Mac that renders.
+- **The writer is a model already installed**: Qwen-Image-2.1's text encoder, Qwen3-VL-8B, made to write.
   Only its output layer is missing from the installed model: Install the Writer downloads it from the
   same repository, 1.25 GB, by byte range. It needs Qwen-Image-2.1 installed; on its Compact, a 16 GB
   Mac (the Standard needs a bigger one).
 - **Our instructions, one per model**, drawn from what each publisher says of its prompts: every element
   of your prompt is kept, quoted text word for word, nothing removed, softened or moralized.
-- **Never during a render**: an image that starts stops the writer, and the lab waits.
+- **Never during a render**: an image that starts stops the writer, and Rewrite and Describe wait.
 - **Checked against the reference**: greedy decoding gives the same tokens as transformers in fp32
   (`siliconed check qwen-image-2.1 writer`). About 18 tokens a second on an M1 Pro, on the GPU, from the
   weights kept in memory.
@@ -55,7 +72,7 @@ English · [Français](RELEASE-NOTES.fr.md)
 - **Render Again (Same Seed)** replaces “Redo” (⌘R); the rack's batch field is now **Batch**.
 - **Window › Show Siliconed** brings the window back (⌘N is gone), **Close Window** has ⌘W back, Full Screen moves to ⌃⌘F, and “Copy the silicontrol command” is **Copy as Terminal Command**.
 - **Generate steps aside** in the Render menu while the exploration panel, the Prompt Lab or Settings is the key window, so ⌘↩ reaches that window's own button.
-- **Settings › Advanced** reads This Mac, Command Line, then **Beta**: More Solvers (formerly Developer Mode), Named Subjects and Negative LoRA Strengths, with the Beta badge the Prompt Lab wears too. The comparison choice left Settings for the canvas toolbar, and Measure This Mac left the Models window.
+- **Settings › Advanced** reads This Mac, Command Line, then **Beta**: More Solvers (formerly Developer Mode) and Negative LoRA Strengths, with the Beta badge Rewrite and Describe wear too. The comparison choice left Settings for the canvas toolbar, and Measure This Mac left the Models window.
 - **Clear History…** asks nothing when every image is saved (⌘Z brings the history back); “Accept and Render” is no longer the default button, so Return cannot accept a license by accident.
 - **VoiceOver**: labels on every icon button, on the images (read as their prompt), on the rack's tiles and on the progress, which now speaks in percent; the curtain is one adjustable element (up and down move the line, or switch the image in Switch); the toast is announced. Click targets of the small close and stop buttons grow to 24 pt, and Reduce Motion now stops every animation of the app.
 - **Keys stay with the control that has them**: with a slider, a stepper or a button focused, the arrows and Space are the control's, not the history's.

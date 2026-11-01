@@ -62,7 +62,7 @@ extension AppState {
         _ = settingsEpoch
         guard settingsRead else { return nil }
         let f = outputFormat
-        return need(f, images: references.count + subjectImageCount)
+        return need(f, images: references.count)
     }
 
     /// Why "Generate" is grayed out, or `nil`: the app does not try what the request would refuse.
@@ -81,7 +81,6 @@ extension AppState {
         case .failure(let e): return Problem(e).text
         case .success(let a): n = a.count
         }
-        if let refusal = subjectsBlocker { return refusal }
         if file.count >= Self.maxQueueLength { return String(localized: "The queue is full.") }
         if file.count + n > Self.maxQueueLength {
             let room = Self.maxQueueLength - file.count
@@ -159,7 +158,7 @@ extension AppState {
         _ = settingsEpoch
         guard settingsRead, let card else { return nil }
         let f = outputFormat
-        let images = references.count + subjectImageCount
+        let images = references.count
         do { try checkNeed(f, images: images) } catch {
             // A need that cannot be computed refuses too, with its own sentence (`memoryNeedUnknown`).
             guard case let .insufficientMemory(needed, budget) = error else { return MemoryRefusal(text: Problem(error).text, smaller: nil) }
@@ -272,7 +271,7 @@ extension AppState {
     var plannedCost: Double? {
         let withLoRA = loras.contains { !$0.path.isEmpty }
         let format = outputFormat
-        let images = references.count + subjectImageCount
+        let images = references.count
         guard let v = speeds[Speed.key(identifier, format, references: images, lora: withLoRA)] else { return nil }
         guard let plan = expectedPlan(steps: steps, format: format, withLoRA: withLoRA || !plainSampling,
                                       references: images) else { return nil }
@@ -285,7 +284,7 @@ extension AppState {
     func stageEstimate(_ stage: Engine.Stage) -> Double? {
         let withLoRA = loras.contains { !$0.path.isEmpty }
         let format = outputFormat
-        let images = references.count + subjectImageCount
+        let images = references.count
         guard let v = speeds[Speed.key(identifier, format, references: images, lora: withLoRA)] else { return nil }
         switch stage {
         case .text: return v.text
@@ -349,7 +348,7 @@ extension AppState {
         do { try checkFormat(width: w, height: h) } catch { return Problem(error) }
         // Beyond B, refused here as the picker greys it out: the same check as the engine's.
         if settingsRead {
-            do { try checkNeed(RecommendedFormat(w, h), images: subjectImageCount) }
+            do { try checkNeed(RecommendedFormat(w, h), images: 0) }
             catch { return Problem(error) }
         }
         let f = RecommendedFormat(w, h)
@@ -367,6 +366,6 @@ extension AppState {
     /// the footer then says why.
     func orientationChanged() {
         guard format.orientation != orientation, let first = orientationFormats.first else { return }
-        format = orientationFormats.first { macNeeded($0, images: subjectImageCount) == nil } ?? first
+        format = orientationFormats.first { macNeeded($0, images: 0) == nil } ?? first
     }
 }

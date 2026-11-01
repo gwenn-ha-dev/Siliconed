@@ -86,10 +86,6 @@ extension AppState {
         if let reason = installBlocker { return reason }
         if !exploresModels, missing != nil { return String(localized: "This model isn’t installed.") }
         if explorePrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return String(localized: "Write a prompt.") }
-        // Named subjects are rewritten for « Generate » only: a grid would read `@alice` as text.
-        if subjectsActive, !NamedSubjects.mentions(in: explorePrompt).isEmpty {
-            return String(localized: "The exploration doesn’t cite named subjects yet.")
-        }
         let g: RenderGrid
         switch grid {
         case .failure(let e): return Problem(e).text

@@ -135,17 +135,13 @@ extension RemoteControl {
         var sketch = false
     }
 
-    /// **`subjects`** (experimental, `Subjects.swift`): list, name, delete — the Subjects mode's
-    /// gestures, in the app's memory. Citing one is `add "@alice in a library"`. Refused while the app's switch is off.
+    /// **`subjects`** (`Subjects.swift`): list, name, delete — the Prompt Lab's library, in the app's memory.
+    /// Citing one is `add "@alice in a library"`.
     ///
     ///     subjects                                              the library
     ///     subjects add IMAGE --name N --kind K [--frame x,y,w,h] [--second IMAGE2]
     ///     subjects remove NAME
     func subjects(_ arguments: [String], cwd: String) throws -> [String: Any] {
-        guard app.subjects.enabled else {
-            throw Refusal("disabled", String(localized: "named subjects are off"),
-                          help: String(localized: "turn on Experimental → Named Subjects in Settings (⌘,)"))
-        }
         // In memory, like the history: a subject lives as long as the app (incognito) — no path to give.
         func json(_ s: NamedSubjects.Subject) -> [String: Any] {
             ["name": s.name, "kind": s.kind.rawValue,

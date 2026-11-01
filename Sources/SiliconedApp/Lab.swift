@@ -1,29 +1,37 @@
-// **The Prompt Lab: a window where an installed language model writes a better prompt.**
+// **The Prompt Lab: where the inputs of a render are prepared, and an installed language model helps write them.**
 //
 //     Window ▸ Prompt Lab (⌥⌘L)
-//     ┌──────────────────────────────────────────────────┐
-//     │ Write for [Z-Image ▾]         Writer: Qwen3-VL-8B │
-//     │            ( Rewrite | Describe )                │
-//     │ ┌──────────────────────────────────────────────┐ │
-//     │ │ woman posing in a library                    │ │   Rewrite: a text, typed, pasted
-//     │ │                    Use the Rack’s Prompt     │ │   or taken from the rack
-//     │ └──────────────────────────────────────────────┘ │   Describe: an image, dropped or opened
-//     │ [                  Rewrite                     ] │
-//     │ ┌ Result ─────────────────────────── Edit ─────┐ │
-//     │ │ A candid photograph of woman standing …      │ │   additions in the accent, removals struck
-//     │ └──────────────────────────────────────────────┘ │
-//     │                                  [ Send to Rack ]│
-//     └──────────────────────────────────────────────────┘
+//     ┌ Prompt Lab ───────────────────────────── Write for [Qwen-Image-2.1 ▾] ┐
+//     │ Images                                                                │   a library, as long as one wants
+//     │ ┌────────────┐ ┌────────────┐ ┌────────────┐ ┌────┐                   │   each image its role:
+//     │ │ 1 · Start ▾│ │ 2 · @alice │ │ Describe   │ │ +  │  drop, open,      │   start · reference · @name · describe only
+//     │ └────────────┘ └────────────┘ │ only      ▾│ └────┘  or from history   │
+//     │ Text                           └────────────┘      Use the Rack’s Prompt│
+//     │ ┌───────────────────────────────────────────────────────────────────┐ │   one text, always editable by hand
+//     │ │ (▣ alice) on a station platform at night, neon, fine rain…        │ │   `@name` drawn as a chip
+//     │ └───────────────────────────────────────────────────────────────────┘ │
+//     │ [ Rewrite  Beta ]                                                     │
+//     │ The rack will receive: « …the person in <image2>… »  1 ▣  2 ▣  1024×1536│
+//     │ Replaces the rack’s prompt (⌘Z brings it back) and its images.        │
+//     │                                              [ Carry to the Rack ]    │
+//     └───────────────────────────────────────────────────────────────────────┘
 //
-// - **The render always has priority.** When one starts (`AppState.busy`: running or queued), a write
-//   under way is cancelled — the window says so once, quietly —, the writer is told to release its memory,
-//   and the two buttons grey out under one sentence until the render ends. Hand-editing stays.
-// - **Incognito**: the text, the image, the results live in `LabModel`, in memory; no file, no default,
-//   no history. Closing the window cancels and releases; the texts stay for the session.
-// - **This Mac only**: while the window follows another Mac (`Carrier.mirror`), the lab says so and
-//   does nothing — the writer is this Mac's, the rack it would fill is not.
-// - **« Send to Rack »** sets the rack's prompt; the prompt field applies it through the text system, so
-//   ⌘Z in that field brings the old prompt back (`PromptField.updateNSView`).
+// - **The lab prepares, the rack shows what the render reads.** « Carry to the Rack » fills the boxes the rack has
+//   always had: its Prompt (the text translated, the `@names` turned into « image N »; ⌘Z in the field brings the old
+//   prompt back) and its Images box (1 to 3 numbered images, which have no undo — the line says so). The rack does not
+//   know the subjects. The rules are `LabInputs` (`Sources/Siliconed`), pure and tested.
+// - **No tabs, gestures that mix.** Describe writes into the text: it fills it when empty, otherwise it inserts at the
+//   caret or replaces the selection. Rewrite works on all of it, additions and removals marked (« Edit » puts the marks
+//   away). **⌘Z undoes any gesture of the language model**: the text is written through the text system (`PromptTextView.replace`).
+// - **Availability is judged gesture by gesture.** While an image renders, or without an installed writer, only Rewrite
+//   and Describe wait, under one sentence; naming, framing, choosing a role and carrying need no model. **The render always
+//   has priority** (`AppState.busy`): a write under way is cancelled — said once, quietly — and the writer gives its memory back.
+// - **Mentions are protected in a rewrite** (`LabInputs.MentionGuard`): each `@name` is put aside as a neutral token and put
+//   back; one the writer lost or deformed is told, never dropped in silence.
+// - **Incognito**: the text, the images, the subjects live in memory; no file, no default, no history. Closing the window cancels
+//   and releases; the texts stay for the session.
+// - **Following another Mac** (`Carrier.mirror`): Rewrite and Describe are off and say so (the writer is this Mac's); images, roles,
+//   subjects and « Carry » fill the rack that is shown, which sends its references to the Mac that renders.
 // - The engine is behind `LabWriter` (`LabWriter.swift`).
 
 import AppKit
@@ -36,33 +44,51 @@ import SwiftUI
 final class LabModel {
     static let shared = LabModel()
 
-    enum Gesture: String, CaseIterable, Identifiable { case rewrite, describe; var id: String { rawValue } }
+    enum Gesture: Equatable { case rewrite, describe }
     enum Phase: Equatable { case idle, loading(Double?), writing }
 
-    /// A finished result: `original` is the text it rewrites (the diff's other side), `nil` when there is none.
-    struct Result: Equatable { var text: String; var original: String? }
+    /// An image of the zone: its bytes as given, never re-encoded, and what the render makes of it.
+    struct Picture: Identifiable {
+        let id = UUID()
+        let data: Data
+        let thumbnail: NSImage
+        /// Upright, in pixels: image 1's give the format.
+        let width: Int, height: Int
+        var role: LabInputs.Role
+    }
+
+    /// What a rewrite changed, to draw its marks while the text is still the one it wrote.
+    struct Changes: Equatable { var before: String; var after: String }
 
     /// The engine's writer; nothing is read from disk until the first `availability`, and no weight until the first gesture.
     var writer: any LabWriter = EngineLabWriter(library: MainWindow.shared.local.library) { didSet { refresh() } }
     private(set) var availability: LabAvailability = .unavailable(.preparing)
 
-    var gesture = Gesture.rewrite
-    var text = ""
-    var image: Data?
-    var thumbnail: NSImage?
+    var text = "" {
+        // The marks belong to the text the writer wrote: any other text puts them away.
+        didSet { if let c = changes, text != c.after { changes = nil } }
+    }
+    var pictures: [Picture] = []
     /// The family chosen by hand; `nil` follows the rack's.
     var chosenTarget: Family?
+    private(set) var changes: Changes?
 
     private(set) var phase = Phase.idle
     private(set) var streaming = ""
-    var results: [Gesture: Result] = [:]
-    /// Rewrite: whether the result is shown as edited by hand rather than as a diff.
-    var editing = false
+    /// The gesture under way, and the image it describes.
+    private(set) var running: Gesture?
+    private(set) var describing: Picture.ID?
     private(set) var stopped = false
     private(set) var failure: String?
-    private(set) var sent = false
-    /// Whether a render is running or queued on this Mac: the lab is paused.
+    /// What a rewrite did not keep of the mentions, in one sentence.
+    private(set) var notice: String?
+    private(set) var carried = false
+    /// Whether a render is running or queued on this Mac: the writer waits.
     private(set) var rendering = false
+
+    /// The sheet that names or edits a subject, while it is open — and the image it names.
+    var draft: SubjectDraft?
+    @ObservationIgnored private var naming: (picture: Picture.ID, known: Int)?
 
     @ObservationIgnored private var task: Task<Void, Never>?
     @ObservationIgnored private var generation = 0
@@ -73,6 +99,80 @@ final class LabModel {
     func refresh() {
         (writer as? EngineLabWriter)?.library = MainWindow.shared.local.library
         availability = writer.availability
+    }
+
+    // MARK: Where it writes for
+
+    /// The rack the lab fills: the one the window shows — this Mac's, or the other Mac's mirror.
+    var rack: AppState { MainWindow.shared.app }
+    /// Whether the window follows another Mac.
+    var following: Bool { MainWindow.shared.carrier.mirror != nil }
+    var subjects: SubjectLibrary { MainWindow.shared.local.subjects }
+
+    /// The families the lab prepares for: those installed here, in the catalog's order — or, in a mirror, the model
+    /// the other Mac's rack has chosen.
+    var families: [Family] {
+        if following { return rack.card.map { [$0.family] } ?? [] }
+        let ready = Set(rack.cards.filter { rack.readySet.contains($0.id) }.map(\.family))
+        return Family.allCases.filter(ready.contains)
+    }
+
+    var target: Family? {
+        if let c = chosenTarget, families.contains(c) { return c }
+        if let f = rack.card?.family, families.contains(f) { return f }
+        return families.first
+    }
+
+    /// The installed card the rack takes to render for `family`: its own when it is of that family.
+    private func card(for family: Family) -> ModelCard? {
+        if let current = rack.card, current.family == family { return current }
+        return rack.cards.first { $0.family == family && rack.readySet.contains($0.id) }
+    }
+
+    /// **How many images the model aimed at reads** (0: none) — from its denoiser here, from the traits the other Mac
+    /// published in a mirror.
+    var capacity: Int {
+        guard let family = target else { return 0 }
+        if following { return rack.promptNamesImages ? rack.maxReferences : 0 }
+        guard let card = card(for: family), let model = rack.model(card.id) else { return 0 }
+        return model.chain.text.output.readsImages ? model.chain.denoising.maxReferences : 0
+    }
+
+    var offeredRoles: [LabInputs.Role] { LabInputs.roles(capacity: capacity) }
+
+    // MARK: The render's priority
+
+    /// Follows `AppState.busy` for as long as the process lives — not through a view, which SwiftUI may
+    /// stop updating once its window is hidden.
+    func watchRender() {
+        guard !watching else { return }
+        watching = true
+        rendering = MainWindow.shared.local.busy
+        observeRender()
+    }
+
+    private func observeRender() {
+        withObservationTracking {
+            _ = MainWindow.shared.local.busy
+        } onChange: { [weak self] in
+            Task { @MainActor in
+                guard let self else { return }
+                self.renderChanged(MainWindow.shared.local.busy)
+                self.observeRender()
+            }
+        }
+    }
+
+    private func renderChanged(_ busy: Bool) {
+        guard busy != rendering else { return }
+        rendering = busy
+        if busy {
+            // The memory goes back even when nothing was being written: the writer may still be loaded.
+            if isWriting { stop(becauseOfRender: true) }
+            Task { await writer.release() }
+        } else {
+            refresh()
+        }
     }
 
     // MARK: The writer's head
@@ -111,60 +211,74 @@ final class LabModel {
         }
     }
 
+    // MARK: What waits, gesture by gesture
 
-    // MARK: The render's priority
-
-    /// Follows `AppState.busy` for as long as the process lives — not through a view, which SwiftUI may
-    /// stop updating once its window is hidden.
-    func watchRender() {
-        guard !watching else { return }
-        watching = true
-        rendering = MainWindow.shared.local.busy
-        observeRender()
-    }
-
-    private func observeRender() {
-        withObservationTracking {
-            _ = MainWindow.shared.local.busy
-        } onChange: { [weak self] in
-            Task { @MainActor in
-                guard let self else { return }
-                self.renderChanged(MainWindow.shared.local.busy)
-                self.observeRender()
+    /// **Why Rewrite and Describe wait**, in one sentence; `nil` when they can run. They are the only gestures that need the
+    /// language model: everything else in the lab works without it, during a render too.
+    var writerPause: (symbol: String, sentence: String)? {
+        if following { return ("macbook", String(localized: "Rewrite and Describe are off while the window follows another Mac.")) }
+        if rendering { return ("pause.circle", String(localized: "Rewrite and Describe wait while an image renders.")) }
+        if case .unavailable(let why) = availability {
+            switch why {
+            case .notInstalled: return ("shippingbox", String(localized: "No writer is installed yet. Install a model to have one."))
+            case .needsMemory(let n): return ("memorychip", String(localized: "The writer needs a Mac with \(n) GB of memory."))
+            case .preparing: return ("hourglass", String(localized: "The writer is being prepared."))
+            case .needsHead(let bytes):
+                return ("arrow.down.circle", String(localized: "The writer needs one more download from Qwen-Image-2.1’s repository: \(Figures.disk(Int(bytes))).")) 
             }
         }
+        if target == nil { return ("shippingbox", String(localized: "No writer is installed yet. Install a model to have one.")) }
+        return nil
     }
 
-    private func renderChanged(_ busy: Bool) {
-        guard busy != rendering else { return }
-        rendering = busy
-        if busy {
-            // The memory goes back even when nothing was being written: the writer may still be loaded.
-            if isWriting { stop(becauseOfRender: true) }
-            Task { await writer.release() }
-        } else {
-            refresh()
+    var canRewrite: Bool {
+        writerPause == nil && !isWriting && !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    var canDescribe: Bool { writerPause == nil && !isWriting }
+
+    // MARK: Writing
+
+    /// **Rewrite**: the whole text, its mentions put aside and put back.
+    func rewrite() {
+        guard canRewrite, let target else { return }
+        let typed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        // `@` is a subject's only for a model that reads images; elsewhere it is the model's own (Anima's artists).
+        let guarded = capacity > 0 ? LabInputs.MentionGuard(typed) : nil
+        let input = LabInput.text(guarded?.masked ?? typed)
+        begin(input, for: target, gesture: .rewrite, picture: nil) { [self] written in
+            var final = written
+            if let guarded {
+                let back = guarded.restore(written)
+                final = back.text
+                if !back.intact { notice = Self.mentionNotice(lost: back.lost) }
+            }
+            place(final, replacingAll: true)
+            changes = Changes(before: typed, after: text)
         }
     }
 
-    // MARK: Gestures
+    /// **Describe**: an image of the zone, or a subject's first picture.
+    func describe(_ picture: Picture) { describe(data: picture.data, id: picture.id) }
 
-    func run(target: Family) {
-        guard !isWriting, !rendering else { return }
-        let input: LabInput, g = gesture
-        switch g {
-        case .rewrite:
-            let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !t.isEmpty else { return }
-            input = .text(t)
-        case .describe:
-            guard let image else { return }
-            input = .image(image)
+    func describe(_ subject: NamedSubjects.Subject) {
+        guard let first = subject.pictures.first, let data = subjects.data(subject, first) else { return }
+        describe(data: data, id: nil)
+    }
+
+    private func describe(data: Data, id: Picture.ID?) {
+        guard canDescribe, let target else { return }
+        begin(.image(data), for: target, gesture: .describe, picture: id) { [self] written in
+            place(written, replacingAll: false)
         }
-        let original: String? = { if case .text(let t) = input { t } else { nil } }()
+    }
+
+    private func begin(_ input: LabInput, for target: Family, gesture: Gesture, picture: Picture.ID?,
+                       finished: @escaping @MainActor (String) -> Void) {
         generation += 1
         let mine = generation
-        phase = .loading(nil); streaming = ""; stopped = false; failure = nil; sent = false
+        phase = .loading(nil); streaming = ""; stopped = false; failure = nil; notice = nil; carried = false
+        running = gesture; describing = picture
         task = Task { [writer] in
             do {
                 var last = ""
@@ -173,36 +287,68 @@ final class LabModel {
                     switch event {
                     case .loading(let f): phase = .loading(f)
                     case .text(let t): phase = .writing; streaming = t; last = t
-                    case .finished(let t): last = t; finish(t, original: original, as: g)
+                    case .finished(let t): last = t; end(last, finished)
                     case .cancelled: self.stop(becauseOfRender: false); return
                     }
                 }
                 guard mine == self.generation else { return }
                 // A stream that ended without saying so: what it wrote is the result.
-                if phase != .idle { finish(last, original: original, as: g) }
+                if phase != .idle { end(last, finished) }
             } catch {
                 guard mine == self.generation else { return }
-                phase = .idle; streaming = ""
+                phase = .idle; streaming = ""; running = nil; describing = nil
                 failure = error.localizedDescription
             }
         }
     }
 
-    private func finish(_ text: String, original: String?, as g: Gesture) {
-        let clean = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        phase = .idle; streaming = ""
+    private func end(_ written: String, _ finished: @MainActor (String) -> Void) {
+        let clean = written.trimmingCharacters(in: .whitespacesAndNewlines)
+        phase = .idle; streaming = ""; running = nil; describing = nil
         guard !clean.isEmpty else { return }
-        results[g] = Result(text: clean, original: original)
-        editing = false
+        finished(clean)
     }
 
-    /// The previous result stays: half a prompt is not offered to the rack.
+    /// The text changes through the text system when the field is on screen: **one undo step per gesture**, which is how ⌘Z
+    /// undoes the writer. A Describe goes to the caret (or replaces the selection) and fills an empty text.
+    private func place(_ written: String, replacingAll: Bool) {
+        guard let view = PromptTextView.current, view.window != nil else {
+            if replacingAll || text.isEmpty { text = written } else { text += (text.last?.isWhitespace == true ? "" : " ") + written }
+            return
+        }
+        let current = view.string as NSString
+        var range = (replacingAll || current.length == 0) ? NSRange(location: 0, length: current.length) : view.selectedRange()
+        var inserted = written
+        if !replacingAll, current.length > 0 {
+            // Words are not glued to the text around.
+            if range.location > 0, !current.substring(with: NSRange(location: range.location - 1, length: 1)).first!.isWhitespace {
+                inserted = " " + inserted
+            }
+            let end = range.location + range.length
+            if end < current.length, !current.substring(with: NSRange(location: end, length: 1)).first!.isWhitespace {
+                inserted += " "
+            }
+        }
+        if range.location > current.length { range = NSRange(location: current.length, length: 0) }
+        view.replace(range, with: inserted)
+        view.window?.makeFirstResponder(view)
+    }
+
+    private static func mentionNotice(lost: [String]) -> String {
+        if lost.isEmpty { return String(localized: "The rewrite deformed a mention. Check the @names in the text; ⌘Z brings your text back.") }
+        return String(localized: "The rewrite lost \(lost.joined(separator: ", ")). Cite it again, or press ⌘Z to bring your text back.")
+    }
+
+    /// The previous text stays: half a prompt is not offered to the field.
     func stop(becauseOfRender: Bool = false) {
         generation += 1
         task?.cancel(); task = nil
-        phase = .idle; streaming = ""
+        phase = .idle; streaming = ""; running = nil; describing = nil
         stopped = becauseOfRender
     }
+
+    /// Puts the marks of the last rewrite away; the text stays.
+    func dismissChanges() { changes = nil }
 
     /// The window closes: nothing keeps writing, nothing keeps the memory.
     func windowClosed() {
@@ -210,19 +356,38 @@ final class LabModel {
         Task { await writer.release() }
     }
 
-    // MARK: Inputs
+    // MARK: The images
 
-    func useRackPrompt(_ app: AppState) {
-        text = app.prompt
-        gesture = .rewrite
+    /// A role for each image of the zone, as the rules see them.
+    private var slots: [LabInputs.Slot<Picture.ID>] { pictures.map { LabInputs.Slot(id: $0.id, role: $0.role) } }
+
+    /// After a change of the model aimed at: an image whose role it no longer offers is « describe only ».
+    func conformRoles() {
+        let kept = LabInputs.conforming(slots, capacity: capacity)
+        for (i, slot) in kept.enumerated() where pictures[i].role != slot.role { pictures[i].role = slot.role }
     }
 
+    func setRole(_ role: LabInputs.Role, of picture: Picture) {
+        for slot in LabInputs.assigning(role, to: picture.id, in: slots) {
+            if let i = pictures.firstIndex(where: { $0.id == slot.id }), pictures[i].role != slot.role { pictures[i].role = slot.role }
+        }
+    }
+
+    func remove(_ picture: Picture) {
+        if describing == picture.id { stop() }
+        pictures.removeAll { $0.id == picture.id }
+    }
+
+    /// An image from bytes: its thumbnail and size are read upright; it takes the role the zone gives a newcomer.
     func load(image data: Data) {
-        guard let picture = NSImage(data: data), picture.isValid else {
+        guard let upright = SubjectPictures.upright(data), upright.width > 0 else {
             failure = String(localized: "This image could not be read.")
             return
         }
-        image = data; thumbnail = picture; gesture = .describe; failure = nil
+        let thumbnail = FinishedImage.reduce(upright, side: 360).map { NSImage(cgImage: $0, size: .zero) } ?? NSImage(cgImage: upright, size: .zero)
+        pictures.append(Picture(data: data, thumbnail: thumbnail, width: upright.width, height: upright.height,
+                                role: LabInputs.defaultRole(adding: slots, capacity: capacity)))
+        failure = nil
     }
 
     func load(_ dropped: DroppedImage) {
@@ -237,23 +402,156 @@ final class LabModel {
         }
     }
 
-    func chooseImage() {
+    func chooseImages() {
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [.image]
-        panel.allowsMultipleSelection = false
+        panel.allowsMultipleSelection = true
         panel.prompt = String(localized: "Choose")
-        panel.message = String(localized: "The image to describe.")
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        load(.file(url))
+        panel.message = String(localized: "Images to describe, to start from, or to name.")
+        guard panel.runModal() == .OK else { return }
+        for url in panel.urls { load(.file(url)) }
     }
 
-    func send(_ result: String, to app: AppState) {
-        app.prompt = result
-        sent = true
+    /// « Prendre le prompt du rack ».
+    func useRackPrompt() { text = rack.prompt }
+
+    // MARK: The subjects
+
+    /// The sheet opens on an image of the zone: once the subject is created, the image becomes it.
+    func name(_ picture: Picture) {
+        guard let draft = SubjectDraft(new: .png(picture.data), taken: subjects.all.map(\.name)) else {
+            failure = String(localized: "This image could not be read.")
+            return
+        }
+        naming = (picture.id, subjects.all.count)
+        self.draft = draft
+    }
+
+    /// The open panel, then the sheet: an image to name that is not in the zone.
+    func chooseImageToName() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.image]
+        panel.prompt = String(localized: "Choose")
+        panel.message = String(localized: "An image to name: a person, a garment, an object, a place or a style.")
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        guard let draft = SubjectDraft(new: .file(url), taken: subjects.all.map(\.name)) else {
+            failure = String(localized: "This image could not be read.")
+            return
+        }
+        naming = nil
+        self.draft = draft
+    }
+
+    func edit(_ s: NamedSubjects.Subject) {
+        naming = nil
+        draft = SubjectDraft(editing: s, library: subjects)
+    }
+
+    /// The sheet is closed: an image it named leaves the zone — it is a subject now.
+    func sheetClosed() {
+        defer { naming = nil }
+        guard let naming, subjects.all.count > naming.known else { return }
+        pictures.removeAll { $0.id == naming.picture }
+    }
+
+    /// Asked first: texts that cite it are refused afterwards.
+    func confirmDeletion(_ s: NamedSubjects.Subject) {
+        let alert = NSAlert()
+        alert.messageText = String(localized: "Delete @\(s.name)?")
+        alert.informativeText = String(localized: "Prompts that cite it will be refused.")
+        alert.addButton(withTitle: String(localized: "Delete"))
+        alert.addButton(withTitle: String(localized: "Cancel"))
+        alert.buttons[0].hasDestructiveAction = true
+        if alert.runModal() == .alertFirstButtonReturn { deleteSubject(s) }
+    }
+
+    func deleteSubject(_ s: NamedSubjects.Subject) { subjects.delete(s) }
+
+    /// `@name` inserted where the caret is (a click on a subject) — appended when the field is not on screen. A space
+    /// before it when it would glue to a word.
+    func cite(_ s: NamedSubjects.Subject) {
+        if let field = PromptTextView.current, field.window != nil {
+            field.insertMention(s.name)
+            return
+        }
+        let glue = text.last.map { !$0.isWhitespace } ?? false
+        text += (glue ? " " : "") + "@\(s.name) "
+    }
+
+    /// A subject renamed: the text's mentions of it follow.
+    func renameMentions(_ old: String, to new: String) {
+        var renamed = text
+        for m in NamedSubjects.mentions(in: text).reversed() where NamedSubjects.key(m.name) == NamedSubjects.key(old) {
+            if let r = Range(NSRange(m.range, in: text), in: renamed) { renamed.replaceSubrange(r, with: "@" + new) }
+        }
+        if renamed != text { text = renamed }
+    }
+
+    // MARK: What the rack will receive
+
+    /// **The line under the lab** (`LabInputs.receipt`): the translated text, the images numbered, and what carrying replaces.
+    var receipt: LabInputs.Receipt<Picture.ID> {
+        let family = target
+        let changesModel = !following && family != nil && rack.card?.family != family
+        return LabInputs.receipt(text: text, slots: slots, subjects: subjects.all, capacity: capacity,
+                                 rackPrompt: rack.prompt, rackImages: rack.references.count, changesModel: changesModel)
+    }
+
+    /// The picture behind an image of the carried list.
+    func picture(_ id: Picture.ID) -> Picture? { pictures.first { $0.id == id } }
+
+    /// The size of an image of the carried list: image 1's gives the format.
+    func size(of image: LabInputs.Image<Picture.ID>) -> (width: Int, height: Int)? {
+        switch image {
+        case .plain(let id, _): picture(id).map { ($0.width, $0.height) }
+        case .subject(let p): subjects.framedSize(p.subject, p.picture)
+        }
+    }
+
+    /// **The format that will come out**: the one the model derives from image 1 (`DenoisingModule.editFormat`), as the
+    /// rack shows it. `nil` in a mirror (the other Mac computes it) or without an image.
+    var outputFormat: RecommendedFormat? {
+        guard !following, let first = receipt.first, let size = size(of: first), let family = target,
+              let card = card(for: family), let denoising = rack.model(card.id)?.chain.denoising else { return nil }
+        let f = denoising.editFormat(referenceWidth: size.width, referenceHeight: size.height)
+        return AppState.cappedForEditing(RecommendedFormat(f.width, f.height))
+    }
+
+    /// **« Carry to the Rack »**: the rack takes the lab's model if it was on another family, its Images box takes the
+    /// numbered images (when the lab sends any), its Prompt the translated text — through the text system, so that ⌘Z in
+    /// the field brings the old one back.
+    func carry() {
+        let receipt = receipt
+        guard case .carries(let carry) = receipt.outcome, let family = target else { return }
+        let app = rack
+        if !following, receipt.changesModel, let wanted = card(for: family) { app.identifier = wanted.id }
+        if !carry.images.isEmpty { app.references = references(of: carry) }
+        if receipt.replacesPrompt { MainWindow.shared.setPrompt(carry.prompt, of: app) }
+        self.carried = true
         MainWindow.shared.show()
         Task {
             try? await Task.sleep(for: .seconds(2))
-            sent = false
+            self.carried = false
+        }
+    }
+
+    /// The rack's references: the images of the zone as they are (upright, whole), the subjects' pictures cropped to their frame.
+    private func references(of carry: LabInputs.Carry<Picture.ID>) -> [ReferenceImage] {
+        carry.images.map { image in
+            switch image {
+            case .subject(let placed):
+                return subjects.references([placed])[0]
+            case .plain(let id, _):
+                let picture = self.picture(id)
+                let data = picture?.data ?? Data()
+                guard let cg = SubjectPictures.upright(data) else {
+                    return ReferenceImage(source: .bytes(data), vignette: picture?.thumbnail ?? NSImage(),
+                                          name: String(localized: "image from the lab"), width: picture?.width ?? 1, height: picture?.height ?? 1)
+                }
+                let vignette = FinishedImage.reduce(cg, side: 240) ?? cg
+                return ReferenceImage(source: .image(cg), vignette: NSImage(cgImage: vignette, size: .zero),
+                                      name: String(localized: "image from the lab"), width: cg.width, height: cg.height)
+            }
         }
     }
 }
@@ -283,8 +581,8 @@ final class LabWindow: NSObject, NSWindowDelegate {
         // Incognito: no frame kept, nothing restored.
         w.isRestorable = false
         w.delegate = self
-        w.setContentSize(NSSize(width: 560, height: 700))
-        w.contentMinSize = NSSize(width: 480, height: 580)
+        w.setContentSize(NSSize(width: 640, height: 780))
+        w.contentMinSize = NSSize(width: 560, height: 640)
         w.center()
         window = w
         NSApp.activate()
@@ -293,312 +591,4 @@ final class LabWindow: NSObject, NSWindowDelegate {
 
     func windowWillClose(_ notification: Notification) { LabModel.shared.windowClosed() }
     func windowDidBecomeKey(_ notification: Notification) { LabModel.shared.refresh() }
-}
-
-// MARK: - The view
-
-struct LabView: View {
-    @Bindable var model: LabModel
-    @FocusState private var typing: Bool
-    @State private var targeted = false
-
-    private var rack: AppState { MainWindow.shared.local }
-    private var followingAnotherMac: Bool { MainWindow.shared.carrier.mirror != nil }
-
-    /// The families installed here, in the catalog's order: the lab writes for what can render.
-    private var families: [Family] {
-        let ready = Set(rack.cards.filter { rack.readySet.contains($0.id) }.map(\.family))
-        return Family.allCases.filter(ready.contains)
-    }
-
-    private var target: Family? {
-        if let c = model.chosenTarget, families.contains(c) { return c }
-        if let f = rack.card?.family, families.contains(f) { return f }
-        return families.first
-    }
-
-    /// Why the gestures are off, in one sentence; `nil` when they are on.
-    private var pause: (symbol: String, sentence: String)? {
-        if followingAnotherMac { return ("macbook", String(localized: "The lab works on this Mac only.")) }
-        if model.rendering { return ("pause.circle", String(localized: "Paused while an image renders.")) }
-        if case .unavailable(let why) = model.availability {
-            switch why {
-            case .notInstalled: return ("shippingbox", String(localized: "No writer is installed yet. Install a model to have one."))
-            case .needsMemory(let n): return ("memorychip", String(localized: "The writer needs a Mac with \(n) GB of memory."))
-            case .preparing: return ("hourglass", String(localized: "The writer is being prepared."))
-            case .needsHead(let bytes):
-                return ("arrow.down.circle", String(localized: "The writer needs one more download from Qwen-Image-2.1’s repository: \(Figures.disk(Int(bytes))).")) 
-            }
-        }
-        if target == nil { return ("shippingbox", String(localized: "No writer is installed yet. Install a model to have one.")) }
-        return nil
-    }
-
-    private var canRun: Bool {
-        guard pause == nil else { return false }
-        switch model.gesture {
-        case .rewrite: return !model.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        case .describe: return model.image != nil
-        }
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            header
-            Picker("Action", selection: $model.gesture) {
-                Text("Rewrite").tag(LabModel.Gesture.rewrite)
-                Text("Describe").tag(LabModel.Gesture.describe)
-            }
-            .pickerStyle(.segmented).labelsHidden()
-            .disabled(model.isWriting)
-            input
-            action
-            result
-            footer
-        }
-        .padding(20)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .dropDestination(for: DroppedImage.self) { items, _ in
-            guard let first = items.first, !model.isWriting else { return false }
-            model.load(first)
-            return true
-        } isTargeted: { targeted = $0 }
-        .overlay {
-            if targeted {
-                RoundedRectangle(cornerRadius: 12).strokeBorder(Color.primary.opacity(0.35), style: StrokeStyle(lineWidth: 2, dash: [6, 4]))
-                    .padding(6).allowsHitTesting(false)
-            }
-        }
-    }
-
-    // MARK: Pieces
-
-    private var header: some View {
-        HStack(alignment: .firstTextBaseline) {
-            BetaBadge(help: "Beta: the Prompt Lab works, and may change.")
-            if families.count > 1, let target {
-                Picker("Write for", selection: Binding(get: { target }, set: { model.chosenTarget = $0 })) {
-                    ForEach(families, id: \.self) { Text(verbatim: $0.name).tag($0) }
-                }
-                .fixedSize()
-                .disabled(model.isWriting)
-            } else if let target {
-                Text("Write for \(target.name)").foregroundStyle(.secondary)
-            }
-            Spacer()
-            if case .ready(let name, _) = model.availability {
-                Text("Writer: \(name)").font(.caption).foregroundStyle(.secondary)
-            }
-        }
-    }
-
-    @ViewBuilder private var input: some View {
-        switch model.gesture {
-        case .rewrite: rewriteInput
-        case .describe: describeInput
-        }
-    }
-
-    private var rewriteInput: some View {
-        VStack(alignment: .trailing, spacing: 4) {
-            TextEditor(text: $model.text)
-                .font(.body)
-                .scrollContentBackground(.hidden)
-                .focused($typing)
-                .padding(6)
-                .frame(minHeight: 96, maxHeight: 150)
-                .background(card)
-                .overlay(alignment: .topLeading) {
-                    if model.text.isEmpty {
-                        Text("Type or paste a prompt to improve")
-                            .foregroundStyle(.tertiary).padding(.horizontal, 11).padding(.vertical, 6)
-                            .allowsHitTesting(false)
-                    }
-                }
-                .disabled(model.isWriting)
-            Button("Use the Rack’s Prompt") { model.useRackPrompt(rack) }
-                .buttonStyle(.link).font(.callout)
-                .disabled(rack.prompt.isEmpty || model.isWriting)
-        }
-    }
-
-    private var describeInput: some View {
-        VStack(spacing: 8) {
-            if let picture = model.thumbnail {
-                Image(nsImage: picture).resizable().scaledToFit()
-                    .frame(maxWidth: .infinity, maxHeight: 190)
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
-                    .accessibilityLabel(Text("The image to describe"))
-            } else {
-                VStack(spacing: 6) {
-                    Image(systemName: "photo.badge.arrow.down").font(.system(size: 28, weight: .light)).foregroundStyle(.secondary)
-                    Text("Drop an image here").foregroundStyle(.secondary)
-                }
-                .frame(maxWidth: .infinity, minHeight: 130)
-            }
-            Button(model.image == nil ? "Choose an Image…" : "Choose Another…") { model.chooseImage() }
-                .buttonStyle(.link).font(.callout)
-                .disabled(model.isWriting)
-        }
-        .padding(10)
-        .frame(maxWidth: .infinity)
-        .background(card)
-    }
-
-    private var card: some View {
-        RoundedRectangle(cornerRadius: 10).fill(Palette.surface)
-            .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Palette.hairline, lineWidth: 0.5))
-    }
-
-    private var action: some View {
-        VStack(spacing: 6) {
-            if model.isWriting {
-                Button { model.stop() } label: { Text("Stop").frame(maxWidth: .infinity) }
-                    .controlSize(.large)
-                    .keyboardShortcut(.cancelAction)
-            } else {
-                Button { if let target { model.run(target: target) } } label: {
-                    Text(model.gesture == .rewrite ? "Rewrite" : "Describe").fontWeight(.semibold).frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
-                .keyboardShortcut(.return, modifiers: .command)
-                .disabled(!canRun)
-            }
-            if let pause {
-                Label(pause.sentence, systemImage: pause.symbol).font(.caption).foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            headInstall
-        }
-    }
-
-    /// The writer's head: one button when the encoder is there and the head is not; the progress while it comes; the failure in red.
-    @ViewBuilder private var headInstall: some View {
-        if model.installingHead {
-            HStack(spacing: 8) {
-                if let fraction = Self.percent(rack.forgeJournal.last) { ProgressView(value: fraction) } else { ProgressView().controlSize(.small) }
-                Text("Installing the writer…").font(.caption).foregroundStyle(.secondary)
-                Button("Stop") { rack.cancelForge() }.buttonStyle(.link).font(.caption)
-            }
-        } else if case .unavailable(.needsHead) = model.availability, !followingAnotherMac, !model.rendering {
-            Button("Install the Writer") { model.installHead(rack) }
-                .disabled(!rack.managementPossible)
-        }
-        if let why = model.headFailure {
-            Text(why).font(.caption).foregroundStyle(Palette.failure)
-                .frame(maxWidth: .infinity, alignment: .leading)
-        }
-    }
-
-    /// `  … 40 %`, the line the installer's journal writes while a file comes.
-    static func percent(_ line: String?) -> Double? {
-        guard let line, line.hasSuffix(" %"), let n = line.split(separator: " ").dropLast().last.flatMap({ Int($0) }) else { return nil }
-        return Double(n) / 100
-    }
-
-    private var current: LabModel.Result? { model.results[model.gesture] }
-
-    private var result: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text("Result").font(.callout.weight(.semibold))
-                Spacer()
-                if model.gesture == .rewrite, !model.isWriting, let current, current.original != nil {
-                    Button(model.editing ? "Show Changes" : "Edit") { model.editing.toggle() }
-                        .buttonStyle(.link).font(.callout)
-                }
-            }
-            Group {
-                switch model.phase {
-                case .loading(let fraction): loading(fraction)
-                case .writing: writing
-                case .idle: finished
-                }
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            .background(card)
-            if let failure = model.failure {
-                Text(failure).font(.caption).foregroundStyle(Palette.failure)
-            } else if model.stopped {
-                Text("Stopped: an image started rendering.").font(.caption).foregroundStyle(.secondary)
-            }
-        }
-    }
-
-    private func loading(_ fraction: Double?) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Preparing the writer…").foregroundStyle(.secondary)
-            if let fraction { ProgressView(value: fraction) } else { ProgressView().controlSize(.small) }
-        }
-        .padding(12)
-    }
-
-    private var writing: some View {
-        ScrollView {
-            Text(model.streaming).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading).padding(12)
-        }
-        .overlay(alignment: .bottomTrailing) {
-            ProgressView().controlSize(.small).padding(10)
-        }
-    }
-
-    @ViewBuilder private var finished: some View {
-        if let current {
-            if model.gesture == .rewrite, let original = current.original, !model.editing {
-                ScrollView {
-                    Text(Self.shown(PromptDiff.pieces(from: original, to: current.text)))
-                        .textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading).padding(12)
-                }
-            } else {
-                TextEditor(text: Binding(get: { model.results[model.gesture]?.text ?? "" },
-                                         set: { model.results[model.gesture]?.text = $0 }))
-                    .font(.body).scrollContentBackground(.hidden).padding(6)
-            }
-        } else {
-            Text("The result appears here.").foregroundStyle(.tertiary).padding(12)
-        }
-    }
-
-    private var footer: some View {
-        HStack {
-            Spacer()
-            if model.sent {
-                Label("Sent", systemImage: "checkmark").foregroundStyle(.secondary)
-            }
-            Button("Send to Rack") {
-                if let current { model.send(current.text, to: rack) }
-            }
-            .controlSize(.large)
-            .disabled(current?.text.isEmpty != false || model.isWriting || followingAnotherMac)
-            .help("Replaces the rack’s prompt. ⌘Z in the prompt field brings the old one back.")
-        }
-    }
-
-    // MARK: The diff, drawn
-
-    /// Additions in the accent on a faint wash (a colour alone would not do for everyone), removals
-    /// struck through and quiet. A removed piece's leading space stays outside the strike.
-    static func shown(_ pieces: [PromptDiff.Piece]) -> AttributedString {
-        var out = AttributedString()
-        for piece in pieces {
-            switch piece.kind {
-            case .same:
-                out += AttributedString(piece.text)
-            case .added:
-                var a = AttributedString(piece.text)
-                a.foregroundColor = Palette.live
-                a.backgroundColor = Palette.live.opacity(0.12)
-                out += a
-            case .removed:
-                let lead = piece.text.prefix { $0.isWhitespace }
-                out += AttributedString(String(lead))
-                var a = AttributedString(String(piece.text.dropFirst(lead.count)))
-                a.strikethroughStyle = .single
-                a.foregroundColor = Color.secondary
-                out += a
-            }
-        }
-        return out
-    }
 }

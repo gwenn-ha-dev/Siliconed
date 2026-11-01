@@ -157,10 +157,6 @@ struct SettingsView: View {
                 Toggle(isOn: $app.developerMode) {
                     SettingLabel("More Solvers", "Adds the solvers Euler a, DPM++ 2M and UniPC to the DiT’s box and to the exploration’s axes. The default, Euler, is the one the models were distilled for.")
                 }
-                Toggle(isOn: Binding(get: { app.subjects.enabled },
-                                     set: { app.subjects.enabled = $0; if !$0 { app.referenceMode = .images } })) {
-                    SettingLabel("Named Subjects", "Name a person, an object or a style from a photo, then cite it as @name in the prompt of an edit.")
-                }
                 Toggle(isOn: $app.negativeLoRAStrengths) {
                     SettingLabel("Negative LoRA Strengths", "Lets a LoRA’s strength go from −1.5 to 1.5, for “slider” LoRAs. An ordinary LoRA is damaged by a negative strength.")
                 }

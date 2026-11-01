@@ -619,10 +619,9 @@ package enum RemoteControlHelp {
         """,
 
         "subjects": """
-        NAMED SUBJECTS (experimental) — silicontrol subjects [add … | remove NAME]
+        NAMED SUBJECTS — silicontrol subjects [add … | remove NAME]
 
-        Off unless « Experimental → Named Subjects » is on in the app's Settings (else: "disabled").
-        A subject is a picture (or two of the same subject) with a name, a kind and a frame; the
+        The same library as the Prompt Lab's (Window → Prompt Lab). A subject is a picture (or two of the same subject) with a name, a kind and a frame; the
         prompt cites it as @name, and its pictures go to the model as references, after the --ref
         images. A model that reads images only (Qwen-Image-2.1); 3 images at most per render.
         In the app's memory, like the history: the subjects go when the app quits (incognito).
@@ -638,7 +637,7 @@ package enum RemoteControlHelp {
         The model's prompt (each subject tied to its image) is the job's "model_prompt".
 
         Answer: {"ok": true, "subjects": [{"name": "alice", "kind": "person", "pictures": [{"frame": [0, 0, 1, 1]}]}]}
-        FAILURES: disabled, usage, ref (an image unreadable or missing), subject (unknown name, a name taken, too many images, a model that reads none).
+        FAILURES: usage, ref (an image unreadable or missing), subject (unknown name, a name taken, too many images, a model that reads none).
         """,
 
         "save": """
@@ -764,7 +763,6 @@ package enum RemoteControlHelp {
                                                                            → leave it out
           subject              a named subject: unknown, a name taken, too many images, a model
                                that reads none, a grid citing one          → help subjects
-          disabled             (subjects) named subjects are off in the app → turn them on in its menu
           grid                 an axis that does not read, two axes on one setting, a {…} group
                                on no axis, more than 64 cells              → help grid
           queue_full           64 jobs waiting, or no room for every alternative or cell
@@ -1379,10 +1377,9 @@ package enum RemoteControlHelp {
         """,
 
         "subjects": """
-        SUJETS NOMMÉS (expérimental) — silicontrol subjects [add … | remove NOM]
+        SUJETS NOMMÉS — silicontrol subjects [add … | remove NOM]
 
-        Éteint tant que « Expérimental → Sujets nommés » n'est pas coché dans le menu de l'app
-        (sinon : "disabled"). Un sujet est une image (ou deux du même sujet) avec un nom, un genre et
+        La même bibliothèque que celle du Labo (Fenêtre → Atelier de prompts). Un sujet est une image (ou deux du même sujet) avec un nom, un genre et
         un cadre ; le prompt le cite par @nom, et ses images vont au modèle comme références, après
         celles des --ref. Un modèle qui lit les images seulement (Qwen-Image-2.1) ; 3 images au plus
         par rendu. En mémoire dans l'app, comme l'historique : les sujets partent quand l'app quitte
@@ -1399,7 +1396,7 @@ package enum RemoteControlHelp {
         Le prompt du modèle (chaque sujet relié à son image) est le "model_prompt" de la tâche.
 
         Réponse : {"ok": true, "subjects": [{"name": "alice", "kind": "person", "pictures": [{"frame": [0, 0, 1, 1]}]}]}
-        ÉCHECS : disabled, usage, ref (image illisible ou absente), subject (nom inconnu ou déjà pris, trop d'images, modèle qui n'en lit pas).
+        ÉCHECS : usage, ref (image illisible ou absente), subject (nom inconnu ou déjà pris, trop d'images, modèle qui n'en lit pas).
         """,
 
         "save": """
@@ -1526,7 +1523,6 @@ package enum RemoteControlHelp {
                                                                            → le retirer
           subject              un sujet nommé : inconnu, nom déjà pris, trop d'images, modèle qui
                                n'en lit pas, une grille qui en cite un     → help subjects
-          disabled             (subjects) les sujets nommés sont éteints dans l'app → les allumer dans son menu
           grid                 un axe illisible, deux axes sur un même réglage, un groupe {…} sur
                                aucun axe, plus de 64 cases                 → help grid
           queue_full           64 travaux en attente, ou pas de place pour toutes les alternatives ou cases

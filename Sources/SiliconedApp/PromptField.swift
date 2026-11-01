@@ -1,4 +1,4 @@
-// **The prompt field when named subjects are on: `@alice` drawn as a chip, in the text itself.**
+// **The Prompt Lab's text: `@alice` drawn as a chip, in the text itself.**
 //
 //     typed      woman posing with @alice in @red-coat and @bob
 //     drawn      woman posing with (▣ alice) in (▣ red-coat) and @bob
@@ -27,12 +27,15 @@ extension NSAttributedString.Key {
     static let subjectChip = NSAttributedString.Key("SiliconedSubjectChip")
 }
 
-/// **The field, for SwiftUI**: the same place, size and font as the `TextEditor` it replaces.
+/// **The field, for SwiftUI**: the same font as a `TextEditor`.
 struct PromptField: NSViewRepresentable {
-    let app: AppState
+    @Binding var text: String
+    let subjects: SubjectLibrary
     @Binding var focused: Bool
+    /// Off while the writer writes: the text it will replace does not move under it.
+    var editable = true
 
-    func makeCoordinator() -> Coordinator { Coordinator(app: app, focused: $focused) }
+    func makeCoordinator() -> Coordinator { Coordinator(text: $text, subjects: subjects, focused: $focused) }
 
     func makeNSView(context: NSViewRepresentableContext<Self>) -> NSScrollView {
         let storage = NSTextStorage()
@@ -73,7 +76,7 @@ struct PromptField: NSViewRepresentable {
         scroll.autohidesScrollers = true
         scroll.drawsBackground = false
         scroll.borderType = .noBorder
-        view.string = app.prompt
+        view.string = text
         context.coordinator.restyle()
         return scroll
     }
@@ -81,9 +84,10 @@ struct PromptField: NSViewRepresentable {
     func updateNSView(_ scroll: NSScrollView, context: NSViewRepresentableContext<Self>) {
         let c = context.coordinator
         guard let view = c.view else { return }
-        // Read here, so that a change of either redraws: the text set elsewhere (« Reuse These
-        // Settings », the remote control), a subject created, renamed or deleted.
-        let text = app.prompt, version = app.subjects.version
+        // Read here, so that a change of either redraws: the text set elsewhere (the rack's prompt taken, a
+        // rewrite), a subject created, renamed or deleted.
+        let text = self.text, version = subjects.version
+        if view.isEditable != editable { view.isEditable = editable }
         if view.string != text, !view.hasMarkedText() {
             // Through the text system, as a paste would be: one undo step. `string =` would leave the
             // undo stack holding ranges of the old text — ⌘Z would then undo into the wrong place.
@@ -113,26 +117,28 @@ struct PromptField: NSViewRepresentable {
 
     @MainActor
     final class Coordinator: NSObject, NSTextViewDelegate {
-        let app: AppState
+        var text: Binding<String>
+        let subjects: SubjectLibrary
         var focused: Binding<Bool>
         weak var view: PromptTextView?
         var styledVersion = -1
         let completion = SubjectCompletion()
 
-        init(app: AppState, focused: Binding<Bool>) {
-            self.app = app
+        init(text: Binding<String>, subjects: SubjectLibrary, focused: Binding<Bool>) {
+            self.text = text
+            self.subjects = subjects
             self.focused = focused
         }
 
         func thumbnail(_ key: String) -> NSImage? {
-            app.subjects.all.first { $0.id == key }.flatMap { app.subjects.thumbnail($0) }
+            subjects.all.first { $0.id == key }.flatMap { subjects.thumbnail($0) }
         }
 
         // ── the text changes ──
 
         func textDidChange(_ notification: Notification) {
             guard let view else { return }
-            if app.prompt != view.string { app.prompt = view.string }
+            if text.wrappedValue != view.string { text.wrappedValue = view.string }
             // A character being composed (a dead key: ^ then e on an AZERTY keyboard) keeps its
             // marked-text styling until it is committed.
             guard !view.hasMarkedText() else { return }
@@ -162,7 +168,7 @@ struct PromptField: NSViewRepresentable {
             var names: [String] = []
             for m in NamedSubjects.mentions(in: text) {
                 let r = NSRange(m.range, in: text)
-                if let s = app.subjects.subject(named: m.name) {
+                if let s = subjects.subject(named: m.name) {
                     names.append(contentsOf: s.name.split(whereSeparator: { $0 == "-" || $0 == "_" }).map(String.init))
                     storage.addAttributes([.subjectChip: "\(s.kind.rawValue):\(s.id)",
                                            .toolTip: "@\(s.name) — \(s.kind.label)"], range: r)
@@ -208,11 +214,11 @@ struct PromptField: NSViewRepresentable {
         func complete() {
             guard let view, view.window != nil, let typed = typedMention() else { completion.close(); return }
             let key = NamedSubjects.key(typed.prefix)
-            let matches = app.subjects.all.filter { $0.id.hasPrefix(key) && $0.id != key }
-                + app.subjects.all.filter { $0.id == key }
+            let matches = subjects.all.filter { $0.id.hasPrefix(key) && $0.id != key }
+                + subjects.all.filter { $0.id == key }
             guard !matches.isEmpty, !(matches.count == 1 && matches[0].id == key) else { completion.close(); return }
             let caret = view.firstRect(forCharacterRange: NSRange(location: typed.range.location, length: 0), actualRange: nil)
-            completion.show(matches.prefix(8).map { s in (s, app.subjects.thumbnail(s)) }, under: caret, parent: view.window!) { [weak self] s in
+            completion.show(matches.prefix(8).map { s in (s, subjects.thumbnail(s)) }, under: caret, parent: view.window!) { [weak self] s in
                 self?.accept(s, replacing: typed.range)
             }
         }
@@ -260,10 +266,10 @@ enum PromptStyle {
     }()
 }
 
-/// **The text view**: it says when it takes or loses the keyboard (the box's edge follows), and
-/// inserts a mention where the caret is (a click on a chip in the subjects shelf).
+/// **The text view**: it says when it takes or loses the keyboard, and inserts a mention where the caret is
+/// (a click on a subject of the lab's Images zone).
 final class PromptTextView: NSTextView {
-    /// The field on screen — at most one: the rack has one prompt.
+    /// The field on screen — at most one: the lab has one text.
     @MainActor static weak var current: PromptTextView?
     var focusChanged: ((Bool) -> Void)?
 
@@ -277,6 +283,19 @@ final class PromptTextView: NSTextView {
         let ok = super.resignFirstResponder()
         if ok { focusChanged?(false) }
         return ok
+    }
+
+    /// **Replaces `range` through the text system**, as a paste would: one undo step, which is how ⌘Z undoes a gesture of
+    /// the writer. `string =` would leave the undo stack holding ranges of the old text.
+    func replace(_ range: NSRange, with text: String) {
+        if shouldChangeText(in: range, replacementString: text) {
+            textStorage?.replaceCharacters(in: range, with: text)
+            didChangeText()
+        } else {
+            string = (string as NSString).replacingCharacters(in: range, with: text)
+            undoManager?.removeAllActions(withTarget: self)
+        }
+        setSelectedRange(NSRange(location: range.location + (text as NSString).length, length: 0))
     }
 
     func insertMention(_ name: String) {

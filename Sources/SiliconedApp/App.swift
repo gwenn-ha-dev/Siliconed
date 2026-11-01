@@ -288,6 +288,30 @@ final class MainWindow: NSObject, NSWindowDelegate {
     /// The other Macs of the network (`OtherMacs.swift`).
     private(set) lazy var otherMacs = OtherMacs(local: local)
 
+    /// **Sets the rack's Prompt as a paste would** (the Prompt Lab's « Carry to the Rack »): through the prompt's text
+    /// view, so that ⌘Z in the field brings the old prompt back. Without the field on screen, the value is set as it is —
+    /// and so is it over an empty prompt: there is nothing to bring back, and an empty field being edited elsewhere in the
+    /// window (Size, Seed) would hold the same string as the Prompt's view.
+    func setPrompt(_ text: String, of app: AppState) {
+        defer { if app.prompt != text { app.prompt = text } }
+        guard app === self.app, !app.prompt.isEmpty, let root = window?.contentView,
+              let view = Self.promptView(in: root, holding: app.prompt),
+              view.string != text else { return }
+        let all = NSRange(location: 0, length: (view.string as NSString).length)
+        guard view.shouldChangeText(in: all, replacementString: text) else { return }
+        view.textStorage?.replaceCharacters(in: all, with: text)
+        view.didChangeText()
+        view.setSelectedRange(NSRange(location: (text as NSString).length, length: 0))
+    }
+
+    private static func promptView(in view: NSView, holding text: String) -> NSTextView? {
+        if let t = view as? NSTextView, t.isEditable, t.string == text { return t }
+        for sub in view.subviews {
+            if let found = promptView(in: sub, holding: text) { return found }
+        }
+        return nil
+    }
+
     /// Empties `<root>/cache/` (incognito, `Delegate`). A failure costs nothing but disk: the next
     /// launch tries again.
     func emptyRenderCache() { try? local.library.emptyCache() }
@@ -533,8 +557,7 @@ final class MainWindow: NSObject, NSWindowDelegate {
             guard let self, let w = window, event.window === w, w.attachedSheet == nil, !app.fullScreen else { return event }
             // Esc leaves the field being typed in: the keys go back to the strip.
             if w.firstResponder is NSText {
-                // The subjects' completion list, open under the caret, takes Esc itself (`PromptField`).
-                guard event.keyCode == 53, !SubjectCompletion.isOpen, Self.chord(event).isEmpty else { return event }
+                guard event.keyCode == 53, Self.chord(event).isEmpty else { return event }
                 w.makeFirstResponder(nil)
                 return nil
             }

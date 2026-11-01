@@ -33,19 +33,39 @@
 - **Une mesure s’applique au rendu suivant**, plus au lancement suivant : jamais à un rendu en cours, si bien qu’un rendu lit toujours un seul plan, du début à la fin. À partir de là, une même graine peut donner une image un peu différente de celle d’avant la mesure.
 - **Le rack dit comment les poids sont stockés** : une étiquette sur le DiT, l’encodeur de texte et le VAE (`int8`, `Q8_0`, `Q4_K_M`, `bf16`…), lue sur ce qui est installé, à côté de celle qui dit ce qui calcule (« calcule en fp32 »). Un Mac prêté les publie aussi.
 
-### Atelier de prompts (bêta)
+### Atelier de prompts : les entrées d’un rendu, préparées
 
-- **Une fenêtre à part, dans le menu Fenêtre (⌥⌘L)** : Réécrire fait d’un prompt court un prompt écrit
-  pour le modèle choisi ; Décrire fait d’une image déposée un prompt. Envoyer au rack met le résultat
-  dans le prompt du rack ; rien ne s’applique seul.
-- **Le rédacteur est un modèle déjà installé** : l’encodeur de texte de Qwen-Image-2.1, Qwen3-VL-8B, mis
-  à écrire. Seule sa couche de sortie manque au modèle installé : Installer le rédacteur la télécharge
-  du même dépôt, 1,25 Go, par plages d’octets. Il faut Qwen-Image-2.1 installé ; en Compact, un Mac de
+- **Une fenêtre à part, dans le menu Fenêtre (⌥⌘L)** : des images d’un côté, un texte de l’autre, et
+  dessous une ligne, « Le rack recevra », qui dit ce qui est porté. Porter dans le rack remplit les
+  boîtes du rack — son Prompt, où ⌘Z dans le champ ramène l’ancien, et ses Images, qui n’ont pas
+  d’annulation et dont la ligne dit qu’elles sont remplacées. Rien ne s’applique seul.
+- **Chaque image a un rôle** : image de départ (l’image 1, celle que change une édition de
+  Qwen-Image-2.1 ; elle donne le format), référence, ou décrire seulement. La première image déposée est
+  le départ, les suivantes des références ; sur les modèles qui ne lisent aucune image, elles sont en
+  décrire seulement. Trois images au plus.
+- **Les sujets nommés viennent ici**, hors du rack et hors des Réglages, où ils étaient un réglage bêta :
+  nommez une image, citez-la par `@nom` dans le texte, et l’atelier remet au rack le prompt traduit
+  (« la personne de l’image 3 ») et les images, numérotées après le départ et les références. Le rack
+  n’en sait rien. Toujours en mémoire seulement ; `silicontrol subjects` et `add "@nom"` restent. Un
+  `@nom` ne peut pas se trouver dans un groupe `{a|b}`. Le PNG du rendu garde le prompt que le modèle a
+  lu, comme pour tout rendu du rack.
+- **Réécrire et Décrire se mêlent dans un seul texte** (bêta) : Réécrire travaille sur tout, ajouts et
+  retraits marqués ; Décrire écrit au curseur, ou remplit un texte vide ; ⌘Z annule l’un comme l’autre.
+  Un `@nom` est mis de côté pendant que le rédacteur réécrit, puis remis ; un nom qu’il perd est
+  signalé, jamais retiré en silence.
+- **Eux seuls attendent** : pendant un rendu, ou sans rédacteur installé, nommer, cadrer, les rôles et
+  Porter continuent ; Réécrire et Décrire attendent, sous une phrase.
+- **En suivant un autre Mac** : Réécrire et Décrire sont éteints et le disent, tandis que les images,
+  les rôles, les sujets et Porter remplissent le rack que vous voyez, qui envoie ses références au Mac
+  qui rend.
+- **Le rédacteur est un modèle déjà installé** : l’encodeur de texte de Qwen-Image-2.1, Qwen3-VL-8B, mis
+  à écrire. Seule sa couche de sortie manque au modèle installé : Installer le rédacteur la télécharge
+  du même dépôt, 1,25 Go, par plages d’octets. Il faut Qwen-Image-2.1 installé ; en Compact, un Mac de
   16 Go (la Standard en demande davantage).
-- **Nos consignes, une par modèle**, tirées de ce que chaque éditeur dit de ses prompts : chaque élément
+- **Nos consignes, une par modèle**, tirées de ce que chaque éditeur dit de ses prompts : chaque élément
   du prompt est gardé, le texte entre guillemets mot pour mot, rien n’est retiré, adouci ni moralisé.
-- **Jamais pendant un rendu** : une image qui démarre arrête le rédacteur, et l’atelier attend.
-- **Vérifié contre la référence** : le décodage glouton donne les mêmes jetons que transformers en fp32
+- **Jamais pendant un rendu** : une image qui démarre arrête le rédacteur, et Réécrire et Décrire attendent.
+- **Vérifié contre la référence** : le décodage glouton donne les mêmes jetons que transformers en fp32
   (`siliconed check qwen-image-2.1 writer`). Environ 18 jetons par seconde sur un M1 Pro, sur le GPU,
   depuis les poids gardés en mémoire.
 
@@ -55,7 +75,7 @@
 - **Rendre à nouveau (même graine)** remplace « Refaire » (⌘R) ; le champ du lot du rack s'appelle maintenant **Lot**.
 - **Fenêtre › Afficher Siliconed** ramène la fenêtre (⌘N disparaît), **Fermer la fenêtre** retrouve ⌘W, le Plein écran passe à ⌃⌘F, et « Copier la commande silicontrol » devient **Copier comme commande de Terminal**.
 - **Générer s'efface** dans le menu Rendu quand le panneau d'exploration, l'Atelier de prompts ou les Réglages sont la fenêtre active, si bien que ⌘↩ atteint le bouton de cette fenêtre.
-- **Réglages › Avancé** se lit Ce Mac, Ligne de commande, puis **Bêta** : Plus de solveurs (ex-Mode développeur), Sujets nommés et Forces de LoRA négatives, avec le badge Bêta que porte aussi l'Atelier de prompts. Le choix de la comparaison a quitté les Réglages pour la barre d'outils du canevas, et Mesurer ce Mac a quitté la fenêtre Modèles.
+- **Réglages › Avancé** se lit Ce Mac, Ligne de commande, puis **Bêta** : Plus de solveurs (ex-Mode développeur) et Forces de LoRA négatives, avec le badge Bêta que portent aussi Réécrire et Décrire. Le choix de la comparaison a quitté les Réglages pour la barre d'outils du canevas, et Mesurer ce Mac a quitté la fenêtre Modèles.
 - **Vider l'historique…** ne demande rien quand toutes les images sont enregistrées (⌘Z le rend) ; « Accepter et rendre » n'est plus le bouton par défaut, si bien que Retour ne peut plus accepter une licence par mégarde.
 - **VoiceOver** : des étiquettes sur tous les boutons-icônes, sur les images (lues comme leur prompt), sur les tuiles du rack et sur la progression, qui parle maintenant en pourcentage ; le rideau est un seul élément ajustable (haut et bas déplacent la ligne, ou changent l'image en mode Alterner) ; la bulle d'information est annoncée. Les cibles des petits boutons de fermeture et d'arrêt passent à 24 pt, et Réduire les animations coupe maintenant toutes celles de l'app.
 - **Les touches restent au contrôle qui les a** : avec un curseur, un stepper ou un bouton actif, les flèches et Espace sont les siennes, pas celles de l'historique.

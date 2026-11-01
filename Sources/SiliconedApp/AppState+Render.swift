@@ -21,14 +21,13 @@ extension AppState {
         let format = imposedFormat ?? outputFormat
         guard let prompts = try? alternatives.get().prompts else { return }
         // **One job per alternative, all at the same seeds**: a series compares the prompts, so
-        // nothing else may differ. Each keeps the batch. Its history images carry the expanded prompt
-        // — and, citing named subjects, the model's prompt and their pictures after the edit's.
+        // nothing else may differ. Each keeps the batch. Its history images carry the expanded prompt.
         enqueue(prompts.map { expanded in
-            var settings = RenderSettings(identifier: identifier, modelName: card?.name ?? identifier, prompt: expanded,
+            let settings = RenderSettings(identifier: identifier, modelName: card?.name ?? identifier, prompt: expanded,
                                           format: format, steps: steps, loras: loras.filter { !$0.path.isEmpty },
                                           references: references.count, variations: variations, detail: effectiveDetail,
                                           solver: effectiveSolver)
-            let used = namedJob(expanded, settings: &settings, references: references)
+            let used = references
             let plan = expectedPlan(steps: steps, format: format, withLoRA: loras.contains { !$0.path.isEmpty } || !plainSampling,
                                     references: used.count)
             return Job(ordinal: nextJobNumber(), settings: settings,
@@ -391,8 +390,8 @@ extension AppState {
                     checkMap(renderResult, model: model, references: references.count)
                     // The PNG and the thumbnail are made off the main thread; the engine has already
                     // moved on to the next image of the batch.
-                    // Named subjects: the PNG keeps the prompt typed, the model's beside it. Nobody
-                    // cited (the switch off among others): the engine's metadata, untouched.
+                    // A job `silicontrol add "@name"` translated: the PNG keeps the prompt typed, the model's beside it.
+                    // Any other job (the rack's, which reads what it holds): the engine's metadata, untouched.
                     let named = settings.modelPrompt.map {
                         NamedSubjects.metadata(renderResult.metadata, typed: settings.prompt, modelPrompt: $0)
                     }

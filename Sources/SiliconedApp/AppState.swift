@@ -5,8 +5,8 @@
 // no temporary file, no preference, no log: nothing that Spotlight or recent items
 // could find. **The exceptions**, each a gesture of the user: the preferences (UserDefaults) — the « More
 // Solvers » switch (`developerModeKey`), « Faster Rendering », the comparison's curtain, switch or side by side
-// (`Curtain.mode`), the beta « Named Subjects » and « Negative LoRA Strengths » switches (`SubjectLibrary.enabledKey`,
-// `negativeLoRAKey`), the file format of the last export (`exportFormatKey`), the Neural Engine's choice per
+// (`Curtain.mode`), the beta « Negative LoRA Strengths » switch
+// (`negativeLoRAKey`), the file format of the last export (`exportFormatKey`), the Neural Engine's choice per
 // model (`neuralEngineKey`), the Macs paired and the lending switch (`OtherMacs`), and this Mac's capacity map
 // with the last render's note against it (`capacityMapKey`, `renderNoteKey`, `driftToldKey`), measured when
 // the user asks, like the system language the app follows —, the licenses accepted, which the library keeps itself (`<local>/accepted-licenses.json`) because its
@@ -68,7 +68,7 @@ final class AppState {
     private static let developerModeKey = "developerMode"
     /// **More Solvers** (Settings ▸ Advanced ▸ Beta): the solvers (`offeredSolvers`). The property and its
     /// preference key keep the name they had when this was « Developer Mode ».
-    /// One of the app's preferences (with `Curtain.mode`, the named subjects' switch and the capacity
+    /// One of the app's preferences (with `Curtain.mode` and the capacity
     /// map) — written without a render gesture, because the user switched it.
     var developerMode = UserDefaults.standard.bool(forKey: AppState.developerModeKey) {
         didSet {
@@ -185,28 +185,9 @@ final class AppState {
     var loras: [LoRASlot] = []
     /// The edit's references, numbered from 1 in this order: **image 1 is the one edited** (it sets
     /// the output's format), the others are what the prompt borrows from (« the dog of image 2 »).
-    /// At most the denoiser's `maxReferences`. An image added while the box shows the subjects brings
-    /// it back to its images (`referenceMode`): « Edit This Image », a drop on the canvas.
-    var references: [ReferenceImage] = [] {
-        didSet { if !references.isEmpty && referenceMode == .subjects { stashedReferences = []; referenceMode = .images } }
-    }
-    /// **The Images box holds images or subjects, never both** (`Subjects.swift`): numbered images —
-    /// an edit —, or the named subjects the prompt cites by `@name`. Switching to the subjects puts the
-    /// images aside, switching back brings them again; a render sends only what the box shows.
-    enum ReferenceMode { case images, subjects }
-    var referenceMode = ReferenceMode.images {
-        didSet {
-            guard referenceMode != oldValue else { return }
-            if referenceMode == .subjects {
-                stashedReferences = references
-                references = []
-            } else if references.isEmpty {
-                references = stashedReferences
-                stashedReferences = []
-            }
-        }
-    }
-    @ObservationIgnored private var stashedReferences: [ReferenceImage] = []
+    /// At most the denoiser's `maxReferences`. Added by the box, a drop, « Edit This Image », or carried by
+    /// the Prompt Lab (the starting image, the references, the subjects the text cites: `Lab.swift`).
+    var references: [ReferenceImage] = []
     var steps = 8
     /// **More detail** (`Detail`): Normal is the render as the model makes it. What a render takes is
     /// `effectiveDetail`: on a model that offers none (Anima, Krea 2: `DenoisingModule.acceptsDetail`), Normal.
@@ -237,10 +218,8 @@ final class AppState {
     var variations: [Variation] = []
     var batch = 1
     var previews = true
-    /// **The named subjects** (`Subjects.swift`, experimental): the library, its switch — and the sheet
-    /// that names or edits one, while it is open.
+    /// **The named subjects** (`Subjects.swift`): the Prompt Lab's library, in memory. The rack does not read them.
     let subjects: SubjectLibrary
-    var subjectDraft: SubjectDraft?
     /// **The exploration's form** (`Exploration.swift`): its own prompt, a small format, the two axes.
     var explorePrompt = ""
     var exploreShape = ExploreShape.square

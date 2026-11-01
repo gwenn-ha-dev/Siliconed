@@ -15,7 +15,7 @@
 //   model (`--download` is the consent, as here). A cell's, a variation's or an enlargement's answer has
 //   the fields it has here, plus `computing_on`.
 // - **Named subjects stay on this Mac** (`subjects` acts on them, mirrored or not; no refusal): a job
-//   that cites them goes with its rewrite and their pictures (`namedJob`), as the window's click does.
+//   that cites them goes with its rewrite and their pictures (`namedJob`), as the Prompt Lab's « Carry to the Rack » does.
 
 import AppKit
 import Foundation
