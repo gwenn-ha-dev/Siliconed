@@ -55,6 +55,19 @@ Reference machine: MacBook Pro M1 Pro (8 cores, 14 GPU cores), 16 GB. App 0.18, 
 
 Each line is a `silicontrol measure` series in a freshly opened app, the series anyone can repeat ([REMOTE-CONTROL.md](REMOTE-CONTROL.md)): a load render, which encodes the prompt, then a witness, the render and a witness again. The prompt being the witness's, these three are the same image, identical to the bit, and the time given is their median, from the request to the PNG, the prompt already encoded; within a series they stayed within 3.9 % of each other, 0 swap-out. The capacity map was measured in the app before each version's series, in 45.6 s before the Standard's and 41.0 s before the Compact's. Peak memory is the app's `phys_footprint`, sampled every 100 ms. The deviations are what `siliconed check <model> dit --size <side>` printed on the same Mac on 24/10/2026, against goldens written by `tools/oracle/`; on yours they differ in the last digits ([VERIFY.md](VERIFY.md), [Verification](#verification)).
 
+### On a MacBook Neo
+
+An 8 GB Mac: a MacBook Neo (A18 Pro), on AC power. App 0.18 as published, 1/11/2026, the series above run on the Neo itself, on the capacity map the app had just measured (45.2 s), with the version installed there, the Compact, Neural Engine on.
+
+| 1024², Compact | Z-Image Turbo | Anima Turbo |
+|---|---|---|
+| every evaluation at full size | **246.5 s** | **91.5 s** |
+| with Faster Rendering | 188.7 s | 67.7 s |
+| peak memory of the app | 2.0 GiB | 1.4 GiB |
+| read from disk per image | 44 GB | 0 GB |
+
+The budget of an 8 GB Mac is 4 GB (¾ of 8 GB minus 2 GB, [Memory and the budget](#memory-and-the-budget)): each peak stays at half of it at most, and no series swapped out a page. Z-Image's Compact weights do not stay in the Neo's memory and are read again from disk at each step, 44 GB per image. That is 2.1 to 2.4 times the reference machine's time on the same lines. Each series gave a single image, identical to the bit from render to render. Z-Image at full size is the mean of its series' first two renders, 247.0 and 246.1 s: the third, the closing witness, took 312.2 s, 26 % more than the first, beyond the 13 % within which `silicontrol measure` holds a series comparable; the other three series kept their renders within 7 % of each other.
+
 ### Faster Rendering
 
 A choice per model, like the Neural Engine's: on by default for the Compact and the Light, off for the Standard (which stays the image checked against the reference), for all five models. The choice is saved with the image, so Render Again gives the same one. From 1024 px on each side (1024², 1024×1536, 1536×1024…), the first evaluations run on the half-size grid — 3 of 8 for Z-Image, Qwen-Image-2.1 and Anima, 4 for Krea 2, whose schedule keeps its first noise levels higher, 1 for MOSS-Image, which starts losing fine detail from the second — and the rest at full size. Still 8 evaluations; one at half size costs about a quarter of a full one. No usual portrait or landscape format qualifies: the half of 832×1216 would fall under 512 px on one side. At 1024² on the reference machine's Compact it takes 31 % off a render on Krea 2, 21 % on Z-Image, 17 % on Qwen-Image-2.1, 19 % on Anima, and 7 % on MOSS-Image, whose single half-size evaluation is all it allows ([Numbers](#numbers)).

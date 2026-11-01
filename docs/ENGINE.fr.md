@@ -55,6 +55,19 @@ Machine de référence : MacBook Pro M1 Pro (8 cœurs, 14 cœurs GPU), 16 Go. A
 
 Chaque ligne est une série `silicontrol measure` dans une app tout juste ouverte, la série que chacun peut refaire ([REMOTE-CONTROL.fr.md](REMOTE-CONTROL.fr.md)) : un rendu de chargement, qui encode le prompt, puis un témoin, le rendu et un témoin encore. Le prompt étant celui du témoin, ces trois-là sont la même image, identique au bit près, et le temps donné est leur médiane, de la demande au PNG, le prompt déjà encodé ; dans une série, ils sont restés à 3,9 % les uns des autres, 0 page swappée. La carte des capacités a été mesurée dans l'app avant les séries de chaque version, en 45,6 s avant celles de la Standard et 41,0 s avant celles de la Compact. Le pic mémoire est le `phys_footprint` de l'app, relevé toutes les 100 ms. Les écarts sont ceux qu'a imprimés `siliconed check <modèle> dit --size <côté>` sur le même Mac le 24/10/2026, contre des goldens écrits par `tools/oracle/` ; chez vous, ils diffèrent sur les derniers chiffres ([VERIFY.fr.md](VERIFY.fr.md), [La vérification](#la-vérification)).
 
+### Sur un MacBook Neo
+
+Un Mac de 8 Go : un MacBook Neo (A18 Pro), sur secteur. App 0.18 telle que publiée, le 1/11/2026, les séries ci-dessus lancées sur le Neo lui-même, sur la carte des capacités que l'app venait de mesurer (45,2 s), dans la version qui y est installée, la Compact, Neural Engine allumé.
+
+| 1024², Compact | Z-Image Turbo | Anima Turbo |
+|---|---|---|
+| toutes les évaluations en pleine taille | **246,5 s** | **91,5 s** |
+| avec le rendu plus rapide | 188,7 s | 67,7 s |
+| pic mémoire de l'app | 2,0 Gio | 1,4 Gio |
+| lu sur le disque par image | 44 Go | 0 Go |
+
+Le budget d'un Mac de 8 Go est de 4 Go (les ¾ de 8 Go moins 2 Go, [La mémoire et le budget](#la-mémoire-et-le-budget)) : chaque pic en reste à la moitié au plus, et aucune série n'a swappé une page. Les poids de la Compact de Z-Image ne restent pas dans la mémoire du Neo et sont relus sur le disque à chaque pas, 44 Go par image. C'est 2,1 à 2,4 fois le temps de la machine de référence sur les mêmes lignes. Chaque série a donné une seule image, identique au bit près d'un rendu à l'autre. Z-Image en pleine taille est la moyenne des deux premiers rendus de sa série, 247,0 et 246,1 s : le troisième, le témoin de clôture, a pris 312,2 s, 26 % de plus que le premier, au-delà des 13 % dans lesquels `silicontrol measure` tient une série pour comparable ; les trois autres séries ont gardé leurs rendus à 7 % les uns des autres.
+
 ### Rendu plus rapide
 
 Un choix par modèle, comme celui du Neural Engine : allumé par défaut sur la Compact et la Légère, éteint sur la Standard (qui reste l'image vérifiée contre la référence), pour les cinq modèles. Le choix est enregistré avec l'image, donc Rendre à nouveau redonne la même. Dès 1024 px de chaque côté (1024², 1024×1536, 1536×1024…), les premières évaluations se font sur la grille en demi-taille — 3 sur 8 pour Z-Image, Qwen-Image-2.1 et Anima, 4 pour Krea 2, dont le calendrier garde ses premiers niveaux de bruit plus hauts, 1 pour MOSS-Image, qui commence à perdre du détail fin dès la deuxième — et le reste en pleine taille. Toujours 8 évaluations ; une évaluation en demi-taille coûte environ un quart d'une pleine. Aucun format portrait ou paysage usuel n'en profite : la moitié de 832×1216 passerait sous 512 px d'un côté. En 1024² sur la Compact de la machine de référence, il retire 31 % du temps d'un rendu sur Krea 2, 21 % sur Z-Image, 17 % sur Qwen-Image-2.1, 19 % sur Anima, et 7 % sur MOSS-Image, dont la seule évaluation en demi-taille est tout ce qu'il permet ([Les chiffres](#les-chiffres)).
