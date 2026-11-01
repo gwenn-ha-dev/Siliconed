@@ -15,10 +15,10 @@
 //     Other Macs  lend this Mac, compute on another (`OtherMacsView.swift`).
 //     Advanced    kept out of the way: This Mac (the capacity map, measured only when asked), Command
 //                 Line (silicontrol, linked into /usr/local/bin), Beta (More Solvers, Faster Rendering,
-//                 Negative LoRA Strengths: off by default, may change; named subjects moved to the Prompt Lab).
+//                 Size in Two Scales, Negative LoRA Strengths: off by default, may change; named subjects moved to the Prompt Lab).
 //                 ┌ This Mac ───── [Measure This Mac…]
 //                 ├ Command Line ─ [Install…]
-//                 └ Beta ───────── More Solvers · Faster Rendering · Negative LoRA Strengths
+//                 └ Beta ───────── More Solvers · Faster Rendering · Size in Two Scales · Negative LoRA Strengths
 //
 // - **Incognito**: an NSWindow of ours, as `MainWindow` — not SwiftUI's `Settings` scene, which would
 //   keep its frame; not restorable. What it sets are the app's preferences (`AppState`'s header), the
@@ -149,6 +149,9 @@ struct SettingsView: View {
                 }
                 Toggle(isOn: $app.fasterRenderingBeta) {
                     SettingLabel("Faster Rendering", "Adds a Faster Rendering switch to the DiT’s box: from 1024² up, the first steps at half size, faster, a slightly different image. Not with a LoRA, Detail or an edit. Off, no render is a faster one.")
+                }
+                Toggle(isOn: $app.sizeScalesBeta) {
+                    SettingLabel("Size in Two Scales", "Splits the Size menu of the rack in two: a proportion, then a resolution, 1K (about 1 megapixel) or 2K (about 4). The sizes are the app’s; the pencil still types any other.")
                 }
                 Toggle(isOn: $app.negativeLoRAStrengths) {
                     SettingLabel("Negative LoRA Strengths", "Lets a LoRA’s strength go from −1.5 to 1.5, for “slider” LoRAs. An ordinary LoRA is damaged by a negative strength.")

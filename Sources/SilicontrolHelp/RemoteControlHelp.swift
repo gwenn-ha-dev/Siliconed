@@ -292,7 +292,7 @@ package enum RemoteControlHelp {
         """,
 
         "add": """
-        silicontrol add [options] "<prompt>" [512|1024|WxH] [seed]
+        silicontrol add [options] "<prompt>" [512|1024|WxH|P:Q@1K|2K] [seed]
 
         Puts a request in the app's queue and returns at once (unless --wait). This page is
         complete. Options and arguments go in any order; the first argument that is not an option
@@ -306,6 +306,16 @@ package enum RemoteControlHelp {
                               ≥ 512 and a multiple of 16 (32 for qwen-image-2.1), ≤ 8192
                               (≤ 2048 for anima); no area limit, the memory decides
                               ("insufficient_memory"). Default: 1024x1024.
+          P:Q@1K | P:Q@2K     the same, as a proportion and a resolution: the app's Size in Two Scales,
+                              accepted whether or not that Beta option is on (no quotes needed). 1K is
+                              about 1 megapixel, 2K about 4. Proportions: 1:1, 4:5, 3:4, 2:3, 9:16,
+                              5:4, 4:3, 3:2, 16:9. The pixels are the app's menu's:
+                                1K   1:1 1024x1024  4:5 896x1120  3:4 864x1152  2:3 832x1248
+                                     9:16 768x1344 (really 4:7, 1.6 % off)
+                                2K   1:1 2048x2048  4:5 1792x2240  3:4 1728x2304  2:3 1664x2496
+                                     9:16 1440x2560 (exact)
+                              The landscapes are the portraits turned (3:2 = 1248x832 at 1K). The model's
+                              limits apply as to WxH: on anima only 1:1 exists at 2K (2048 px a side).
           seed                integer. Absent: drawn at random, returned in "seeds".
 
         OPTIONS
@@ -391,7 +401,7 @@ package enum RemoteControlHelp {
         """,
 
         "grid": """
-        silicontrol grid --x AXIS [--y AXIS] [options] "<prompt>" [512|1024|WxH] [seed]
+        silicontrol grid --x AXIS [--y AXIS] [options] "<prompt>" [512|1024|WxH|P:Q@1K|2K] [seed]
 
         An XY grid: one or two settings swept, ONE JOB PER CELL in the queue — each an ordinary
         job, its image in the history like any other —, then, when the last cell ends, a SHEET:
@@ -751,7 +761,7 @@ package enum RemoteControlHelp {
                                                                            → connect it, then retry
           lora                 LoRA not found for this model, or > 3        → "hint" lists the compatible ones
           format               unreadable or out-of-bounds format; an edit beyond 1024² of area
-                                                                           → WxH, sides ≥ 512, multiples of 16 (32: qwen-image-2.1)
+                                                                           → WxH or P:Q@1K|2K, sides ≥ 512, multiples of 16 (32: qwen-image-2.1)
           steps                a step count the model has no schedule for   → its "default_steps"
           edit                 --ref on a model without editing, or more --ref than it reads
                                                                            → a model with "edit": true; its "max_references"
@@ -1046,7 +1056,7 @@ package enum RemoteControlHelp {
         """,
 
         "add": """
-        silicontrol add [options] "<prompt>" [512|1024|WxH] [seed]
+        silicontrol add [options] "<prompt>" [512|1024|WxH|P:Q@1K|2K] [seed]
 
         Met une demande dans la file de l'app et rend la main tout de suite (sauf --wait).
         Cette page est complète. Options et arguments vont dans n'importe quel ordre ; le premier
@@ -1060,6 +1070,17 @@ package enum RemoteControlHelp {
                               ≥ 512 et multiple de 16 (32 pour qwen-image-2.1), ≤ 8192
                               (≤ 2048 pour anima) ; pas de limite de surface, la mémoire décide
                               ("insufficient_memory"). Défaut : 1024x1024.
+          P:Q@1K | P:Q@2K     la même chose, en proportion et résolution : la Taille en deux échelles de
+                              l'app, acceptée que cette option Bêta soit allumée ou non (sans guillemets).
+                              1K vaut environ 1 mégapixel, 2K environ 4. Proportions : 1:1, 4:5, 3:4,
+                              2:3, 9:16, 5:4, 4:3, 3:2, 16:9. Les pixels sont ceux du menu de l'app :
+                                1K   1:1 1024x1024  4:5 896x1120  3:4 864x1152  2:3 832x1248
+                                     9:16 768x1344 (en fait 4:7, 1,6 % d'écart)
+                                2K   1:1 2048x2048  4:5 1792x2240  3:4 1728x2304  2:3 1664x2496
+                                     9:16 1440x2560 (exact)
+                              Les paysages sont les portraits couchés (3:2 = 1248x832 en 1K). Les limites
+                              du modèle valent comme pour WxH : sur anima, seul 1:1 existe en 2K
+                              (2048 px par côté).
           seed                entier. Absente : tirée au hasard, rendue dans "seeds".
 
         OPTIONS
@@ -1145,7 +1166,7 @@ package enum RemoteControlHelp {
         """,
 
         "grid": """
-        silicontrol grid --x AXE [--y AXE] [options] "<prompt>" [512|1024|WxH] [seed]
+        silicontrol grid --x AXE [--y AXE] [options] "<prompt>" [512|1024|WxH|P:Q@1K|2K] [seed]
 
         Une grille XY : un ou deux réglages balayés, UN TRAVAIL PAR CASE dans la file — chacun un
         travail ordinaire, son image dans l'historique comme les autres —, puis, quand la dernière
@@ -1513,7 +1534,7 @@ package enum RemoteControlHelp {
                                                                            → le brancher, puis réessayer
           lora                 LoRA introuvable pour ce modèle, ou > 3      → "hint" liste les compatibles
           format               format illisible ou hors bornes ; une édition au-delà de 1024² de surface
-                                                                           → WxH, côtés ≥ 512, multiples de 16
+                                                                           → WxH ou P:Q@1K|2K, côtés ≥ 512, multiples de 16
           steps                un nombre de pas sans calendrier pour ce modèle → son "default_steps"
           edit                 --ref sur un modèle sans édition, ou plus de --ref qu'il n'en lit
                                                                            → un modèle "edit": true ; son "max_references"

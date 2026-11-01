@@ -75,6 +75,8 @@ sans prompt, hors de la file — refusé pendant un rendu —, avec la nouvelle 
 fois dans l'historique. Le modèle d'Apple n'est téléchargé par macOS qu'avec `--download` (sinon
 `download_required`) ; le reste est dans `silicontrol help enlarge`.
 
+**Une taille est `WxH` ou une proportion et une résolution.** `silicontrol add` et `grid` prennent `832x1216` comme toujours, ou `3:4@2K` : la proportion (1:1, 4:5, 3:4, 2:3, 9:16, 5:4, 4:3, 3:2, 16:9), `@`, puis `1K` ou `2K`. Aucun de ces caractères ne veut rien dire pour un shell, donc pas de guillemets. Elle se résout dans les pixels du Format en deux échelles du rack (`SizeScales`, une seule fonction pour les deux), que cette option Bêta soit allumée ou non, et elle est refusée (`format`) avec sa raison là où le rack la grise : la 2K d'Anima, par exemple, est le carré seul (2048 px de côté). La table est dans [la page de l'app](APP.fr.md#créer).
+
 **Les solveurs suivent Plus de solveurs.** `--solver` n'est accepté qu'avec Plus de solveurs allumé (Réglages › Avancé › Bêta) et sur un modèle qui propose autre chose qu'Euler ; sinon la réponse est un refus (`solver`) qui nomme le réglage.
 
 **Le rendu plus rapide est aussi un réglage de l'app, un par modèle, et une option Bêta.** `silicontrol set faster-rendering

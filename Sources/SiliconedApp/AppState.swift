@@ -134,6 +134,12 @@ final class AppState {
     var fasterRenderingBeta = UserDefaults.standard.bool(forKey: AppState.fasterRenderingBetaKey) {
         didSet { UserDefaults.standard.set(fasterRenderingBeta, forKey: Self.fasterRenderingBetaKey) }
     }
+    private static let sizeScalesBetaKey = "sizeScalesBeta"
+    /// **Size in two scales, the Beta option** (Settings ▸ Advanced ▸ Beta): off by default. On, the rack's Size menu becomes a
+    /// proportion and a resolution (`SizeScales`). Only the rack changes: the sizes, the pencil, `silicontrol` are the same.
+    var sizeScalesBeta = UserDefaults.standard.bool(forKey: AppState.sizeScalesBetaKey) {
+        didSet { UserDefaults.standard.set(sizeScalesBeta, forKey: Self.sizeScalesBetaKey) }
+    }
     /// Why Faster Rendering would do nothing for the render being set up in the form (nil: it applies).
     var fasterRenderingUnavailable: DiTSwitchUnavailable? {
         DiTSwitches.fasterRenderingUnavailable(width: format.width, height: format.height,

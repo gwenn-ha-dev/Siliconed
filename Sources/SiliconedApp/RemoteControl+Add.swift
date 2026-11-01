@@ -74,11 +74,25 @@ extension RemoteControl {
             i += 1
         }
         guard let prompt = positional.first else {
-            throw Refusal("usage", String(localized: "the prompt is missing"), help: "silicontrol add [--model id] \"<prompt>\" [512|1024|WxH] [seed] — silicontrol help add")
+            throw Refusal("usage", String(localized: "the prompt is missing"), help: "silicontrol add [--model id] \"<prompt>\" [512|1024|WxH|P:Q@1K|2K] [seed] — silicontrol help add")
         }
         d.prompt = prompt
         for p in positional.dropFirst() {
-            if d.format == nil, p.lowercased().contains("x") || p.contains("×") {
+            if d.format == nil, SizeScales.looksLikeScale(p) {
+                // `3:4@2K`: the pixels of the rack's two-scale Size (`SizeScales`), whether or not that Beta option is on.
+                // The model's own limits are judged below, with `WxH`'s.
+                do { let c = try SizeScales.parse(p); d.format = (c.width, c.height) } catch {
+                    switch error {
+                    case .unknownRatio(let r):
+                        throw Refusal("format", String(localized: "no such proportion: \"\(r)\""),
+                                      help: String(localized: "proportions: \(SizeScales.ratioList) — silicontrol help add"))
+                    case .unknownResolution(let r):
+                        throw Refusal("format", String(localized: "no such resolution: \"\(r)\""), help: String(localized: "1K or 2K, e.g. 3:4@2K"))
+                    case .unreadable:
+                        throw Refusal("format", String(localized: "unreadable size: \"\(p)\""), help: String(localized: "proportion@resolution, e.g. 3:4@2K"))
+                    }
+                }
+            } else if d.format == nil, p.lowercased().contains("x") || p.contains("×") {
                 guard let f = Format.parse(p) else { throw Refusal("format", String(localized: "unreadable format: \"\(p)\""), help: String(localized: "width x height, e.g. 832x1216")) }
                 d.format = (f.width, f.height)
             } else if d.format == nil, p == "512" || p == "1024" {

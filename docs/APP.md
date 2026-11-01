@@ -23,6 +23,18 @@ The engine behind it, with the measurements: [The Siliconed engine](ENGINE.md).
 
 Each side must be at least 512 and a multiple of 16; there is no fixed ceiling on the area: the memory budget decides. What a format costs is computed from the model's shapes before the first computation and judged against the Mac's memory budget ([how](ENGINE.md#memory-and-the-budget)): a Mac that cannot hold it is refused, and told which one can. The size picker lists 1536² and 2048² beside 1024², and greys what this Mac's budget refuses; any other size is typed. Formats past 1024×1536 are priced by the same formulas; Anima Turbo at 2048² was rendered on the 16 GB reference Mac, peaking at 5.4 GB. Below 512² the models are outside their domain. Qwen-Image-2.1 needs multiples of 32 (its VAE divides by 16), and Anima at most 2048 px on a side (the positions its reference computes); both are refused before any computation, and so is any side past 8192 px.
 
+**Size in Two Scales** (Settings › Advanced › Beta, off by default) splits the rack's Size menu in two: a proportion (1:1, 4:5, 3:4, 2:3, 9:16 and, turned, 5:4, 4:3, 3:2, 16:9), then a resolution, 1K (about 1 megapixel) or 2K (about 4); the app works out the pixels, always multiples of 32 so that every model takes them. The pencil, the memory check and each model's limits are unchanged, and the default menu stays the default.
+
+| Proportion | 1K | 2K |
+|---|---|---|
+| 1:1 | 1024 × 1024 | 2048 × 2048 |
+| 4:5 | 896 × 1120 | 1792 × 2240 |
+| 3:4 | 864 × 1152 | 1728 × 2304 |
+| 2:3 | 832 × 1248 | 1664 × 2496 |
+| 9:16 | 768 × 1344 ≈ | 1440 × 2560 |
+
+The landscapes are the same sizes turned (3:2 is 1248 × 832 at 1K). The ≈: at 1K an exact 9:16 is out of reach: an exact 9:16 in multiples of 32 comes only in steps of 288 × 512 (576 × 1024, 864 × 1536), so 1K keeps 768 × 1344, which is really a 4:7 (1.6 % off) and is shown “≈ 9:16”; the same goes for 16:9 lying down. At 2K, 1440 × 2560 is an exact 9:16. Anima stops at 2048 px on a side, so its 2K is the square alone and the other 2K sizes are greyed with that reason. `silicontrol add` and `grid` take the same sizes as `3:4@2K`, Beta option on or off ([Remote control](REMOTE-CONTROL.md)).
+
 ## Edit
 
 - **Editing by instruction** with Qwen-Image-2.1 Turbo: give it 1 to 3 images and a sentence (“replace the cloudy sky with a blue sky”); its encoder sees the images. In the app an edit is limited to an area of 1024².
@@ -135,7 +147,7 @@ Siliconed › Settings… (⌘,), three tabs.
 
 - **General**: where the models live, with Move Library…, Open Library… and Move Back to This Mac.
 - **Other Macs**: lend this Mac, pair with another ([Render on another Mac](#render-on-another-mac)).
-- **Advanced**, in this order: This Mac (the measure); Command Line (installs `silicontrol`, below); and **Beta**, off by default and liable to change: More Solvers (adds the solvers Euler a, DPM++ 2M and UniPC to the denoiser's box and to the exploration's axes; Euler, the default, is the one the models were distilled for), Faster Rendering (adds its switch to the denoiser's box), Negative LoRA Strengths (strengths from −1.5 to 1.5, for “slider” LoRAs; an ordinary LoRA is damaged by a negative strength).
+- **Advanced**, in this order: This Mac (the measure); Command Line (installs `silicontrol`, below); and **Beta**, off by default and liable to change: More Solvers (adds the solvers Euler a, DPM++ 2M and UniPC to the denoiser's box and to the exploration's axes; Euler, the default, is the one the models were distilled for), Faster Rendering (adds its switch to the denoiser's box), Size in Two Scales (the rack's Size becomes a proportion and a resolution, below), Negative LoRA Strengths (strengths from −1.5 to 1.5, for “slider” LoRAs; an ordinary LoRA is damaged by a negative strength).
 
 While you compute on another Mac, the measure is that Mac's, and the window says so.
 

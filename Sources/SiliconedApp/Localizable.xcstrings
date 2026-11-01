@@ -911,6 +911,52 @@
         }
       }
     },
+    "%@ is really %@, %@ off %@: an exact %@ in multiples of 32 has no size near this resolution." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ ist eigentlich %@, %@ Abweichung von %@: Ein exaktes %@ in Vielfachen von 32 gibt es nahe dieser Auflösung nicht."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ is really %2$@, %3$@ off %4$@: an exact %5$@ in multiples of 32 has no size near this resolution."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ es en realidad %@, con una diferencia de %@ respecto a %@: un %@ exacto en múltiplos de 32 no tiene un tamaño cercano a esta resolución."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ est en réalité du %@, à %@ d’écart du %@ : un %@ exact en multiples de 32 n’a pas de taille proche de cette résolution."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ è in realtà %@, con %@ di scarto da %@: un %@ esatto in multipli di 32 non ha una dimensione vicina a questa risoluzione."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@の実際の比率は%2$@で、%4$@から%3$@ずれています。32の倍数では、この解像度の近くに正確な%5$@のサイズはありません。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ 实际上是 %2$@，与 %4$@ 相差 %3$@：32 的倍数中，这个分辨率附近没有精确的 %5$@ 尺寸。"
+          }
+        }
+      }
+    },
     "%@ isn’t installed" : {
       "localizations" : {
         "de" : {
@@ -2035,6 +2081,52 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@ × %@ 超出引擎可寻址的范围，与内存大小无关：最多 %@ 百万像素。"
+          }
+        }
+      }
+    },
+    "%@ × %@ — %@ px a side at most" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ × %@ — höchstens %@ px pro Seite"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ × %2$@ — %3$@ px a side at most"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ × %@ — %@ px por lado como máximo"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ × %@ — %@ px par côté au plus"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ × %@ — al massimo %@ px per lato"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ × %@ — 1辺は最大%@ px"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ × %@ — 每边最多 %@ px"
           }
         }
       }
@@ -4335,6 +4427,86 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "1 张参考图"
+          }
+        }
+      }
+    },
+    "1K is about 1 megapixel, 2K about 4" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1K sind etwa 1 Megapixel, 2K etwa 4"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1K equivale a 1 megapíxel aproximadamente, 2K a 4"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1K vaut environ 1 mégapixel, 2K environ 4"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1K è circa 1 megapixel, 2K circa 4"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1Kは約1メガピクセル、2Kは約4メガピクセル"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1K 约 100 万像素，2K 约 400 万像素"
+          }
+        }
+      }
+    },
+    "1K or 2K, e.g. 3:4@2K" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1K oder 2K, z. B. 3:4@2K"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1K o 2K, p. ej. 3:4@2K"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1K ou 2K, par exemple 3:4@2K"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1K o 2K, ad es. 3:4@2K"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1Kまたは2K（例：3:4@2K）"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1K 或 2K，例如 3:4@2K"
           }
         }
       }
@@ -11741,6 +11913,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "卷帘：在两张图像之间拖移分隔线（← →）"
+          }
+        }
+      }
+    },
+    "Custom" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Benutzerdefiniert"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Personalizado"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Personnalisé"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Personalizzato"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "カスタム"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自定义"
           }
         }
       }
@@ -24925,6 +25137,46 @@
         }
       }
     },
+    "Proportion" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seitenverhältnis"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Proporción"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Proportion"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Proporzioni"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "縦横比"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "比例"
+          }
+        }
+      }
+    },
     "Publishers’ models" : {
       "localizations" : {
         "de" : {
@@ -27516,6 +27768,46 @@
         }
       }
     },
+    "Resolution" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Auflösung"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Resolución"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Résolution"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Risoluzione"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "解像度"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "分辨率"
+          }
+        }
+      }
+    },
     "Resumed at the next installation, or discarded." : {
       "localizations" : {
         "de" : {
@@ -29682,6 +29974,46 @@
         }
       }
     },
+    "Size in Two Scales" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Format in zwei Stufen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tamaño en dos escalas"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Format en deux échelles"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Formato in due scale"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "2段階サイズ"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "两级尺寸"
+          }
+        }
+      }
+    },
     "Sketch at %lld steps of %lld" : {
       "localizations" : {
         "de" : {
@@ -29986,6 +30318,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "速度"
+          }
+        }
+      }
+    },
+    "Splits the Size menu of the rack in two: a proportion, then a resolution, 1K (about 1 megapixel) or 2K (about 4). The sizes are the app’s; the pencil still types any other." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Teilt das Formatmenü des Racks in zwei: ein Seitenverhältnis, dann eine Auflösung, 1K (etwa 1 Megapixel) oder 2K (etwa 4). Die Formate sind die der App; mit dem Stift lässt sich weiterhin jedes andere eingeben."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Divide el menú Tamaño del rack en dos: una proporción y luego una resolución, 1K (cerca de 1 megapíxel) o 2K (cerca de 4). Los tamaños son los de la app; el lápiz sigue permitiendo escribir cualquier otro."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sépare le menu Format du rack en deux : une proportion, puis une résolution, 1K (environ 1 mégapixel) ou 2K (environ 4). Les formats sont ceux de l’app ; le crayon permet toujours d’en taper un autre."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Divide il menu Formato del rack in due: prima le proporzioni, poi la risoluzione, 1K (circa 1 megapixel) o 2K (circa 4). I formati sono quelli dell’app; la matita permette sempre di digitarne un altro."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ラックのサイズメニューを2つに分けます。縦横比を選び、次に解像度（1Kは約1メガピクセル、2Kは約4メガピクセル）を選びます。サイズはアプリが決めたもので、鉛筆では引き続き好きなサイズを入力できます。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "将机架中的尺寸菜单一分为二：先选比例，再选分辨率，1K（约 100 万像素）或 2K（约 400 万像素）。尺寸由应用给出；铅笔仍可输入任何其他尺寸。"
           }
         }
       }
@@ -35093,6 +35465,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "提示词打开了一个从未关闭的备选组（第 %@ 个字符）。"
+          }
+        }
+      }
+    },
+    "The proportion of the size; the resolution is next to it" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das Seitenverhältnis des Formats; die Auflösung steht daneben"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La proporción del tamaño; la resolución está a su lado"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La proportion du format ; la résolution est à côté"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le proporzioni del formato; la risoluzione è accanto"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サイズの縦横比。解像度は隣にあります"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "尺寸的比例；分辨率在旁边"
           }
         }
       }
@@ -44671,6 +45083,86 @@
         }
       }
     },
+    "no such proportion: \"%@\"" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unbekanntes Seitenverhältnis: \"%@\""
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "proporción desconocida: \"%@\""
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "proportion inconnue : \"%@\""
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "proporzioni sconosciute: \"%@\""
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "不明な縦横比：「%@」"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未知的比例：\"%@\""
+          }
+        }
+      }
+    },
+    "no such resolution: \"%@\"" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unbekannte Auflösung: \"%@\""
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "resolución desconocida: \"%@\""
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "résolution inconnue : \"%@\""
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "risoluzione sconosciuta: \"%@\""
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "不明な解像度：「%@」"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未知的分辨率：\"%@\""
+          }
+        }
+      }
+    },
     "non-commercial" : {
       "localizations" : {
         "de" : {
@@ -45027,6 +45519,86 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "提示词，第 %lld 组"
+          }
+        }
+      }
+    },
+    "proportion@resolution, e.g. 3:4@2K" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seitenverhältnis@Auflösung, z. B. 3:4@2K"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "proporción@resolución, p. ej. 3:4@2K"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "proportion@résolution, par exemple 3:4@2K"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "proporzioni@risoluzione, ad es. 3:4@2K"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "縦横比@解像度（例：3:4@2K）"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "比例@分辨率，例如 3:4@2K"
+          }
+        }
+      }
+    },
+    "proportions: %@ — silicontrol help add" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seitenverhältnisse: %@ — silicontrol help add"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "proporciones: %@ — silicontrol help add"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "proportions : %@ — silicontrol help add"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "proporzioni: %@ — silicontrol help add"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "縦横比：%@ — silicontrol help add"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "比例：%@ — silicontrol help add"
           }
         }
       }
@@ -47159,6 +47731,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "无法识别的格式：“%@”"
+          }
+        }
+      }
+    },
+    "unreadable size: \"%@\"" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unlesbares Format: \"%@\""
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "tamaño ilegible: \"%@\""
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "taille illisible : \"%@\""
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "formato illeggibile: \"%@\""
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "読み取れないサイズ：「%@」"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法识别的尺寸：\"%@\""
           }
         }
       }

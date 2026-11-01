@@ -67,6 +67,8 @@ queue — refused while a render runs —, answered with the new image once it i
 Apple's model is downloaded by macOS only with `--download` (else `download_required`);
 `silicontrol help enlarge` has the rest.
 
+**A size is `WxH` or a proportion and a resolution.** `silicontrol add` and `grid` take `832x1216` as ever, or `3:4@2K`: the proportion (1:1, 4:5, 3:4, 2:3, 9:16, 5:4, 4:3, 3:2, 16:9), `@`, then `1K` or `2K`. Neither character means anything to a shell, so no quotes. It resolves to the pixels of the rack's Size in Two Scales (`SizeScales`, one function for both), whether or not that Beta option is on, and is refused (`format`) with its reason where the rack greys it: Anima's 2K, for instance, is the square alone (2048 px a side). The table is in [the app's page](APP.md#create).
+
 **Solvers follow More Solvers.** `--solver` is accepted only with More Solvers on (Settings › Advanced › Beta) and on a model that offers more than Euler; otherwise the answer is a refusal (`solver`) that names the setting.
 
 **Faster Rendering is the app's setting too, one per model, and a Beta option.** `silicontrol set faster-rendering on|off

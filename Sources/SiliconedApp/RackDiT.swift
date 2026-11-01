@@ -92,10 +92,78 @@ struct DiTBox: View {
         }
     }
 
+    // ── Size in two scales (Beta): a proportion, then a resolution; the table is `SizeScales` ──
+
+    /// The two menus and the pixels they give. The shown choice is read from the form's size, so a size typed by hand, or
+    /// restored with an image, shows « Custom » instead of a proportion it is not. A greyed entry says why (the model's
+    /// limit, or the Mac it needs), as the default menu does.
+    @ViewBuilder private var scales: some View {
+        let current = app.sizeCell
+        let resolution = current?.resolution ?? .oneK
+        let ratio = current?.ratio ?? SizeRatio(1, 1)
+        Field(title: "Size") {
+            Picker("Proportion", selection: Binding<SizeRatio?>(
+                get: { current?.ratio },
+                set: { if let r = $0 { app.selectScale(r, resolution) } })) {
+                if current == nil { Text("Custom").tag(SizeRatio?.none) }
+                ForEach(Array([[SizeRatio(1, 1)], SizeScales.portraits, SizeScales.landscapes].enumerated()), id: \.offset) { group in
+                    if group.offset > 0 { Divider() }
+                    ForEach(group.element, id: \.self) { r in
+                        let cell = SizeScales.cell(r, resolution)!
+                        scaleItem(cell, title: ratioTitle(cell)).tag(Optional(r))
+                    }
+                }
+            }
+            .labelsHidden().fixedSize()
+            .help(approximateHelp(current))
+            Picker("Resolution", selection: Binding<SizeResolution?>(
+                get: { current?.resolution },
+                set: { if let q = $0 { app.selectScale(ratio, q) } })) {
+                if current == nil { Text("Custom").tag(SizeResolution?.none) }
+                ForEach(SizeResolution.allCases, id: \.self) { q in
+                    scaleItem(SizeScales.cell(ratio, q)!, title: q.rawValue).tag(Optional(q))
+                }
+            }
+            .labelsHidden().fixedSize()
+            .help("1K is about 1 megapixel, 2K about 4")
+            Text(verbatim: "\(app.format.width) × \(app.format.height)").monospacedDigit().foregroundStyle(.secondary)
+            Button { customSize = true } label: { Image(systemName: "pencil") }
+                .buttonStyle(.borderless)
+                .help("Type a size (width × height)")
+                .accessibilityLabel(Text("Type a size (width × height)"))
+                .popover(isPresented: $customSize, arrowEdge: .trailing) { CustomSize(app: app) }
+        }
+    }
+
+    /// An entry of either menu: its title, or why it is greyed.
+    @ViewBuilder private func scaleItem(_ cell: SizeCell, title: String) -> some View {
+        if let why = app.scaleUnavailable(cell) {
+            Text(verbatim: "\(title) · \(why)").disabled(true)
+        } else {
+            Text(verbatim: title)
+        }
+    }
+
+    /// « 3:4 », or « ≈ 9:16 » where the pixels at this resolution are not quite that proportion.
+    private func ratioTitle(_ cell: SizeCell) -> String {
+        cell.isApproximate ? "≈ \(cell.ratio)" : cell.ratio.description
+    }
+
+    /// The footnote of an approximate proportion, as a tooltip.
+    private func approximateHelp(_ cell: SizeCell?) -> Text {
+        guard let cell, cell.isApproximate else { return Text("The proportion of the size; the resolution is next to it") }
+        let pixels = "\(cell.width) × \(cell.height)"
+        let really = cell.actualRatio.description, asked = cell.ratio.description
+        let off = cell.deviation.formatted(.percent.precision(.fractionLength(1)))
+        return Text("\(pixels) is really \(really), \(off) off \(asked): an exact \(asked) in multiples of 32 has no size near this resolution.")
+    }
+
     // ── what the DiT is told: size, seed, how many, steps ──
 
     @ViewBuilder private var settings: some View {
-        if app.references.isEmpty {
+        if app.references.isEmpty, app.sizeScalesBeta {
+            scales
+        } else if app.references.isEmpty {
             Field(title: "Size") {
                 Picker("Orientation", selection: $app.orientation) {
                     ForEach([RecommendedFormat.Orientation.square, .portrait, .landscape], id: \.self) { o in

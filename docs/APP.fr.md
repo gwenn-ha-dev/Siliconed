@@ -23,6 +23,18 @@ Le moteur derrière elle, avec les mesures : [Le moteur de Siliconed](ENGINE.fr
 
 Chaque côté doit être d'au moins 512 et multiple de 16 ; la surface n'a pas de plafond fixe : le budget mémoire décide. Ce qu'un format coûte se calcule sur les formes du modèle avant le premier calcul et se juge contre le budget mémoire du Mac ([comment](ENGINE.fr.md#la-mémoire-et-le-budget)) : un Mac qui ne peut pas le tenir le refuse, et dit lequel le peut. Le sélecteur de taille propose 1536² et 2048² à côté de 1024², et grise ce que le budget de ce Mac refuse ; toute autre taille se tape. Les formats au-delà de 1024×1536 sont chiffrés par les mêmes formules ; Anima Turbo en 2048² a été rendu sur le Mac de référence de 16 Go, avec un pic de 5,4 Go. Sous 512² les modèles sont hors de leur domaine. Qwen-Image-2.1 veut des multiples de 32 (son VAE divise par 16), et Anima au plus 2048 px de côté (les positions que sa référence calcule) ; l'un et l'autre sont refusés avant tout calcul, de même que tout côté au-delà de 8192 px.
 
+**Format en deux échelles** (Réglages › Avancé › Bêta, éteint par défaut) sépare en deux le menu Format du rack : une proportion (1:1, 4:5, 3:4, 2:3, 9:16 et, couchés, 5:4, 4:3, 3:2, 16:9), puis une résolution, 1K (environ 1 mégapixel) ou 2K (environ 4) ; l'app calcule les pixels, toujours multiples de 32 pour que tous les modèles les prennent. Le crayon, le contrôle de mémoire et les limites de chaque modèle ne changent pas, et le menu par défaut reste le défaut.
+
+| Proportion | 1K | 2K |
+|---|---|---|
+| 1:1 | 1024 × 1024 | 2048 × 2048 |
+| 4:5 | 896 × 1120 | 1792 × 2240 |
+| 3:4 | 864 × 1152 | 1728 × 2304 |
+| 2:3 | 832 × 1248 | 1664 × 2496 |
+| 9:16 | 768 × 1344 ≈ | 1440 × 2560 |
+
+Les paysages sont les mêmes tailles couchées (le 3:2 fait 1248 × 832 en 1K). Le ≈ : en 1K, un 9:16 exact est hors d'atteinte : un 9:16 exact en multiples de 32 ne va que par pas de 288 × 512 (576 × 1024, 864 × 1536), donc la 1K garde 768 × 1344, qui est en réalité un 4:7 (1,6 % d'écart) et s'affiche « ≈ 9:16 » ; pareil pour le 16:9 couché. En 2K, 1440 × 2560 est un 9:16 exact. Anima s'arrête à 2048 px de côté : sa 2K est le carré seul, et les autres tailles 2K sont grisées avec cette raison. `silicontrol add` et `grid` prennent les mêmes tailles écrites `3:4@2K`, option Bêta allumée ou non ([Télécommande](REMOTE-CONTROL.fr.md)).
+
 ## Éditer
 
 - **L'édition par instruction** avec Qwen-Image-2.1 Turbo : donnez-lui 1 à 3 images et une phrase (« remplace le ciel nuageux par un ciel bleu ») ; son encodeur voit les images. Dans l'app, une édition est plafonnée à une surface de 1024².
@@ -135,7 +147,7 @@ Siliconed › Réglages… (⌘,), trois onglets.
 
 - **Général** : où vivent les modèles, avec Déplacer la bibliothèque…, Ouvrir une bibliothèque… et Ramener sur ce Mac .
 - **Autres Mac** : prêter ce Mac, appairer avec un autre ([Calculer sur un autre Mac](#calculer-sur-un-autre-mac)).
-- **Avancé**, dans cet ordre : Ce Mac (la mesure) ; Ligne de commande (installe `silicontrol`, plus bas) ; et **Bêta**, éteint par défaut et susceptible de changer : Plus de solveurs (ajoute les solveurs Euler a, DPM++ 2M et UniPC à la boîte du débruiteur et aux axes de l'exploration ; Euler, le défaut, est celui pour lequel les modèles ont été distillés), le Rendu plus rapide (ajoute son interrupteur à la boîte du débruiteur), les Forces de LoRA négatives (curseurs de −1,5 à 1,5, pour les LoRA « curseur » ; une LoRA ordinaire est abîmée par une force négative).
+- **Avancé**, dans cet ordre : Ce Mac (la mesure) ; Ligne de commande (installe `silicontrol`, plus bas) ; et **Bêta**, éteint par défaut et susceptible de changer : Plus de solveurs (ajoute les solveurs Euler a, DPM++ 2M et UniPC à la boîte du débruiteur et aux axes de l'exploration ; Euler, le défaut, est celui pour lequel les modèles ont été distillés), le Rendu plus rapide (ajoute son interrupteur à la boîte du débruiteur), le Format en deux échelles (le Format du rack devient une proportion et une résolution, plus bas), les Forces de LoRA négatives (curseurs de −1,5 à 1,5, pour les LoRA « curseur » ; une LoRA ordinaire est abîmée par une force négative).
 
 Quand vous calculez sur un autre Mac, la mesure est celle de cet autre Mac, et la fenêtre le dit.
 

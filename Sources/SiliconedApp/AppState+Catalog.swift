@@ -357,6 +357,33 @@ extension AppState {
         return nil
     }
 
+    // ── Size in two scales (Beta): the cells are `SizeScales`'; this is only what the rack asks of them ──
+
+    /// The table cell the form's size is, `nil` for a size typed by hand or from the default menu that is not in the table.
+    var sizeCell: SizeCell? { SizeScales.cell(matching: format) }
+
+    /// **Why a cell is greyed in the rack**, `nil` where it can be chosen: the model's own limit (Anima's 2048 px a side)
+    /// first, then this Mac's memory — the same two checks as the default menu and the engine's preflight.
+    func scaleUnavailable(_ cell: SizeCell) -> String? {
+        let w = String(cell.width), h = String(cell.height)
+        if let family = card?.family, let refusal = SizeScales.refusal(cell, family: family) {
+            if case let .formatRefused(_, _, _, bound) = refusal {
+                return String(localized: "\(w) × \(h) — \(String(bound)) px a side at most")
+            }
+            return Problem(refusal).text
+        }
+        if let n = macNeeded(cell.format, images: 0) {
+            return String(localized: "\(w) × \(h) — needs a Mac with \(String(n)) GB")
+        }
+        return nil
+    }
+
+    /// Takes the cell as the form's size, as a click on the default menu would.
+    func selectScale(_ ratio: SizeRatio, _ resolution: SizeResolution) {
+        guard let cell = SizeScales.cell(ratio, resolution) else { return }
+        useFormat(cell.format)
+    }
+
     /// The sizes the picker offers: the model's for this orientation, and the one typed by hand.
     var pickerFormats: [RecommendedFormat] {
         orientationFormats.contains(format) ? orientationFormats : orientationFormats + [format]
