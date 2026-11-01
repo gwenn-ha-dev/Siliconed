@@ -38,6 +38,7 @@ import Synchronization
 ///     resident is taken out of it (it is in the need).
 ///   - **A cancelled stream ends with `.cancelled`, not an error**; a consumer that stops reading cancels the run.
 ///   - **The text is cumulative**, and never ends inside a character (`UTF8Stream`).
+///   - **A loop is cut** (`RepetitionGuard`): an exact cycle of the last tokens ends the run, the text keeping one turn of it.
 ///   - **Greedy**, whatever the Instruct's `generation_config.json` recommends: ties to the lowest id.
 package final class PromptWriter: @unchecked Sendable {
     package enum Request: Sendable {
@@ -241,11 +242,26 @@ package final class PromptWriter: @unchecked Sendable {
 
         // ── the decoding, streamed ──────────────────────────────────────────────────────────────
         var stream = UTF8Stream(), text = ""
-        let output = try generator.generate(.init(ids: prepared.ids, positions: prepared.positions, images: pixels.map { [$0] } ?? []),
+        // The identifiers written (the stop token apart), for the loop guard.
+        var written: [Int] = []
+        struct Loop: Error { let keep: Int }
+        let output: Qwen3VLGenerator.Output
+        do {
+            output = try generator.generate(.init(ids: prepared.ids, positions: prepared.positions, images: pixels.map { [$0] } ?? []),
                                             maxNewTokens: limits.newTokens) { id in
-            guard !generator.stops.contains(id), !tokenizer.specialIdentifiers.contains(id) else { return }
-            let more = stream.push(Array(table.bytes(of: id)))
-            if !more.isEmpty { text += more; emit(.text(text)) }
+                guard !generator.stops.contains(id), !tokenizer.specialIdentifiers.contains(id) else { return }
+                written.append(id)
+                if let keep = RepetitionGuard.cut(written) { throw Loop(keep: keep) }
+                let more = stream.push(Array(table.bytes(of: id)))
+                if !more.isEmpty { text += more; emit(.text(text)) }
+            }
+        } catch let loop as Loop {
+            // The model went round in a circle: what the app showed so far shrinks to the text before the second turn.
+            written.removeSubrange(loop.keep...)
+            var again = UTF8Stream()
+            text = written.map { again.push(Array(table.bytes(of: $0))) }.joined() + again.finish()
+            emit(.text(text)); emit(.finished(text: text, tokens: written.count))
+            return
         }
         let rest = stream.finish()
         if !rest.isEmpty { text += rest; emit(.text(text)) }
