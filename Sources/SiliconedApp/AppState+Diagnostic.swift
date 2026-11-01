@@ -32,7 +32,7 @@ extension AppState {
         diagnosticOpen = true
     }
 
-    /// **Runs `Diagnostic.run`** in a child process (`Diagnostic.Child`, under a minute), the queue held meanwhile.
+    /// **Runs `Diagnostic.run`** in a child process (`Diagnostic.Child`, about a minute, five at most), the queue held meanwhile.
     func startDiagnostic() {
         guard diagnosticBlocker == nil else { return }
         // In a mirror the lending Mac measures itself; the sheet shows it starting until its word comes.

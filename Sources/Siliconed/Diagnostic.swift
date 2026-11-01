@@ -4,7 +4,7 @@ import IOKit
 import IOKit.ps
 import Metal
 
-/// **The diagnostic — the Mac's capacity model, measured in a minute**: voluntary, not one byte of weights, a JSON a user can
+/// **The diagnostic — the Mac's capacity model, measured once per version, in about a minute**: voluntary, not one byte of weights, a JSON a user can
 /// share. It reads what the silicon announces, measures only what the system does not say, and writes the numbers the engine
 /// plans with (`CapacityModel`): the engine reads **no table of routes**, it asks the plan for exact rows
 /// at every product and every attention (`CapacityPlan`), solved from this model.
@@ -32,7 +32,7 @@ import Metal
 ///   - **Every output is poisoned before each engine** (NaN on the sampled rows): a submission that fails silently leaves the
 ///     previous engine's right answer, which would pass;
 ///   - **The sizes follow the machine, not its name** (`CapacityProbes.Sizes`): chosen from the inventory's peak, then from the
-///     first witnesses' own rates, so that the slowest Mac of the fleet holds the minute; each stage's projection is written
+///     first witnesses' own rates, so that the slowest Mac of the fleet holds the ceiling; each stage's projection is written
 ///     beside its seconds (`stages`);
 ///   - **A finished measure is always a map**: applied as it stands, never refused, never asked again. What the probes could not give
 ///     is said and the plan does without it (a route or a set that is not offered, like one the judge excluded); what is aberrant is
@@ -42,7 +42,7 @@ import Metal
 ///     milliseconds asks whether as many threads as performance cores still get a core each (against a thread alone, measured at the
 ///     same moment: a clock that went down is the Mac's, a core that went to another process is not) and whether an empty submission
 ///     still reaches the GPU promptly, and the calls of a chain are compared with one another. A step that fails is measured again, after
-///     a wait, while the minute leaves seconds (`Sizes.retryCap`) — and then it is kept: **a disturbance only adds time**, so a chain whose
+///     a wait, while the ceiling leaves seconds (`Sizes.retryCap`) — and then it is kept: **a disturbance only adds time**, so a chain whose
 ///     calls disagree is read on its fast side (`CapacityProbes.figure`), how far they disagreed is written beside each engine and set
 ///     (`Report.uncertainty`), and the Mac need not be at rest: a moving mouse, a browser, Activity Monitor are the Mac's life;
 ///   - **It runs in a process of its own** (`Child`), because a program the Neural Engine refuses may kill the process that loads
@@ -73,8 +73,12 @@ package enum Diagnostic {
     /// engine no longer reads. A report of a schema under 17 is not a map: the app measures again (`isCurrent`).
     package static let schema = 17
     package static let repository = "https://github.com/gwenn-ha-dev/Siliconed"
-    /// Wall seconds the whole diagnostic promises, inventory and witnesses included, on any Mac.
-    package static let minute = 60.0
+    /// **Wall seconds the whole diagnostic may take, inventory and witnesses included, on any Mac: a ceiling, not a target** (the
+    /// user, 1/11/2026: a Mac pays once per version rather than a few percent at every render). The duration is a result: about forty
+    /// seconds on an M1 Pro at the first tier. Under a one-minute budget the tier was chosen by time, and the tier stepped down on the
+    /// noise of the first witnesses — the same Mac measured at one tier, then at another, and planned two ways; a Mac small or hot
+    /// enough measured less than the plan needs. Now the memory chooses the tier (`Plan.choose`), the time only past the ceiling.
+    package static let ceiling = 300.0
 
     /// **The fp32 threshold**: the AMX check's (`siliconed-dev amx`), a row of an fp32 product or
     /// attention no further than 10⁻⁵ from the exact. Measured on the M1 Pro (14/10/2026): the
@@ -109,7 +113,7 @@ package enum Diagnostic {
         }
     }
 
-    /// **Runs the diagnostic**: under a minute on any Mac, no weights, its peak under B (`Plan`). Synchronous and
+    /// **Runs the diagnostic**: under the ceiling on any Mac (about a minute), no weights, its peak under B (`Plan`). Synchronous and
     /// heavy: call it off the main thread, and never from the engine's queue.
     ///
     /// **It passes the doors a render passes**: it waits its turn on the engine's queue (`Engine.file`:
@@ -117,7 +121,7 @@ package enum Diagnostic {
     /// another process refuses it: `renderAlreadyRunning`). `cancellation` is checked between two
     /// measurements (`cancelled`).
     ///
-    /// It knows no model: the same probes on every Mac, whatever is installed. `validate` (a developer's, outside the minute) adds the
+    /// It knows no model: the same probes on every Mac, whatever is installed. `validate` (a developer's, outside the ceiling) adds the
     /// model's seconds on products it never saw, against a long measure — in `measure`'s probes, not in the report.
     package static func run(cancellation: Cancellation? = nil, validate: Bool = false, skipping: Set<CapacityModel.Kernel> = [],
                            log: ((String) -> Void)? = nil,

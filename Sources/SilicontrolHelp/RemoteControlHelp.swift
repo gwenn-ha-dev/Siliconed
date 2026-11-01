@@ -255,13 +255,14 @@ package enum RemoteControlHelp {
         silicontrol diagnose [--issue]
 
         « Measure This Mac » (the app's Help menu), from the terminal. The sheet opens in
-        the app and the diagnostic runs — under a minute, no model needed: what the silicon
-        announces (the GPU's cores and clock, the CPU's clusters, the Neural Engine), then each
+        the app and the diagnostic runs — about a minute, five at most, no model needed: what
+        the silicon announces (the GPU's cores and clock, the CPU's clusters, the Neural Engine),
+        then each
         engine alone and in sets on matrix products and on attention, the forms of the weights and
         their preparation, the heat and the memory; each output checked against the exact result,
         and a route that computed wrong is left out. After each step it checks that the Mac was
         free (the threads still had their cores, the GPU answered promptly, identical calls took
-        the same time) and measures the step again, while the minute leaves seconds; what stayed
+        the same time) and measures the step again, while the ceiling leaves seconds; what stayed
         busy is kept, its chains read on their quick side (a disturbance only adds time), and said
         in "findings" ("disturbed") with how far identical calls differed ("regime"."spreads") and
         the cores the others used ("regime"."foreign"). It runs in a
@@ -1009,13 +1010,14 @@ package enum RemoteControlHelp {
         silicontrol diagnose [--issue]
 
         « Mesurer ce Mac » (menu Aide de l'app), depuis le terminal. La feuille s'ouvre
-        dans l'app et le diagnostic tourne — moins d'une minute, sans modèle : ce que le silicium
-        annonce (les cœurs et la fréquence du GPU, les grappes du CPU, le Neural Engine), puis
+        dans l'app et le diagnostic tourne — une minute environ, cinq au plus, sans modèle : ce
+        que le silicium annonce (les cœurs et la fréquence du GPU, les grappes du CPU, le Neural
+        Engine), puis
         chaque moteur seul et en ensembles sur des produits matriciels et sur l'attention, les formes
         des poids et leur préparation, la chaleur et la mémoire ; chaque sortie vérifiée contre le
         résultat exact, et une route qui a mal calculé est écartée. Après chaque étape elle vérifie
         que le Mac était libre (les fils avaient encore leurs cœurs, le GPU répondait sans attendre,
-        des appels identiques prenaient le même temps) et refait l'étape tant que la minute laisse
+        des appels identiques prenaient le même temps) et refait l'étape tant que le plafond laisse
         des secondes ; ce qui est resté occupé est gardé, ses chaînes lues du côté rapide (une
         perturbation n'ajoute que du temps), et dit dans "findings" ("disturbed") avec l'écart des
         appels identiques ("regime"."spreads") et les cœurs qu'ont pris les autres ("regime"."foreign").

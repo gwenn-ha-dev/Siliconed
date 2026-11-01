@@ -15,7 +15,7 @@ import Foundation
 ///     a fixed cost below zero                           → taken as 0                (`bounded`: the fit does it)
 ///     a keep outside the band, a staircase of the whole range → bounded to the band's edge (`bounded`, `Rules`)
 ///     identical calls that disagreed                    → read on the fast side, how far they disagreed written (`fastSide`)
-///     a peak over the need, swap that grew, a minute overrun → facts of the run, written (`fact`)
+///     a peak over the need, swap that grew, a ceiling overrun → facts of the run, written (`fact`)
 ///
 /// The aberrant-figure rules, and what they were set from (the M1 Pro in three runs of the probes; the nine Macs of the fleet):
 ///
@@ -81,7 +81,7 @@ extension Diagnostic {
             package static let keepRange = 0.1...1.25
             /// The ANE's staircase unit, in rows: past four of the engine's own units (1 024) the fit has read noise, not steps.
             package static let maximumANEUnit = 4 * NeuralEngine.rowUnit
-            /// The minute, with the 2 % the clock and the report's own assembly take.
+            /// The ceiling, with the 2 % the clock and the report's own assembly take.
             package static let timeAllowance = 1.02
         }
 
@@ -209,7 +209,7 @@ extension Diagnostic {
             }
             // The Mac was not free while it measured: what was measured again is no finding, what stayed busy is an uncertainty.
             for d in regime?.disturbances ?? [] { found.append(finding(d)) }
-            // The memory, the swap, the minute: facts of the run.
+            // The memory, the swap, the ceiling: facts of the run.
             if !memory.held {
                 if memory.peak > memory.base + memory.need {
                     found.append(Finding(.memory, "peak", "\(Diagnostic.megabytes(memory.peak)) is over the need \(Diagnostic.megabytes(memory.base + memory.need)): a defect of the code"))
@@ -220,8 +220,8 @@ extension Diagnostic {
             if after.swapUsedBytes > before.swapUsedBytes {
                 found.append(Finding(.swap, "swap", "grew from \(Diagnostic.megabytes(before.swapUsedBytes)) to \(Diagnostic.megabytes(after.swapUsedBytes))"))
             }
-            if seconds > Diagnostic.minute * Rules.timeAllowance {
-                found.append(Finding(.time, "seconds", "took \(String(format: "%.1f", seconds)) s of \(Int(Diagnostic.minute))"))
+            if seconds > Diagnostic.ceiling * Rules.timeAllowance {
+                found.append(Finding(.time, "seconds", "took \(String(format: "%.1f", seconds)) s of \(Int(Diagnostic.ceiling))"))
             }
             return found
         }
@@ -233,7 +233,11 @@ extension Diagnostic {
         var kernels = Set<CapacityModel.Kernel>()
         for (name, judged) in judge where judged.excluded {
             if let kernel = CapacityModel.Kernel(name) { kernels.insert(kernel); continue }
-            let set = name.split(separator: "+").compactMap { CapacityModel.Engine(rawValue: String($0)) }
+            let parts = name.split(separator: "+").map(String.init)
+            // A set named by its kernels (`gpu/int8+ane/int8`, the integers' pair): the kernels beside the GPU's, as for a set of engines.
+            let named = parts.compactMap { CapacityModel.Kernel($0) }
+            if named.count == parts.count { kernels.formUnion(named.filter { $0.engine != .gpu }); continue }
+            let set = parts.compactMap { CapacityModel.Engine(rawValue: $0) }
             kernels.formUnion(Diagnostic.kernels(of: set).filter { $0.engine != .gpu })
         }
         return kernels

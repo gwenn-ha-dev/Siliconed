@@ -320,7 +320,7 @@ extension Diagnostic {
         case memoryOverBudget
         case swapGrew
         case tookTooLong
-        /// Something else used the Mac while it was measured and the minute could not measure the steps again: their figures are read on the
+        /// Something else used the Mac while it was measured and the ceiling could not measure the steps again: their figures are read on the
         /// fast side.
         case disturbed
     }
@@ -352,7 +352,7 @@ extension Diagnostic.Finding {
     /// The kernel this finding concerns (`ane/fp16`), if it concerns one.
     package var kernel: CapacityModel.Kernel? { CapacityModel.Kernel(subject) }
 
-    /// The engines this finding concerns: the kernel's, or those of the set (`gpu+ane`); none for the memory, the swap or the minute.
+    /// The engines this finding concerns: the kernel's, or those of the set (`gpu+ane`); none for the memory, the swap or the ceiling.
     package var engines: [CapacityModel.Engine] {
         if let kernel { return [kernel.engine] }
         return subject.split(separator: "+").compactMap { CapacityModel.Engine(rawValue: String($0)) }

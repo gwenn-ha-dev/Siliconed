@@ -2,7 +2,7 @@
 // from** (`Diagnostic.swift`). Sharing the report is an option behind « Share… », never advised nor the default button: the
 // sheet is for the tuning, not for the issue (the user, 19/10 and 31/10/2026).
 //
-// Three states in one sheet: what the diagnostic does and how long (under a minute, no model needed; it occupies
+// Three states in one sheet: what the diagnostic does and how long (about a minute, five at most, no model needed; it occupies
 // the GPU and the CPU, so it waits for an empty queue — and the queue waits for it); its progress; then
 // the report as a person reads it — the map first (always: a finished measure is a map, applied as it stands), then how sure
 // each engine's figure is and what the measure found, said plainly, with no grade; then per engine what it reaches against the
@@ -59,7 +59,7 @@ struct DiagnosticSheet: View {
 
     private var ready: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Matrix products and attention on the GPU, the CPU’s matrix unit and the Neural Engine, alone and together, each result checked against the exact one: what Siliconed plans a render with. No model is needed, nothing is downloaded. Under a minute; the queue waits meanwhile.")
+            Text("Matrix products and attention on the GPU, the CPU’s matrix unit and the Neural Engine, alone and together, each result checked against the exact one: what Siliconed plans a render with. No model is needed, nothing is downloaded. About a minute, five at most; the queue waits meanwhile.")
                 .font(.callout)
                 .fixedSize(horizontal: false, vertical: true)
             mapStatus
@@ -82,9 +82,6 @@ struct DiagnosticSheet: View {
     static func mapStatus(_ app: AppState) -> LocalizedStringKey {
         let map = app.mapFacts
         if let used = map.inUse {
-            if let drift = map.drift, let predicted = drift.predicted {
-                return driftSentence(measured: drift.measured, predicted: predicted)
-            }
             return used == map.stored
                 ? "This session plans with this Mac’s measure of \(day(used.date))."
                 : "This session plans with the measure of \(day(used.date)); the newer one applies to the next render."
@@ -93,12 +90,6 @@ struct DiagnosticSheet: View {
             return "The measure of \(day(stored.date)) was taken with another macOS or another version of Siliconed: this Mac is measured again before the next render."
         }
         return "This Mac is measured before its first render: Siliconed plans its calculations from it."
-    }
-
-    /// **A render ran off this Mac's measure** (the footer says it, the chip's tooltip and the sheet too): what it took, what the measure
-    /// predicted, and what to do — measure again, which applies to the next render: a render never changes its plan on the way.
-    static func driftSentence(measured: Double, predicted: Double) -> LocalizedStringKey {
-        "The last render took \(Figures.seconds(measured)) where this Mac’s measure predicted \(Figures.seconds(predicted)). If the Mac has changed (heat, other programs), measure it again: the new measure applies to the next render."
     }
 
     /// A report's ISO date as a day the user reads.
@@ -343,7 +334,7 @@ private struct ReportView: View {
         case .memoryOverNeed: String(localized: "The measure used more memory than had been counted for it.")
         case .memoryOverBudget: String(localized: "The measure needs more memory than this Mac allows.")
         case .swapGrew: String(localized: "The Mac swapped during the measure: other apps held its memory.")
-        case .tookTooLong: String(localized: "The measure took longer than a minute.")
+        case .tookTooLong: String(localized: "The measure took longer than five minutes.")
         case .disturbed: String(localized: "The Mac was busy while it was measured: the figures that differed are read on their quick side.")
         }
         return (subject, sentence)

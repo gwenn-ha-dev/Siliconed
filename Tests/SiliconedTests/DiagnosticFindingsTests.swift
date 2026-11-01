@@ -72,6 +72,15 @@ import Testing
         #expect(found(reference).contains { $0.hasPrefix("line gpu/fp32 was judged wrong: the plan has no model of it") }, "\(found(reference))")
     }
 
+    /// **A set named by its kernels and judged wrong leaves the kernels beside the GPU out** — the integers' pair (`gpu/int8+ane/int8`)
+    /// as a set of engines (`gpu+ane`) does: read as engines, its name matched nothing and the ANE's integers stayed in the plan.
+    @Test func aPairOfKernelsJudgedWrongLeavesTheANEsKernelOut() {
+        let wrong = ["gpu/int8+ane/int8": Diagnostic.Judge(error: 1, threshold: 0.01, excluded: true)]
+        #expect(Diagnostic.excluded(wrong) == [CapacityModel.Kernel(.ane, .int8)])
+        let engines = ["gpu+ane": Diagnostic.Judge(error: 1, threshold: 0.01, excluded: true)]
+        #expect(Diagnostic.excluded(engines) == [CapacityModel.Kernel(.ane, .fp16)])
+    }
+
     @Test func aSetThatExistsHasItsSharingOrIsNotOffered() {
         var m = R.measurements()
         m.trials.removeAll { $0.set == "gpu+ane" }
@@ -198,21 +207,21 @@ import Testing
         #expect(R.report(before: R.conditions(swap: 7_000_000_000), after: R.conditions(swap: 6_000_000_000)).findings.isEmpty)
     }
 
-    @Test func theMinuteIsWrittenBeyond2Percent() {
-        #expect(R.report(seconds: 61.1).findings.isEmpty)
-        let late = R.report(seconds: 61.3)
-        #expect(found(late) == ["time seconds took 61.3 s of 60"])
-        #expect(R.report(seconds: 57.6).findings.isEmpty, "the Neo's old map: 57.6 s")
+    @Test func theCeilingIsWrittenBeyond2Percent() {
+        #expect(R.report(seconds: 305.9).findings.isEmpty)
+        let late = R.report(seconds: 306.2)
+        #expect(found(late) == ["time seconds took 306.2 s of 300"])
+        #expect(R.report(seconds: 70).findings.isEmpty, "a minute and more is no finding: five minutes are the ceiling")
     }
 
     @Test func severalFindingsAreAllSaid() {
         var m = R.measurements(dropping: ["ane/fp16"])
         m.trials.removeAll { $0.set.contains("ane") }
-        let report = R.report(measurements: m, after: R.conditions(swap: 5), seconds: 70)
+        let report = R.report(measurements: m, after: R.conditions(swap: 5), seconds: 310)
         #expect(Set(report.findings.map(\.kind)) == [.line, .swap, .time])
         #expect(report.findings.count == 3)
         // …and the map is the map all the same: of this Mac, current, designated, its plan made.
-        let mine = R.report(machine: Diagnostic.machine(), measurements: m, after: R.conditions(swap: 5), seconds: 70)
+        let mine = R.report(machine: Diagnostic.machine(), measurements: m, after: R.conditions(swap: 5), seconds: 310)
         #expect(mine.findings.count == 3 && mine.isCurrent)
         #expect(EngineSettings.designation(of: mine).plan != nil)
     }
@@ -250,7 +259,7 @@ import Testing
         #expect(over.cause(excluding: []) == .memoryOverNeed && big.cause(excluding: []) == .memoryOverBudget)
         #expect(over.engines.isEmpty && over.kernel == nil)
         let swap = R.report(before: R.conditions(swap: 1), after: R.conditions(swap: 9)).findings[0]
-        let late = R.report(seconds: 70).findings[0]
+        let late = R.report(seconds: 310).findings[0]
         #expect(swap.cause(excluding: []) == .swapGrew && late.cause(excluding: []) == .tookTooLong)
     }
 

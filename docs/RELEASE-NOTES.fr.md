@@ -25,7 +25,10 @@
   d'activité ou une autre fenêtre qui se dessine à côté ne déplacent plus ses chiffres ; les appels
   qui ne s'accordent pas sont lus de leur côté rapide. La mesure lancée par l'app lit maintenant le GPU
   et le Neural Engine ensemble aussi bien qu'une mesure lancée depuis le Terminal.
-- **Moins d'une minute** sur le Mac le plus lent, sans aucun modèle.
+- **Environ une minute, cinq au plus**, sans aucun modèle : une fois par version, et la même mesure sur
+  chaque Mac. La mémoire fixe la taille des sondes, jamais le temps qu'elles prendraient : un Mac plus
+  lent ne mesure plus moins que ce dont son plan a besoin, et un départ chargé ne mesure plus le même
+  Mac de deux façons.
 
 ### Mesurer ce Mac se lit simplement ; une mesure s’applique au rendu suivant
 
@@ -90,7 +93,10 @@
 - **Le rendu plus rapide se choisit par modèle**, comme le Neural Engine : allumé par défaut sur la
   Compact et la Légère, éteint sur la Standard, qui reste l'image contrôlée contre la référence. Le choix
   est gardé avec l'image, Rendre à nouveau redonne le même ; `silicontrol set faster-rendering on|off
-  --model ID` règle celui d'un modèle, `silicontrol models` donne celui de chacun.
+  --model ID` règle celui d'un modèle, `silicontrol models` donne celui de chacun. **Sur une Standard,
+  un rendu aux réglages par défaut prend donc plus de temps qu'en 0.17** (un quart à un tiers en 1024²),
+  pour la recette en pleine taille. Si vous aviez éteint le rendu plus rapide, il reste éteint pour vos
+  modèles.
 - **Le rendu plus rapide, mesuré** : en 1024², il retire un tiers du temps d'un rendu sur Krea 2, un
   cinquième à un quart sur Z-Image, Qwen-Image-2.1 et Anima, et 6 à 9 % sur MOSS-Image.
 

@@ -2,10 +2,10 @@ import Foundation
 
 /// **What a render's gap to the plan's prediction says**: nothing while the model holds, that it drifted when it does not, that it
 /// cannot judge when the catalogue speaks for too little of the render — and never a change of the plan. The verdict is written in the
-/// render's record (the note, the journal) so that a drifting model is *seen*; acting on it is a new measure (« Measure This Mac »),
-/// the user's call, because the bits of an image must not depend on what an earlier render measured. The app says it, once for a given
-/// measure, under the Generate button — what the render took, what the model predicted, and the button that measures again — and the
-/// new measure applies from the next render: a render never changes its plan on the way.
+/// render's record (the note, the journal, the report) so that a drifting model is *seen* by whoever reads the reports; it changes no
+/// plan, because the bits of an image must not depend on what an earlier render measured. The app does not propose to measure again on
+/// a drift: the model's known gap — a long render's regime read off the probes' short passes — is the same on every Mac, and a new
+/// measure could not close it (the user still can, « Measure This Mac », and it applies from the next render).
 ///
 ///     comparison (`RenderLoop.compare`)
 ///        │   no model, or no class matched                   →  unjudged(noModel)

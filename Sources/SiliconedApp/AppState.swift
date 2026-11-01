@@ -8,7 +8,7 @@
 // (`Curtain.mode`), the beta « Named Subjects » and « Negative LoRA Strengths » switches (`SubjectLibrary.enabledKey`,
 // `negativeLoRAKey`), the file format of the last export (`exportFormatKey`), the Neural Engine's choice per
 // model (`neuralEngineKey`), the Macs paired and the lending switch (`OtherMacs`), and this Mac's capacity map
-// with the last render's note against it (`capacityMapKey`, `renderNoteKey`, `driftToldKey`), measured when
+// with the last render's note against it (`capacityMapKey`, `renderNoteKey`), measured when
 // the user asks, like the system language the app follows —, the licenses accepted, which the library keeps itself (`<local>/accepted-licenses.json`) because its
 // engine refuses a render without them, and where the library is when the user moved it (`<local>/library-location`,
 // `AppState+Place.swift`). A library on another disk is rendered through a copy on this Mac, removed when the
@@ -105,7 +105,8 @@ final class AppState {
     /// half grid (`Request.fasterRendering`; three of eight, Krea 2 four) — a quarter to a third faster, another image than the
     /// recipe at full size, judged clean by eye per family. Not with a LoRA, Detail or an edit (each plan's rules). What the user
     /// chose; absent, the version's default (`Variant.fasterRenderingByDefault`: off on the Standard, on on the Compact and the
-    /// Light), as the Neural Engine does. A new key: the single switch of earlier builds is not read.
+    /// Light), as the Neural Engine does. A new key: the single switch of earlier builds is read once, at the first launch after
+    /// the update (`adoptEarlierFasterRendering`), then removed.
     /// Every request carries the value and every history image keeps it (`RenderSettings.fasterRendering`): a redo is the same
     /// image whatever the switch says by then.
     var fasterRenderingChoices = UserDefaults.standard.dictionary(forKey: AppState.fasterRenderingKey) as? [String: Bool] ?? [:] {
@@ -117,6 +118,19 @@ final class AppState {
     }
     func setFasterRendering(_ on: Bool, for id: String) {
         if let card = cards.first(where: { $0.id == id }) { fasterRenderingChoices[neuralEngineKey(card)] = on }
+    }
+    /// **The single switch of the builds before the per-model choice** (« fasterRendering », on by default): a user who turned it off
+    /// asked for the recipe at full size, and an update must not turn it back on behind them — each installed model that would default
+    /// to on gets the choice off. On (the old default, or chosen) says nothing more than the versions' defaults do. Read once, removed.
+    private static let earlierFasterRenderingKey = "fasterRendering"
+    private func adoptEarlierFasterRendering() {
+        let defaults = UserDefaults.standard
+        guard let earlier = defaults.object(forKey: Self.earlierFasterRenderingKey) as? Bool else { return }
+        defaults.removeObject(forKey: Self.earlierFasterRenderingKey)
+        guard !earlier else { return }
+        var choices = fasterRenderingChoices
+        for card in cards where !card.isImported && choices[neuralEngineKey(card)] == nil { choices[neuralEngineKey(card)] = false }
+        fasterRenderingChoices = choices
     }
     private static let exportFormatKey = "exportFormat"
     /// **The file format the last export used** (PNG, JPEG or HEIC): the next Save and Export open on it.
@@ -523,6 +537,7 @@ final class AppState {
         readySet = Set(library.models().map(\.id))
         occupancy = library.occupancy()
         identifier = defaultIdentifier
+        adoptEarlierFasterRendering()
         readEditors()
         // The engine's settings, read with the capacity map — once per process, and only
         // with a current map: the app builds only one `AppState` (see `App.swift`). Without one (none yet,
@@ -571,29 +586,7 @@ final class AppState {
                                            thresholds: .init(uncertainty: map)) else { return }
         renderNote = check.note
         if let data = try? JSONEncoder().encode(check.note) { UserDefaults.standard.set(data, forKey: Self.renderNoteKey) }
-        noteDrift(check.verdict, check.note)
     }
-
-    /// **A render ran off the model by more than the loop's tolerance** (`RenderLoop.Verdict.drift`): the footer says it and proposes to
-    /// measure again. It says nothing else — the plan of this session stays what it is, and so do the bits of the images —, and only
-    /// once for a given measure: a render that held clears it, a new measure clears it, and a measure already told about is not
-    /// told about again at the next launch (the proposal would be repeated at every render of a Mac whose model is off by its own
-    /// structure, not by the hour).
-    private func noteDrift(_ verdict: RenderLoop.Verdict, _ note: RenderLoop.Note) {
-        guard verdict == .drift else {
-            if verdict == .held { drift = nil }
-            return
-        }
-        let told = UserDefaults.standard.string(forKey: Self.driftToldKey)
-        guard drift != nil || told != note.map else { return }
-        drift = note
-        UserDefaults.standard.set(note.map, forKey: Self.driftToldKey)
-    }
-
-    /// The date of the measure the user was last told renders ran off.
-    private static let driftToldKey = "capacityMapDriftTold"
-    /// The last render's note when it ran off the model, until a render holds or a measure replaces the model; the footer reads it.
-    private(set) var drift: RenderLoop.Note?
 
     /// The map kept in the preferences, current or not.
     private(set) var storedMap: Diagnostic.Report?
@@ -615,7 +608,6 @@ final class AppState {
         guard let data = try? report.json(pretty: false) else { return }
         UserDefaults.standard.set(data, forKey: Self.capacityMapKey)
         if report.date != renderNote?.map { renderNote = nil; UserDefaults.standard.removeObject(forKey: Self.renderNoteKey) }
-        drift = nil
         storedMap = report
         if !settingsRead { readSettings(map: report) } else { EngineSettings.adopt(map: report); syncPlan() }
     }

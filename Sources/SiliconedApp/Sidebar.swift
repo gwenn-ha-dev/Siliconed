@@ -202,14 +202,13 @@ private struct Footer: View {
             } else if case let .running(done, total, line) = app.diagnostic {
                 // Before the first render, the measure it waits for: why nothing starts yet, and how far.
                 Text(app.settingsRead ? "The diagnostic is running: renders wait for it."
-                                      : "Siliconed measures this Mac before its first render — under a minute.")
+                                      : "Siliconed measures this Mac before its first render — about a minute.")
                     .font(.callout)
                 Text(verbatim: "\(line) · \(done + 1)/\(total)").font(.caption).foregroundStyle(.secondary)
-            } else if !app.busy, let drift = app.drift, let predicted = drift.predicted {
-                // The last render ran off the measure: said once, beside the button that measures again. The plan stays what it is.
-                Text(DiagnosticSheet.driftSentence(measured: drift.measured, predicted: predicted)).font(.caption)
-                Button("Measure This Mac…") { app.openDiagnostic() }.buttonStyle(.link).font(.caption)
             }
+            // A render's gap to the measure's prediction is not said here: the model runs a long render's regime off the probes' short
+            // passes, the same way on every Mac, and an invitation to measure again could not close that gap. The gap goes with the
+            // report (the diagnostic sheet's last render).
             HStack(spacing: 8) {
                 Button { app.render() } label: {
                     Text(label).fontWeight(.semibold).frame(maxWidth: .infinity)

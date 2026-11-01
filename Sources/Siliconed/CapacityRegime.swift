@@ -13,7 +13,7 @@ import Metal
 ///              written for whoever reads the report, not what the findings stand on       (`LoadWatch`)
 ///
 /// A step whose pulse or spread says the Mac was busy is measured again (`CapacityProbes.Context.guarded`), after a wait for a
-/// quiet pulse, while the minute leaves time; what the minute could not redo is kept, its chains read on their fast side
+/// quiet pulse, while the ceiling leaves time; what it could not redo is kept, its chains read on their fast side
 /// (`CapacityProbes.figure`), and said by the findings as disturbed — an uncertainty, never a reason to refuse the map.
 ///
 /// What sets it apart — what a "was the Mac busy?" written by analogy with a load average would get wrong:

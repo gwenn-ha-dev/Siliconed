@@ -5825,6 +5825,46 @@
         }
       }
     },
+    "About a minute, five at most; done before the first render and after each update. A new measure applies to the next render." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Etwa eine Minute, höchstens fünf; vor dem ersten Rendern und nach jedem Update. Eine neue Messung gilt für das nächste Rendern."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alrededor de un minuto, cinco como mucho; se hace antes del primer render y tras cada actualización. Una nueva medición se aplica al siguiente render."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Environ une minute, cinq au plus ; faite avant le premier rendu et après chaque mise à jour. Une nouvelle mesure s’applique au rendu suivant."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Circa un minuto, cinque al massimo; fatta prima del primo render e dopo ogni aggiornamento. Una nuova misura si applica al render successivo."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "約1分、長くても5分で、最初のレンダリングの前とアップデートのたびに行われます。新しい測定は次のレンダリングから適用されます。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "大约一分钟，最多五分钟；在首次渲染之前以及每次更新之后进行。新的测量会应用到下一次渲染。"
+          }
+        }
+      }
+    },
     "Accept" : {
       "localizations" : {
         "de" : {
@@ -19226,42 +19266,42 @@
         }
       }
     },
-    "Matrix products and attention on the GPU, the CPU’s matrix unit and the Neural Engine, alone and together, each result checked against the exact one: what Siliconed plans a render with. No model is needed, nothing is downloaded. Under a minute; the queue waits meanwhile." : {
+    "Matrix products and attention on the GPU, the CPU’s matrix unit and the Neural Engine, alone and together, each result checked against the exact one: what Siliconed plans a render with. No model is needed, nothing is downloaded. About a minute, five at most; the queue waits meanwhile." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Matrixprodukte und Attention auf der GPU, der Matrixeinheit der CPU und der Neural Engine, einzeln und zusammen, jedes Ergebnis gegen das exakte geprüft: die Grundlage, auf der Siliconed ein Rendering plant. Kein Modell nötig, nichts wird geladen. Weniger als eine Minute; die Warteschlange wartet so lange."
+            "value" : "Matrixprodukte und Attention auf der GPU, der Matrixeinheit der CPU und der Neural Engine, einzeln und zusammen, jedes Ergebnis gegen das exakte geprüft: die Grundlage, auf der Siliconed ein Rendering plant. Kein Modell nötig, nichts wird geladen. Etwa eine Minute, höchstens fünf; die Warteschlange wartet so lange."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Productos de matrices y atención en la GPU, la unidad matricial de la CPU y el Neural Engine, por separado y juntos, cada resultado comprobado frente al exacto: las cifras con las que Siliconed planifica una imagen. No hace falta ningún modelo, no se descarga nada. Menos de un minuto; mientras tanto, la cola espera."
+            "value" : "Productos de matrices y atención en la GPU, la unidad matricial de la CPU y el Neural Engine, por separado y juntos, cada resultado comprobado frente al exacto: las cifras con las que Siliconed planifica una imagen. No hace falta ningún modelo, no se descarga nada. Alrededor de un minuto, cinco como mucho; mientras tanto, la cola espera."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Produits matriciels et attention sur le GPU, l’unité matricielle du CPU et le Neural Engine, seuls et ensemble, chaque résultat vérifié contre le résultat exact : les chiffres à partir desquels Siliconed planifie un rendu. Aucun modèle n’est nécessaire, rien n’est téléchargé. Moins d’une minute ; la file attend pendant ce temps."
+            "value" : "Produits matriciels et attention sur le GPU, l’unité matricielle du CPU et le Neural Engine, seuls et ensemble, chaque résultat vérifié contre le résultat exact : les chiffres à partir desquels Siliconed planifie un rendu. Aucun modèle n’est nécessaire, rien n’est téléchargé. Environ une minute, cinq au plus ; la file attend pendant ce temps."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Prodotti di matrici e attention sulla GPU, sull’unità matriciale della CPU e sul Neural Engine, da soli e insieme, ogni risultato verificato rispetto a quello esatto: le cifre su cui Siliconed pianifica un’immagine. Non serve alcun modello, non si scarica nulla. Meno di un minuto; nel frattempo la coda attende."
+            "value" : "Prodotti di matrici e attention sulla GPU, sull’unità matriciale della CPU e sul Neural Engine, da soli e insieme, ogni risultato verificato rispetto a quello esatto: le cifre su cui Siliconed pianifica un’immagine. Non serve alcun modello, non si scarica nulla. Circa un minuto, cinque al massimo; nel frattempo la coda attende."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "GPU、CPUの行列ユニット、Neural Engine での行列積とアテンション。単独と同時の両方で、それぞれの結果を厳密な結果と照合し、Siliconed がレンダリングを計画するための数値を求めます。モデルは不要で、何もダウンロードしません。1分未満で終わり、その間キューは待機します。"
+            "value" : "GPU、CPUの行列ユニット、Neural Engine での行列積とアテンション。単独と同時の両方で、それぞれの結果を厳密な結果と照合し、Siliconed がレンダリングを計画するための数値を求めます。モデルは不要で、何もダウンロードしません。約1分、長くても5分で終わり、その間キューは待機します。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "在 GPU、CPU 矩阵单元和神经网络引擎上计算矩阵乘积和注意力，分别单独运行和同时运行，每个结果都与精确结果核对，得出 Siliconed 规划一次生成所依据的数值。无需任何模型，也不下载任何内容。不到一分钟；期间队列会等待。"
+            "value" : "在 GPU、CPU 矩阵单元和神经网络引擎上计算矩阵乘积和注意力，分别单独运行和同时运行，每个结果都与精确结果核对，得出 Siliconed 规划一次生成所依据的数值。无需任何模型，也不下载任何内容。大约一分钟，最多五分钟；期间队列会等待。"
           }
         }
       }
@@ -28680,7 +28720,7 @@
         }
       }
     },
-    "Siliconed measures this Mac before its first render — under a minute." : {
+    "Siliconed measures this Mac before its first render — about a minute." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -28709,13 +28749,13 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Siliconedは最初の生成の前にこのMacを測定します — 1分未満です。"
+            "value" : "Siliconedは最初の生成の前にこのMacを測定します — 約1分です。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Siliconed 会在首次生成之前测量这台 Mac——不到一分钟。"
+            "value" : "Siliconed 会在首次生成之前测量这台 Mac——大约一分钟。"
           }
         }
       }
@@ -33287,52 +33327,6 @@
         }
       }
     },
-    "The last render took %@ where this Mac’s measure predicted %@. If the Mac has changed (heat, other programs), measure it again: the new measure applies to the next render." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Das letzte Rendern dauerte %@, wo die Messung dieses Macs %@ vorhergesagt hatte. Hat sich der Mac verändert (Hitze, andere Programme), messen Sie ihn erneut: Die neue Messung gilt für das nächste Rendern."
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "The last render took %1$@ where this Mac's measure predicted %2$@. If the Mac has changed (heat, other programs), measure it again: the new measure applies to the next render."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "El último render tardó %@ donde la medición de este Mac preveía %@. Si el Mac ha cambiado (calor, otros programas), vuelve a medirlo: la nueva medición se aplica al siguiente render."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Le dernier rendu a pris %@ là où la mesure de ce Mac en prévoyait %@. Si le Mac a changé (chaleur, autres programmes), mesurez-le de nouveau : la nouvelle mesure s’applique au rendu suivant."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "L’ultimo render ha richiesto %@ dove la misura di questo Mac ne prevedeva %@. Se il Mac è cambiato (calore, altri programmi), misuralo di nuovo: la nuova misura si applica al render successivo."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "直前のレンダリングは%@かかりました。この Mac の測定では%@と予測されていました。Mac の状態が変わった場合(発熱、ほかのプログラム)は、もう一度測定してください。新しい測定は次のレンダリングから適用されます。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "上一次渲染用时 %@，而这台 Mac 的测量预测为 %@。如果 Mac 的状态变了（发热、其他程序），请重新测量：新的测量会应用到下一次渲染。"
-          }
-        }
-      }
-    },
     "The last render’s matrix products and attention took %@ where %@ was predicted; this goes with the report." : {
       "localizations" : {
         "de" : {
@@ -33773,42 +33767,42 @@
         }
       }
     },
-    "The measure took longer than a minute." : {
+    "The measure took longer than five minutes." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Die Messung dauerte länger als eine Minute."
+            "value" : "Die Messung dauerte länger als fünf Minuten."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "La medición tardó más de un minuto."
+            "value" : "La medición tardó más de cinco minutos."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "La mesure a duré plus d’une minute."
+            "value" : "La mesure a duré plus de cinq minutes."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "La misura è durata più di un minuto."
+            "value" : "La misura è durata più di cinque minuti."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "測定に1分以上かかりました。"
+            "value" : "測定に5分以上かかりました。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "测量用时超过了一分钟。"
+            "value" : "测量用时超过了五分钟。"
           }
         }
       }
@@ -38795,46 +38789,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "输入或粘贴要改进的提示词"
-          }
-        }
-      }
-    },
-    "Under a minute; done before the first render and after each update. A new measure applies to the next render." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Weniger als eine Minute; vor dem ersten Rendern und nach jedem Update. Eine neue Messung gilt für das nächste Rendern."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Menos de un minuto; se hace antes del primer render y tras cada actualización. Una nueva medición se aplica al siguiente render."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Moins d’une minute ; faite avant le premier rendu et après chaque mise à jour. Une nouvelle mesure s’applique au rendu suivant."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Meno di un minuto; fatta prima del primo render e dopo ogni aggiornamento. Una nuova misura si applica al render successivo."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "1分足らずで、最初のレンダリングの前とアップデートのたびに行われます。新しい測定は次のレンダリングから適用されます。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "不到一分钟；在首次渲染之前以及每次更新之后进行。新的测量会应用到下一次渲染。"
           }
         }
       }

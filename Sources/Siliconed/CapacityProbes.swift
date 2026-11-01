@@ -34,7 +34,7 @@ import MetalPerformanceShadersGraph
 ///     three sizes, and the sizes are three different products (512×2048², 1024×3840², 4096×6144²), because an engine's
 ///     rate depends on k and n as much as on W — the line is the machine's, not a shape's.
 ///   - **the sizes follow the machine** (`Sizes`): the memory plan takes the largest tier B holds, the witnesses' own rates can only step
-///     it down — the minute is held on the slowest Mac without a line of the probes naming one.
+///     it down — the ceiling is held on the slowest Mac without a line of the probes naming one.
 ///   - **the ANE alone is `NeuralEngine.product` over all the rows** (`first: 0, rows: m`), not a pair at the smallest share
 ///     (`shareRange` starts at 0.05, and the GPU would keep a twentieth of the product and its own launch). Its time is the
 ///     side's whole: the CPU's lift of the weight and conversion of the activation included, as in a render.
@@ -70,6 +70,8 @@ extension Diagnostic {
         /// is in calls and measured seconds, so a Mac whose calls are three times longer reads three times fewer of them, not three
         /// times longer.
         package static let chainWarm = 0.15, chainWarmCalls = 3, chainWindow = 0.4, chainCalls = 8, chainCap = 1.5
+        /// **The end's witnesses, read in rounds** (the heat's numerator): three rounds a fifth of a second apart, the fast side kept.
+        package static let endRounds = 3, endPause = 0.2
         /// Products the fit never saw, for `validate`: the truth test of a model (a probe is judged against a long measure).
         package static let validationShapes: [(m: Int, k: Int, n: Int)] = [(2048, 3840, 10240), (1536, 4096, 4096), (3072, 3072, 3072), (1024, 2048, 8192)]
 
@@ -161,7 +163,7 @@ extension Diagnostic {
             if !skipped.contains(Kernel(.ane, .fp16)) { _ = NeuralEngine.bringUp }
             let gauge = Gauge()
             let clock = now()
-            // The largest tier whose need fits B; the witnesses step it down if the minute does not hold.
+            // The largest tier whose need fits B; the witnesses step it down only if the ceiling does not hold.
             let plan = try Plan.choose(budget: MemoryBudget.machineCeiling(), base: gauge.base) {
                 need(sizes: Sizes.tiers[$0], validating: validate)
             }
@@ -657,7 +659,15 @@ extension Diagnostic {
                 d.massive = massives
                 try stage("witnesses end") {
                     restoreB()
-                    let end = witnesses()
+                    // The heat is the end's witness over the start's, applied to every rate of the plan (`CapacityModel.heat`): one
+                    // round read through a burst of another program took a fifth off a fanned GPU that holds its rate for minutes.
+                    // A disturbance only adds time and lasts less than a second; the heat lasts. So the end is read in three rounds
+                    // a fifth of a second apart, each engine on its fast side.
+                    var end = witnesses()
+                    for _ in 1..<CapacityProbes.endRounds {
+                        Thread.sleep(forTimeInterval: CapacityProbes.endPause)
+                        for (engine, t) in witnesses() { end[engine] = min(end[engine] ?? t, t) }
+                    }
                     m.witnesses = m.witnesses.map { w in .init(engine: w.engine, before: w.before, after: end[w.engine] ?? w.before) }
                 }
             }
@@ -683,7 +693,7 @@ extension Diagnostic {
                 return pulse
             }
 
-            /// **A step measured when the Mac is free, or as free as the minute allows.** `body` is the step's timing: the figure it
+            /// **A step measured when the Mac is free, or as free as the ceiling allows.** `body` is the step's timing: the figure it
             /// returns is kept when the pulse that closes it says the threads still had their cores and the GPU its promptness, and
             /// the calls inside it agreed (`Regime.Rules`). Otherwise it waits — for a quiet pulse, at most two seconds — and measures
             /// it again, three times at most and while `retryBudget` has seconds. What it could not redo is kept — its chains read on the fast side
@@ -730,7 +740,7 @@ extension Diagnostic {
                 regime.repeatedSeconds += spent
             }
 
-            /// **Projects the rest of the run from what the engines did on the witness**, and steps the tier down while the minute does not hold.
+            /// **Projects the rest of the run from what the engines did on the witness**, and steps the tier down while the ceiling does not hold.
             /// The sizes only shrink here: the operands were planned for the tier the inventory allowed, and a lower tier's are inside them.
             func project(_ witnesses: [Fit.Measurements.Witness]) {
                 let flop = 2.0 * Double(Sizes.witness.m) * Double(Sizes.witness.k) * Double(Sizes.witness.n)
@@ -738,7 +748,7 @@ extension Diagnostic {
                 guard let gpu = rate("gpu") else { return }
                 let cores = Double(machine.performanceCores + machine.efficiencyCores)
                 let rates = Rates(gpu: gpu, amx: rate("amx"), ane: rate("ane"), cpu: cores > 0 ? 0.125e12 * cores : 1.0e12)
-                let left = Diagnostic.minute - Sizes.reserve - (CapacityProbes.now() - started)
+                let left = Diagnostic.ceiling - Sizes.reserve - (CapacityProbes.now() - started)
                 let chosen = Sizes.tier(for: rates, budget: left, startingAt: sizes.tier)
                 if chosen.tier != sizes.tier {
                     log?("the projection \(Int(sizes.projectedSeconds(rates) * Sizes.margin)) s does not fit the \(Int(left)) s left: tier \(sizes.tier) → \(chosen.tier)")
@@ -746,7 +756,7 @@ extension Diagnostic {
                 }
                 // Preparation and the first witnesses have run: they were not projected.
                 projected = sizes.projection(rates).filter { $0.key != "preparation" && $0.key != "witnesses start" }
-                // What the minute leaves beyond the run as projected is what the guard may spend: none on a Mac that fills it.
+                // What the ceiling leaves beyond the run as projected is what the guard may spend: none on a Mac that fills it.
                 retryBudget = max(0, min(Sizes.retryCap, left - sizes.projectedSeconds(rates) * Sizes.expectation))
             }
 

@@ -25,7 +25,9 @@ English · [Français](RELEASE-NOTES.fr.md)
   another window drawing beside it no longer moves its figures; calls that disagree are read on their
   fast side. The measure launched by the app now reads the GPU and the Neural Engine together as well
   as one launched from the Terminal.
-- **Under a minute** on the slowest Mac, without any model.
+- **About a minute, five at most**, without any model: once per version, and the same measure on every
+  Mac. The memory sets how big the probes are, never the time they would take, so a slower Mac no
+  longer measures less than its plan needs, and a busy start no longer measures the same Mac two ways.
 
 ### Measure This Mac reads plainly; a measure applies to the next render
 
@@ -90,7 +92,9 @@ English · [Français](RELEASE-NOTES.fr.md)
 - **Faster Rendering is chosen per model**, like the Neural Engine: on by default for the Compact and
   the Light, off for the Standard, which stays the image checked against the reference. The choice is
   saved with the image, so Render Again gives the same one; `silicontrol set faster-rendering on|off
-  --model ID` sets one model's, `silicontrol models` tells each.
+  --model ID` sets one model's, `silicontrol models` tells each. **On a Standard, a render at the
+  default settings therefore takes longer than in 0.17** (a quarter to a third at 1024²), for the
+  recipe at full size. If you had turned Faster Rendering off, it stays off for the models you have.
 - **Faster Rendering, measured**: at 1024² it takes a third off a render on Krea 2, a fifth to a
   quarter on Z-Image, Qwen-Image-2.1 and Anima, and 6 to 9 % on MOSS-Image.
 

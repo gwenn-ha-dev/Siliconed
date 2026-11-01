@@ -71,7 +71,7 @@ The exploration panel builds a grid in the canvas. Its axes: seeds, steps, the s
 
 ### Measure This Mac
 
-Before its first render, and again after an update or a new macOS, Siliconed times what each engine of your Mac computes. It takes under a minute, needs no model, and gives a map every time: nothing is ever refused, and how sure the measure is of each figure is written beside it. You can open it whenever you like: Help › Measure This Mac…, the Chain title and the Mac's icon at the head of the rack (greyed until this Mac is measured), or Settings › Advanced › This Mac. It is not in the Models window: installing a model and measuring a Mac are two different jobs.
+Before its first render, and again after an update or a new macOS, Siliconed times what each engine of your Mac computes. It takes about a minute, five at most, needs no model, and gives a map every time: nothing is ever refused, and how sure the measure is of each figure is written beside it. You can open it whenever you like: Help › Measure This Mac…, the Chain title and the Mac's icon at the head of the rack (greyed until this Mac is measured), or Settings › Advanced › This Mac. It is not in the Models window: installing a model and measuring a Mac are two different jobs.
 
 The sheet shows, with its columns titled: each route's speed, its share of the GPU's peak, whether its result matched the exact one (Exact ✓), what each engine keeps of its speed when they work together, the memory the measure held and how long it took. What it found is said in plain sentences, each with its effect on the plan. Sharing is an option, never the default: Share… ▸ Open a GitHub Issue, or Copy JSON.
 

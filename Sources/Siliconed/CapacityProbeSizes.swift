@@ -11,8 +11,9 @@ import Foundation
 ///     engine rates  ──▶  projection(stage) = Σ runs · FLOP / rate  +  the exact rows' fp64 on the CPU  (+ constants of the stage)
 ///        │
 ///        ├─ before the first product   the memory plan takes the largest tier whose need fits B (`MemoryNeedDiagnostic`)
-///        └─ after the first witnesses  from what each engine did on the same product (`tier(for:)`): a tier steps down while its
-///                                       projection, with the margin the heat takes (`margin`), does not fit what is left of the minute
+///        └─ after the first witnesses  from what each engine did on the same product (`tier(for:)`): a tier steps down only while its
+///                                       projection, with the margin the heat takes (`margin`), does not fit what is left of the ceiling
+///                                       (`Diagnostic.ceiling`, five minutes: in practice the memory alone chooses)
 ///
 /// What sets it apart — what a size chosen by analogy with "scale by the chip" would get wrong:
 ///
@@ -29,6 +30,9 @@ import Foundation
 ///     three stages added the same evening, rendered 8 to 25 % slower. The kernels alone keep the tier's sequences: theirs are lines,
 ///     extrapolated like the products'; at a sequence only the pair runs, its sides are the lines' (`CapacityFit.overlap` reads them so).
 ///     The point costs ~0.7 s on a hot Neo and keeps it at its tier.
+///   - **Every tier measures the sets at a short and a long k** (`chains`): the plan offers a pair only within the k's it was measured at
+///     (`CapacityFit.overlap`), so a tier with one k took every pair off the products past twice it — a DiT's down projection, its largest
+///     product (k = 10 240 or 12 288) — and left them to the GPU alone, with nothing said.
 ///   - **A tier steps down on the projection of what remains**, not on a chip class: the Mac that is slow because it is hot, throttled
 ///     or low on power is served the same way as the Mac that is slow because it is small. A fanless Mac pays `margin` for the heat the
 ///     witnesses measured at the start of the run and the run then adds.
@@ -105,7 +109,7 @@ extension Diagnostic.CapacityProbes {
                   product: [(1024, 2048, 4096), (1024, 3840, 3840), (2048, 3840, 3840), (1024, 8192, 1536)],
                   small: [(512, 3840, 3840)],
                   thin: [(256, 3072, 8192), (2048, 3072, 128), (2048, 128, 3072), (32, 3072, 8192), (256, 1536, 3072)],
-                  integers: [(1024, 2048, 4096), (1024, 3840, 3840), (2048, 3840, 3840), (1024, 8192, 1536)], chains: [(2048, 3840, 3840)], sharing: [(1024, 3840, 3840)], attention: [1024],
+                  integers: [(1024, 2048, 4096), (1024, 3840, 3840), (2048, 3840, 3840), (1024, 8192, 1536)], chains: [(2048, 3840, 3840), (2048, 12288, 4096)], sharing: [(1024, 3840, 3840)], attention: [1024],
                   stairRows: [768, 1024, 1792, 2048]),
         ]
         package static let full = tiers[0]
@@ -155,7 +159,7 @@ extension Diagnostic.CapacityProbes {
             let witnessFlop = flop(Self.witness)
             let witnessTime = 7 * witnessFlop * (1 / g + (x.map { 1 / $0 } ?? 0) + (a.map { 1 / $0 } ?? 0)) + 0.05
             p["witnesses start"] = witnessTime
-            p["witnesses end"] = witnessTime
+            p["witnesses end"] = Double(Diagnostic.CapacityProbes.endRounds) * witnessTime + Double(Diagnostic.CapacityProbes.endRounds - 1) * Diagnostic.CapacityProbes.endPause
             p["bandwidth"] = 0.02
             p["disk"] = 2.0   // the default class's three passes, then the two lower ones beside a computation (`CapacityDisk.classBudget`)
             // A chain's seconds: the ramp, the window, at most the cap — or the calls it needs where they are long (`chainCalls` after `chainWarmCalls`).
@@ -206,16 +210,16 @@ extension Diagnostic.CapacityProbes {
         package func projectedSeconds(_ rates: Rates) -> Double { projection(rates).values.reduce(0, +) }
 
         /// The heat a run adds beyond what its start shows, and the noise of the projection: a tier is kept only while this much
-        /// of the minute is left (the fanless Neo lost 1.9 × of the AMX over a minute).
+        /// of the ceiling is left (the fanless Neo lost 1.9 × of the AMX over a minute).
         package static let margin = 1.6
-        /// **What the guard may spend** measuring a step again (`CapacityProbes.Context.guarded`): the seconds the minute leaves beyond the
+        /// **What the guard may spend** measuring a step again (`CapacityProbes.Context.guarded`): the seconds the ceiling leaves beyond the
         /// run as projected with `expectation` (the projection is within 5–10 % of the seconds the stages take here), at most `retryCap`.
         package static let expectation = 1.3, retryCap = 15.0
         /// Seconds the inventory, the fit and the report take beyond the probes.
         package static let reserve = 2.0
 
         /// **The first tier whose projection fits `budget` seconds**, starting from `first`; the last tier when none does.
-        package static func tier(for rates: Rates, budget: Double = Diagnostic.minute - reserve, startingAt first: Int = 0) -> Sizes {
+        package static func tier(for rates: Rates, budget: Double = Diagnostic.ceiling - reserve, startingAt first: Int = 0) -> Sizes {
             for t in tiers[first...] where t.projectedSeconds(rates) * margin <= budget { return t }
             return tiers.last!
         }

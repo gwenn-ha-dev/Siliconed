@@ -117,7 +117,7 @@ extension AppState {
         if mirror != nil {
             return MapFacts(inUse: mirrorMachine?.inUse, stored: mirrorMachine?.stored)
         }
-        return MapFacts(inUse: mapInUse.map(RemoteMap.init), stored: storedMap.map(RemoteMap.init), drift: drift)
+        return MapFacts(inUse: mapInUse.map(RemoteMap.init), stored: storedMap.map(RemoteMap.init))
     }
 
     /// A map of this Mac and this build is kept (the Mac beside « Chain » is in colour): whatever it found, it is the map.
@@ -136,8 +136,6 @@ extension AppState {
 struct MapFacts: Equatable {
     var inUse: RemoteMap?
     var stored: RemoteMap?
-    /// The last render ran off the model in use (`RenderLoop.Verdict.drift`): this Mac's own, never a lender's.
-    var drift: RenderLoop.Note?
 }
 
 extension RemoteDiagnostic {

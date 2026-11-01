@@ -214,7 +214,7 @@ import Testing
     /// when it is faster, with its own sharing (`gpu/int8+ane/int8`) and the integers the engines run.
     @Test func theANEReadsTheIntegersWhenTheModelSaysItIsFaster() throws {
         let g8 = M.Kernel(.gpu, .int8), a8 = M.Kernel(.ane, .int8)
-        var m = machine()
+        var m = machine(aneRate: 1e9)   // the ANE is up (its fp16 line, too slow to take anything here)
         m.lines[g8] = .init(t0: 0, rate: 3e12)
         m.preparation[.int8] = [.widened: 1e-9, .native: 1e-11]
         let int8 = key(4096, 4096, 4096, .int8)
@@ -242,6 +242,10 @@ import Testing
         m.lines[a8] = .init(t0: 0, rate: 9e12)
         let refused = try #require(CS.product(int8, model: m, constraints: .init(sustained: false, excluded: [a8], allowsANE: true)))
         #expect(refused.route == "gpu/int8")
+        // …nor without the ANE itself: a map that left its fp16 out brings no engine up for the integers
+        let down = try #require(CS.product(int8, model: m, constraints: .init(sustained: false, excluded: [ane], allowsANE: true)))
+        #expect(down.route == "gpu/int8")
+        #expect(!CapacityPlan(model: m, excluded: [ane]).resources.aneInt8)
         // never an encoder, never a process without the ANE, never under the model's floor
         #expect(try solve(m, key(4096, 4096, 4096, .int8, phase: .encoding)).route == "gpu/int8")
         #expect(try solve(m, int8, ane: false).route == "gpu/int8")
@@ -259,7 +263,7 @@ import Testing
     /// answer, and the GPU's rows alone (what it read before) are a third of the seconds of a product the ANE shares.
     @Test func anAssignedIntegersProductIsTimedWithTheANEsRowsToo() throws {
         let g8 = M.Kernel(.gpu, .int8), a8 = M.Kernel(.ane, .int8)
-        var m = machine()
+        var m = machine(aneRate: 1e9)
         m.lines[g8] = .init(t0: 0, rate: 3e12)
         m.lines[a8] = .init(t0: 0, rate: 9e12)
         m.sharing["gpu/int8+ane/int8"] = .init(overhead: 0, keep: [.gpu: 0.9, .ane: 0.8])
@@ -281,7 +285,7 @@ import Testing
 
     @Test func theANEMayTakeTheWholeIntegersProductWhenTheGPUIsTheSlowEngine() throws {
         let g8 = M.Kernel(.gpu, .int8), a8 = M.Kernel(.ane, .int8)
-        var m = machine(gpuRate: 0.5e12)
+        var m = machine(gpuRate: 0.5e12, aneRate: 1e9)
         m.lines[g8] = .init(t0: 0, rate: 0.5e12)
         m.lines[a8] = .init(t0: 0, rate: 12e12)
         m.sharing["gpu/int8+ane/int8"] = .init(overhead: 0.01, keep: [.gpu: 0.5, .ane: 0.9])
@@ -308,6 +312,12 @@ import Testing
         #expect(enc.route == "gpu" && enc.preparation > 0)
         // below the rounding's floor the activation keeps its fp32
         #expect(try solve(m, key(64, 64, 128, .bf16)).assignment.roundsActivation == false)
+        // **never the Standard's**: a process or a request without half precision computes its bf16 weights on fp32 activations,
+        // however much faster another Mac's bf16 kernel is — and its plan brings no rounding up
+        let standard = try solve(m, key(4096, 4096, 4096, .bf16), ane: false)
+        #expect(!standard.assignment.roundsActivation && standard.route != "gpu/bf16act")
+        #expect(!CapacityPlan(model: m, allowsANE: false).resources.roundedActivations)
+        #expect(CapacityPlan(model: m).resources.roundedActivations)
     }
 
     // MARK: attention

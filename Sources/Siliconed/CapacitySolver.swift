@@ -65,8 +65,9 @@ package enum CapacitySolver {
         package var excluded: Set<CapacityModel.Kernel>
         /// The ANE may be asked for: this process brings it up (never the Standard's, fp32 products).
         package var allowsANE: Bool
-        /// **The fp16 attention may be asked for** (`tiles16`: Q, K, V and P rounded to half, fp32 sums): the ANE's permission, the
-        /// request's — the Compact and the Light, never the Standard. `nil` at `init`: whatever `allowsANE` says.
+        /// **Half precision may be asked for** — the fp16 attention (`tiles16`: Q, K, V and P rounded to half, fp32 sums) and the
+        /// activations rounded to bf16 (`gpu/bf16act`): the ANE's permission, the request's — the Compact and the Light, never the
+        /// Standard. `nil` at `init`: whatever `allowsANE` says.
         package var allowsHalf: Bool
 
         package init(limits: Limits = .init(), sustained: Bool = true, excluded: Set<CapacityModel.Kernel> = [],
@@ -383,7 +384,9 @@ private struct ProductSolver {
             let cands = gpuColumns(n: n, balance: Double(g0)).compactMap { option(n - $0) }
             if let b = cands.min(by: { $0.seconds < $1.seconds }) { out.append(b) }
         }
-        if key.weight == .int8, c.allowsANE, key.phase == .denoising, m >= c.limits.aneRows, !short, let ane = line(.ane, .int8) {
+        // The ANE's integers need the ANE itself: a map that left its fp16 out (judged wrong) brings no engine up (`Resources.ane`).
+        if key.weight == .int8, c.allowsANE, key.phase == .denoising, m >= c.limits.aneRows, !short, line(.ane, .fp16) != nil,
+           let ane = line(.ane, .int8) {
             func integers(_ rows: Int) -> Option? {
                 let assignment = ProductAssignment(path: .native, gpu: m - rows, ane: rows)
                 guard assignment.isRunnable(for: key) else { return nil }
@@ -423,7 +426,9 @@ private struct ProductSolver {
             if let gpu = line(.gpu, .bf16), let t = seconds([gpu: m], m: m, k: k, n: n) {
                 options.append(Option(assignment: .gpuAlone(m, path: .bf16), rows: [gpu: m], seconds: t))
             }
-            if key.phase == .denoising, m >= c.limits.roundingRows, let gpu = line(.gpu, .bf16act), let t = seconds([gpu: m], m: m, k: k, n: n) {
+            // Rounding the activations to bf16 trades bits for time: the Compact's and the Light's, never the Standard's (`allowsHalf`),
+            // whose bf16 weights compute on fp32 activations whatever a faster bf16 kernel would gain on another Mac.
+            if key.phase == .denoising, c.allowsHalf, m >= c.limits.roundingRows, let gpu = line(.gpu, .bf16act), let t = seconds([gpu: m], m: m, k: k, n: n) {
                 options.append(Option(assignment: .gpuAlone(m, path: .bf16, rounds: true), rows: [gpu: m], seconds: t))
             }
         }

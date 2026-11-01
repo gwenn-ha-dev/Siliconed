@@ -132,7 +132,7 @@ package final class CapacityPlan: Sendable {
         self.allowsANE = allowsANE
         resources = Resources(amx: has(.amx, .fp32), ane: allowsANE && has(.ane, .fp16),
                               bf16Weights: has(.gpu, .bf16), int8Weights: has(.gpu, .int8), q8Weights: has(.gpu, .q8),
-                              roundedActivations: has(.gpu, .bf16act), aneInt8: allowsANE && has(.ane, .int8),
+                              roundedActivations: allowsANE && has(.gpu, .bf16act), aneInt8: allowsANE && has(.ane, .fp16) && has(.ane, .int8),
                               halfAttention: allowsANE && has(.gpu, .tiles16))
         override = nil; attentionOverride = nil
         identity = "model " + Self.fingerprint(model) + (allowsANE ? "" : " no-ane")
