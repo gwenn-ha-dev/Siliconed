@@ -121,7 +121,7 @@ struct DiTBox: View {
                     .overlay(alignment: .trailing) {
                         Picker("Size", selection: $app.format) {
                             ForEach(app.pickerFormats, id: \.self) { f in
-                                if let n = app.macNeeded(f, images: app.subjectImageCount) {
+                                if let n = app.macNeeded(f, images: 0) {
                                     Text("\(String(f.width)) × \(String(f.height)) — needs a Mac with \(String(n)) GB")
                                         .tag(f).disabled(true)
                                 } else {

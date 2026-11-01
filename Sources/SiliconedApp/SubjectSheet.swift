@@ -81,8 +81,10 @@ struct SubjectDraft: Identifiable {
 }
 
 struct SubjectSheet: View {
-    let app: AppState
+    let lab: LabModel
     @State var draft: SubjectDraft
+    /// Why the last gesture failed, in one sentence.
+    @State private var failure: String?
     @State private var shown = 0
     @State private var confirmsDeletion = false
     @Environment(\.dismiss) private var dismiss
@@ -101,6 +103,9 @@ struct SubjectSheet: View {
                 }
                 .frame(width: 270)
             }
+            if let failure {
+                Text(failure).font(.caption).foregroundStyle(Palette.failure)
+            }
             HStack {
                 if draft.original != nil {
                     Button("Delete Subject…", role: .destructive) { confirmsDeletion = true }
@@ -117,7 +122,7 @@ struct SubjectSheet: View {
         .frame(width: 760)
         .confirmationDialog(String(localized: "Delete @\(draft.original?.name ?? "")?"), isPresented: $confirmsDeletion) {
             Button("Delete", role: .destructive) {
-                if let s = draft.original { app.deleteSubject(s) }
+                if let s = draft.original { lab.deleteSubject(s) }
                 dismiss()
             }
         } message: {
@@ -170,7 +175,7 @@ struct SubjectSheet: View {
         panel.message = String(localized: "Another picture of the same subject.")
         guard panel.runModal() == .OK, let url = panel.url else { return }
         guard let p = SubjectDraft.picture(.file(url)) else {
-            app.flash(String(localized: "This image can’t be read"))
+            failure = String(localized: "This image can’t be read")
             return
         }
         draft.pictures.append(p)
@@ -254,13 +259,13 @@ struct SubjectSheet: View {
             s.kind = draft.kind
             s.pictures = draft.pictures.compactMap { p in p.existing.map { NamedSubjects.Picture(file: $0.file, frame: p.frame) } }
             let added = draft.pictures.compactMap { p in p.existing == nil ? p.source.map { ($0, p.frame) } : nil }
-            problem = app.subjects.update(original.name, to: s, adding: added)
+            problem = lab.subjects.update(original.name, to: s, adding: added)
         } else {
-            problem = app.subjects.create(name: draft.name, kind: draft.kind,
+            problem = lab.subjects.create(name: draft.name, kind: draft.kind,
                                           pictures: draft.pictures.compactMap { p in p.source.map { ($0, p.frame) } })
         }
-        if let problem { app.problem = problem } else {
-            if let old = draft.original?.name, old != draft.name { app.renameMentions(old, to: draft.name) }
+        if let problem { failure = problem.title } else {
+            if let old = draft.original?.name, old != draft.name { lab.renameMentions(old, to: draft.name) }
             dismiss()
         }
     }

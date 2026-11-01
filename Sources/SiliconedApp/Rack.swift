@@ -1,9 +1,9 @@
 // **The rack: the chain of the render, drawn from `model.chain`, as the window's left column**.
 //
 //     ┌ Images ─────────────────┐   only if the model edits: the images the prompt works on, 1 to 3,
-//   ┌─┤ ▣ ▣ +                   ├─┐ numbered — or, with « Named Subjects » on (experimental,
-//   │ │                         │ │ `Subjects.swift`) and the box switched to Subjects, the named
-//   │ └─────────────────────────┘ │ subjects the prompt cites by @name: one or the other
+//   ┌─┤ ▣ ▣ +                   ├─┐ numbered (the Prompt Lab can carry them here, with the prompt
+//   │ │                         │ │ that names them: `Lab.swift`)
+//   │ └─────────────────────────┘ │
 //   │ ┌ Prompt ─────────────────┐ │ the text field itself, under what it names
 //   │ └──────────┬──────────────┘ │
 //   │ ┌Text encoder┐ ┌Image encoder┐
@@ -220,8 +220,7 @@ struct RackView: View {
     private var encodesImages: Bool { app.editingPossible && app.chain?.encoding != nil }
 
     private var edges: [Edge] {
-        // An edit's images and the subjects a prompt cites are the same images to the model: one wire each way.
-        let live = !app.references.isEmpty || app.subjectImageCount > 0
+        let live = !app.references.isEmpty
         var e = [Edge(from: .prompt, to: .textEncoder, kind: .text, stage: .text)]
         if app.editingPossible {
             // Qwen-Image-2.1's encoder sees the images (`TextFormat.readsImages`): one more wire.
@@ -323,7 +322,7 @@ struct RackView: View {
                  explanation: "Turns the images to edit into the compact form the DiT works in, the latent") {
             ModuleSlot(name: app.moduleNames.encoding)
             WeightsTag(format: app.weightFormats?.vae)
-            Cost(app.references.isEmpty && app.subjectImageCount == 0 ? (nil, false) : app.stageCost(.image))
+            Cost(app.references.isEmpty ? (nil, false) : app.stageCost(.image))
         }
     }
 

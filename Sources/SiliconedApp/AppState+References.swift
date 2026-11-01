@@ -112,7 +112,7 @@ extension AppState {
     }
 
     /// **⌘V outside a text field**: an image copied in Procreate, Photoshop, Preview or the Finder
-    /// goes where a drop on the Images box would — image or subject. `false` when the pasteboard holds
+    /// goes where a drop on the Images box would. `false` when the pasteboard holds
     /// no image, so the key goes on to the menu.
     func pasteImage() -> Bool {
         let pasteboard = NSPasteboard.general
@@ -127,9 +127,7 @@ extension AppState {
             flash(String(localized: "To start from an image, choose a model that edits"))
             return true
         }
-        if subjectsActive {
-            nameSubject(files.first.map { .file($0) } ?? .png(pixels!))
-        } else if let pixels {
+        if let pixels {
             addReference(png: pixels, name: String(localized: "pasted image"))
         } else {
             addReferences(files)

@@ -29,7 +29,7 @@ Chaque côté doit être d'au moins 512 et multiple de 16 ; la surface n'a pas
 - **Trois façons de comparer** deux images, ou une édition ou un agrandissement et son original : Rideau, Alterner ou Côte à côte, à choisir dans la barre d'outils du canevas.
   - **Rideau** : faites glisser une ligne sur les images pour voir ce qui a changé. Zoomez vers le curseur pour regarder un détail : en pinçant, ou à la molette d'une souris (une molette horizontale déplace toujours l'image).
   - **Alterner** : les deux mêmes images, une à la fois, au même endroit et au même zoom ; cliquez sur l'image, ou appuyez sur ← pour la première et → pour la seconde.
-- **Les sujets nommés** (bêta, éteints par défaut ; Réglages › Avancé › Bêta) : nommez une personne, un objet ou un style à partir d'une photo, puis citez-le par `@nom` dans le prompt d'une édition.
+- **Les sujets nommés** : nommez une personne, un objet ou un style à partir d'une photo, puis citez-le par `@nom` dans le texte de l'Atelier de prompts (voir Préparer, plus bas) ; l'atelier remet au rack le prompt traduit et les images numérotées.
 - **Un historique comme dans Photos** : flèches, ⌫ et ⌘Z, sélection multiple, export, glisser-déposer, Partager.
 
 ![Une édition par Qwen-Image-2.1 dans la fenêtre : la photo Krea 2 de la surfeuse en image 1 dans la boîte Images, l'instruction « Convert this photo to a western comic book style with cel shading », le résultat en cel shading dans le canevas](images/edit.jpg)
@@ -40,15 +40,20 @@ Chaque côté doit être d'au moins 512 et multiple de 16 ; la surface n'a pas
 
 *Une édition qui ne change que ce qu'on lui dit : « Replace her wetsuit with a white linen blouse. Keep her face, hair, surfboard, pose and the beach unchanged. », la photo Krea 2 en image 1, 203 s.*
 
-## Écrire (laissez un modèle taper)
+## Préparer (et laissez un modèle taper)
 
-L'**Atelier de prompts** (bêta ; Fenêtre › Atelier de prompts, ⌥⌘L) est une fenêtre à part où un modèle de langage écrit le prompt à votre place.
+L'**Atelier de prompts** (Fenêtre › Atelier de prompts, ⌥⌘L) est une fenêtre à part où l'on prépare les entrées d'un rendu : des images d'un côté, un texte de l'autre, et un modèle qui aide à écrire. Le rack reste ce qu'il est ; l'atelier remplit ses boîtes.
 
-- **Réécrire** transforme un prompt court en un prompt écrit pour le modèle que vous choisissez (« Écrire pour… »). **Décrire** transforme une image déposée en prompt. **Envoyer au rack** met le résultat dans le prompt du rack, et ⌘Z dans ce champ ramène l'ancien. Rien ne s'applique tout seul.
+- **Images** : déposez-les, ouvrez-les (+), ou envoyez-en une depuis l'historique (Ouvrir dans l'atelier de prompts). Chaque image a un rôle, choisi dans son menu : **Image de départ** (l'image 1, celle que le modèle édite ; elle donne le format), **Référence** (ce que le modèle voit comme contexte) ou **Décrire seulement** (elle reste dans l'atelier). Avec Qwen-Image-2.1, la première image déposée est l'image de départ et les suivantes sont des références ; ailleurs les images sont en Décrire seulement, ces modèles n'en lisant aucune. Un rendu prend 3 images au plus.
+- **Sujets** : Nommer… donne à une image un nom, un genre et un cadre, et le texte la cite par `@nom` (complété à la frappe). Un sujet ne part au rendu que si le texte le cite, après les images que les rôles envoient, dans l'ordre où le texte les nomme. Ils vivent en mémoire seulement (rien n'est écrit sur le disque, comme l'historique). `silicontrol subjects` agit sur les mêmes.
+- **Texte** : un seul texte, toujours modifiable à la main. **Réécrire** en fait un texte écrit pour le modèle que vous choisissez (« Écrire pour… ») et garde vos `@noms` (un nom perdu est signalé, jamais retiré en silence) ; les ajouts et les retraits sont marqués, et Modifier retire les marques. **Décrire**, sur une image, écrit dans le texte ce qu'elle montre : il remplit un texte vide, sinon il s'insère au curseur ou remplace la sélection. ⌘Z annule tout geste du modèle. Un `@` n'est un sujet que pour un modèle qui lit les images ; pour Anima, il reste l'`@` de l'artiste. Un `@nom` ne peut pas se trouver dans un groupe `{a|b}`.
+- **Le rack recevra** dit, avant que rien n'arrive, le prompt traduit (chaque `@nom` devenu « image N »), les images numérotées, le format que donne l'image 1 et ce que **Porter dans le rack** remplace. Le prompt du rack revient par ⌘Z dans son champ ; ses images n'ont pas d'annulation. Un refus (sujet inconnu, plus de 3 images) s'y dit en une phrase.
+- **En suivant un autre Mac** (voir plus bas) : Réécrire et Décrire sont éteints et le disent ; les images, les rôles, les sujets et Porter remplissent le rack que vous voyez, qui envoie ses références au Mac qui rend.
+- **Réécrire et Décrire sont en bêta**, et ce sont les seuls gestes qui ont besoin du rédacteur (plus bas) : pendant un rendu, ou sans rédacteur, eux seuls attendent, et le reste de l'atelier marche.
 - **Le rédacteur est un modèle que vous avez déjà** : l'encodeur de texte de Qwen-Image-2.1, Qwen3-VL-8B, mis à écrire. Il ne manque au modèle installé que sa couche de sortie, et « Installer le rédacteur » la télécharge dans le même dépôt (1,25 Go, par plage d'octets). Il faut Qwen-Image-2.1 installé, en Compact sur un Mac de 16 Go (la Standard en demande davantage) ; la fenêtre dit ce qui manque.
 - **Nos consignes, une par modèle**, tirées de ce que chaque éditeur dit de ses prompts. Chaque élément de votre prompt est gardé, le texte entre guillemets mot pour mot ; rien n'est retiré, adouci ni moralisé.
-- **Jamais pendant un rendu** : une image qui démarre arrête le rédacteur, et l'atelier attend. Environ 18 jetons par seconde sur un M1 Pro, sur le GPU. Sa sortie gloutonne est celle de transformers, jeton pour jeton ([VERIFY](VERIFY.fr.md)).
-- **Incognito** : textes et images restent en mémoire, sans fichier ni historique ; fermer la fenêtre libère le rédacteur. L'atelier travaille sur ce Mac seulement, pas quand vous calculez sur un autre.
+- **Jamais pendant un rendu** : une image qui démarre arrête le rédacteur, et Réécrire et Décrire attendent. Environ 18 jetons par seconde sur un M1 Pro, sur le GPU. Sa sortie gloutonne est celle de transformers, jeton pour jeton ([VERIFY](VERIFY.fr.md)).
+- **Incognito** : textes, images et sujets restent en mémoire, sans fichier ni historique ; fermer la fenêtre libère le rédacteur.
 
 ## Explorer (esquissez d'abord, engagez-vous après)
 
@@ -122,7 +127,7 @@ Les autres versions Compact utilisent des poids 8 bits publiés par des tiers :
 - **Un Mac rend pour un autre, sur le même réseau.** Le MacBook du salon calcule sur le Mac mini de la pièce d'à côté : **Rendu › Calculer sur** y fait passer toute la fenêtre — sa file, l'avancement, l'aperçu, l'historique, les modèles, la bibliothèque, les licences et la mesure sont ceux de l'autre Mac —, tandis que le formulaire, la sélection, les exports et le presse-papiers restent sur le vôtre. Un menu « Sur : » à côté de Chaîne dit où l'on calcule, et le rack porte un liseré bleu tant que la liaison tient ; un menu vous ramène. Jamais deux vues à la fois.
 - **Appairer une fois.** Sur le Mac qui se prête : Réglages › Autres Mac › Prêter ce Mac, puis Appairer un Mac…. Sur le vôtre : Réglages › Autres Mac › Appairer avec un Mac…, et choisissez-le. Les deux écrans affichent six chiffres ; n'acceptez sur le Mac prêteur que s'ils sont les mêmes. Les deux Mac doivent avoir la même version de Siliconed. Rien ne se connecte avant qu'un appairage soit accepté, et Oublier en défait un d'un côté comme de l'autre.
 - **Chiffré, rien en clair.** TLS 1.2 avec une clé par Mac appairé, gardée au Trousseau. macOS demande une fois l'accès au réseau local, la première fois que vous prêtez ce Mac ou que vous l'appairez ; un Mac qui ne fait ni l'un ni l'autre n'est jamais interrogé.
-- **Tout marche là-bas** : rendus, éditions avec vos références, variations, grilles et explorations, agrandissement et recadrage, sujets nommés, annulation ; installer un modèle ou importer une LoRA sur le Mac prêteur, le mesurer. En retirer un attend un clic sur ce Mac. Chaque Mac ne voit que ses travaux et ses images, et le Mac prêteur reste dans son propre budget mémoire. `silicontrol` suit Calculer sur ([REMOTE-CONTROL.fr.md](REMOTE-CONTROL.fr.md)).
+- **Tout marche là-bas** : rendus, éditions avec vos références, variations, grilles et explorations, agrandissement et recadrage, annulation ; l'Atelier de prompts remplit le rack que vous voyez (images, sujets et Porter ; Réécrire et Décrire restent éteints) ; installer un modèle ou importer une LoRA sur le Mac prêteur, le mesurer. En retirer un attend un clic sur ce Mac. Chaque Mac ne voit que ses travaux et ses images, et le Mac prêteur reste dans son propre budget mémoire. `silicontrol` suit Calculer sur ([REMOTE-CONTROL.fr.md](REMOTE-CONTROL.fr.md)).
 
 ## Réglages (peu, exprès)
 
@@ -130,7 +135,7 @@ Siliconed › Réglages… (⌘,), trois onglets.
 
 - **Général** : où vivent les modèles, avec Déplacer la bibliothèque…, Ouvrir une bibliothèque… et Ramener sur ce Mac ; le choix du Rendu plus rapide est à côté.
 - **Autres Mac** : prêter ce Mac, appairer avec un autre ([Calculer sur un autre Mac](#calculer-sur-un-autre-mac)).
-- **Avancé**, dans cet ordre : Ce Mac (la mesure) ; Ligne de commande (installe `silicontrol`, plus bas) ; et **Bêta**, éteint par défaut et susceptible de changer : Plus de solveurs (ajoute les solveurs Euler a, DPM++ 2M et UniPC à la boîte du débruiteur et aux axes de l'exploration ; Euler, le défaut, est celui pour lequel les modèles ont été distillés), les Sujets nommés, les Forces de LoRA négatives (curseurs de −1,5 à 1,5, pour les LoRA « curseur » ; une LoRA ordinaire est abîmée par une force négative).
+- **Avancé**, dans cet ordre : Ce Mac (la mesure) ; Ligne de commande (installe `silicontrol`, plus bas) ; et **Bêta**, éteint par défaut et susceptible de changer : Plus de solveurs (ajoute les solveurs Euler a, DPM++ 2M et UniPC à la boîte du débruiteur et aux axes de l'exploration ; Euler, le défaut, est celui pour lequel les modèles ont été distillés), les Forces de LoRA négatives (curseurs de −1,5 à 1,5, pour les LoRA « curseur » ; une LoRA ordinaire est abîmée par une force négative).
 
 Quand vous calculez sur un autre Mac, la mesure et le choix du Rendu plus rapide sont ceux de cet autre Mac, et la fenêtre le dit.
 

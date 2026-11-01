@@ -237,27 +237,20 @@ struct Cost: View {
 struct PromptNode: View {
     @Bindable var app: AppState
     @FocusState private var typing: Bool
-    /// The named subjects' field says itself when it has the keyboard (`PromptField`).
-    @State private var fieldTyping = false
     @State private var height: CGFloat = 72
     @GestureState private var stretch: CGFloat = 0
     private static let heights: ClosedRange<CGFloat> = 44...480
 
     var body: some View {
-        PortBox(title: "Prompt", symbol: "text.quote", kind: .text, focused: typing || fieldTyping) {
+        PortBox(title: "Prompt", symbol: "text.quote", kind: .text, focused: typing) {
             VStack(spacing: 0) {
                 ZStack(alignment: .topLeading) {
-                    // Named subjects on: the field that draws `@name` as chips. Off: the app as it was.
-                    if app.subjectsActive {
-                        PromptField(app: app, focused: $fieldTyping)
-                    } else {
-                        TextEditor(text: $app.prompt)
-                            .accessibilityLabel(Text("Prompt"))
-                            .font(.body)
-                            .scrollContentBackground(.hidden)
-                            .scrollIndicators(.automatic)
-                            .focused($typing)
-                    }
+                    TextEditor(text: $app.prompt)
+                        .accessibilityLabel(Text("Prompt"))
+                        .font(.body)
+                        .scrollContentBackground(.hidden)
+                        .scrollIndicators(.automatic)
+                        .focused($typing)
                     if app.prompt.isEmpty {
                         Text(app.references.isEmpty ? "Describe the image…" : "Say what changes…")
                             .font(.body).foregroundStyle(.tertiary)
@@ -267,7 +260,6 @@ struct PromptNode: View {
                 }
                 .frame(height: min(max(height + stretch, Self.heights.lowerBound), Self.heights.upperBound))
                 grip
-                if app.subjectsActive, let rewrite = app.shownRewrite { ModelPromptRow(app: app, rewrite: rewrite) }
             }
         }
     }
@@ -293,38 +285,19 @@ struct PromptNode: View {
 /// drop here or on the canvas (there, a PNG Siliconed wrote restores its settings instead), or by
 /// « Edit This Image » in the history; reordered by dragging a
 /// thumbnail onto another, or from its menu. Only for a model that edits (rule 2: the inputs follow
-/// the model). **With Named Subjects on, the box is images OR subjects** (`AppState.referenceMode`):
-/// numbered images, or a library of named subjects — as many as one wants — that the prompt cites by
-/// `@name`, 3 at most. The title counts what the next render sends.
+/// the model). The Prompt Lab fills it too, with the starting image, the references and the subjects its text
+/// cites (« Carry to the Rack »). The title counts what the next render sends.
 struct ImagesNode: View {
     @Bindable var app: AppState
-    private var subjects: Bool { app.subjectsActive }
-    private var used: Int { subjects ? app.subjectImageCount : app.references.count }
+    private var used: Int { app.references.count }
     var body: some View {
         PortBox(title: "Images", symbol: "photo.on.rectangle", kind: .image) {
             Text(used == 0 ? String(localized: "up to \(app.maxReferences) images") : "\(used)/\(app.maxReferences)")
                 .foregroundStyle(used > app.maxReferences ? Palette.failure : .secondary)
         } content: {
-            if app.subjectsAvailable {
-                Picker("Images", selection: $app.referenceMode) {
-                    Text("Images").tag(AppState.ReferenceMode.images)
-                    Text("Subjects").tag(AppState.ReferenceMode.subjects)
-                }
-                .pickerStyle(.segmented).labelsHidden()
-                .padding(.bottom, 2)
-            }
-            if subjects { SubjectShelf(app: app) } else { images }
+            images
         }
         .dropDestination(for: DroppedImage.self) { items, _ in
-            if subjects {
-                // Here an image is named: the sheet opens on the first one.
-                switch items.first {
-                case .file(let url)? where !AppState.importable(url): app.nameSubject(.file(url))
-                case .png(let data)?: app.nameSubject(.png(data))
-                default: return false
-                }
-                return true
-            }
             var files: [URL] = []
             for item in items {
                 switch item {

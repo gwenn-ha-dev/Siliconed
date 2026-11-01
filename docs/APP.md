@@ -29,7 +29,7 @@ Each side must be at least 512 and a multiple of 16; there is no fixed ceiling o
 - **Three ways to compare** two images, an edit or an enlargement and its original: pick Curtain, Switch or Side by Side in the canvas toolbar.
   - **Curtain**: drag a line across the images to see what changed. Zoom in toward the pointer to look at a detail: pinch, or a mouse's wheel (a horizontal wheel still moves the image).
   - **Switch**: the same two images one at a time, at the same place and zoom; click the image, or press ← for the first and → for the second.
-- **Named subjects** (beta, off by default; Settings › Advanced › Beta): name a person, an object or a style from a photo, then cite it as `@name` in the prompt of an edit.
+- **Named subjects**: name a person, an object or a style from a photo, then cite it as `@name` in the text of the Prompt Lab (see Prepare, below); the lab hands the rack the prompt translated and the images numbered.
 - **A history like Photos**: arrows, ⌫ and ⌘Z, multiple selection, export, drag and drop, Share.
 
 ![An edit by Qwen-Image-2.1 in the window: the Krea 2 photo of the surfer as image 1 in the Images box, the instruction “Convert this photo to a western comic book style with cel shading”, the cel-shaded result in the canvas](images/edit.jpg)
@@ -40,15 +40,20 @@ Each side must be at least 512 and a multiple of 16; there is no fixed ceiling o
 
 *An edit that changes only what it is told: “Replace her wetsuit with a white linen blouse. Keep her face, hair, surfboard, pose and the beach unchanged.”, the Krea 2 photo as image 1, 203 s.*
 
-## Write (let a model do the typing)
+## Prepare (and let a model do the typing)
 
-The **Prompt Lab** (beta; Window › Prompt Lab, ⌥⌘L) is a window of its own where a language model writes the prompt for you.
+The **Prompt Lab** (Window › Prompt Lab, ⌥⌘L) is a window of its own where the inputs of a render are prepared: images on one side, a text on the other, and a model that helps write. The rack stays what it is; the lab fills its boxes.
 
-- **Rewrite** turns a short prompt into one written for the model you pick (“Write for…”). **Describe** turns a dropped image into a prompt. **Send to Rack** puts the result in the rack's prompt, and ⌘Z in that field brings the old one back. Nothing is applied on its own.
+- **Images**: drop them, open them (+), or send one from the history (Open in the Prompt Lab). Each image has a role, chosen in its menu: **Starting image** (image 1, the one the model edits; it gives the format), **Reference** (what the model sees as context) or **Describe only** (it stays in the lab). With Qwen-Image-2.1 the first image dropped is the starting image and the next ones are references; elsewhere images are Describe only, since those models read none. A render takes 3 images at most.
+- **Subjects**: Name… gives an image a name, a kind and a frame, and the text cites it as `@name` (completed as you type). A subject goes to the render only when the text cites it, after the images the roles send, in the order the text names them. They live in memory only (nothing is written to disk, as in the history). `silicontrol subjects` acts on the same ones.
+- **Text**: one text, always yours to edit. **Rewrite** turns it into one written for the model you pick (“Write for…”) and keeps your `@names` (one it loses is said, never dropped in silence); the additions and removals are marked, and Edit puts the marks away. **Describe**, on an image, writes what it shows into the text: it fills an empty text, otherwise it goes where the caret is or replaces the selection. ⌘Z undoes any gesture of the model. A `@` is a subject only for a model that reads images; for Anima it stays the artist's `@`. A `@name` cannot sit inside a `{a|b}` group.
+- **The rack will receive** says, before anything happens, the translated prompt (each `@name` turned into “image N”), the numbered images, the format image 1 gives, and what **Carry to the Rack** replaces. The rack's prompt comes back with ⌘Z in its field; its images have no undo. A refusal (unknown subject, more than 3 images) is said there in a sentence.
+- **Following another Mac** (see below): Rewrite and Describe are off and say so; images, roles, subjects and Carry fill the rack you see, which sends its references to the Mac that renders.
+- **Rewrite and Describe are in beta**, and they are the only gestures that need the writer (below): during a render, or without the writer, only they wait, and the rest of the lab works.
 - **The writer is a model you already have**: Qwen-Image-2.1's text encoder, Qwen3-VL-8B, made to write. Only its output layer is missing from the installed model, and “Install the Writer” downloads it from the same repository (1.25 GB, by byte range). It needs Qwen-Image-2.1 installed, in the Compact on a 16 GB Mac (the Standard needs a bigger one); the window tells you what is missing.
 - **Our instructions, one per model**, drawn from what each publisher says of its prompts. Every element of your prompt is kept, quoted text word for word; nothing is removed, softened or moralized.
-- **Never during a render**: an image that starts stops the writer, and the lab waits. About 18 tokens a second on an M1 Pro, on the GPU. Its greedy output matches transformers' token for token ([VERIFY](VERIFY.md)).
-- **Incognito**: texts and images stay in memory, with no file and no history; closing the window releases the writer. The lab works on this Mac only, not while you compute on another.
+- **Never during a render**: an image that starts stops the writer, and Rewrite and Describe wait. About 18 tokens a second on an M1 Pro, on the GPU. Its greedy output matches transformers' token for token ([VERIFY](VERIFY.md)).
+- **Incognito**: texts, images and subjects stay in memory, with no file and no history; closing the window releases the writer.
 
 ## Explore (sketch first, commit later)
 
@@ -122,7 +127,7 @@ The other Compact versions use 8-bit weights published by third parties: [unslot
 - **One Mac renders for another on the same network.** The MacBook in the living room computes on the Mac mini in the next room: **Render › Compute On** moves the whole window there — its queue, progress, preview, history, models, library, licenses and measure are the other Mac's — while the form, your selection, exports and the clipboard stay on yours. An “On:” menu beside Chain says where you compute, and the rack wears a blue edge while connected; one menu brings you back. Never two views at once.
 - **Pair once.** On the Mac that lends itself: Settings › Other Macs › Lend This Mac, then Pair a Mac…. On yours: Settings › Other Macs › Pair With a Mac…, and choose it. Both screens show six digits; accept on the lending Mac only if they are the same. Both Macs must run the same version of Siliconed. Nothing connects before a pairing is accepted, and Forget undoes one on either side.
 - **Encrypted, nothing in clear.** TLS 1.2 with a key per paired Mac, kept in the Keychain. macOS asks once for the local network, the first time you lend this Mac or pair it; a Mac that never does either is never asked.
-- **Everything works there**: renders, edits with your references, variations, grids and explorations, enlarging and cropping, named subjects, undo; installing a model or importing a LoRA on the lending Mac, measuring it. Removing a model waits for a click on that Mac. Each Mac sees only its own jobs and images, and the lending Mac stays within its own memory budget. `silicontrol` follows Compute On ([REMOTE-CONTROL.md](REMOTE-CONTROL.md)).
+- **Everything works there**: renders, edits with your references, variations, grids and explorations, enlarging and cropping, undo; the Prompt Lab fills the rack you see (images, subjects and Carry; Rewrite and Describe stay off); installing a model or importing a LoRA on the lending Mac, measuring it. Removing a model waits for a click on that Mac. Each Mac sees only its own jobs and images, and the lending Mac stays within its own memory budget. `silicontrol` follows Compute On ([REMOTE-CONTROL.md](REMOTE-CONTROL.md)).
 
 ## Settings (few, on purpose)
 
@@ -130,7 +135,7 @@ Siliconed › Settings… (⌘,), three tabs.
 
 - **General**: where the models live, with Move Library…, Open Library… and Move Back to This Mac; the Faster Rendering choice sits with it.
 - **Other Macs**: lend this Mac, pair with another ([Render on another Mac](#render-on-another-mac)).
-- **Advanced**, in this order: This Mac (the measure); Command Line (installs `silicontrol`, below); and **Beta**, off by default and liable to change: More Solvers (adds the solvers Euler a, DPM++ 2M and UniPC to the denoiser's box and to the exploration's axes; Euler, the default, is the one the models were distilled for), Named Subjects, Negative LoRA Strengths (strengths from −1.5 to 1.5, for “slider” LoRAs; an ordinary LoRA is damaged by a negative strength).
+- **Advanced**, in this order: This Mac (the measure); Command Line (installs `silicontrol`, below); and **Beta**, off by default and liable to change: More Solvers (adds the solvers Euler a, DPM++ 2M and UniPC to the denoiser's box and to the exploration's axes; Euler, the default, is the one the models were distilled for), Negative LoRA Strengths (strengths from −1.5 to 1.5, for “slider” LoRAs; an ordinary LoRA is damaged by a negative strength).
 
 While you compute on another Mac, the measure and the Faster Rendering choice are that Mac's, and the window says so.
 

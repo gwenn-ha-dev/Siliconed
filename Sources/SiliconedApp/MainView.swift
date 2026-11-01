@@ -50,7 +50,6 @@ struct MainView: View {
         .sheet(item: $app.licenseRequest) { request in LicenseSheet(app: app, card: request.card) }
         .sheet(item: $app.hubOffer) { _ in HubSheet(app: app) }
         .sheet(isPresented: $app.diagnosticOpen) { DiagnosticSheet(app: app) }
-        .sheet(item: $app.subjectDraft) { draft in SubjectSheet(app: app, draft: draft) }
         .overlay {
             if app.fullScreen, let image = app.selectedImage?.image { FullScreen(app: app, image: image) }
         }

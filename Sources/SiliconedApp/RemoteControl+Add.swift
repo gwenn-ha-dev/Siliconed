@@ -262,7 +262,7 @@ extension RemoteControl {
             return
         }
         let variants = alternatives.variants
-        // Named subjects (experimental, `Subjects.swift`): each expanded prompt rewritten, its
+        // Named subjects (`Subjects.swift`): each expanded prompt rewritten, its
         // subjects' pictures after the --ref images — refused whole if one expansion is.
         for v in variants {
             if case .failure(let f)? = app.rewrite(v.prompt, model: model, editImages: references.count) {

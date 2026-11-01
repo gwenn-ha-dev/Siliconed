@@ -242,7 +242,7 @@ extension AppState {
     var editQuote: RemoteQuote? {
         guard mirror != nil, let first = references.first else { return nil }
         return RemoteQuote(model: identifier, width: format.width, height: format.height,
-                           first: [first.width, first.height], images: references.count + subjectImageCount)
+                           first: [first.width, first.height], images: references.count)
     }
 
     /// The rack's three module names: from the chain here, from the traits in a mirror.
