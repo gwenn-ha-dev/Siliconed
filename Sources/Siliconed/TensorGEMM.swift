@@ -69,6 +69,8 @@ package final class TensorGEMM {
     package var roundsActivations: Bool { rounded != nil }
     /// ... and the Q8_0 kernel on it compiled.
     package var roundsBlocks: Bool { rounded?.blocks != nil }
+    /// The tile each kernel runs (`MatmulTile`): the map's, or the standard one of the default library.
+    let tiles: TileTable
 
     static let source = """
     #include <metal_stdlib>
@@ -209,6 +211,7 @@ package final class TensorGEMM {
         guard let int8 = pipeline("linear_int8"), let scaleColumns = pipeline("scale_columns"),
               let rotateGroups = pipeline("rotate_groups") else { return nil }
         self.queue = queue; self.byColumns = byColumns; self.byRows = byRows
+        tiles = TileTable(device: device)
         self.int8 = int8; self.scaleColumns = scaleColumns; self.rotateGroups = rotateGroups
         blocks = pipeline("linear_q8")
         if roundingActivations {
@@ -223,7 +226,9 @@ package final class TensorGEMM {
     /// (the forge's layout), `[n, k]` otherwise; all row-major from offset 0. Returns the GPU seconds.
     package func linear(a: MTLBuffer, w: MTLBuffer, c: MTLBuffer, m: Int, k: Int, n: Int,
                         weightIsTransposed: Bool) -> Double {
-        let pipeline = weightIsTransposed ? byColumns : byRows
+        let tiled = tiles.products(CapacityModel.Kernel(.gpu, .bf16), rows: m, k: k, n: n)
+        let pipeline = (weightIsTransposed ? tiled?.byColumns : tiled?.byRows) ?? (weightIsTransposed ? byColumns : byRows)
+        let tile = tiled?.tile ?? MatmulTile.standard(for: CapacityModel.Kernel(.gpu, .bf16))
         let commands = queue.checkedCommandBuffer()
         let encoder = commands.checkedEncoder()
         encoder.setComputePipelineState(pipeline)
@@ -232,9 +237,7 @@ package final class TensorGEMM {
         encoder.setBuffer(c, offset: 0, index: 2)
         var mkn = SIMD3<UInt32>(UInt32(m), UInt32(k), UInt32(n))
         encoder.setBytes(&mkn, length: MemoryLayout<SIMD3<UInt32>>.stride, index: 3)
-        encoder.dispatchThreadgroups(MTLSize(width: (n + 31) / 32, height: (m + 63) / 64, depth: 1),
-                                     threadsPerThreadgroup: MTLSize(width: pipeline.threadExecutionWidth * 4,
-                                                                    height: 1, depth: 1))
+        encoder.dispatchThreadgroups(tile.grid(rows: m, columns: n), threadsPerThreadgroup: tile.threads(pipeline))
         encoder.endEncoding()
         commands.commit()
         commands.waitUntilCompleted()
@@ -287,6 +290,9 @@ package final class TensorGEMM {
             commands.commit()
             return commands
         }
+        let tiled = tiles.products(CapacityModel.Kernel(.gpu, .int8), rows: m, k: k, n: n)
+        let int8 = tiled?.int8 ?? self.int8
+        let tile = tiled?.tile ?? MatmulTile.standard(for: CapacityModel.Kernel(.gpu, .int8))
         func product(_ x: MTLBuffer, _ xOffset: Int, first: Int, rows: Int) {
             encoder.setComputePipelineState(int8)
             encoder.setBuffer(x, offset: xOffset, index: 0)
@@ -294,9 +300,7 @@ package final class TensorGEMM {
             encoder.setBuffer(c, offset: first * n * 4, index: 2)
             mkn.x = UInt32(rows)
             encoder.setBytes(&mkn, length: MemoryLayout<SIMD3<UInt32>>.stride, index: 3)
-            encoder.dispatchThreadgroups(MTLSize(width: (columns + 63) / 64, height: (rows + 63) / 64, depth: 1),
-                                         threadsPerThreadgroup: MTLSize(width: int8.threadExecutionWidth * 4,
-                                                                        height: 1, depth: 1))
+            encoder.dispatchThreadgroups(tile.grid(rows: rows, columns: columns), threadsPerThreadgroup: tile.threads(int8))
         }
         if let rotation {
             var groupNorm = SIMD2<UInt32>(UInt32(rotation.group), (1 / Float(rotation.group).squareRoot()).bitPattern)

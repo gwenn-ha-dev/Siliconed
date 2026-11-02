@@ -187,6 +187,11 @@ package enum CapacityFit {
         package var preparation: [String: [String: Double]] = [:]
         /// Kernels the judge refused (a wrong route fills nothing).
         package var wrong: [String] = []
+        /// **The tile chosen per kernel** (`"gpu/bf16act": "128x128/8"`, `MatmulTile`) for its wide products and for its thin ones, and each
+        /// candidate's solos that chose them (`kernel` = `"gpu/bf16act 128x128/8"`, one per round and shape). `nil` in a report that predates them.
+        package var tiles: [String: String]?
+        package var thinTiles: [String: String]?
+        package var tileTrials: [Solo]?
         package init() {}
 
         /// **The same numbers to `digits` significant digits** — what a report keeps (an exact FLOP count stays exact). The model of a
@@ -197,6 +202,7 @@ package enum CapacityFit {
             m.solos = solos.map { Solo(kernel: $0.kernel, shape: $0.shape, flop: $0.flop, seconds: r($0.seconds),
                                        error: $0.error.map { Diagnostic.significant($0, 3) }) }
             m.thin = thin?.map { Solo(kernel: $0.kernel, shape: $0.shape, flop: $0.flop, seconds: r($0.seconds), error: $0.error.map { Diagnostic.significant($0, 3) }) }
+            m.tileTrials = tileTrials?.map { Solo(kernel: $0.kernel, shape: $0.shape, flop: $0.flop, seconds: r($0.seconds), error: $0.error.map { Diagnostic.significant($0, 3) }) }
             m.stairs = stairs.map { Stair(rows: $0.rows, seconds: r($0.seconds)) }
             m.trials = trials.map { t in
                 Trial(set: t.set, shape: t.shape, pass: t.pass,
@@ -505,6 +511,12 @@ package enum CapacityFit {
     package static func model(from m: Measurements, allocationUnit: Int = 256) -> CapacityModel {
         var model = CapacityModel()
         var points: [Kernel: [Point]] = [:]
+        for (name, text) in m.tiles ?? [:] {
+            if let k = Kernel(name), let t = MatmulTile(text) { model.tiles[k] = t }
+        }
+        for (name, text) in m.thinTiles ?? [:] {
+            if let k = Kernel(name), let t = MatmulTile(text) { model.thinTiles[k] = t }
+        }
         for s in m.solos {
             guard !m.wrong.contains(s.kernel), let k = Kernel(s.kernel), s.seconds > 0 else { continue }
             points[k, default: []].append(Point(flop: s.flop, seconds: s.seconds))

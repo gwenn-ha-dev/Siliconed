@@ -1,7 +1,7 @@
 import Foundation
 @testable import Siliconed
 
-/// **A report of schema 17 written in memory** — an M1 Pro's order of figures (the probes' three runs, `capacities`), no GPU, no clock:
+/// **A report of schema 18 written in memory** — an M1 Pro's order of figures (the probes' three runs, `capacities`), no GPU, no clock:
 /// measurements generated from lines whose answer is known, the model fitted on them by the code under test, the judge and the memory
 /// of a clean run. The same figures on every Mac, the CI's included.
 enum ReportFixtures {

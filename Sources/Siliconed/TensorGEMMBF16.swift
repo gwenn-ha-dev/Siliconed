@@ -158,7 +158,9 @@ extension TensorGEMM {
     package func linear(a: MTLBuffer, rounding: Rounding, w: MTLBuffer, c: MTLBuffer, m: Int, k: Int, n: Int,
                         weightIsTransposed: Bool) -> Double {
         let kernels = rounded!
-        let pipeline = weightIsTransposed ? kernels.byColumns : kernels.byRows
+        let tiled = tiles.products(CapacityModel.Kernel(.gpu, .bf16act), rows: m, k: k, n: n)
+        let pipeline = (weightIsTransposed ? tiled?.byColumns : tiled?.byRows) ?? (weightIsTransposed ? kernels.byColumns : kernels.byRows)
+        let tile = tiled?.tile ?? MatmulTile.standard(for: CapacityModel.Kernel(.gpu, .bf16act))
         let commands = makeCommands()
         let encoder = commands.checkedEncoder()
         for first in stride(from: 0, to: m, by: rounding.rows) {
@@ -170,9 +172,7 @@ extension TensorGEMM {
             encoder.setBuffer(c, offset: first * n * 4, index: 2)
             var mkn = SIMD3<UInt32>(UInt32(rows), UInt32(k), UInt32(n))
             encoder.setBytes(&mkn, length: MemoryLayout<SIMD3<UInt32>>.stride, index: 3)
-            encoder.dispatchThreadgroups(MTLSize(width: (n + 31) / 32, height: (rows + 63) / 64, depth: 1),
-                                         threadsPerThreadgroup: MTLSize(width: pipeline.threadExecutionWidth * 4,
-                                                                        height: 1, depth: 1))
+            encoder.dispatchThreadgroups(tile.grid(rows: rows, columns: n), threadsPerThreadgroup: tile.threads(pipeline))
         }
         encoder.endEncoding()
         commands.commit()

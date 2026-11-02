@@ -312,12 +312,20 @@ import Testing
         #expect(enc.route == "gpu" && enc.preparation > 0)
         // below the rounding's floor the activation keeps its fp32
         #expect(try solve(m, key(64, 64, 128, .bf16)).assignment.roundsActivation == false)
-        // **never the Standard's**: a process or a request without half precision computes its bf16 weights on fp32 activations,
-        // however much faster another Mac's bf16 kernel is — and its plan brings no rounding up
+        // **the Standard's too, where the map says it is faster** (P20, decided 2/11/2026): the ANE's absence is not a precision; its
+        // plan brings the rounding up when the map has its line
         let standard = try solve(m, key(4096, 4096, 4096, .bf16), ane: false)
-        #expect(!standard.assignment.roundsActivation && standard.route != "gpu/bf16act")
-        #expect(!CapacityPlan(model: m, allowsANE: false).resources.roundedActivations)
+        #expect(standard.assignment.roundsActivation && standard.route == "gpu/bf16act")
+        #expect(CapacityPlan(model: m, allowsANE: false).resources.roundedActivations)
         #expect(CapacityPlan(model: m).resources.roundedActivations)
+        // ... and only there: on a GPU whose rounded kernel is slower than its fp32 product (an M1 Pro's), the operand stays fp32
+        var slow = m
+        slow.lines[M.Kernel(.gpu, .bf16act)] = .init(t0: 0, rate: 1e12)
+        #expect(try solve(slow, key(4096, 4096, 4096, .bf16), ane: false).assignment.roundsActivation == false)
+        // a constraint that refuses the rounding is obeyed
+        let refused = try #require(CS.product(key(4096, 4096, 4096, .bf16), model: m,
+                                              constraints: CS.Constraints(allowsANE: false, allowsRounding: false)))
+        #expect(!refused.assignment.roundsActivation)
     }
 
     // MARK: attention

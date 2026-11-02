@@ -238,13 +238,18 @@ package struct CapacityModel: Codable, Sendable, Equatable {
     /// Seconds per value to widen a K-quant (Q4_K to Q6_K) weight: it has no `WeightKind`, so `preparation` cannot say it,
     /// and a super-block's unpacking costs more than a bf16 shift. `nil`: the solver falls back on `preparation[.bf16]`.
     package var kquantPreparation: Double?
+    /// **The `matmul2d` tile each kernel runs** (`MatmulTile`): the fastest of its candidates on this Mac, measured before its line (which is
+    /// the line of that tile). A kernel absent runs its standard tile — what every map before tiles were measured planned with.
+    package var tiles: [Kernel: MatmulTile] = [:]
+    /// ... and on its thin products (`isThin`), chosen on `Sizes.thin`: the tile that times its `thin` line.
+    package var thinTiles: [Kernel: MatmulTile] = [:]
 
     package init() {}
 
     // MARK: - JSON
 
     private enum CodingKeys: String, CodingKey {
-        case crest, lines, thin, aneRowUnit, sharing, heat, memoryBandwidth, diskBandwidth, diskClasses, preparation, kquantPreparation
+        case crest, lines, thin, aneRowUnit, sharing, heat, memoryBandwidth, diskBandwidth, diskClasses, preparation, kquantPreparation, tiles, thinTiles
     }
 
     /// The engines of a dictionary keyed by their names.
@@ -297,6 +302,18 @@ package struct CapacityModel: Codable, Sendable, Equatable {
             }
         }
         kquantPreparation = try c.decodeIfPresent(Double.self, forKey: .kquantPreparation)
+        for (name, tile) in try c.decodeIfPresent([String: MatmulTile].self, forKey: .tiles) ?? [:] {
+            guard let kernel = Kernel(name) else {
+                throw DecodingError.dataCorruptedError(forKey: .tiles, in: c, debugDescription: "kernel « \(name) »")
+            }
+            tiles[kernel] = tile
+        }
+        for (name, tile) in try c.decodeIfPresent([String: MatmulTile].self, forKey: .thinTiles) ?? [:] {
+            guard let kernel = Kernel(name) else {
+                throw DecodingError.dataCorruptedError(forKey: .thinTiles, in: c, debugDescription: "kernel « \(name) »")
+            }
+            thinTiles[kernel] = tile
+        }
     }
 
     package func encode(to encoder: any Encoder) throws {
@@ -314,6 +331,12 @@ package struct CapacityModel: Codable, Sendable, Equatable {
             (kind.rawValue, Dictionary(uniqueKeysWithValues: paths.map { ($0.key.rawValue, $0.value) }))
         }), forKey: .preparation)
         try c.encodeIfPresent(kquantPreparation, forKey: .kquantPreparation)
+        if !tiles.isEmpty {
+            try c.encode(Dictionary(uniqueKeysWithValues: tiles.map { ($0.key.description, $0.value) }), forKey: .tiles)
+        }
+        if !thinTiles.isEmpty {
+            try c.encode(Dictionary(uniqueKeysWithValues: thinTiles.map { ($0.key.description, $0.value) }), forKey: .thinTiles)
+        }
     }
 
     /// **Every number to `digits` significant digits**: what a report keeps (`Diagnostic.significant`), so that a model read back

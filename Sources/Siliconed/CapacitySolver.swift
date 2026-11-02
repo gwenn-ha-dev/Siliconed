@@ -65,15 +65,20 @@ package enum CapacitySolver {
         package var excluded: Set<CapacityModel.Kernel>
         /// The ANE may be asked for: this process brings it up (never the Standard's, fp32 products).
         package var allowsANE: Bool
-        /// **Half precision may be asked for** — the fp16 attention (`tiles16`: Q, K, V and P rounded to half, fp32 sums) and the
-        /// activations rounded to bf16 (`gpu/bf16act`): the ANE's permission, the request's — the Compact and the Light, never the
-        /// Standard. `nil` at `init`: whatever `allowsANE` says.
+        /// **fp16 may be asked for** — the attention on fp16 operands (`tiles16`: Q, K, V and P rounded to half, fp32 sums): the ANE's
+        /// permission, the request's — the Compact and the Light, never the Standard (P20: fp16 loses the range bf16 holds, P17). `nil` at
+        /// `init`: whatever `allowsANE` says.
         package var allowsHalf: Bool
+        /// **An activation may be rounded to bf16 before a product on a bf16 weight** (`gpu/bf16act`): P20 — bf16 between two operations on
+        /// bf16 published weights, as a GPU in bf16 computes them, the sums fp32 — at every version, the Standard's included (decided
+        /// 2/11/2026: the fp32 operand was the M1 Pro's choice of speed, not a rule). The map says where it is faster; an encoder never.
+        package var allowsRounding: Bool
 
         package init(limits: Limits = .init(), sustained: Bool = true, excluded: Set<CapacityModel.Kernel> = [],
-                     allowsANE: Bool = true, allowsHalf: Bool? = nil) {
+                     allowsANE: Bool = true, allowsHalf: Bool? = nil, allowsRounding: Bool = true) {
             self.limits = limits; self.sustained = sustained; self.excluded = excluded; self.allowsANE = allowsANE
             self.allowsHalf = allowsHalf ?? allowsANE
+            self.allowsRounding = allowsRounding
         }
 
         /// The constraints of a request: the ANE for the versions that publish a non-bf16 weight.
@@ -426,9 +431,9 @@ private struct ProductSolver {
             if let gpu = line(.gpu, .bf16), let t = seconds([gpu: m], m: m, k: k, n: n) {
                 options.append(Option(assignment: .gpuAlone(m, path: .bf16), rows: [gpu: m], seconds: t))
             }
-            // Rounding the activations to bf16 trades bits for time: the Compact's and the Light's, never the Standard's (`allowsHalf`),
-            // whose bf16 weights compute on fp32 activations whatever a faster bf16 kernel would gain on another Mac.
-            if key.phase == .denoising, c.allowsHalf, m >= c.limits.roundingRows, let gpu = line(.gpu, .bf16act), let t = seconds([gpu: m], m: m, k: k, n: n) {
+            // Rounding the activation to bf16 trades the operand's last bits for time, within P20 (`allowsRounding`); taken where this
+            // Mac's line says it is faster, and only there — on a GPU without bf16 in hardware the fp32 operand stays.
+            if key.phase == .denoising, c.allowsRounding, m >= c.limits.roundingRows, let gpu = line(.gpu, .bf16act), let t = seconds([gpu: m], m: m, k: k, n: n) {
                 options.append(Option(assignment: .gpuAlone(m, path: .bf16, rounds: true), rows: [gpu: m], seconds: t))
             }
         }

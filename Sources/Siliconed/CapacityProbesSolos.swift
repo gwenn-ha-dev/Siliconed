@@ -40,6 +40,51 @@ extension Diagnostic.CapacityProbes.Context {
         }
     }
 
+    /// **The tiles of a `matmul2d` kernel** (`MatmulTile`): every candidate, judged, then timed in three alternated rounds — on the largest solo
+    /// product for the wide tile (a render's height; the middle one, 1.5 ms on an M5 Pro, ran 30 % apart between two maps), over the thin shapes
+    /// (`Sizes.thin`) for the thin one —, each shape on its fast side (the least of the rounds, as the map reads every disturbed figure), the
+    /// shapes summed, and `MatmulTile.choose`. The chosen tiles run the kernel's lines and its products, and go in the report with every
+    /// candidate's solos.
+    func chooseTiles(_ probe: Probe, _ m: inout Fit.Measurements) {
+        let kernel = probe.kernel
+        guard MatmulTile.kernels.contains(kernel), !skipped.contains(kernel), !sizes.solo.isEmpty,
+              let tensor = (probe == .gpu_int8 ? both : alone).tensor else { return }
+        let candidates = MatmulTile.candidates(for: kernel), standard = MatmulTile.standard(for: kernel)
+        func measure(_ shapes: [Sizes.Shape], thin: Bool) -> [MatmulTile: Double] {
+            var fastest: [MatmulTile: [Int: Double]] = [:]
+            var refused: Set<MatmulTile> = []
+            for _ in 0..<MatmulTile.rounds {
+                for tile in candidates where !refused.contains(tile) {
+                    guard tensor.tiles.use(tile, for: kernel, thin: thin) else { refused.insert(tile); continue }
+                    for (i, shape) in shapes.enumerated() {
+                        guard let s = solo(probe, m: shape.m, k: shape.k, n: shape.n) else { continue }
+                        m.tileTrials = (m.tileTrials ?? []) + [.init(kernel: "\(kernel) \(tile)", shape: s.shape, flop: s.flop, seconds: s.seconds, error: s.error)]
+                        guard s.seconds > 0 else { refused.insert(tile); break }
+                        fastest[tile, default: [:]][i] = min(fastest[tile]?[i] ?? .infinity, s.seconds)
+                    }
+                }
+            }
+            // A shape counts only where every candidate left kept a time for it: the sums compare the same products.
+            let kept = fastest.filter { !refused.contains($0.key) }
+            let common = kept.values.map { Set($0.keys) }.reduce(Set(shapes.indices)) { $0.intersection($1) }
+            return kept.mapValues { times in common.reduce(0) { $0 + times[$1]! } }.filter { $0.value > 0 }
+        }
+        func decide(_ seconds: [MatmulTile: Double], thin: Bool) -> MatmulTile {
+            let chosen = MatmulTile.choose(seconds, among: candidates, standard: standard, margin: thin ? MatmulTile.thinMargin : MatmulTile.margin)
+            log?("  tiles \(kernel)\(thin ? " thin" : ""): " + candidates.compactMap { t in seconds[t].map { String(format: "%@ %.3f ms", t.description, $0 * 1e3) } }
+                    .joined(separator: " · ") + " → \(chosen)")
+            tensor.tiles.use(chosen, for: kernel, thin: thin)
+            return chosen
+        }
+        let wide = decide(measure([sizes.solo[sizes.solo.count - 1]], thin: false), thin: false)
+        m.tiles = (m.tiles ?? [:]).merging([kernel.description: wide.description]) { $1 }
+        let thinShapes = sizes.thin.filter { CapacityModel.isThin(rows: $0.m, k: $0.k, n: $0.n) }
+        if !thinShapes.isEmpty {
+            let thin = decide(measure(thinShapes, thin: true), thin: true)
+            m.thinTiles = (m.thinTiles ?? [:]).merging([kernel.description: thin.description]) { $1 }
+        }
+    }
+
     /// **The products with a short side** (`Sizes.thin`), each kernel the solver can give such a product alone: the fp32 routes of the GPU, the
     /// AMX and the ANE, the GPU's bf16 weights, then the kernels that stage their weight after the fp32 routes (the rounded activations, int8,
     /// q8). Each is a steady figure (a few milliseconds a run; the ANE's cost is its programs' compile, one per shape); the ANE takes the shapes

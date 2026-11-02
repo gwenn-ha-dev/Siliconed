@@ -132,7 +132,7 @@ package final class CapacityPlan: Sendable {
         self.allowsANE = allowsANE
         resources = Resources(amx: has(.amx, .fp32), ane: allowsANE && has(.ane, .fp16),
                               bf16Weights: has(.gpu, .bf16), int8Weights: has(.gpu, .int8), q8Weights: has(.gpu, .q8),
-                              roundedActivations: allowsANE && has(.gpu, .bf16act), aneInt8: allowsANE && has(.ane, .fp16) && has(.ane, .int8),
+                              roundedActivations: has(.gpu, .bf16act), aneInt8: allowsANE && has(.ane, .fp16) && has(.ane, .int8),
                               halfAttention: allowsANE && has(.gpu, .tiles16))
         override = nil; attentionOverride = nil
         identity = "model " + Self.fingerprint(model) + (allowsANE ? "" : " no-ane")
@@ -183,6 +183,8 @@ package final class CapacityPlan: Sendable {
             parts.append("\(k) \(s.overhead) \(s.sustained.map { "\($0)" } ?? "-") \(s.kFrom ?? 0)-\(s.kTo ?? 0) " + (s.keepByK?.map { "\($0.k):" + $0.keep.sorted { $0.key < $1.key }.map { "\($0.key)=\($0.value)" }.joined(separator: ",") }.joined(separator: ";") ?? "") + " " + s.keep.sorted { $0.key < $1.key }.map { "\($0.key.rawValue)=\($0.value)" }.joined(separator: ","))
         }
         for (e, h) in model.heat.sorted(by: { $0.key < $1.key }) { parts.append("heat \(e.rawValue) \(h)") }
+        for (k, t) in model.tiles.sorted(by: { $0.key.description < $1.key.description }) { parts.append("tile \(k) \(t)") }
+        for (k, t) in model.thinTiles.sorted(by: { $0.key.description < $1.key.description }) { parts.append("thin tile \(k) \(t)") }
         for (e, c) in model.crest.sorted(by: { $0.key < $1.key }) { parts.append("crest \(e.rawValue) \(c)") }
         parts.append("memory \(model.memoryBandwidth.map { "\($0)" } ?? "-") disk \(model.diskBandwidth.map { "\($0)" } ?? "-")")
         for (c, r) in model.diskClasses.sorted(by: { $0.key < $1.key }) { parts.append("diskclass \(c) \(r.rate) \(r.mean)") }

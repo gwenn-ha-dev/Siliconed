@@ -185,6 +185,9 @@ package final class GEMM {
         if r.amx { conductor = Conductor(queue: queue) }
         if r.usesTensor {
             tensor = TensorGEMM(device: device, queue: queue, roundingActivations: r.roundedActivations)
+            // The tile each matmul2d kernel runs is the map's (`MatmulTile`); none measured: the standard ones.
+            for (kernel, tile) in plan.model?.tiles ?? [:] { tensor?.tiles.use(tile, for: kernel) }
+            for (kernel, tile) in plan.model?.thinTiles ?? [:] { tensor?.tiles.use(tile, for: kernel, thin: true) }
         }
         self.bf16Activations = tensor?.roundsActivations == true
         tensorBF16 = tensor != nil && r.bf16Weights

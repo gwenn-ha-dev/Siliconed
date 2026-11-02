@@ -1,4 +1,4 @@
-// The diagnostic's report: the JSON types (machine, conditions, judge, memory, stages), the report itself of schema 17 and the
+// The diagnostic's report: the JSON types (machine, conditions, judge, memory, stages), the report itself of schema 18 and the
 // issue link. Split from `Diagnostic.swift`, which says what the diagnostic is.
 
 import CryptoKit
@@ -130,7 +130,7 @@ extension Diagnostic {
 
     // ── the report ──────────────────────────────────────────────────────────────────────────
 
-    /// **The report of schema 17**: the machine and what it announces, the model the probes fitted — what the engine plans with —,
+    /// **The report of schema 18**: the machine and what it announces, the model the probes fitted — what the engine plans with —,
     /// the raw measurements it was fitted on (so that anyone can replay the fit: `refit`), what the judge said of each kernel, the heat
     /// and the memory, each stage's seconds beside its projection, and what the measure found (`findings`, `uncertainty`). A finished
     /// report is always a map: it is applied as it stands.
@@ -268,7 +268,7 @@ extension Diagnostic {
         /// Every kernel judged right ran within its threshold: nothing excluded.
         package var passes: Bool { !judge.values.contains { $0.excluded } }
 
-        /// **Reads a stored or received report**, `nil` for anything that is not a report of schema 17 — an older schema is not a map.
+        /// **Reads a stored or received report**, `nil` for anything that is not a report of schema 18 — an older schema is not a map.
         package static func read(_ data: Data) -> Report? {
             struct Schema: Decodable { var schema: Int }
             guard let s = try? JSONDecoder().decode(Schema.self, from: data), s.schema == Diagnostic.schema else { return nil }

@@ -649,11 +649,11 @@ extension Diagnostic {
                     m.diskBandwidth = readings?[.standard]?.rate
                     m.diskClasses = Dictionary(uniqueKeysWithValues: (readings ?? [:]).map { ($0.key.rawValue, $0.value) })
                 }
-                try stage("solos fp32") { solos([.gpu_fp32], &m, shapes: sizes.product); solos([.amx_fp32, .ane_fp16], &m, shapes: sizes.product, chained: true); solos([.ane_fp16], &m, shapes: sizes.small, chained: true); solos([.gpu_bf16], &m) }
+                try stage("solos fp32") { solos([.gpu_fp32], &m, shapes: sizes.product); solos([.amx_fp32, .ane_fp16], &m, shapes: sizes.product, chained: true); solos([.ane_fp16], &m, shapes: sizes.small, chained: true); chooseTiles(.gpu_bf16, &m); solos([.gpu_bf16], &m) }
                 try stage("stairs") { stairs(&m) }
                 try stage("attention") { try attention(&m) }
                 try stage("sharing") { sharing(&m) }
-                try stage("solos 8-bit and rounded") { solos([.gpu_bf16act, .gpu_int8, .gpu_q8], &m); solos([.ane_int8], &m, shapes: sizes.integers + sizes.small, chained: true) }
+                try stage("solos 8-bit and rounded") { chooseTiles(.gpu_bf16act, &m); chooseTiles(.gpu_int8, &m); solos([.gpu_bf16act, .gpu_int8, .gpu_q8], &m); solos([.ane_int8], &m, shapes: sizes.integers + sizes.small, chained: true) }
                 try stage("thin products") { thinSolos(&m) }
                 try stage("sharing int8") { sharingInt8(&m) }
                 d.massive = massives

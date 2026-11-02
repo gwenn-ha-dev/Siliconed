@@ -65,13 +65,14 @@ import Metal
 /// (`EngineSettings.adopt(map:)`), never during one. The command line, the checks and the close-out
 /// never designate one unless a developer names it (`SILICONED_MAP`): today's defaults.
 package enum Diagnostic {
-    /// The JSON's version: the script that aggregates the reports reads it. **17** (31/10/2026, the 0.18's only step): the attention's
+    /// The JSON's version: the script that aggregates the reports reads it. **18** (2/11/2026): the `matmul2d` kernels' tile is measured
+    /// among candidates and kept in the model (`tiles`, `MatmulTile`), each candidate's solo in the measurements; **17** (31/10/2026): the attention's
     /// two kernels by tiles (`gpu/tiles`, `gpu/tiles16`) are measured and judged beside the graph, flash and the CPU's heads; **16**: no verdict — `findings`, each with its
     /// effect on the plan, replace the green flag and the defects, and the fit's aberrant figures are bounded; 15 (30/10/2026) was the
     /// capacity model — inventory, the probes' raw measurements, the model they fit, the judge per kernel, the memory, the stages and
     /// a verdict of defects; 14 and before were a table of routes timed against each other (grid of classes, pairs A B A B), which the
-    /// engine no longer reads. A report of a schema under 17 is not a map: the app measures again (`isCurrent`).
-    package static let schema = 17
+    /// engine no longer reads. A report of a schema under 18 is not a map: the app measures again (`isCurrent`).
+    package static let schema = 18
     package static let repository = "https://github.com/gwenn-ha-dev/Siliconed"
     /// **Wall seconds the whole diagnostic may take, inventory and witnesses included, on any Mac: a ceiling, not a target** (the
     /// user, 1/11/2026: a Mac pays once per version rather than a few percent at every render). The duration is a result: about forty
