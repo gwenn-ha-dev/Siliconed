@@ -4,6 +4,9 @@
 
 /// Why a switch of the DiT box is greyed out; `nil` where it is available.
 package enum DiTSwitchUnavailable: Equatable, Sendable {
+    /// This Mac is not measured yet — none kept, or the one kept is of another Mac, macOS or build (an update): the first render
+    /// measures it. Until then nobody knows whether the Neural Engine will get rows, and « nothing to do » would be a guess.
+    case notMeasured
     /// This Mac's measure gives the Neural Engine no row: the denoiser is fp32 throughout, nothing to choose.
     case noNeuralEngineRow
     /// The size has a side under 1024 px: the half grid would fall under the 512-px floor.
@@ -36,8 +39,9 @@ package enum DiTSwitches {
 
     /// The Neural Engine switch: available where this Mac's map gives it a row, whatever the version (the Standard
     /// too, off by default there).
-    package static func neuralEngineUnavailable(offered: Bool) -> DiTSwitchUnavailable? {
-        offered ? nil : .noNeuralEngineRow
+    package static func neuralEngineUnavailable(measured: Bool, offered: Bool) -> DiTSwitchUnavailable? {
+        guard measured else { return .notMeasured }
+        return offered ? nil : .noNeuralEngineRow
     }
 
     /// The Neural Engine a render takes: the choice only where the map offers it.

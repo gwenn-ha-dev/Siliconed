@@ -1079,6 +1079,7 @@ package enum RemoteControlHelp {
                                                                            → leave it out
           neural_engine        --ane, or set neural-engine, on a Mac whose measure does not offer the
                                Neural Engine                               → leave it out: nothing to choose there
+                               set neural-engine on a Mac not measured yet → render once (it measures), or diagnose
           subject              a named subject: unknown, a name taken, too many images, a model
                                that reads none, a grid citing one          → help subjects
           grid                 an axis that does not read, two axes on one setting, a {…} group
@@ -2191,6 +2192,7 @@ package enum RemoteControlHelp {
                                                                            → le retirer
           neural_engine        --ane, ou set neural-engine, sur un Mac dont la mesure n'offre pas le
                                Neural Engine                               → le retirer : rien à choisir là
+                               set neural-engine sur un Mac pas encore mesuré → un rendu (il mesure), ou diagnose
           subject              un sujet nommé : inconnu, nom déjà pris, trop d'images, modèle qui
                                n'en lit pas, une grille qui en cite un     → help subjects
           grid                 un axe illisible, deux axes sur un même réglage, un groupe {…} sur

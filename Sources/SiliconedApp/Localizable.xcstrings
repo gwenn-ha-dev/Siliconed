@@ -38271,6 +38271,46 @@
         }
       }
     },
+    "This Mac is not measured yet: its first render measures it, then the Neural Engine can be chosen." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dieser Mac ist noch nicht gemessen: Sein erstes Rendering misst ihn, danach lässt sich die Neural Engine wählen."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Este Mac aún no está medido: su primer renderizado lo mide, y después se puede elegir el Neural Engine."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce Mac n’est pas encore mesuré : son premier rendu le mesure, puis le Neural Engine peut se choisir."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Questo Mac non è ancora misurato: il suo primo rendering lo misura, poi si può scegliere il Neural Engine."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このMacはまだ測定されていません。最初のレンダリングで測定され、その後Neural Engineを選べます。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此 Mac 尚未测量：首次渲染时会进行测量，之后即可选择 Neural Engine。"
+          }
+        }
+      }
+    },
     "This Mac’s engine settings couldn’t be read as they are." : {
       "localizations" : {
         "de" : {

@@ -52,8 +52,12 @@ final class DiTSwitchesTests: XCTestCase {
     }
 
     func testNeuralEngineAvailabilityAndReason() {
-        XCTAssertNil(DiTSwitches.neuralEngineUnavailable(offered: true))
-        XCTAssertEqual(DiTSwitches.neuralEngineUnavailable(offered: false), .noNeuralEngineRow)
+        XCTAssertNil(DiTSwitches.neuralEngineUnavailable(measured: true, offered: true))
+        XCTAssertEqual(DiTSwitches.neuralEngineUnavailable(measured: true, offered: false), .noNeuralEngineRow)
+        // Before the first measure (after an update, say), the switch says so rather than « nothing to do »: whether the
+        // Neural Engine gets rows is not known yet, and an unread map offers nothing whatever it holds.
+        XCTAssertEqual(DiTSwitches.neuralEngineUnavailable(measured: false, offered: false), .notMeasured)
+        XCTAssertEqual(DiTSwitches.neuralEngineUnavailable(measured: false, offered: true), .notMeasured)
         // Offered: the choice, else the default — the Standard included (off by default there, but available).
         XCTAssertTrue(DiTSwitches.neuralEngine(offered: true, choice: true, versionDefault: Variant.standard.neuralEngineByDefault))
         XCTAssertFalse(DiTSwitches.neuralEngine(offered: true, choice: nil, versionDefault: Variant.standard.neuralEngineByDefault))

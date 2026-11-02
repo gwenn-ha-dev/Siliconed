@@ -273,15 +273,15 @@ struct DiTBox: View {
     /// greyed and says why, in a sentence, instead of disappearing or turning into a label. The decisions are `DiTSwitches`'s.
     @ViewBuilder private var switches: some View {
         let id = app.identifier
-        let aneReason = DiTSwitches.neuralEngineUnavailable(offered: app.neuralEngineOffered)
+        let aneReason = DiTSwitches.neuralEngineUnavailable(measured: app.settingsRead, offered: app.neuralEngineOffered)
         VStack(alignment: .leading, spacing: 2) {
             Toggle("Neural Engine", isOn: Binding(get: { aneReason == nil && app.neuralEngine(for: id) },
                                                   set: { app.setNeuralEngine($0, for: id) }))
                 .font(.callout)
                 .disabled(aneReason != nil)
                 .help("Runs part of the DiT in fp16 on the Neural Engine: less energy (about a fifth on an M1 Pro), an image a little different from fp32’s. Off, the DiT is in fp32 throughout, the image verified against the reference.")
-            if aneReason != nil {
-                Text(Self.sentence(.noNeuralEngineRow))
+            if let aneReason {
+                Text(Self.sentence(aneReason))
                     .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             }
         }
@@ -307,6 +307,7 @@ struct DiTBox: View {
         case .sizeUnder1024: String(localized: "Needs 1024 px or more on each side.")
         case .withLoRADetailOrEdit: String(localized: "Not with a LoRA, Detail or an edit.")
         case .stepsOffRecipe: String(localized: "Only at the model’s own step count.")
+        case .notMeasured: String(localized: "This Mac is not measured yet: its first render measures it, then the Neural Engine can be chosen.")
         case .noNeuralEngineRow: String(localized: "This Mac’s measure gives the Neural Engine nothing to do: the DiT is computed in fp32.")
         }
     }

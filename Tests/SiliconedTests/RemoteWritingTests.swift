@@ -105,7 +105,7 @@ final class RemoteWritingTests: XCTestCase {
 
     /// The Neural Engine is offered or not by the map, whichever the version: `set neural-engine` refuses on the same rule as the switch.
     func testTheNeuralEngineSwitchHasNothingToChooseWithoutARow() {
-        XCTAssertEqual(DiTSwitches.neuralEngineUnavailable(offered: false), .noNeuralEngineRow)
-        XCTAssertNil(DiTSwitches.neuralEngineUnavailable(offered: true))
+        XCTAssertEqual(DiTSwitches.neuralEngineUnavailable(measured: true, offered: false), .noNeuralEngineRow)
+        XCTAssertNil(DiTSwitches.neuralEngineUnavailable(measured: true, offered: true))
     }
 }

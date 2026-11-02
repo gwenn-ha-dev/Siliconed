@@ -304,9 +304,12 @@ extension RemoteControl {
                 app.setFasterRendering(on, for: card.id)
                 return ["ok": true, "model": card.id, "faster_rendering": app.fasterRendering(for: card.id), "previous": previous]
             case .neuralEngine:
-                // The switch is greyed where this Mac's measure gives the Neural Engine no row (`DiTSwitches`): nothing to choose, either way.
-                if DiTSwitches.neuralEngineUnavailable(offered: app.neuralEngineOffered) != nil {
-                    throw Refusal("neural_engine", String(localized: "This Mac’s measure gives the Neural Engine nothing to do: the DiT is computed in fp32."),
+                // The switch is greyed where this Mac is not measured yet, or its measure gives the Neural Engine no row (`DiTSwitches`):
+                // nothing to choose, either way.
+                if let why = DiTSwitches.neuralEngineUnavailable(measured: app.settingsRead, offered: app.neuralEngineOffered) {
+                    throw Refusal("neural_engine", why == .notMeasured
+                        ? String(localized: "This Mac is not measured yet: its first render measures it, then the Neural Engine can be chosen.")
+                        : String(localized: "This Mac’s measure gives the Neural Engine nothing to do: the DiT is computed in fp32."),
                                   help: "silicontrol diagnose")
                 }
                 let previous = app.neuralEngine(for: card.id)
