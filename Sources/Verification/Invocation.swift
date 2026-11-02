@@ -26,6 +26,8 @@ package struct Invocation: Sendable {
     package let neuralEngine: Bool
     /// `--bf16-activations`: the DiT's products on an activation rounded to bf16 (`BF16ActivationRun`).
     package let bf16Activations: Bool
+    /// `--bf16-attention`: the DiT's attention on bf16 operands, fused (`BF16AttentionRun`).
+    package let bf16Attention: Bool
     /// `--long`: the text stages on the oracle's long prompt (past 512 tokens), golden `…-text-long`.
     package let long: Bool
     package let goldens: Goldens
@@ -67,14 +69,17 @@ package struct Invocation: Sendable {
         profile = flags.contains("--profile")
         neuralEngine = flags.contains("--neural-engine")
         bf16Activations = flags.contains("--bf16-activations")
-        if neuralEngine || bf16Activations { try HalfPrecisionRun.enable(neuralEngine: neuralEngine, bf16Activations: bf16Activations) }
+        bf16Attention = flags.contains("--bf16-attention")
+        if neuralEngine || bf16Activations || bf16Attention {
+            try HalfPrecisionRun.enable(neuralEngine: neuralEngine, bf16Activations: bf16Activations, bf16Attention: bf16Attention)
+        }
         long = flags.contains("--long")
         goldens = Goldens(directory: values["--goldens"]?.last)
         extras = values.compactMapValues(\.last).filter { !Self.known.contains($0.key) }
     }
 
     /// The options that take no value.
-    private static let flags: Set<String> = ["--profile", "--neural-engine", "--bf16-activations", "--long"]
+    private static let flags: Set<String> = ["--profile", "--neural-engine", "--bf16-activations", "--bf16-attention", "--long"]
 
     /// The options parsed above; any other accepted option lands in `extras`.
     private static let known: Set<String> = ["--size", "--goldens", "--edit", "--map"]
@@ -88,10 +93,10 @@ package struct Invocation: Sendable {
     }
 
     /// The bf16 reference beside `file` when the engine runs a half-precision path. Under `--neural-engine`
-    /// or `--bf16-activations` it is required: the fp32 rule would fail the ANE's fp16 products for what they are, not for a fault.
+    /// `--bf16-activations` or `--bf16-attention` it is required: the fp32 rule would fail the ANE's fp16 products for what they are, not for a fault.
     package func halfReference(_ file: String, script: String) throws -> HalfPrecisionReference? {
         let half = HalfPrecisionReference(goldens: goldens, file: file)
-        if neuralEngine || bf16Activations, half == nil { throw Skip("bf16 reference missing beside \(file) — \(script)") }
+        if neuralEngine || bf16Activations || bf16Attention, half == nil { throw Skip("bf16 reference missing beside \(file) — \(script)") }
         return half
     }
 

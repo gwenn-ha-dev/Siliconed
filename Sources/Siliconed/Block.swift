@@ -232,7 +232,7 @@ package final class Block: BoundaryRecording, PhaseTiming {
         guard attentionAssignment.splits else { return nil }
         if let existing = builtHeadSplit { return existing }
         let built = try HeadSplitAttention(device: gemm.device, queue: gemm.queue, heads: shapes.heads,
-                                       sequence: sequence, headDim: shapes.headDim, cpuHeads: attentionAssignment.cpuHeads, gpuKernel: attentionAssignment.gpuKernel)
+                                       sequence: sequence, headDim: shapes.headDim, cpuHeads: attentionAssignment.cpuHeads, gpuKernel: attentionAssignment.gpuKernel, tile: attentionAssignment.tile)
         builtHeadSplit = built
         return built
     }

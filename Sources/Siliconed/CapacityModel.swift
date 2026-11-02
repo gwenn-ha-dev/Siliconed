@@ -62,8 +62,9 @@ package struct CapacityModel: Codable, Sendable, Equatable {
         /// widened weight).
         case fp32, bf16, bf16act, int8, q8, fp16
         /// Attentions: the MPSGraph graph, the flash kernel, a share of the heads on the CPU, the three stages by tiles of query rows
-        /// (`tiles`: fp32 throughout; `tiles16`: fp16 operands, fp32 sums).
-        case graph, flash, heads, tiles, tiles16
+        /// (`tiles`: fp32 throughout; `tiles16`: fp16 operands, fp32 sums; `tilesbf16`: bf16 operands, fp32 sums) — the last two in
+        /// the form their map chose (`attentionTiles`).
+        case graph, flash, heads, tiles, tiles16, tilesbf16
     }
 
     /// One engine computing one form: `gpu/fp32`, `ane/fp16`, `cpu/heads`.
@@ -243,13 +244,17 @@ package struct CapacityModel: Codable, Sendable, Equatable {
     package var tiles: [Kernel: MatmulTile] = [:]
     /// ... and on its thin products (`isThin`), chosen on `Sizes.thin`: the tile that times its `thin` line.
     package var thinTiles: [Kernel: MatmulTile] = [:]
+    /// **The form of each half-precision attention kernel** (`AttentionTile`, `gpu/tiles16` and `gpu/tilesbf16`): fused at this tile,
+    /// the fastest of the candidates on this Mac, measured before its line (which is the line of that form). A kernel absent runs the
+    /// three stages — what every map before the fused form planned with.
+    package var attentionTiles: [Kernel: AttentionTile] = [:]
 
     package init() {}
 
     // MARK: - JSON
 
     private enum CodingKeys: String, CodingKey {
-        case crest, lines, thin, aneRowUnit, sharing, heat, memoryBandwidth, diskBandwidth, diskClasses, preparation, kquantPreparation, tiles, thinTiles
+        case crest, lines, thin, aneRowUnit, sharing, heat, memoryBandwidth, diskBandwidth, diskClasses, preparation, kquantPreparation, tiles, thinTiles, attentionTiles
     }
 
     /// The engines of a dictionary keyed by their names.
@@ -314,6 +319,12 @@ package struct CapacityModel: Codable, Sendable, Equatable {
             }
             thinTiles[kernel] = tile
         }
+        for (name, tile) in try c.decodeIfPresent([String: AttentionTile].self, forKey: .attentionTiles) ?? [:] {
+            guard let kernel = Kernel(name) else {
+                throw DecodingError.dataCorruptedError(forKey: .attentionTiles, in: c, debugDescription: "kernel « \(name) »")
+            }
+            attentionTiles[kernel] = tile
+        }
     }
 
     package func encode(to encoder: any Encoder) throws {
@@ -336,6 +347,9 @@ package struct CapacityModel: Codable, Sendable, Equatable {
         }
         if !thinTiles.isEmpty {
             try c.encode(Dictionary(uniqueKeysWithValues: thinTiles.map { ($0.key.description, $0.value) }), forKey: .thinTiles)
+        }
+        if !attentionTiles.isEmpty {
+            try c.encode(Dictionary(uniqueKeysWithValues: attentionTiles.map { ($0.key.description, $0.value) }), forKey: .attentionTiles)
         }
     }
 

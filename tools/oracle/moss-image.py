@@ -464,16 +464,16 @@ def probe_dit(model) -> dict:
     return taps
 
 
-def dit_inputs(text: torch.Tensor):
+def dit_inputs(text: torch.Tensor, height: int = 512, width: int = 512):
     scheduler = make_scheduler(STEPS)
-    return initial_latent(), scheduler.timesteps[0].reshape(1).float(), text[None], scheduler
+    return initial_latent(height, width), scheduler.timesteps[0].reshape(1).float(), text[None], scheduler
 
 
 def stage_dit(size: str, lora: bool):
     height, width, name = common.parse_size(size)
-    assert height == width == 512
     text = read("goldens-moss-text", "moss-image.py text")["final"]
-    latent, timestep, embeds, scheduler = dit_inputs(text)
+    # Any size the engine renders (the schedule does not depend on it): 1 024² is where the tiled attention runs (2 048 rows and more).
+    latent, timestep, embeds, scheduler = dit_inputs(text, height, width)
     model = load_dit(lora=lora)
     taps = probe_dit(model)
     out = model(latent, timestep, embeds).sample
@@ -522,7 +522,7 @@ def stage_witness(size: str, lora: bool):
     checkpoint = dit_checkpoint(lora)
     model.load_state_dict({k: checkpoint.tensor(k, f64) for k in checkpoint.keys if not k.startswith("layers.")},
                           strict=False, assign=True)
-    height = width = 32
+    height, width = golden["latent_in"].shape[-2:]
     text = golden["text_in"].double()[None]
     t = text.shape[1]
     # the sinusoid in double, NOT rounded to float32 as the reference does before its MLP: the exact value
@@ -763,7 +763,7 @@ def main() -> None:
     p = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     p.add_argument("stage", choices=["schedule", "tokenizer", "text", "text-witness", "vae", "vae-witness", "dit", "witness",
                                      "dit-bf16", "bf16", "trajectory", "vae-final", "all"])
-    p.add_argument("--size", default="512", help="512 (the only size)")
+    p.add_argument("--size", default="512", help="512 (every stage); 1024 for dit, witness and dit-bf16")
     p.add_argument("--lora", action="store_true", help="dit, witness: the 8-step LoRA merged at strength 1")
     p.add_argument("--variant", choices=list(quantized.SOURCES["moss-image"]),
                    help="dit, witness, dit-bf16: the Compact's published DiT (Comfy-Org's int8 convrot) instead of the publisher's")

@@ -144,6 +144,14 @@ extension Diagnostic.CapacityProbes {
         /// The three stages by tiles, fp32 and fp16 operands (M1 Pro: 0.43 and 0.49 of the GPU's product; the matrix units of a bigger GPU
         /// are another figure, and the projection only prices the stage).
         static let tilesRatio = 0.43, tiles16Ratio = 0.49
+        /// The forms of the two half-precision kernels: the three stages and the fused tiles each, `AttentionTile.rounds` single runs,
+        /// at the tier's longest sequence, priced at the fp16 kernel's rate (a fused form is faster: an upper bound).
+        static let formRuns = 2.0 * Double(1 + AttentionTile.candidates.count) * Double(AttentionTile.rounds)
+        /// The seconds of those forms' choice, inside the attention's stage.
+        package func formSeconds(_ rates: Rates) -> Double {
+            let l = Double(attention.max() ?? 0)
+            return Self.formRuns * 4 * l * l * Double(Self.attentionHeads) * Double(Self.attentionHeadDim) / (rates.gpu * Self.tiles16Ratio)
+        }
 
         /// **The seconds each stage is projected to take** (the names of `m.budget`), from the engines' rates: `FLOP / rate` of each
         /// timed run, the truths the judge computes on the CPU, and the stages' constants (a program's compile, a pipeline's build).
@@ -189,8 +197,9 @@ extension Diagnostic.CapacityProbes {
             let (h, d) = (Double(Self.attentionHeads), Double(Self.attentionHeadDim))
             func attentionFlop(_ sequences: [Int]) -> Double { sequences.reduce(0) { $0 + 4 * Double($1) * Double($1) * h * d } }
             // The five kernels alone at the tier's sequences, then the graph beside the CPU's heads at their balance at the pair's.
-            let kernels = 1 / (g * Self.graphRatio) + 1 / (g * Self.flashRatio) + 1 / (g * Self.tilesRatio) + 1 / (g * Self.tiles16Ratio) + 1 / rates.cpu
+            let kernels = 1 / (g * Self.graphRatio) + 1 / (g * Self.flashRatio) + 1 / (g * Self.tilesRatio) + 2 / (g * Self.tiles16Ratio) + 1 / rates.cpu
             p["attention"] = Self.runs * (attentionFlop(attention) * kernels + attentionFlop(Self.pairSequences) / (g * Self.graphRatio + rates.cpu))
+                + formSeconds(rates)
                 + Double(attentionRuns.count) * 0.08
             // A chain per set and pass (the pairs with the GPU, the three, the AMX beside the ANE; a pass 3 where a long k is run), at the sets' rate.
             let setRate = 0.75 * (g + (x ?? 0) + (a ?? 0))

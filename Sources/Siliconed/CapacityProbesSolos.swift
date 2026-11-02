@@ -40,6 +40,43 @@ extension Diagnostic.CapacityProbes.Context {
         }
     }
 
+    /// **The form of a half-precision attention kernel** (`AttentionTile`): the three stages and every fused candidate, judged at the
+    /// kernel's bar, then timed in alternated rounds of one run each (`AttentionTile.rounds`) at the tier's longest sequence, its fast side
+    /// (the least of the rounds), and
+    /// `MatmulTile.choose`'s rule, the three stages first — no gain within the margin, no change of bits. The chosen form runs the kernel's
+    /// line; it goes in the report with every candidate's times (`tileTrials`, `"gpu/tiles16 16x32/4"`, `"… staged"`).
+    func chooseForm(_ kernel: Kernel, _ m: inout Fit.Measurements, flop: Double, shape: [Int], threshold: Double,
+                    build: (AttentionTile?) -> TiledAttention?, run: @escaping (TiledAttention) -> Void, poison: () -> Void,
+                    verdict: (String, Double) -> (pass: Bool, error: Double)) -> AttentionTile? {
+        let candidates: [AttentionTile?] = [nil] + AttentionTile.candidates.map { $0 }
+        var built: [AttentionTile?: TiledAttention] = [:]
+        var refused: Set<AttentionTile?> = []
+        for c in candidates {
+            guard let t = build(c) else { refused.insert(c); continue }
+            poison()
+            run(t)
+            let name = "\(kernel) \(c?.description ?? "staged")"
+            let v = verdict(name, threshold)
+            guard v.pass else { refused.insert(c); m.tileTrials = (m.tileTrials ?? []) + [.init(kernel: name, shape: shape, flop: flop, seconds: 0, error: v.error)]; continue }
+            built[c] = t
+        }
+        var fastest: [AttentionTile?: Double] = [:]
+        for _ in 0..<AttentionTile.rounds {
+            for c in candidates {
+                guard let t = built[c], let seconds = guarded("\(kernel) form \(c?.description ?? "staged")", {
+                    CapacityProbes.timed { run(t); return true }
+                }) else { continue }
+                m.tileTrials = (m.tileTrials ?? []) + [.init(kernel: "\(kernel) \(c?.description ?? "staged")", shape: shape, flop: flop, seconds: seconds, error: nil)]
+                fastest[c] = min(fastest[c] ?? .infinity, seconds)
+            }
+        }
+        let chosen = MatmulTile.choose(fastest, among: candidates, standard: nil)
+        log?("  form \(kernel): " + candidates.compactMap { c in fastest[c].map { String(format: "%@ %.2f ms", c?.description ?? "staged", $0 * 1e3) } }
+                .joined(separator: " · ") + " → \(chosen?.description ?? "staged")")
+        if let chosen { m.attentionTiles = (m.attentionTiles ?? [:]).merging([kernel.description: chosen.description]) { $1 } }
+        return chosen
+    }
+
     /// **The tiles of a `matmul2d` kernel** (`MatmulTile`): every candidate, judged, then timed in three alternated rounds — on the largest solo
     /// product for the wide tile (a render's height; the middle one, 1.5 ms on an M5 Pro, ran 30 % apart between two maps), over the thin shapes
     /// (`Sizes.thin`) for the thin one —, each shape on its fast side (the least of the rounds, as the map reads every disturbed figure), the
@@ -216,7 +253,12 @@ extension Diagnostic.CapacityProbes.Context {
         Diagnostic.fill(pages.v.floats(), count: floats, scale: 1, seed: 13)
         let buffers = (q: try bench.buffer(pages.q), k: try bench.buffer(pages.k), v: try bench.buffer(pages.v), out: try bench.buffer(pages.out))
         let out = pages.out.floats()
-        for s in sizes.attentionRuns {
+        // The tier's longest sequence first: the half-precision kernels' form is chosen there (`chooseForm`), before any of their lines.
+        // The others keep their order after it (a pair's sequence reads the tier's below it, measured by then).
+        let longest = sizes.attention.max()
+        let order = longest.map { l in [l] + sizes.attentionRuns.filter { $0 != l } } ?? sizes.attentionRuns
+        var forms: [Kernel: AttentionTile?] = [:]
+        for s in order {
             // The tier's sequences run every kernel; the pair's alone (`Sizes.pairSequences`) its two sides and the pair.
             let kernels = sizes.attention.contains(s)
             autoreleasepool {
@@ -253,20 +295,40 @@ extension Diagnostic.CapacityProbes.Context {
                 if kernels, !skipped.contains(Kernel(.gpu, .flash)), let flash = try? FlashMatrix(device: bench.device, queue: bench.queue, heads: h, sequence: s, headDim: d) {
                     record(Kernel(.gpu, .flash), flop: flop, run: { _ = flash.run(q: buffers.q, k: buffers.k, v: buffers.v, into: buffers.out); return true }, shape: [s, h, d])
                 }
-                // The three stages by tiles of query rows. fp32: the graph's bar. fp16 operands (Q, K, V, P rounded to half, fp32 sums): the
-                // bar of every fp16 route — 1.25 × what rounding the exact output to bf16 does (invariant 3; the ANE's, `aneThreshold`) —
-                // and only on a machine that runs it (the probe measures it everywhere: the permission is the request's, at the solver).
-                for (kernel, precision) in [(Kernel(.gpu, .tiles), TiledAttention.Precision.fp32), (Kernel(.gpu, .tiles16), .fp16)] {
+                // The tiled kernels. fp32: the graph's bar. fp16 operands (Q, K, V, P rounded to half, fp32 sums): the bar of every fp16
+                // route — 1.25 × what rounding the exact output to bf16 does (invariant 3; the ANE's, `aneThreshold`). bf16 operands: 1.25 ×
+                // bf16's own error — the exact attention of the operands rounded to bf16, its output rounded too (what a bf16 reference
+                // computes at best). Each only on a machine that runs it (the probe measures them everywhere: the permission is the
+                // request's, at the solver). The half-precision ones run the form their map chose (three stages or fused, `chooseForm`).
+                for (kernel, precision) in [(Kernel(.gpu, .tiles), TiledAttention.Precision.fp32), (Kernel(.gpu, .tiles16), .fp16), (Kernel(.gpu, .tilesbf16), .bf16)] {
                     RouteBeacon.announce(kernel.description)
-                    guard kernels, !skipped.contains(kernel),
-                          let tiled = try? TiledAttention(device: bench.device, queue: bench.queue, heads: h, sequence: s, headDim: d, precision: precision)
-                    else { continue }
+                    guard kernels, !skipped.contains(kernel) else { continue }
                     var bar = Diagnostic.fp32Threshold
-                    if precision == .fp16 {
-                        let floor = Diagnostic.judge(exact.map { Double(Diagnostic.Half.bf16.round(Float($0))) }.map(Float.init), exact,
-                                                     columns: rows.count * h, threshold: 1).error
+                    let bf16 = Diagnostic.Half.bf16
+                    switch precision {
+                    case .fp32: break
+                    case .fp16:
+                        let floor = Diagnostic.judge(exact.map { bf16.round(Float($0)) }, exact, columns: rows.count * h, threshold: 1).error
+                        bar = max(Diagnostic.fp32Threshold, Diagnostic.floorMargin * floor)
+                    case .bf16:
+                        let n = s * h * d
+                        let rounded = [pages.q.floats(), pages.k.floats(), pages.v.floats()].map { p in (0..<n).map { bf16.round(p[$0]) } }
+                        let own = rounded[0].withUnsafeBufferPointer { q in rounded[1].withUnsafeBufferPointer { k in rounded[2].withUnsafeBufferPointer { v in
+                            Diagnostic.exactAttention(q: q.baseAddress!, k: k.baseAddress!, v: v.baseAddress!, sequence: s, heads: h, headDim: d, rows: rows)
+                        } } }
+                        let floor = Diagnostic.judge(own.map { bf16.round(Float($0)) }, exact, columns: rows.count * h, threshold: 1).error
                         bar = max(Diagnostic.fp32Threshold, Diagnostic.floorMargin * floor)
                     }
+                    func build(_ tile: AttentionTile?) -> TiledAttention? {
+                        try? TiledAttention(device: bench.device, queue: bench.queue, heads: h, sequence: s, headDim: d, precision: precision, tile: tile)
+                    }
+                    if precision != .fp32, forms[kernel] == nil, s == longest {
+                        forms[kernel] = chooseForm(kernel, &measurements, flop: flop, shape: [s, h, d], threshold: bar, build: build,
+                                                   run: { _ = $0.run(q: buffers.q, k: buffers.k, v: buffers.v, into: buffers.out) },
+                                                   poison: poison, verdict: verdict)
+                    }
+                    let form = forms[kernel] ?? nil
+                    guard let tiled = build(form) ?? (form != nil ? build(nil) : nil) else { continue }
                     record(kernel, flop: flop, threshold: bar,
                            run: { _ = tiled.run(q: buffers.q, k: buffers.k, v: buffers.v, into: buffers.out); return true }, shape: [s, h, d])
                 }

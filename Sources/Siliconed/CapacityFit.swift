@@ -191,6 +191,8 @@ package enum CapacityFit {
         /// candidate's solos that chose them (`kernel` = `"gpu/bf16act 128x128/8"`, one per round and shape). `nil` in a report that predates them.
         package var tiles: [String: String]?
         package var thinTiles: [String: String]?
+        /// The form each half-precision attention kernel runs (`AttentionTile` text), measured before its line; absent: the three stages.
+        package var attentionTiles: [String: String]?
         package var tileTrials: [Solo]?
         package init() {}
 
@@ -516,6 +518,9 @@ package enum CapacityFit {
         }
         for (name, text) in m.thinTiles ?? [:] {
             if let k = Kernel(name), let t = MatmulTile(text) { model.thinTiles[k] = t }
+        }
+        for (name, text) in m.attentionTiles ?? [:] {
+            if let k = Kernel(name), AttentionTile.kernels.contains(k), let t = AttentionTile(text) { model.attentionTiles[k] = t }
         }
         for s in m.solos {
             guard !m.wrong.contains(s.kernel), let k = Kernel(s.kernel), s.seconds > 0 else { continue }

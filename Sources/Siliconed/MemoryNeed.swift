@@ -228,14 +228,15 @@ package struct MemoryNeed: Sendable, Equatable {
     /// it: cut by heads (`HeadSplitAttention`: its host arena, ours, and MPSGraph's copy of the GPU
     /// heads' queries) or in one MPSGraph SDPA (its queries' copy, and its causal mask in our pages). `assignment`: the plan's
     /// answer for the attention's class (its CPU heads exactly), `.graph` for one the plan does not speak of (an encoder's).
-    /// The flash kernel holds no more than the graph's terms. The tiled kernels (`tiles`, `tiles16`) hold their own buffers instead.
+    /// The flash kernel holds no more than the graph's terms. The tiled kernels (`tiles`, `tiles16`, `tilesbf16`) hold their own buffers
+    /// instead (the fused form, its operands' copies alone).
     package static func attention(_ name: String, heads: Int, rows: Int, keys: Int, headDim: Int, causal: Bool,
                                   assignment: AttentionAssignment = .graph, threads: Int, group: Int = 1) -> [Term] {
         // The three stages by tiles (`TiledAttention`): no graph is built — the scores of a pass, and for fp16 the probabilities and the
         // half copies of q, k and v, private buffers of ours, each a term of its own (`TiledAttention.bytes`, the function the kernel sizes by).
         if assignment.usesTiles {
             let b = TiledAttention.bytes(heads: heads, kvHeads: max(1, heads / max(1, group)), sequence: rows, keys: keys, headDim: headDim,
-                                         precision: assignment.tilePrecision)
+                                         precision: assignment.tilePrecision, tile: assignment.tile)
             return [Term("\(name) tiles scores", b.scores), Term("\(name) tiles probabilities", b.probabilities),
                     Term("\(name) tiles half operands", b.operands)]
         }
@@ -258,7 +259,7 @@ package struct MemoryNeed: Sendable, Equatable {
             if assignment.gpuUsesFlash { return [host] }
             if assignment.gpuUsesTiles {
                 let b = TiledAttention.bytes(heads: heads, kvHeads: max(1, heads / max(1, group)), sequence: rows, keys: keys, headDim: headDim,
-                                             precision: assignment.gpuTilePrecision, computed: gpu)
+                                             precision: assignment.gpuTilePrecision, computed: gpu, tile: assignment.tile)
                 return [host, Term("\(name) tiles scores", b.scores), Term("\(name) tiles probabilities", b.probabilities),
                         Term("\(name) tiles half operands", b.operands)]
             }

@@ -323,10 +323,10 @@ enum KernelStages {
 
     static let sdpaTiles = Stage(
         model: "kernels", name: "sdpa-tiles",
-        proves: "the attention in three stages by tiles of query rows (Metal 4 matmul2d) returns the float64 attention — in fp32, and with fp16 operands and fp32 sums — on a self-attention, a cross-attention over few keys, grouped k/v heads and a length that tiles nothing",
+        proves: "the attention by tiles (Metal 4 matmul2d) returns the float64 attention — in three stages in fp32, and with fp16 or bf16 operands and fp32 sums in three stages and fused at every candidate tile — on a self-attention, a cross-attention over few keys, grouped k/v heads and a length that tiles nothing",
         options: ["--sequence"],
         oracle: nil, weights: [],
-        rule: "against float64, per channel: fp32 ≤ 1e-5 and ≤ the graph's own error + 25 % on the golden tensors' amplitudes (saturated softmax); fp16 operands ≤ 1.25 × the error of rounding the same exact output to bf16 (invariant 3, the ANE's bar), on the map's amplitudes"
+        rule: "against float64, per channel: fp32 ≤ 1e-5 and ≤ the graph's own error + 25 % on the golden tensors' amplitudes (saturated softmax); fp16 operands ≤ 1.25 × the error of rounding the same exact output to bf16 (invariant 3, the ANE's bar); bf16 operands ≤ 1.25 × bf16's own error (the float64 attention of the operands rounded to bf16, its output rounded too); both on the map's amplitudes"
     ) { invocation in
         let sequence = try invocation.integer("--sequence", 4128)
         let report = Report(title: "kernels sdpa-tiles S=\(sequence)")
@@ -361,8 +361,9 @@ enum KernelStages {
             let (q, qb) = buffer(s * width, regime.q), (k, kb) = buffer(keys * kvWidth, regime.k), (v, vb) = buffer(keys * kvWidth, regime.v)
             let rows = [0, 1, 2, 3, s / 3, s / 2, s - 4, s - 3, s - 2, s - 1].filter { $0 >= 0 && $0 < s }
             // The float64 attention of those rows, every head: [rows, width].
-            var exact = [Double](repeating: 0, count: rows.count * width)
             let scale = 1 / Double(headDim).squareRoot()
+            func attention(_ q: UnsafePointer<Float>, _ k: UnsafePointer<Float>, _ v: UnsafePointer<Float>) -> [Double] {
+            var exact = [Double](repeating: 0, count: rows.count * width)
             exact.withUnsafeMutableBufferPointer { out in
                 nonisolated(unsafe) let out = out.baseAddress!
                 DispatchQueue.concurrentPerform(iterations: rows.count * heads) { c in
@@ -386,6 +387,14 @@ enum KernelStages {
                     }
                 }
             }
+            return exact
+            }
+            let exact = attention(q, k, v)
+            // A bf16 path's own error: the float64 attention of the operands rounded to bf16, its output rounded too.
+            let roundedOperands = [(q, s * width), (k, keys * kvWidth), (v, keys * kvWidth)].map { p, n in (0..<n).map { bf16(p[$0]) } }
+            let bf16Own = roundedOperands[0].withUnsafeBufferPointer { rq in roundedOperands[1].withUnsafeBufferPointer { rk in
+                roundedOperands[2].withUnsafeBufferPointer { rv in attention(rq.baseAddress!, rk.baseAddress!, rv.baseAddress!) } } }
+            let bf16Floor = exact.withUnsafeBufferPointer { channelError(bf16Own.map { bf16(Float($0)) }, $0, columns: width).worst }
             func error(_ out: UnsafeMutablePointer<Float>) -> Double {
                 var got = [Float](repeating: 0, count: rows.count * width)
                 for (r, row) in rows.enumerated() { for c in 0..<width { got[r * width + c] = out[row * width + c] } }
@@ -397,19 +406,27 @@ enum KernelStages {
             _ = Attention(device: device, queue: queue, heads: heads, sequence: s, headDim: headDim, keySequence: keys,
                           kvHeads: kvHeads == heads ? nil : kvHeads).run(q: qb, k: kb, v: vb, into: graphBuffer)
             let graphError = error(graphOut)
-            for precision in [TiledAttention.Precision.fp32, .fp16] where precision == .fp32 || regime.fp16 {
-                let name = "\(label) S=\(s)/\(keys) \(heads)/\(kvHeads) heads, " + (precision == .fp32 ? "fp32" : "fp16 operands") + ", \(regime.label)"
+            // Every form the map may choose: the three stages in each precision, and fused at each candidate tile in half and bf16.
+            let forms: [(TiledAttention.Precision, AttentionTile?)] = [(.fp32, nil)]
+                + [TiledAttention.Precision.fp16, .bf16].flatMap { p in ([nil] + AttentionTile.candidates.map { $0 }).map { (p, $0) } }
+            for (precision, tile) in forms where precision == .fp32 || regime.fp16 {
+                let operands = ["fp32", "fp16 operands", "bf16 operands"][precision == .fp32 ? 0 : precision == .fp16 ? 1 : 2]
+                let name = "\(label) S=\(s)/\(keys) \(heads)/\(kvHeads) heads, \(operands)" + (tile.map { ", fused \($0)" } ?? "") + ", \(regime.label)"
                 let (out, ob) = buffer(s * width, 0)
                 memset(out, 0xFF, s * width * 4)            // NaN: a row nobody wrote cannot pass
                 let kernel = try TiledAttention(device: device, queue: queue, heads: heads, sequence: s, headDim: headDim, keys: keys,
-                                                kvHeads: kvHeads, precision: precision)
+                                                kvHeads: kvHeads, precision: precision, tile: tile)
                 _ = kernel.run(q: qb, k: kb, v: vb, into: ob)
-                if precision == .fp32 {
+                switch precision {
+                case .fp32:
                     report.add(Judge.bound(name, error(out), max(1e-5, 1.25 * graphError), unit: "per channel",
                                            note: String(format: "the graph's own %.2e", graphError)))
-                } else {
+                case .fp16:
                     report.add(Judge.bound(name, error(out), max(1e-5, 1.25 * floor), unit: "per channel",
                                            note: String(format: "bf16's own rounding %.2e", floor)))
+                case .bf16:
+                    report.add(Judge.bound(name, error(out), max(1e-5, 1.25 * bf16Floor), unit: "per channel",
+                                           note: String(format: "bf16's own error %.2e", bf16Floor)))
                 }
             }
         }

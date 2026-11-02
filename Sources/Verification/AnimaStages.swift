@@ -74,8 +74,8 @@ enum AnimaStages {
     static let dit = Stage(
         model: model, name: "dit",
         proves: "one evaluation of the DiT at σ = 1, boundary by boundary, and its output per latent plane against the fp64 witness",
-        sizes: ["512", "1024", "768x512"], options: ["--map", "--neural-engine", "--bf16-activations", "--variant"],
-        oracle: "tools/oracle/anima.py dit --size {size}; witness --size {size} --step 0; with --neural-engine or --bf16-activations, bf16 --size {size}; with --variant compact or light, dit and bf16 with --variant, at 512 \(Wording.publishers)", weights: ["DiT"],
+        sizes: ["512", "1024", "768x512"], options: ["--map", "--neural-engine", "--bf16-activations", "--bf16-attention", "--variant"],
+        oracle: "tools/oracle/anima.py dit --size {size}; witness --size {size} --step 0; with --neural-engine, --bf16-activations or --bf16-attention, bf16 --size {size}; with --variant compact or light, dit and bf16 with --variant, at 512 \(Wording.publishers)", weights: ["DiT"],
         rule: "the rule, floor 5e-4; model_out per latent plane at the fp64 witness; \(Wording.rectangle); \(Wording.halfPrecision)"
     ) { invocation in
         let version = try invocation.quantizedVariant()
@@ -114,6 +114,7 @@ enum AnimaStages {
         }
         if invocation.neuralEngine { try NeuralEngineRun.account(report) }
         if invocation.bf16Activations { try BF16ActivationRun.account(report) }
+        if invocation.bf16Attention { try BF16AttentionRun.account(report) }
         return report
     }
 

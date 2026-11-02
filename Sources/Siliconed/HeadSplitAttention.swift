@@ -212,7 +212,7 @@ package final class HeadSplitAttention {
     package init(device: MTLDevice, queue: MTLCommandQueue, heads: Int, sequence: Int, headDim: Int,
                  keys: Int? = nil, kvHeads: Int? = nil, cpuHeads: Int? = nil, cpuFraction: Double? = nil,
                  threads: Int = EngineSettings.effective.machine.performanceCores,
-                 matrixLimit: Int = Attention.maxMatrix, gpuKernel asked: AttentionAssignment.Kernel = .graph) throws {
+                 matrixLimit: Int = Attention.maxMatrix, gpuKernel asked: AttentionAssignment.Kernel = .graph, tile: AttentionTile? = nil) throws {
         let kvHeads = kvHeads ?? heads
         precondition(heads % kvHeads == 0, "\(heads) heads over \(kvHeads) k/v heads")
         let group = heads / kvHeads
@@ -242,10 +242,10 @@ package final class HeadSplitAttention {
         var own: (tiled: TiledAttention?, flash: FlashMatrix?, kernel: AttentionAssignment.Kernel) = (nil, nil, .graph)
         if !cpu.isEmpty || asked != .graph {
             switch asked {
-            case .tiles, .tiles16:
+            case .tiles, .tiles16, .tilesbf16:
                 let a = AttentionAssignment(kernel: .split, cpuHeads: cpu.count, gpuKernel: asked)
                 if let t = try? TiledAttention(device: device, queue: queue, heads: heads, sequence: sequence, headDim: headDim, keys: keys,
-                                               kvHeads: kvHeads, precision: a.gpuTilePrecision, computed: gpu.count) {
+                                               kvHeads: kvHeads, precision: a.gpuTilePrecision, computed: gpu.count, tile: tile) {
                     own = (t, nil, asked)
                 } else { Warnings.emit("⚠ head split: the tiled kernel refuses S=\(sequence), the GPU's heads keep the graph") }
             case .flash:

@@ -503,8 +503,8 @@ private struct ProductSolver {
         case .graph:
             guard let g = line(.gpu, .graph) else { return nil }
             rows = [g: key.heads]
-        case .tiles, .tiles16:
-            guard a.kernel == .tiles || c.allowsHalf, let t = line(.gpu, a.kernel == .tiles ? .tiles : .tiles16) else { return nil }
+        case .tiles, .tiles16, .tilesbf16:
+            guard let t = gpuLine(a.kernel) else { return nil }
             rows = [t: key.heads]
         case .split:
             // The GPU's heads run the kernel the assignment names (the best of those allowed, `solve`); the pair's sharing was measured
@@ -517,13 +517,21 @@ private struct ProductSolver {
         return (a.kernel.rawValue, rows, t, Dictionary(b.map { ($0.key.engine, $0.value) }, uniquingKeysWith: +))
     }
 
-    /// The line of the kernel that computes the GPU's heads under a split; the fp16 one only where the request allows half precision.
+    /// The line of a kernel the GPU runs (all the heads, or its share under a split); the fp16 one only where the request allows half
+    /// precision, the bf16 one where it allows the rounding.
     func gpuLine(_ k: AttentionAssignment.Kernel) -> Kernel? {
         switch k {
         case .graph: return line(.gpu, .graph)
         case .flash: return line(.gpu, .flash)
         case .tiles: return line(.gpu, .tiles)
         case .tiles16: return c.allowsHalf ? line(.gpu, .tiles16) : nil
+        case .tilesbf16:
+            // Where fp16 is allowed too, bf16 (three fewer bits) must beat it by more than the noise (`MatmulTile.margin`): a tie at
+            // the noise is the finer mantissa's.
+            guard c.allowsRounding, let b = line(.gpu, .tilesbf16) else { return nil }
+            if c.allowsHalf, let h = line(.gpu, .tiles16), let hr = model.lines[h]?.rate, let br = model.lines[b]?.rate,
+               br <= hr * (1 + MatmulTile.margin) { return nil }
+            return b
         case .split: return nil
         }
     }
@@ -531,13 +539,13 @@ private struct ProductSolver {
     func solve(_ key: AttentionKey, flash: Bool) -> CapacitySolver.AttentionSolution? {
         var options: [AttentionAssignment] = [.graph]
         if flash, line(.gpu, .flash) != nil { options.append(.flash) }
-        // The three stages by tiles: a candidate wherever the map has its line (fp16 only where the request allows half precision).
-        if line(.gpu, .tiles) != nil { options.append(.tiles) }
-        if c.allowsHalf, line(.gpu, .tiles16) != nil { options.append(.tiles16) }
+        // The tiled kernels: a candidate wherever the map has its line (fp16 only where the request allows half precision, bf16 where it
+        // allows the rounding, and beats fp16 where both are: `gpuLine`).
+        for k in [AttentionAssignment.Kernel.tiles, .tiles16, .tilesbf16] where gpuLine(k) != nil { options.append(AttentionAssignment(kernel: k)) }
         let groups = key.kvHeads
         if key.sequence >= HeadSplitAttention.minimumSequence, groups >= 2, line(.cpu, .heads) != nil, model.measures([.gpu, .cpu]) {
             // The GPU's heads with each kernel the engine can give them: the cut composes with the best of them.
-            var gpuKernels: [AttentionAssignment.Kernel] = [.graph, .tiles, .tiles16]
+            var gpuKernels: [AttentionAssignment.Kernel] = [.graph, .tiles, .tiles16, .tilesbf16]
             if flash { gpuKernels.insert(.flash, at: 1) }
             for gpu in gpuKernels where gpuLine(gpu) != nil {
                 for cpu in 1..<groups { options.append(AttentionAssignment(kernel: .split, cpuHeads: cpu * key.group, gpuKernel: gpu)) }
@@ -548,7 +556,10 @@ private struct ProductSolver {
             guard let t = timed(key, o) else { continue }
             if best == nil || t.seconds < best!.1.seconds * (1 - 1e-9) { best = (o, t) }
         }
-        guard let (a, t) = best else { return nil }
+        guard var (a, t) = best else { return nil }
+        // The form its map chose for the tiled kernel that runs: what its line timed.
+        let tiled = a.splits ? a.gpuKernel : a.kernel
+        if tiled == .tiles16 || tiled == .tilesbf16 { a.tile = model.attentionTiles[Kernel(.gpu, tiled == .tiles16 ? .tiles16 : .tilesbf16)] }
         return .init(assignment: a, route: t.route, rows: t.rows, compute: t.seconds, busy: t.busy)
     }
 }

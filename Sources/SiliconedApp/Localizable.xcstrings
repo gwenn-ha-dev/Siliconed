@@ -7821,6 +7821,46 @@
         }
       }
     },
+    "Attention, GPU tensor units, bf16 operands" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Attention, Tensoreinheiten der GPU, bf16-Operanden"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Atención, unidades tensoriales de la GPU, operandos en bf16"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Attention, unités tensorielles du GPU, opérandes en bf16"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Attenzione, unità tensoriali della GPU, operandi in bf16"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アテンション(GPUのテンソルユニット、bf16オペランド)"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "注意力（GPU 张量单元，bf16 操作数）"
+          }
+        }
+      }
+    },
     "Attention, Siliconed kernel" : {
       "localizations" : {
         "de" : {

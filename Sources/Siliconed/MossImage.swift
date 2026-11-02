@@ -497,7 +497,7 @@ package final class MossImageDiT: BoundaryRecording, PhaseTiming {
             let split: HeadSplitAttention
             if let s = splits[n] { split = s } else {
                 split = try HeadSplitAttention(device: gemm.device, queue: gemm.queue, heads: config.heads, sequence: n,
-                                               headDim: config.headDim, cpuHeads: cut.cpuHeads, gpuKernel: cut.gpuKernel)
+                                               headDim: config.headDim, cpuHeads: cut.cpuHeads, gpuKernel: cut.gpuKernel, tile: cut.tile)
                 splits[n] = split
             }
             timed("sdpa wall") {

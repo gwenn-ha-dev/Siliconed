@@ -483,7 +483,7 @@ package final class Krea2DiT: BoundaryRecording, PhaseTiming {
             let split: HeadSplitAttention
             if let s = splits[n] { split = s } else {
                 split = try HeadSplitAttention(device: gemm.device, queue: gemm.queue, heads: config.heads, sequence: n,
-                                               headDim: config.headDim, kvHeads: config.kvHeads, cpuHeads: cut.cpuHeads, gpuKernel: cut.gpuKernel)
+                                               headDim: config.headDim, kvHeads: config.kvHeads, cpuHeads: cut.cpuHeads, gpuKernel: cut.gpuKernel, tile: cut.tile)
                 splits[n] = split
             }
             let qb = try gemm.wrap(UnsafeMutableRawPointer(q), bytes: maxRows * d * 4, name: "q")

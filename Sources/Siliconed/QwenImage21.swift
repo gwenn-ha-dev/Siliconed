@@ -850,7 +850,7 @@ package final class QwenImage21DiT: BoundaryRecording, PhaseTiming {
                 let split: HeadSplitAttention
                 if let existing = headSplits[key] { split = existing } else {
                     split = try HeadSplitAttention(device: gemm.device, queue: gemm.queue, heads: heads, sequence: rows,
-                                               headDim: config.headDim, keys: visible, cpuHeads: cut.cpuHeads, gpuKernel: cut.gpuKernel)
+                                               headDim: config.headDim, keys: visible, cpuHeads: cut.cpuHeads, gpuKernel: cut.gpuKernel, tile: cut.tile)
                     headSplits[key] = split
                 }
                 timed("sdpa wall") {

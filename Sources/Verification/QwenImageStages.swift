@@ -213,8 +213,8 @@ enum QwenImageStages {
     static let dit = Stage(
         model: model, name: "dit",
         proves: "one evaluation three ways — prefill of the conditions, the step from their K/V cache, the full pass under the block-causal mask — plus the layout and the modulation",
-        options: ["--edit", "--map", "--neural-engine", "--bf16-activations", "--variant"], variants: edits,
-        oracle: "tools/oracle/qwen-image-2.1.py dit [--edit N]; witness; with --neural-engine or --bf16-activations, bf16 [--edit N]; with --variant compact or light (no --edit), dit and bf16 with --variant \(Wording.publishers)", weights: ["DiT"],
+        options: ["--edit", "--map", "--neural-engine", "--bf16-activations", "--bf16-attention", "--variant"], variants: edits,
+        oracle: "tools/oracle/qwen-image-2.1.py dit [--edit N]; witness; with --neural-engine, --bf16-activations or --bf16-attention, bf16 [--edit N]; with --variant compact or light (no --edit), dit and bf16 with --variant \(Wording.publishers)", weights: ["DiT"],
         rule: "layout bit for bit; the rule, floor 5e-4, at the fp64 witness where one exists; cache and full pass ≤ 1e-5 apart; a second step the same bits; \(Wording.halfPrecision), cache and full pass too"
     ) { invocation in
         let n = invocation.edit ?? 0
@@ -316,7 +316,7 @@ enum QwenImageStages {
         // Under the ANE the two paths cut their rows between the engines at different heights (prefill and
         // step against the whole sequence): they differ by fp16 rounding, bounded by the bf16 bar instead.
         var apart = (bound: 1e-5, note: "")
-        if invocation.neuralEngine || invocation.bf16Activations, let bf16 = half?.values("model_out"), let golden = goldens.float32("model_out") {
+        if invocation.neuralEngine || invocation.bf16Activations || invocation.bf16Attention, let bf16 = half?.values("model_out"), let golden = goldens.float32("model_out") {
             apart = (1.25 * channelError(bf16, golden, columns: c).worst, invocation.neuralEngine ? "under the ANE, the bf16 bar" : "on rounded activations, the bf16 bar")
         }
         report.add(fullOut.withUnsafeBufferPointer {
@@ -325,6 +325,7 @@ enum QwenImageStages {
         })
         if invocation.neuralEngine { try NeuralEngineRun.account(report) }
         if invocation.bf16Activations { try BF16ActivationRun.account(report) }
+        if invocation.bf16Attention { try BF16AttentionRun.account(report) }
         return report
     }
 

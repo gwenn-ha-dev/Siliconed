@@ -81,8 +81,8 @@ package struct MatmulTile: Hashable, Sendable, Codable, CustomStringConvertible 
     /// **The choice, from each candidate's seconds** (a median over alternated rounds, or a sum over the thin shapes): the first candidate, in
     /// the list's order, within `margin` of the fastest. The same Mac measured twice chooses the same tile wherever two candidates are within
     /// the noise of each other — a tile is bits, not only speed. No candidate timed: the standard one.
-    package static func choose(_ seconds: [MatmulTile: Double], among candidates: [MatmulTile], standard: MatmulTile,
-                               margin: Double = MatmulTile.margin) -> MatmulTile {
+    package static func choose<Candidate: Hashable>(_ seconds: [Candidate: Double], among candidates: [Candidate], standard: Candidate,
+                                                margin: Double = MatmulTile.margin) -> Candidate {
         guard let best = seconds.values.filter({ $0 > 0 }).min() else { return standard }
         return candidates.first { seconds[$0].map { $0 > 0 && $0 <= best * (1 + margin) } ?? false } ?? standard
     }

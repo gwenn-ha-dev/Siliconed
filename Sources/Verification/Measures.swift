@@ -124,12 +124,16 @@ extension Judge {
 ///   - **`--bf16-activations`**: the DiT's products on an activation rounded to bf16, the weights as published, the sums and the
 ///     output fp32, every product of 256 rows or more. Judged like the ANE's, against the reference run in bf16: invariant 3, no
 ///     further from the fp64 witness than diffusers in bf16, + 25 %.
+///   - **`--bf16-attention`**: the DiT's attention on bf16 operands (Q, K, V and the probabilities rounded once, the softmax and the
+///     sums fp32), in the fused form at the first candidate tile — every attention the plan speaks of. Judged the same way.
 package enum HalfPrecisionRun {
-    package static func enable(neuralEngine: Bool, bf16Activations: Bool) throws {
+    package static func enable(neuralEngine: Bool, bf16Activations: Bool, bf16Attention: Bool = false) throws {
         do {
-            try EngineSettings.designate(plan: .forcing(neuralEngine: neuralEngine, bf16Activations: bf16Activations))
+            try EngineSettings.designate(plan: .forcing(neuralEngine: neuralEngine, bf16Activations: bf16Activations,
+                                                        tilesbf16: bf16Attention, fused: bf16Attention))
         } catch {
-            let flags = [neuralEngine ? "--neural-engine" : nil, bf16Activations ? "--bf16-activations" : nil].compactMap { $0 }
+            let flags = [neuralEngine ? "--neural-engine" : nil, bf16Activations ? "--bf16-activations" : nil,
+                         bf16Attention ? "--bf16-attention" : nil].compactMap { $0 }
             throw UsageError("\(flags.joined(separator: " ")): the engine's settings were read before it")
         }
     }
@@ -151,6 +155,17 @@ package enum NeuralEngineRun {
                                note: "half the rows of \(handed - givenBack) products"
                                    + (integers > 0 ? ", \(integers) of them on the weight's integers" : "")
                                    + (givenBack > 0 ? ", \(givenBack) given back to the GPU" : "")))
+    }
+}
+
+package enum BF16AttentionRun {
+    /// How many attentions ran on bf16 operands. None (no Metal 4, a refused compiler, a shape the kernel does not take): skipped.
+    package static func account(_ report: Report) throws {
+        let runs = TiledAttention.bf16Runs.withLock { $0 }
+        guard runs > 0 else {
+            throw Skip("--bf16-attention: no attention ran on bf16 operands on this Mac (Metal 4 missing, or the kernel refused)")
+        }
+        report.add(Judge.holds("bf16 attention", true, note: "\(runs) attentions on bf16 operands"))
     }
 }
 

@@ -2,8 +2,9 @@ import Foundation
 import Metal
 import Synchronization
 
-/// **The attention in three stages, by tiles of query rows** — two candidate kernels of the capacity map (`AttentionAssignment.Kernel`
-/// `tiles`, `tilesHalf`), neither ever the default: the map times them on each Mac and the solver picks.
+/// **The attention in three stages, by tiles of query rows — or fused, one pass by simdgroup** — three candidate kernels of the capacity
+/// map (`AttentionAssignment.Kernel` `tiles`, `tiles16`, `tilesbf16`), none ever the default: the map times them on each Mac and the
+/// solver picks; for the two half-precision ones the map also picks the form (three stages, or fused at a measured `AttentionTile`).
 ///
 ///     per pass of `headsPerPass` heads and block of `blockRows` query rows (scores [heads, rows, keys] kept under `scoreBytes`):
 ///       scores  = Q_blk · K_hᵀ                 matmul2d, strided views of the callers' [S, H·Dh] arrays — no copy, no transposition
@@ -22,11 +23,25 @@ import Synchronization
 ///     `precise::exp`. The fp16 variant (`tilesHalf`) rounds Q, K, V and P to half — once each, nothing else — and sums, scales and
 ///     normalizes in fp32: operands as the ANE's fp16, sums as P20 requires. Whether a Mac may run it is the request's (Compact and
 ///     Light, never the Standard), whether it should is the map's.
+///   - **The bf16 variant** (`tilesbf16`) is the fp16 one with bfloat operands: the range of fp32, three fewer bits — the rounding the
+///     Standard may take (`Constraints.allowsRounding`, P20 on bf16 weights), judged against the reference in bf16 like `bf16act`.
+///   - **The fused form** (`AttentionTile`, half and bfloat only) keeps nothing between the stages: per simdgroup a block of `rows` query
+///     rows, per chunk of `keys` keys S = Q·Kᵀ into a cooperative fp32 tensor, the online softmax in the registers (`reduce_rows` max
+///     and sum, fp32), P rounded to the operand type and handed to the second product as its cooperative left input, O += P·V
+///     multiply-accumulated in fp32; O is rescaled by the row's factor through threadgroup memory (the two products' layouts differ).
+///     Where the GPU has matrix accelerators both products reach them (M5: 18 TFLOP/s against 7 for the three stages); the tile that
+///     fits the registers is the machine's (M5: 16 rows — the 16 × 128 accumulator; 32 rows halves the speed), hence measured.
+///     P is written at S's own index: the two destinations of one descriptor share the layout (`map_iterator` maps only into a
+///     reduction), which the check against fp64 proves on every Mac (`KernelStages`).
 ///   - **Any length**: the tensors carry the real extents, so a block of 100 rows or a key length that is no multiple of 32 needs no
 ///     padding rows. Cross-attention (`keys ≠ sequence`) and grouped k/v heads are the same code; a causal mask is not (the callers
 ///     that need one never ask).
 package final class TiledAttention {
-    package enum Precision: Sendable { case fp32, fp16 }
+    package enum Precision: Sendable { case fp32, fp16, bf16
+        /// The operand type in the kernels' source.
+        var metal: String { switch self { case .fp32: "float"; case .fp16: "half"; case .bf16: "bfloat" } }
+        var suffix: String { switch self { case .fp32: "f32"; case .fp16: "f16"; case .bf16: "bf16" } }
+    }
     package enum Failure: Error, CustomStringConvertible {
         case unsupported(String)
         package var description: String { switch self { case .unsupported(let why): return "tiled attention: \(why)" } }
@@ -42,11 +57,14 @@ package final class TiledAttention {
     package let precision: Precision
     package let blockRows: Int
     package let headsPerPass: Int
+    /// The fused form's tile; `nil`: the three stages.
+    package let tile: AttentionTile?
 
     private let queue: MTLCommandQueue
-    private let scoresPipeline, softmaxPipeline, productPipeline: MTLComputePipelineState
+    private let scoresPipeline, softmaxPipeline, productPipeline: MTLComputePipelineState?
+    private let fusedPipeline: MTLComputePipelineState?
     private let halfPipeline: MTLComputePipelineState
-    private let scores: MTLBuffer
+    private let scores: MTLBuffer?
     private let probabilities: MTLBuffer?
     private let half: (q: MTLBuffer, k: MTLBuffer, v: MTLBuffer)?
 
@@ -66,27 +84,30 @@ package final class TiledAttention {
     /// The bytes the instance holds (private buffers), by the same function the memory need reads.
     /// The bytes for the `computed` first heads of `heads` (`nil`: all), grouped k/v heads following (`kvHeads` of `heads`).
     package struct Bytes: Equatable {
-        /// The scores of a pass (fp32), the probabilities (fp16 only), the half copies of q, k and v (fp16 only).
+        /// The scores of a pass (fp32), the probabilities (half and bf16 only), the half copies of q, k and v (half and bf16 only);
+        /// the fused form holds the copies alone.
         package var scores: Int, probabilities: Int, operands: Int
         package var asTotal: Int { scores + probabilities + operands }
     }
     package static func bytes(heads: Int, kvHeads: Int, sequence: Int, keys: Int, headDim: Int, precision: Precision,
-                              computed: Int? = nil) -> Bytes {
+                              computed: Int? = nil, tile: AttentionTile? = nil) -> Bytes {
         let computed = computed ?? heads
         let t = tiling(heads: computed, sequence: sequence, keys: keys)
         let group = max(1, heads / max(1, kvHeads))
         let s = Arena.capacity(for: t.heads * t.rows * keys * 4)
         switch precision {
         case .fp32: return Bytes(scores: s, probabilities: 0, operands: 0)
-        case .fp16:
-            return Bytes(scores: s, probabilities: Arena.capacity(for: t.heads * t.rows * keys * 2),
-                         operands: Arena.capacity(for: sequence * computed * headDim * 2)
-                             + 2 * Arena.capacity(for: keys * max(1, computed / group) * headDim * 2))
+        case .fp16, .bf16:
+            let operands = Arena.capacity(for: sequence * computed * headDim * 2)
+                + 2 * Arena.capacity(for: keys * max(1, computed / group) * headDim * 2)
+            if tile != nil { return Bytes(scores: 0, probabilities: 0, operands: operands) }
+            return Bytes(scores: s, probabilities: Arena.capacity(for: t.heads * t.rows * keys * 2), operands: operands)
         }
     }
 
     package init(device: MTLDevice, queue: MTLCommandQueue, heads: Int, sequence: Int, headDim: Int, keys: Int? = nil, kvHeads: Int? = nil,
-                 precision: Precision, computed: Int? = nil, blockRows: Int? = nil, headsPerPass: Int? = nil) throws {
+                 precision: Precision, computed: Int? = nil, blockRows: Int? = nil, headsPerPass: Int? = nil,
+                 tile: AttentionTile? = nil) throws {
         let keys = keys ?? sequence, kvHeads = kvHeads ?? heads
         let computed = computed ?? heads
         guard computed >= 1, computed <= heads, computed % max(1, heads / max(1, kvHeads)) == 0 else {
@@ -97,15 +118,26 @@ package final class TiledAttention {
             throw Failure.unsupported("head dimension \(headDim), \(heads)/\(kvHeads) heads")
         }
         let library = try TiledAttention.library(device)
-        let suffix = precision == .fp32 ? "f32" : "f16"
-        func pipeline(_ name: String) throws -> MTLComputePipelineState {
+        let suffix = precision.suffix
+        func pipeline(_ name: String, from library: MTLLibrary = library) throws -> MTLComputePipelineState {
             guard let f = library.makeFunction(name: name) else { throw Failure.unsupported("no function \(name)") }
             return try device.makeComputePipelineState(function: f)
         }
-        scoresPipeline = try pipeline("tiles_scores_" + suffix)
-        softmaxPipeline = try pipeline("tiles_softmax_" + suffix)
-        productPipeline = try pipeline("tiles_product_" + suffix)
-        halfPipeline = try pipeline("tiles_to_half")
+        let tile = precision == .fp32 ? nil : tile
+        self.tile = tile
+        if let tile {
+            fusedPipeline = try pipeline("fused", from: TiledAttention.fusedLibrary(device, precision: precision, tile: tile, headDim: headDim))
+            guard fusedPipeline!.maxTotalThreadsPerThreadgroup >= 32 * tile.simdgroups else {
+                throw Failure.unsupported("the fused kernel at \(tile) takes \(fusedPipeline!.maxTotalThreadsPerThreadgroup) threads")
+            }
+            (scoresPipeline, softmaxPipeline, productPipeline) = (nil, nil, nil)
+        } else {
+            fusedPipeline = nil
+            scoresPipeline = try pipeline("tiles_scores_" + suffix)
+            softmaxPipeline = try pipeline("tiles_softmax_" + suffix)
+            productPipeline = try pipeline("tiles_product_" + suffix)
+        }
+        halfPipeline = try pipeline(precision == .bf16 ? "tiles_to_bf16" : "tiles_to_half")
         let t = TiledAttention.tiling(heads: computed, sequence: sequence, keys: keys)
         self.computed = computed
         self.blockRows = blockRows ?? t.rows
@@ -116,9 +148,9 @@ package final class TiledAttention {
             guard let b = device.makeBuffer(length: n, options: .storageModePrivate) else { throw Failure.unsupported("no \(n) bytes") }
             return b
         }
-        scores = try buffer(self.headsPerPass * self.blockRows * keys * 4)
-        if precision == .fp16 {
-            probabilities = try buffer(self.headsPerPass * self.blockRows * keys * 2)
+        scores = tile == nil ? try buffer(self.headsPerPass * self.blockRows * keys * 4) : nil
+        if precision != .fp32 {
+            probabilities = tile == nil ? try buffer(self.headsPerPass * self.blockRows * keys * 2) : nil
             let kvComputed = computed / (heads / kvHeads)
             half = (try buffer(sequence * computed * headDim * 2), try buffer(keys * kvComputed * headDim * 2),
                     try buffer(keys * kvComputed * headDim * 2))
@@ -131,7 +163,7 @@ package final class TiledAttention {
                              keys: Int? = nil, kvHeads: Int? = nil) -> TiledAttention? {
         do {
             return try TiledAttention(device: device, queue: queue, heads: heads, sequence: sequence, headDim: headDim, keys: keys,
-                                      kvHeads: kvHeads, precision: a.tilePrecision)
+                                      kvHeads: kvHeads, precision: a.tilePrecision, tile: a.tile)
         } catch {
             Warnings.emit("⚠ tiled attention: falling back to MPSGraph at S=\(sequence) — \(error)")
             return nil
@@ -142,12 +174,20 @@ package final class TiledAttention {
         var rows: UInt32, keys: UInt32, qWidth: UInt32, kvWidth: UInt32, headDim: UInt32, group: UInt32
         var headBase: UInt32, firstRow: UInt32, count: UInt32, scale: Float, outWidth: UInt32
     }
+    private struct FusedParams { var sequence: UInt32, keys: UInt32, qWidth: UInt32, kvWidth: UInt32, outWidth: UInt32, group: UInt32; var scale: Float }
+
+    /// The attentions run on bf16 operands since the process started: the check under `--bf16-attention` says how many it judged.
+    package static let bf16Runs = Mutex<Int>(0)
+
+    /// The route the ledger and the logs name.
+    package var route: String {
+        switch precision { case .fp32: "tiles"; case .fp16: "tiles16"; case .bf16: "tilesbf16" }
+    }
 
     /// **Runs the attention** over `q [S, H·Dh]`, `k` and `v [keys, KVH·Dh]` (fp32, offset 0), writing `out [S, H·Dh]`: one command
     /// buffer. Returns the GPU seconds.
     package func run(q: MTLBuffer, k: MTLBuffer, v: MTLBuffer, into out: MTLBuffer) -> Double {
-        let clock = ProductLedger.attention(sequence: sequence, heads: heads, headDim: headDim,
-                                            route: precision == .fp32 ? "tiles" : "tiles16")
+        let clock = ProductLedger.attention(sequence: sequence, heads: heads, headDim: headDim, route: route)
         defer { clock?.finish() }
         let commands = submit(q: q, k: k, v: v, into: out)
         commands.waitUntilCompleted()
@@ -156,9 +196,10 @@ package final class TiledAttention {
 
     /// The same, **committed and not awaited**: the head split computes the CPU's heads meanwhile, then waits on the buffer.
     package func submit(q: MTLBuffer, k: MTLBuffer, v: MTLBuffer, into out: MTLBuffer) -> MTLCommandBuffer {
+        if precision == .bf16 { Self.bf16Runs.withLock { $0 += 1 } }
         let commands = queue.checkedCommandBuffer()
         let e = commands.checkedEncoder()
-        e.label = precision == .fp32 ? "tiles_sdpa" : "tiles_sdpa_half"
+        e.label = tile != nil ? "fused_sdpa_" + precision.suffix : precision == .fp32 ? "tiles_sdpa" : "tiles_sdpa_" + precision.suffix
         let outWidth = heads * headDim
         let group = heads / kvHeads
         // The widths the kernels read: the callers' (all heads), or — in half — the compact copy of the computed heads' columns.
@@ -179,6 +220,22 @@ package final class TiledAttention {
             (qs, ks, vs) = (half.q, half.k, half.v)
             (qWidth, kvWidth) = (computed * headDim, kvComputed * headDim)
         }
+        if let tile, let fusedPipeline {
+            var p = FusedParams(sequence: UInt32(sequence), keys: UInt32(keys), qWidth: UInt32(qWidth), kvWidth: UInt32(kvWidth),
+                                outWidth: UInt32(outWidth), group: UInt32(group), scale: 1 / Float(headDim).squareRoot())
+            e.setComputePipelineState(fusedPipeline)
+            e.setBuffer(qs, offset: 0, index: 0); e.setBuffer(ks, offset: 0, index: 1); e.setBuffer(vs, offset: 0, index: 2)
+            e.setBuffer(out, offset: 0, index: 3)
+            e.setBytes(&p, length: MemoryLayout<FusedParams>.stride, index: 4)
+            e.setThreadgroupMemoryLength(tile.simdgroups * tile.rows * 4, index: 0)
+            let blocks = (sequence + tile.rows * tile.simdgroups - 1) / (tile.rows * tile.simdgroups)
+            e.dispatchThreadgroups(MTLSize(width: 1, height: blocks, depth: computed),
+                                   threadsPerThreadgroup: MTLSize(width: 32 * tile.simdgroups, height: 1, depth: 1))
+            e.endEncoding()
+            commands.commit()
+            return commands
+        }
+        guard let scores, let scoresPipeline, let softmaxPipeline, let productPipeline else { preconditionFailure("three stages unbuilt") }
         var first = 0
         while first < sequence {
             let rows = min(blockRows, sequence - first)
@@ -271,6 +328,8 @@ package final class TiledAttention {
                                  constant Params &p [[buffer(3)]], uint3 g [[threadgroup_position_in_grid]]) { scores_body<float>(q, k, s, p, g); }
     kernel void tiles_scores_f16(device half *q [[buffer(0)]], device half *k [[buffer(1)]], device float *s [[buffer(2)]],
                                  constant Params &p [[buffer(3)]], uint3 g [[threadgroup_position_in_grid]]) { scores_body<half>(q, k, s, p, g); }
+    kernel void tiles_scores_bf16(device bfloat *q [[buffer(0)]], device bfloat *k [[buffer(1)]], device float *s [[buffer(2)]],
+                                  constant Params &p [[buffer(3)]], uint3 g [[threadgroup_position_in_grid]]) { scores_body<bfloat>(q, k, s, p, g); }
 
     // One simdgroup a row of the pass's [count · rows, keys] scores: softmax(scale · s), sums in fp32.
     kernel void tiles_softmax_f32(device float *s [[buffer(0)]], device float *unused [[buffer(1)]], constant Params &p [[buffer(3)]],
@@ -287,9 +346,8 @@ package final class TiledAttention {
         const float inverse = 1.0f / simd_sum(sum);
         for (uint c = lane; c < p.keys; c += 32) x[c] *= inverse;
     }
-    kernel void tiles_softmax_f16(device const float *s [[buffer(0)]], device half *out [[buffer(1)]], constant Params &p [[buffer(3)]],
-                                  uint tg [[threadgroup_position_in_grid]], uint sg [[simdgroup_index_in_threadgroup]],
-                                  uint lane [[thread_index_in_simdgroup]]) {
+    template <typename T>
+    inline void softmax_rounded(device const float *s, device T *out, constant Params &p, uint tg, uint sg, uint lane) {
         const uint row = tg * 8 + sg;
         if (row >= p.rows * p.count) return;
         const ulong base = ulong(row) * p.keys;
@@ -299,8 +357,14 @@ package final class TiledAttention {
         float sum = 0.0f;
         for (uint c = lane; c < p.keys; c += 32) sum += precise::exp(s[base + c] * p.scale - m);
         const float inverse = 1.0f / simd_sum(sum);
-        for (uint c = lane; c < p.keys; c += 32) out[base + c] = half(precise::exp(s[base + c] * p.scale - m) * inverse);
+        for (uint c = lane; c < p.keys; c += 32) out[base + c] = T(precise::exp(s[base + c] * p.scale - m) * inverse);
     }
+    kernel void tiles_softmax_f16(device const float *s [[buffer(0)]], device half *out [[buffer(1)]], constant Params &p [[buffer(3)]],
+                                  uint tg [[threadgroup_position_in_grid]], uint sg [[simdgroup_index_in_threadgroup]],
+                                  uint lane [[thread_index_in_simdgroup]]) { softmax_rounded<half>(s, out, p, tg, sg, lane); }
+    kernel void tiles_softmax_bf16(device const float *s [[buffer(0)]], device bfloat *out [[buffer(1)]], constant Params &p [[buffer(3)]],
+                                   uint tg [[threadgroup_position_in_grid]], uint sg [[simdgroup_index_in_threadgroup]],
+                                   uint lane [[thread_index_in_simdgroup]]) { softmax_rounded<bfloat>(s, out, p, tg, sg, lane); }
 
     // O[first + r, head·Dh + n] = Σ_j P[z, r, j] · V[j, kvhead·Dh + n], written where the head's columns are.
     template <typename T>
@@ -321,11 +385,174 @@ package final class TiledAttention {
                                   constant Params &p [[buffer(3)]], uint3 g [[threadgroup_position_in_grid]]) { product_body<float>(pr, v, o, p, g); }
     kernel void tiles_product_f16(device half *pr [[buffer(0)]], device half *v [[buffer(1)]], device float *o [[buffer(2)]],
                                   constant Params &p [[buffer(3)]], uint3 g [[threadgroup_position_in_grid]]) { product_body<half>(pr, v, o, p, g); }
+    kernel void tiles_product_bf16(device bfloat *pr [[buffer(0)]], device bfloat *v [[buffer(1)]], device float *o [[buffer(2)]],
+                                   constant Params &p [[buffer(3)]], uint3 g [[threadgroup_position_in_grid]]) { product_body<bfloat>(pr, v, o, p, g); }
 
     // The first `columns` of each row of a source with row stride `stride`, into a compact copy (x: column, y: row).
     kernel void tiles_to_half(device const float *x [[buffer(0)]], device half *y [[buffer(1)]], constant uint3 &shape [[buffer(2)]],
                               uint2 i [[thread_position_in_grid]]) {
         y[ulong(i.y) * shape.z + i.x] = half(x[ulong(i.y) * shape.y + i.x]);
     }
+    kernel void tiles_to_bf16(device const float *x [[buffer(0)]], device bfloat *y [[buffer(1)]], constant uint3 &shape [[buffer(2)]],
+                              uint2 i [[thread_position_in_grid]]) {
+        y[ulong(i.y) * shape.z + i.x] = bfloat(x[ulong(i.y) * shape.y + i.x]);
+    }
     """
+
+    // MARK: The fused form
+
+    private static let fusedLibraries = Mutex<[String: MTLLibrary]>([:])
+    /// The fused kernel for an operand type, a tile and a head dimension (all compile-time: the cooperative tensors' extents), once per
+    /// device and combination.
+    static func fusedLibrary(_ device: MTLDevice, precision: Precision, tile: AttentionTile, headDim: Int) throws -> MTLLibrary {
+        let key = "\(device.registryID) \(precision.metal) \(tile) \(headDim)"
+        if let known = fusedLibraries.withLock({ $0[key] }) { return known }
+        let options = MTLCompileOptions()
+        options.languageVersion = .version4_0
+        options.mathMode = .safe
+        let built: MTLLibrary
+        do { built = try device.makeLibrary(source: fusedSource(type: precision.metal, tile: tile, headDim: headDim), options: options) } catch {
+            throw Failure.unsupported("the compiler refused the fused kernel at \(tile) — \(error.localizedDescription)")
+        }
+        fusedLibraries.withLock { $0[key] = built }
+        return built
+    }
+
+    /// The fused kernel's source. One simdgroup a block of `BR` query rows of one head (the grid's z: the computed heads; y: the blocks
+    /// of `simdgroups` simdgroups); the softmax is the online one, every figure of it fp32.
+    static func fusedSource(type: String, tile: AttentionTile, headDim: Int) -> String {
+        """
+        #include <metal_stdlib>
+        #include <metal_tensor>
+        #include <MetalPerformancePrimitives/MetalPerformancePrimitives.h>
+        using namespace metal;
+        using namespace mpp::tensor_ops;
+        typedef \(type) T;
+        constant constexpr int BR = \(tile.rows), BC = \(tile.keys), D = \(headDim);
+        struct FusedParams { uint sequence, keys, qWidth, kvWidth, outWidth, group; float scale; };
+
+        kernel void fused(device T *q [[buffer(0)]], device T *k [[buffer(1)]], device T *v [[buffer(2)]], device float *o [[buffer(3)]],
+                          constant FusedParams &p [[buffer(4)]], threadgroup float *shared [[threadgroup(0)]],
+                          uint3 tg [[threadgroup_position_in_grid]], uint sg [[simdgroup_index_in_threadgroup]],
+                          uint groups [[simdgroups_per_threadgroup]]) {
+            const int head = int(tg.z), kvHead = head / int(p.group);
+            const int row0 = int(tg.y * groups + sg) * BR;
+            if (row0 >= int(p.sequence)) return;
+            const int keys = int(p.keys);
+            threadgroup float *factor = shared + sg * BR;
+
+            tensor<device T, dextents<int32_t, 2>, tensor_inline> Q(q + head * D, dextents<int32_t, 2>(D, int(p.sequence)), array<int32_t, 2>({1, int(p.qWidth)}));
+            tensor<device T, dextents<int32_t, 2>, tensor_inline> K(k + kvHead * D, dextents<int32_t, 2>(D, keys), array<int32_t, 2>({1, int(p.kvWidth)}));
+            tensor<device T, dextents<int32_t, 2>, tensor_inline> V(v + kvHead * D, dextents<int32_t, 2>(D, keys), array<int32_t, 2>({1, int(p.kvWidth)}));
+            tensor<device float, dextents<int32_t, 2>, tensor_inline> O(o + head * D, dextents<int32_t, 2>(D, int(p.sequence)), array<int32_t, 2>({1, int(p.outWidth)}));
+
+            constexpr auto ds = matmul2d_descriptor(BR, BC, D, false, true, false);
+            matmul2d<ds, execution_simdgroup> scores;
+            constexpr auto dv = matmul2d_descriptor(BR, D, BC, false, false, false, matmul2d_descriptor::mode::multiply_accumulate);
+            matmul2d<dv, execution_simdgroup> product;
+
+            auto Qb = Q.slice(0, row0);
+            auto K0 = K.slice(0, 0);
+            auto V0 = V.slice(0, 0);
+            using QT = decltype(Qb); using KT = decltype(K0); using VT = decltype(V0);
+            using PT = matmul2d<dv, execution_simdgroup>::cooperative_tensor_left_input_t<T, T, float>;
+            auto Oc = product.get_destination_cooperative_tensor<PT, VT, float>();
+            #pragma unroll
+            for (uint16_t i = 0; i < Oc.get_capacity(); ++i) { if (Oc.is_valid_element(i)) Oc[i] = 0; }
+            auto m = scores.get_row_reduction_destination_cooperative_tensor<QT, KT, float>();
+            auto l = scores.get_row_reduction_destination_cooperative_tensor<QT, KT, float>();
+            #pragma unroll
+            for (uint16_t i = 0; i < m.get_capacity(); ++i) { if (m.is_valid_element(i)) { m[i] = -INFINITY; l[i] = 0; } }
+
+            for (int j0 = 0; j0 < keys; j0 += BC) {
+                auto Kc = K.slice(0, j0);
+                auto Sc = scores.get_destination_cooperative_tensor<QT, KT, float>();
+                #pragma unroll
+            for (uint16_t i = 0; i < Sc.get_capacity(); ++i) { if (Sc.is_valid_element(i)) Sc[i] = 0; }
+                scores.run(Qb, Kc, Sc);
+                // The keys past the length (the last chunk's) leave the softmax: −∞, hence P = 0 (V's rows there read as zeros).
+                const int valid = min(BC, keys - j0);
+                #pragma unroll
+            for (uint16_t i = 0; i < Sc.get_capacity(); ++i) {
+                    if (Sc.is_valid_element(i)) { auto at = Sc.get_multidimensional_index(i); Sc[i] = at[0] < valid ? Sc[i] * p.scale : -INFINITY; }
+                }
+                auto mx = scores.get_row_reduction_destination_cooperative_tensor<QT, KT, float>();
+                reduce_rows(Sc, mx, reduction_operation::max, -INFINITY);
+                #pragma unroll
+            for (uint16_t i = 0; i < mx.get_capacity(); ++i) {
+                    if (mx.is_valid_element(i)) {
+                        const float mn = max(m[i], mx[i]);
+                        const float alpha = precise::exp(m[i] - mn);
+                        m[i] = mn; mx[i] = alpha;
+                        factor[mx.get_multidimensional_index(i)[0]] = alpha;
+                    }
+                }
+                auto P = scores.get_destination_cooperative_tensor<QT, KT, T>();
+                #pragma unroll
+            for (uint16_t i = 0; i < Sc.get_capacity(); ++i) {
+                    if (Sc.is_valid_element(i)) {
+                        const float e = precise::exp(Sc[i] - *m.map_iterator(Sc.get_iterator(i)));
+                        Sc[i] = e;
+                        P[i] = T(e);
+                    }
+                }
+                auto sum = scores.get_row_reduction_destination_cooperative_tensor<QT, KT, float>();
+                reduce_rows(Sc, sum, reduction_operation::sum, 0.0f);
+                #pragma unroll
+            for (uint16_t i = 0; i < l.get_capacity(); ++i) { if (l.is_valid_element(i)) l[i] = l[i] * mx[i] + sum[i]; }
+                simdgroup_barrier(mem_flags::mem_threadgroup);
+                #pragma unroll
+            for (uint16_t i = 0; i < Oc.get_capacity(); ++i) {
+                    if (Oc.is_valid_element(i)) { auto at = Oc.get_multidimensional_index(i); Oc[i] *= factor[at[1]]; }
+                }
+                auto Pin = product.get_left_input_cooperative_tensor<T, T, float>(P);
+                auto Vc = V.slice(0, j0);
+                product.run(Pin, Vc, Oc);
+                simdgroup_barrier(mem_flags::mem_threadgroup);
+            }
+            #pragma unroll
+            for (uint16_t i = 0; i < l.get_capacity(); ++i) { if (l.is_valid_element(i)) factor[l.get_multidimensional_index(i)[0]] = 1.0f / l[i]; }
+            simdgroup_barrier(mem_flags::mem_threadgroup);
+            #pragma unroll
+            for (uint16_t i = 0; i < Oc.get_capacity(); ++i) {
+                if (Oc.is_valid_element(i)) { auto at = Oc.get_multidimensional_index(i); Oc[i] *= factor[at[1]]; }
+            }
+            auto Ob = O.slice(0, row0);
+            Oc.store(Ob);
+        }
+        """
+    }
+}
+
+/// **The fused attention's tile** (`TiledAttention`'s fused form): `rows` query rows a simdgroup, `keys` keys a chunk, `simdgroups` a
+/// threadgroup — written `16x32/4`. Which one a Mac runs, if any, is its map's (`CapacityModel.attentionTiles`, per half-precision
+/// kernel): the same candidates on every Mac (`candidates`), the three stages (`nil`) first, the choice by `MatmulTile.choose`'s rule.
+package struct AttentionTile: Hashable, Sendable, Codable, CustomStringConvertible {
+    package let rows: Int, keys: Int, simdgroups: Int
+    package init(_ rows: Int, _ keys: Int, simdgroups: Int) { self.rows = rows; self.keys = keys; self.simdgroups = simdgroups }
+    package init?(_ text: String) {
+        let parts = text.split(separator: "/")
+        guard parts.count == 2, let g = Int(parts[1]), g > 0 else { return nil }
+        let dims = parts[0].split(separator: "x").compactMap { Int($0) }
+        guard dims.count == 2, dims[0] > 0, dims[0] % 8 == 0, dims[1] > 0, dims[1] % 16 == 0 else { return nil }
+        self.init(dims[0], dims[1], simdgroups: g)
+    }
+    package var description: String { "\(rows)x\(keys)/\(simdgroups)" }
+    package init(from decoder: Decoder) throws {
+        let text = try decoder.singleValueContainer().decode(String.self)
+        guard let t = AttentionTile(text) else { throw DecodingError.dataCorrupted(.init(codingPath: decoder.codingPath, debugDescription: text)) }
+        self = t
+    }
+    package func encode(to encoder: Encoder) throws { var c = encoder.singleValueContainer(); try c.encode(description) }
+
+    /// The kernels the map measures a form for: the two whose operands are half-precision (the fused form has no fp32 variant: on an
+    /// fp32 operand `matmul2d` stays on the shader cores, and there the graph is faster).
+    package static let kernels = [CapacityModel.Kernel(.gpu, .tiles16), CapacityModel.Kernel(.gpu, .tilesbf16)]
+    /// The fused tiles every Mac's map times beside the three stages. An accumulator of `rows × headDim` fp32 has to fit a simdgroup's
+    /// registers, hence few rows; the chunk of keys trades the number of passes against the scores' tile.
+    package static let candidates = [AttentionTile(16, 32, simdgroups: 4), AttentionTile(16, 64, simdgroups: 4), AttentionTile(32, 32, simdgroups: 4)]
+    /// Alternated rounds of the choice, one run of the tier's longest attention each (11 to 60 ms on an M5 Pro): the least of three.
+    /// Not the shortest sequence, though 16 times cheaper: its millisecond runs are bimodal — on an M5 Pro one bf16 tile ran 1.11 ms in
+    /// one map and 1.60 in the next, and the choice flipped to a tile 30 % slower at 4 096.
+    package static let rounds = 3
 }

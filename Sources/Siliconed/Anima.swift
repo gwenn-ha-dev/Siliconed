@@ -381,7 +381,7 @@ package final class AnimaDiT: BoundaryRecording, PhaseTiming {
             p = .tiles(tiled)
         } else if assigned.splits {
             p = .split(try HeadSplitAttention(device: gemm.device, queue: gemm.queue, heads: config.heads,
-                                              sequence: s, headDim: config.headDim, cpuHeads: assigned.cpuHeads, gpuKernel: assigned.gpuKernel))
+                                              sequence: s, headDim: config.headDim, cpuHeads: assigned.cpuHeads, gpuKernel: assigned.gpuKernel, tile: assigned.tile))
         } else {
             p = .graph(Attention(device: gemm.device, queue: gemm.queue, heads: config.heads,
                                  sequence: s, headDim: config.headDim))
@@ -400,7 +400,7 @@ package final class AnimaDiT: BoundaryRecording, PhaseTiming {
             p = .tiles(tiled)
         } else if assigned.splits {
             p = .split(try HeadSplitAttention(device: gemm.device, queue: gemm.queue, heads: config.heads,
-                                              sequence: s, headDim: config.headDim, keys: textLength, cpuHeads: assigned.cpuHeads, gpuKernel: assigned.gpuKernel))
+                                              sequence: s, headDim: config.headDim, keys: textLength, cpuHeads: assigned.cpuHeads, gpuKernel: assigned.gpuKernel, tile: assigned.tile))
         } else {
             p = .graph(Attention(device: gemm.device, queue: gemm.queue, heads: config.heads,
                                  sequence: s, headDim: config.headDim, keySequence: textLength))

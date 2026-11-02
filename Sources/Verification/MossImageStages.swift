@@ -54,8 +54,8 @@ package enum MossImageStages {
     static let dit = Stage(
         model: model, name: "dit",
         proves: "one evaluation of the DiT at σ = 1, boundary by boundary — time, modulations, RoPE, text path, block 0 inside out, blocks 1, 13, 27, 41, the head —, judged at the fp64 witness",
-        options: ["--map", "--neural-engine", "--bf16-activations", "--variant"],
-        oracle: "tools/oracle/moss-image.py dit; witness; with --neural-engine or --bf16-activations, dit-bf16; with --variant compact, dit, witness and dit-bf16 with --variant \(Wording.publishers)",
+        sizes: ["512", "1024"], options: ["--map", "--neural-engine", "--bf16-activations", "--bf16-attention", "--variant"],
+        oracle: "tools/oracle/moss-image.py dit --size {size}; witness --size {size}; with --neural-engine, --bf16-activations or --bf16-attention, dit-bf16 --size {size}; with --variant compact, dit, witness and dit-bf16 with --variant at 512 \(Wording.publishers)",
         weights: ["DiT"],
         rule: "the rule, floor 5e-4, at the fp64 witness where it exists; model_out per latent plane at the witness; \(Wording.halfPrecision)"
     ) { invocation in try evaluate(invocation, lora: false) }
@@ -182,7 +182,7 @@ package enum MossImageStages {
             stack = loaded
         }
         let witnessStem = stem.replacingOccurrences(of: "goldens-moss-dit", with: "witness-moss-dit")
-            .replacingOccurrences(of: "512", with: "f64-512")
+            .replacingOccurrences(of: "-\(invocation.size)", with: "-f64-\(invocation.size)")
         let witness = invocation.goldens.optional(witnessStem + ".safetensors")
         // `dit-lora` lists no half-precision option: `half` is nil there.
         let half = useLoRA ? nil : try invocation.halfReference(
@@ -219,6 +219,7 @@ package enum MossImageStages {
         }
         if invocation.neuralEngine { try NeuralEngineRun.account(report) }
         if invocation.bf16Activations { try BF16ActivationRun.account(report) }
+        if invocation.bf16Attention { try BF16AttentionRun.account(report) }
         return report
     }
 }

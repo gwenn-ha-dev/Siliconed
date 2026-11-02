@@ -55,10 +55,12 @@ import Testing
         let p = Sizes.full.projection(Self.m1Pro)
         #expect(Set(p.keys) == Set(Self.measured.keys))
         for (stage, seconds) in Self.measured.sorted(by: { $0.key < $1.key }) {
-            let projected = p[stage]!
+            // The attention's 4.0 s were measured before the half-precision kernels chose their form (2/11/2026): that choice is the
+            // one part of the projection no M1 Pro has timed yet, left out until one does.
+            let projected = p[stage]! - (stage == "attention" ? Sizes.full.formSeconds(Self.m1Pro) : 0)
             #expect(abs(projected / seconds - 1) < 0.35 || abs(projected - seconds) < 0.1, "\(stage): projected \(projected), measured \(seconds)")
         }
-        let total = p.values.reduce(0, +), measured = Self.measured.values.reduce(0, +)
+        let total = p.values.reduce(0, +) - Sizes.full.formSeconds(Self.m1Pro), measured = Self.measured.values.reduce(0, +)
         #expect(abs(total / measured - 1) < 0.2, "projected \(total) s of the \(measured) s the probes took")
     }
 
