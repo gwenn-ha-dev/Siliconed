@@ -28,7 +28,7 @@ package enum RemoteControlHelp {
     /// The topics in reading order (`help all` follows it).
     static let order = ["contract", "open", "models", "install", "add", "grid", "edit", "wait", "status", "follow",
                         "cancel", "clear", "set", "history", "save", "vary", "enlarge", "crop", "again", "remove", "undo", "finish", "rewrite", "describe",
-                        "subjects", "import", "uninstall", "macs", "library", "diagnose", "measure", "errors", "recipes"]
+                        "start-image", "subjects", "import", "uninstall", "macs", "library", "diagnose", "measure", "errors", "recipes"]
     static let aliases = ["examples": "recipes", "reuse": "again", "sheet": "finish", "compute": "macs"]
 
     /// French when the user puts it before English. Not `Bundle.main.preferredLocalizations`: the app's
@@ -122,6 +122,8 @@ package enum RemoteControlHelp {
       enlarge i7 [--download]                  the image ×4, by macOS's super-resolution → its image (i8)
       rewrite "<text>" [--for ID]              the Prompt Lab's Rewrite: a prompt rewritten for a model → its text
       describe <image|i7> [--for ID]           the Prompt Lab's Describe: an image told as a prompt → its text
+      start-image [<image|i7>] [--strength S] · start-image --remove
+                                               the rack's starting image (img2img), as the Prompt Lab carries it
       remove i7 [i8 …]                         Remove from History · undo [--redo]: ⌘Z, ⇧⌘Z
       again <i7|file.png> · reuse <i7|file.png> Render Again (Same Seed) · Reuse These Settings (an image, or a PNG of another day)
       crop i7 --box X,Y,W,H | --ratio P:Q      Crop… → a new image (i8)
@@ -140,6 +142,9 @@ package enum RemoteControlHelp {
 
     EDITING: silicontrol add --model qwen-image-2.1 --ref photo.png --ref dog.png "put the dog of image 2 next to her"
       up to 3 --ref, in order; the first is image 1, the one edited (help edit)
+
+    STARTING FROM AN IMAGE (img2img): silicontrol add --image photo.png --strength 0.65 "a lighthouse at dusk"
+      Z-Image, Anima and Krea 2; 0 keeps the image, 1 ignores it (help start-image)
 
     OTHER PAGES: help edit · help errors · help recipes · help all (the whole reference at once)
     """, pages: [
@@ -221,6 +226,8 @@ package enum RemoteControlHelp {
                       not installed
         max_references → how many --ref it reads at most (Qwen-Image-2.1 3, the others 0);
                       null while it is not installed
+        start_image → "start_image": true when the model starts from an image (img2img: add --image,
+                      start-image) — Z-Image, Anima, Krea 2; absent while it is not installed
         formats     → the suggested formats; any valid WxH is accepted (help add)
         accelerators → the DiT box's « Accelerators » for the installed version: true = part of the
                       DiT on the Neural Engine and the GPU's tensor units, where this Mac's map
@@ -404,6 +411,16 @@ package enum RemoteControlHelp {
                               images by number (« image 1 », « image 2 »): Qwen-Image-2.1 reads
                               them as <image1>, <image2>. Leave the format out: the output then
                               follows image 1 (help edit).
+          --image IMAGE|i7    img2img: the render starts from this image (a file, or an image of the
+                              history) instead of noise, and keeps its composition. Only for a
+                              model with "start_image": true (Z-Image, Anima, Krea 2); not with
+                              --ref. Leave the format out: the output takes the model's format
+                              nearest the image's proportions; any format is accepted, the image
+                              then filled and its centre kept. The rack takes the image, as
+                              « start-image » does (help start-image).
+          --strength S        with --image: how far the render moves away from it — diffusers'
+                              strength, 0.65 or 65%, above 0 and at most 1 (1 ignores the image).
+                              Default 0.65. Jobs and images say "strength" and "start_image".
           --preview, --no-preview
                               a preview at every step in the app (writes nothing). Default: the
                               app's « Preview at every step » switch.
@@ -444,7 +461,7 @@ package enum RemoteControlHelp {
           With --wait: one "type": "added" line per job, then the lines of « wait » for all.
 
         FAILURES: usage, prompt, model, solver, detail, accelerators, lora, format, steps, edit, ref, img2img
-        (--image/--strength: the app does none), subject (a named subject the prompt cites, help
+        (--image on a model that does not start from an image, or a strength that leaves no step), subject (a named subject the prompt cites, help
         subjects), queue_full (64 waiting, or not enough room for every alternative), busy (an
         installation is running: no render until it is done), write.
 
@@ -774,6 +791,40 @@ package enum RemoteControlHelp {
         not in the history).
         """,
 
+        "start-image": """
+        silicontrol start-image [<image|i7>] [--strength S]
+        silicontrol start-image --remove
+
+        THE RACK'S STARTING IMAGE (img2img) — what the Prompt Lab's « Carry to the Rack » puts in the rack's
+        Images box when a picture is the starting image, and what that box retouches. Only for a model that
+        starts from an image ("start_image": true in « models »: Z-Image, Anima, Krea 2). Qwen-Image-2.1
+        edits by reference instead (--ref, help edit).
+
+          start-image                  what the rack holds
+          start-image IMAGE|i7         carries an image (a file, or an image of the history): the next
+                                       renders start from it. The size is set to the model's format
+                                       nearest its proportions, at the rack's scale — and stays free.
+          … --strength S               with it, its strength; alone, retouches the one carried
+          start-image --remove         takes it out: the next renders start from noise
+
+        THE STRENGTH is diffusers' strength: how far the render moves away from the image. 0.65 or 65%,
+        above 0 and at most 1: low keeps its composition and colours, 1 ignores it. It counts in steps:
+        at 8 steps, 0.65 redraws 6 of them (0.63 and 0.74 too). Default 0.65 (provisional).
+        Kept in hundredths: the PNG writes it ("Denoising strength"), « reuse » brings it back — the
+        image itself is not in the file.
+
+        ANSWER
+          {"ok": true, "rack": {"model": "z-image", "width": 1024, "height": 1024, …,
+            "start_image": {"name": "photo.png", "width": 3024, "height": 4032, "strength": 0.65,
+                            "used": true, "redrawn_steps": 6, "of_steps": 8}}}
+          "start_image": null when the rack holds none; "used": false when the rack's model does not
+          start from an image (it is then dropped at the next change of model). « status » says the same.
+
+        FAILURES: img2img (the rack's model does not start from an image), no_start_image (--strength
+        alone, with no image carried), ref (unreadable or missing image), unknown_image, usage, remote
+        (the window computes on another Mac: not offered there yet).
+        """,
+
         "subjects": """
         NAMED SUBJECTS — silicontrol subjects [add … | remove NAME]
 
@@ -1080,7 +1131,10 @@ package enum RemoteControlHelp {
           edit                 --ref on a model without editing, or more --ref than it reads
                                                                            → a model with "edit": true; its "max_references"
           ref                  unreadable reference image, or image to describe → check the path
-          img2img              --image / --strength: not in the app         → leave them out
+          img2img              (add, start-image) --image on a model that does not start from an image,
+                               or a strength that leaves no step           → a model "start_image": true; a higher --strength
+          no_start_image       (start-image --strength) the rack holds no starting image
+                                                                           → start-image <image|i7>
           solver               --solver without More Solvers, or on a model that walks Euler only
                                                                            → leave it out
           detail               --detail more|most on a model without Detail (Anima, Krea 2)
@@ -1225,6 +1279,8 @@ package enum RemoteControlHelp {
       enlarge i7 [--download]                  l'image ×4, par la super-résolution de macOS → son image (i8)
       rewrite "<texte>" [--for ID]             « Réécrire » de l'Atelier : un prompt réécrit pour un modèle → son texte
       describe <image|i7> [--for ID]           « Décrire » de l'Atelier : une image racontée en prompt → son texte
+      start-image [<image|i7>] [--strength S] · start-image --remove
+                                               l'image de départ du rack (img2img), comme l'Atelier la porte
       remove i7 [i8 …]                         Retirer de l'historique · undo [--redo] : ⌘Z, ⇧⌘Z
       again <i7|fichier.png> · reuse <i7|fichier.png> Rendre à nouveau (même graine) · Reprendre ces réglages (une image, ou un PNG d'un autre jour)
       crop i7 --box X,Y,W,H | --ratio P:Q      Recadrer… → une nouvelle image (i8)
@@ -1243,6 +1299,9 @@ package enum RemoteControlHelp {
 
     ÉDITER : silicontrol add --model qwen-image-2.1 --ref photo.png --ref chien.png "put the dog of image 2 next to her"
       jusqu'à 3 --ref, dans l'ordre ; le premier est l'image 1, celle qu'on édite (help edit)
+
+    PARTIR D'UNE IMAGE (img2img) : silicontrol add --image photo.png --strength 0.65 "a lighthouse at dusk"
+      Z-Image, Anima et Krea 2 ; 0 garde l'image, 1 l'ignore (help start-image)
 
     AUTRES PAGES : help edit · help errors · help recipes · help all (toute la référence d'un coup)
     Les commandes, options et clés JSON sont en anglais ; seuls les textes sont traduits.
@@ -1325,6 +1384,8 @@ package enum RemoteControlHelp {
                       qu'il n'est pas installé
         max_references → combien de --ref il lit au plus (Qwen-Image-2.1 3, les autres 0) ;
                       null tant qu'il n'est pas installé
+        start_image → "start_image": true quand le modèle part d'une image (img2img : add --image,
+                      start-image) — Z-Image, Anima, Krea 2 ; absent tant qu'il n'est pas installé
         formats     → les formats conseillés ; tout WxH valide est accepté (help add)
         accelerators → les « Accélérateurs » de la boîte DiT pour la version installée : true = une
                       part du DiT sur le Neural Engine et les unités tensorielles du GPU, là où la
@@ -1509,6 +1570,17 @@ package enum RemoteControlHelp {
                               images par leur numéro (« image 1 », « image 2 ») : Qwen-Image-2.1
                               les lit comme <image1>, <image2>. Ne pas donner de format : la sortie
                               suit alors l'image 1 (help edit).
+          --image IMAGE|i7    img2img : le rendu part de cette image (un fichier, ou une image de
+                              l'historique) au lieu du bruit, et garde sa composition. Seulement
+                              pour un modèle "start_image": true (Z-Image, Anima, Krea 2) ; pas
+                              avec --ref. Ne pas donner de format : la sortie prend le format du
+                              modèle le plus proche des proportions de l'image ; tout format est
+                              accepté, l'image le remplit alors et son centre est gardé. Le rack
+                              prend l'image, comme « start-image » (help start-image).
+          --strength S        avec --image : jusqu'où le rendu s'en éloigne — la strength de
+                              diffusers, 0.65 ou 65%, au-dessus de 0 et au plus 1 (1 ignore
+                              l'image). Défaut 0.65. Travaux et images disent "strength" et
+                              "start_image".
           --preview, --no-preview
                               un aperçu à chaque pas dans l'app (n'écrit rien). Défaut : l'interrupteur
                               « Aperçu à chaque pas » de l'app.
@@ -1550,7 +1622,7 @@ package enum RemoteControlHelp {
           Avec --wait : une ligne "type": "added" par travail, puis les lignes de « wait » pour tous.
 
         ÉCHECS : usage, prompt, model, solver, detail, accelerators, lora, format, steps, edit, ref, img2img
-        (--image/--strength : l'app n'en fait pas), subject (un sujet nommé que le prompt cite,
+        (--image sur un modèle qui ne part pas d'une image, ou une force qui ne laisse aucun pas), subject (un sujet nommé que le prompt cite,
         help subjects), queue_full (64 en attente, ou pas assez de place pour toutes les
         alternatives), busy (une installation tourne : pas de rendu avant qu'elle soit finie), write.
 
@@ -1888,6 +1960,41 @@ package enum RemoteControlHelp {
         n'est pas dans l'historique).
         """,
 
+        "start-image": """
+        silicontrol start-image [<image|i7>] [--strength S]
+        silicontrol start-image --remove
+
+        L'IMAGE DE DÉPART DU RACK (img2img) — ce que « Porter dans le rack » de l'Atelier met dans la boîte
+        Images du rack quand une image a le rôle de départ, et ce que cette boîte retouche. Seulement pour
+        un modèle qui part d'une image ("start_image": true dans « models » : Z-Image, Anima, Krea 2).
+        Qwen-Image-2.1 édite par référence à la place (--ref, help edit).
+
+          start-image                  ce que le rack tient
+          start-image IMAGE|i7         porte une image (un fichier, ou une image de l'historique) : les
+                                       rendus suivants partent d'elle. La taille prend le format du
+                                       modèle le plus proche de ses proportions, à l'échelle du rack —
+                                       et reste libre.
+          … --strength S               avec elle, sa force ; seul, retouche celle de l'image portée
+          start-image --remove         la retire : les rendus suivants partent du bruit
+
+        LA FORCE est la strength de diffusers : jusqu'où le rendu s'éloigne de l'image. 0.65 ou 65%,
+        au-dessus de 0 et au plus 1 : basse, elle garde sa composition et ses couleurs ; 1 l'ignore. Elle
+        compte en pas : à 8 pas, 0.65 en redessine 6 (0.63 et 0.74 aussi). Défaut 0.65 (provisoire).
+        Gardée au centième : le PNG l'écrit ("Denoising strength"), « reuse » la rend — l'image
+        elle-même n'est pas dans le fichier.
+
+        RÉPONSE
+          {"ok": true, "rack": {"model": "z-image", "width": 1024, "height": 1024, …,
+            "start_image": {"name": "photo.png", "width": 3024, "height": 4032, "strength": 0.65,
+                            "used": true, "redrawn_steps": 6, "of_steps": 8}}}
+          "start_image" : null quand le rack n'en tient pas ; "used": false quand le modèle du rack ne
+          part pas d'une image (elle part alors au prochain changement de modèle). « status » dit pareil.
+
+        ÉCHECS : img2img (le modèle du rack ne part pas d'une image), no_start_image (--strength seul,
+        sans image portée), ref (image illisible ou absente), unknown_image, usage, remote (la fenêtre
+        calcule sur un autre Mac : pas encore offert là).
+        """,
+
         "subjects": """
         SUJETS NOMMÉS — silicontrol subjects [add … | remove NOM]
 
@@ -2201,7 +2308,10 @@ package enum RemoteControlHelp {
           edit                 --ref sur un modèle sans édition, ou plus de --ref qu'il n'en lit
                                                                            → un modèle "edit": true ; son "max_references"
           ref                  image de référence, ou à décrire, illisible  → vérifier le chemin
-          img2img              --image / --strength : pas dans l'app        → les retirer
+          img2img              (add, start-image) --image sur un modèle qui ne part pas d'une image,
+                               ou une force qui ne laisse aucun pas        → un modèle "start_image": true ; une --strength plus haute
+          no_start_image       (start-image --strength) le rack ne tient aucune image de départ
+                                                                           → start-image <image|i7>
           solver               --solver hors du mode développeur, ou sur un modèle qui ne fait
                                qu'Euler                                    → le retirer
           detail               --detail more|most sur un modèle sans Détail (Anima, Krea 2)

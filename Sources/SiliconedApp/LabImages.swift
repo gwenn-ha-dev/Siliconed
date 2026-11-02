@@ -10,6 +10,8 @@
 //
 // A **plain image** is dropped, opened, or sent from the history; its menu says what the render makes of it
 // (`LabInputs.Role`): the starting image (image 1, which gives the format), a reference, or nothing (« describe only »).
+// For a model that starts from an image (img2img), the tile of an image to describe offers « Start From This Image », and the
+// starting image's tile carries its strength, 0 to 100 % — the rack's Images box receives both.
 // A **subject** is an image that has a name, a kind and a frame (`SubjectSheet.swift`): it goes to the render only when the
 // text cites it by `@name`, and takes the places after the images the roles send. Describe is the language model's, Name… opens
 // the sheet, × removes. Nothing is written to disk.
@@ -57,6 +59,11 @@ struct LabImages: View {
     }
 
     private var hint: LocalizedStringKey {
+        if model.startIsImg2Img {
+            return model.pictures.isEmpty
+                ? "Drop an image here to describe it, or to start the render from it."
+                : "The render can start from one image: it keeps its composition, the strength says how far it moves away. The others stay here, to be described."
+        }
         if model.capacity == 0 {
             return "This model does not read images: they stay here, to be described."
         }
@@ -129,6 +136,12 @@ private struct PictureTile: View {
             Image(nsImage: picture.thumbnail).resizable().scaledToFill()
                 .frame(width: LabTile.width, height: LabTile.picture).clipped()
                 .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                .overlay {
+                    // The starting image of an img2img, framed in the image wire's colour: the one the render starts from.
+                    if model.startIsImg2Img, picture.role == .start {
+                        RoundedRectangle(cornerRadius: 6, style: .continuous).strokeBorder(WireKind.image.color, lineWidth: 2)
+                    }
+                }
                 .overlay(alignment: .topLeading) { if let number { NumberBadge(text: String(number)) } }
                 .overlay(alignment: .topTrailing) {
                     Button { model.remove(picture) } label: {
@@ -142,6 +155,14 @@ private struct PictureTile: View {
                 .overlay { if model.describing == picture.id { ProgressView().controlSize(.small) } }
                 .accessibilityLabel(Text("An image of the lab"))
             roleMenu
+            if model.startIsImg2Img {
+                if picture.role == .start { StartStrength(model: model) }
+                else {
+                    Button("Start From This Image") { model.startFrom(picture) }
+                        .controlSize(.small)
+                        .help("The render starts from this image and keeps its composition")
+                }
+            }
             DescribeButton(model: model) { model.describe(picture) }
             Button("Name…") { model.name(picture) }
                 .buttonStyle(.link).controlSize(.small)
@@ -161,7 +182,29 @@ private struct PictureTile: View {
             Text(verbatim: (number.map { "\($0) · " } ?? "") + picture.role.label).lineLimit(1)
         }
         .menuStyle(.button).controlSize(.small)
-        .help(picture.role.explanation)
+        .help(picture.role.explanation(img2img: model.startIsImg2Img))
+    }
+}
+
+/// **The starting image's strength, on its tile**: what it will be carried with — the rack's slider retouches it afterwards.
+private struct StartStrength: View {
+    @Bindable var model: LabModel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 1) {
+            HStack {
+                Text("Strength").foregroundStyle(.secondary)
+                Spacer(minLength: 2)
+                Text(verbatim: StartWords.percent(model.startStrength)).monospacedDigit()
+                    .onTapGesture(count: 2) { model.setStartStrength(AppState.defaultStartStrength) }
+            }
+            .font(.caption)
+            Slider(value: Binding(get: { model.startStrength }, set: { model.setStartStrength($0) }), in: 0...1)
+                .controlSize(.mini)
+                .accessibilityLabel(Text("Strength"))
+                .accessibilityValue(Text(verbatim: StartWords.percent(model.startStrength)))
+        }
+        .help(StartWords.explanation(nil))
     }
 }
 
@@ -172,6 +215,12 @@ extension LabInputs.Role {
         case .reference: String(localized: "Reference", comment: "The role of an image the model sees as context")
         case .describeOnly: String(localized: "Describe only", comment: "The role of an image that goes nowhere")
         }
+    }
+
+    /// What the role does, for a model that starts from an image (img2img) or not.
+    func explanation(img2img: Bool) -> String {
+        if img2img, self == .start { return String(localized: "The image the render starts from: it keeps its composition; the size follows it.") }
+        return explanation
     }
 
     var explanation: String {

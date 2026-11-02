@@ -142,15 +142,18 @@ extension AppState {
         stopExploring()
         let base = imposed ?? (fixedSeed ? seed : UInt64.random(in: 0...UInt64(UInt32.max)))
         guard let g = try? grid(seed: base).get() else { return }
-        let settings = RenderSettings(identifier: identifier, modelName: card?.name ?? identifier, prompt: explorePrompt,
+        var settings = RenderSettings(identifier: identifier, modelName: card?.name ?? identifier, prompt: explorePrompt,
                                       format: exploreFormat, steps: steps, loras: exploresModels ? [] : activeLoRAs,
                                       references: references.count, detail: effectiveDetail, solver: effectiveSolver)
+        // The starting image the rack holds: every cell starts from it, as a click on Generate would.
+        if usedStart != nil { settings.strength = startStrength }
         followsRender = false
         if let mirror {
             do { try mirror.explore(g, settings: resolvingFaster(settings), references: references, stopAfter: exploreStop, accelerators: nil) }
             catch { problem = Problem(error); flash(Problem(error).text); return }
         } else {
-            enqueueGrid(g, settings: settings, references: references, previews: true, sketch: true, stopAfter: exploreStop)
+            enqueueGrid(g, settings: settings, references: references, previews: true, sketch: true, stopAfter: exploreStop,
+                        start: usedStart)
         }
         showsExploration = true
     }

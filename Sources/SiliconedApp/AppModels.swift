@@ -147,6 +147,9 @@ struct RenderSettings {
     /// give back, so that the same settings render the same image whatever the Settings switch says by then. `nil`: the model's
     /// choice when the job is queued (`AppState.fasterRendering(for:)`), fixed then.
     var fasterRendering: Bool? = nil
+    /// **img2img's strength** (`Request.strength`, diffusers'): set when the render starts from an image (`Job.start`), `nil` for
+    /// any other. What the PNG writes and « Redo » gives back with the image.
+    var strength: Double? = nil
     var isVariation: Bool { !variations.isEmpty }
 }
 
@@ -171,6 +174,8 @@ struct Entry: Identifiable {
     /// The edit's references it was rendered with — what « Variations » renders again. Shared with
     /// its job's other images (the same sources), never decoded here.
     var references: [ReferenceImage] = []
+    /// **The image it started from** (img2img, `RenderSettings.strength`): what « Variations » and « Redo » render again.
+    var start: ReferenceImage? = nil
     /// **A grid's sheet** (`Grid.swift`): its `settings` are what the cells share — the prompt as
     /// typed, braces included —, its `timings` the cells' sum, its `footprints` their peaks.
     var grid: GridInfo? = nil
@@ -217,7 +222,8 @@ struct Entry: Identifiable {
             ? String(localized: "\(settings.modelName) · \(String(width))×\(String(height)) · seed \(String(seed)) · variation · \(Figures.duration(seconds))")
             : String(localized: "\(settings.modelName) · \(String(width))×\(String(height)) · seed \(String(seed)) · \(Figures.duration(seconds))")
         // Only when it changes the image: Normal and Euler are every render's, they say nothing.
-        return base + (settings.detail == .normal ? "" : " · " + settings.detail.label)
+        return base + (settings.strength.map { " · " + StartWords.legend($0) } ?? "")
+            + (settings.detail == .normal ? "" : " · " + settings.detail.label)
             + (settings.solver == .euler ? "" : " · " + settings.solver.label)
             + (enlarged.map { " · " + String(localized: "enlarged ×\(String($0))") } ?? "")
     }
@@ -293,6 +299,8 @@ struct Job: Identifiable {
     let seeds: [UInt64]
     /// The edit's references, in order — image 1 is the one edited: re-read, not re-noised.
     let references: [ReferenceImage]
+    /// **The image it starts from** (img2img): re-noised to `settings.strength`, then denoised. `nil`: from noise.
+    var start: ReferenceImage? = nil
     let previews: Bool
     /// The model's default number of steps: `nil` in the request if it was not changed.
     let defaultSteps: Int?
@@ -313,7 +321,7 @@ struct Job: Identifiable {
     /// lengthens the sequence and every evaluation with it), with or without LoRA (the spectral turns off under a LoRA, and the LoRA weighs on
     /// every evaluation).
     var speedKey: String {
-        Speed.key(settings.identifier, settings.format, references: references.count, lora: !settings.loras.isEmpty)
+        Speed.key(settings.identifier, settings.format, references: references.count + (start == nil ? 0 : 1), lora: !settings.loras.isEmpty)
     }
 
     var name: String { "t\(ordinal)" }

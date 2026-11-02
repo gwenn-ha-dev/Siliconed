@@ -140,6 +140,8 @@ final class RemoteControl {
             .merging(r.isVariation ? ["variation": Self.json(r.variations)] : [:]) { a, _ in a }
             .merging(r.detail == .normal ? [:] : ["detail": r.detail.rawValue]) { a, _ in a }
             .merging(r.solver == .euler ? [:] : ["solver": r.solver.rawValue]) { a, _ in a }
+            // An img2img: the image it starts from, and the strength.
+            .merging(r.strength.map { ["strength": Response.number($0), "start_image": t.start?.name ?? ""] } ?? [:]) { a, _ in a }
             // What the job will ask, on a Mac whose map offers an accelerator: elsewhere, the answer is unchanged.
             .merging(app.acceleratorsOffered ? ["accelerators": t.accelerators ?? app.accelerators(for: r.identifier)] : [:]) { a, _ in a }
     }
@@ -165,6 +167,7 @@ final class RemoteControl {
             "references": r.references,
             "loras": r.loras.map { ["lora": Self.shortName($0.path), "strength": Response.number($0.strength)] }]
         if r.isVariation { o["variation"] = Self.json(r.variations) }
+        if let s = r.strength { o["strength"] = Response.number(s); o["start_image"] = e.start?.name ?? "" }
         if r.detail != .normal { o["detail"] = r.detail.rawValue }
         if r.solver != .euler { o["solver"] = r.solver.rawValue }
         // What the accelerators could do for it on the Mac that computed it: absent, fp32 throughout.
@@ -215,7 +218,8 @@ final class RemoteControl {
         var o: [String: Any] = ["ok": true, "library": app.library.root.path,
                                 "history_images": app.history.count,
                                 "faster_rendering": app.fasterRendering(for: app.identifier),
-                                "beta": betaState(), "writer": writerState()]
+                                "beta": betaState(), "writer": writerState(),
+                                "start_image": startJSON() ?? NSNull()]
         // The rack's « Accelerators » choice, on a Mac whose map offers one (elsewhere nothing is chosen).
         if app.acceleratorsOffered { o["accelerators"] = app.accelerators(for: app.identifier) }
         // The settings renders run on: a series compared across launches compares maps too.
@@ -305,9 +309,12 @@ final class RemoteControl {
             } else {
                 o["ready"] = true
                 o["variant"] = f.isImported ? NSNull() : b.variant(of: f.family).rawValue as Any
-                let max = (try? Model.named(f.id, in: b))?.chain.denoising.maxReferences ?? 0
+                let chain = (try? Model.named(f.id, in: b))?.chain
+                let max = chain?.denoising.maxReferences ?? 0
                 o["edit"] = max > 0
                 o["max_references"] = max
+                // img2img: the rack's starting image (`start-image`, `add --image`).
+                o["start_image"] = chain?.entries.contains { $0.kind == .image } ?? false
                 o["loras"] = b.loras(for: f.id).map { ["lora": Self.shortName($0.path), "name": $0.name] }
                 // The DiT box's « Accelerators », per installed version: only on a Mac whose map offers one.
                 if app.acceleratorsOffered { o["accelerators"] = app.accelerators(for: f.id) }

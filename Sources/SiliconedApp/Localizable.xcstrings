@@ -545,6 +545,86 @@
         }
       }
     },
+    "%@ doesn’t start from an image" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ geht von keinem Bild aus"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ no parte de una imagen"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ ne part pas d’une image"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ non parte da un’immagine"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@は画像から始められません"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 不能从图像开始"
+          }
+        }
+      }
+    },
+    "%@ doesn’t start from an image (--image)" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ geht von keinem Bild aus (--image)"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ no parte de una imagen (--image)"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ ne part pas d’une image (--image)"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ non parte da un’immagine (--image)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@は画像から始められません（--image）"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 不能从图像开始（--image）"
+          }
+        }
+      }
+    },
     "%@ doesn’t start from an image." : {
       "localizations" : {
         "de" : {
@@ -4243,6 +4323,46 @@
         }
       }
     },
+    "--image and --ref don’t go together" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "--image und --ref passen nicht zusammen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "--image y --ref no van juntos"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "--image et --ref ne vont pas ensemble"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "--image e --ref non vanno insieme"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "--imageと--refは併用できません"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "--image 与 --ref 不能同时使用"
+          }
+        }
+      }
+    },
     "--kind expects one of %@, not \"%@\"" : {
       "localizations" : {
         "de" : {
@@ -4369,42 +4489,42 @@
         }
       }
     },
-    "--ref <image> for editing (a model with \"edit\": true)" : {
+    "--ref <image> to edit it (help edit)" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "--ref <Bild> zum Bearbeiten (ein Modell mit \"edit\": true)"
+            "value" : "--ref <Bild>, um es zu bearbeiten (help edit)"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "--ref <imagen> para editar (un modelo con \"edit\": true)"
+            "value" : "--ref <imagen> para editarla (help edit)"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "--ref <image> pour éditer (un modèle \"edit\": true)"
+            "value" : "--ref <image> pour l’éditer (help edit)"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "--ref <immagine> per modificare (un modello \"edit\": true)"
+            "value" : "--ref <immagine> per modificarla (help edit)"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "編集用の --ref <image>（\"edit\": true のモデル）"
+            "value" : "--ref <画像> で編集します（help edit）"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "--ref <image> 用于编辑（\"edit\": true 的模型）"
+            "value" : "--ref <图像> 来编辑它（help edit）"
           }
         }
       }
@@ -4571,6 +4691,86 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "--steps 需要 1 到 %lld 的整数，而不是“%@”"
+          }
+        }
+      }
+    },
+    "--strength expects a number above 0 and at most 1 (0.65 or 65%%), not \"%@\"" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "--strength erwartet eine Zahl über 0 und höchstens 1 (0.65 oder 65%%), nicht \"%@\""
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "--strength espera un número mayor que 0 y como mucho 1 (0.65 o 65%%), no \"%@\""
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "--strength attend un nombre au-dessus de 0 et au plus 1 (0.65 ou 65%%), pas \"%@\""
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "--strength vuole un numero sopra 0 e al massimo 1 (0.65 o 65%%), non \"%@\""
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "--strengthには0より大きく1以下の数を指定してください（0.65または65%%）。\"%@\"は不可"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "--strength 需要大于 0 且不超过 1 的数（0.65 或 65%%），而不是 \"%@\""
+          }
+        }
+      }
+    },
+    "--strength goes with --image" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "--strength gehört zu --image"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "--strength va con --image"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "--strength va avec --image"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "--strength va con --image"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "--strengthは--imageと一緒に使います"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "--strength 须与 --image 一起使用"
           }
         }
       }
@@ -7857,6 +8057,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在向“%@”询问编辑尺寸…"
+          }
+        }
+      }
+    },
+    "At this strength the image would come back unchanged: raise it." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bei dieser Stärke käme das Bild unverändert zurück: Erhöhen Sie sie."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Con esta fuerza la imagen volvería sin cambios: súbela."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "À cette force, l’image reviendrait telle quelle : montez-la."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Con questa forza l’immagine tornerebbe invariata: alzala."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この強さでは画像がそのまま戻ってきます。強さを上げてください。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在此强度下图像会原样返回：请调高强度。"
           }
         }
       }
@@ -13560,6 +13800,46 @@
         }
       }
     },
+    "Drop an image here to describe it, or to start the render from it." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Legen Sie hier ein Bild ab, um es zu beschreiben oder das Rendern davon ausgehen zu lassen."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Suelta aquí una imagen para describirla, o para que el renderizado parta de ella."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Déposez une image ici pour la décrire, ou pour que le rendu parte d’elle."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trascina qui un’immagine per descriverla, o per far partire il rendering da essa."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ここに画像をドロップすると、説明させたり、レンダリングの開始画像にしたりできます。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "将图像拖到这里，可以描述它，或让渲染从它开始。"
+          }
+        }
+      }
+    },
     "Drop an image here to edit it." : {
       "localizations" : {
         "de" : {
@@ -15246,6 +15526,46 @@
         }
       }
     },
+    "Faithful" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Treu"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fiel"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fidèle"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fedele"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "忠実"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "忠实"
+          }
+        }
+      }
+    },
     "Fast and photographic. The one to start with." : {
       "localizations" : {
         "de" : {
@@ -16451,6 +16771,46 @@
         }
       }
     },
+    "Gives the rack a starting image." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gibt dem Rack ein Startbild."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Da al rack una imagen de partida."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Donne au rack une image de départ."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dà al rack un’immagine di partenza."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ラックに開始画像を渡します。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "为机架提供一张起始图像。"
+          }
+        }
+      }
+    },
     "Grid" : {
       "localizations" : {
         "de" : {
@@ -16577,6 +16937,52 @@
         }
       }
     },
+    "Here: %@ of the %@ steps are redrawn." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hier: %@ der %@ Schritte werden neu gezeichnet."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Here: %1$@ of the %2$@ steps are redrawn."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aquí: se redibujan %@ de los %@ pasos."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ici : %@ des %@ pas sont redessinés."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Qui: %@ dei %@ passi vengono ridisegnati."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この設定では%@/%@ステップが描き直されます。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此处：%@ 个步骤中的 %@ 个将被重绘。"
+          }
+        }
+      }
+    },
     "How each step moves to the next, with the same steps: Euler is the one this model was distilled for" : {
       "localizations" : {
         "de" : {
@@ -16613,6 +17019,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "每一步如何过渡到下一步，步数相同：Euler 是此模型蒸馏时所用的求解器"
+          }
+        }
+      }
+    },
+    "How far the render moves away from the starting image: low keeps its composition and colours, %@ ignores it." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wie weit sich das Rendern vom Startbild entfernt: niedrig behält es Komposition und Farben, bei %@ ignoriert es das Bild."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cuánto se aleja el renderizado de la imagen de partida: baja, conserva su composición y sus colores; al %@, la ignora."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Jusqu’où le rendu s’éloigne de l’image de départ : faible, il garde sa composition et ses couleurs ; à %@, il l’ignore."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quanto il rendering si allontana dall’immagine di partenza: bassa, ne conserva composizione e colori; al %@, la ignora."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "レンダリングが開始画像からどれだけ離れるか。低いと構図と色を保ち、%@では画像を無視します。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "渲染离起始图像有多远：低时保留其构图和色彩，为 %@ 时忽略它。"
           }
         }
       }
@@ -27448,6 +27894,46 @@
         }
       }
     },
+    "Remove: the next render starts from noise" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Entfernen: Das nächste Rendern geht vom Rauschen aus"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quitar: el próximo renderizado parte del ruido"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Retirer : le prochain rendu part du bruit"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rimuovi: il prossimo rendering parte dal rumore"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "削除：次のレンダリングはノイズから始まります"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移除：下次渲染将从噪声开始"
+          }
+        }
+      }
+    },
     "Removed" : {
       "localizations" : {
         "de" : {
@@ -28072,6 +28558,46 @@
         }
       }
     },
+    "Replaces the rack’s prompt (⌘Z brings it back) and gives it a starting image." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ersetzt den Prompt des Racks (⌘Z holt ihn zurück) und gibt ihm ein Startbild."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sustituye el prompt del rack (⌘Z lo recupera) y le da una imagen de partida."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remplace le prompt du rack (⌘Z le rétablit) et lui donne une image de départ."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sostituisce il prompt del rack (⌘Z lo ripristina) e gli dà un’immagine di partenza."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ラックのプロンプトを置き換え（⌘Zで元に戻せます）、開始画像を渡します。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "替换机架中的提示词（按 ⌘Z 可恢复），并为其提供起始图像。"
+          }
+        }
+      }
+    },
     "Replaces the rack’s prompt (⌘Z brings it back) and its images (they can’t be brought back)." : {
       "localizations" : {
         "de" : {
@@ -28112,6 +28638,46 @@
         }
       }
     },
+    "Replaces the rack’s prompt (⌘Z brings it back) and its starting image (it can’t be brought back)." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ersetzt den Prompt des Racks (⌘Z holt ihn zurück) und sein Startbild (es lässt sich nicht zurückholen)."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sustituye el prompt del rack (⌘Z lo recupera) y su imagen de partida (no se puede recuperar)."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remplace le prompt du rack (⌘Z le rétablit) et son image de départ (elle ne peut pas être rétablie)."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sostituisce il prompt del rack (⌘Z lo ripristina) e la sua immagine di partenza (non si può ripristinare)."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ラックのプロンプトと開始画像を置き換えます（プロンプトは⌘Zで元に戻せますが、開始画像は戻せません）。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "替换机架中的提示词和起始图像（提示词可按 ⌘Z 恢复，起始图像无法恢复）。"
+          }
+        }
+      }
+    },
     "Replaces the rack’s prompt. ⌘Z in its field brings it back." : {
       "localizations" : {
         "de" : {
@@ -28148,6 +28714,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "替换机架中的提示词。在其栏中按 ⌘Z 可恢复。"
+          }
+        }
+      }
+    },
+    "Replaces the rack’s starting image. It can’t be brought back." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ersetzt das Startbild des Racks. Es lässt sich nicht zurückholen."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sustituye la imagen de partida del rack. No se puede recuperar."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remplace l’image de départ du rack. Elle ne peut pas être rétablie."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sostituisce l’immagine di partenza del rack. Non si può ripristinare."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ラックの開始画像を置き換えます。元に戻すことはできません。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "替换机架中的起始图像。无法恢复。"
           }
         }
       }
@@ -28308,6 +28914,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "请报告此问题：App 构建了引擎拒绝的处理链。"
+          }
+        }
+      }
+    },
+    "Reset to %@" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Auf %@ zurücksetzen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restablecer a %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Revenir à %@"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ripristina a %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ に戻す"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "恢复为 %@"
           }
         }
       }
@@ -31147,6 +31793,46 @@
         }
       }
     },
+    "Start From This Image" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Von diesem Bild ausgehen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Partir de esta imagen"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Partir de cette image"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Parti da questa immagine"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この画像から始める"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "从此图像开始"
+          }
+        }
+      }
+    },
     "Start again: the damaged file was thrown away." : {
       "localizations" : {
         "de" : {
@@ -31183,6 +31869,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "请重新开始：已损坏的文件已丢弃。"
+          }
+        }
+      }
+    },
+    "Starting Image" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Startbild"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Imagen de partida"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Image de départ"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Immagine di partenza"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "開始画像"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "起始图像"
           }
         }
       }
@@ -31950,6 +32676,86 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "强度"
+          }
+        }
+      }
+    },
+    "Strength %@" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stärke %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fuerza %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Force %@"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Forza %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "強さ %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "强度 %@"
+          }
+        }
+      }
+    },
+    "Strength — double-click for %@" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stärke — Doppelklick für %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fuerza — doble clic para %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Force — double-clic pour %@"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Forza — doppio clic per %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "強さ — ダブルクリックで%@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "强度——双击恢复为 %@"
           }
         }
       }
@@ -34647,6 +35453,86 @@
         }
       }
     },
+    "The image the render starts from: it keeps its composition, the strength says how far it moves away." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das Bild, von dem das Rendern ausgeht: Es behält seine Komposition, die Stärke sagt, wie weit es sich davon entfernt."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La imagen de la que parte el renderizado: conserva su composición, la fuerza dice cuánto se aleja de ella."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’image dont part le rendu : il garde sa composition, la force dit jusqu’où il s’en éloigne."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’immagine da cui parte il rendering: ne conserva la composizione, la forza dice quanto se ne allontana."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "レンダリングの開始画像です。構図は保たれ、強さはそこからどれだけ離れるかを決めます。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "渲染开始时的图像：保留其构图，强度决定离它有多远。"
+          }
+        }
+      }
+    },
+    "The image the render starts from: it keeps its composition; the size follows it." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das Bild, von dem das Rendern ausgeht: Es behält seine Komposition; das Format folgt ihm."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La imagen de la que parte el renderizado: conserva su composición; el formato la sigue."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’image dont part le rendu : il garde sa composition ; le format la suit."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’immagine da cui parte il rendering: ne conserva la composizione; il formato la segue."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "レンダリングの開始画像です。構図は保たれ、サイズはこの画像に合わせます。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "渲染开始时的图像：保留其构图；尺寸随它而定。"
+          }
+        }
+      }
+    },
     "The image to edit — or drop or paste it here (⌘V)" : {
       "localizations" : {
         "de" : {
@@ -36533,6 +37419,46 @@
         }
       }
     },
+    "The render can start from one image: it keeps its composition, the strength says how far it moves away. The others stay here, to be described." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das Rendern kann von einem Bild ausgehen: Es behält seine Komposition, die Stärke sagt, wie weit es sich davon entfernt. Die anderen bleiben hier, zum Beschreiben."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El renderizado puede partir de una imagen: conserva su composición, la fuerza dice cuánto se aleja de ella. Las demás se quedan aquí, para describirlas."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le rendu peut partir d’une image : il garde sa composition, la force dit jusqu’où il s’en éloigne. Les autres restent ici, pour être décrites."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il rendering può partire da un’immagine: ne conserva la composizione, la forza dice quanto se ne allontana. Le altre restano qui, da descrivere."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "レンダリングは1枚の画像から始められます。構図は保たれ、強さはそこからどれだけ離れるかを決めます。ほかの画像はここに残り、説明に使えます。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "渲染可以从一张图像开始：保留其构图，强度决定离它有多远。其他图像留在这里，用于描述。"
+          }
+        }
+      }
+    },
     "The render in progress" : {
       "localizations" : {
         "de" : {
@@ -36569,6 +37495,86 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在进行的生成"
+          }
+        }
+      }
+    },
+    "The render starts from this image and keeps its composition" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das Rendern geht von diesem Bild aus und behält seine Komposition"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El renderizado parte de esta imagen y conserva su composición"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le rendu part de cette image et garde sa composition"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il rendering parte da questa immagine e ne conserva la composizione"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "レンダリングはこの画像から始まり、構図を保ちます"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "渲染从这张图像开始，并保留其构图"
+          }
+        }
+      }
+    },
+    "The render starts from this image and keeps its composition. The size can differ: the centre is kept." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das Rendern geht von diesem Bild aus und behält seine Komposition. Das Format kann abweichen: Die Mitte bleibt erhalten."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El renderizado parte de esta imagen y conserva su composición. El formato puede ser otro: se conserva el centro."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le rendu part de cette image et garde sa composition. Le format peut différer : le centre est gardé."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il rendering parte da questa immagine e ne conserva la composizione. Il formato può essere diverso: si conserva il centro."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "レンダリングはこの画像から始まり、構図を保ちます。サイズが違っても中央が残ります。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "渲染从这张图像开始，并保留其构图。尺寸可以不同：保留中心部分。"
           }
         }
       }
@@ -36969,6 +37975,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "silicontrol 命令未安装。"
+          }
+        }
+      }
+    },
+    "The size follows the starting image’s proportions; it stays free in the rack, which keeps the centre." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das Format folgt den Proportionen des Startbilds; im Rack bleibt es frei, die Mitte bleibt erhalten."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El formato sigue las proporciones de la imagen de partida; queda libre en el rack, que conserva el centro."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le format suit les proportions de l’image de départ ; il reste libre dans le rack, qui garde le centre."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il formato segue le proporzioni dell’immagine di partenza; resta libero nel rack, che conserva il centro."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サイズは開始画像の縦横比に合わせます。ラックでは自由に変えられ、中央が残ります。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "尺寸随起始图像的比例而定；在机架中仍可自由更改，并保留中心部分。"
           }
         }
       }
@@ -40313,6 +41359,46 @@
         }
       }
     },
+    "To start from an image, choose it in the Prompt Lab" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Um von einem Bild auszugehen, wählen Sie es im Prompt-Labor"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Para partir de una imagen, elígela en el laboratorio de prompts"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pour partir d’une image, choisissez-la dans l’atelier de prompts"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Per partire da un’immagine, sceglila nel laboratorio dei prompt"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "画像から始めるには、プロンプトラボで選んでください"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要从图像开始，请在提示词实验室中选择它"
+          }
+        }
+      }
+    },
     "Too small: %@ px on a side, %@ px at least." : {
       "localizations" : {
         "de" : {
@@ -40635,6 +41721,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "将要编辑的图像转换为 DiT 所使用的紧凑形式，即潜变量"
+          }
+        }
+      }
+    },
+    "Turns the starting image into the latent the DiT starts from, noised to the strength" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Macht aus dem Startbild den Latent, von dem der DiT ausgeht, verrauscht nach der Stärke"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Convierte la imagen de partida en el latente del que parte el DiT, con ruido según la fuerza"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fait de l’image de départ le latent dont part le DiT, bruité selon la force"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trasforma l’immagine di partenza nel latente da cui parte il DiT, con rumore secondo la forza"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "開始画像を、DiTが始める潜在表現に変換し、強さに応じてノイズを加えます"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "将起始图像转为 DiT 开始时的潜变量，并按强度加噪"
           }
         }
       }
@@ -42977,6 +44103,86 @@
         }
       }
     },
+    "a starting image (--image) is not offered while the window computes on “%@”" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ein Startbild (--image) wird nicht angeboten, solange das Fenster auf „%@“ rechnet"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "una imagen de partida (--image) no se ofrece mientras la ventana calcula en «%@»"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "une image de départ (--image) n’est pas offerte quand la fenêtre calcule sur « %@ »"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "un’immagine di partenza (--image) non è offerta mentre la finestra calcola su «%@»"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ウインドウが「%@」で計算している間は開始画像（--image）を使えません"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "窗口在“%@”上计算时不提供起始图像（--image）"
+          }
+        }
+      }
+    },
+    "a starting image is not offered while the window computes on “%@”" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ein Startbild wird nicht angeboten, solange das Fenster auf „%@“ rechnet"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "una imagen de partida no se ofrece mientras la ventana calcula en «%@»"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "une image de départ n’est pas offerte quand la fenêtre calcule sur « %@ »"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "un’immagine di partenza non è offerta mentre la finestra calcola su «%@»"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ウインドウが「%@」で計算している間は開始画像を使えません"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "窗口在“%@”上计算时不提供起始图像"
+          }
+        }
+      }
+    },
     "after one exploration" : {
       "localizations" : {
         "de" : {
@@ -44701,6 +45907,46 @@
         }
       }
     },
+    "from an image, %@" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "von einem Bild, %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "a partir de una imagen, %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "d’après une image, %@"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "da un’immagine, %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "画像から、%@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "来自图像，%@"
+          }
+        }
+      }
+    },
     "g%@ is not the exploration shown (%@): a new one replaces the last" : {
       "localizations" : {
         "de" : {
@@ -45909,6 +47155,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "在“silicontrol models”中确有 \"edit\": true 的模型"
+          }
+        }
+      }
+    },
+    "models that do have \"start_image\": true in \"silicontrol models\"" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modelle, die in „silicontrol models“ tatsächlich \"start_image\": true haben"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "los modelos que sí tienen \"start_image\": true en «silicontrol models»"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "modèles qui ont bien \"start_image\": true dans « silicontrol models »"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "modelli che hanno davvero \"start_image\": true in «silicontrol models»"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "\"start_image\": true を持つモデル（「silicontrol models」で確認）"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在“silicontrol models”中确有 \"start_image\": true 的模型"
           }
         }
       }
@@ -48599,46 +49885,6 @@
         }
       }
     },
-    "the app does no img2img (--image, --strength)" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "die App macht kein img2img (--image, --strength)"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "la app no hace img2img (--image, --strength)"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "l’app ne fait pas d’img2img (--image, --strength)"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "l’app non fa img2img (--image, --strength)"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Appはimg2imgに対応していません（--image、--strength）"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "此 App 不支持 img2img（--image、--strength）"
-          }
-        }
-      }
-    },
     "the app edits up to 1024² of area, not %@x%@" : {
       "localizations" : {
         "de" : {
@@ -49287,6 +50533,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "队列已满（%lld 个任务）"
+          }
+        }
+      }
+    },
+    "the rack holds no starting image" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "das Rack hält kein Startbild"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "el rack no tiene imagen de partida"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "le rack ne tient aucune image de départ"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "il rack non ha un’immagine di partenza"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ラックに開始画像がありません"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "机架中没有起始图像"
           }
         }
       }

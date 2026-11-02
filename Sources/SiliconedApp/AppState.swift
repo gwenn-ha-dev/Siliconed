@@ -247,6 +247,13 @@ final class AppState {
     /// At most the denoiser's `maxReferences`. Added by the box, a drop, « Edit This Image », or carried by
     /// the Prompt Lab (the starting image, the references, the subjects the text cites: `Lab.swift`).
     var references: [ReferenceImage] = []
+    /// **The image the render starts from** (img2img: Z-Image, Anima, Krea 2 — `startsFromImage`), carried by the Prompt Lab
+    /// (`Lab.swift`) or `silicontrol start-image`, shown with its strength in the rack's Images box. `nil`: from noise. Dropped
+    /// when the rack takes a model that does not start from an image, as the references a model does not read are.
+    var startImage: ReferenceImage?
+    /// **Its strength** (diffusers' `strength`, `StartImage`): how far the render moves from the image — retouched in the rack
+    /// between two renders. In hundredths.
+    var startStrength = AppState.defaultStartStrength
     var steps = 8
     /// **More detail** (`Detail`): Normal is the render as the model makes it. What a render takes is
     /// `effectiveDetail`: on a model that offers none (Anima, Krea 2: `DenoisingModule.acceptsDetail`), Normal.

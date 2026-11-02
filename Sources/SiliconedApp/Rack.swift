@@ -2,8 +2,9 @@
 //
 //     ┌ Images ─────────────────┐   only if the model edits: the images the prompt works on, 1 to 3,
 //   ┌─┤ ▣ ▣ +                   ├─┐ numbered (the Prompt Lab can carry them here, with the prompt
-//   │ │                         │ │ that names them: `Lab.swift`)
-//   │ └─────────────────────────┘ │
+//   │ │                         │ │ that names them: `Lab.swift`) — or, on a model that starts from an
+//   │ └─────────────────────────┘ │ image (img2img), only once the Lab has carried one: its thumbnail and
+//   │                             │ its strength (`StartImageNode`), wired to the image encoder alone
 //   │ ┌ Prompt ─────────────────┐ │ the text field itself, under what it names
 //   │ └──────────┬──────────────┘ │
 //   │ ┌Text encoder┐ ┌Image encoder┐
@@ -198,6 +199,7 @@ struct RackView: View {
         VStack(alignment: .leading, spacing: 18) {
             header
             if app.editingPossible { ImagesNode(app: app).node(.images) }
+            else if showsStart { StartImageNode(app: app).node(.images) }
             PromptNode(app: app).node(.prompt)
             HStack(alignment: .top, spacing: 10) {
                 textEncoder.node(.textEncoder)
@@ -216,12 +218,20 @@ struct RackView: View {
         .overlay { LinkEdge(app: app) }
     }
 
-    /// The chosen model edits by reference and has an image encoder: its box is drawn.
-    private var encodesImages: Bool { app.editingPossible && app.chain?.encoding != nil }
+    /// The chosen model edits by reference and has an image encoder — or starts from the image the rack holds: its box is drawn.
+    private var encodesImages: Bool { (app.editingPossible && app.chain?.encoding != nil) || showsStart }
+
+    /// A starting image is carried, and the model starts from it (img2img): the Images box shows it, wired to the encoder alone.
+    private var showsStart: Bool { !app.editingPossible && app.usedStart != nil }
 
     private var edges: [Edge] {
         let live = !app.references.isEmpty
         var e = [Edge(from: .prompt, to: .textEncoder, kind: .text, stage: .text)]
+        if showsStart {
+            // The text encoder does not see a starting image: only the image encoder reads it, and the DiT starts from its latent.
+            e.append(Edge(from: .images, to: .imageEncoder, kind: .image, stage: .image, rail: .right))
+            e.append(Edge(from: .imageEncoder, to: .dit, kind: .latent, stage: .denoising))
+        }
         if app.editingPossible {
             // Qwen-Image-2.1's encoder sees the images (`TextFormat.readsImages`): one more wire.
             if app.promptNamesImages { e.append(Edge(from: .images, to: .textEncoder, kind: .image, stage: .text, live: live, rail: .left)) }
@@ -319,10 +329,11 @@ struct RackView: View {
 
     private var imageEncoder: some View {
         StageBox(title: "Image encoder", symbol: "photo", state: app.state(of: .image),
-                 explanation: "Turns the images to edit into the compact form the DiT works in, the latent") {
+                 explanation: showsStart ? "Turns the starting image into the latent the DiT starts from, noised to the strength"
+                                         : "Turns the images to edit into the compact form the DiT works in, the latent") {
             ModuleSlot(name: app.moduleNames.encoding)
             WeightsTag(format: app.weightFormats?.vae)
-            Cost(app.references.isEmpty ? (nil, false) : app.stageCost(.image))
+            Cost(app.sentImages == 0 ? (nil, false) : app.stageCost(.image))
         }
     }
 

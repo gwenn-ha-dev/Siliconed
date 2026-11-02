@@ -23,17 +23,20 @@ extension AppState {
         // **One job per alternative, all at the same seeds**: a series compares the prompts, so
         // nothing else may differ. Each keeps the batch. Its history images carry the expanded prompt.
         enqueue(prompts.map { expanded in
-            let settings = RenderSettings(identifier: identifier, modelName: card?.name ?? identifier, prompt: expanded,
+            var settings = RenderSettings(identifier: identifier, modelName: card?.name ?? identifier, prompt: expanded,
                                           format: format, steps: steps, loras: loras.filter { !$0.path.isEmpty },
                                           references: references.count, variations: variations, detail: effectiveDetail,
                                           solver: effectiveSolver)
-            let used = references
+            let used = references, start = usedStart
+            if start != nil { settings.strength = startStrength }
             let plan = expectedPlan(steps: steps, format: format, withLoRA: loras.contains { !$0.path.isEmpty } || !plainSampling,
-                                    references: used.count)
-            return Job(ordinal: nextJobNumber(), settings: settings,
-                       seeds: (0..<max(1, batch)).map { firstNumber &+ UInt64($0) },
-                       references: used, previews: previews,
-                       defaultSteps: card?.defaultSteps, plan: plan)
+                                    references: used.count, strength: settings.strength)
+            var job = Job(ordinal: nextJobNumber(), settings: settings,
+                          seeds: (0..<max(1, batch)).map { firstNumber &+ UInt64($0) },
+                          references: used, previews: previews,
+                          defaultSteps: card?.defaultSteps, plan: plan)
+            job.start = start
+            return job
         })
     }
 
@@ -43,9 +46,11 @@ extension AppState {
     /// image kept by the run, not the history, and no sheet is drawn unless asked (`addSheet`).
     @discardableResult
     /// `owner`: another Mac's (`MirrorServer`), whose exploration is not shown here (`shows`).
+    /// `start`: the starting image every cell renders from (img2img, at `settings.strength`) — dropped by a cell whose model
+    /// does not start from one (a models axis).
     func enqueueGrid(_ grid: RenderGrid, settings: RenderSettings, references: [ReferenceImage], previews: Bool,
                      sketch: Bool = false, stopAfter: Int = 0, accelerators: Bool? = nil, owner: Data? = nil,
-                     shows: Bool = true) -> (run: GridRun, jobs: [Job]) {
+                     shows: Bool = true, start: ReferenceImage? = nil) -> (run: GridRun, jobs: [Job]) {
         lastGrid += 1
         let jobs = grid.cells.map { cell in
             var s = settings
@@ -63,10 +68,14 @@ extension AppState {
             if let model, !model.chain.denoising.solvers.contains(s.solver) { s.solver = .euler }
             // …and a cell whose model offers no Detail renders Normal.
             if let model, !model.chain.denoising.acceptsDetail { s.detail = .normal }
+            // …and a cell whose model does not start from an image renders from noise.
+            let cellStart = start != nil && model?.chain.entries.contains(where: { $0.kind == .image }) == true ? start : nil
+            if cellStart == nil { s.strength = nil }
             var plan = model.map { m in
                 let f = m.chain.denoising.space.factor
+                let first = s.strength.map { min(s.steps, Strength.startStep(steps: s.steps, strength: $0)) } ?? 0
                 let plan = m.chain.denoising.plan(height: s.format.height / f, width: s.format.width / f, steps: s.steps,
-                                                  start: 0, withLoRA: !s.loras.isEmpty || s.detail != .normal,
+                                                  start: first, withLoRA: !s.loras.isEmpty || s.detail != .normal,
                                                   faster: s.fasterRendering ?? fasterRendering(for: s.identifier))
                 return s.references > 0 ? plan.unreduced : plan
             }
@@ -76,6 +85,7 @@ extension AppState {
             if let stop { plan = plan?.sketched(stop) }
             var job = Job(ordinal: nextJobNumber(), settings: s, seeds: [cell.seed], references: used,
                           previews: previews, defaultSteps: card?.defaultSteps, plan: plan)
+            job.start = cellStart
             job.sketch = stop
             job.accelerators = accelerators
             job.owner = owner
@@ -339,10 +349,15 @@ extension AppState {
             let references = try await Task.detached(priority: .userInitiated) {
                 try sources.map { try $0.imageRGB() }
             }.value
+            // The starting image (img2img), decoded off the main thread too, as `siliconed-dev render --image` reads it; the
+            // request fills and crops it to the format at once (`Request.image`).
+            let startSource = settings.strength == nil ? nil : job.start
+            let start = try await Task.detached(priority: .userInitiated) { try startSource?.imageRGB() }.value
             var request = Request(settings.modelPrompt ?? settings.prompt, width: settings.format.width,
                                   height: settings.format.height, seed: job.seeds[0],
                                   steps: settings.steps == job.defaultSteps ? nil : settings.steps,
-                                  loras: loraEntries, previews: job.previews)
+                                  loras: loraEntries, image: start, strength: settings.strength ?? Strength.defaultValue,
+                                  previews: job.previews)
             request.references = references
             request.sketch = job.sketch
             request.detail = settings.detail
@@ -387,7 +402,7 @@ extension AppState {
                 case .image(_, let renderResult):
                     stageStates[.decoding] = .done
                     // The render against the map's prediction (`RenderLoop`): kept for the report and the next launch.
-                    checkMap(renderResult, model: model, references: references.count)
+                    checkMap(renderResult, model: model, references: references.count + (start == nil ? 0 : 1))
                     // The PNG and the thumbnail are made off the main thread; the engine has already
                     // moved on to the next image of the batch.
                     // A job `silicontrol add "@name"` translated: the PNG keeps the prompt typed, the model's beside it.
@@ -405,7 +420,7 @@ extension AppState {
                                         evaluations: renderResult.evaluations,
                                         settings: { var s = settings; s.offer = renderResult.offer; s.fasterRendering = renderResult.fasterRendering; return s }(),
                                         metadata: named ?? renderResult.metadata, references: job.references,
-                                        sketch: renderResult.sketch, owner: job.owner)
+                                        start: start == nil ? nil : job.start, sketch: renderResult.sketch, owner: job.owner)
                     // A sketch belongs to its exploration, not to the history.
                     if job.sketch != nil, let at = gridCells[job.ordinal] {
                         gridRuns[at.grid]?.entries[at.cell] = entry
@@ -467,12 +482,14 @@ extension AppState {
 
     /// The per-image plan that the chosen model's denoiser foresees for these settings.
     /// `withLoRA`: a LoRA or a Detail — either turns the spectral schedule off; so do references (an edit).
-    func expectedPlan(steps: Int, format: RecommendedFormat, withLoRA: Bool, references: Int) -> DenoisingPlan? {
+    /// `strength`: img2img's, when the render starts from an image — it starts that many steps in (`Strength.startStep`).
+    func expectedPlan(steps: Int, format: RecommendedFormat, withLoRA: Bool, references: Int, strength: Double? = nil) -> DenoisingPlan? {
         // A plan reads the settings (`EngineSettings.effective`, through the memory need): none before they are (`settingsRead`).
         guard settingsRead, let chain else { return nil }
         let f = chain.denoising.space.factor
+        let start = strength.map { min(steps, Strength.startStep(steps: steps, strength: $0)) } ?? 0
         let plan = chain.denoising.plan(height: format.height / f, width: format.width / f,
-                                        steps: steps, start: 0, withLoRA: withLoRA, faster: fasterRendering(for: identifier))
+                                        steps: steps, start: start, withLoRA: withLoRA, faster: fasterRendering(for: identifier))
         return references > 0 ? plan.unreduced : plan
     }
 
@@ -568,8 +585,9 @@ extension AppState {
         let card = cards.first { $0.id == entry.settings.identifier }
         let plan = (try? Model.named(entry.settings.identifier, in: library)).map { m in
             let f = m.chain.denoising.space.factor
+            let first = entry.settings.strength.map { min(entry.settings.steps, Strength.startStep(steps: entry.settings.steps, strength: $0)) } ?? 0
             let plan = m.chain.denoising.plan(height: entry.settings.format.height / f, width: entry.settings.format.width / f,
-                                              steps: entry.settings.steps, start: 0,
+                                              steps: entry.settings.steps, start: first,
                                               withLoRA: !entry.settings.loras.isEmpty || entry.settings.detail != .normal,
                                               faster: entry.settings.fasterRendering ?? fasterRendering(for: entry.settings.identifier))
             return entry.settings.references > 0 ? plan.unreduced : plan
@@ -577,8 +595,10 @@ extension AppState {
         let jobs = (0..<(count ?? batch)).map { _ in
             var settings = entry.settings
             settings.variations.append(Variation(seed: UInt64.random(in: 0...UInt64(UInt32.max)), strength: strength))
-            return Job(ordinal: nextJobNumber(), settings: settings, seeds: [entry.seed], references: entry.references,
-                       previews: previews, defaultSteps: card?.defaultSteps, plan: plan)
+            var job = Job(ordinal: nextJobNumber(), settings: settings, seeds: [entry.seed], references: entry.references,
+                          previews: previews, defaultSteps: card?.defaultSteps, plan: plan)
+            job.start = entry.start
+            return job
         }
         enqueue(jobs)
         return jobs
@@ -599,6 +619,13 @@ extension AppState {
         fixedSeed = true
         // After the seed: setting it drops a variation (`seed.didSet`).
         variations = entry.settings.variations
+        // The image it started from, with its strength — or none: « Redo » renders the same image, not an img2img of another.
+        if let s = entry.settings.strength, let start = entry.start, startsFromImage {
+            startImage = start
+            startStrength = s
+        } else {
+            startImage = nil
+        }
         if let g = entry.grid?.grid {
             // A sheet's prompt is the one typed, its groups the grid's axes: not escaped.
             setGridForm(g, prompt: entry.settings.prompt)
@@ -689,6 +716,8 @@ extension AppState {
             notes.append(String(localized: "\(model?.name ?? identifier) doesn’t offer Detail: Normal will be used."))
         }
         if let s = recipe.seed { seed = s; fixedSeed = true }
+        // An img2img's strength comes back to the rack; its image is not in the file (said above): the one carried, if any, stays.
+        if let s = recipe.strength { startStrength = StartImage.snapped(s) }
         // A variation is its seed's: without the seed, there is nothing to vary.
         variations = recipe.seed == nil ? [] : recipe.variations
         flash(String(localized: "Settings of \(file) restored"))

@@ -64,9 +64,13 @@ extension RemoteControl {
             case "--no-preview": d.previews = false
             case "--wait": d.wait = true
             case "--sketch": d.sketch = true
-            case "--image", "--strength":
-                throw Refusal("img2img", String(localized: "the app does no img2img (--image, --strength)"),
-                            help: String(localized: "--ref <image> for editing (a model with \"edit\": true)"))
+            case "--image": d.image = try value(a)
+            case "--strength":
+                let v = try value(a)
+                guard let s = StartImage.strength(v) else {
+                    throw Refusal("usage", String(localized: "--strength expects a number above 0 and at most 1 (0.65 or 65%), not \"\(v)\""))
+                }
+                d.strength = s
             default:
                 if a.hasPrefix("--") { throw Refusal("usage", String(localized: "unknown flag: \(a)")) }
                 positional.append(a)
@@ -172,6 +176,33 @@ extension RemoteControl {
             throw Refusal("prompt", p.title, help: p.suggestion)
         }
 
+        // The starting image (img2img): a model whose chain starts from one, never with references — one or the other.
+        var start: ReferenceImage?
+        if d.strength != nil, d.image == nil {
+            throw Refusal("usage", String(localized: "--strength goes with --image"), help: "silicontrol help add")
+        }
+        if let word = d.image {
+            guard model.chain.entries.contains(where: { $0.kind == .image }) else {
+                let name = card?.name ?? model.name
+                throw Refusal("img2img", String(localized: "\(name) doesn’t start from an image (--image)"),
+                              help: model.chain.denoising.maxReferences > 0
+                                  ? String(localized: "--ref <image> to edit it (help edit)")
+                                  : String(localized: "models that do have \"start_image\": true in \"silicontrol models\""))
+            }
+            guard d.references.isEmpty else {
+                throw Refusal("usage", String(localized: "--image and --ref don’t go together"), help: "silicontrol help add")
+            }
+            start = try startImage(word, cwd: cwd)
+            if d.format == nil, let start {
+                let fitting = (card?.formats ?? ModelCard.recommendedFormats).filter {
+                    app.card?.id != model.identifier || app.macNeeded($0, images: 1) == nil
+                }
+                if let f = StartImage.recommendedFormat(width: start.width, height: start.height, among: fitting, current: app.format) {
+                    d.format = (f.width, f.height)
+                }
+            }
+        }
+
         // The references, in order: files, or images of the history (`i7`). The first is image 1,
         // the one edited: with no format typed, the output takes the denoiser's (`editFormat`) —
         // the app's rule and the CLI's, so that a command and a click give the same image.
@@ -261,7 +292,13 @@ extension RemoteControl {
                         help: "--steps \(defaultSteps) (the model's \"default_steps\")")
         }
         let f = model.chain.denoising.space.factor
-        let plan = model.chain.denoising.plan(height: height / f, width: width / f, steps: steps, start: 0,
+        let strength = start == nil ? nil : StartImage.snapped(d.strength ?? AppState.defaultStartStrength)
+        let first = strength.map { min(steps, Strength.startStep(steps: steps, strength: $0)) } ?? 0
+        if strength != nil, first >= steps {
+            throw Refusal("img2img", String(localized: "At this strength the image would come back unchanged: raise it."),
+                          help: "--strength 0.65")
+        }
+        let plan = model.chain.denoising.plan(height: height / f, width: width / f, steps: steps, start: first,
                                                  withLoRA: !stack.isEmpty || d.detail != .normal, faster: app.fasterRendering(for: model.identifier))
         // One seed for the whole series, drawn once: the alternatives are compared at the same seeds.
         let firstNumber = d.seed ?? UInt64.random(in: 0...UInt64(UInt32.max))
@@ -272,7 +309,8 @@ extension RemoteControl {
             }
             let format = RecommendedFormat(width, height)
             try addGrid(d, prompt: prompt, model: model, card: card, format: format, steps: steps, stack: stack,
-                        references: references, seed: firstNumber, defaultSteps: defaultSteps, folder: folder, cwd: cwd, c)
+                        references: references, start: start, strength: strength,
+                        seed: firstNumber, defaultSteps: defaultSteps, folder: folder, cwd: cwd, c)
             return
         }
         let variants = alternatives.variants
@@ -289,6 +327,7 @@ extension RemoteControl {
                                           prompt: v.prompt, format: RecommendedFormat(width, height), steps: steps,
                                           loras: stack, references: references.count, detail: d.detail,
                                           solver: d.solver)
+            settings.strength = strength
             let used = app.namedJob(v.prompt, settings: &settings, references: references, model: model)
             var job = Job(ordinal: app.nextJobNumber(), settings: settings,
                           seeds: (0..<d.batch).map { firstNumber &+ UInt64($0) },
@@ -297,6 +336,7 @@ extension RemoteControl {
                           // them, the plan as it was.
                           defaultSteps: defaultSteps, plan: used.count > references.count ? plan.unreduced : plan)
             job.accelerators = d.accelerators
+            job.start = start
             return job
         }
         app.enqueue(jobs)
@@ -306,6 +346,9 @@ extension RemoteControl {
         app.restoreSettings(jobs[0].settings)
         app.prompt = prompt
         app.references = references
+        // The starting image too, or none: « Generate » would queue the same request.
+        app.startImage = start
+        if let strength { app.startStrength = strength }
         // A seed drawn here is a Random render, as after a click: the rack must not keep showing an old Fixed one.
         if let seed = d.seed { app.fixedSeed = true; app.seed = seed } else { app.fixedSeed = false }
 
@@ -339,7 +382,8 @@ extension RemoteControl {
     /// (`RenderGrid`), every step count of it checked by the denoiser, the queue's room — then one job
     /// per cell, and the sheet when the last one ends.
     private func addGrid(_ d: RenderOrder, prompt: String, model: Model, card: ModelCard?, format: RecommendedFormat,
-                         steps: Int, stack: [LoRASlot], references: [ReferenceImage], seed: UInt64,
+                         steps: Int, stack: [LoRASlot], references: [ReferenceImage], start: ReferenceImage?, strength: Double?,
+                         seed: UInt64,
                          defaultSteps: Int, folder: String?, cwd: String, _ c: Connection) throws {
         let g: RenderGrid
         do {
@@ -394,18 +438,21 @@ extension RemoteControl {
             throw Refusal("queue_full", String(localized: "\(n) jobs for the grid: the queue has room for \(room) (\(max) jobs)"),
                           help: "silicontrol wait, then retry")
         }
-        let settings = RenderSettings(identifier: model.identifier, modelName: card?.name ?? model.name, prompt: prompt,
+        var settings = RenderSettings(identifier: model.identifier, modelName: card?.name ?? model.name, prompt: prompt,
                                       format: format, steps: steps, loras: stack, references: references.count, detail: d.detail,
                                       solver: d.solver)
+        settings.strength = strength
         if d.sketch { app.stopExploring() }
         let (run, jobs) = app.enqueueGrid(g, settings: settings, references: references, previews: d.previews ?? app.previews,
-                                          sketch: d.sketch, accelerators: d.accelerators)
+                                          sketch: d.sketch, accelerators: d.accelerators, start: start)
         // The rack's tag of each model the cells render, as after a click.
         if let on = d.accelerators { for id in Set(jobs.map(\.settings.identifier)) { app.setAccelerators(on, for: id) } }
         // The form takes the grid, as after a click: settings, prompt as typed, edit images, axes.
         app.restoreSettings(settings)
         app.prompt = prompt
         app.references = references
+        app.startImage = start
+        if let strength { app.startStrength = strength }
         if let s = d.seed { app.fixedSeed = true; app.seed = s } else { app.fixedSeed = false }
         app.setGridForm(g, prompt: prompt)
 
@@ -426,5 +473,61 @@ extension RemoteControl {
             finish(c, ["ok": true, "grid": run.name, "columns": g.columns, "rows": g.rows, "jobs": added,
                        "estimate_s": total])
         }
+    }
+}
+
+// MARK: - The starting image
+
+extension RemoteControl {
+    /// **An image the remote control names as a starting image**: `i7` of the history (its PNG's bytes), or a file — read as
+    /// `siliconed-dev render --image` reads it.
+    func startImage(_ word: String, cwd: String) throws -> ReferenceImage {
+        if let entry = image(word) { return app.startImage(from: entry) }
+        let url = URL(fileURLWithPath: absolute(word, cwd))
+        guard let vignette = NSImage(contentsOf: url), vignette.isValid, let size = ReferenceImage.size(of: url) else {
+            let path = url.path
+            throw Refusal("ref", String(localized: "image unreadable or missing: \(path)"))
+        }
+        return ReferenceImage(source: .file(url), vignette: vignette, name: url.lastPathComponent,
+                              width: size.width, height: size.height)
+    }
+
+    /// **`start-image`**: the rack's starting image, as the Prompt Lab carries it and the rack's Images box retouches it —
+    /// `start-image` alone says what it holds; `start-image IMAGE|i7 [--strength S]` carries one (the size set to the nearest
+    /// recommended format, as « Carry to the Rack » does); `--strength S` alone retouches its strength; `--remove` takes it out.
+    func startImage(_ action: GestureOrder.StartImageAction, cwd: String) throws -> [String: Any] {
+        func refuseWithoutImg2Img() throws {
+            guard app.startsFromImage else {
+                let name = app.card?.name ?? app.identifier
+                throw Refusal("img2img", String(localized: "\(name) doesn’t start from an image"),
+                              help: app.editingPossible ? String(localized: "--ref <image> to edit it (help edit)")
+                                                        : String(localized: "models that do have \"start_image\": true in \"silicontrol models\""))
+            }
+        }
+        switch action {
+        case .status:
+            break
+        case .carry(let word, let strength):
+            try refuseWithoutImg2Img()
+            app.carryStart(try startImage(word, cwd: cwd), strength: strength)
+        case .strength(let s):
+            guard app.startImage != nil else {
+                throw Refusal("no_start_image", String(localized: "the rack holds no starting image"),
+                              help: "silicontrol start-image <image|i7>")
+            }
+            app.setStartStrength(s)
+        case .remove:
+            app.removeStart()
+        }
+        return ["ok": true, "rack": rackSettings()]
+    }
+
+    /// The starting image the rack holds, as the answers say it — `nil` when none.
+    func startJSON() -> [String: Any]? {
+        guard let s = app.startImage else { return nil }
+        var o: [String: Any] = ["name": s.name, "width": s.width, "height": s.height,
+                                "strength": Response.number(app.startStrength), "used": app.usedStart != nil]
+        if let r = app.startRedraws { o["redrawn_steps"] = r.redrawn; o["of_steps"] = r.of }
+        return o
     }
 }

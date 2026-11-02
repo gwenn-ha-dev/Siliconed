@@ -97,6 +97,8 @@ package enum GestureOrder: Equatable, Sendable {
     case compute(ComputeTarget)
     /// `library …`.
     case library(LibraryAction, confirmed: Bool)
+    /// `start-image …`: the rack's starting image (img2img), as the Prompt Lab carries it and the Images box retouches it.
+    case startImage(StartImageAction)
 
     package enum Removal: Equatable, Sendable {
         /// A model's id: a publisher's family is uninstalled, an imported model removed.
@@ -118,6 +120,15 @@ package enum GestureOrder: Equatable, Sendable {
         case local
     }
 
+    /// What `start-image` does: say what the rack holds, carry an image (a file, or `i7` of the history) with its strength or the
+    /// rack's, set the strength of the one carried, or take it out.
+    package enum StartImageAction: Equatable, Sendable {
+        case status
+        case carry(String, strength: Double?)
+        case strength(Double)
+        case remove
+    }
+
     package enum Failure: Error, Equatable, Sendable {
         /// Not the syntax; the associated value is the usage line.
         case usage(String)
@@ -128,7 +139,7 @@ package enum GestureOrder: Equatable, Sendable {
     }
 
     package static let verbs: Set<String> = ["remove", "undo", "again", "reuse", "crop", "finish", "sheet", "import", "uninstall",
-                                             "macs", "compute", "library"]
+                                             "macs", "compute", "library", "start-image"]
 
     package static func usage(_ command: String) -> String {
         switch command {
@@ -143,6 +154,7 @@ package enum GestureOrder: Equatable, Sendable {
         case "uninstall": "uninstall <model-id> [--yes] · uninstall lora <name> [--yes] · uninstall downloads [--yes]"
         case "macs": "macs [connect|disconnect NAME]"
         case "compute": "compute <NAME|this>"
+        case "start-image": "start-image [<image|i7>] [--strength 0.65] · start-image --remove"
         default: "library [move DIR|home|open DIR|local] [--yes]"
         }
     }
@@ -162,7 +174,7 @@ package enum GestureOrder: Equatable, Sendable {
         var words: [String] = []
         var yes = false
         var values: [String: String] = [:]
-        let valued: Set<String> = command == "crop" ? ["--box", "--ratio"] : []
+        let valued: Set<String> = command == "crop" ? ["--box", "--ratio"] : command == "start-image" ? ["--strength"] : []
         var i = 0
         while i < arguments.count {
             let a = arguments[i]
@@ -175,6 +187,7 @@ package enum GestureOrder: Equatable, Sendable {
             }
             if a == "--yes", takesYes(command, arguments) { yes = true; i += 1; continue }
             if command == "undo", a == "--redo" { values[a] = ""; i += 1; continue }
+            if command == "start-image", a == "--remove" { values[a] = ""; i += 1; continue }
             if a.hasPrefix("--"), a.count > 2, !a.contains(" ") { return .failure(.unknownFlag(a)) }
             words.append(a)
             i += 1
@@ -220,6 +233,21 @@ package enum GestureOrder: Equatable, Sendable {
         case "compute":
             guard let word = one() else { return .failure(.usage(line)) }
             return .success(.compute(word.lowercased() == "this" ? .thisMac : .mac(word)))
+        case "start-image":
+            var strength: Double?
+            if let v = values["--strength"] {
+                guard let s = StartImage.strength(v) else { return .failure(.badValue("--strength", v)) }
+                strength = s
+            }
+            if values["--remove"] != nil {
+                return words.isEmpty && strength == nil ? .success(.startImage(.remove)) : .failure(.usage(line))
+            }
+            switch (words.count, strength) {
+            case (0, nil): return .success(.startImage(.status))
+            case (0, let s?): return .success(.startImage(.strength(s)))
+            case (1, let s): return .success(.startImage(.carry(words[0], strength: s)))
+            default: return .failure(.usage(line))
+            }
         default:
             switch words.first {
             case nil: return .success(.library(.status, confirmed: false))

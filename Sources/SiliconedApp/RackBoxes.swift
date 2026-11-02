@@ -375,3 +375,76 @@ struct ImagesNode: View {
         .fixedSize(horizontal: false, vertical: true)
     }
 }
+
+/// **The image the render starts from** (img2img), on a model that starts from one: shown only once the Prompt Lab (or
+/// `silicontrol start-image`) has carried one — the rack has no empty slot for it, the Lab is where it is chosen. Its thumbnail,
+/// and its strength on a slider from 0 to 100 %, like a LoRA's: retouched between two renders. Low keeps the image's composition
+/// and colours, 100 % ignores it; the tooltip says how many of the steps the strength leaves. A file dropped here replaces it.
+struct StartImageNode: View {
+    @Bindable var app: AppState
+    @State private var hover = false
+
+    var body: some View {
+        PortBox(title: "Starting Image", symbol: "photo", kind: .image) {
+            Text(verbatim: StartWords.percent(app.startStrength))
+                .onTapGesture(count: 2) { app.setStartStrength(AppState.defaultStartStrength) }
+                .help("Strength — double-click for \(StartWords.percent(AppState.defaultStartStrength))")
+        } content: {
+            if let start = app.usedStart {
+                HStack(alignment: .center, spacing: 10) {
+                    thumbnail(start)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("Strength").font(.callout).foregroundStyle(.secondary)
+                        Slider(value: Binding(get: { app.startStrength }, set: { app.setStartStrength($0) }), in: 0...1)
+                            .controlSize(.small)
+                            .accessibilityLabel(Text("Strength"))
+                            .accessibilityValue(Text(verbatim: StartWords.percent(app.startStrength)))
+                        HStack {
+                            Text("Faithful")
+                            Spacer(minLength: 4)
+                            Text("Free")
+                        }
+                        .font(.caption2).foregroundStyle(.tertiary)
+                    }
+                    .help(StartWords.explanation(app.startRedraws))
+                }
+                Text(app.startBlocker ?? String(localized: "The render starts from this image and keeps its composition. The size can differ: the centre is kept."))
+                    .font(.caption).foregroundStyle(app.startBlocker == nil ? .secondary : Palette.failure)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .contextMenu {
+            Button("Reset to \(StartWords.percent(AppState.defaultStartStrength))") { app.setStartStrength(AppState.defaultStartStrength) }
+            Button("Replace…") { app.chooseStartReplacement() }
+            Divider()
+            Button("Remove", role: .destructive) { app.removeStart() }
+        }
+        .dropDestination(for: URL.self) { urls, _ in
+            guard let url = urls.first(where: { $0.isFileURL && !AppState.importable($0) }) else { return false }
+            app.replaceStart(with: url)
+            return true
+        }
+    }
+
+    private func thumbnail(_ start: ReferenceImage) -> some View {
+        Image(nsImage: start.vignette).resizable().scaledToFill()
+            .frame(width: ReferenceThumbnail.side, height: ReferenceThumbnail.side)
+            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 6, style: .continuous).strokeBorder(WireKind.image.color, lineWidth: 1.5))
+            .overlay(alignment: .topTrailing) {
+                if hover {
+                    Button { app.removeStart() } label: {
+                        Image(systemName: "xmark.circle.fill").symbolRenderingMode(.palette)
+                            .foregroundStyle(.white, .black.opacity(0.6))
+                            .frame(width: 24, height: 24).contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .help("Remove: the next render starts from noise")
+                    .accessibilityLabel(Text("Remove"))
+                }
+            }
+            .onHover { hover = $0 }
+            .help(Text(verbatim: "\(start.name) · \(start.width) × \(start.height)"))
+            .accessibilityLabel(Text(verbatim: start.name))
+    }
+}

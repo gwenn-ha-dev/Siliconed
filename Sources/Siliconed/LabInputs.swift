@@ -20,7 +20,10 @@ import Foundation
 // - **Three images at most** (`NamedSubjects.maxImages`), the starting image and the references counted with the
 //   subjects: the worst case measured is 1024×1536 with three references.
 // - **A model that reads no images** (capacity 0) keeps the text as typed — `@` is then its own character (Anima's
-//   artists) — and every image is « describe only »: it stays in the lab and goes nowhere.
+//   artists) — and every image is « describe only »: it stays in the lab and goes nowhere — **unless the model starts from
+//   an image** (img2img: Z-Image, Anima, Krea 2; `startsFromImage`): then one image may be the start, the image the render
+//   re-noises and denoises, chosen by a gesture as for Qwen-Image-2.1. A newcomer is never a start there: dropping a picture
+//   to describe it must not turn the next render into an img2img nobody asked for.
 // - **A `@` inside a `{a|b}` group is refused**: the rack expands the group, and each expansion would need its own
 //   translation. A group without `@` goes through as it is.
 package enum LabInputs {
@@ -28,7 +31,8 @@ package enum LabInputs {
 
     /// What the render makes of an image of the lab.
     package enum Role: String, CaseIterable, Sendable {
-        /// The image the model edits (Qwen-Image-2.1): image 1, one only, and it gives the format.
+        /// The image the model edits (Qwen-Image-2.1), or the one it starts from (img2img): image 1, one only, and it gives
+        /// the format.
         case start
         /// Context the model sees: images 2 and 3.
         case reference
@@ -46,13 +50,16 @@ package enum LabInputs {
         package init(id: ID, role: Role) { self.id = id; self.role = role }
     }
 
-    /// **The roles a model offers**: all three when it reads images (`capacity` > 0), « describe only » otherwise.
-    package static func roles(capacity: Int) -> [Role] {
-        capacity > 0 ? [.start, .reference, .describeOnly] : [.describeOnly]
+    /// **The roles a model offers**: all three when it reads images (`capacity` > 0); the start and « describe only » when it
+    /// reads none but starts from an image (`startsFromImage`, img2img); « describe only » otherwise.
+    package static func roles(capacity: Int, startsFromImage: Bool = false) -> [Role] {
+        if capacity > 0 { return [.start, .reference, .describeOnly] }
+        return startsFromImage ? [.start, .describeOnly] : [.describeOnly]
     }
 
     /// **The role of an image just dropped**: the first one sent is the start, the next ones references — as long as
-    /// the render has room (`capacity`, three at most); beyond, or with a model that reads no image, « describe only ».
+    /// the render has room (`capacity`, three at most); beyond, or with a model that reads no image, « describe only » —
+    /// an img2img model's included: its start is a gesture, never a default.
     package static func defaultRole<ID>(adding slots: [Slot<ID>], capacity: Int) -> Role {
         let limit = min(capacity, NamedSubjects.maxImages)
         let sent = slots.filter { $0.role.isSent }
@@ -60,27 +67,28 @@ package enum LabInputs {
         return sent.isEmpty ? .start : .reference
     }
 
-    /// **Gives `id` a role.** The start is unique: choosing it for one image makes the previous start a reference.
-    package static func assigning<ID>(_ role: Role, to id: ID, in slots: [Slot<ID>]) -> [Slot<ID>] {
+    /// **Gives `id` a role.** The start is unique: choosing it for one image makes the previous start a reference — or
+    /// « describe only » for a model that reads no references (img2img: `startsFromImage`, `capacity` 0).
+    package static func assigning<ID>(_ role: Role, to id: ID, in slots: [Slot<ID>], capacity: Int = 3) -> [Slot<ID>] {
         var out = slots
         guard let i = out.firstIndex(where: { $0.id == id }) else { return out }
         if role == .start {
-            for j in out.indices where out[j].role == .start { out[j].role = .reference }
+            for j in out.indices where out[j].role == .start { out[j].role = capacity > 0 ? .reference : .describeOnly }
         }
         out[i].role = role
         return out
     }
 
     /// **After a change of the model aimed at**: an image whose role it no longer offers becomes « describe only »;
-    /// a second start (never made by the window) becomes a reference.
-    package static func conforming<ID>(_ slots: [Slot<ID>], capacity: Int) -> [Slot<ID>] {
-        let offered = roles(capacity: capacity)
+    /// a second start (never made by the window) becomes a reference — or « describe only » where there are no references.
+    package static func conforming<ID>(_ slots: [Slot<ID>], capacity: Int, startsFromImage: Bool = false) -> [Slot<ID>] {
+        let offered = roles(capacity: capacity, startsFromImage: startsFromImage)
         var out = slots
         var started = false
         for i in out.indices {
             if !offered.contains(out[i].role) { out[i].role = .describeOnly }
             if out[i].role == .start {
-                if started { out[i].role = .reference }
+                if started { out[i].role = offered.contains(.reference) ? .reference : .describeOnly }
                 started = true
             }
         }
@@ -117,10 +125,14 @@ package enum LabInputs {
 
     /// **Translates the text and numbers the images.** `capacity` is how many images the model aimed at reads
     /// (0: none), `subjects` the library. The starting image goes first, then the references in the zone's order,
-    /// then the subjects the text cites.
+    /// then the subjects the text cites. A model that reads none but starts from an image (`startsFromImage`) receives the
+    /// text as typed and its start alone.
     package static func carry<ID>(text: String, slots: [Slot<ID>], subjects: [NamedSubjects.Subject],
-                                  capacity: Int) -> Result<Carry<ID>, Refusal> {
-        guard capacity > 0 else { return .success(Carry(prompt: text, images: [], cited: [])) }
+                                  capacity: Int, startsFromImage: Bool = false) -> Result<Carry<ID>, Refusal> {
+        guard capacity > 0 else {
+            let start = startsFromImage ? slots.first { $0.role == .start }.map { [Image<ID>.plain($0.id, .start)] } ?? [] : []
+            return .success(Carry(prompt: text, images: start, cited: []))
+        }
         let start = slots.filter { $0.role == .start }
         let references = slots.filter { $0.role == .reference }
         let plain = (start + references).map { Image<ID>.plain($0.id, $0.role) }
@@ -168,12 +180,13 @@ package enum LabInputs {
         package var canCarry: Bool { if case .carries = outcome { true } else { false } }
     }
 
-    /// **What carrying would do now.** `rackPrompt` and `rackImages` are the rack's own, `changesModel` whether the rack
-    /// must change family to receive it.
+    /// **What carrying would do now.** `rackPrompt` and `rackImages` are the rack's own (for an img2img model, its starting
+    /// image: 0 or 1), `changesModel` whether the rack must change family to receive it.
     package static func receipt<ID>(text: String, slots: [Slot<ID>], subjects: [NamedSubjects.Subject], capacity: Int,
+                                    startsFromImage: Bool = false,
                                     rackPrompt: String, rackImages: Int, changesModel: Bool) -> Receipt<ID> {
         let blank = text.allSatisfy(\.isWhitespace)
-        switch carry(text: text, slots: slots, subjects: subjects, capacity: capacity) {
+        switch carry(text: text, slots: slots, subjects: subjects, capacity: capacity, startsFromImage: startsFromImage) {
         case .failure(let refusal):
             return Receipt(outcome: .refused(refusal), replacesPrompt: false, replacedImages: 0, changesModel: changesModel)
         case .success(let c):
