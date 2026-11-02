@@ -16,13 +16,13 @@ final class DiTSwitchesTests: XCTestCase {
         XCTAssertFalse(DiTSwitches.fasterRendering(beta: true, choice: nil, versionDefault: false))
     }
 
-    /// Off on every version: a user who never chose gets the full-size recipe even with the option on. The Neural Engine's
-    /// default is unchanged (off on the Standard, on on the Compact and the Light).
-    func testNoVersionDefaultsToFasterRendering() {
-        for variant in Variant.allCases { XCTAssertFalse(variant.fasterRenderingByDefault) }
-        XCTAssertFalse(Variant.standard.neuralEngineByDefault)
-        XCTAssertTrue(Variant.compact.neuralEngineByDefault)
-        XCTAssertTrue(Variant.light.neuralEngineByDefault)
+    /// Off on every version: a user who never chose gets the full-size recipe even with the option on. The Neural Engine is the
+    /// opposite: on by default on every version, the Standard's included (2/11/2026), off where the user turns it off.
+    func testNoVersionDefaultsToFasterRenderingAndEveryVersionToTheNeuralEngine() {
+        for variant in Variant.allCases {
+            XCTAssertFalse(variant.fasterRenderingByDefault)
+            XCTAssertTrue(variant.neuralEngineByDefault)
+        }
     }
 
     /// The box greys the switch for the same reasons the plan would not apply it.
@@ -58,9 +58,9 @@ final class DiTSwitchesTests: XCTestCase {
         // Neural Engine gets rows is not known yet, and an unread map offers nothing whatever it holds.
         XCTAssertEqual(DiTSwitches.neuralEngineUnavailable(measured: false, offered: false), .notMeasured)
         XCTAssertEqual(DiTSwitches.neuralEngineUnavailable(measured: false, offered: true), .notMeasured)
-        // Offered: the choice, else the default — the Standard included (off by default there, but available).
-        XCTAssertTrue(DiTSwitches.neuralEngine(offered: true, choice: true, versionDefault: Variant.standard.neuralEngineByDefault))
-        XCTAssertFalse(DiTSwitches.neuralEngine(offered: true, choice: nil, versionDefault: Variant.standard.neuralEngineByDefault))
+        // Offered: the choice, else the default — on, the Standard's included; a choice off stays off.
+        XCTAssertTrue(DiTSwitches.neuralEngine(offered: true, choice: nil, versionDefault: Variant.standard.neuralEngineByDefault))
+        XCTAssertFalse(DiTSwitches.neuralEngine(offered: true, choice: false, versionDefault: Variant.standard.neuralEngineByDefault))
         XCTAssertTrue(DiTSwitches.neuralEngine(offered: true, choice: nil, versionDefault: Variant.compact.neuralEngineByDefault))
         // Not offered: never on, whatever was kept.
         XCTAssertFalse(DiTSwitches.neuralEngine(offered: false, choice: true, versionDefault: true))

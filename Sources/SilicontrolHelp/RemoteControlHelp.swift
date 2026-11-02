@@ -640,8 +640,8 @@ package enum RemoteControlHelp {
         full size. Off: full size, the image checked against the reference.
 
         NEURAL-ENGINE flips the Neural Engine of one model (the DiT box's switch): part of the DiT in fp16 on the
-        Neural Engine, less energy, an image a little different from fp32's; off, the DiT is fp32 throughout. Also
-        per installed version; unless chosen, on for the Compact and the Light, off for the Standard. Refused
+        Neural Engine, less energy, an image a little different; off, no product of the DiT in fp16. Also per
+        installed version; unless chosen, on, on every version. Refused
         ("neural_engine"), on or off, on a Mac whose measure gives the Neural Engine nothing to do: the window greys
         the switch there with that reason, and there is nothing to choose. For one render only: add --ane / --no-ane.
 
@@ -1743,8 +1743,8 @@ package enum RemoteControlHelp {
         contrôlée contre la référence.
 
         NEURAL-ENGINE bascule le Neural Engine d'un modèle (l'interrupteur de la boîte DiT) : une part du DiT en fp16 sur le
-        Neural Engine, moins d'énergie, une image un peu différente de celle du fp32 ; éteint, le DiT est en fp32 de bout en
-        bout. Aussi par version installée ; faute de choix, allumé pour la Compacte et la Légère, éteint pour la Standard.
+        Neural Engine, moins d'énergie, une image un peu différente ; éteint, aucun produit du DiT en fp16. Aussi par
+        version installée ; faute de choix, allumé, sur toutes les versions.
         Refusé (« neural_engine »), allumé ou éteint, sur un Mac dont la mesure ne donne rien à faire au Neural Engine : la
         fenêtre y grise l'interrupteur avec cette raison, et il n'y a rien à choisir. Pour un seul rendu : add --ane / --no-ane.
 
