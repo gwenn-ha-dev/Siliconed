@@ -146,16 +146,6 @@ package enum MossImageStages {
         return report
     }
 
-    /// The boundaries of the DiT in the reference's tensor names, with the width of their channels.
-    static func boundaries(dim d: Int, headDim: Int, ffn: Int) -> [(name: String, columns: Int)] {
-        [("time_embedding_out", d), ("shared_modulation", d), ("head_modulation", d), ("video_embed", d),
-         ("rope", headDim), ("text_proj_out", d), ("text_block0_out", d), ("text_block1_out", d),
-         ("block0_q_out", d), ("block0_k_out", d), ("block0_v_out", d), ("block0_q_norm_out", d), ("block0_o_out", d),
-         ("block0_ffn_up_gate_out", 2 * ffn), ("block0_ffn_down_out", d),
-         ("block0_out", d), ("block1_out", d), ("block13_out", d), ("block27_out", d), ("block41_out", d),
-         ("final_norm_out", d)]
-    }
-
     static func evaluate(_ invocation: Invocation, lora useLoRA: Bool) throws -> Report {
         // The Compact's golden is the reference on Comfy-Org's int8 convrot dequantized; `dit-lora` judges the Standard's.
         let version = useLoRA ? nil : try invocation.quantizedVariant()
@@ -189,12 +179,12 @@ package enum MossImageStages {
             stem + ".safetensors", script: "tools/oracle/moss-image.py dit-bf16\(version.map { " --variant " + $0.rawValue } ?? "")")
         let dit = try MossImageDiT(artifact: artifact, gridHeight: height, gridWidth: width, maxText: t, lora: stack)
         dit.recordBoundaries = true
-        dit.recordedBlocks = [0, 1, 13, 27, 41]
+        dit.recordedBlocks = MossImageDiT.checkedBlocks
         let started = Date()
         let out = try dit.forward(latent: latent.baseAddress!, text: text.baseAddress!, textRows: t, timestep: timestep[0])
         if invocation.profile { printTimings(dit.timings, seconds: Date().timeIntervalSince(started)) }
         let recorded = dit.boundaries
-        for (name, columns) in boundaries(dim: dit.config.dim, headDim: dit.config.headDim, ffn: dit.config.hidden) {
+        for (name, columns) in dit.checkedBoundaries {
             guard let oracle = goldens.float32(name) else { continue }
             guard let engine = recorded[name] else { report.add(Judge.missing(name)); continue }
             report.add(Judge.boundary(name, engine: engine, oracle: oracle, witness: witness?.float32(name),

@@ -51,6 +51,53 @@ final class PromptWriterLoopTests: XCTestCase {
         XCTAssertNil(RepetitionGuard.cut([5]))
     }
 
+    // The writer's goldens hold 48 tokens against transformers (`qwen21 writer`); a loop seen in a render began past them and
+    // ran to the 768-token budget. What follows replays such runs on identifiers, the writer's way: one token at a time.
+
+    func testALoopThatStartsPastTheGoldensIsCutAtItsSpan() throws {
+        // 120 tokens of a description, then a 7-token phrase over and over until the budget.
+        let head = Array(1000..<1120), phrase = Array(500..<507)
+        let budget = PromptWriterNeed.Limits().newTokens
+        let tokens = Array((head + Array(repeating: phrase, count: budget / phrase.count).flatMap { $0 }).prefix(budget))
+        let cut = try XCTUnwrap(firstCut(tokens))
+        // Seen once the cycle covers the span (32 tokens, here more than four turns), one turn kept.
+        XCTAssertEqual(cut.at, head.count + RepetitionGuard.minimumSpan)
+        XCTAssertEqual(Array(tokens[..<cut.kept]), head + phrase)
+    }
+
+    func testTheLongestPeriodIsCutAfterFourTurnsWithinTheBudget() throws {
+        let head = Array(1000..<1050), period = Array(2000..<(2000 + RepetitionGuard.maximumPeriod))
+        let tokens = head + Array(repeating: period, count: 12).flatMap { $0 }
+        let cut = try XCTUnwrap(firstCut(tokens))
+        XCTAssertEqual(cut.at, head.count + RepetitionGuard.minimumRepeats * period.count)
+        XCTAssertEqual(cut.kept, head.count + period.count)
+        // The worst case still stops well inside the writer's budget: a page, not pages.
+        XCTAssertLessThan(cut.at, PromptWriterNeed.Limits().newTokens)
+    }
+
+    func testALateLoopIsCutEvenNearTheBudget() throws {
+        // 600 tokens without a loop (a varied description: no period up to 64 repeats), then "solo," to the end.
+        var head: [Int] = []
+        for i in 0..<600 { head.append(3000 + (i * 37) % 251) }
+        XCTAssertNil(firstCut(head))
+        let tokens = Array((head + Array(repeating: [100, 101], count: 200).flatMap { $0 })
+            .prefix(PromptWriterNeed.Limits().newTokens))
+        let cut = try XCTUnwrap(firstCut(tokens))
+        XCTAssertEqual(cut.at, head.count + RepetitionGuard.minimumSpan)
+        XCTAssertEqual(cut.kept, head.count + 2)
+    }
+
+    func testWhatTheGuardDoesNotSeeByDesign() {
+        // A period longer than the maximum, to the budget: not cut (the decode stops at `newTokens`).
+        let long = Array(0..<(RepetitionGuard.maximumPeriod + 1))
+        let budget = PromptWriterNeed.Limits().newTokens
+        XCTAssertNil(firstCut(Array(Array(repeating: long, count: 12).flatMap { $0 }.prefix(budget))))
+        // A loop that drifts by one token at each turn: never exact, never cut.
+        var drifting: [Int] = Array(1000..<1060)
+        for turn in 0..<70 { drifting += [500, 501, 502, 503, 504, 505, 506, 600 + turn] }
+        XCTAssertNil(firstCut(Array(drifting.prefix(budget))))
+    }
+
     func testAnUnbrokenRunOfOneTokenIsCut() throws {
         let cut = try XCTUnwrap(firstCut([9] + Array(repeating: 4, count: 100)))
         XCTAssertEqual(cut.kept, 2)

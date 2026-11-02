@@ -1376,13 +1376,13 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%1$@にはインストール済みのバージョン（%2$@）の%3$@が必要です：読み込んだモデルはバージョンを切り替えません"
+            "value" : "%1$@には、インストール済みのバージョン（%3$@）の%2$@が必要です：読み込んだモデルはバージョンを切り替えません"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@ 需要已安装版本（%@）中的 %@：导入的模型不会切换版本"
+            "value" : "%1$@ 需要已安装版本（%3$@）的 %2$@：导入的模型不会切换版本"
           }
         }
       }
@@ -2350,7 +2350,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@ × %@ — 每边最多 %@ px"
+            "value" : "%@ × %@——每边最多 %@ 像素"
           }
         }
       }
@@ -3110,7 +3110,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "代替案用のジョブ%lld件：キューの空きは%lld件です（%lld件のジョブ）"
+            "value" : "選択肢用のジョブ%lld件：キューの空きは%lld件です（%lld件のジョブ）"
           }
         },
         "zh-Hans" : {
@@ -5004,7 +5004,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Comfy-Orgが公開している8ビットの重み：画像モデルとテキストエンコーダー（int8 convrot）。VAEとトークナイザーはStandardバージョンと同じです。"
+            "value" : "Comfy-Orgが公開している8ビットの重み：画像モデルとテキストエンコーダー（int8 convrot）。VAEとトークナイザーは標準バージョンと同じです。"
           }
         },
         "zh-Hans" : {
@@ -5604,13 +5604,13 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "測定は次のレンダリングから適用され、実行中のレンダリングには適用されません。それ以降は、同じシードでも測定前とは少し違う画像になることがあります。"
+            "value" : "測定は次の生成から適用され、実行中の生成には適用されません。それ以降は、同じシードでも測定前とは少し違う画像になることがあります。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "一次测量会应用到下一次渲染，而不会影响正在进行的渲染。此后，同一个种子生成的图像可能与测量前略有不同。"
+            "value" : "一次测量会应用到下一次生成，而不会影响正在进行的生成。此后，同一个种子生成的图像可能与测量前略有不同。"
           }
         }
       }
@@ -6090,7 +6090,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "草稿会提前停止：停得越晚，越接近成图（LoRA 的风格可能较晚才定型），耗时也越长。步数与调节栏一致"
+            "value" : "草稿会提前停止：停得越晚，越接近成图（LoRA 的风格可能较晚才定型），耗时也越长。步数与机架一致"
           }
         }
       }
@@ -6136,7 +6136,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "强度 %@ 不会漏掉 %lld 步中的任何一步。"
+            "value" : "强度为 %@ 时，%lld 步中没有一步会执行。"
           }
         }
       }
@@ -6330,13 +6330,13 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "約1分、長くても5分で、最初のレンダリングの前とアップデートのたびに行われます。新しい測定は次のレンダリングから適用されます。"
+            "value" : "約1分、長くても5分で、最初の生成の前とアップデートのたびに行われます。新しい測定は次の生成から適用されます。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "大约一分钟，最多五分钟；在首次渲染之前以及每次更新之后进行。新的测量会应用到下一次渲染。"
+            "value" : "大约一分钟，最多五分钟；在首次生成之前以及每次更新之后进行。新的测量会应用到下一次生成。"
           }
         }
       }
@@ -6890,7 +6890,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "DiTのボックスに高速生成のスイッチを追加します。1024²以上では最初のステップを半分のサイズで行い、速くなり、画像がわずかに変わります。LoRA、ディテール、編集では使われません。オフのときは、どのレンダリングも高速になりません。"
+            "value" : "DiTのボックスに高速生成のスイッチを追加します。1024²以上では最初のステップを半分のサイズで行い、速くなり、画像がわずかに変わります。LoRA、ディテール、編集では使われません。オフのときは、どの生成も高速になりません。"
           }
         },
         "zh-Hans" : {
@@ -6970,7 +6970,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ソルバー Euler a、DPM++ 2M、UniPC を DiT のボックスと探索の軸に追加します。標準の Euler は、モデルが蒸留されたときのソルバーです。"
+            "value" : "ソルバー Euler a、DPM++ 2M、UniPC を DiT のボックスと探索の軸に追加します。既定の Euler は、モデルが蒸留されたときのソルバーです。"
           }
         },
         "zh-Hans" : {
@@ -7850,7 +7850,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "アテンション(GPUのテンソルユニット、bf16オペランド)"
+            "value" : "アテンション（GPUのテンソルユニット、bf16オペランド）"
           }
         },
         "zh-Hans" : {
@@ -8330,7 +8330,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ベータ版オプション：%@"
+            "value" : "ベータオプション：%@"
           }
         },
         "zh-Hans" : {
@@ -8416,7 +8416,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Beta：仍在调整中，可能会有变化。"
+            "value" : "测试版：仍在调整中，可能会有变化。"
           }
         }
       }
@@ -9410,7 +9410,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "「標準」を選んでください。"
+            "value" : "「通常」を選んでください。"
           }
         },
         "zh-Hans" : {
@@ -13829,7 +13829,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "各経路を単独で動かしたときの、1秒あたり1兆回の演算数(TFLOP/s)。バーはGPUのピーク性能(コア数とクロックから求めた値)に対する割合です。ピークがあるのはGPUだけで、比べるのも行列積だけです。✓は、結果が正確な結果から許容範囲内にあることを示します。"
+            "value" : "各経路を単独で動かしたときの、1秒あたり1兆回の演算数（TFLOP/s）。バーはGPUのピーク性能（コア数とクロックから求めた値）に対する割合です。ピークがあるのはGPUだけで、比べるのも行列積だけです。✓は、結果が正確な結果から許容範囲内にあることを示します。"
           }
         },
         "zh-Hans" : {
@@ -15315,7 +15315,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "高速生成は、ベータ版オプションがオンのときだけ使えます"
+            "value" : "高速生成は、ベータオプションがオンのときだけ使えます"
           }
         },
         "zh-Hans" : {
@@ -15639,7 +15639,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "削除"
+            "value" : "登録解除"
           }
         },
         "zh-Hans" : {
@@ -18258,7 +18258,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "安装写作器"
+            "value" : "安装写作模型"
           }
         }
       }
@@ -18458,7 +18458,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "正在安装写作器"
+            "value" : "正在安装写作模型"
           }
         }
       }
@@ -18498,7 +18498,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "正在安装写作器…"
+            "value" : "正在安装写作模型…"
           }
         }
       }
@@ -18612,7 +18612,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "計算結果が誤っていました：プランにはこれのモデルがなく、演算装置の既定値が代わりに答えます。"
+            "value" : "計算結果が誤っていました：プランにはこれのモデルがなく、エンジンの既定値が代わりに答えます。"
           }
         },
         "zh-Hans" : {
@@ -19572,7 +19572,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%1$@用のLoRA「%2$@」が見つかりません"
+            "value" : "%2$@用のLoRA「%1$@」が見つかりません"
           }
         },
         "zh-Hans" : {
@@ -20212,7 +20212,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "GPU、CPUの行列ユニット、Neural Engine での行列積とアテンション。単独と同時の両方で、それぞれの結果を厳密な結果と照合し、Siliconed がレンダリングを計画するための数値を求めます。モデルは不要で、何もダウンロードしません。約1分、長くても5分で終わり、その間キューは待機します。"
+            "value" : "GPU、CPUの行列ユニット、Neural Engine での行列積とアテンション。単独と同時の両方で、それぞれの結果を厳密な結果と照合し、Siliconed が生成を計画するための数値を求めます。モデルは不要で、何もダウンロードしません。約1分、長くても5分で終わり、その間キューは待機します。"
           }
         },
         "zh-Hans" : {
@@ -20252,13 +20252,13 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "8ビットの重みでの行列積(Neural Engine)"
+            "value" : "8ビットの重みでの行列積（Neural Engine）"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "8 位权重上的矩阵乘积（Neural Engine）"
+            "value" : "8 位权重上的矩阵乘积（神经网络引擎）"
           }
         }
       }
@@ -20492,7 +20492,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "行列積(GPUのテンソルユニット、bf16の重みとアクティベーション)"
+            "value" : "行列積（GPUのテンソルユニット、bf16の重みとアクティベーション）"
           }
         },
         "zh-Hans" : {
@@ -21381,6 +21381,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "向右移"
+          }
+        }
+      }
+    },
+    "Move Siliconed to the Applications folder first." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bewege Siliconed zuerst in den Ordner „Programme“."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Primero mueve Siliconed a la carpeta Aplicaciones."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Placez d’abord Siliconed dans le dossier Applications."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sposta prima Siliconed nella cartella Applicazioni."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "先にSiliconedを「アプリケーション」フォルダへ移動してください。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请先将 Siliconed 移到“应用程序”文件夹。"
           }
         }
       }
@@ -22454,7 +22494,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "文章を書くモデルがまだインストールされていません。モデルをインストールしてください。"
+            "value" : "ライターはまだインストールされていません。モデルをインストールすると使えるようになります。"
           }
         },
         "zh-Hans" : {
@@ -23908,13 +23948,13 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "対象：%@"
+            "value" : "計算先：%@"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "开启：%@"
+            "value" : "计算于：%@"
           }
         }
       }
@@ -25436,7 +25476,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "上一个"
+            "value" : "上一张"
           }
         }
       }
@@ -25476,7 +25516,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "上一张"
+            "value" : "上一张图像"
           }
         }
       }
@@ -26563,7 +26603,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "遥控帮助"
+            "value" : "远程控制帮助"
           }
         }
       }
@@ -28501,13 +28541,13 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "画像のレンダリング中は、「書き直す」と「説明する」は待機します。"
+            "value" : "画像の生成中は、「書き直す」と「説明する」は待機します。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "图像渲染期间，“改写”和“描述”会等待。"
+            "value" : "图像生成期间，“改写”和“描述”会等待。"
           }
         }
       }
@@ -28541,13 +28581,13 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "DiTの一部をNeural Engine上でfp16で実行します。消費エネルギーが減り(M1 Proで約5分の1)、fp32とは少し異なる画像になります。オフのときは、DiT全体がfp32で動作し、画像は基準実装と照合されています。"
+            "value" : "DiTの一部をNeural Engine上でfp16で実行します。消費エネルギーが減り（M1 Proで約5分の1）、fp32とは少し異なる画像になります。オフのときは、DiT全体がfp32で動作し、画像はリファレンスと照合されています。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "让 DiT 的一部分在Neural Engine上以 fp16 运行：更省电（在 M1 Pro 上约省五分之一），图像与 fp32 略有不同。关闭时，DiT 全程使用 fp32，图像已对照参考实现验证。"
+            "value" : "让 DiT 的一部分在神经网络引擎上以 fp16 运行：更省电（在 M1 Pro 上约省五分之一），图像与 fp32 略有不同。关闭时，DiT 全程使用 fp32，图像已对照参考实现验证。"
           }
         }
       }
@@ -29233,7 +29273,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "调节栏采用的单元格设置"
+            "value" : "机架采用的单元格设置"
           }
         }
       }
@@ -29307,7 +29347,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "GPUのピークに対する割合(%@)"
+            "value" : "GPUのピークに対する割合（%@）"
           }
         },
         "zh-Hans" : {
@@ -30147,7 +30187,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Siliconedは、このMacの各演算装置が何を計算できるかを、単独と同時の両方で測定し、その結果からレンダリングの計算を一つずつ計画します。"
+            "value" : "Siliconedは、このMacの各エンジンが何を計算できるかを、単独と同時の両方で測定し、その結果から生成の計算を一つずつ計画します。"
           }
         },
         "zh-Hans" : {
@@ -30187,7 +30227,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Siliconedは重みを同梱していません。Compactバージョンは、公開元のモデルを第三者が8ビットで再公開したもので、そこからダウンロードされます。公開元のライセンスが適用され、変更内容は各第三者のモデルカードに記載されています。"
+            "value" : "Siliconedは重みを同梱していません。コンパクトバージョンは、公開元のモデルを第三者が8ビットで再公開したもので、そこからダウンロードされます。公開元のライセンスが適用され、変更内容は各第三者のモデルカードに記載されています。"
           }
         },
         "zh-Hans" : {
@@ -30227,7 +30267,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Siliconedは重みを同梱していません。Compactバージョンの画像モデルは、公開元のモデルをvanes430が8ビットで再公開したもので、そこからダウンロードされます。それ以外はすべて公開元のものです。公開元のライセンスが適用され、変更内容はvanes430のモデルカードに記載されています。"
+            "value" : "Siliconedは重みを同梱していません。コンパクトバージョンの画像モデルは、公開元のモデルをvanes430が8ビットで再公開したもので、そこからダウンロードされます。それ以外はすべて公開元のものです。公開元のライセンスが適用され、変更内容はvanes430のモデルカードに記載されています。"
           }
         },
         "zh-Hans" : {
@@ -30535,7 +30575,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%1$lldステップ中%2$lldステップのスケッチ"
+            "value" : "%2$lldステップ中%1$lldステップのスケッチ"
           }
         },
         "zh-Hans" : {
@@ -30815,13 +30855,13 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ラックのサイズメニューを2つに分けます。縦横比を選び、次に解像度（1Kは約1メガピクセル、2Kは約4メガピクセル）を選びます。サイズはアプリが決めたもので、鉛筆では引き続き好きなサイズを入力できます。"
+            "value" : "ラックのサイズメニューを2つに分けます。縦横比を選び、次に解像度（1Kは約1メガピクセル、2Kは約4メガピクセル）を選びます。サイズはAppが決めたもので、鉛筆では引き続き好きなサイズを入力できます。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "将机架中的尺寸菜单一分为二：先选比例，再选分辨率，1K（约 100 万像素）或 2K（约 400 万像素）。尺寸由应用给出；铅笔仍可输入任何其他尺寸。"
+            "value" : "将机架中的尺寸菜单一分为二：先选比例，再选分辨率，1K（约 100 万像素）或 2K（约 400 万像素）。尺寸由 App 给出；铅笔仍可输入任何其他尺寸。"
           }
         }
       }
@@ -30901,7 +30941,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "一同叠加，使用调节栏自己的 LoRA。若要对比 LoRA，请在某个轴上选择“用于对比的 LoRA”。"
+            "value" : "一同叠加，使用机架自己的 LoRA。若要对比 LoRA，请在某个轴上选择“用于对比的 LoRA”。"
           }
         }
       }
@@ -31257,13 +31297,13 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ラボに残ります：レンダリングには送られません。"
+            "value" : "ラボに残ります：生成には送られません。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "留在实验室中：不会发送到渲染。"
+            "value" : "留在实验室中：不会被送去生成。"
           }
         }
       }
@@ -31783,13 +31823,13 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "停止しました：画像のレンダリングが始まりました。"
+            "value" : "停止しました：画像の生成が始まりました。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "已停止：图像开始渲染。"
+            "value" : "已停止：图像开始生成。"
           }
         }
       }
@@ -34276,7 +34316,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "画像モデルは4〜5ビットでvantagewithaiが公開（GGUF Q4_K_M）。テキストエンコーダーはCompactと同じ8ビットで、Comfy-Org（int8 convrot）のものです。VAEとトークナイザーはStandardバージョンと同じです。"
+            "value" : "画像モデルは4〜5ビットでvantagewithaiが公開（GGUF Q4_K_M）。テキストエンコーダーはコンパクトと同じ8ビットで、Comfy-Org（int8 convrot）のものです。VAEとトークナイザーは標準バージョンと同じです。"
           }
         },
         "zh-Hans" : {
@@ -34316,7 +34356,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "画像モデルは4〜6ビットでunslothが公開（GGUF Q4_K_M）。テキストエンコーダーはCompactと同じ8ビットで、Disty0（SDNQ int8）のものです。トークナイザーとVAEは公開元のものです。"
+            "value" : "画像モデルは4〜6ビットでunslothが公開（GGUF Q4_K_M）。テキストエンコーダーはコンパクトと同じ8ビットで、Disty0（SDNQ int8）のものです。トークナイザーとVAEは公開元のものです。"
           }
         },
         "zh-Hans" : {
@@ -34396,7 +34436,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "画像モデルは4〜8ビットでunslothが公開（GGUF Q4_K_M）。テキストエンコーダーはCompactと同じ8ビットで、unsloth（int8 convrot）のものです。プロセッサーとVAEは公開元のものです。"
+            "value" : "画像モデルは4〜8ビットでunslothが公開（GGUF Q4_K_M）。テキストエンコーダーはコンパクトと同じ8ビットで、unsloth（int8 convrot）のものです。プロセッサーとVAEは公開元のものです。"
           }
         },
         "zh-Hans" : {
@@ -34642,13 +34682,13 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ラボが送る画像は%@枚です：1回のレンダリングで読めるのは最大%@枚です。いくつかを「説明のみ」にしてください。"
+            "value" : "ラボが送る画像は%@枚です：1回の生成で読めるのは最大%@枚です。いくつかを「説明のみ」にしてください。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "实验室发送了 %@ 张图像：一次渲染最多接收 %@ 张。请将部分设为“仅描述”。"
+            "value" : "实验室发送了 %@ 张图像：一次生成最多接收 %@ 张。请将部分设为“仅描述”。"
           }
         }
       }
@@ -34722,7 +34762,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "直近のレンダリングの行列積とアテンションは %@ かかりました（予測は %@）。この結果はレポートに含まれます。"
+            "value" : "直近の生成の行列積とアテンションは %@ かかりました（予測は %@）。この結果はレポートに含まれます。"
           }
         },
         "zh-Hans" : {
@@ -35642,13 +35682,13 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "この計算経路を読み込んだプロセスが異常終了しました：計画から外され、どのレンダリングもこれを読み込みません。"
+            "value" : "この計算経路を読み込んだプロセスが異常終了しました：計画から外され、どの生成もこれを読み込みません。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "加载此计算路径的进程已崩溃：它被排除在计划之外，任何渲染都不会加载它。"
+            "value" : "加载此计算路径的进程已崩溃：它被排除在计划之外，任何生成都不会加载它。"
           }
         }
       }
@@ -35682,13 +35722,13 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "DiTの積はfp32で計算され、画像は基準と照合されます。"
+            "value" : "DiTの積はfp32で計算され、画像はリファレンスと照合されます。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "DiT 的乘积以 fp32 计算，图像对照参考结果验证。"
+            "value" : "DiT 的乘积以 fp32 计算，图像对照参考实现验证。"
           }
         }
       }
@@ -36128,7 +36168,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "调节栏会完整采用此单元格——模型、提示词、尺寸、步数、LoRA、种子——但不进行生成"
+            "value" : "机架会完整采用此单元格——模型、提示词、尺寸、步数、LoRA、种子——但不进行生成"
           }
         }
       }
@@ -36168,7 +36208,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "调节栏采用此单元格，然后将其生成到底：即此草稿所预告的图像（双击单元格）"
+            "value" : "机架采用此单元格，然后将其生成到底：即此草稿所预告的图像（双击单元格）"
           }
         }
       }
@@ -36288,7 +36328,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "调节栏的 LoRA、种子和要编辑的图像：探索会改变它们"
+            "value" : "机架的 LoRA、种子和要编辑的图像：探索会改变它们"
           }
         }
       }
@@ -36328,7 +36368,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "调节栏的模型：在这里更改，那里也随之更改"
+            "value" : "机架的模型：在这里更改，那里也随之更改"
           }
         }
       }
@@ -36568,7 +36608,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "调节栏种子之后的各个种子，或你列出的种子"
+            "value" : "机架种子之后的各个种子，或你列出的种子"
           }
         }
       }
@@ -37162,7 +37202,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "重みは公開されたままの5〜6ビット(GGUF %@)で保存されています。積はfp32で計算されます。"
+            "value" : "重みは公開されたままの5〜6ビット（GGUF %@）で保存されています。積はfp32で計算されます。"
           }
         },
         "zh-Hans" : {
@@ -37202,7 +37242,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "重みは公開されたままの8ビット(fp8)で保存されています。積はfp32で計算されます。"
+            "value" : "重みは公開されたままの8ビット（fp8）で保存されています。積はfp32で計算されます。"
           }
         },
         "zh-Hans" : {
@@ -37242,7 +37282,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "重みは公開されたままの8ビット(int8)で保存され、サイズはfp32の4分の1です。積はfp32で計算されます。"
+            "value" : "重みは公開されたままの8ビット（int8）で保存され、サイズはfp32の4分の1です。積はfp32で計算されます。"
           }
         },
         "zh-Hans" : {
@@ -37282,7 +37322,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "重みは公開されたままの32個ずつのブロックの8ビット(GGUF Q8_0)で保存され、サイズはfp32の4分の1です。積はfp32で計算されます。"
+            "value" : "重みは公開されたままの32個ずつのブロックの8ビット（GGUF Q8_0）で保存され、サイズはfp32の4分の1です。積はfp32で計算されます。"
           }
         },
         "zh-Hans" : {
@@ -37322,7 +37362,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "重みは公開されたままのおよそ4ビット(GGUF %@)で保存され、サイズはfp32の8分の1です。積はfp32で計算されます。"
+            "value" : "重みは公開されたままのおよそ4ビット（GGUF %@）で保存され、サイズはfp32の8分の1です。積はfp32で計算されます。"
           }
         },
         "zh-Hans" : {
@@ -37362,13 +37402,13 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "重みは発行元が公開したままのbf16で保存され、サイズはfp32の半分です。積はfp32で計算されます。"
+            "value" : "重みは公開されたままのbf16で保存され、サイズはfp32の半分です。積はfp32で計算されます。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "权重按发布者发布时的 bf16 存储，大小为 fp32 的一半。乘积以 fp32 计算。"
+            "value" : "权重按发布方发布时的 bf16 存储，大小为 fp32 的一半。乘积以 fp32 计算。"
           }
         }
       }
@@ -37608,7 +37648,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "写作器已安装"
+            "value" : "写作模型已安装"
           }
         }
       }
@@ -37688,7 +37728,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "写作器还需要从 Qwen-Image-2.1 的仓库再下载一个文件：%@。"
+            "value" : "写作模型还需要从 Qwen-Image-2.1 的仓库再下载一个文件：%@。"
           }
         }
       }
@@ -37728,7 +37768,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "写作器没有写出任何内容。"
+            "value" : "写作模型没有写出任何内容。"
           }
         }
       }
@@ -37762,13 +37802,13 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ライターのヘッドは Qwen-Image-2.1 に付属しており、そのライセンスがまだ承諾されていません。"
+            "value" : "ライターのヘッドは Qwen-Image-2.1 に付属しており、そのライセンスにまだ同意していません。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "写作器的头部随 Qwen-Image-2.1 提供，而其许可尚未接受。"
+            "value" : "写作模型的头部随 Qwen-Image-2.1 提供，而其许可证尚未接受。"
           }
         }
       }
@@ -38020,13 +38060,13 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "これらのモジュールは接続できません：%@が出力される場所で%@が期待されています。"
+            "value" : "これらのモジュールは接続できません：出力は%@ですが、入力には%@が必要です。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "这些模块无法连接：%@ 的输出不是 %@ 所需的输入。"
+            "value" : "这些模块无法连接：输出的是 %@，而此处需要 %@。"
           }
         }
       }
@@ -38340,13 +38380,13 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "このMacはまだ測定されていません。最初のレンダリングで測定され、その後Neural Engineを選べます。"
+            "value" : "このMacはまだ測定されていません。最初の生成で測定され、その後Neural Engineを選べます。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "此 Mac 尚未测量：首次渲染时会进行测量，之后即可选择 Neural Engine。"
+            "value" : "此 Mac 尚未测量：首次生成时会进行测量，之后即可选择神经网络引擎。"
           }
         }
       }
@@ -38426,7 +38466,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "此 Mac 的测量没有给Neural Engine分配任何任务：DiT 以 fp32 计算。"
+            "value" : "此 Mac 的测量没有给神经网络引擎分配任何任务：DiT 以 fp32 计算。"
           }
         }
       }
@@ -39364,7 +39404,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "此模型不生成草稿：其单元格都是完成的图像。步数与调节栏一致（步数轴会覆盖它）"
+            "value" : "此模型不生成草稿：其单元格都是完成的图像。步数与机架一致（步数轴会覆盖它）"
           }
         }
       }
@@ -39810,13 +39850,13 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "このセッションは%@の測定で計画しています。新しい測定は次のレンダリングから適用されます。"
+            "value" : "このセッションは%@の測定で計画しています。新しい測定は次の生成から適用されます。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "本次会话按 %@ 的测量进行规划；更新的测量会应用到下一次渲染。"
+            "value" : "本次会话按 %@ 的测量进行规划；更新的测量会应用到下一次生成。"
           }
         }
       }
@@ -39902,7 +39942,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "此文本对写作器来说太长：%lld 个词元，最多 %lld 个。"
+            "value" : "此文本对写作模型来说太长：%lld 个词元，最多 %lld 个。"
           }
         }
       }
@@ -41200,7 +41240,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "变体：这张图像的“近亲”，场景相同，略有不同——数量与调节栏的“批量”一致"
+            "value" : "变体：这张图像的“近亲”，场景相同，略有不同——数量与机架的“批量”一致"
           }
         }
       }
@@ -41600,7 +41640,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "各演算装置の到達値"
+            "value" : "各エンジンの到達値"
           }
         },
         "zh-Hans" : {
@@ -41680,13 +41720,13 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "このステージがいま取り込んだもの"
+            "value" : "このステージにいまかかった時間"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "此阶段刚刚占用的内容"
+            "value" : "此阶段刚才所用的时间"
           }
         }
       }
@@ -42726,13 +42766,13 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "枠の一辺が %@ px 未満です"
+            "value" : "フレームの一辺が %@ px 未満です"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "框的一边小于 %@ px"
+            "value" : "取景框的一边小于 %@ 像素"
           }
         }
       }
@@ -43406,7 +43446,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "計算:%@"
+            "value" : "計算：%@"
           }
         },
         "zh-Hans" : {
@@ -43606,7 +43646,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "演算装置の単独測定"
+            "value" : "エンジンの単独測定"
           }
         },
         "zh-Hans" : {
@@ -43816,7 +43856,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "已编辑"
+            "value" : "待编辑"
           }
         }
       }
@@ -45427,6 +45467,46 @@
         }
       }
     },
+    "macOS runs this copy from a temporary place, made again at each launch: a command linked to it would stop working. Move Siliconed to Applications, open it from there, then install the command." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "macOS führt diese Kopie von einem temporären Ort aus, der bei jedem Start neu angelegt wird: Ein damit verknüpfter Befehl würde nicht mehr funktionieren. Bewege Siliconed in „Programme“, öffne es von dort und installiere dann den Befehl."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "macOS ejecuta esta copia desde una ubicación temporal que se vuelve a crear en cada arranque: un comando enlazado a ella dejaría de funcionar. Mueve Siliconed a Aplicaciones, ábrelo desde allí y después instala el comando."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "macOS exécute cette copie depuis un emplacement temporaire, recréé à chaque lancement : une commande qui y serait liée cesserait de fonctionner. Placez Siliconed dans Applications, ouvrez-le depuis là, puis installez la commande."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "macOS esegue questa copia da una posizione temporanea, ricreata a ogni avvio: un comando collegato a essa smetterebbe di funzionare. Sposta Siliconed in Applicazioni, aprilo da lì, poi installa il comando."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "macOSはこのコピーを起動のたびに作り直される一時的な場所から実行しています。ここにリンクしたコマンドは動かなくなります。Siliconedを「アプリケーション」へ移動し、そこから開いてからコマンドをインストールしてください。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "macOS 正从一个每次启动都会重新创建的临时位置运行此副本：链接到它的命令将无法使用。请将 Siliconed 移到“应用程序”，从那里打开，然后再安装命令。"
+          }
+        }
+      }
+    },
     "memory (peak)" : {
       "localizations" : {
         "de" : {
@@ -45948,7 +46028,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "还没有单元格有图像，所以没有图版可绘制"
+            "value" : "还没有单元格有图像，所以没有总图可绘制"
           }
         }
       }
@@ -46268,7 +46348,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "未知的比例：\"%@\""
+            "value" : "未知的比例：“%@”"
           }
         }
       }
@@ -46308,7 +46388,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "未知的分辨率：\"%@\""
+            "value" : "未知的分辨率：“%@”"
           }
         }
       }
@@ -46902,13 +46982,13 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ウインドウで 設定 › ほかのMac から Mac をペアリングしてください"
+            "value" : "ウインドウの「設定」›「ほかのMac」でMacをペアリングしてください"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "请在窗口的 设置 › 其他 Mac 中配对 Mac"
+            "value" : "请在窗口的“设置”›“其他 Mac”中配对 Mac"
           }
         }
       }
@@ -47148,7 +47228,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "比例：%@ — silicontrol help add"
+            "value" : "比例：%@——silicontrol help add"
           }
         }
       }
@@ -47742,7 +47822,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "silicontrol はターミナル、スクリプト、AIエージェントからこのアプリを操作します。詳しくは silicontrol help"
+            "value" : "silicontrol はターミナル、スクリプト、AIエージェントからこのAppを操作します。詳しくは silicontrol help"
           }
         },
         "zh-Hans" : {
@@ -48514,7 +48594,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "演算装置の再測定"
+            "value" : "エンジンの再測定"
           }
         },
         "zh-Hans" : {
@@ -48554,7 +48634,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "演算装置の同時測定"
+            "value" : "エンジンの同時測定"
           }
         },
         "zh-Hans" : {
@@ -48594,7 +48674,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "演算装置の初回測定"
+            "value" : "エンジンの初回測定"
           }
         },
         "zh-Hans" : {
@@ -48680,13 +48760,13 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "枠が画像からはみ出しています（%@ × %@）"
+            "value" : "フレームが画像からはみ出しています（%@ × %@）"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "框超出了图像（%@ × %@）"
+            "value" : "取景框超出了图像（%@ × %@）"
           }
         }
       }
@@ -48966,7 +49046,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "没有绘制图版"
+            "value" : "没有绘制总图"
           }
         }
       }
@@ -49166,7 +49246,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "正在安装写作器：silicontrol status 会告知何时完成"
+            "value" : "正在安装写作模型：silicontrol status 会告知何时完成"
           }
         }
       }
@@ -49286,7 +49366,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "无法裁剪这张图像：两边都须为 %@ px 或以上，且其中一边更大"
+            "value" : "无法裁剪这张图像：两边都须为 %@ 像素或以上，且其中一边更大"
           }
         }
       }
@@ -49326,7 +49406,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "这张图像在 512 px 以上无法容纳该比例"
+            "value" : "这张图像在 512 像素以上无法容纳该比例"
           }
         }
       }
@@ -49600,13 +49680,13 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "設定(⌘,)の「詳細設定」›「ベータ」で高速生成をオンにしてください"
+            "value" : "「設定」（⌘,）の「詳細設定」›「ベータ」で「高速生成」をオンにしてください"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "请在“设置”(⌘,) 的“高级”›“测试版”中开启“更快生成”"
+            "value" : "请在“设置”（⌘,）的“高级”›“测试版”中开启“更快生成”"
           }
         }
       }
@@ -49680,7 +49760,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "不明なベータ版オプション：\"%@\""
+            "value" : "不明なベータオプション：「%@」"
           }
         },
         "zh-Hans" : {
@@ -49800,7 +49880,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "不明なモデル：\"%@\""
+            "value" : "不明なモデル：「%@」"
           }
         },
         "zh-Hans" : {
@@ -49926,7 +50006,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "无法识别的尺寸：\"%@\""
+            "value" : "无法识别的尺寸：“%@”"
           }
         }
       }
@@ -50164,7 +50244,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "重み:%@"
+            "value" : "重み：%@"
           }
         },
         "zh-Hans" : {
@@ -50656,7 +50736,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "「%@」が %@（%@）をインストールしようとしています。先に %@ 版が削除されるため、インストールが終わるまで %@ では生成できません。"
+            "value" : "「%@」が %@（%@）をインストールしようとしています。先に %@ バージョンが削除されるため、インストールが終わるまで %@ では生成できません。"
           }
         },
         "zh-Hans" : {
@@ -50702,7 +50782,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "「%@」が %@（%@）をインストールしようとしています。準備ができ次第、%@ 版と置き換えられます。"
+            "value" : "「%@」が %@（%@）をインストールしようとしています。準備ができ次第、%@ バージョンと置き換えられます。"
           }
         },
         "zh-Hans" : {

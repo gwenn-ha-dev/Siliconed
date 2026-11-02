@@ -21,6 +21,7 @@
 
 import AppKit
 import Siliconed
+import SilicontrolHelp
 import SwiftUI
 
 @main
@@ -659,7 +660,8 @@ final class MainWindow: NSObject, NSWindowDelegate {
 /// into `/usr/local/bin`, like `code` for VS Code. On a fresh Mac `/usr/local/bin` may not exist and
 /// belongs to root: the link is made as administrator (macOS asks for the password); if that is
 /// refused or fails, the alert shows the two commands to paste into a terminal. The link follows the
-/// app: a rebuilt or moved app stays the one it drives, as long as the link points into it.
+/// app: a rebuilt or moved app stays the one it drives, as long as the link points into it. An app run
+/// translocated by Gatekeeper (`SilicontrolLink`) gets no link: it would dangle at the next launch.
 enum SilicontrolCommand {
     static let destination = "/usr/local/bin/silicontrol"
     /// The helper inside this app — what the link must point to.
@@ -681,6 +683,12 @@ enum SilicontrolCommand {
         guard FileManager.default.isExecutableFile(atPath: source) else {
             alert.messageText = String(localized: "The silicontrol command is missing from this app.")
             alert.informativeText = String(localized: "Build the app with tools/app.sh.")
+            alert.runModal()
+            return
+        }
+        guard !SilicontrolLink.isTranslocated(Bundle.main.bundleURL) else {
+            alert.messageText = String(localized: "Move Siliconed to the Applications folder first.")
+            alert.informativeText = String(localized: "macOS runs this copy from a temporary place, made again at each launch: a command linked to it would stop working. Move Siliconed to Applications, open it from there, then install the command.")
             alert.runModal()
             return
         }

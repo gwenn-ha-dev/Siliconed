@@ -127,6 +127,7 @@ package final class WeightProducts {
                 timings["gemm GPU", default: 0] += gemm.linear(a: a, bf16: w, c: c, m: m, k: k, n: n,
                                                               weightIsTransposed: transposed)
             case .int8(let plan):
+                GEMM.int8Products.withLock { $0 += 1 }
                 // The ANE beside the GPU on the integers: the plan's last rows (`ProductAssignment.ane` on a native weight), read from
                 // the reserve beside the GPU's int8 kernel. The engine takes them only if it can run them (`aneInt8Rows`).
                 let aneRows = aneInt8Rows(planned, plan, m: m, k: k, n: n)
