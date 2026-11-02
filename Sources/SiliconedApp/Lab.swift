@@ -20,6 +20,10 @@
 //   always had: its Prompt (the text translated, the `@names` turned into « image N »; ⌘Z in the field brings the old
 //   prompt back) and its Images box (1 to 3 numbered images, which have no undo — the line says so). The rack does not
 //   know the subjects. The rules are `LabInputs` (`Sources/Siliconed`), pure and tested.
+// - **The starting image of an img2img** (Z-Image, Anima, Krea 2: a model that reads no image but starts from one) is a role
+//   too, chosen by a gesture — « Start From This Image », or the role menu — never by default: a picture dropped to be described
+//   must not turn the next render into an img2img. Its tile then carries the strength (0 to 100 %, `StartImage`), and « Carry »
+//   puts both in the rack's Images box (`AppState.carryStart`), the size set to the format nearest the image's proportions.
 // - **No tabs, gestures that mix, written in the field as they come.** Describe writes into the text: it fills it when empty,
 //   otherwise it inserts at the caret or replaces the selection. Rewrite works on all of it. Both draw their marks token by
 //   token over the field (additions in the accent, removals struck; « Edit » puts them away), and the text lands in the field
@@ -57,6 +61,9 @@ final class LabModel {
         let width: Int, height: Int
         var role: LabInputs.Role
     }
+
+    /// **The strength the starting image is carried with** (img2img), set on its tile — the rack's own is retouched there afterwards.
+    var startStrength = AppState.defaultStartStrength
 
     /// What a rewrite changed, to draw its marks while the text is still the one it wrote.
     struct Changes: Equatable { var before: String; var after: String }
@@ -142,7 +149,22 @@ final class LabModel {
         return model.chain.text.output.readsImages ? model.chain.denoising.maxReferences : 0
     }
 
-    var offeredRoles: [LabInputs.Role] { LabInputs.roles(capacity: capacity) }
+    /// **Whether the model aimed at starts from an image** (img2img): its chain offers the image entry. Never in a mirror — the
+    /// other Mac's traits do not say it, and its jobs carry no starting image.
+    var startsFromImage: Bool { startsFromImage(for: target) }
+
+    func startsFromImage(for family: Family?) -> Bool {
+        guard !following, let family, let card = card(for: family), let model = rack.model(card.id) else { return false }
+        return model.chain.entries.contains { $0.kind == .image }
+    }
+
+    /// The model's start is an img2img's — not Qwen-Image-2.1's image 1, which the model reads as a reference.
+    var startIsImg2Img: Bool { capacity == 0 && startsFromImage }
+
+    var offeredRoles: [LabInputs.Role] { LabInputs.roles(capacity: capacity, startsFromImage: startsFromImage) }
+
+    /// What the roles depend on: a change of either conforms them.
+    var rolesKey: String { "\(capacity)·\(startsFromImage)" }
 
     // MARK: The render's priority
 
@@ -418,12 +440,17 @@ final class LabModel {
 
     /// After a change of the model aimed at: an image whose role it no longer offers is « describe only ».
     func conformRoles() {
-        let kept = LabInputs.conforming(slots, capacity: capacity)
+        let kept = LabInputs.conforming(slots, capacity: capacity, startsFromImage: startsFromImage)
         for (i, slot) in kept.enumerated() where pictures[i].role != slot.role { pictures[i].role = slot.role }
     }
 
+    /// « Start From This Image »: the gesture that makes an img2img's start — the previous start, if any, goes back to « describe only ».
+    func startFrom(_ picture: Picture) { setRole(.start, of: picture) }
+
+    func setStartStrength(_ s: Double) { startStrength = StartImage.snapped(s) }
+
     func setRole(_ role: LabInputs.Role, of picture: Picture) {
-        for slot in LabInputs.assigning(role, to: picture.id, in: slots) {
+        for slot in LabInputs.assigning(role, to: picture.id, in: slots, capacity: capacity) {
             if let i = pictures.firstIndex(where: { $0.id == slot.id }), pictures[i].role != slot.role { pictures[i].role = slot.role }
         }
     }
@@ -548,8 +575,11 @@ final class LabModel {
     var receipt: LabInputs.Receipt<Picture.ID> {
         let family = target
         let changesModel = !following && family != nil && rack.card?.family != family
-        return LabInputs.receipt(text: text, slots: slots, subjects: subjects.all, capacity: capacity,
-                                 rackPrompt: rack.prompt, rackImages: rack.references.count, changesModel: changesModel)
+        let img2img = startIsImg2Img
+        return LabInputs.receipt(text: text, slots: slots, subjects: subjects.all, capacity: capacity, startsFromImage: img2img,
+                                 rackPrompt: rack.prompt,
+                                 rackImages: img2img ? (rack.startImage == nil ? 0 : 1) : rack.references.count,
+                                 changesModel: changesModel)
     }
 
     /// The picture behind an image of the carried list.
@@ -568,6 +598,12 @@ final class LabModel {
     var outputFormat: RecommendedFormat? {
         guard !following, let first = receipt.first, let size = size(of: first), let family = target,
               let card = card(for: family), let denoising = rack.model(card.id)?.chain.denoising else { return nil }
+        // An img2img's size follows its starting image too, but among the model's sizes: the nearest proportions, at the rack's scale.
+        if startIsImg2Img {
+            return rack.identifier == card.id
+                ? rack.recommendedFormat(width: size.width, height: size.height)
+                : StartImage.recommendedFormat(width: size.width, height: size.height, among: card.formats, current: rack.format)
+        }
         let f = denoising.editFormat(referenceWidth: size.width, referenceHeight: size.height)
         return AppState.cappedForEditing(RecommendedFormat(f.width, f.height))
     }
@@ -579,8 +615,15 @@ final class LabModel {
         let receipt = receipt
         guard case .carries(let carry) = receipt.outcome, let family = target else { return }
         let app = rack
+        let img2img = startIsImg2Img
         if !following, receipt.changesModel, let wanted = card(for: family) { app.identifier = wanted.id }
-        if !carry.images.isEmpty { app.references = references(of: carry) }
+        if img2img, case .plain(let id, _)? = carry.images.first, let picture = picture(id) {
+            app.carryStart(AppState.startImage(bytes: picture.data, thumbnail: picture.thumbnail, width: picture.width,
+                                               height: picture.height, name: String(localized: "image from the lab")),
+                           strength: startStrength)
+        } else if !carry.images.isEmpty {
+            app.references = references(of: carry)
+        }
         if receipt.replacesPrompt { MainWindow.shared.setPrompt(carry.prompt, of: app) }
         self.carried = true
         MainWindow.shared.show()

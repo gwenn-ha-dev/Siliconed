@@ -33,6 +33,9 @@ extension RemoteControl {
         case "install" where arguments == ["stop"]:
             break
         // Files go up to the other Mac, whose owner confirms there.
+        case "start-image":
+            throw Refusal("remote", String(localized: "a starting image is not offered while the window computes on “\(name)”"),
+                          help: String(localized: "Render › Compute On › This Mac, then retry"))
         case "install", "import":
             throw Refusal("remote", String(localized: "\(command) acts on this Mac, and the window computes on “\(name)”"),
                           help: String(localized: "Render › Compute On › This Mac, then retry"))
@@ -73,6 +76,11 @@ extension RemoteControl {
         // A request while the session is down would be dropped, and its command would wait for an answer
         // that cannot come.
         if let down = app.linkBlocker { throw Refusal("link", down) }
+        // The starting image does not travel to the other Mac yet: said, never dropped in silence.
+        if d.image != nil || d.strength != nil {
+            throw Refusal("remote", String(localized: "a starting image (--image) is not offered while the window computes on “\(mirror.macName)”"),
+                          help: String(localized: "Render › Compute On › This Mac, then retry"))
+        }
         // The same usage rules as here (`add`).
         if !grid, d.sketch {
             throw Refusal("usage", String(localized: "--sketch belongs to “silicontrol grid”"), help: "silicontrol help grid")

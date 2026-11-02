@@ -24,6 +24,9 @@ extension RemoteControl {
             switch what {
             case "cell": throw Refusal("usage", String(localized: "cell expected (g2c3 or t5), not \"\(value)\""), help: "silicontrol help finish")
             case "grid": throw Refusal("usage", String(localized: "grid expected (g2), not \"\(value)\""), help: "silicontrol help finish")
+            case "--strength":
+                throw Refusal("usage", String(localized: "--strength expects a number above 0 and at most 1 (0.65 or 65%), not \"\(value)\""),
+                              help: "silicontrol help start-image")
             default:
                 throw Refusal("usage", String(localized: "\(what) does not read: \"\(value)\""), help: "silicontrol help \(command)")
             }
@@ -45,6 +48,7 @@ extension RemoteControl {
         case .macs(let action): finish(c, try macs(action))
         case .compute(let target): try compute(target, c)
         case .library(let action, let confirmed): try library(action, confirmed: confirmed, cwd: cwd, c)
+        case .startImage(let action): finish(c, try startImage(action, cwd: cwd))
         }
     }
 
@@ -119,11 +123,12 @@ extension RemoteControl {
     }
 
     /// What the rack holds after a gesture that fills it.
-    private func rackSettings() -> [String: Any] {
+    func rackSettings() -> [String: Any] {
         ["model": app.identifier, "prompt": app.prompt, "steps": app.steps,
          "width": app.format.width, "height": app.format.height,
          "seed": app.fixedSeed ? NSNumber(value: app.seed) : NSNull(),
-         "loras": app.loras.filter { !$0.path.isEmpty }.map { ["lora": Self.shortName($0.path), "strength": Response.number($0.strength)] }]
+         "loras": app.loras.filter { !$0.path.isEmpty }.map { ["lora": Self.shortName($0.path), "strength": Response.number($0.strength)] },
+         "start_image": startJSON() ?? NSNull()]
     }
 
     /// **`again <i7|file.png>`**: « Render Again (Same Seed) » (⌘R) — `redo` for an image of the history, which fills the rack with its

@@ -10,10 +10,8 @@ import UniformTypeIdentifiers
 extension AppState {
     // MARK: Reference (editing)
 
-    // **No img2img in the app** (decided 2026-09-25): the re-noised starting image
-    // (SDEdit) does not follow an instruction prompt and keeps a style only by losing the likeness.
-    // The engine and the CLI keep it (`Request.image`, `--image`); the app offers only editing
-    // by reference, where the model supports it.
+    // **Editing by reference** (Qwen-Image-2.1) lives here. The re-noised starting image (img2img, SDEdit) of
+    // Z-Image, Anima and Krea 2 is another input, chosen in the Prompt Lab: `AppState+Start.swift`.
 
     private func read(_ url: URL) -> ReferenceImage? {
         guard let vignette = NSImage(contentsOf: url), vignette.isValid, let size = ReferenceImage.size(of: url) else {
@@ -124,7 +122,18 @@ extension AppState {
             .flatMap { try? PNG.data($0) } : nil
         guard !files.isEmpty || pixels != nil else { return false }
         guard editingPossible else {
-            flash(String(localized: "To start from an image, choose a model that edits"))
+            // img2img: a pasted image replaces the starting image the rack holds; the first one is chosen in the Prompt Lab.
+            if startsFromImage, startImage != nil {
+                if let pixels, let image = Self.startImage(png: pixels, name: String(localized: "pasted image")) {
+                    carryStart(image)
+                } else if let file = files.first {
+                    replaceStart(with: file)
+                }
+            } else if startsFromImage {
+                flash(String(localized: "To start from an image, choose it in the Prompt Lab"))
+            } else {
+                flash(String(localized: "To start from an image, choose a model that edits"))
+            }
             return true
         }
         if let pixels {
