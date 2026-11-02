@@ -121,8 +121,11 @@ final class MossImageFamilyTests: XCTestCase {
         XCTAssertThrowsError(try Chain(text: text, denoising: Krea2DenoisingModule(map: ""), decoding: decoder))
         XCTAssertThrowsError(try Chain(text: text, denoising: dit, decoding: QwenImageDecodingModule(path: "")))
         XCTAssertThrowsError(try Chain(text: text, denoising: dit, decoding: FluxDecodingModule(path: "")))
-        // No image encoder, no reference: the entries are the prompt's.
+        // Without its encoder, no image entry; with FLUX.2's, a start image (img2img), and no reference.
         XCTAssertEqual(try Chain(text: text, denoising: dit, decoding: decoder).entries.map(\.kind), [.text])
+        let encoder = Flux2EncodingModule(path: "")
+        XCTAssertEqual(encoder.space, dit.space)
+        XCTAssertEqual(try Chain(text: text, denoising: dit, decoding: decoder, encoding: encoder).entries.map(\.kind), [.text, .image])
     }
 
     func testTheRecipeIsEightStepsOfEulerWithoutCFG() {
@@ -131,7 +134,7 @@ final class MossImageFamilyTests: XCTestCase {
         XCTAssertEqual(ModelCard.mossImage.defaultSteps, 8)
         XCTAssertEqual(dit.sigmas(steps: 8), [1, 0.968, 0.926, 0.871, 0.791, 0.671, 0.46300002932548523, 0.024, 0])
         XCTAssertEqual(dit.solvers, [.euler])
-        XCTAssertFalse(dit.acceptsStartImage)
+        XCTAssertTrue(dit.acceptsStartImage)
         XCTAssertEqual(dit.maxReferences, 0)
         let plan = dit.plan(height: 64, width: 64, steps: 8, start: 0, withLoRA: false, faster: false)
         XCTAssertEqual(plan.evaluations, 8)
@@ -290,6 +293,80 @@ final class MossImageFamilyTests: XCTestCase {
         batch.batch = 3
         let three = try XCTUnwrap(MemoryNeed.mossImage(batch, maps: Self.maps()))
         XCTAssertEqual(three.crossing - (try need(1024, 1024)).crossing, 2 * 128 * 64 * 64 * 4)
+    }
+
+    /// **img2img's start image is charged** (`MemoryNeed.Request.references`, which the render fills with it): a phase of
+    /// its own, the FLUX.2 encoder's plan at the render's format (the `fitted` copy when the size handed differs), and the
+    /// image as handed plus its z₀ crossing the render — nothing of it in the denoising.
+    func testTheStartImageIsCharged() throws {
+        let maps = Self.maps()
+        let plain = try need(1024, 1024)
+        var r = request(1024, 1024, maps: maps)
+        r.references = [(1024, 1024)]
+        let start = try XCTUnwrap(MemoryNeed.mossImage(r, maps: maps))
+        XCTAssertEqual(start.phases.map(\.kind), [.text, .references, .denoising, .decoding])
+        let encoder = VAEEncoder.plan(family: .flux2, height: 1024, width: 1024)
+        XCTAssertEqual(start.phases[1].bytes, encoder.bytes + encoder.outside)
+        XCTAssertEqual(start.phases[1].bytes("fitted copy"), 0)
+        XCTAssertEqual(start.crossing - plain.crossing, 3 * 1024 * 1024 * 4 + 128 * 64 * 64 * 4)
+        XCTAssertEqual(start.phases[2].bytes, plain.phases[1].bytes)
+        r.references = [(2048, 1024)]
+        let other = try XCTUnwrap(MemoryNeed.mossImage(r, maps: maps))
+        XCTAssertEqual(other.phases[1].bytes("fitted copy"), 3 * 1024 * 1024 * 4)
+        XCTAssertGreaterThan(other.crossing, start.crossing)
+    }
+
+    /// **FLUX.2's encoder is Flux's plus `quant_conv` and the pipeline's part on the host**: its plan is the walk, at
+    /// least Flux.1's (the same layers, a wider head), and grows with the format.
+    func testTheFlux2EncoderPlanIsItsWalk() {
+        for (w, h) in [(512, 512), (1024, 1024), (1024, 1536)] {
+            let plan = VAEEncoder.plan(family: .flux2, height: h, width: w)
+            XCTAssertEqual(plan, VAEEncoder.walk(family: .flux2, height: h, width: w))
+            XCTAssertGreaterThanOrEqual(plan.bytes, VAEEncoder.plan(family: .flux, height: h, width: w).bytes)
+        }
+        XCTAssertLessThan(VAEEncoder.plan(family: .flux2, height: 512, width: 512).bytes,
+                          VAEEncoder.plan(family: .flux2, height: 1024, width: 1024).bytes)
+    }
+
+    /// **The patch of the encoding side is the decoder's, inverted**: `patchify ∘ unpatchify` is the identity bit for
+    /// bit, channel `4c + 2py + px` holds the pixel `(2y + py, 2x + px)` of channel `c` (`Flux2Pipeline._patchify_latents`),
+    /// and the normalization is the denormalization's inverse in torch's order, `(z − mean) / scale`.
+    func testThePatchAndTheNormalizationInvertTheDecoders() {
+        let (c, h, w) = (3, 2, 4)
+        let patched = (0..<(4 * c * h * w)).map { Float($0) * 0.25 - 7 }
+        let unpatched = Flux2VAE.unpatchify(patched, channels: c, patch: 2, height: h, width: w)
+        XCTAssertEqual(Flux2VAE.patchify(unpatched, channels: c, patch: 2, height: 2 * h, width: 2 * w), patched)
+        let z = (0..<(c * 2 * h * 2 * w)).map { Float($0) }
+        let p = Flux2VAE.patchify(z, channels: c, patch: 2, height: 2 * h, width: 2 * w)
+        // channel 4·1 + 2·1 + 0 = 6, cell (y 1, x 2) ← pixel (3, 4) of channel 1.
+        XCTAssertEqual(p[6 * h * w + 1 * w + 2], z[1 * (2 * h) * (2 * w) + 3 * (2 * w) + 4])
+        let (scale, shift): ([Float], [Float]) = ([1.5, 0.25, 3], [0.1, -2, 0.5])
+        let x: [Float] = [0.3, -1.2, 2.5, 0, 7, -0.01]
+        let normalized = Flux2VAE.normalize(x, scale: scale, shift: shift, plane: 2)
+        XCTAssertEqual(normalized, zip(x.indices, x).map { i, v in (v - shift[i / 2]) / scale[i / 2] })
+        let back = Flux2VAE.denormalize(normalized, scale: scale, shift: shift, plane: 2)
+        for (a, b) in zip(back, x) { XCTAssertEqual(a, b, accuracy: 1e-6) }
+    }
+
+    /// **The strength's N is the schedule's length** (`len(timesteps)` in diffusers' `get_timesteps`): MOSS-Image snaps
+    /// its σ to the training grid and merges the duplicates, so a dense schedule has fewer evaluations than steps, and
+    /// t_start counts in evaluations, never past the last one.
+    func testTheStrengthCountsTheScheduleNotTheSteps() throws {
+        let dit = MossImageDenoisingModule(map: "", turbo: "")
+        let chain = try Chain(text: MossImageTextModule(map: "", tokenizer: ""), denoising: dit,
+                              decoding: Flux2DecodingModule(path: ""), encoding: Flux2EncodingModule(path: ""))
+        let picture = ImageRGB(pixels: [Float](repeating: 0, count: 3 * 512 * 512), height: 512, width: 512)
+        let eight = try Admission.judge(Request("p", resolution: 512, steps: 8, image: picture, strength: 0.6), chain: chain, usesANE: false)
+        XCTAssertEqual(eight.start, 3)
+        XCTAssertEqual(eight.plan.evaluations, 5)
+        XCTAssertEqual(eight.plan.startSigma, dit.sigmas(steps: 8)[3])
+        for steps in 1...Request.maximumSteps {
+            let n = dit.sigmas(steps: steps).count - 1
+            let admitted = try Admission.judge(Request("p", resolution: 512, steps: steps, image: picture, strength: 0.5),
+                                               chain: chain, usesANE: false)
+            XCTAssertEqual(admitted.start, Strength.startStep(steps: n, strength: 0.5), "\(steps) steps")
+            XCTAssertEqual(admitted.plan.evaluations, n - admitted.start, "\(steps) steps")
+        }
     }
 
     /// Unknown maps, unknown need: the render is refused rather than priced at zero.

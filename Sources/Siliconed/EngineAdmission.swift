@@ -38,10 +38,13 @@ package struct Admission: Sendable {
         // **img2img is judged before any computation, too**: an out-of-range strength, a chain
         // without an encoder, a strength that leaves no evaluation all throw here.
         var start = 0
+        // The strength's N is the schedule's length as diffusers' `get_timesteps` reads it (`len(timesteps)`): the
+        // steps asked, but fewer where a family's schedule merges σs (MOSS-Image's, snapped to its training grid).
+        let scheduled = denoising.sigmas(steps: steps).count - 1
         if request.image != nil {
             guard chain.encoding != nil else { throw Strength.Failure.withoutEncoder(model: denoising.model) }
             guard request.strength > 0, request.strength <= 1 else { throw Strength.Failure.outOfBounds(request.strength) }
-            start = Strength.startStep(steps: steps, strength: request.strength)
+            start = Strength.startStep(steps: scheduled, strength: request.strength)
         }
         if !request.references.isEmpty {
             guard chain.encoding != nil, request.references.count <= denoising.maxReferences else {
@@ -64,12 +67,12 @@ package struct Admission: Sendable {
         guard plan.evaluations > 0 else {
             // The floor: the last start that keeps an evaluation, `d`, is reached as soon as
             // `N − N·s < d + 1`, i.e. `s > (N − d − 1)/N`.
-            let last = (0..<steps).last {
+            let last = (0..<scheduled).last {
                 denoising.plan(height: height, width: width, steps: steps, start: $0,
                                withLoRA: !request.loras.isEmpty, faster: faster).evaluations > 0
             } ?? 0
             throw Strength.Failure.noEvaluation(strength: request.strength, steps: steps,
-                                                floor: Double(steps - last - 1) / Double(steps))
+                                                floor: Double(scheduled - last - 1) / Double(scheduled))
         }
         return Admission(space: space, height: height, width: width, steps: steps, start: start, plan: plan,
                          accelerators: Accelerators(requested: request.accelerators, usesANE: usesANE), fasterRendering: faster)

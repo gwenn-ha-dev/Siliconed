@@ -9,8 +9,10 @@ import Foundation
 ///                          ─ mid(resnet, attention, resnet) ─ GroupNorm ─ SiLU ─ conv_out → moments [32, H/8, W/8]
 ///     Qwen-Image         image [3, H, W] ─ conv_in ─ 11 flat layers (resnets, ÷2 at 2, 5, 8)
 ///     (Anima, Krea 2)      ─ mid(resnet, attention, resnet) ─ RMSNorm ─ SiLU ─ conv_out ─ quant_conv → moments
+///     FLUX.2             Flux's encoder as it stands ─ conv_out (64) ─ quant_conv (1×1, 64 → 64) → moments [64, H/8, W/8]
+///     (MOSS-Image)         ─ mean (32) ─ patchify 2×2 ─ (z − mean_c) / √(var_c + ε) per patched channel → [128, H/16, W/16]
 ///
-///     moments = [mean (16) | log-variance (16)]      latent = normalize(mean)
+///     moments = [mean (16 or 32) | log-variance (16 or 32)]      latent = normalize(mean)
 ///
 /// The bricks are those of the decoders (`VAEBuildingBlocks`); the only new operation is the
 /// **downsampling**: `3×3`, stride 2, asymmetric padding `(0, 1, 0, 1)` (`VAEBuildingBlocks.downsample`).
@@ -24,6 +26,17 @@ import Foundation
 /// on the first pass (empty cache): only `resample.1` remains, a stride-2 `Conv2d`. The
 /// `time_conv`s are not read. Anima and Krea 2 publish **the same weights** (bf16 versus f32,
 /// bit-equal once widened): one encoder, two files.
+///
+/// ## FLUX.2: Flux's encoder, then the pipeline's part on the host
+///
+/// `AutoencoderKLFlux2`'s encoder is diffusers' `Encoder`, the very one Flux.1's VAE uses (`block_out_channels`
+/// 128…512, two resnets per block, GroupNorm 32) — only `conv_out` doubles (2 × 32 channels) and a `quant_conv`
+/// (1×1, 64 → 64) follows, as Qwen-Image's does: the mean also depends on the log-variance half. What a port by
+/// analogy with Flux.1 would miss is after it, in the pipeline (`Flux2Pipeline._encode_vae_image`; MOSS-Image's
+/// own pipeline never encodes): the mean is **patchified** 2×2 with channel `4c + 2py + px` — the inverse of
+/// `Flux2VAE.unpatchify` — and only then normalized by the batch-norm's running statistics of the 128 PATCHED
+/// channels, `(z − mean) / √(var + 1e-4)`. Flux.1's two scalars are not this. Done on the host
+/// (`Flux2VAE.patchify`, `.normalize`): a latent's worth of arithmetic, the same roundings as torch's.
 ///
 /// ## The mean, not a sample — a deliberate departure from diffusers
 ///
@@ -51,17 +64,22 @@ package final class VAEEncoder {
         case flux
         /// `AutoencoderKLQwenImage` (Anima, Krea 2): RMSNorm, causal 3D kernels, `quant_conv`.
         case qwenImage
+        /// `AutoencoderKLFlux2` (MOSS-Image): Flux's encoder with 32 channels and a `quant_conv`, then the
+        /// pipeline's patchify and batch-norm normalization.
+        case flux2
 
         /// The latent channels (half of the moments).
-        var channels: Int { 16 }
+        var channels: Int { self == .flux2 ? 32 : 16 }
+        /// Pixels per cell of the denoiser's latent: the network's 8, times FLUX.2's 2×2 patch.
+        var factor: Int { self == .flux2 ? 16 : 8 }
     }
 
     /// What an encoding returns: the normalized latent — the one the denoiser expects —, the
     /// raw moments (for the checks) and, on request, the per-block probes.
     package struct Output {
-        /// `[16, H/8, W/8]`, normalized in the denoiser's space.
+        /// `[16, H/8, W/8]` (FLUX.2: `[128, H/16, W/16]`), normalized in the denoiser's space.
         package let latent: [Float]
-        /// `[32, H/8, W/8]`: mean then log-variance, before normalization.
+        /// `[32, H/8, W/8]` (FLUX.2: `[64, H/8, W/8]`, after `quant_conv`): mean then log-variance, before normalization.
         package let moments: [Float]
         package let probes: [String: [Float]]
         package let seconds: Double
@@ -78,8 +96,11 @@ package final class VAEEncoder {
     private let targets: [String: MPSGraphTensor]
     package let family: Family
     package let height, width: Int
-    package var latentGridHeight: Int { height / 8 }
-    package var latentGridWidth: Int { width / 8 }
+    /// FLUX.2's batch-norm statistics, `√(running_var + ε)` and `running_mean` per patched channel; `nil` otherwise.
+    private let batchNorm: (scale: [Float], shift: [Float])?
+    /// The denoiser's grid: `H/8` (FLUX.2: `H/16`, after the patch).
+    package var latentGridHeight: Int { height / family.factor }
+    package var latentGridWidth: Int { width / family.factor }
 
     /// - Parameter path: the published `vae/diffusion_pytorch_model.safetensors`, read as is.
     /// - Parameter height, width: the image, in pixels (multiples of 8).
@@ -93,12 +114,25 @@ package final class VAEEncoder {
                  startingAt: String? = nil) throws {
         let weights = try Safetensors(path: path)
         let expectedShape = family == .qwenImage ? [96, 3, 3, 3, 3] : [128, 3, 3, 3]
-        guard weights.entries["encoder.conv_in.weight"]?.shape == expectedShape else {
+        // Flux.1's and FLUX.2's encoders differ by `conv_out`'s width (2 × 16, 2 × 32) and FLUX.2's `quant_conv`.
+        let flux2Shaped = family != .flux2 || (weights.entries["encoder.conv_out.weight"]?.shape == [64, 512, 3, 3]
+                                               && weights.entries["quant_conv.weight"]?.shape == [64, 64, 1, 1])
+        guard weights.entries["encoder.conv_in.weight"]?.shape == expectedShape, flux2Shaped else {
             throw Safetensors.Failure.badHeader("\(path): not the VAE encoder "
-                                                + [.flux: "of Flux", .qwenImage: "of Qwen-Image"][family]!)
+                                                + [.flux: "of Flux", .qwenImage: "of Qwen-Image", .flux2: "of FLUX.2"][family]!)
         }
-        guard height % 8 == 0, width % 8 == 0 else {
-            throw EngineError.formatRefused(width: width, height: height, reason: .notMultiple, bound: 8)
+        guard height % family.factor == 0, width % family.factor == 0 else {
+            throw EngineError.formatRefused(width: width, height: height, reason: .notMultiple, bound: family.factor)
+        }
+        if family == .flux2 {
+            let patched = 4 * family.channels
+            guard let mean = weights.materialize("bn.running_mean"), let variance = weights.materialize("bn.running_var"),
+                  mean.count == patched, variance.count == patched else {
+                throw Safetensors.Failure.badHeader("\(path): the FLUX.2 VAE's batch-norm statistics (\(patched) channels) are missing")
+            }
+            batchNorm = (Flux2VAE.scale(variance: variance, epsilon: Flux2VAE.Config().batchNormEpsilon), mean)
+        } else {
+            batchNorm = nil
         }
         let (device, queue) = try SystemGPU.open()
         self.device = device; self.queue = queue; self.weights = weights
@@ -125,12 +159,16 @@ package final class VAEEncoder {
         case .flux:
             moments = try VAEEncoder.flux(graph, weights, input, (height, width), probe: probe)
         case .qwenImage: moments = try VAEEncoder.qwen(graph, weights, input, (height, width), probe: probe)
+        case .flux2:
+            moments = try VAEBuildingBlocks(graph: graph, weights: weights, name: "FLUX.2 encoder", groups: 32)
+                .conv(VAEEncoder.flux(graph, weights, input, (height, width), probe: probe), "quant_conv", padding: 0)
         }
         if let startingAt, entry === input {
             throw Safetensors.Failure.badHeader("\(path): no probe \(startingAt) in this encoder")
         }
         let mean = graph.sliceTensor(moments, dimension: 1, start: 0, length: family.channels, name: nil)
-        var targets = ["moments": moments, "latent": VAEEncoder.normalize(graph, mean, family)]
+        // FLUX.2's latent is made on the host from the moments (`hostLatent`): the patch is a permutation.
+        var targets = family == .flux2 ? ["moments": moments] : ["moments": moments, "latent": VAEEncoder.normalize(graph, mean, family)]
         if probes { targets.merge(captured) { a, _ in a } }
         self.graph = graph; self.entry = entry; self.targets = targets
         self.entryShape = (entry.shape ?? []).map(\.intValue)
@@ -154,7 +192,18 @@ package final class VAEEncoder {
             }
             return graph.division(graph.subtraction(z, vector(config.mean), name: nil),
                                   vector(config.std), name: "normalize")
+        case .flux2:
+            preconditionFailure("FLUX.2's latent is normalized on the host (hostLatent)")
         }
+    }
+
+    /// **FLUX.2's latent from its moments**, as `Flux2Pipeline._encode_vae_image` makes it: the mean (the first 32
+    /// planes of `[64, h, w]`), patchified 2×2, then `(z − mean) / √(var + ε)` per patched channel.
+    static func hostLatent(moments: [Float], height h: Int, width w: Int, batchNorm: (scale: [Float], shift: [Float]),
+                           channels: Int = 32) -> [Float] {
+        let mean = Array(moments.prefix(channels * h * w))
+        let patched = Flux2VAE.patchify(mean, channels: channels, patch: 2, height: h, width: w)
+        return Flux2VAE.normalize(patched, scale: batchNorm.scale, shift: batchNorm.shift, plane: (h / 2) * (w / 2))
     }
 
     /// Flux's encoder (`diffusers/models/autoencoders/vae.py`, `Encoder`): `block_out_channels
@@ -241,7 +290,8 @@ package final class VAEEncoder {
                 try VAEEncoder.encodeBanded(image, family: family, height: height, width: width, bands: bands)
             }
             memory.finish()
-            return Output(latent: latent, moments: moments, probes: [:], seconds: Date().timeIntervalSince(begin))
+            let normalized = batchNorm.map { VAEEncoder.hostLatent(moments: moments, height: height / 8, width: width / 8, batchNorm: $0) } ?? latent
+            return Output(latent: normalized, moments: moments, probes: [:], seconds: Date().timeIntervalSince(begin))
         }
         let count = entryShape.reduce(1, *)
         let buffer = device.checkedBuffer(length: count * 4)
@@ -269,7 +319,9 @@ package final class VAEEncoder {
             }
         }
         let seconds = Date().timeIntervalSince(begin)
-        let latent = readValues.removeValue(forKey: "latent")!, moments = readValues.removeValue(forKey: "moments")!
+        let moments = readValues.removeValue(forKey: "moments")!
+        let latent = readValues.removeValue(forKey: "latent")
+            ?? batchNorm.map { VAEEncoder.hostLatent(moments: moments, height: height / 8, width: width / 8, batchNorm: $0) } ?? []
         return Output(latent: latent, moments: moments, probes: readValues, seconds: seconds)
     }
 
@@ -300,9 +352,23 @@ package final class VAEEncoder {
         x = try bands.resnet(x, mid + ".resnets.0", inChannels: 512, outChannels: 512)
         try bands.attention(x, mid + ".attentions.0")
         x = try bands.resnet(x, mid + ".resnets.1", inChannels: 512, outChannels: 512)
-        let moments = try bands.normConv(x, norm: "encoder.conv_norm_out", conv: "encoder.conv_out", outChannels: 2 * c,
+        var moments = try bands.normConv(x, norm: "encoder.conv_norm_out", conv: "encoder.conv_out", outChannels: 2 * c,
                                          residual: nil, into: nil)
         memory.free(x)
+        if family == .flux2 {
+            // `quant_conv`, then the pipeline's part on the host (`hostLatent`): the moments, the mean's patched
+            // copy and the latent, alive together.
+            let projected = try bands.whole([moments], moments.shape, weights: WeightList.conv(2 * c, 2 * c, kernel: 1),
+                                            workspace: VAELayout.reformattedWeights(4 * c * c) / 4) { b, p in
+                try b.conv(p[0], "quant_conv", padding: 0)
+            }
+            memory.free(moments)
+            moments = projected
+            memory.host(4 * (moments.count + c * h * w + c * h * w))
+            let values = memory.isLive ? Array(UnsafeBufferPointer(start: moments.values, count: moments.count)) : []
+            memory.free(moments)
+            return ([], values)
+        }
         let latent = try bands.whole([moments], [1, c, h, w], weights: []) { b, p in
             VAEEncoder.normalize(b.graph, b.graph.sliceTensor(p[0], dimension: 1, start: 0, length: c, name: nil), family)
         }

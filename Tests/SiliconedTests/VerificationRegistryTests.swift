@@ -139,7 +139,7 @@ final class VerificationRegistryTests: XCTestCase {
         let runs = CheckCommand.everyStage(stages, ["--goldens", "g"])
         XCTAssertEqual(runs.map(\.0), ["anima tokenizer", "anima text", "anima dit 512", "anima dit 1024", "anima dit 768x512",
                                        "anima trajectory 512", "anima trajectory 1024",
-                                       "anima vae 512", "anima vae 1024", "anima vae 768x512"])
+                                       "anima vae 512", "anima vae 1024", "anima vae 768x512", "anima img2img"])
         XCTAssertEqual(runs[3].2, ["--size", "1024", "--goldens", "g"])
         XCTAssertEqual(runs[0].2, ["--goldens", "g"])
         let at1024 = CheckCommand.everyStage(stages, ["--size", "1024"])

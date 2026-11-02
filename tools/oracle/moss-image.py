@@ -20,6 +20,8 @@ The recipe is the community turbo: MOSS-Image-SFT + the LoRA `lodestones/MOSS-Im
     moss-image.py bf16                         LoRA merged into bf16 weights vs kept apart   -> witness-moss-bf16-512
     moss-image.py trajectory                   the 8 steps with the LoRA                     -> goldens-moss-trajectory-512
     moss-image.py vae-final                    the final latent decoded, the image's md5     -> goldens-moss-vae-final-512
+    moss-image.py img2img [--variant compact]  img2img at strength 0.6 with the LoRA: the picture encoded, the start,
+                                               the truncated loop (steps 3-7)                -> goldens-moss-img2img[-compact]-512
     moss-image.py all                          all of the above, in dependency order
 
 Goldens go in `<goldens>/moss/`; `--goldens DIR`, else `SILICONED_GOLDENS`, else `./goldens`. Each stage rereads what an
@@ -404,6 +406,10 @@ class LoraCheckpoint:
         n = len(prefix)
         return {k[n:]: self.tensor(k, dtype) for k in self.keys if k.startswith(prefix)}
 
+    def describe(self) -> dict:
+        """The base's weights (a variant's provenance), the LoRA merged on them named."""
+        return {**self.base.describe(), "lora": lora_path().name, "lora_strength": self.strength}
+
 
 def dit_checkpoint(lora: bool):
     base = quantized.Variant("moss-image", VARIANT) if VARIANT else Checkpoint(snap() / "transformer", DIT_INDEX)
@@ -656,6 +662,69 @@ def stage_trajectory(size: str):
                                                        "steps_run": len(scheduler.timesteps)})
 
 
+# ------------------------------------------------------------------ img2img
+
+def stage_img2img(size: str):
+    """**img2img.** MOSS-Image's pipeline has none (`pipeline_moss_image.py`: text to image only): the recipe is
+    diffusers' own img2img construction on the reference's scheduler, DiT and loop, with the turbo LoRA at strength 1
+    and CFG 1 (one forward per step), each piece the reference's code:
+
+        z0        = Flux2Pipeline._encode_vae_image(picture)        FLUX.2's own encoding: the posterior mean
+                    (`argmax`), patchified 2x2, then (z - bn.running_mean) / sqrt(bn.running_var + eps)
+        timesteps = get_timesteps(N, strength)                      N = len(timesteps) after the snap to the grid
+        x_s       = scheduler.scale_noise(z0, timesteps[:1], eps)   MOSSImageScheduler is diffusers' Euler; eps the
+                                                                    pipeline's own noise for the seed
+        then the trajectory's loop from x_s, steps t_start ... N - 1
+
+    With `--variant`, the Standard's start (the same picture, z0, noise and x_s) through the Compact's DiT, the
+    Standard's LoRA on it."""
+    import types
+    from diffusers import Flux2Pipeline
+    from diffusers.pipelines.qwenimage.pipeline_qwenimage_img2img import QwenImageImg2ImgPipeline
+    height, width, name = common.parse_size(size)
+    assert height == width == 512
+    text = read("goldens-moss-text", "moss-image.py text")["final"]
+    standard = f"goldens-moss-img2img-{name}"
+    if VARIANT:
+        start = read(standard, f"moss-image.py img2img --size {name}")
+        picture, z0, eps = start["image"], start["z0"], start["eps"]
+    else:
+        picture = common.start_picture(height, width)
+        vae = load_vae()
+        z0 = Flux2Pipeline._encode_vae_image(types.SimpleNamespace(vae=vae, _patchify_latents=Flux2Pipeline._patchify_latents),
+                                             picture[None], None)[0]
+        del vae
+        eps = initial_latent(height, width)[0]
+    scheduler = make_scheduler(STEPS)
+    count = len(scheduler.timesteps)
+    timesteps, t_start, sigma_s = common.img2img_truncation(
+        lambda sch, n, strength: QwenImageImg2ImgPipeline.get_timesteps(types.SimpleNamespace(scheduler=sch), n, strength, "cpu"),
+        scheduler, count, common.IMG2IMG_STRENGTH)
+    latents = scheduler.scale_noise(z0[None], timesteps[:1], eps[None])
+    if VARIANT:
+        assert torch.equal(latents[0], start["x_s"]), "the Standard's x_s is not recomputed bit for bit"
+    model = load_dit(lora=True)
+    embeds = text[None]
+    payload = {"image": picture, "z0": z0.clone(), "eps": eps.clone(), "x_s": latents[0].clone(),
+               "sigmas": scheduler.sigmas.float(), "timesteps": scheduler.timesteps.float(),
+               "t_start": torch.tensor([float(t_start)]), "sigma_s": torch.tensor([sigma_s])}
+    print(f"  strength {common.IMG2IMG_STRENGTH}: t_start {t_start}, sigma_s {sigma_s:.6f}, {len(timesteps)} evaluations")
+    for k, t in enumerate(timesteps):
+        i = t_start + k
+        velocity = model(latents, t.reshape(1), embeds).sample.float()      # CFG 1: one forward, no negative branch
+        latents = scheduler.step(velocity, t, latents, return_dict=False)[0]
+        payload[f"velocity_{i}"] = velocity[0].clone()
+        payload[f"latent_{i + 1}"] = latents[0].clone()
+        print(f"  step {i}: sigma = {float(scheduler.sigmas[i]):.4f}, t = {float(t):.1f}", flush=True)
+    payload["latent_final"] = latents[0].clone()
+    write(quantized.stem(standard, VARIANT), payload, {
+        "lora": "lora.safetensors, strength 1", "cfg": 1.0, "strength": common.IMG2IMG_STRENGTH, "t_start": t_start,
+        "sigma_s": sigma_s, "evaluations": len(timesteps),
+        "picture": f"inputs/{common.START_PICTURE}, covered and center-cropped, LANCZOS",
+        "recipe": "Flux2Pipeline._encode_vae_image; QwenImageImg2ImgPipeline.get_timesteps; scale_noise",
+        **({"inputs": standard, "weights": model.published.describe()} if VARIANT else {})})
+
+
 # ------------------------------------------------------------------ the VAE
 
 def load_vae(dtype=torch.float32):
@@ -753,7 +822,7 @@ def everything(goldens: Path):
     stages = [["schedule"], ["tokenizer"], ["text"], ["vae", "--size", "512"], ["dit", "--size", "512"],
               ["dit", "--size", "512", "--lora"], ["text-witness"], ["vae-witness", "--size", "512"],
               ["witness", "--size", "512", "--lora"], ["witness", "--size", "512"], ["dit-bf16", "--size", "512"], ["bf16", "--size", "512"],
-              ["trajectory", "--size", "512"], ["vae-final", "--size", "512"]]
+              ["trajectory", "--size", "512"], ["vae-final", "--size", "512"], ["img2img", "--size", "512"]]
     common.run_stages(__file__, goldens, stages)
 
 
@@ -762,16 +831,16 @@ def main() -> None:
     common.unbuffered()
     p = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     p.add_argument("stage", choices=["schedule", "tokenizer", "text", "text-witness", "vae", "vae-witness", "dit", "witness",
-                                     "dit-bf16", "bf16", "trajectory", "vae-final", "all"])
+                                     "dit-bf16", "bf16", "trajectory", "vae-final", "img2img", "all"])
     p.add_argument("--size", default="512", help="512 (every stage); 1024 for dit, witness and dit-bf16")
     p.add_argument("--lora", action="store_true", help="dit, witness: the 8-step LoRA merged at strength 1")
     p.add_argument("--variant", choices=list(quantized.SOURCES["moss-image"]),
-                   help="dit, witness, dit-bf16: the Compact's published DiT (Comfy-Org's int8 convrot) instead of the publisher's")
+                   help="dit, witness, dit-bf16, img2img: the Compact's published DiT (Comfy-Org's int8 convrot) instead of the publisher's")
     p.add_argument("--goldens", help="output folder (default: $SILICONED_GOLDENS, else ./goldens)")
     args = p.parse_args()
     global VARIANT
-    if args.variant and (args.stage not in ("dit", "witness", "dit-bf16") or args.lora):
-        p.error("--variant goes with dit, witness or dit-bf16, without --lora (the Compact takes the Standard's LoRA)")
+    if args.variant and (args.stage not in ("dit", "witness", "dit-bf16", "img2img") or args.lora):
+        p.error("--variant goes with dit, witness, dit-bf16 or img2img, without --lora (the Compact takes the Standard's LoRA)")
     VARIANT = args.variant
     OUT = common.goldens_directory(args.goldens) / "moss"
     OUT.mkdir(parents=True, exist_ok=True)
@@ -785,7 +854,7 @@ def main() -> None:
         {"schedule": stage_schedule, "tokenizer": stage_tokenizer, "text": stage_text, "text-witness": stage_text_witness,
          "vae": lambda: stage_vae(args.size), "vae-witness": lambda: stage_vae_witness(args.size),
          "bf16": lambda: stage_bf16(args.size), "dit-bf16": lambda: stage_dit_bf16(args.size), "trajectory": lambda: stage_trajectory(args.size),
-         "vae-final": lambda: stage_vae_final(args.size)}[args.stage]()
+         "vae-final": lambda: stage_vae_final(args.size), "img2img": lambda: stage_img2img(args.size)}[args.stage]()
 
 
 if __name__ == "__main__":

@@ -118,6 +118,41 @@ package final class Flux2VAE {
         return out
     }
 
+    // MARK: - The encoding side: patchify and normalize (pure), the inverses
+
+    /// `[C, p·h, p·w]` → `[C·p², h, w]`, the exact inverse of `unpatchify`: the pixel `(p·y + py, p·x + px)` of
+    /// channel `c` goes to channel `p²c + p·py + px` (`Flux2Pipeline._patchify_latents`:
+    /// `view(C, h, p, w, p).permute(0, 1, 3, 5, 2, 4)`).
+    package static func patchify(_ z: [Float], channels: Int, patch p: Int, height H: Int, width W: Int) -> [Float] {
+        precondition(z.count == channels * H * W && H % p == 0 && W % p == 0,
+                     "Flux2VAE.patchify: a [\(channels), \(H), \(W)] latent divisible by \(p) expected")
+        var out = [Float](repeating: 0, count: z.count)
+        let (h, w) = (H / p, W / p)
+        for c in 0..<channels {
+            for py in 0..<p {
+                for px in 0..<p {
+                    let target = ((c * p + py) * p + px) * h * w
+                    for y in 0..<h {
+                        let source = (c * H + p * y + py) * W + px
+                        for x in 0..<w { out[target + y * w + x] = z[source + p * x] }
+                    }
+                }
+            }
+        }
+        return out
+    }
+
+    /// `(z − shift) / scale` per channel of a `[C, h, w]` latent — `denormalize`'s inverse, in torch's order
+    /// (`(image_latents - latents_bn_mean) / latents_bn_std`).
+    package static func normalize(_ z: [Float], scale: [Float], shift: [Float], plane: Int) -> [Float] {
+        var out = z
+        for c in 0..<scale.count {
+            let (s, m) = (scale[c], shift[c])
+            for i in (c * plane)..<((c + 1) * plane) { out[i] = (z[i] - m) / s }
+        }
+        return out
+    }
+
     // MARK: - The decoder
 
     /// **The decoder's layers on a `[32, h, w]` latent (already denormalized and unpatchified)**, as

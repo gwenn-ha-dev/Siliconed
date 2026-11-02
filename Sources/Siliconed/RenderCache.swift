@@ -354,6 +354,9 @@ extension FluxEncodingModule: CacheIdentified {
 extension QwenImageEncodingModule: CacheIdentified {
     package var cacheIdentity: [String] { identity(self, [space.name], files: [path]) }
 }
+extension Flux2EncodingModule: CacheIdentified {
+    package var cacheIdentity: [String] { identity(self, [space.name], files: [path]) }
+}
 extension QwenImage21EncodingModule: CacheIdentified {
     package var cacheIdentity: [String] { identity(self, [space.name], files: [path]) }
 }

@@ -11,6 +11,8 @@
     anima.py vae --size 512 [1024 768x512]  the decoder on the final latent             -> goldens-anima-vae-<size>
     anima.py witness --size 512 --step 0    one guided evaluation in float64            -> witness-anima-f64-<size>-step<n>
     anima.py vae-witness --size 512         the decoder in float64                      -> witness-anima-vae-f64-<size>
+    anima.py img2img --size 512             img2img at strength 0.6: the picture encoded, the start, the
+                                            truncated loop (steps 3-7)                  -> goldens-anima-img2img-<size>
     anima.py all [--size 512 1024 768x512]  all of the above, in an order that satisfies their dependencies
 
 `bf16` is the bar of a half-precision path (the ANE's fp16 products): the `dit` evaluation with the
@@ -375,6 +377,50 @@ def stage_trajectory(size: str):
     write(f"goldens-anima-trajectory-{resolution}", payload)
 
 
+def stage_img2img(size: str):
+    """**img2img**, by diffusers' modular Anima blocks (`AnimaImg2ImgVaeEncoderStep`, `AnimaImg2ImgSetTimestepsStep`),
+    each piece their code:
+
+        z0        = encode_vae_image(picture, sample_mode="argmax")   the posterior mean, (z - mean) / std
+        timesteps = get_timesteps(scheduler, N, strength)             the full schedule, then truncated
+        x_s       = scheduler.scale_noise(z0, timesteps[:1], eps)     eps: the txt2img noise of the seed
+        then the trajectory's loop from x_s, steps t_start ... N - 1
+
+    The noise is the txt2img one, so that strength 1 is txt2img bit for bit, as in the engine."""
+    from diffusers import AutoencoderKLQwenImage
+    from diffusers.modular_pipelines.anima.before_denoise import get_timesteps
+    from diffusers.modular_pipelines.anima.encoders import encode_vae_image
+    resolution = int(size)
+    embeds = read("goldens-anima-text", "anima.py text")["prompt_embeds"][None]
+    picture = common.start_picture(resolution, resolution)
+    vae = AutoencoderKLQwenImage.from_pretrained(base() / "vae", torch_dtype=torch.float32).eval()
+    z0 = encode_vae_image(picture[None], vae, None, torch.device("cpu"), torch.float32, sample_mode="argmax")
+    del vae
+    scheduler = schedule()
+    timesteps, t_start, sigma_s = common.img2img_truncation(get_timesteps, scheduler, STEPS, common.IMG2IMG_STRENGTH)
+    eps = initial_latent(resolution, resolution)
+    latent = scheduler.scale_noise(z0, timesteps[:1], eps)
+    model = load_transformer()
+    padding = torch.zeros(1, 1, resolution, resolution)
+    payload = {"image": picture, "z0": z0[0, :, 0].clone(), "eps": eps[0, :, 0].clone(), "x_s": latent[0, :, 0].clone(),
+               "sigmas": scheduler.sigmas.float(), "t_start": torch.tensor([float(t_start)]), "sigma_s": torch.tensor([sigma_s])}
+    print(f"  strength {common.IMG2IMG_STRENGTH}: t_start {t_start}, sigma_s {sigma_s:.6f}, {len(timesteps)} evaluations")
+    for k, t in enumerate(timesteps):
+        i = t_start + k
+        timestep = (t / scheduler.config.num_train_timesteps).expand(1).float()
+        velocity = model(hidden_states=latent, timestep=timestep, encoder_hidden_states=embeds,
+                         padding_mask=padding, return_dict=False)[0]
+        latent = scheduler.step(velocity, t, latent, return_dict=False)[0]
+        payload[f"velocity_{i}"] = velocity[0, :, 0].clone()
+        payload[f"latent_{i + 1}"] = latent[0, :, 0].clone()
+        print(f"  step {i}: sigma = {float(scheduler.sigmas[i]):.4f}", flush=True)
+    payload["latent_final"] = latent[0, :, 0].clone()
+    write(f"goldens-anima-img2img-{resolution}", payload, {
+        "strength": common.IMG2IMG_STRENGTH, "t_start": t_start, "sigma_s": sigma_s, "evaluations": len(timesteps),
+        "picture": f"inputs/{common.START_PICTURE}, covered and center-cropped, LANCZOS",
+        "recipe": "modular Anima: encode_vae_image (argmax), get_timesteps, scale_noise"})
+
+
 def stage_vae(size: str):
     """Decoding the final latent. For a rectangle (`768x512`), the latent is the **centered crop** of the
     final 1024 latent: a real latent, and h != w."""
@@ -533,6 +579,7 @@ def everything(goldens: Path, sizes: list[str]) -> None:
     stages += [["witness", "--size", s, "--step", "0"] for s in squares]
     stages += [["vae", "--size", s] for s in sizes]
     stages += [["vae-witness", "--size", s] for s in sizes]
+    stages += [["img2img", "--size", "512"]] if "512" in squares else []
     common.run_stages(__file__, goldens, stages)
 
 
@@ -540,7 +587,7 @@ def main() -> None:
     global OUT
     common.unbuffered()
     p = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    p.add_argument("stage", choices=["tokenizer", "text", "dit", "bf16", "trajectory", "vae", "witness", "vae-witness", "all"])
+    p.add_argument("stage", choices=["tokenizer", "text", "dit", "bf16", "trajectory", "vae", "witness", "vae-witness", "img2img", "all"])
     p.add_argument("--size", nargs="+", default=None,
                    help="512, 1024 or WIDTHxHEIGHT (dit, vae: a rectangle too; default 512, all: every size)")
     p.add_argument("--step", type=int, default=0, help="witness only: the step of the trajectory (default 0, the one the check reads)")
@@ -567,7 +614,7 @@ def main() -> None:
                 stage_witness(size, args.step)
             else:
                 {"dit": stage_dit, "bf16": stage_bf16, "trajectory": stage_trajectory, "vae": stage_vae,
-                 "vae-witness": stage_vae_witness}[args.stage](size)
+                 "vae-witness": stage_vae_witness, "img2img": stage_img2img}[args.stage](size)
 
 
 if __name__ == "__main__":

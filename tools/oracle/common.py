@@ -255,6 +255,40 @@ def centered_crop(latent: torch.Tensor, height: int, width: int) -> torch.Tensor
     return latent[:, y0:y0 + h, x0:x0 + w].contiguous()
 
 
+# ------------------------------------------------------------------------------------------ img2img
+
+# img2img's goldens, every family: one picture, one strength, the reference seed. 0.6 at 8 steps starts at step 3
+# (`t_start = int(8 - 4.8)`), five evaluations: past the first step, where the style is decided, and short of the end.
+START_PICTURE = "border-collie-beach.png"
+IMG2IMG_STRENGTH = 0.6
+
+
+def start_picture(height: int, width: int) -> torch.Tensor:
+    """img2img's starting picture at a render's format, `[3, H, W]` in `[-1, 1]`, 8-bit values: scaled to cover the
+    format, center-cropped (the engine's `ImageRGB.fitted`; diffusers' `VaeImageProcessor` would stretch), LANCZOS.
+    The check reads this tensor from the golden: the preprocessing is the app's own and is not what is judged, the
+    encoder starts from the same bits on both sides."""
+    import numpy as np
+    from PIL import Image
+    picture = Image.open(Path(__file__).resolve().parent / "inputs" / START_PICTURE).convert("RGB")
+    scale = max(width / picture.width, height / picture.height)
+    w, h = max(width, round(picture.width * scale)), max(height, round(picture.height * scale))
+    picture = picture.resize((w, h), Image.LANCZOS)
+    x0, y0 = (w - width) // 2, (h - height) // 2
+    picture = picture.crop((x0, y0, x0 + width, y0 + height))
+    return torch.from_numpy(np.asarray(picture).copy()).permute(2, 0, 1).float() / 127.5 - 1
+
+
+def img2img_truncation(get_timesteps, scheduler, steps: int, strength: float):
+    """diffusers' img2img truncation, by the reference's own `get_timesteps` (the same code in every img2img
+    pipeline): the FULL schedule is set first, then `t_start = int(N - min(N * strength, N))`, `set_begin_index(t_start)`.
+    Returns the timesteps run, `t_start` and `sigma_s = sigmas[t_start]`."""
+    timesteps, remaining = get_timesteps(scheduler, steps, strength)
+    t_start = steps - remaining
+    assert scheduler.begin_index == t_start, f"get_timesteps left begin_index at {scheduler.begin_index}, not {t_start}"
+    return timesteps, t_start, float(scheduler.sigmas[t_start])
+
+
 def per_plane(got: torch.Tensor, exact: torch.Tensor) -> tuple[float, float, int]:
     """The engine's `errorPerPlan`: relative L2 error per plane (first axis), the denominator floored
     at 1 % of the median plane norm. Returns (worst, median, index of the worst plane)."""

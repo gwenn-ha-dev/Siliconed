@@ -10,7 +10,9 @@ import Foundation
 
 package enum Registry {
     /// In the order a reader meets them: the kernels, then each model from its text to its image.
-    package static let stages: [Stage] = KernelStages.all + ZImageStages.all + QwenImageStages.all + AnimaStages.all + Krea2Stages.all + MossImageStages.all
+    package static let stages: [Stage] = KernelStages.all + ZImageStages.all + [Img2ImgStages.zImage] + QwenImageStages.all
+        + AnimaStages.all + [Img2ImgStages.anima] + Krea2Stages.all + [Img2ImgStages.krea2]
+        + MossImageStages.all + [Img2ImgStages.mossImage]
 
     package static func stage(_ model: String, _ name: String) -> Stage? {
         stages.first { $0.model == model && $0.name == name }

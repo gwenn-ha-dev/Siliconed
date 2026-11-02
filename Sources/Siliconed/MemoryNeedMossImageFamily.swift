@@ -4,11 +4,13 @@ import Foundation
 /// shape functions: the DiT's (`MemoryNeed.mossImageDenoising`, its file), the encoder's and the decoder's.
 ///
 ///     crossing: the encoded text [T, 4096] · the modulation table (kept by the context to the render's end)
-///               · latent [128, H/16, W/16]
+///               · latent [128, H/16, W/16] · (img2img) the image as handed, and z₀
 ///
 ///     text        Qwen35Encoder arena(T) + its staging units × the largest tensor of the stream
 ///                 + the largest rotated weight's widening scratch (the Compact's int8 convrot)
 ///                 + the full layers' causal SDPA (mask T·T ⊕ queries' copy) · its GEMM
+///     references  (img2img) the `fitted` copy when the size differs
+///                 + the FLUX.2 encoder's two heaps and host copies (`VAEEncoder.plan`, family `.flux2`)
 ///     denoising   MossImageDiT arena(S + T, r) + the stream's units + CacheLoRA(r) … (`mossImageDenoising`)
 ///     decoding    the FLUX.2 decoder's two heaps and the image it returns (`Flux2VAE.plan`)
 ///
@@ -96,8 +98,10 @@ extension MemoryNeed {
         let (gridHeight, gridWidth) = (request.height / 16, request.width / 16)
         let latent = dit.channels * gridHeight * gridWidth * f
 
+        // img2img's image as handed (kept by the request through the render) and its z₀ at the render's grid.
+        let starts = request.references.reduce(0) { $0 + 3 * $1.width * $1.height * f + latent }
         let crossing = t * dit.textDim * f + MossImageDiT.tableBytes(config: dit, count: Siliconed.Request.maximumSteps)
-            + latent + batchLatents(request, latent: latent)
+            + latent + starts + batchLatents(request, latent: latent)
 
         // ── text: the encoder's arena, its stream's buffers, the full layers' SDPA, its GEMM ───────────
         let (h, i, a, kv) = (encoder.hidden, encoder.intermediate, encoder.attentionWidth, encoder.kvWidth)
@@ -113,6 +117,14 @@ extension MemoryNeed {
                                       (sequence, h, i), (sequence, i, h)], spread: sequence,
                  plan: request.encoderPlan, weight: maps.encoderFormat, phase: .encoding))
 
+        // ── img2img's starting image, encoded at the render's format (`fitted`: a copy when the size handed differs),
+        //    one encoder at a time: its heaps and the latent it returns ─────────────────────────────────────────
+        let references = request.references.map { image in
+            Phase(kind: .references, terms: [
+                Term("fitted copy", image.width == request.width && image.height == request.height ? 0 : 3 * request.width * request.height * f),
+            ] + vae("FLUX.2 encoder", VAEEncoder.plan(family: .flux2, height: request.height, width: request.width)))
+        }
+
         // ── denoising: the DiT's own formula, under the stack the denoiser opens: the turbo LoRA, then the request's ──
         var denoisingRequest = request
         denoisingRequest.loraRanks = [maps.turboRank] + request.loraRanks
@@ -124,6 +136,6 @@ extension MemoryNeed {
         let decoding = Phase(kind: .decoding,
                              terms: vae("FLUX.2 decoder", Flux2VAE.plan(latentHeight: request.height / 8, latentWidth: request.width / 8,
                                                                        band: band)) + [batchImages(request)])
-        return MemoryNeed(phases: [text, denoising, decoding], crossing: crossing, base: request.base)
+        return MemoryNeed(phases: [text] + references + [denoising, decoding], crossing: crossing, base: request.base)
     }
 }

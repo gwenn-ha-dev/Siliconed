@@ -8,6 +8,8 @@
     z-image.py trajectory --size 512      the 8-step sampler and its image  -> goldens-trajectory-<size>
     z-image.py vae --size 768x512         the decoder on a rectangle        -> goldens-vae-<size>
     z-image.py vae-witness --size 768x512 the same decoding in float64      -> witness-vae-f64-<size>
+    z-image.py img2img --size 512         img2img at strength 0.6: the picture encoded, the start, the truncated
+                                          sampler (steps 3-7)              -> goldens-img2img-<size>
     z-image.py all                        every stage at every size the check reads (not `bf16`)
     z-image.py dit|bf16|witness --variant compact|light   the same, for the Compact's or the Light's published
                                           DiT, dequantized by its publisher's code (`quantized.py`)
@@ -392,6 +394,70 @@ def trajectory(goldens: Path, size: str, steps: int = 8) -> None:
         summary_extra=True)
 
 
+# ======================================================================================== img2img
+
+def img2img(goldens: Path, size: str, steps: int = 8) -> None:
+    """**img2img**, by `ZImageImg2ImgPipeline`'s own pieces (diffusers 0.41):
+
+        z0        = (mean - shift_factor) * scaling_factor            the posterior MEAN: the pipeline draws a sample
+                    (`retrieve_latents`, sample_mode "sample"); the engine takes the mean, deterministic, and so does this
+        timesteps = ZImageImg2ImgPipeline.get_timesteps(N, strength)  the full schedule, then truncated
+        x_s       = scheduler.scale_noise(z0, timesteps[:1], eps)     eps: the txt2img noise of the seed (no sample
+                                                                      drawn before it, so strength 1 is txt2img bit for bit)
+        then the pipeline's loop from x_s: reversed time, negated output, `scheduler.step`
+
+    `velocity_i` is the negated output (`noise_pred`), what the engine's sampler records."""
+    import types
+    from diffusers import AutoencoderKL, FlowMatchEulerDiscreteScheduler
+    from diffusers.pipelines.z_image.pipeline_z_image import calculate_shift
+    from diffusers.pipelines.z_image.pipeline_z_image_img2img import (ZImageImg2ImgPipeline, get_default_z_image_sigmas,
+                                                                      retrieve_latents, retrieve_timesteps)
+    from diffusers.utils.torch_utils import randn_tensor
+
+    resolution = int(size)
+    root = common.snapshot(REPOSITORY, ["transformer", "vae", "scheduler"])
+    caps = conditioning(goldens)
+    picture = common.start_picture(resolution, resolution)
+    vae = AutoencoderKL.from_pretrained(str(root / "vae"), torch_dtype=torch.float32).eval()
+    mean = retrieve_latents(vae.encode(picture[None]), sample_mode="argmax")
+    z0 = (mean - vae.config.shift_factor) * vae.config.scaling_factor
+    del vae
+
+    scheduler = FlowMatchEulerDiscreteScheduler.from_pretrained(str(root / "scheduler"))
+    latent_size = resolution // 8
+    mu = calculate_shift((latent_size // 2) ** 2,
+                         scheduler.config.get("base_image_seq_len", 256),
+                         scheduler.config.get("max_image_seq_len", 4096),
+                         scheduler.config.get("base_shift", 0.5),
+                         scheduler.config.get("max_shift", 1.15))
+    retrieve_timesteps(scheduler, steps, torch.device("cpu"), sigmas=get_default_z_image_sigmas(steps), mu=mu)
+    timesteps, t_start, sigma_s = common.img2img_truncation(
+        lambda s, n, strength: ZImageImg2ImgPipeline.get_timesteps(types.SimpleNamespace(scheduler=s), n, strength, "cpu"),
+        scheduler, steps, common.IMG2IMG_STRENGTH)
+    generator = torch.Generator().manual_seed(TRAJECTORY_SEED)
+    eps = randn_tensor((1, 16, latent_size, latent_size), generator=generator, device=torch.device("cpu"), dtype=torch.float32)
+    latents = scheduler.scale_noise(z0, timesteps[:1], eps)
+    model, _ = build_dit(root)
+    out = {"image": picture, "z0": z0[0].clone(), "eps": eps[0].clone(), "x_s": latents[0].clone(),
+           "sigmas": scheduler.sigmas.float(), "t_start": torch.tensor([float(t_start)]), "sigma_s": torch.tensor([sigma_s])}
+    print(f"strength {common.IMG2IMG_STRENGTH}: t_start {t_start}, sigma_s {sigma_s:.6f}, {len(timesteps)} evaluations")
+    for k, t in enumerate(timesteps):
+        i = t_start + k
+        timestep = ((1000 - t.expand(latents.shape[0])) / 1000).to(torch.float32)
+        v = model(list(latents.unsqueeze(2).unbind(dim=0)), timestep, [caps], return_dict=False)[0]
+        noise_pred = -torch.stack([x.float() for x in v], dim=0).squeeze(2)
+        latents = scheduler.step(noise_pred, t, latents, return_dict=False)[0]
+        out[f"velocity_{i}"] = noise_pred[0].clone()
+        out[f"latent_{i + 1}"] = latents[0].clone()
+        print(f"step {i}: t {float(t):8.2f}  sigma {float(scheduler.sigmas[i]):.6f}", flush=True)
+    out["latent_final"] = latents[0].clone()
+    common.write_golden(goldens, f"goldens-img2img-{resolution}", out, {
+        "resolution": resolution, "steps": steps, "seed": TRAJECTORY_SEED, "strength": common.IMG2IMG_STRENGTH,
+        "t_start": t_start, "sigma_s": sigma_s, "evaluations": len(timesteps), "prompt": PROMPT,
+        "picture": f"inputs/{common.START_PICTURE}, covered and center-cropped, LANCZOS",
+        "recipe": "ZImageImg2ImgPipeline.get_timesteps, scale_noise; the posterior mean", "dtype": "float32", "device": "cpu"})
+
+
 # ======================================================================================== vae
 
 def vae(goldens: Path, size: str) -> None:
@@ -452,6 +518,8 @@ def everything(goldens: Path, prompt: str, sizes: list[str]) -> None:
             trajectory(goldens, size)   # the check's trajectories are square
     if "1024" in sizes:
         vae(goldens, "768x512")
+    if "512" in sizes:
+        img2img(goldens, "512")         # `siliconed check z-image img2img`
     # A stage regenerated without its successors leaves the goldens straddling two prompts, and the
     # deviation then measured has nothing to do with the engine.
     caps = conditioning(goldens)
@@ -468,7 +536,7 @@ def everything(goldens: Path, prompt: str, sizes: list[str]) -> None:
 def main() -> None:
     common.unbuffered()
     p = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    p.add_argument("stage", choices=["text", "dit", "witness", "trajectory", "bf16", "vae", "vae-witness", "all"])
+    p.add_argument("stage", choices=["text", "dit", "witness", "trajectory", "bf16", "vae", "vae-witness", "img2img", "all"])
     p.add_argument("--size", nargs="+", default=None,
                    help="512, 1024 or WIDTHxHEIGHT (default: 512; vae: 768x512; all: 512 1024)")
     p.add_argument("--goldens", help="output folder (default: $SILICONED_GOLDENS, else ./goldens)")
@@ -493,7 +561,7 @@ def main() -> None:
                 {"dit": dit, "witness": witness, "bf16": bf16}[args.stage](goldens, size, args.variant)
             else:
                 {"dit": dit, "witness": witness, "bf16": bf16, "trajectory": trajectory, "vae": vae,
-                 "vae-witness": vae_witness}[args.stage](goldens, size)
+                 "vae-witness": vae_witness, "img2img": img2img}[args.stage](goldens, size)
 
 
 if __name__ == "__main__":

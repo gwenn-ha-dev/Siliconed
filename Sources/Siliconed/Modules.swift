@@ -356,6 +356,7 @@ package struct Model: Sendable {
         return Model(card: card, library: b, chain: try Chain(
             text: MossImageTextModule(map: try map(b.encoderMap(.mossImage), b), tokenizer: try b.component(.mossImage, "tokenizer")),
             denoising: MossImageDenoisingModule(map: try map(dit, b), turbo: turbo),
-            decoding: Flux2DecodingModule(path: try b.component(.mossImage, "vae.safetensors"))))
+            decoding: Flux2DecodingModule(path: try b.component(.mossImage, "vae.safetensors")),
+            encoding: Flux2EncodingModule(path: try b.component(.mossImage, "vae.safetensors"))))
     }
 }

@@ -54,8 +54,6 @@ package struct MossImageDenoisingModule: DenoisingModule {
     package var entry: TextFormat { .mossImage }
     package var space: LatentSpace { .flux2 }
     package var defaultSteps: Int { 8 }
-    /// No img2img: the family has no image encoder (the product has none).
-    package var acceptsStartImage: Bool { false }
     /// The lie about σ was never judged on this model.
     package var acceptsDetail: Bool { false }
 
@@ -143,6 +141,19 @@ package struct MossImageDenoisingModule: DenoisingModule {
 }
 
 /// FLUX.2's decoder on the DiT's latent: the batch-norm denormalization, the 2×2 unpatchify, the decoder, the clamp.
+/// **FLUX.2's encoder**, img2img's input on MOSS-Image: Flux's encoder, `quant_conv`, then the pipeline's patchify and
+/// batch-norm normalization (`VAEEncoder`, family `.flux2`) — a `[128, H/16, W/16]` latent in the DiT's space.
+package struct Flux2EncodingModule: ImageEncodingModule {
+    package var path: String
+    package var space: LatentSpace { .flux2 }
+    package var name: String { "VAE FLUX.2" }
+    package init(path: String) { self.path = path }
+
+    package func encoder(_ image: ImageRGB, context: Context) throws -> Latent {
+        try encoderImage(image, path: path, family: .flux2, space: space, context: context)
+    }
+}
+
 package struct Flux2DecodingModule: DecodingModule {
     package var path: String
     package var space: LatentSpace { .flux2 }
