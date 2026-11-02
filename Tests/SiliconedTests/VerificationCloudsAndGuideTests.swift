@@ -76,7 +76,7 @@ final class VerificationCloudsAndGuideTests: XCTestCase {
         XCTAssertEqual(m.atWitness!.engine, 0.03, accuracy: 1e-6)
         XCTAssertEqual(m.atWitness!.reference, 0.10, accuracy: 1e-6)
         XCTAssertEqual(m.threshold, 0.125, accuracy: 1e-6)
-        XCTAssertEqual(m.note, "clouds: engine median of 5 draws, oracle worst of 3")
+        XCTAssertEqual(m.note, "clouds of one-ulp moves: engine median of 5 draws, oracle worst of 3")
     }
 
     func testAFailureStaysAFailureWhenTheMedianIsPastTheAllowance() throws {
@@ -116,5 +116,37 @@ final class VerificationCloudsAndGuideTests: XCTestCase {
         let wrong = try arbitrate(failed(), oracle: [0.1, 0.1], engine: [0, 0, 0, 0], shape: [3, 1])
         XCTAssertFalse(wrong.passed)
         XCTAssertEqual(wrong.note, "no oracle draws to arbitrate")
+    }
+
+    // MARK: - Clouds of summation orders
+
+    /// The oracle's order draws (seeds 2, 5, 7) at 0.12, 0.30, 0.06 beside its ulp draws 0.10 and 0.05: its cloud holds the
+    /// five and its nominal, worst 0.30, bar 0.375. The engine draws the same three seeds — never the ulp moves — and its
+    /// median of four (0.2 at the witness, 0.1, 0.3, 0.35) is judged: 0.3 passes.
+    func testTheOrdersJudgeWhenTheOracleDrewThem() throws {
+        let orders = zip([UInt64(2), 5, 7], try draws([0.12, 0.30, 0.06])).map { (seed: $0, file: $1) }
+        var asked: [UInt64] = [], moved = 0
+        let byOrder: [UInt64: Float] = [2: 0.1, 5: 0.3, 7: 0.35]
+        var clouds = Clouds(draws: try draws([0.10, 0.05]), orders: orders,
+                            engineOrder: { seed in asked.append(seed); return ["h": self.away(byOrder[seed]!)] }) { _ in
+            moved += 1
+            return ["h": self.away(0)]
+        }
+        let m = try truth.withUnsafeBufferPointer { try clouds.arbitrate(failed(), exact: $0, columns: 1) }
+        XCTAssertEqual(asked, [2, 5, 7])
+        XCTAssertEqual(moved, 0)
+        XCTAssertEqual(m.threshold, 0.375, accuracy: 1e-6)
+        XCTAssertEqual(m.atWitness!.engine, 0.3, accuracy: 1e-6)   // sorted 0.1 0.2 0.3 0.35: the upper median
+        XCTAssert(m.passed)
+        XCTAssertEqual(m.note, "clouds of summation orders: engine median of 4 (nominal + 3 orders), oracle worst of 6 (nominal + 2 ulp + 3 orders)")
+    }
+
+    /// Without the engine's own order draws (a stage that cannot draw them), the oracle's are left out and the ulp moves judge.
+    func testOrdersWithoutTheEnginesDrawsAreLeftOut() throws {
+        let orders = zip([UInt64(1), 2], try draws([0.9, 0.9])).map { (seed: $0, file: $1) }
+        var clouds = Clouds(draws: try draws([0.10, 0.05]), orders: orders) { _ in ["h": self.away(0.01)] }
+        let m = try truth.withUnsafeBufferPointer { try clouds.arbitrate(failed(), exact: $0, columns: 1) }
+        XCTAssertEqual(m.threshold, 0.125, accuracy: 1e-6)
+        XCTAssertEqual(m.note, "clouds of one-ulp moves: engine median of 5 draws, oracle worst of 3")
     }
 }

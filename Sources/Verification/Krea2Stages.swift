@@ -13,9 +13,24 @@ import Siliconed
 // **Clouds.** Some boundaries are ill-conditioned in fp32: block 0's text rows amplify a rounding about
 // a thousandfold, and one fp32 draw against one says which summation order the engine took, not how
 // close it is. When the single verdict at the witness fails and the oracle has **draws** of the same
-// inputs — the latent moved by one ulp, `krea2.py draw --jitter N`, the exact value moves by ~10⁻⁷ and the witness
-// still judges —, the engine draws four the same way: its median no further from the exact than the
-// oracle's worst draw, + 25 %. Without draws, the single verdict stands.
+// inputs, the engine draws the same way: its median no further from the exact than the oracle's worst
+// draw, + 25 %. Without draws, the single verdict stands.
+//
+// **Two families of draws, and the orders judge where they exist.** The first moves the latent by one ulp
+// (`krea2.py draw --jitter N`): the exact value moves by ~10⁻⁷ and the witness still judges, but every product
+// still sums its terms in the one order its BLAS or kernel chose, so the cloud samples the inputs, not the
+// arithmetic. The second draws the arithmetic itself (`--permute N --permute-kind group`, `Krea2PermutedMap`):
+// the residual stream's channels reordered everywhere at once, by whole groups of 256 — the same model, the
+// same exact result, its sums over the hidden dimension in another order. Groups of 256 because it is the only
+// family a convrot map admits: its rotation is one Hadamard per group, which a permutation of groups commutes
+// with and nothing finer does; the oracle and the engine then draw the same seeds, so the same orders.
+// Measured on the Compact at 512², `block27_out` against fp64 (·10⁻⁴): the oracle's golden is 4.60, the low
+// tail of its own orders (4.96–6.18 over seeds 1–8), and its identity taken by another loading path gives 6.27;
+// the engine's widened route spans 5.00–7.02 (median 5.69), its int8 route 5.05–6.90 (median 6.03). The two
+// routes overlap, int8 − widened per seed +0.27 ± 0.25: the order, not the route, moved the int8 past the
+// ulp clouds' bar (6.35, which the widened route itself fails on one order in eight). So when the oracle has
+// order draws of a boundary, the engine draws the same seeds (its nominal + 8 orders, the median judged), and
+// the oracle's cloud is its nominal, its ulp draws and its orders; the ulp moves judge otherwise.
 
 enum Krea2Stages {
     static let all: [Stage] = [text, dit, trajectory, vae]
@@ -83,8 +98,8 @@ enum Krea2Stages {
         model: model, name: "dit",
         proves: "one evaluation of the DiT at σ = 1, boundary by boundary, judged at the fp64 witness where it exists",
         sizes: ["512", "1024", "768x512"], options: ["--map", "--neural-engine", "--bf16-activations", "--bf16-attention", "--no-accelerators", "--variant"],
-        oracle: "tools/oracle/krea2.py dit --size {size}; witness --size {size}; witness-step --size {size} --step 0; draw --size {size} --step 0 --jitter 1 2 3; with --neural-engine, --bf16-activations or --bf16-attention, bf16 --size {size}; with --variant compact or light, dit, bf16, witness, witness-step --step 0 and draw --step 0 --jitter 1 2 3 with --variant, at 512 \(Wording.publishers)", weights: ["DiT"],
-        rule: "the rule, floor 5e-4, at the fp64 witness where it exists, clouds when the oracle has draws; model_out per latent plane at the witness; \(Wording.rectangle); \(Wording.halfPrecision)"
+        oracle: "tools/oracle/krea2.py dit --size {size}; witness --size {size}; witness-step --size {size} --step 0; draw --size {size} --step 0 --jitter 1 2 3; with --neural-engine, --bf16-activations or --bf16-attention, bf16 --size {size}; with --variant compact or light, dit, bf16, witness, witness-step --step 0, draw --step 0 --jitter 1 2 3 and draw --size {size} --step 0 --permute 1 2 3 4 5 6 7 8 --permute-kind group with --variant, at 512 \(Wording.publishers)", weights: ["DiT"],
+        rule: "the rule, floor 5e-4, at the fp64 witness where it exists, clouds of summation orders when the oracle has order draws (the same seeds drawn by the engine), of one-ulp moves when it has only those; model_out per latent plane at the witness; \(Wording.rectangle); \(Wording.halfPrecision)"
     ) { invocation in
         let version = try invocation.quantizedVariant()
         let report = Report(title: "\(model) dit\(version.map { " " + $0.rawValue } ?? "") \(invocation.size)")
@@ -105,8 +120,9 @@ enum Krea2Stages {
 
         // Published int8 weights (the Compact): the evaluation along the int8 kernel, `model_out` once widened below (`Int8Route`).
         let int8 = Int8Route(artifact, invocation)
+        let accelerators = Accelerators.on(neuralEngine: int8?.neuralEngine ?? EngineSettings.effective.plan.usesANE)
         let dit = try Krea2DiT(artifact: artifact, latentHeight: height, latentWidth: width, maxText: t,
-                               accelerators: .on(neuralEngine: int8?.neuralEngine ?? EngineSettings.effective.plan.usesANE), plan: int8?.plan)
+                               accelerators: accelerators, plan: int8?.plan)
         dit.recordBoundaries = true
         let started = Date()
         let out = try dit.forward(latent: latent.baseAddress!, text: text.baseAddress!, textRows: t, sigma: sigma[0])
@@ -115,7 +131,24 @@ enum Krea2Stages {
         let half = try invocation.halfReference(stem + ".safetensors", script: "tools/oracle/krea2.py bf16 --size \(invocation.size)\(version.map { " --variant " + $0.rawValue } ?? "")")
         // The oracle's draws of these inputs: `draw-krea2-R-step0-jitterN`.
         let draws = stem.replacingOccurrences(of: "goldens-krea2-dit-", with: "draw-krea2-") + "-step0"
-        var clouds = Clouds(draws: (1...8).compactMap { invocation.goldens.optional(draws + "-jitter\($0).safetensors") }) { seed in
+        // Their summation-order draws, `draw-krea2-R-step0-permgroupN`, and the engine's of the same seeds: the map rewritten
+        // with its residual stream permuted (`Krea2PermutedMap.draw`), evaluated by a DiT built as `make` builds it.
+        let orders = Clouds.orders(invocation.goldens, draws)
+        let orderDraw = { (make: @escaping (Artifact) throws -> Krea2DiT) -> (UInt64) throws -> [String: [Float]] in
+            { seed in
+                try Krea2PermutedMap.draw(source: artifact.path, seed: seed, text: text) { map, movedText in
+                    let permuted = try make(map)
+                    permuted.recordBoundaries = true
+                    let v = try permuted.forward(latent: latent.baseAddress!, text: movedText.baseAddress!, textRows: t, sigma: sigma[0])
+                    return permuted.boundaries.merging(["model_out": v]) { $1 }
+                }
+            }
+        }
+        var clouds = Clouds(draws: (1...8).compactMap { invocation.goldens.optional(draws + "-jitter\($0).safetensors") },
+                            orders: orders, engineOrder: orderDraw {
+                                try Krea2DiT(artifact: $0, latentHeight: height, latentWidth: width, maxText: t,
+                                             accelerators: accelerators, plan: int8?.plan)
+                            }) { seed in
             var moved = Array(latent)
             moveByOneULP(&moved, seed: seed)
             let v = try moved.withUnsafeBufferPointer {
@@ -149,7 +182,10 @@ enum Krea2Stages {
                 let widened = try Krea2DiT(artifact: artifact, latentHeight: height, latentWidth: width, maxText: t)
                 let forward = { (l: UnsafePointer<Float>) in try widened.forward(latent: l, text: text.baseAddress!, textRows: t, sigma: sigma[0]) }
                 let other = try forward(latent.baseAddress!)
-                var widenedClouds = Clouds(draws: (1...8).compactMap { invocation.goldens.optional(draws + "-jitter\($0).safetensors") }) { seed in
+                var widenedClouds = Clouds(draws: (1...8).compactMap { invocation.goldens.optional(draws + "-jitter\($0).safetensors") },
+                                           orders: orders, engineOrder: orderDraw {
+                                               try Krea2DiT(artifact: $0, latentHeight: height, latentWidth: width, maxText: t)
+                                           }) { seed in
                     var moved = Array(latent)
                     moveByOneULP(&moved, seed: seed)
                     return ["model_out": try moved.withUnsafeBufferPointer { try forward($0.baseAddress!) }]
@@ -268,16 +304,33 @@ func moveByOneULP(_ x: inout [Float], seed: UInt64) {
 }
 
 /// **The clouds' arbiter** (see the header): a measure that fails at the witness, and only such a one, is
-/// judged again by draws when the oracle has at least two of the same inputs.
+/// judged again by draws when the oracle has at least two of the same inputs. Two families: the summation orders
+/// (`orders`, the oracle's `-permgroupN` with the engine's own draws of the same seeds, `engineOrder`), which judge
+/// whenever both sides have them, and the one-ulp moves of the input (`draws`, `engineDraw`) otherwise. The oracle's
+/// cloud is its nominal, its ulp draws and its order draws; the engine's, its nominal and the draws of the judging family.
 struct Clouds {
     let draws: [Safetensors]
     /// One engine evaluation on the inputs moved by one ulp (seed n): its boundaries by name.
     let engineDraw: (UInt64) throws -> [String: [Float]]
+    /// The oracle's summation-order draws, by seed (`krea2.py draw --permute N --permute-kind group`).
+    let orders: [(seed: UInt64, file: Safetensors)]
+    /// One engine evaluation with its residual stream permuted by the group permutation of a seed
+    /// (`Krea2PermutedMap.draw`): its boundaries by name, in the reference's channel order.
+    let engineOrder: ((UInt64) throws -> [String: [Float]])?
     private var engine: [[String: [Float]]] = []
 
-    init(draws: [Safetensors], engineDraw: @escaping (UInt64) throws -> [String: [Float]]) {
+    init(draws: [Safetensors], orders: [(seed: UInt64, file: Safetensors)] = [],
+         engineOrder: ((UInt64) throws -> [String: [Float]])? = nil, engineDraw: @escaping (UInt64) throws -> [String: [Float]]) {
         self.draws = draws
         self.engineDraw = engineDraw
+        self.engineOrder = engineOrder
+        self.orders = engineOrder == nil ? [] : orders
+    }
+
+    /// The oracle's order draws of `stem` (`-permgroup1` … `-permgroup8`): not `permgroup0`, the identity taken by
+    /// another loading path than the golden's, nor the full permutations, which a convrot map cannot draw.
+    static func orders(_ goldens: Goldens, _ stem: String) -> [(seed: UInt64, file: Safetensors)] {
+        (1...8).compactMap { n in goldens.optional(stem + "-permgroup\(n).safetensors").map { (UInt64(n), $0) } }
     }
 
     /// `m` itself, or its verdict by clouds. `name`: the boundary's name in the draws, `m`'s by default.
@@ -289,23 +342,33 @@ struct Clouds {
         let worst = { (v: [Float], exact: UnsafeBufferPointer<Float>) -> Double in
             planes.map { errorPerPlane(v, exact, planes: $0).worst } ?? channelError(v, exact, columns: columns).worst
         }
-        let oracle = draws.compactMap { d -> Double? in
-            guard let v = d.float32(name), v.count == exact.count else { return nil }
-            return worst(Array(v), exact)
+        let judged = { (files: [Safetensors]) in
+            files.compactMap { d -> Double? in
+                guard let v = d.float32(name), v.count == exact.count else { return nil }
+                return worst(Array(v), exact)
+            }
         }
-        guard oracle.count >= 2 else { return m.with(note: "no oracle draws to arbitrate") }
-        if engine.isEmpty { engine = try (1...4).map { try engineDraw(UInt64($0)) } }
+        let moves = judged(draws), permuted = judged(orders.map(\.file))
+        // The orders judge when the oracle drew them: the engine draws the same seeds.
+        let byOrders = permuted.count >= 2, engineOrder = byOrders ? self.engineOrder : nil
+        guard byOrders || moves.count >= 2 else { return m.with(note: "no oracle draws to arbitrate") }
+        if engine.isEmpty {
+            engine = try engineOrder.map { draw in try orders.map { try draw($0.seed) } }
+                ?? (1...4).map { try engineDraw(UInt64($0)) }
+        }
         let engineCloud = [atWitness.engine] + engine.compactMap { b -> Double? in
             guard let v = b[name], v.count == exact.count else { return nil }
             return worst(v, exact)
         }
-        let oracleCloud = [atWitness.reference] + oracle
+        let oracleCloud = [atWitness.reference] + moves + permuted
         let median = engineCloud.sorted()[engineCloud.count / 2], threshold = 1.25 * (oracleCloud.max() ?? 0)
-        var judged = Measure(boundary: m.boundary, worst: m.worst, median: m.median, channel: m.channel,
-                             atWitness: (median, oracleCloud.max() ?? 0), threshold: threshold, passed: median <= threshold,
-                             note: String(format: "clouds: engine median of %d draws, oracle worst of %d", engineCloud.count,
-                                          oracleCloud.count))
-        judged.kind = m.kind
-        return judged
+        let note = byOrders
+            ? String(format: "clouds of summation orders: engine median of %d (nominal + %d orders), oracle worst of %d (nominal + %d ulp + %d orders)",
+                     engineCloud.count, engineCloud.count - 1, oracleCloud.count, moves.count, permuted.count)
+            : String(format: "clouds of one-ulp moves: engine median of %d draws, oracle worst of %d", engineCloud.count, oracleCloud.count)
+        var verdict = Measure(boundary: m.boundary, worst: m.worst, median: m.median, channel: m.channel,
+                              atWitness: (median, oracleCloud.max() ?? 0), threshold: threshold, passed: median <= threshold, note: note)
+        verdict.kind = m.kind
+        return verdict
     }
 }
