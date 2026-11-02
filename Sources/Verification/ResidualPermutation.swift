@@ -140,42 +140,58 @@ package enum Krea2PermutedMap {
         throw Artifact.Failure.badHeader("\(name): no rule for the residual permutation")
     }
 
-    /// **One draw of the summation order**: the map at `source` permuted by the group permutation of `seed`, written in
-    /// `directory` (by default a temporary folder on the source's own volume, so that `clonefile` shares the untouched
-    /// tensors) and removed once evaluated; `text` (`[T, d]`, `txt_in`'s output) permuted alike. `evaluate` runs the
-    /// permuted model on the map and the text it is handed and returns its boundaries by name, `model_out` included;
-    /// every boundary but `model_out` (the latent, outside the residual stream) comes back in the reference's channel
-    /// order. Seed 0 evaluates `source` itself.
+    /// **One draw of the summation order**: `draws` with a single request.
     package static func draw(source: String, seed: UInt64, text: UnsafeBufferPointer<Float>, directory: String? = nil,
                              evaluate: (Artifact, UnsafeBufferPointer<Float>) throws -> [String: [Float]]) throws -> [String: [Float]] {
+        try draws(source: source, requests: [[seed]], text: text, directory: directory) { _, map, moved in try evaluate(map, moved) }[0][seed]!
+    }
+
+    /// **Draws of the summation order, seed outside** (`SeedOutside`): for each seed any request asks for, the map at
+    /// `source` permuted by the group permutation of that seed is written **once** in `directory` (by default a temporary
+    /// folder on the source's own volume, so that `clonefile` shares the untouched tensors), every request of that seed
+    /// evaluated on it, then the map removed — at most one map per seed on the disk, and one write, however many
+    /// requests (a trajectory's failing steps) share it. `text` (`[T, d]`, `txt_in`'s output) is permuted alike.
+    /// `evaluate(request, map, text)` runs the permuted model and returns its boundaries by name, `model_out` included;
+    /// every boundary but `model_out` (the latent, outside the residual stream) comes back in the reference's channel
+    /// order. Seed 0 evaluates `source` itself. Returns, per request, its boundaries by seed.
+    package static func draws(source: String, requests: [[UInt64]], text: UnsafeBufferPointer<Float>, directory: String? = nil,
+                              evaluate: (Int, Artifact, UnsafeBufferPointer<Float>) throws -> [String: [Float]])
+        throws -> [[UInt64: [String: [Float]]]] {
+        guard requests.contains(where: { !$0.isEmpty }) else { return requests.map { _ in [:] } }
         let d = Krea2DiT.Config(header: try Artifact(path: source).header).dim
-        let perm = ResidualPermutation.residual(dim: d, seed: seed)
-        var path = source, temporary: URL?
-        if seed != 0 {
-            let folder: URL
+        typealias Map = (path: String, temporary: URL?, perm: [Int], text: [Float])
+        return try SeedOutside.run(requests, prepare: { seed -> Map in
+            let perm = ResidualPermutation.residual(dim: d, seed: seed)
+            guard seed != 0 else { return (source, nil, perm, Array(text)) }
+            let folder: URL, temporary: URL?
             if let directory {
-                folder = URL(fileURLWithPath: directory)
+                folder = URL(fileURLWithPath: directory); temporary = nil
             } else {
                 folder = try FileManager.default.url(for: .itemReplacementDirectory, in: .userDomainMask,
                                                      appropriateFor: URL(fileURLWithPath: source), create: true)
                 temporary = folder
             }
-            path = folder.appendingPathComponent("krea2-permgroup\(seed).silicon").path
-            try write(source: source, destination: path, perm: perm)
-        }
-        defer {
-            if seed != 0 { try? FileManager.default.removeItem(atPath: path) }
-            if let temporary { try? FileManager.default.removeItem(at: temporary) }
-        }
-        let moved = ResidualPermutation.permuted(text, perm)
-        let boundaries = try autoreleasepool {
-            try moved.withUnsafeBufferPointer { try evaluate(try Artifact(path: path), $0) }
-        }
-        var restored: [String: [Float]] = [:]
-        for (name, values) in boundaries {
-            restored[name] = name == "model_out" ? values : ResidualPermutation.restored(values, perm)
-        }
-        return restored
+            let path = folder.appendingPathComponent("krea2-permgroup\(seed).silicon").path
+            do { try write(source: source, destination: path, perm: perm) } catch {
+                try? FileManager.default.removeItem(atPath: path)
+                if let temporary { try? FileManager.default.removeItem(at: temporary) }
+                throw error
+            }
+            return (path, temporary, perm, ResidualPermutation.permuted(text, perm))
+        }, release: { map in
+            guard map.path != source else { return }
+            try? FileManager.default.removeItem(atPath: map.path)
+            if let temporary = map.temporary { try? FileManager.default.removeItem(at: temporary) }
+        }, evaluate: { request, _, map in
+            let boundaries = try autoreleasepool {
+                try map.text.withUnsafeBufferPointer { try evaluate(request, try Artifact(path: map.path), $0) }
+            }
+            var restored: [String: [Float]] = [:]
+            for (name, values) in boundaries {
+                restored[name] = name == "model_out" ? values : ResidualPermutation.restored(values, map.perm)
+            }
+            return restored
+        })
     }
 
     /// Writes at `destination` the map at `source` with its residual stream permuted by `perm` (`ResidualPermutation`).
@@ -271,5 +287,24 @@ package enum Krea2PermutedMap {
             guard n > 0 else { throw Artifact.Failure.truncated("\(name): wrote \(done) of \(buffer.count) bytes") }
             done += n
         }
+    }
+}
+
+/// **Seed outside, evaluations inside**: what a costly per-seed setup (a permuted map, ~26 GB written for Krea 2's
+/// Standard) is shared by. `requests[i]` is the seeds request `i` wants; each seed of their union, in increasing order,
+/// is prepared **once**, every request that wants it evaluated on it, then released before the next seed is prepared —
+/// one setup alive at a time. Returns, per request, its results by seed.
+package enum SeedOutside {
+    package static func run<Map>(_ requests: [[UInt64]], prepare: (UInt64) throws -> Map, release: (Map) -> Void,
+                                 evaluate: (Int, UInt64, Map) throws -> [String: [Float]]) throws -> [[UInt64: [String: [Float]]]] {
+        var results = [[UInt64: [String: [Float]]]](repeating: [:], count: requests.count)
+        for seed in Set(requests.joined()).sorted() {
+            let map = try prepare(seed)
+            defer { release(map) }
+            for (i, seeds) in requests.enumerated() where seeds.contains(seed) {
+                results[i][seed] = try evaluate(i, seed, map)
+            }
+        }
+        return results
     }
 }

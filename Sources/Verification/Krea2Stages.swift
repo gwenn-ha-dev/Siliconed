@@ -32,8 +32,8 @@ import Siliconed
 // order draws of a boundary, the engine draws the same seeds (its nominal + 8 orders, the median judged), and
 // the oracle's cloud is its nominal, its ulp draws and its orders; the ulp moves judge otherwise. The same rule
 // holds for each guided step of `trajectory`, whose velocity the oracle draws in orders at every step: there the
-// permuted map is the Standard's, ~26 GB rewritten per draw, one at a time — paid only by a step that fails at its
-// witness.
+// permuted map is the Standard's, ~26 GB rewritten per draw — paid only when a step fails at its witness, and drawn
+// seed outside: one map per seed, on which every failing step is evaluated, 8 maps at worst whatever their number.
 
 enum Krea2Stages {
     static let all: [Stage] = [text, dit, trajectory, vae]
@@ -246,31 +246,46 @@ enum Krea2Stages {
                 try dit.forward(latent: $0.baseAddress!, text: text.baseAddress!, textRows: t, sigma: sigmas[i])
             }
         }
-        // The guided pass: each step from the oracle's latent, its velocity judged.
-        var guided: [Measure] = []
+        // The guided pass: each step from the oracle's latent, its velocity measured at its witness; then the order draws of
+        // every step that fails there, map by map (below); then each step judged.
+        var pending: [(step: Int, measure: Measure, exact: UnsafeBufferPointer<Float>?, clouds: Clouds, input: [Float])] = []
+        var drawn: [Int: [UInt64: [String: [Float]]]] = [:]
         for i in 0..<steps {
             let input = i == 0 ? Array(initial) : trajectory.float32("latent_\(i)").map(Array.init) ?? []
             guard !input.isEmpty, let expected = trajectory.float32("velocity_\(i)") else { continue }
             let step = "krea2/witness-krea2-f64-\(invocation.size)-step\(i)"
             let exact = invocation.goldens.optional(step + ".safetensors")?.float32("velocity")
-            // The step's draws: one-ulp moves (`-jitterN`) and summation orders (`-permgroupN`), the engine's of the same
-            // seeds on the map rewritten with its residual stream permuted (`Krea2PermutedMap.draw`), from the step's latent.
+            // The step's draws: one-ulp moves (`-jitterN`) and summation orders (`-permgroupN`), the engine's orders read
+            // from `drawn`, filled below.
             let stem = "krea2/draw-krea2-\(invocation.size)-step\(i)"
-            var clouds = Clouds(draws: (1...8).compactMap { invocation.goldens.optional(stem + "-jitter\($0).safetensors") },
+            let clouds = Clouds(draws: (1...8).compactMap { invocation.goldens.optional(stem + "-jitter\($0).safetensors") },
                                 orders: Clouds.orders(invocation.goldens, stem), engineOrder: { seed in
-                try Krea2PermutedMap.draw(source: map, seed: seed, text: text) { permutedMap, movedText in
-                    let permuted = try Krea2DiT(artifact: permutedMap, latentHeight: side, latentWidth: side, maxText: t)
-                    return ["model_out": try input.withUnsafeBufferPointer {
-                        try permuted.forward(latent: $0.baseAddress!, text: movedText.baseAddress!, textRows: t, sigma: sigmas[i])
-                    }]
-                }
+                guard let v = drawn[i]?[seed] else { throw Artifact.Failure.misuse("step \(i): order \(seed) not drawn") }
+                return v
             }) { seed in
                 var moved = input
                 moveByOneULP(&moved, seed: seed)
                 return ["model_out": try velocity(moved, i)]
             }
             let m = Judge.boundary("v_\(i)", engine: try velocity(input, i), oracle: expected, witness: exact, columns: columns)
-            guided.append(try clouds.arbitrate(m, exact: exact, columns: columns, as: "model_out"))
+            pending.append((i, m, exact, clouds, input))
+        }
+        // **Seed outside**: one map rewritten with its residual stream permuted per seed (the Standard's, ~26 GB), on which
+        // every failing step of that seed is evaluated from its latent — 8 maps at worst, not 8 per failing step.
+        let ordered = pending.filter { $0.clouds.judgesByOrders($0.measure, exact: $0.exact, as: "model_out") }
+        let orders = try Krea2PermutedMap.draws(source: map, requests: ordered.map { $0.clouds.orders.map(\.seed) }, text: text) {
+            k, permutedMap, movedText in
+            let p = ordered[k]
+            let permuted = try Krea2DiT(artifact: permutedMap, latentHeight: side, latentWidth: side, maxText: t)
+            return ["model_out": try p.input.withUnsafeBufferPointer {
+                try permuted.forward(latent: $0.baseAddress!, text: movedText.baseAddress!, textRows: t, sigma: sigmas[p.step])
+            }]
+        }
+        for (k, p) in ordered.enumerated() { drawn[p.step] = orders[k] }
+        var guided: [Measure] = []
+        for p in pending {
+            var clouds = p.clouds
+            guided.append(try clouds.arbitrate(p.measure, exact: p.exact, columns: columns, as: "model_out"))
         }
         // The free pass: the latents chain, the error amplifies; shown beside each step.
         var latent = Array(initial)
@@ -345,6 +360,15 @@ struct Clouds {
         (1...8).compactMap { n in goldens.optional(stem + "-permgroup\(n).safetensors").map { (UInt64(n), $0) } }
     }
 
+    /// **Will `arbitrate` judge `m` by summation orders**, and so ask `engineOrder` for every seed of `orders`? What a
+    /// caller asks before drawing, to draw the orders of all its failing measures map by map (`Krea2PermutedMap.draws`)
+    /// rather than measure by measure: a measure that fails at its witness, with at least two oracle order draws of it.
+    func judgesByOrders(_ m: Measure, exact: UnsafeBufferPointer<Float>?, as name: String? = nil) -> Bool {
+        guard !m.passed, let exact, m.atWitness != nil else { return false }
+        let name = name ?? m.boundary
+        return orders.filter { $0.file.float32(name)?.count == exact.count }.count >= 2
+    }
+
     /// `m` itself, or its verdict by clouds. `name`: the boundary's name in the draws, `m`'s by default.
     /// `planes`: the measure is per plane of a latent (`Judge.planes`), not per channel of `columns`.
     mutating func arbitrate(_ m: Measure, exact: UnsafeBufferPointer<Float>?, columns: Int, as name: String? = nil,
@@ -362,7 +386,7 @@ struct Clouds {
         }
         let moves = judged(draws), permuted = judged(orders.map(\.file))
         // The orders judge when the oracle drew them: the engine draws the same seeds.
-        let byOrders = permuted.count >= 2, engineOrder = byOrders ? self.engineOrder : nil
+        let byOrders = judgesByOrders(m, exact: exact, as: name), engineOrder = byOrders ? self.engineOrder : nil
         guard byOrders || moves.count >= 2 else { return m.with(note: "no oracle draws to arbitrate") }
         if engine.isEmpty {
             engine = try engineOrder.map { draw in try orders.map { try draw($0.seed) } }

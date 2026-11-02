@@ -181,4 +181,59 @@ final class VerificationCloudsAndGuideTests: XCTestCase {
         XCTAssert(m.passed)
         XCTAssertEqual(m.note, "clouds of summation orders: engine median of 3 (nominal + 2 orders), oracle worst of 3 (nominal + 0 ulp + 2 orders)")
     }
+
+    // MARK: - Seed outside
+
+    /// The trajectory's order draws: one setup (a permuted map) per seed, prepared once and released before the next,
+    /// however many failing steps want it — 8 maps for 1 step as for 5, never 8 per step.
+    func testOneMapIsWrittenPerSeedWhateverTheNumberOfSteps() throws {
+        for steps in [1, 5] {
+            var prepared: [UInt64] = [], released = 0, alive = 0, evaluated: [(Int, UInt64)] = []
+            let requests = Array(repeating: Array(UInt64(1)...8), count: steps)
+            let results = try SeedOutside.run(requests, prepare: { seed -> UInt64 in
+                XCTAssertEqual(alive, 0, "one map on the disk at a time")
+                prepared.append(seed); alive += 1
+                return seed
+            }, release: { _ in released += 1; alive -= 1 }, evaluate: { i, seed, map in
+                XCTAssertEqual(map, seed)
+                evaluated.append((i, seed))
+                return ["model_out": [Float(i), Float(seed)]]
+            })
+            XCTAssertEqual(prepared, Array(1...8))
+            XCTAssertEqual(released, 8)
+            XCTAssertEqual(evaluated.count, 8 * steps)
+            XCTAssertEqual(results.count, steps)
+            for (i, r) in results.enumerated() {
+                XCTAssertEqual(r.keys.sorted(), Array(1...8))
+                XCTAssertEqual(r[3]?["model_out"], [Float(i), 3])
+            }
+        }
+    }
+
+    /// Requests that want different seeds: the union is prepared once each, each request gets only its own.
+    func testSeedsAreTheUnionOfTheRequests() throws {
+        var prepared: [UInt64] = []
+        let results = try SeedOutside.run([[2, 5], [], [5, 7]], prepare: { prepared.append($0); return $0 },
+                                          release: { _ in }, evaluate: { _, seed, _ in ["h": [Float(seed)]] })
+        XCTAssertEqual(prepared, [2, 5, 7])
+        XCTAssertEqual(results.map { $0.keys.sorted() }, [[2, 5], [], [5, 7]])
+    }
+
+    /// `judgesByOrders` is the question `arbitrate` answers: a failing measure with two order draws, not a passed one, not
+    /// one without its witness, not one whose draws are of another size.
+    func testJudgesByOrdersIsWhatArbitrateDoes() throws {
+        let orders = zip([UInt64(1), 2], try draws([0.1, 0.1])).map { (seed: $0, file: $1) }
+        let clouds = Clouds(draws: [], orders: orders, engineOrder: { _ in ["h": self.away(0.1)] }) { _ in [:] }
+        try truth.withUnsafeBufferPointer { exact in
+            XCTAssertTrue(clouds.judgesByOrders(failed(), exact: exact))
+            let passed = Measure(boundary: "h", worst: 0.1, median: 0.1, channel: 0, atWitness: (0.01, 0.08), threshold: 0.1,
+                                 passed: true, note: "")
+            XCTAssertFalse(clouds.judgesByOrders(passed, exact: exact))
+            XCTAssertFalse(clouds.judgesByOrders(failed(), exact: nil))
+            XCTAssertFalse(clouds.judgesByOrders(failed(), exact: exact, as: "elsewhere"))
+        }
+        let wrong = zip([UInt64(1), 2], try draws([0.1, 0.1], shape: [3, 1])).map { (seed: $0, file: $1) }
+        let other = Clouds(draws: [], orders: wrong, engineOrder: { _ in [:] }) { _ in [:] }
+        try truth.withUnsafeBufferPointer { XCTAssertFalse(other.judgesByOrders(failed(), exact: $0)) }
+    }
 }
