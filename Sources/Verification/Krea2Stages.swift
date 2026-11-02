@@ -103,7 +103,10 @@ enum Krea2Stages {
         let witnesses = [witnessStem, witnessStem + "-step0"].compactMap { invocation.goldens.optional($0 + ".safetensors") }
         let exact = { (name: String) in witnesses.lazy.compactMap { $0.float32(name) }.first }
 
-        let dit = try Krea2DiT(artifact: artifact, latentHeight: height, latentWidth: width, maxText: t)
+        // Published int8 weights (the Compact): the evaluation along the int8 kernel, `model_out` once widened below (`Int8Route`).
+        let int8 = Int8Route(artifact, invocation)
+        let dit = try Krea2DiT(artifact: artifact, latentHeight: height, latentWidth: width, maxText: t,
+                               neuralEngine: int8?.neuralEngine ?? EngineSettings.effective.plan.usesANE, plan: int8?.plan)
         dit.recordBoundaries = true
         let started = Date()
         let out = try dit.forward(latent: latent.baseAddress!, text: text.baseAddress!, textRows: t, sigma: sigma[0])
@@ -138,6 +141,28 @@ enum Krea2Stages {
                 report.add(try clouds.arbitrate(m, exact: witness, columns: height * width, as: "model_out", planes: 16))
             }
             if let m = Judge.orientation(out, expected, height: height, width: width) { report.add(m) }
+        }
+        if let int8 {
+            int8.account(report)
+            if int8.judgesWidened, let expected = goldens.float32("model_out") {
+                // The widened route by the same rule, its clouds drawn by its own DiT.
+                let widened = try Krea2DiT(artifact: artifact, latentHeight: height, latentWidth: width, maxText: t)
+                let forward = { (l: UnsafePointer<Float>) in try widened.forward(latent: l, text: text.baseAddress!, textRows: t, sigma: sigma[0]) }
+                let other = try forward(latent.baseAddress!)
+                var widenedClouds = Clouds(draws: (1...8).compactMap { invocation.goldens.optional(draws + "-jitter\($0).safetensors") }) { seed in
+                    var moved = Array(latent)
+                    moveByOneULP(&moved, seed: seed)
+                    return ["model_out": try moved.withUnsafeBufferPointer { try forward($0.baseAddress!) }]
+                }
+                if let witness = exact("model_out") {
+                    let m = Judge.planes("model_out per plane (widened)", engine: other, oracle: expected, witness: witness,
+                                         reference: half?.values("model_out"), planes: 16)
+                    report.add(try widenedClouds.arbitrate(m, exact: witness, columns: height * width, as: "model_out", planes: 16))
+                } else {
+                    report.add(Judge.boundary("model_out (widened)", engine: other, oracle: expected, half: half?.values("model_out"),
+                                              columns: height * width))
+                }
+            }
         }
         if invocation.neuralEngine { try NeuralEngineRun.account(report) }
         if invocation.bf16Activations { try BF16ActivationRun.account(report) }

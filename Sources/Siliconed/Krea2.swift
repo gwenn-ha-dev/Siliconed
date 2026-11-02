@@ -139,8 +139,9 @@ package final class Krea2DiT: BoundaryRecording, PhaseTiming {
     /// The products by a weight, and their LoRA stack.
     private let products: WeightProducts
 
+    /// `plan`: the plan its products run under — the process's by default; a check passes the route it judges.
     package init(artifact: Artifact, latentHeight: Int, latentWidth: Int, maxText: Int = 512,
-                neuralEngine: Bool = EngineSettings.effective.plan.usesANE, lora: LoRA? = nil) throws {
+                neuralEngine: Bool = EngineSettings.effective.plan.usesANE, lora: LoRA? = nil, plan: CapacityPlan? = nil) throws {
         guard artifact.header["kind"] as? String == "krea2-turbo-dit" else {
             throw Artifact.Failure.badHeader("map \(artifact.header["kind"] ?? "?"): krea2-turbo-dit expected")
         }
@@ -152,7 +153,7 @@ package final class Krea2DiT: BoundaryRecording, PhaseTiming {
         self.artifact = artifact
         self.config = Config(header: artifact.header)
         self.prefetcher = Prefetcher(artifact: artifact)
-        self.gemm = try GEMM(neuralEngine: neuralEngine)
+        self.gemm = try GEMM(plan: plan ?? EngineSettings.effective.plan, neuralEngine: neuralEngine)
         self.elementwise = try ElementwiseGPU(device: gemm.device, queue: gemm.queue)
         self.latentHeight = latentHeight
         self.latentWidth = latentWidth

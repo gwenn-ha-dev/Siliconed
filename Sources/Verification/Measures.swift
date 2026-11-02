@@ -139,6 +139,46 @@ package enum HalfPrecisionRun {
     }
 }
 
+/// **The int8 route of a published int8 weight** (`gemm_int8`). A render of a map holding weights published as int8 with a scale
+/// per column or per tensor (a Compact from Comfy-Org's int8 convrot) reads them as published wherever its map says the int8
+/// kernel wins, else widened; `siliconed check` runs the defaults, which widen. A DiT stage on such a map therefore evaluates along
+/// the int8 route (`plan`), says how many products read the integers (`account`), and judges its output once more widened,
+/// by the same rule: both routes a render can take. A GGUF Q8_0's blocks (`gemm_q8`) are another route, not this one.
+package struct Int8Route {
+    /// The plan the DiT under test runs under: `nil` when the process's plan already reads the integers (`SILICONED_PLAN=int8`).
+    package let plan: CapacityPlan?
+    /// The process's plan does not read the integers: the stage judges the widened route too.
+    package var judgesWidened: Bool { plan != nil }
+    /// The engine's neural-engine flag for the DiT built on `plan`.
+    package var neuralEngine: Bool { (plan ?? EngineSettings.effective.plan).usesANE }
+    private let before: Int
+
+    /// `nil` when `artifact` publishes no int8 weight `gemm_int8` reads.
+    package init?(_ artifact: Artifact, _ invocation: Invocation) {
+        guard artifact.tensors.values.contains(where: { $0.dtype == .int8 && $0.scale != nil && $0.scale?.block == nil }) else {
+            return nil
+        }
+        plan = Self.plan(invocation)
+        before = GEMM.int8Products.withLock { $0 }
+    }
+
+    /// The process's plan with `int8`: the invocation's half-precision flags, or the developer's `SILICONED_PLAN` (which has the
+    /// last word), plus the published integers read as they are, whatever this Mac's map says.
+    private static func plan(_ invocation: Invocation) -> CapacityPlan? {
+        if EngineSettings.effective.plan.resources.int8Weights { return nil }
+        if let named = ProcessInfo.processInfo.environment["SILICONED_PLAN"], !named.isEmpty,
+           let forced = CapacityPlan.forcing(named: named + ",int8") { return forced }
+        return .forcing(neuralEngine: invocation.neuralEngine, bf16Activations: invocation.bf16Activations,
+                        tilesbf16: invocation.bf16Attention, fused: invocation.bf16Attention, int8: true)
+    }
+
+    /// The products that read the published integers since the route was taken: none fails, the route was not crossed.
+    package func account(_ report: Report) {
+        let read = GEMM.int8Products.withLock { $0 } - before
+        report.add(Judge.holds("gemm_int8", read > 0, note: "\(read) products on the published integers"))
+    }
+}
+
 package enum NeuralEngineRun {
     /// How many of the DiT's products the ANE computed. None (no ANE on this Mac, every product refused):
     /// skipped, since what would be judged is the GPU's fp32 against a looser bar.

@@ -177,7 +177,10 @@ package enum MossImageStages {
         // `dit-lora` lists no half-precision option: `half` is nil there.
         let half = useLoRA ? nil : try invocation.halfReference(
             stem + ".safetensors", script: "tools/oracle/moss-image.py dit-bf16\(version.map { " --variant " + $0.rawValue } ?? "")")
-        let dit = try MossImageDiT(artifact: artifact, gridHeight: height, gridWidth: width, maxText: t, lora: stack)
+        // Published int8 weights (the Compact): the evaluation along the int8 kernel, `model_out` once widened below (`Int8Route`).
+        let int8 = Int8Route(artifact, invocation)
+        let dit = try MossImageDiT(artifact: artifact, gridHeight: height, gridWidth: width, maxText: t,
+                                   neuralEngine: int8?.neuralEngine ?? EngineSettings.effective.plan.usesANE, lora: stack, plan: int8?.plan)
         dit.recordBoundaries = true
         dit.recordedBlocks = MossImageDiT.checkedBlocks
         let started = Date()
@@ -206,6 +209,16 @@ package enum MossImageStages {
             let skippedOut = try dit.forward(latent: latent.baseAddress!, text: text.baseAddress!, textRows: t,
                                              timestep: timestep[0], skipping: [22])
             report.add(Judge.planes("model_out, block 22 skipped", engine: skippedOut, oracle: expected, planes: dit.config.channels))
+        }
+        if let int8 {
+            int8.account(report)
+            if int8.judgesWidened, let expected = goldens.float32("model_out") {
+                let widened = try MossImageDiT(artifact: artifact, gridHeight: height, gridWidth: width, maxText: t, lora: stack)
+                let other = try widened.forward(latent: latent.baseAddress!, text: text.baseAddress!, textRows: t, timestep: timestep[0])
+                report.add(Judge.planes("model_out per plane (widened)", engine: other, oracle: expected,
+                                        witness: witness?.float32("model_out"), reference: half?.values("model_out"),
+                                        planes: dit.config.channels))
+            }
         }
         if invocation.neuralEngine { try NeuralEngineRun.account(report) }
         if invocation.bf16Activations { try BF16ActivationRun.account(report) }

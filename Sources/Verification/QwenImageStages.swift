@@ -270,13 +270,10 @@ enum QwenImageStages {
             latents.append(l)
             offset += cells
         }
-        // A render of a map holding published int8 weights (the Compact) reads them as published wherever its map says the int8
-        // kernel wins (`gemm_int8`), else widened: the evaluation takes the int8 route, the step is judged once widened below.
-        let int8 = publishesInt8(artifact)
-        let int8Route = int8 ? int8Plan(invocation) : nil
-        let int8Before = GEMM.int8Products.withLock { $0 }
+        // Published int8 weights (the Compact): the evaluation along the int8 kernel, the step once widened below (`Int8Route`).
+        let int8 = Int8Route(artifact, invocation)
         let dit = try QwenImage21DiT(artifact: artifact, sequence: sequence, lora: nil, fullPass: true,
-                                     neuralEngine: (int8Route ?? EngineSettings.effective.plan).usesANE, plan: int8Route)
+                                     neuralEngine: int8?.neuralEngine ?? EngineSettings.effective.plan.usesANE, plan: int8?.plan)
         dit.recordBoundaries = true
         let d = config.dim
         let half = try invocation.halfReference(file + ".safetensors", script: "tools/oracle/qwen-image-2.1.py bf16\(version.map { " --variant " + $0.rawValue } ?? "")")
@@ -329,11 +326,8 @@ enum QwenImageStages {
             Judge.bound("prefill + cache against full pass", channelError(cachedOut, $0, columns: c).worst, apart.bound,
                         unit: "per channel", note: apart.note)
         })
-        if int8 {
-            let read = GEMM.int8Products.withLock { $0 } - int8Before
-            report.add(Judge.holds("gemm_int8", read > 0, note: "\(read) products on the published integers"))
-        }
-        if int8Route != nil {
+        int8?.account(report)
+        if int8?.judgesWidened == true {
             // The other route of the same weights, the process's plan: the step from a fresh prefill, by the same rule.
             let widened = try QwenImage21DiT(artifact: artifact, sequence: sequence, lora: nil, fullPass: true)
             try embeds.baseAddress.map { try widened.prefill(hidden: $0, references: references.map { UnsafePointer($0) }) }
@@ -345,23 +339,6 @@ enum QwenImageStages {
         if invocation.bf16Activations { try BF16ActivationRun.account(report) }
         if invocation.bf16Attention { try BF16AttentionRun.account(report) }
         return report
-    }
-
-    /// The map holds weights published as int8 with a scale per column or per tensor — what `gemm_int8` reads (a GGUF Q8_0's
-    /// blocks go to `gemm_q8`).
-    static func publishesInt8(_ artifact: Artifact) -> Bool {
-        artifact.tensors.values.contains { $0.dtype == .int8 && $0.scale != nil && $0.scale?.block == nil }
-    }
-
-    /// **The int8 route, whatever this Mac's map says**: the process's plan with `int8` — the half-precision flags of the
-    /// invocation, or the developer's `SILICONED_PLAN` (which has the last word), plus the published integers read as they are.
-    /// `nil` when the process's plan already reads them.
-    static func int8Plan(_ invocation: Invocation) -> CapacityPlan? {
-        if EngineSettings.effective.plan.resources.int8Weights { return nil }
-        if let named = ProcessInfo.processInfo.environment["SILICONED_PLAN"], !named.isEmpty,
-           let forced = CapacityPlan.forcing(named: named + ",int8") { return forced }
-        return .forcing(neuralEngine: invocation.neuralEngine, bf16Activations: invocation.bf16Activations,
-                        tilesbf16: invocation.bf16Attention, fused: invocation.bf16Attention, int8: true)
     }
 
     /// `[64, h, w]` → `[h·w, 64]`, the oracle's packed layout.
