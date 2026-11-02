@@ -126,8 +126,9 @@ extension RemoteControl {
         var detail = Detail.normal
         /// `--solver NAME`: the rack's Solver (`Request.solver`), More Solvers and `AppState.solverFamilies` only.
         var solver = Solver.euler
-        /// `--ane`, `--no-ane`: the rack's fp32 tag (`Job.neuralEngine`); `nil`, the model's choice.
-        var neuralEngine: Bool?
+        /// `--accelerators`, `--no-accelerators` (`--ane`, `--no-ane`, their former names): the DiT box's switch (`Job.accelerators`);
+        /// `nil`, the model's choice.
+        var accelerators: Bool?
         var loras: [(name: String, strength: Double)] = []
         /// The `--ref`, in their order: the first is image 1, the one edited.
         var references: [String] = []
@@ -263,8 +264,8 @@ extension RemoteControl {
 
     // ── set ──
 
-    /// **`set faster-rendering|neural-engine on|off [--model ID]` and `set beta [OPTION on|off]`: Settings' switches, from the
-    /// terminal.** Each goes through the function its switch calls — `AppState.setFasterRendering(_:for:)`, `setNeuralEngine(_:for:)`,
+    /// **`set faster-rendering|accelerators on|off [--model ID]` and `set beta [OPTION on|off]`: Settings' switches, from the
+    /// terminal.** Each goes through the function its switch calls — `AppState.setFasterRendering(_:for:)`, `setAccelerators(_:for:)`,
     /// the Beta properties — so the choice is written and the window follows, exactly as a click. A model's choice is per
     /// installed version; without `--model`, the model in the rack. Only with the queue empty, so that a series is not started
     /// under one recipe and finished under the other (a job keeps the value it was queued with:
@@ -303,18 +304,15 @@ extension RemoteControl {
                 let previous = app.fasterRendering(for: card.id)
                 app.setFasterRendering(on, for: card.id)
                 return ["ok": true, "model": card.id, "faster_rendering": app.fasterRendering(for: card.id), "previous": previous]
-            case .neuralEngine:
-                // The switch is greyed where this Mac is not measured yet, or its measure gives the Neural Engine no row (`DiTSwitches`):
+            case .accelerators:
+                // The switch is greyed where this Mac is not measured yet, or its measure chooses no accelerator (`DiTSwitches`):
                 // nothing to choose, either way.
-                if let why = DiTSwitches.neuralEngineUnavailable(measured: app.settingsRead, offered: app.neuralEngineOffered) {
-                    throw Refusal("neural_engine", why == .notMeasured
-                        ? String(localized: "This Mac is not measured yet: its first render measures it, then the Neural Engine can be chosen.")
-                        : String(localized: "This Mac’s measure gives the Neural Engine nothing to do: the DiT is computed in fp32."),
-                                  help: "silicontrol diagnose")
+                if let why = DiTSwitches.acceleratorsUnavailable(measured: app.settingsRead, offered: app.acceleratorsOffered) {
+                    throw Refusal("accelerators", AcceleratorWords.unavailable(why), help: "silicontrol diagnose")
                 }
-                let previous = app.neuralEngine(for: card.id)
-                app.setNeuralEngine(on, for: card.id)
-                return ["ok": true, "model": card.id, "neural_engine": app.neuralEngine(for: card.id), "previous": previous]
+                let previous = app.accelerators(for: card.id)
+                app.setAccelerators(on, for: card.id)
+                return ["ok": true, "model": card.id, "accelerators": app.accelerators(for: card.id), "previous": previous]
             }
         }
     }

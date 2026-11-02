@@ -141,7 +141,7 @@ package final class MossImageDiT: BoundaryRecording, PhaseTiming {
     ///     half-size start's, handed to the full one: the turbo LoRA's 1.19 GB of fp32 read once).
     ///   - plan: the plan its products run under — the process's by default; a check passes the route it judges.
     package init(artifact: Artifact, gridHeight: Int, gridWidth: Int, maxText: Int = 512,
-                 neuralEngine: Bool = EngineSettings.effective.plan.usesANE,
+                 accelerators: Accelerators = .process,
                  lora: LoRA? = nil, expanded: CacheLoRA? = nil, plan: CapacityPlan? = nil) throws {
         guard artifact.header["kind"] as? String == MossImageDiT.kind else {
             throw Artifact.Failure.badHeader("map \(artifact.header["kind"] ?? "?"): \(MossImageDiT.kind) expected")
@@ -152,7 +152,7 @@ package final class MossImageDiT: BoundaryRecording, PhaseTiming {
         self.artifact = artifact
         self.config = Config(header: artifact.header)
         self.prefetcher = Prefetcher(artifact: artifact)
-        self.gemm = try GEMM(plan: plan ?? EngineSettings.effective.plan, neuralEngine: neuralEngine)
+        self.gemm = try GEMM(plan: plan ?? EngineSettings.effective.plan, accelerators: accelerators)
         self.elementwise = try ElementwiseGPU(device: gemm.device, queue: gemm.queue)
         self.kernels = try MossImageKernels(device: gemm.device, queue: gemm.queue)
         self.gridHeight = gridHeight; self.gridWidth = gridWidth

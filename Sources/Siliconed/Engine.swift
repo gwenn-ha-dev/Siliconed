@@ -106,9 +106,15 @@ package final class Engine: Sendable {
         /// (`MemoryCheck`); a phase above its need is a defect of the engine (`MemoryCheck.exceeded`).
         /// `nil` when no need was computed (a model whose maps are not installed).
         package var memory: MemoryCheck? = nil
-        /// **Its denoiser's products could take the Neural Engine** (`Request.neuralEngine`, resolved against
+        /// **Its denoiser's products could take the Neural Engine** (`Request.accelerators`, resolved against
         /// the map): fp16 products, another image than fp32's. False writes nothing in the metadata.
         package var neuralEngine = false
+        /// **The « Accelerators » switch as the request asked it** (`Request.accelerators`): what « Redo » gives back. Off is written
+        /// in the metadata (`accelerators = off`): the image is fp32 throughout.
+        package var accelerators = true
+        /// **What the accelerators could do for its denoiser on the Mac that computed it** (`AcceleratorOffer`, the plan it ran under):
+        /// what the image's panel says. `none` with the switch off, or where the map chooses no accelerator.
+        package var offer = AcceleratorOffer.none
         /// **« Faster Rendering » as the request asked it** (`Request.fasterRendering`): what « Redo » gives back. It is written in the
         /// metadata only where it moved the image (`spectral` > 0).
         package var fasterRendering = false
@@ -139,6 +145,7 @@ package final class Engine: Sendable {
             if detail != .normal { m["detail"] = detail.rawValue }
             if solver != .euler { m["solver"] = solver.rawValue }
             if neuralEngine { m["neural-engine"] = "true" }
+            if !accelerators { m["accelerators"] = "off" }
             if fasterRendering && spectral > 0 { m["faster-rendering"] = "true" }
             // `seed` stays the origin's: the variations turn its noise, in order (`Variation.text`).
             if !variations.isEmpty { m["variation"] = Variation.text(variations) }
@@ -207,9 +214,12 @@ package final class Engine: Sendable {
             package var detail: Detail = .normal
             /// `Request.solver`; `euler` when the key is absent (every render before it).
             package var solver: Solver = .euler
-            /// `Request.neuralEngine`; false when the key is absent (every render before it, and every one
-            /// computed in fp32).
+            /// The Neural Engine took part (`Render.neuralEngine`); false when the key is absent (every render before it, and
+            /// every one computed without it).
             package var neuralEngine = false
+            /// `Request.accelerators`: false for `off`, true for `on`; `nil` when the key is absent (every render with the switch
+            /// on, and every one before the switch).
+            package var accelerators: Bool?
             /// `Request.fasterRendering`; `nil` when the key is absent (the half-size start was not in play, or the image is older).
             package var fasterRendering: Bool?
             /// The variations its noise was turned by, in order (`Request.variations`); empty for an
@@ -241,6 +251,7 @@ package final class Engine: Sendable {
                 detail = read("detail") { Detail(rawValue: $0) } ?? .normal
                 solver = read("solver") { Solver(rawValue: $0) } ?? .euler
                 neuralEngine = read("neural-engine") { Bool($0) } ?? false
+                accelerators = read("accelerators") { $0 == "off" ? false : $0 == "on" ? true : nil }
                 fasterRendering = read("faster-rendering") { Bool($0) }
                 variations = read("variation") { Variation.parse($0) } ?? []
                 if let raw = m["lora"] {

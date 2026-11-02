@@ -78,7 +78,8 @@ final class RemoteWritingTests: XCTestCase {
 
     func testSetReadsAModelsSwitch() throws {
         XCTAssertEqual(try SetOrder.parse(["faster-rendering", "on"]).get(), .perModel(.fasterRendering, on: true, model: nil))
-        XCTAssertEqual(try SetOrder.parse(["neural-engine", "off", "--model", "krea2"]).get(), .perModel(.neuralEngine, on: false, model: "krea2"))
+        XCTAssertEqual(try SetOrder.parse(["neural-engine", "off", "--model", "krea2"]).get(), .perModel(.accelerators, on: false, model: "krea2"))
+        XCTAssertEqual(try SetOrder.parse(["accelerators", "on"]).get(), .perModel(.accelerators, on: true, model: nil))
         for bad in [["neural-engine"], ["neural-engine", "maybe"], ["neural-engine", "on", "--model"], ["neural-engine", "on", "krea2"], []] {
             guard case .failure(.usage) = SetOrder.parse(bad) else { return XCTFail("\(bad)") }
         }
@@ -105,7 +106,7 @@ final class RemoteWritingTests: XCTestCase {
 
     /// The Neural Engine is offered or not by the map, whichever the version: `set neural-engine` refuses on the same rule as the switch.
     func testTheNeuralEngineSwitchHasNothingToChooseWithoutARow() {
-        XCTAssertEqual(DiTSwitches.neuralEngineUnavailable(measured: true, offered: false), .noNeuralEngineRow)
-        XCTAssertNil(DiTSwitches.neuralEngineUnavailable(measured: true, offered: true))
+        XCTAssertEqual(DiTSwitches.acceleratorsUnavailable(measured: true, offered: false), .noAccelerator)
+        XCTAssertNil(DiTSwitches.acceleratorsUnavailable(measured: true, offered: true))
     }
 }

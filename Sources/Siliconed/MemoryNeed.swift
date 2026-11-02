@@ -61,10 +61,15 @@ package struct MemoryNeed: Sendable, Equatable {
         /// puts at each product — the rows each engine takes, hence the AMX's workspace and the ANE's surfaces, are the plan's answers,
         /// computed here before the first computation. The process's by default (`EngineSettings.plan`); a test hands its own.
         package var plan = EngineSettings.effective.plan
-        /// **The denoiser may take the Neural Engine** (`Request.neuralEngine` against the plan's): its surfaces are charged to the
-        /// phases whose products it takes — the DiT's, Krea 2's fusion —, never to an encoder's, which never takes it. The plan's by
-        /// default: what a render not yet chosen may do.
-        package var neuralEngine = EngineSettings.effective.plan.usesANE
+        /// **What the denoiser may compute on** (`Request.accelerators` against the plan's): the Neural Engine's surfaces are charged
+        /// to the phases whose products it takes — the DiT's, Krea 2's fusion —, never to an encoder's, which never takes it; off, the
+        /// plan computed in fp32. The plan's by default: what a render not yet chosen may do.
+        package var accelerators = Accelerators.process
+        /// The denoiser may take the Neural Engine (`accelerators`).
+        package var neuralEngine: Bool {
+            get { accelerators.neuralEngine }
+            set { accelerators = newValue ? .on(neuralEngine: true) : .on(neuralEngine: false) }
+        }
         /// The images of the batch (`Engine.renderBatch`): every latent waits for the decodings, every
         /// image decoded waits for the batch's end.
         package var batch = 1
@@ -132,8 +137,9 @@ package struct MemoryNeed: Sendable, Equatable {
             }
         }
 
-        /// The plan of the denoiser's products: the process's, without the ANE when the request refuses it.
-        package var ditPlan: CapacityPlan { plan.restricted(allowingANE: neuralEngine) }
+        /// The plan of the denoiser's products: the process's, without the ANE when the render does not bring it up, in fp32 when
+        /// the accelerators are off.
+        package var ditPlan: CapacityPlan { plan.forDenoiser(accelerators) }
         /// The plan of an encoder's products: never the ANE.
         package var encoderPlan: CapacityPlan { plan.restricted(allowingANE: false) }
 

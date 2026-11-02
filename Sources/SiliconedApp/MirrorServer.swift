@@ -376,7 +376,7 @@ final class MirrorServer {
         job = Job(ordinal: job.ordinal,
                   settings: { var s = job.settings; s.modelName = card.name; s.references = references.count; return s }(),
                   seeds: job.seeds, references: references, previews: job.previews, defaultSteps: card.defaultSteps, plan: plan)
-        job.neuralEngine = r.neuralEngine
+        job.accelerators = r.neuralEngine
         job.owner = identity
         return job
     }
@@ -416,7 +416,7 @@ final class MirrorServer {
             if let c = app.currentJob, c.owner == identity, previous.jobs.contains(c.ordinal) { app.cancel() }
         }
         let made = app.enqueueGrid(grid, settings: settings, references: references, previews: g.job.previews,
-                                   sketch: g.sketch, stopAfter: g.stopAfter, neuralEngine: g.job.neuralEngine,
+                                   sketch: g.sketch, stopAfter: g.stopAfter, accelerators: g.job.neuralEngine,
                                    owner: identity, shows: false)
         if g.sketch { explorations[identity] = made.run.ordinal }
         return made
@@ -514,7 +514,7 @@ final class MirrorServer {
     private func exploration(_ r: GridRun) -> RemoteExploration {
         RemoteExploration(
             ordinal: r.ordinal, spec: RemoteGridSpec(r.grid),
-            job: MirrorProjection.remote(r.settings, ordinal: 0, seeds: [], previews: true, defaultSteps: nil, neuralEngine: nil),
+            job: MirrorProjection.remote(r.settings, ordinal: 0, seeds: [], previews: true, defaultSteps: nil, accelerators: nil),
             cells: r.cellJobs.map(MirrorProjection.remote),
             issues: r.issues.mapValues(Self.remote),
             sketch: r.sketch)
@@ -543,7 +543,7 @@ final class MirrorServer {
         }
         return MirrorCatalog(ready: app.readySet.sorted(), traits: traits, loras: loras, loraNames: names, needs: needs,
                              ceiling: app.memoryCeiling, settingsRead: app.settingsRead,
-                             neuralEngineOffered: app.neuralEngineOffered,
+                             neuralEngineOffered: app.acceleratorsOffered,
                              enlarges: SuperResolution.available)
     }
 
@@ -562,13 +562,14 @@ final class MirrorServer {
 
     private func remote(_ e: Entry, png id: UInt32) -> RemoteEntry {
         var job = MirrorProjection.remote(e.settings, ordinal: e.job, seeds: [e.seed], previews: false, defaultSteps: nil,
-                                          neuralEngine: e.settings.neuralEngine)
+                                          accelerators: nil)
         job.references = e.references.enumerated().map { i, ref in
             RemoteReference(origin: .ofImage(e.ordinal, index: i), name: ref.name, width: ref.width, height: ref.height)
         }
         let r = RemoteEntry(ordinal: e.ordinal, job: job,
                             width: e.width, height: e.height, seed: e.seed, timings: e.timings, footprints: e.footprints,
-                            evaluations: e.evaluations, metadata: e.metadata, neuralEngine: e.settings.neuralEngine, png: id,
+                            evaluations: e.evaluations, metadata: e.metadata, neuralEngine: e.settings.offer.neuralEngine, png: id,
+                            offer: e.settings.offer,
                             enlarged: e.enlarged, cropped: e.cropped,
                             sheet: e.grid.map { RemoteSheet(ordinal: $0.ordinal, spec: RemoteGridSpec($0.grid), empty: $0.empty) },
                             enlargedFrom: e.enlargedFrom.flatMap { from in app.history.first { $0.owner == e.owner && $0.png == from }?.ordinal })

@@ -1,14 +1,15 @@
-// The two switches of the app's DiT box, as pure rules: « Faster Rendering » and the Neural Engine.
+// The two switches of the app's DiT box, as pure rules: « Faster Rendering » and « Accelerators ».
 // They live here, not in the views, so that what a switch shows, what it greys out and what a render
 // takes are one decision that the tests can read (`DiTSwitchesTests`).
 
 /// Why a switch of the DiT box is greyed out; `nil` where it is available.
 package enum DiTSwitchUnavailable: Equatable, Sendable {
     /// This Mac is not measured yet — none kept, or the one kept is of another Mac, macOS or build (an update): the first render
-    /// measures it. Until then nobody knows whether the Neural Engine will get rows, and « nothing to do » would be a guess.
+    /// measures it. Until then nobody knows whether an accelerator will get work, and « nothing to do » would be a guess.
     case notMeasured
-    /// This Mac's measure gives the Neural Engine no row: the denoiser is fp32 throughout, nothing to choose.
-    case noNeuralEngineRow
+    /// This Mac's measure chooses no accelerator — no row for the Neural Engine, no rounded operand on the GPU: the denoiser is fp32
+    /// throughout, nothing to choose.
+    case noAccelerator
     /// The size has a side under 1024 px: the half grid would fall under the 512-px floor.
     case sizeUnder1024
     /// A LoRA, Detail or an edit: the half-size start was never judged under them.
@@ -37,15 +38,15 @@ package enum DiTSwitches {
         return nil
     }
 
-    /// The Neural Engine switch: available where this Mac's map gives it a row, whatever the version (the Standard
-    /// too, off by default there).
-    package static func neuralEngineUnavailable(measured: Bool, offered: Bool) -> DiTSwitchUnavailable? {
+    /// The « Accelerators » switch: available where this Mac's map chooses one (`AcceleratorOffer`: the Neural Engine's rows, the GPU's
+    /// tensor units on rounded operands), whatever the version.
+    package static func acceleratorsUnavailable(measured: Bool, offered: Bool) -> DiTSwitchUnavailable? {
         guard measured else { return .notMeasured }
-        return offered ? nil : .noNeuralEngineRow
+        return offered ? nil : .noAccelerator
     }
 
-    /// The Neural Engine a render takes: the choice only where the map offers it.
-    package static func neuralEngine(offered: Bool, choice: Bool?, versionDefault: Bool) -> Bool {
+    /// The accelerators a render takes: the choice only where the map offers them.
+    package static func accelerators(offered: Bool, choice: Bool?, versionDefault: Bool) -> Bool {
         offered && (choice ?? versionDefault)
     }
 }

@@ -140,9 +140,9 @@ struct RenderSettings {
     var detail: Detail = .normal
     /// **The solver** (`Request.solver`): Euler unless picked with More Solvers on.
     var solver: Solver = .euler
-    /// **Its denoiser could take the Neural Engine** (`Engine.Render.neuralEngine`): set from the render, for
-    /// the image's panel — the choice itself is read when the job starts (`Job.neuralEngine`).
-    var neuralEngine = false
+    /// **What the accelerators could do for its denoiser** (`Engine.Render.offer`): set from the render, for the image's panel —
+    /// the switch itself is read when the job starts (`Job.accelerators`). `none`: fp32 throughout.
+    var offer = AcceleratorOffer.none
     /// **« Faster Rendering » as the image was (or will be) rendered** (`Request.fasterRendering`): what « Redo » and the variations
     /// give back, so that the same settings render the same image whatever the Settings switch says by then. `nil`: the model's
     /// choice when the job is queued (`AppState.fasterRendering(for:)`), fixed then.
@@ -303,9 +303,9 @@ struct Job: Identifiable {
     /// **A sketch** (`Request.sketch`): the evaluations it stops after; its image is the estimate,
     /// kept by its exploration and never put in the history. `nil`: a finished image.
     var sketch: Int? = nil
-    /// **The Neural Engine as the remote control asked it** (`add --ane`, `--no-ane`), frozen in the job;
-    /// `nil`, the model's choice when the job starts (`AppState.neuralEngine(for:)`), like a click.
-    var neuralEngine: Bool? = nil
+    /// **The accelerators as the remote control asked them** (`add --accelerators`, `--no-accelerators`), frozen in the job;
+    /// `nil`, the model's choice when the job starts (`AppState.accelerators(for:)`), like a click.
+    var accelerators: Bool? = nil
     /// Who asked for it (`Entry.owner`).
     var owner: Data? = nil
 

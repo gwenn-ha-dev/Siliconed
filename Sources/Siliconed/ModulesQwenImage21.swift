@@ -137,7 +137,7 @@ package struct QwenImage21DenoisingModule: DenoisingModule {
         }
         try check(steps: steps, startImage: start > 0)
         var sampler = QwenImage21Sampler(artifact: try Artifact(path: map), lora: lora)
-        sampler.neuralEngine = context.neuralEngine
+        sampler.accelerators = context.accelerators
         sampler.cancellation = context.cancellation
         sampler.storage = storage
         sampler.solver = context.solver
@@ -162,7 +162,7 @@ package struct QwenImage21DenoisingModule: DenoisingModule {
                                                        imageSlots: text.imageSlots.filter { $0 }.count)
             if QwenImage21CachePolicy.storage(prefix: prefix) == .file {
                 let key = kvKey(stack: lora?.layers ?? [], text: text, references: references, latent: latent,
-                                neuralEngine: context.neuralEngine)
+                                accelerators: context.accelerators)
                 cache.keepOnlyKV([key])
                 sampler.kept = (cache.kvPath(key), key.hex)
                 sampler.keptReserve = cache.keptReserve
@@ -188,9 +188,9 @@ package struct QwenImage21DenoisingModule: DenoisingModule {
     /// states and slots, each reference latent, and the target's grid (it closes the joint sequence).
     /// Not the seed, not σ: the conditions read `t = 0` and never see the target.
     func kvKey(stack: [LoRA.Layer], text: Conditioning, references: [Latent], latent: Latent,
-               neuralEngine: Bool) -> RenderCache.Key {
+               accelerators: Accelerators) -> RenderCache.Key {
         var k = RenderCache.KeyBuilder("qwen21 kv v2")
-        k.add(RenderCache.build); k.add(RenderCache.numerics(neuralEngine: neuralEngine))
+        k.add(RenderCache.build); k.add(RenderCache.numerics(accelerators))
         k.add(RenderCache.stamp(map))
         k.add(stack.count)
         for layer in stack { k.add(RenderCache.stamp(layer.artifact.path)); k.add(Int(layer.strength.bitPattern)) }

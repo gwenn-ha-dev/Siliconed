@@ -77,7 +77,7 @@ final class RemoteControlHelpTests: XCTestCase {
 final class RemoteControlWriterHelpTests: XCTestCase {
     func testTheLabAndTheSwitchesAreDocumented() {
         for pages in [RemoteControlHelp.english, RemoteControlHelp.french] {
-            for line in ["install writer", "rewrite \"<", "describe <image|i7>", "set neural-engine on|off", "set beta [OPTION on|off]"] {
+            for line in ["install writer", "rewrite \"<", "describe <image|i7>", "set accelerators on|off", "set beta [OPTION on|off]"] {
                 XCTAssertTrue(pages.overview.contains(line), line)
             }
             XCTAssertNotNil(RemoteControlHelp.answer(["rewrite", "--help"], pages)?["help"] as? String)

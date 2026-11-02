@@ -100,7 +100,7 @@ package struct ZImageDenoisingModule: DenoisingModule {
         let full = { () throws -> DiT in
             if let kept = context.keptDenoiser as? DiT { return kept }
             let dit = try DiT(artifact: try Artifact(path: map), latentHeight: height, latentWidth: width,
-                              capLength: text.rows, neuralEngine: context.neuralEngine, lora: lora)
+                              capLength: text.rows, accelerators: context.accelerators, lora: lora)
             dit.cancellation = context.cancellation
             context.keptDenoiser = dit
             return dit
@@ -111,7 +111,7 @@ package struct ZImageDenoisingModule: DenoisingModule {
             context.keptDenoiser = nil
             let half = try DiT(artifact: try Artifact(path: map), latentHeight: planned.reducedHeight,
                                latentWidth: planned.reducedWidth, capLength: text.rows,
-                               neuralEngine: context.neuralEngine, lora: lora)
+                               accelerators: context.accelerators, lora: lora)
             half.cancellation = context.cancellation
             sampler = Sampler(half: half, halfSteps: planned.reduced, steps: steps, full: full)
         } else {

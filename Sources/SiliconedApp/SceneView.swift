@@ -413,8 +413,9 @@ private struct Details: View {
             }
             .font(.callout)
             HStack {
-                Text(r.neuralEngine ? "fp32, part of the DiT in fp16 on the Neural Engine · same seed, same bits"
-                                    : "fp32 end to end · same seed, same bits")
+                // What the accelerators could do for this image on the Mac that computed it (`RenderSettings.offer`).
+                Text(AcceleratorWords.place(r.offer).map { String(localized: "fp32, part of the DiT \($0) · same seed, same bits") }
+                     ?? String(localized: "fp32 end to end · same seed, same bits"))
                     .font(.caption).foregroundStyle(.secondary)
                 Spacer()
                 Menu {

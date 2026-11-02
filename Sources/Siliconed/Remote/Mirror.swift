@@ -123,7 +123,8 @@ package struct RemoteJob: Codable, Equatable, Sendable {
     package var detail: Detail
     package var solver: Solver
     package var previews: Bool
-    /// The Neural Engine as the rack chose it; `nil`: the mini's choice for the model.
+    /// The « Accelerators » switch as the rack chose it (`Request.accelerators`; the wire keeps the name it had when the switch was
+    /// the Neural Engine's alone); `nil`: the mini's choice for the model.
     package var neuralEngine: Bool?
     /// « Faster Rendering » as the borrower's switch says it (`Request.fasterRendering`): the render is the borrower's, so is the
     /// switch. `nil`: the mini's own.
@@ -189,7 +190,11 @@ package struct RemoteEntry: Codable, Equatable, Sendable {
     package var footprints: Engine.Footprints
     package var evaluations: Int
     package var metadata: [String: String]
+    /// The Neural Engine took part (`Engine.Render.neuralEngine`).
     package var neuralEngine: Bool
+    /// What the accelerators could do for its denoiser on the Mac that computed it (`Engine.Render.offer`); `nil` from a Mac before
+    /// the « Accelerators » switch, whose image says only `neuralEngine`.
+    package var offer: AcceleratorOffer?
     package var png: UInt32
     /// An enlargement's factor; a crop's box in the image it was cut from.
     package var enlarged: Int?
@@ -201,11 +206,11 @@ package struct RemoteEntry: Codable, Equatable, Sendable {
 
     package init(ordinal: Int, job: RemoteJob, width: Int, height: Int, seed: UInt64, timings: Engine.Timings,
                  footprints: Engine.Footprints, evaluations: Int, metadata: [String: String], neuralEngine: Bool, png: UInt32,
-                 enlarged: Int? = nil, cropped: Crop.Box? = nil, sheet: RemoteSheet? = nil, enlargedFrom: Int? = nil) {
+                 offer: AcceleratorOffer? = nil, enlarged: Int? = nil, cropped: Crop.Box? = nil, sheet: RemoteSheet? = nil, enlargedFrom: Int? = nil) {
         self.enlarged = enlarged; self.cropped = cropped; self.sheet = sheet; self.enlargedFrom = enlargedFrom
         self.ordinal = ordinal; self.job = job; self.width = width; self.height = height; self.seed = seed
         self.timings = timings; self.footprints = footprints; self.evaluations = evaluations
-        self.metadata = metadata; self.neuralEngine = neuralEngine; self.png = png
+        self.metadata = metadata; self.neuralEngine = neuralEngine; self.png = png; self.offer = offer
     }
 }
 
@@ -242,6 +247,7 @@ package struct MirrorCatalog: Codable, Equatable, Sendable {
     /// The mini's B, in bytes: the Neo judges memory against it, the mini checks again.
     package var ceiling: Int
     package var settingsRead: Bool
+    /// This Mac's map chooses some accelerator (`AppState.acceleratorsOffered`; the wire keeps the Neural Engine's name).
     package var neuralEngineOffered: Bool
     /// macOS's super-resolution is offered there (`SuperResolution.available`).
     package var enlarges: Bool

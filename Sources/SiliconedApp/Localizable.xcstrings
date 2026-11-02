@@ -6341,6 +6341,46 @@
         }
       }
     },
+    "Accelerators" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Beschleuniger"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aceleradores"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Accélérateurs"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Acceleratori"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アクセラレータ"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "加速器"
+          }
+        }
+      }
+    },
     "Accept" : {
       "localizations" : {
         "de" : {
@@ -7341,42 +7381,42 @@
         }
       }
     },
-    "An image engine for Apple silicon, in Swift and Metal — fp32, verified stage by stage against the reference; the Neural Engine beside it where you choose.\n\nLibrary: %@" : {
+    "An image engine for Apple silicon, in Swift and Metal, verified stage by stage against the reference: the Neural Engine and the GPU’s tensor units (bf16) where this Mac’s measure chooses them, fp32 throughout when you turn them off.\n\nLibrary: %@" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Eine Bild-Engine für Apple silicon, in Swift und Metal – fp32, Stufe für Stufe an der Referenz überprüft; die Neural Engine daneben, wo Sie es wählen.\n\nBibliothek: %@"
+            "value" : "Eine Bild-Engine für Apple silicon, in Swift und Metal, Stufe für Stufe an der Referenz überprüft: die Neural Engine und die Tensor-Einheiten der GPU (bf16), wo die Messung dieses Macs sie wählt, durchgehend fp32, wenn Sie sie ausschalten.\n\nBibliothek: %@"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Un motor de imagen para Apple silicon, en Swift y Metal — fp32, verificado etapa por etapa frente a la referencia; el Neural Engine al lado, donde tú lo elijas.\n\nBiblioteca: %@"
+            "value" : "Un motor de imagen para Apple silicon, en Swift y Metal, verificado etapa por etapa frente a la referencia: el Neural Engine y las unidades tensoriales de la GPU (bf16) donde la medición de este Mac los elige, fp32 de principio a fin cuando los apagas.\n\nBiblioteca: %@"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Un moteur d’image pour Apple silicon, en Swift et Metal — fp32, vérifié étage par étage contre la référence ; le Neural Engine à côté, là où vous le choisissez.\n\nBibliothèque : %@"
+            "value" : "Un moteur d’image pour Apple silicon, en Swift et Metal, vérifié étage par étage contre la référence : le Neural Engine et les unités tensorielles du GPU (bf16) là où la mesure de ce Mac les choisit, le fp32 de bout en bout quand vous les éteignez.\n\nBibliothèque : %@"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Un motore d’immagine per Apple silicon, in Swift e Metal — fp32, verificato stadio per stadio rispetto al riferimento; il Neural Engine accanto, dove lo scegli tu.\n\nLibreria: %@"
+            "value" : "Un motore d’immagine per Apple silicon, in Swift e Metal, verificato stadio per stadio rispetto al riferimento: il Neural Engine e le unità tensoriali della GPU (bf16) dove la misura di questo Mac li sceglie, fp32 per tutto il percorso quando li spegni.\n\nLibreria: %@"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Apple silicon用の画像エンジン。SwiftとMetalで書かれ、fp32で、リファレンスに対して段階ごとに検証されています。Neural Engineは、選んだ場所でその隣で働きます。\n\nライブラリ：%@"
+            "value" : "Apple silicon用の画像エンジン。SwiftとMetalで書かれ、リファレンスに対して段階ごとに検証されています。このMacの測定が選んだところではNeural EngineとGPUのテンソルユニット（bf16）を使い、オフにすると全体がfp32になります。\n\nライブラリ：%@"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "适用于 Apple 芯片的图像引擎，使用 Swift 和 Metal 编写——fp32，逐阶段对照参考实现验证；神经网络引擎在一旁，由你选择在何处使用。\n\n资源库：%@"
+            "value" : "适用于 Apple 芯片的图像引擎，使用 Swift 和 Metal 编写，逐阶段对照参考实现验证：在这台 Mac 的测量选中之处使用神经网络引擎和 GPU 的张量单元（bf16），关闭后全程使用 fp32。\n\n资源库：%@"
           }
         }
       }
@@ -25079,6 +25119,46 @@
         }
       }
     },
+    "Part of the DiT %@, where this Mac’s measure finds it faster or more frugal: an image a little different from fp32’s, checked against the reference in bf16. Off, the DiT is in fp32 throughout, the image verified against the reference." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ein Teil des DiT %@, wo die Messung dieses Macs ihn schneller oder sparsamer findet: ein etwas anderes Bild als in fp32, gegen die Referenz in bf16 geprüft. Aus, läuft der DiT durchgehend in fp32, das Bild gegen die Referenz geprüft."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Una parte del DiT %@, donde la medición de este Mac la encuentra más rápida o más eficiente: una imagen algo distinta de la de fp32, verificada contra la referencia en bf16. Apagado, el DiT va en fp32 de principio a fin, con la imagen verificada contra la referencia."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Une partie du DiT %@, là où la mesure de ce Mac la trouve plus rapide ou plus sobre : une image un peu différente de celle du fp32, contrôlée contre la référence en bf16. Éteint, le DiT est en fp32 de bout en bout, l’image vérifiée contre la référence."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Una parte del DiT %@, dove la misura di questo Mac la trova più veloce o più parsimoniosa: un’immagine un po’ diversa da quella in fp32, verificata rispetto al riferimento in bf16. Spento, il DiT è in fp32 per tutto il percorso, con l’immagine verificata rispetto al riferimento."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このMacの測定で速い、または省電力と判断されたところでは、DiTの一部を%@で計算します。fp32とは少し異なる画像になり、bf16のリファレンスと照合されています。オフのときは、DiT全体がfp32で動作し、画像はリファレンスと照合されています。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在这台 Mac 的测量认为更快或更省电之处，DiT 的一部分在%@上运行：图像与 fp32 略有不同，已对照 bf16 参考实现验证。关闭时，DiT 全程使用 fp32，图像已对照参考实现验证。"
+          }
+        }
+      }
+    },
     "Peak read from the silicon: %@" : {
       "localizations" : {
         "de" : {
@@ -28548,46 +28628,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "图像生成期间，“改写”和“描述”会等待。"
-          }
-        }
-      }
-    },
-    "Runs part of the DiT in fp16 on the Neural Engine: less energy (about a fifth on an M1 Pro), an image a little different from fp32’s. Off, the DiT is in fp32 throughout, the image verified against the reference." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Lässt einen Teil des DiT in fp16 auf der Neural Engine laufen: weniger Energie (etwa ein Fünftel auf einem M1 Pro), ein etwas anderes Bild als in fp32. Aus, läuft der DiT durchgehend in fp32, das Bild gegen die Referenz geprüft."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ejecuta parte del DiT en fp16 en el Neural Engine: menos energía (cerca de una quinta parte en un M1 Pro), una imagen algo distinta de la de fp32. Apagado, el DiT va en fp32 de principio a fin, con la imagen verificada contra la referencia."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Fait tourner une partie du DiT en fp16 sur le Neural Engine : moins d’énergie (environ un cinquième sur un M1 Pro), une image un peu différente de celle du fp32. Éteint, le DiT est en fp32 de bout en bout, l’image vérifiée contre la référence."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Esegue una parte del DiT in fp16 sul Neural Engine: meno energia (circa un quinto su un M1 Pro), un’immagine un po’ diversa da quella in fp32. Spento, il DiT è in fp32 per tutto il percorso, con l’immagine verificata rispetto al riferimento."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "DiTの一部をNeural Engine上でfp16で実行します。消費エネルギーが減り（M1 Proで約5分の1）、fp32とは少し異なる画像になります。オフのときは、DiT全体がfp32で動作し、画像はリファレンスと照合されています。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "让 DiT 的一部分在神经网络引擎上以 fp16 运行：更省电（在 M1 Pro 上约省五分之一），图像与 fp32 略有不同。关闭时，DiT 全程使用 fp32，图像已对照参考实现验证。"
           }
         }
       }
@@ -33121,6 +33161,46 @@
         }
       }
     },
+    "The Neural Engine and the GPU’s tensor units (bf16), where this Mac’s measure chooses them; fp32 throughout when you turn them off." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Neural Engine und die Tensor-Einheiten der GPU (bf16), wo die Messung dieses Macs sie wählt; durchgehend fp32, wenn Sie sie ausschalten."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El Neural Engine y las unidades tensoriales de la GPU (bf16), donde la medición de este Mac los elige; fp32 de principio a fin cuando los apagas."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le Neural Engine et les unités tensorielles du GPU (bf16), là où la mesure de ce Mac les choisit ; le fp32 de bout en bout quand vous les éteignez."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il Neural Engine e le unità tensoriali della GPU (bf16), dove la misura di questo Mac li sceglie; fp32 per tutto il percorso quando li spegni."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このMacの測定が選んだところではNeural EngineとGPUのテンソルユニット（bf16）を使います。オフにすると全体がfp32になります。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在这台 Mac 的测量选中之处使用神经网络引擎和 GPU 的张量单元（bf16）；关闭后全程使用 fp32。"
+          }
+        }
+      }
+    },
     "The cells still waiting leave the queue; the running one stops" : {
       "localizations" : {
         "de" : {
@@ -35693,6 +35773,86 @@
         }
       }
     },
+    "The products are computed in fp32, except part of them %@." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Produkte werden in fp32 berechnet, außer einem Teil %@."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Los productos se calculan en fp32, salvo una parte %@."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les produits sont calculés en fp32, sauf une partie %@."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I prodotti sono calcolati in fp32, salvo una parte %@."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "積はfp32で計算されます。ただし一部は%@で計算されます。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "乘积以 fp32 计算，但其中一部分在%@上计算。"
+          }
+        }
+      }
+    },
+    "The products are computed in fp32." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Produkte werden in fp32 berechnet."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Los productos se calculan en fp32."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les produits sont calculés en fp32."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I prodotti sono calcolati in fp32."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "積はfp32で計算されます。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "乘积以 fp32 计算。"
+          }
+        }
+      }
+    },
     "The products of the DiT are computed in fp32, the image verified against the reference." : {
       "localizations" : {
         "de" : {
@@ -37173,322 +37333,322 @@
         }
       }
     },
-    "The weights are stored in 5 to 6 bits (GGUF %@), as published. The products are computed in fp32." : {
+    "The weights are stored in 5 to 6 bits (GGUF %@), as published." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Die Gewichte sind mit 5 bis 6 Bit gespeichert (GGUF %@), wie veröffentlicht. Die Produkte werden in fp32 berechnet."
+            "value" : "Die Gewichte sind mit 5 bis 6 Bit gespeichert (GGUF %@), wie veröffentlicht."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Los pesos se almacenan en 5 a 6 bits (GGUF %@), tal como se publicaron. Los productos se calculan en fp32."
+            "value" : "Los pesos se almacenan en 5 a 6 bits (GGUF %@), tal como se publicaron."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Les poids sont stockés sur 5 à 6 bits (GGUF %@), tels que publiés. Les produits sont calculés en fp32."
+            "value" : "Les poids sont stockés sur 5 à 6 bits (GGUF %@), tels que publiés."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "I pesi sono memorizzati a 5–6 bit (GGUF %@), come pubblicati. I prodotti sono calcolati in fp32."
+            "value" : "I pesi sono memorizzati a 5–6 bit (GGUF %@), come pubblicati."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "重みは公開されたままの5〜6ビット（GGUF %@）で保存されています。積はfp32で計算されます。"
+            "value" : "重みは公開されたままの5〜6ビット（GGUF %@）で保存されています。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "权重按发布时的 5 至 6 位（GGUF %@）存储。乘积以 fp32 计算。"
+            "value" : "权重按发布时的 5 至 6 位（GGUF %@）存储。"
           }
         }
       }
     },
-    "The weights are stored in 8 bits (fp8), as published. The products are computed in fp32." : {
+    "The weights are stored in 8 bits (fp8), as published." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Die Gewichte sind mit 8 Bit gespeichert (fp8), wie veröffentlicht. Die Produkte werden in fp32 berechnet."
+            "value" : "Die Gewichte sind mit 8 Bit gespeichert (fp8), wie veröffentlicht."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Los pesos se almacenan en 8 bits (fp8), tal como se publicaron. Los productos se calculan en fp32."
+            "value" : "Los pesos se almacenan en 8 bits (fp8), tal como se publicaron."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Les poids sont stockés sur 8 bits (fp8), tels que publiés. Les produits sont calculés en fp32."
+            "value" : "Les poids sont stockés sur 8 bits (fp8), tels que publiés."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "I pesi sono memorizzati a 8 bit (fp8), come pubblicati. I prodotti sono calcolati in fp32."
+            "value" : "I pesi sono memorizzati a 8 bit (fp8), come pubblicati."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "重みは公開されたままの8ビット（fp8）で保存されています。積はfp32で計算されます。"
+            "value" : "重みは公開されたままの8ビット（fp8）で保存されています。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "权重按发布时的 8 位（fp8）存储。乘积以 fp32 计算。"
+            "value" : "权重按发布时的 8 位（fp8）存储。"
           }
         }
       }
     },
-    "The weights are stored in 8 bits (int8), as published: a quarter of fp32’s size. The products are computed in fp32." : {
+    "The weights are stored in 8 bits (int8), as published: a quarter of fp32’s size." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Die Gewichte sind mit 8 Bit gespeichert (int8), wie veröffentlicht: ein Viertel der Größe von fp32. Die Produkte werden in fp32 berechnet."
+            "value" : "Die Gewichte sind mit 8 Bit gespeichert (int8), wie veröffentlicht: ein Viertel der Größe von fp32."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Los pesos se almacenan en 8 bits (int8), tal como se publicaron: la cuarta parte del tamaño de fp32. Los productos se calculan en fp32."
+            "value" : "Los pesos se almacenan en 8 bits (int8), tal como se publicaron: la cuarta parte del tamaño de fp32."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Les poids sont stockés sur 8 bits (int8), tels que publiés : le quart de la taille du fp32. Les produits sont calculés en fp32."
+            "value" : "Les poids sont stockés sur 8 bits (int8), tels que publiés : le quart de la taille du fp32."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "I pesi sono memorizzati a 8 bit (int8), come pubblicati: un quarto della dimensione di fp32. I prodotti sono calcolati in fp32."
+            "value" : "I pesi sono memorizzati a 8 bit (int8), come pubblicati: un quarto della dimensione di fp32."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "重みは公開されたままの8ビット（int8）で保存され、サイズはfp32の4分の1です。積はfp32で計算されます。"
+            "value" : "重みは公開されたままの8ビット（int8）で保存され、サイズはfp32の4分の1です。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "权重按发布时的 8 位（int8）存储，大小为 fp32 的四分之一。乘积以 fp32 计算。"
+            "value" : "权重按发布时的 8 位（int8）存储，大小为 fp32 的四分之一。"
           }
         }
       }
     },
-    "The weights are stored in 8 bits in blocks of 32 (GGUF Q8_0), as published: a quarter of fp32’s size. The products are computed in fp32." : {
+    "The weights are stored in 8 bits in blocks of 32 (GGUF Q8_0), as published: a quarter of fp32’s size." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Die Gewichte sind mit 8 Bit in Blöcken von 32 gespeichert (GGUF Q8_0), wie veröffentlicht: ein Viertel der Größe von fp32. Die Produkte werden in fp32 berechnet."
+            "value" : "Die Gewichte sind mit 8 Bit in Blöcken von 32 gespeichert (GGUF Q8_0), wie veröffentlicht: ein Viertel der Größe von fp32."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Los pesos se almacenan en 8 bits en bloques de 32 (GGUF Q8_0), tal como se publicaron: la cuarta parte del tamaño de fp32. Los productos se calculan en fp32."
+            "value" : "Los pesos se almacenan en 8 bits en bloques de 32 (GGUF Q8_0), tal como se publicaron: la cuarta parte del tamaño de fp32."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Les poids sont stockés sur 8 bits par blocs de 32 (GGUF Q8_0), tels que publiés : le quart de la taille du fp32. Les produits sont calculés en fp32."
+            "value" : "Les poids sont stockés sur 8 bits par blocs de 32 (GGUF Q8_0), tels que publiés : le quart de la taille du fp32."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "I pesi sono memorizzati a 8 bit in blocchi da 32 (GGUF Q8_0), come pubblicati: un quarto della dimensione di fp32. I prodotti sono calcolati in fp32."
+            "value" : "I pesi sono memorizzati a 8 bit in blocchi da 32 (GGUF Q8_0), come pubblicati: un quarto della dimensione di fp32."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "重みは公開されたままの32個ずつのブロックの8ビット（GGUF Q8_0）で保存され、サイズはfp32の4分の1です。積はfp32で計算されます。"
+            "value" : "重みは公開されたままの32個ずつのブロックの8ビット（GGUF Q8_0）で保存され、サイズはfp32の4分の1です。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "权重按发布时的 8 位、每 32 个一块（GGUF Q8_0）存储，大小为 fp32 的四分之一。乘积以 fp32 计算。"
+            "value" : "权重按发布时的 8 位、每 32 个一块（GGUF Q8_0）存储，大小为 fp32 的四分之一。"
           }
         }
       }
     },
-    "The weights are stored in about 4 bits (GGUF %@), as published: an eighth of fp32’s size. The products are computed in fp32." : {
+    "The weights are stored in about 4 bits (GGUF %@), as published: an eighth of fp32’s size." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Die Gewichte sind mit etwa 4 Bit gespeichert (GGUF %@), wie veröffentlicht: ein Achtel der Größe von fp32. Die Produkte werden in fp32 berechnet."
+            "value" : "Die Gewichte sind mit etwa 4 Bit gespeichert (GGUF %@), wie veröffentlicht: ein Achtel der Größe von fp32."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Los pesos se almacenan en unos 4 bits (GGUF %@), tal como se publicaron: la octava parte del tamaño de fp32. Los productos se calculan en fp32."
+            "value" : "Los pesos se almacenan en unos 4 bits (GGUF %@), tal como se publicaron: la octava parte del tamaño de fp32."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Les poids sont stockés sur environ 4 bits (GGUF %@), tels que publiés : le huitième de la taille du fp32. Les produits sont calculés en fp32."
+            "value" : "Les poids sont stockés sur environ 4 bits (GGUF %@), tels que publiés : le huitième de la taille du fp32."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "I pesi sono memorizzati a circa 4 bit (GGUF %@), come pubblicati: un ottavo della dimensione di fp32. I prodotti sono calcolati in fp32."
+            "value" : "I pesi sono memorizzati a circa 4 bit (GGUF %@), come pubblicati: un ottavo della dimensione di fp32."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "重みは公開されたままのおよそ4ビット（GGUF %@）で保存され、サイズはfp32の8分の1です。積はfp32で計算されます。"
+            "value" : "重みは公開されたままのおよそ4ビット（GGUF %@）で保存され、サイズはfp32の8分の1です。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "权重按发布时的约 4 位（GGUF %@）存储，大小为 fp32 的八分之一。乘积以 fp32 计算。"
+            "value" : "权重按发布时的约 4 位（GGUF %@）存储，大小为 fp32 的八分之一。"
           }
         }
       }
     },
-    "The weights are stored in bf16, as the publisher released them: half of fp32’s size. The products are computed in fp32." : {
+    "The weights are stored in bf16, as the publisher released them: half of fp32’s size." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Die Gewichte sind in bf16 gespeichert, wie der Herausgeber sie veröffentlicht hat: die Hälfte der Größe von fp32. Die Produkte werden in fp32 berechnet."
+            "value" : "Die Gewichte sind in bf16 gespeichert, wie der Herausgeber sie veröffentlicht hat: die Hälfte der Größe von fp32."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Los pesos se almacenan en bf16, tal como los publicó el editor: la mitad del tamaño de fp32. Los productos se calculan en fp32."
+            "value" : "Los pesos se almacenan en bf16, tal como los publicó el editor: la mitad del tamaño de fp32."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Les poids sont stockés en bf16, tels que l’éditeur les a publiés : la moitié de la taille du fp32. Les produits sont calculés en fp32."
+            "value" : "Les poids sont stockés en bf16, tels que l’éditeur les a publiés : la moitié de la taille du fp32."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "I pesi sono memorizzati in bf16, come li ha pubblicati l’editore: metà della dimensione di fp32. I prodotti sono calcolati in fp32."
+            "value" : "I pesi sono memorizzati in bf16, come li ha pubblicati l’editore: metà della dimensione di fp32."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "重みは公開されたままのbf16で保存され、サイズはfp32の半分です。積はfp32で計算されます。"
+            "value" : "重みは公開されたままのbf16で保存され、サイズはfp32の半分です。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "权重按发布方发布时的 bf16 存储，大小为 fp32 的一半。乘积以 fp32 计算。"
+            "value" : "权重按发布方发布时的 bf16 存储，大小为 fp32 的一半。"
           }
         }
       }
     },
-    "The weights are stored in fp16: half of fp32’s size. The products are computed in fp32." : {
+    "The weights are stored in fp16: half of fp32’s size." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Die Gewichte sind in fp16 gespeichert: die Hälfte der Größe von fp32. Die Produkte werden in fp32 berechnet."
+            "value" : "Die Gewichte sind in fp16 gespeichert: die Hälfte der Größe von fp32."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Los pesos se almacenan en fp16: la mitad del tamaño de fp32. Los productos se calculan en fp32."
+            "value" : "Los pesos se almacenan en fp16: la mitad del tamaño de fp32."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Les poids sont stockés en fp16 : la moitié de la taille du fp32. Les produits sont calculés en fp32."
+            "value" : "Les poids sont stockés en fp16 : la moitié de la taille du fp32."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "I pesi sono memorizzati in fp16: metà della dimensione di fp32. I prodotti sono calcolati in fp32."
+            "value" : "I pesi sono memorizzati in fp16: metà della dimensione di fp32."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "重みはfp16で保存され、サイズはfp32の半分です。積はfp32で計算されます。"
+            "value" : "重みはfp16で保存され、サイズはfp32の半分です。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "权重以 fp16 存储，大小为 fp32 的一半。乘积以 fp32 计算。"
+            "value" : "权重以 fp16 存储，大小为 fp32 的一半。"
           }
         }
       }
     },
-    "The weights are stored in fp32. The products are computed in fp32." : {
+    "The weights are stored in fp32." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Die Gewichte sind in fp32 gespeichert. Die Produkte werden in fp32 berechnet."
+            "value" : "Die Gewichte sind in fp32 gespeichert."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Los pesos se almacenan en fp32. Los productos se calculan en fp32."
+            "value" : "Los pesos se almacenan en fp32."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Les poids sont stockés en fp32. Les produits sont calculés en fp32."
+            "value" : "Les poids sont stockés en fp32."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "I pesi sono memorizzati in fp32. I prodotti sono calcolati in fp32."
+            "value" : "I pesi sono memorizzati in fp32."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "重みはfp32で保存されています。積はfp32で計算されます。"
+            "value" : "重みはfp32で保存されています。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "权重以 fp32 存储。乘积以 fp32 计算。"
+            "value" : "权重以 fp32 存储。"
           }
         }
       }
@@ -37533,42 +37693,42 @@
         }
       }
     },
-    "The weights as published, in fp32 except part of the DiT on the Neural Engine" : {
+    "The weights as published, in fp32 except part of the DiT %@" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Die Gewichte wie veröffentlicht, in fp32 außer einem Teil des DiT auf der Neural Engine"
+            "value" : "Die Gewichte wie veröffentlicht, in fp32 außer einem Teil des DiT %@"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Los pesos tal como se publicaron, en fp32 salvo una parte del DiT en el Neural Engine"
+            "value" : "Los pesos tal como se publicaron, en fp32 salvo una parte del DiT %@"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Les poids tels que publiés, en fp32 sauf une partie du DiT sur le Neural Engine"
+            "value" : "Les poids tels que publiés, en fp32 sauf une partie du DiT %@"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "I pesi così come pubblicati, in fp32 salvo una parte del DiT sul Neural Engine"
+            "value" : "I pesi così come pubblicati, in fp32 salvo una parte del DiT %@"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "公開されたままの重みを fp32 で計算（DiT の一部のみ Neural Engine）"
+            "value" : "公開されたままの重みを fp32 で計算（DiT の一部のみ%@）"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "按发布原样的权重，以 fp32 运行，DiT 的一部分在神经网络引擎上"
+            "value" : "按发布原样的权重，以 fp32 运行，DiT 的一部分在%@上"
           }
         }
       }
@@ -38351,42 +38511,42 @@
         }
       }
     },
-    "This Mac is not measured yet: its first render measures it, then the Neural Engine can be chosen." : {
+    "This Mac is not measured yet: its first render measures it, then the accelerators can be chosen." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Dieser Mac ist noch nicht gemessen: Sein erstes Rendering misst ihn, danach lässt sich die Neural Engine wählen."
+            "value" : "Dieser Mac ist noch nicht gemessen: Sein erstes Rendering misst ihn, danach lassen sich die Beschleuniger wählen."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Este Mac aún no está medido: su primer renderizado lo mide, y después se puede elegir el Neural Engine."
+            "value" : "Este Mac aún no está medido: su primer renderizado lo mide, y después se pueden elegir los aceleradores."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ce Mac n’est pas encore mesuré : son premier rendu le mesure, puis le Neural Engine peut se choisir."
+            "value" : "Ce Mac n’est pas encore mesuré : son premier rendu le mesure, puis les accélérateurs peuvent se choisir."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Questo Mac non è ancora misurato: il suo primo rendering lo misura, poi si può scegliere il Neural Engine."
+            "value" : "Questo Mac non è ancora misurato: il suo primo rendering lo misura, poi si possono scegliere gli acceleratori."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "このMacはまだ測定されていません。最初の生成で測定され、その後Neural Engineを選べます。"
+            "value" : "このMacはまだ測定されていません。最初の生成で測定され、その後アクセラレータを選べます。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "此 Mac 尚未测量：首次生成时会进行测量，之后即可选择神经网络引擎。"
+            "value" : "此 Mac 尚未测量：首次生成时会进行测量，之后即可选择加速器。"
           }
         }
       }
@@ -38431,42 +38591,42 @@
         }
       }
     },
-    "This Mac’s measure gives the Neural Engine nothing to do: the DiT is computed in fp32." : {
+    "This Mac’s measure gives the accelerators nothing to do: the DiT is computed in fp32." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Die Messung dieses Macs gibt der Neural Engine nichts zu tun: der DiT wird in fp32 berechnet."
+            "value" : "Die Messung dieses Macs gibt den Beschleunigern nichts zu tun: der DiT wird in fp32 berechnet."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "La medición de este Mac no da nada que hacer al Neural Engine: el DiT se calcula en fp32."
+            "value" : "La medición de este Mac no da nada que hacer a los aceleradores: el DiT se calcula en fp32."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "La mesure de ce Mac ne donne rien à faire au Neural Engine : le DiT est calculé en fp32."
+            "value" : "La mesure de ce Mac ne donne rien à faire aux accélérateurs : le DiT est calculé en fp32."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "La misura di questo Mac non dà nulla da fare al Neural Engine: il DiT è calcolato in fp32."
+            "value" : "La misura di questo Mac non dà nulla da fare agli acceleratori: il DiT è calcolato in fp32."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "このMacの測定では、Neural Engineに任せる処理がありません。DiTはfp32で計算されます。"
+            "value" : "このMacの測定では、アクセラレータに任せる処理がありません。DiTはfp32で計算されます。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "此 Mac 的测量没有给神经网络引擎分配任何任务：DiT 以 fp32 计算。"
+            "value" : "此 Mac 的测量没有给加速器分配任何任务：DiT 以 fp32 计算。"
           }
         }
       }
@@ -44461,82 +44621,82 @@
         }
       }
     },
-    "fp32, except part of the DiT in fp16 on the Neural Engine" : {
+    "fp32, except part of the DiT %@" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "fp32, außer einem Teil des DiT in fp16 auf der Neural Engine"
+            "value" : "fp32, außer einem Teil des DiT %@"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "fp32, salvo una parte del DiT en fp16 en el Neural Engine"
+            "value" : "fp32, salvo una parte del DiT %@"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "fp32, sauf une partie du DiT en fp16 sur le Neural Engine"
+            "value" : "fp32, sauf une partie du DiT %@"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "fp32, salvo una parte del DiT in fp16 sul Neural Engine"
+            "value" : "fp32, salvo una parte del DiT %@"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "fp32。ただし DiT の一部は Neural Engine で fp16"
+            "value" : "fp32。ただし DiT の一部は%@で計算"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "fp32，但 DiT 的一部分在神经网络引擎上以 fp16 运行"
+            "value" : "fp32，但 DiT 的一部分在%@上运行"
           }
         }
       }
     },
-    "fp32, part of the DiT in fp16 on the Neural Engine · same seed, same bits" : {
+    "fp32, part of the DiT %@ · same seed, same bits" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "fp32, ein Teil des DiT in fp16 auf der Neural Engine · gleicher Seed, gleiche Bits"
+            "value" : "fp32, ein Teil des DiT %@ · gleicher Seed, gleiche Bits"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "fp32, una parte del DiT en fp16 en el Neural Engine · misma semilla, mismos bits"
+            "value" : "fp32, una parte del DiT %@ · misma semilla, mismos bits"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "fp32, une partie du DiT en fp16 sur le Neural Engine · même graine, mêmes bits"
+            "value" : "fp32, une partie du DiT %@ · même graine, mêmes bits"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "fp32, una parte del DiT in fp16 sul Neural Engine · stesso seme, stessi bit"
+            "value" : "fp32, una parte del DiT %@ · stesso seme, stessi bit"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "fp32、DiTの一部はNeural Engineでfp16 · 同じシード、同じビット"
+            "value" : "fp32、DiTの一部は%@で計算 · 同じシード、同じビット"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "fp32，DiT 的一部分在神经网络引擎上以 fp16 运行 · 相同种子，相同比特"
+            "value" : "fp32，DiT 的一部分在%@上运行 · 相同种子，相同比特"
           }
         }
       }
@@ -45227,42 +45387,42 @@
         }
       }
     },
-    "leave out --ane" : {
+    "leave out --accelerators" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "--ane weglassen"
+            "value" : "--accelerators weglassen"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "quita --ane"
+            "value" : "quita --accelerators"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "retirez --ane"
+            "value" : "retirez --accelerators"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "togli --ane"
+            "value" : "togli --accelerators"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "--ane を外してください"
+            "value" : "--accelerators を外してください"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "请去掉 --ane"
+            "value" : "请去掉 --accelerators"
           }
         }
       }
@@ -46869,6 +47029,126 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "没有移除任何内容：添加 --yes 才会移除"
+          }
+        }
+      }
+    },
+    "on the GPU’s tensor units (%@)" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "auf den Tensor-Einheiten der GPU (%@)"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "en las unidades tensoriales de la GPU (%@)"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "sur les unités tensorielles du GPU (%@)"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "sulle unità tensoriali della GPU (%@)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GPUのテンソルユニット（%@）"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GPU 的张量单元（%@）"
+          }
+        }
+      }
+    },
+    "on the Neural Engine (fp16)" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "auf der Neural Engine (fp16)"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "en el Neural Engine (fp16)"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "sur le Neural Engine (fp16)"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "sul Neural Engine (fp16)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Neural Engine（fp16）"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "神经网络引擎（fp16）"
+          }
+        }
+      }
+    },
+    "on the Neural Engine (fp16) and the GPU’s tensor units (%@)" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "auf der Neural Engine (fp16) und den Tensor-Einheiten der GPU (%@)"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "en el Neural Engine (fp16) y las unidades tensoriales de la GPU (%@)"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "sur le Neural Engine (fp16) et les unités tensorielles du GPU (%@)"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "sul Neural Engine (fp16) e sulle unità tensoriali della GPU (%@)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Neural Engine（fp16）とGPUのテンソルユニット（%@）"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "神经网络引擎（fp16）和 GPU 的张量单元（%@）"
           }
         }
       }
@@ -49291,42 +49571,42 @@
         }
       }
     },
-    "this Mac’s measure does not offer the Neural Engine" : {
+    "this Mac’s measure offers no accelerator" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "die Messung dieses Macs bietet die Neural Engine nicht an"
+            "value" : "die Messung dieses Macs bietet keinen Beschleuniger an"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "la medición de este Mac no ofrece el Neural Engine"
+            "value" : "la medición de este Mac no ofrece ningún acelerador"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "la mesure de ce Mac n’offre pas le Neural Engine"
+            "value" : "la mesure de ce Mac n’offre aucun accélérateur"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "la misura di questo Mac non offre il Neural Engine"
+            "value" : "la misura di questo Mac non offre alcun acceleratore"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "このMacの測定では、Neural Engineは利用できません"
+            "value" : "このMacの測定では、アクセラレータは利用できません"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "这台 Mac 的测量结果中没有可用的神经网络引擎"
+            "value" : "这台 Mac 的测量结果中没有可用的加速器"
           }
         }
       }

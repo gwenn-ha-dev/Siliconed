@@ -163,11 +163,14 @@ package enum Variant: String, CaseIterable, Sendable, Codable {
     /// compose differently. Preselected on a Mac of 8 GB (`Family.preselectedVariant`).
     case light
 
-    /// **The Neural Engine's default** (`Request.neuralEngine`): on, on every version (decided 2/11/2026), for the energy its fp16
-    /// products save (a fifth of the machine's, M1 Pro, 1024², 23/10/2026) and the time where the map gives it rows; the user turns it
-    /// off per model, and that choice is kept. Whether it takes any row is the map's (`usesANE`): on a Mac where it does not, nothing
-    /// changes. Until 2/11 the Standard was off by default, its promise the publisher's weights in fp32.
-    package var neuralEngineByDefault: Bool { true }
+    /// **The accelerators' default** (`Request.accelerators`): on, on every version (decided 2/11/2026), for the energy the Neural
+    /// Engine's fp16 products save (a fifth of the machine's, M1 Pro, 1024², 23/10/2026) and the time the GPU's tensor units give where
+    /// the map chooses them; the user turns them off per model — fp32 throughout —, and that choice is kept. Whether they take anything
+    /// is the map's: on a Mac where they do not, nothing changes. Until 2/11 the Standard was off by default, its promise the
+    /// publisher's weights in fp32 — the switch off keeps it.
+    package var acceleratorsByDefault: Bool { true }
+    /// The default's name before the switch covered the GPU's tensor units (`acceleratorsByDefault`).
+    package var neuralEngineByDefault: Bool { acceleratorsByDefault }
 
     /// **« Faster Rendering »'s default** (`Request.fasterRendering`): off on every version. It changes the image, and helps only from
     /// 1024 px on each side; it is a Beta option now (`DiTSwitches.fasterRendering`), and a model's explicit choice stays its own.

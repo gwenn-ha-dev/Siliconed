@@ -213,7 +213,7 @@ enum QwenImageStages {
     static let dit = Stage(
         model: model, name: "dit",
         proves: "one evaluation three ways — prefill of the conditions, the step from their K/V cache, the full pass under the block-causal mask — plus the layout and the modulation; on published int8 weights, along the int8 kernel a render's map may pick (gemm_int8), and the step once on the widened weights",
-        options: ["--edit", "--map", "--neural-engine", "--bf16-activations", "--bf16-attention", "--variant"], variants: edits,
+        options: ["--edit", "--map", "--neural-engine", "--bf16-activations", "--bf16-attention", "--no-accelerators", "--variant"], variants: edits,
         oracle: "tools/oracle/qwen-image-2.1.py dit [--edit N]; witness; with --neural-engine, --bf16-activations or --bf16-attention, bf16 [--edit N]; with --variant compact or light (no --edit), dit and bf16 with --variant \(Wording.publishers)", weights: ["DiT"],
         rule: "layout bit for bit; the rule, floor 5e-4, at the fp64 witness where one exists; cache and full pass ≤ 1e-5 apart; a second step the same bits; \(Wording.halfPrecision), cache and full pass too; on int8 weights, every route by the same rule"
     ) { invocation in
@@ -273,7 +273,7 @@ enum QwenImageStages {
         // Published int8 weights (the Compact): the evaluation along the int8 kernel, the step once widened below (`Int8Route`).
         let int8 = Int8Route(artifact, invocation)
         let dit = try QwenImage21DiT(artifact: artifact, sequence: sequence, lora: nil, fullPass: true,
-                                     neuralEngine: int8?.neuralEngine ?? EngineSettings.effective.plan.usesANE, plan: int8?.plan)
+                                     accelerators: .on(neuralEngine: int8?.neuralEngine ?? EngineSettings.effective.plan.usesANE), plan: int8?.plan)
         dit.recordBoundaries = true
         let d = config.dim
         let half = try invocation.halfReference(file + ".safetensors", script: "tools/oracle/qwen-image-2.1.py bf16\(version.map { " --variant " + $0.rawValue } ?? "")")

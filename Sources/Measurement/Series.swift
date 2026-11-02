@@ -18,7 +18,7 @@ package struct MeasureOptions: Equatable, Sendable {
     package var tag = ""
     /// `--faster-rendering on|off`: the setting for the series, put back at its end; `nil`, the app's as it is.
     package var fasterRendering: Bool?
-    /// Passed to `add` as given, after `--`: `--steps`, `--ane`, `--no-ane`, `--lora`…
+    /// Passed to `add` as given, after `--`: `--steps`, `--accelerators`, `--no-accelerators`, `--lora`…
     package var extra: [String] = []
 
     package struct Failure: Error, Equatable { package let message: String }
@@ -95,6 +95,7 @@ package struct Row: Sendable, Equatable {
     package var steps: Int?, seed: Int
     package var prompt: String
     package var fasterRendering: Bool?
+    /// The « Accelerators » switch the render took (`--accelerators`, the model's choice); the column keeps its name, `neural_engine`.
     package var neuralEngine: Bool?
     package var wallSeconds: Double, engineSeconds: Double?
     package var startFootprint: UInt64, peakSampled: UInt64

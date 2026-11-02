@@ -44,7 +44,7 @@ extension AppState {
     @discardableResult
     /// `owner`: another Mac's (`MirrorServer`), whose exploration is not shown here (`shows`).
     func enqueueGrid(_ grid: RenderGrid, settings: RenderSettings, references: [ReferenceImage], previews: Bool,
-                     sketch: Bool = false, stopAfter: Int = 0, neuralEngine: Bool? = nil, owner: Data? = nil,
+                     sketch: Bool = false, stopAfter: Int = 0, accelerators: Bool? = nil, owner: Data? = nil,
                      shows: Bool = true) -> (run: GridRun, jobs: [Job]) {
         lastGrid += 1
         let jobs = grid.cells.map { cell in
@@ -77,7 +77,7 @@ extension AppState {
             var job = Job(ordinal: nextJobNumber(), settings: s, seeds: [cell.seed], references: used,
                           previews: previews, defaultSteps: card?.defaultSteps, plan: plan)
             job.sketch = stop
-            job.neuralEngine = neuralEngine
+            job.accelerators = accelerators
             job.owner = owner
             return job
         }
@@ -348,7 +348,7 @@ extension AppState {
             request.detail = settings.detail
             request.solver = settings.solver
             request.variations = settings.variations
-            request.neuralEngine = job.neuralEngine ?? neuralEngine(for: settings.identifier)
+            request.accelerators = job.accelerators ?? accelerators(for: settings.identifier)
             request.fasterRendering = settings.fasterRendering ?? fasterRendering(for: settings.identifier)
 
             var progress = Engine.Progress()
@@ -403,7 +403,7 @@ extension AppState {
                                         width: renderResult.image.width, height: renderResult.image.height,
                                         seed: renderResult.seed, timings: renderResult.timings, footprints: renderResult.footprints,
                                         evaluations: renderResult.evaluations,
-                                        settings: { var s = settings; s.neuralEngine = renderResult.neuralEngine; s.fasterRendering = renderResult.fasterRendering; return s }(),
+                                        settings: { var s = settings; s.offer = renderResult.offer; s.fasterRendering = renderResult.fasterRendering; return s }(),
                                         metadata: named ?? renderResult.metadata, references: job.references,
                                         sketch: renderResult.sketch, owner: job.owner)
                     // A sketch belongs to its exploration, not to the history.

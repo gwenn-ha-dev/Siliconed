@@ -270,18 +270,18 @@ struct RackView: View {
         }
     }
 
-    /// **What the chain computes in, for the version installed and the Neural Engine's switch**: the Standard is the publisher's weights in
-    /// fp32, each stage verified against the reference; a Compact or a Light computes in fp32 too, on 8- or 4-bit weights as a third party
-    /// published them, and turns the Neural Engine on by default — « verified against the reference » is not said of them.
-    private var precision: LocalizedStringKey {
-        let ane = app.neuralEngineOffered && app.neuralEngine(for: app.identifier)
+    /// **What the chain computes in, for the version installed and the « Accelerators » switch, on this Mac**: the Standard is the
+    /// publisher's weights in fp32, each stage verified against the reference; a Compact or a Light computes in fp32 too, on 8- or 4-bit
+    /// weights as a third party published them — « verified against the reference » is not said of them. Part of the DiT goes where this
+    /// Mac's map puts the accelerators (`AcceleratorWords.place`): the Neural Engine, the GPU's tensor units, both, or neither.
+    private var precision: String {
         let quantized = app.card.flatMap { app.installedVariant(of: $0.family) }.map { $0 != .standard } ?? false
-        switch (quantized, ane) {
-        case (false, false): return "fp32 end to end, every stage verified against the reference"
-        case (false, true): return "fp32, except part of the DiT in fp16 on the Neural Engine"
-        case (true, true): return "The weights as published, in fp32 except part of the DiT on the Neural Engine"
-        case (true, false): return "The weights as published, computed in fp32"
+        if let place = AcceleratorWords.place(app.acceleratorsInEffect) {
+            return quantized ? String(localized: "The weights as published, in fp32 except part of the DiT \(place)")
+                             : String(localized: "fp32, except part of the DiT \(place)")
         }
+        return quantized ? String(localized: "The weights as published, computed in fp32")
+                         : String(localized: "fp32 end to end, every stage verified against the reference")
     }
 
     private var legend: some View {

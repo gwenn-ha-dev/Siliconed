@@ -140,8 +140,8 @@ final class RemoteControl {
             .merging(r.isVariation ? ["variation": Self.json(r.variations)] : [:]) { a, _ in a }
             .merging(r.detail == .normal ? [:] : ["detail": r.detail.rawValue]) { a, _ in a }
             .merging(r.solver == .euler ? [:] : ["solver": r.solver.rawValue]) { a, _ in a }
-            // What the job will ask, on a Mac whose map offers the Neural Engine: elsewhere, the answer is unchanged.
-            .merging(app.neuralEngineOffered ? ["neural_engine": t.neuralEngine ?? app.neuralEngine(for: r.identifier)] : [:]) { a, _ in a }
+            // What the job will ask, on a Mac whose map offers an accelerator: elsewhere, the answer is unchanged.
+            .merging(app.acceleratorsOffered ? ["accelerators": t.accelerators ?? app.accelerators(for: r.identifier)] : [:]) { a, _ in a }
     }
 
     /// The variation seeds in order, each with its strength — the seed stays the origin's.
@@ -167,7 +167,9 @@ final class RemoteControl {
         if r.isVariation { o["variation"] = Self.json(r.variations) }
         if r.detail != .normal { o["detail"] = r.detail.rawValue }
         if r.solver != .euler { o["solver"] = r.solver.rawValue }
-        if r.neuralEngine { o["neural_engine"] = true }
+        // What the accelerators could do for it on the Mac that computed it: absent, fp32 throughout.
+        if r.offer.neuralEngine { o["neural_engine"] = true }
+        if !r.offer.tensorUnits.isEmpty { o["tensor_units"] = r.offer.tensorUnitsText }
         if let g = e.grid {
             // A grid's sheet: no job made it; its seconds and evaluations are its cells' sum.
             o["job"] = nil
@@ -214,8 +216,8 @@ final class RemoteControl {
                                 "history_images": app.history.count,
                                 "faster_rendering": app.fasterRendering(for: app.identifier),
                                 "beta": betaState(), "writer": writerState()]
-        // The rack's Neural Engine choice, on a Mac whose map offers one (elsewhere nothing is chosen).
-        if app.neuralEngineOffered { o["neural_engine"] = app.neuralEngine(for: app.identifier) }
+        // The rack's « Accelerators » choice, on a Mac whose map offers one (elsewhere nothing is chosen).
+        if app.acceleratorsOffered { o["accelerators"] = app.accelerators(for: app.identifier) }
         // The settings renders run on: a series compared across launches compares maps too.
         o["settings"] = ["read": app.settingsRead, "map": app.mapFacts.inUse?.date ?? NSNull(),
                          "warnings": app.settingsWarnings] as [String: Any]
@@ -307,8 +309,8 @@ final class RemoteControl {
                 o["edit"] = max > 0
                 o["max_references"] = max
                 o["loras"] = b.loras(for: f.id).map { ["lora": Self.shortName($0.path), "name": $0.name] }
-                // The rack's fp32 tag, per installed version: only on a Mac whose map offers the Neural Engine.
-                if app.neuralEngineOffered { o["neural_engine"] = app.neuralEngine(for: f.id) }
+                // The DiT box's « Accelerators », per installed version: only on a Mac whose map offers one.
+                if app.acceleratorsOffered { o["accelerators"] = app.accelerators(for: f.id) }
                 // Faster Rendering is chosen per installed version too: what « measure » reads and gives back.
                 o["faster_rendering"] = app.fasterRendering(for: f.id)
             }

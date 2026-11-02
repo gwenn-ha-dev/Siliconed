@@ -66,12 +66,15 @@ package enum RenderLoop {
     }
 
     /// **The prediction, class by class**, for the denoising of `request` under `plan`: the assignment the plan gives each class, timed by
-    /// the plan's model. `aneBroughtUp`: the render's products could take the ANE (`Render.neuralEngine`). `nil` when the version does not
-    /// exist for the family, or the plan has no model (the engine's defaults: nothing measured, nothing to predict from).
-    package static func predictions(for request: CapacityClasses.Request, plan: CapacityPlan, aneBroughtUp: Bool = true) -> [Predicted]? {
+    /// the plan's model. `aneBroughtUp`: the render's products could take the ANE (`Render.neuralEngine`); `accelerators`: false, the
+    /// render computed in fp32 throughout (`Render.accelerators`). `nil` when the version does not exist for the family, or the plan has no
+    /// model (the engine's defaults: nothing measured, nothing to predict from).
+    package static func predictions(for request: CapacityClasses.Request, plan: CapacityPlan, aneBroughtUp: Bool = true,
+                                    accelerators: Bool = true) -> [Predicted]? {
         guard let model = plan.model, let classes = CapacityClasses.classes(for: request) else { return nil }
-        let plan = plan.restricted(allowingANE: aneBroughtUp)
-        let constraints = CapacitySolver.Constraints(allowsANE: plan.allowsANE)
+        let plan = plan.restricted(accelerators: accelerators).restricted(allowingANE: aneBroughtUp)
+        let constraints = CapacitySolver.Constraints(allowsANE: plan.allowsANE, allowsHalf: plan.allowsANE && plan.allowsHalfPrecision,
+                                                     allowsRounding: plan.allowsHalfPrecision)
         var result: [Predicted] = []
         for c in classes where c.phase == .denoising {
             let executions = c.executions[request.family] ?? 0

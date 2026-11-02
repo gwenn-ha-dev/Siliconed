@@ -120,7 +120,7 @@ package struct AnimaDenoisingModule: DenoisingModule {
         let told = context.told(schedule, start: start)
         let build = { (h: Int, w: Int, range: Range<Int>) throws -> AnimaDiT in
             let dit = try AnimaDiT(artifact: try Artifact(path: map), latentHeight: h, latentWidth: w,
-                                   textLength: text.rows, neuralEngine: context.neuralEngine, lora: lora)
+                                   textLength: text.rows, accelerators: context.accelerators, lora: lora)
             dit.cancellation = context.cancellation
             try dit.tabulate(sigmas: Array(told[range]))
             return dit

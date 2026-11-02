@@ -82,7 +82,7 @@ enum Krea2Stages {
     static let dit = Stage(
         model: model, name: "dit",
         proves: "one evaluation of the DiT at σ = 1, boundary by boundary, judged at the fp64 witness where it exists",
-        sizes: ["512", "1024", "768x512"], options: ["--map", "--neural-engine", "--bf16-activations", "--bf16-attention", "--variant"],
+        sizes: ["512", "1024", "768x512"], options: ["--map", "--neural-engine", "--bf16-activations", "--bf16-attention", "--no-accelerators", "--variant"],
         oracle: "tools/oracle/krea2.py dit --size {size}; witness --size {size}; witness-step --size {size} --step 0; draw --size {size} --step 0 --jitter 1 2 3; with --neural-engine, --bf16-activations or --bf16-attention, bf16 --size {size}; with --variant compact or light, dit, bf16, witness, witness-step --step 0 and draw --step 0 --jitter 1 2 3 with --variant, at 512 \(Wording.publishers)", weights: ["DiT"],
         rule: "the rule, floor 5e-4, at the fp64 witness where it exists, clouds when the oracle has draws; model_out per latent plane at the witness; \(Wording.rectangle); \(Wording.halfPrecision)"
     ) { invocation in
@@ -106,7 +106,7 @@ enum Krea2Stages {
         // Published int8 weights (the Compact): the evaluation along the int8 kernel, `model_out` once widened below (`Int8Route`).
         let int8 = Int8Route(artifact, invocation)
         let dit = try Krea2DiT(artifact: artifact, latentHeight: height, latentWidth: width, maxText: t,
-                               neuralEngine: int8?.neuralEngine ?? EngineSettings.effective.plan.usesANE, plan: int8?.plan)
+                               accelerators: .on(neuralEngine: int8?.neuralEngine ?? EngineSettings.effective.plan.usesANE), plan: int8?.plan)
         dit.recordBoundaries = true
         let started = Date()
         let out = try dit.forward(latent: latent.baseAddress!, text: text.baseAddress!, textRows: t, sigma: sigma[0])

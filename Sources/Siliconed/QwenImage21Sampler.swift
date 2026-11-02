@@ -52,8 +52,8 @@ package struct QwenImage21Sampler {
     package var kept: (path: String, key: String)?
     /// What a kept file must leave free on its volume (`RenderCache.keptReserve`).
     package var keptReserve: Int64 = RenderCache.defaultKeptReserve
-    /// The DiT's products may take the Neural Engine (`Request.neuralEngine`).
-    package var neuralEngine = EngineSettings.effective.plan.usesANE
+    /// What the DiT's products may compute on beyond fp32 (`Request.accelerators`, resolved).
+    package var accelerators = Accelerators.process
     package var cancellation: Cancellation?
     /// Seconds: `prefill`, `steps`, and the DiT's own breakdown (`dit …`).
     package private(set) var timings: [String: Double] = [:]
@@ -128,7 +128,7 @@ package struct QwenImage21Sampler {
             let dit = try (divisor == 1 ? reusable : nil)
                 ?? QwenImage21DiT(artifact: artifact, sequence: sequence, lora: lora, storage: used,
                                   kept: divisor == 1 ? kept.map { ($0.path, $0.key, keptReserve) } : nil,
-                                  neuralEngine: neuralEngine)
+                                  accelerators: accelerators)
             if divisor == 1 { reused = dit }
             if dit.reusedPrefill { timings["kv reused", default: 0] += 1 }
             if dit.keepsPrefill { timings["kv kept", default: 0] += 1 }

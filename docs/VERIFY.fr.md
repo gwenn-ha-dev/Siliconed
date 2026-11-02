@@ -261,6 +261,12 @@ siliconed check z-image dit --size 1024 --neural-engine
 siliconed check z-image dit --size 512 --bf16-activations
 ```
 
+**Les accélérateurs éteints.** Un rendu dont l'interrupteur **Accélérateurs** de l'app est éteint calcule son DiT en fp32 de bout en bout sous la carte de ce Mac : les moteurs et les noyaux que la carte choisit, les poids lus tels que publiés à côté d'activations fp32, mais aucun produit sur le Neural Engine et aucun opérande arrondi sous le fp32. `--no-accelerators` vérifie ce chemin : avec `SILICONED_MAP` qui nomme le rapport de ce Mac (une mesure de ce Mac et de cette version), l'étape tourne sous le plan de cette carte interrupteur éteint, jugée par la règle du fp32 contre la référence fp32 ; sans lui, ce sont les défauts qui tournent, déjà en fp32. Les étapes `dit` des cinq modèles l'acceptent.
+
+```sh
+SILICONED_MAP=<rapport.json> siliconed check z-image dit --size 512 --no-accelerators
+```
+
 L'édition de Qwen-Image-2.1, avec une et deux images de référence, fait partie de son `all` et de `siliconed check qwen-image-2.1` ; une étape seule, c'est `siliconed check qwen-image-2.1 dit --edit 2`. Sa barre sous le Neural Engine s'écrit par `qwen-image-2.1.py bf16 --edit N`.
 
 **La Compact et la Légère.** Leurs DiT sont des fichiers de tiers (GGUF Q8_0 et int8 convrot de Comfy-Org pour la Compact, GGUF Q4_K_M pour la Légère ; l'app épingle chacun par dépôt, révision et sha256). Deux choses se vérifient, de l'extérieur.

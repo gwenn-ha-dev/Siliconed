@@ -21,7 +21,7 @@ final class DiTSwitchesTests: XCTestCase {
     func testNoVersionDefaultsToFasterRenderingAndEveryVersionToTheNeuralEngine() {
         for variant in Variant.allCases {
             XCTAssertFalse(variant.fasterRenderingByDefault)
-            XCTAssertTrue(variant.neuralEngineByDefault)
+            XCTAssertTrue(variant.acceleratorsByDefault)
         }
     }
 
@@ -52,17 +52,17 @@ final class DiTSwitchesTests: XCTestCase {
     }
 
     func testNeuralEngineAvailabilityAndReason() {
-        XCTAssertNil(DiTSwitches.neuralEngineUnavailable(measured: true, offered: true))
-        XCTAssertEqual(DiTSwitches.neuralEngineUnavailable(measured: true, offered: false), .noNeuralEngineRow)
+        XCTAssertNil(DiTSwitches.acceleratorsUnavailable(measured: true, offered: true))
+        XCTAssertEqual(DiTSwitches.acceleratorsUnavailable(measured: true, offered: false), .noAccelerator)
         // Before the first measure (after an update, say), the switch says so rather than « nothing to do »: whether the
         // Neural Engine gets rows is not known yet, and an unread map offers nothing whatever it holds.
-        XCTAssertEqual(DiTSwitches.neuralEngineUnavailable(measured: false, offered: false), .notMeasured)
-        XCTAssertEqual(DiTSwitches.neuralEngineUnavailable(measured: false, offered: true), .notMeasured)
+        XCTAssertEqual(DiTSwitches.acceleratorsUnavailable(measured: false, offered: false), .notMeasured)
+        XCTAssertEqual(DiTSwitches.acceleratorsUnavailable(measured: false, offered: true), .notMeasured)
         // Offered: the choice, else the default — on, the Standard's included; a choice off stays off.
-        XCTAssertTrue(DiTSwitches.neuralEngine(offered: true, choice: nil, versionDefault: Variant.standard.neuralEngineByDefault))
-        XCTAssertFalse(DiTSwitches.neuralEngine(offered: true, choice: false, versionDefault: Variant.standard.neuralEngineByDefault))
-        XCTAssertTrue(DiTSwitches.neuralEngine(offered: true, choice: nil, versionDefault: Variant.compact.neuralEngineByDefault))
+        XCTAssertTrue(DiTSwitches.accelerators(offered: true, choice: nil, versionDefault: Variant.standard.acceleratorsByDefault))
+        XCTAssertFalse(DiTSwitches.accelerators(offered: true, choice: false, versionDefault: Variant.standard.acceleratorsByDefault))
+        XCTAssertTrue(DiTSwitches.accelerators(offered: true, choice: nil, versionDefault: Variant.compact.acceleratorsByDefault))
         // Not offered: never on, whatever was kept.
-        XCTAssertFalse(DiTSwitches.neuralEngine(offered: false, choice: true, versionDefault: true))
+        XCTAssertFalse(DiTSwitches.accelerators(offered: false, choice: true, versionDefault: true))
     }
 }

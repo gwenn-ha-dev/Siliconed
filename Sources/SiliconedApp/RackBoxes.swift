@@ -170,25 +170,34 @@ struct ModuleSlot: View {
 /// language, so that it is never taken for the label of the computation (« computes fp32 »). The hover says what it is in plain words.
 struct WeightsTag: View {
     let format: WeightFormat?
+    /// What the accelerators do for this module on this Mac (the DiT's, `AppState.acceleratorsInEffect`); `none` for an encoder or
+    /// the VAE, which never take them.
+    var accelerators = AcceleratorOffer.none
     /// What the module is, in the sentence of the hover: its stage.
     var body: some View {
         if let format {
             Tag(text: Text("weights \(format.label)"), symbol: "shippingbox")
-                .help(Self.explanation(format))
+                .help(Self.explanation(format) + " " + Self.computation(accelerators))
         }
     }
 
-    static func explanation(_ f: WeightFormat) -> Text {
+    static func explanation(_ f: WeightFormat) -> String {
         switch f {
-        case .int8: Text("The weights are stored in 8 bits (int8), as published: a quarter of fp32’s size. The products are computed in fp32.")
-        case .q8_0: Text("The weights are stored in 8 bits in blocks of 32 (GGUF Q8_0), as published: a quarter of fp32’s size. The products are computed in fp32.")
-        case .fp8: Text("The weights are stored in 8 bits (fp8), as published. The products are computed in fp32.")
-        case .q4_k_m, .q4_k, .q4_0, .q4_1: Text("The weights are stored in about 4 bits (GGUF \(f.label)), as published: an eighth of fp32’s size. The products are computed in fp32.")
-        case .q5_k_m, .q5_k, .q5_0, .q5_1, .q6_k: Text("The weights are stored in 5 to 6 bits (GGUF \(f.label)), as published. The products are computed in fp32.")
-        case .bf16: Text("The weights are stored in bf16, as the publisher released them: half of fp32’s size. The products are computed in fp32.")
-        case .fp16: Text("The weights are stored in fp16: half of fp32’s size. The products are computed in fp32.")
-        case .fp32: Text("The weights are stored in fp32. The products are computed in fp32.")
+        case .int8: String(localized: "The weights are stored in 8 bits (int8), as published: a quarter of fp32’s size.")
+        case .q8_0: String(localized: "The weights are stored in 8 bits in blocks of 32 (GGUF Q8_0), as published: a quarter of fp32’s size.")
+        case .fp8: String(localized: "The weights are stored in 8 bits (fp8), as published.")
+        case .q4_k_m, .q4_k, .q4_0, .q4_1: String(localized: "The weights are stored in about 4 bits (GGUF \(f.label)), as published: an eighth of fp32’s size.")
+        case .q5_k_m, .q5_k, .q5_0, .q5_1, .q6_k: String(localized: "The weights are stored in 5 to 6 bits (GGUF \(f.label)), as published.")
+        case .bf16: String(localized: "The weights are stored in bf16, as the publisher released them: half of fp32’s size.")
+        case .fp16: String(localized: "The weights are stored in fp16: half of fp32’s size.")
+        case .fp32: String(localized: "The weights are stored in fp32.")
         }
+    }
+
+    /// What computes the products: fp32, or fp32 but for the part this Mac's map gives the accelerators.
+    static func computation(_ o: AcceleratorOffer) -> String {
+        if let place = AcceleratorWords.place(o) { return String(localized: "The products are computed in fp32, except part of them \(place).") }
+        return String(localized: "The products are computed in fp32.")
     }
 }
 

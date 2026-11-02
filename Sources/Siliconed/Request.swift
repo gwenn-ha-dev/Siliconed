@@ -96,13 +96,21 @@ package struct Request: Sendable, Equatable {
     /// the text, the images and the render cache's keys do not see it. In a batch, each seed is turned
     /// by the same variations.
     package var variations: [Variation] = []
-    /// **The Neural Engine beside the GPU in the denoiser**, where this Mac's plan gives it rows (`EngineSettings.plan.usesANE`):
-    /// the products it takes run in fp16, each weight column and activation row lifted into fp16's range and
-    /// undone in fp32 (`NeuralEngine`) — less energy, and another image than fp32's, close to it (at 1024²,
-    /// Z-Image's and Qwen-Image-2.1's within a tenth of a level on average, Krea 2's finest details moved).
-    /// False: the denoiser in fp32 throughout, the image the checks compare with the reference. It can only
-    /// turn the branch off: where the map left it off, true changes nothing. The encoders never take it.
-    package var neuralEngine = true
+    /// **« Accelerators »: the Neural Engine and the GPU's tensor units in half precision, in the denoiser**, where this Mac's plan
+    /// chooses them (`Accelerators`, resolved at admission):
+    ///   - the Neural Engine beside the GPU (`EngineSettings.plan.usesANE`): the products it takes run in fp16, each weight column and
+    ///     activation row lifted into fp16's range and undone in fp32 (`NeuralEngine`) — less energy, and another image than fp32's,
+    ///     close to it (at 1024², Z-Image's and Qwen-Image-2.1's within a tenth of a level on average, Krea 2's finest details moved);
+    ///   - the GPU's tensor units on rounded operands: an activation rounded to bf16 before a product on a bf16 weight (`bf16act`),
+    ///     the attention on bf16 or fp16 operands (`tilesbf16`, `tiles16`), the sums fp32 — checked against the reference in bf16.
+    /// False: the denoiser in fp32 throughout (`CapacityPlan.restricted(accelerators:)`), the image the fp32 checks compare with the
+    /// reference. It can only turn them off: where the map chooses none, true changes nothing. The encoders never take them.
+    package var accelerators = true
+    /// The switch's name before it covered the GPU's tensor units (`accelerators`): what callers written then still set.
+    package var neuralEngine: Bool {
+        get { accelerators }
+        set { accelerators = newValue }
+    }
     /// **« Faster Rendering »**: the family's first evaluations on the half grid (`Spectral.reducedEvaluations`) — a quarter to a third
     /// faster at 1024² and above, **another image than the recipe at full size**, which is why it is a field of the request and not a
     /// setting of the machine: the same request renders the same image, whatever else runs. Off by default (the CLI, the checks and the

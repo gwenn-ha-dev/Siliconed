@@ -28,6 +28,8 @@ package struct Invocation: Sendable {
     package let bf16Activations: Bool
     /// `--bf16-attention`: the DiT's attention on bf16 operands, fused (`BF16AttentionRun`).
     package let bf16Attention: Bool
+    /// `--no-accelerators`: this Mac's map (`SILICONED_MAP`) with the « Accelerators » switch off — fp32 throughout (`FP32Run`).
+    package let noAccelerators: Bool
     /// `--long`: the text stages on the oracle's long prompt (past 512 tokens), golden `…-text-long`.
     package let long: Bool
     package let goldens: Goldens
@@ -70,16 +72,21 @@ package struct Invocation: Sendable {
         neuralEngine = flags.contains("--neural-engine")
         bf16Activations = flags.contains("--bf16-activations")
         bf16Attention = flags.contains("--bf16-attention")
+        noAccelerators = flags.contains("--no-accelerators")
+        if noAccelerators && (neuralEngine || bf16Activations || bf16Attention) {
+            throw UsageError("--no-accelerators is fp32 throughout: not with --neural-engine, --bf16-activations or --bf16-attention")
+        }
         if neuralEngine || bf16Activations || bf16Attention {
             try HalfPrecisionRun.enable(neuralEngine: neuralEngine, bf16Activations: bf16Activations, bf16Attention: bf16Attention)
         }
+        if noAccelerators { try FP32Run.enable() }
         long = flags.contains("--long")
         goldens = Goldens(directory: values["--goldens"]?.last)
         extras = values.compactMapValues(\.last).filter { !Self.known.contains($0.key) }
     }
 
     /// The options that take no value.
-    private static let flags: Set<String> = ["--profile", "--neural-engine", "--bf16-activations", "--bf16-attention", "--long"]
+    private static let flags: Set<String> = ["--profile", "--neural-engine", "--bf16-activations", "--bf16-attention", "--no-accelerators", "--long"]
 
     /// The options parsed above; any other accepted option lands in `extras`.
     private static let known: Set<String> = ["--size", "--goldens", "--edit", "--map"]

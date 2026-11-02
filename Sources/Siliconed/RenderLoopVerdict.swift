@@ -156,7 +156,8 @@ extension RenderLoop {
         guard !render.classes.isEmpty, render.sketch == nil, render.loras.isEmpty, references == 0,
               let request = request(of: render, variant: variant),
               CapacityClasses.classes(for: request) != nil else { return nil }
-        let predicted = predictions(for: request, plan: plan, aneBroughtUp: render.neuralEngine) ?? []
+        let predicted = predictions(for: request, plan: plan, aneBroughtUp: render.neuralEngine,
+                                    accelerators: render.accelerators) ?? []
         let comparison = compare(render.classes, predicted: predicted)
         let verdict = verdict(comparison, thresholds: thresholds)
         return (comparison, verdict, Note(request: request, map: mapDate, comparison: comparison, verdict: verdict))

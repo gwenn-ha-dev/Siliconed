@@ -112,7 +112,7 @@ package struct MossImageDenoisingModule: DenoisingModule {
         // full one takes over the small one's expanded LoRA, the one thing that outlives it.
         func build(height: Int, width: Int, expanded: CacheLoRA? = nil) throws -> MossImageDiT {
             let dit = try MossImageDiT(artifact: artifact, gridHeight: height, gridWidth: width, maxText: tokens,
-                                       neuralEngine: context.neuralEngine, lora: stack,
+                                       accelerators: context.accelerators, lora: stack,
                                        expanded: expanded)
             dit.cancellation = context.cancellation
             try context.check()

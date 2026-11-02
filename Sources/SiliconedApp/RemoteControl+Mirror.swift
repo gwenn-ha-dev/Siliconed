@@ -7,7 +7,7 @@
 //   leaves its size to the other Mac (image 1's, by its denoiser's rule).
 // - `wait` and `follow` read the signals the mirror gives from what the other Mac publishes.
 // - What acts on this Mac — `install`, `install writer`, `rewrite` and `describe` (the writer is this Mac's, as the Prompt Lab
-//   says) — refuses; `diagnose` and `set faster-rendering|neural-engine` act on the other Mac's
+//   says) — refuses; `diagnose` and `set faster-rendering|accelerators` act on the other Mac's
 //   (`MirrorMachine.swift`, `diagnose` in `RemoteControl+Commands.swift`); `set beta` writes this Mac's preferences and the
 //   mirror's copy of them; the window says where it computes.
 // - `grid` (and `add` of a series with `--sketch`, `--x`, `--y`) is asked whole of the other Mac, which
@@ -51,7 +51,7 @@ extension RemoteControl {
                                     "default": f.id == "z-image", "ready": app.readySet.contains(f.id)]
             // The choices the window's switches hold for this model, the borrower's (they ride on each job): `set` writes them.
             if app.readySet.contains(f.id) {
-                if app.neuralEngineOffered { o["neural_engine"] = app.neuralEngine(for: f.id) }
+                if app.acceleratorsOffered { o["accelerators"] = app.accelerators(for: f.id) }
                 o["faster_rendering"] = app.fasterRendering(for: f.id)
             }
             if let t = catalog?.traits[f.id] {
@@ -192,7 +192,7 @@ extension RemoteControl {
             let used = app.namedJob(v.prompt, settings: &settings, references: references, capacity: capacity)
             var job = Job(ordinal: 0, settings: settings, seeds: (0..<d.batch).map { firstNumber &+ UInt64($0) },
                           references: used, previews: d.previews ?? app.previews, defaultSteps: card.defaultSteps, plan: nil)
-            job.neuralEngine = d.neuralEngine
+            job.accelerators = d.accelerators
             return job
         }
 
@@ -299,7 +299,7 @@ extension RemoteControl {
                                       loras: stack, references: references.count, detail: d.detail, solver: d.solver)
         let on = mirror.macName
         do {
-            try mirror.explore(g, settings: app.resolvingFaster(settings), references: references, stopAfter: 0, neuralEngine: d.neuralEngine,
+            try mirror.explore(g, settings: app.resolvingFaster(settings), references: references, stopAfter: 0, accelerators: d.accelerators,
                                sketch: d.sketch, previews: d.previews ?? app.previews) { [self] answer in
                 switch answer {
                 case .refused(let text):

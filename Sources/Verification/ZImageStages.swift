@@ -133,7 +133,7 @@ enum ZImageStages {
     static let dit = Stage(
         model: "z-image", name: "dit",
         proves: "one evaluation of the DiT, latent to velocity: embedders, refiners, 30 blocks, head, unpatchify",
-        sizes: ["512", "1024", "768x512", "832x1216"], options: ["--map", "--neural-engine", "--bf16-activations", "--bf16-attention", "--variant"],
+        sizes: ["512", "1024", "768x512", "832x1216"], options: ["--map", "--neural-engine", "--bf16-activations", "--bf16-attention", "--no-accelerators", "--variant"],
         oracle: "tools/oracle/z-image.py dit --size {size}; witness --size {size}; with --neural-engine, --bf16-activations or --bf16-attention, bf16 --size {size}; with --variant compact or light, the same three with --variant, at 512 \(Wording.publishers)", weights: ["DiT"],
         rule: "the rule, floor 5e-4; \(Wording.rectangle); \(Wording.halfPrecision)"
     ) { invocation in

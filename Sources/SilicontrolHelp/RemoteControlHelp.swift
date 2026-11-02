@@ -114,7 +114,7 @@ package enum RemoteControlHelp {
       cancel [t3 …]                            stops the running render, or removes jobs
       clear                                    empties the queue and stops the running render
       set faster-rendering on|off [--model ID] a model's Faster Rendering, as a click (queue empty)
-      set neural-engine on|off [--model ID]    a model's Neural Engine, as a click (queue empty)
+      set accelerators on|off [--model ID]     a model's accelerators, as a click (queue empty)
       set beta [OPTION on|off]                 the four Beta options of Settings, as a click; alone, reads them
       history [N]                              the session's images (most recent first)
       save i7 [i8 …] DEST [--format F]         writes images (.png/.jpg/.heic file, or folder in png|jpeg|heic)
@@ -222,9 +222,11 @@ package enum RemoteControlHelp {
         max_references → how many --ref it reads at most (Qwen-Image-2.1 3, the others 0);
                       null while it is not installed
         formats     → the suggested formats; any valid WxH is accepted (help add)
-        neural_engine → the rack's fp32 tag for the installed version: true = part of the DiT
-                      on the Neural Engine (--ane, --no-ane of « add »; help set). Only on a Mac whose
-                      measure offers it, and once the model is ready
+        accelerators → the DiT box's « Accelerators » for the installed version: true = part of the
+                      DiT on the Neural Engine and the GPU's tensor units, where this Mac's map
+                      chooses them; false = fp32 throughout (--accelerators, --no-accelerators of
+                      « add »; help set). Only on a Mac whose measure offers one, and once the model
+                      is ready
         faster_rendering → Faster Rendering for the installed version (help set): what a render takes,
                       so false while its Beta option is off; off by default; once the model is ready
         license_urls → the license file(s) on Hugging Face, at the revision the installation takes:
@@ -381,13 +383,17 @@ package enum RemoteControlHelp {
                               the model was distilled for), euler-ancestral, dpmpp-2m or unipc.
                               Same steps, same time, another image. Jobs and images say "solver"
                               when it is not euler.
-          --ane, --no-ane     the rack's fp32 tag, as a click: part of the DiT in fp16 on the Neural
-                              Engine (less energy, an image a little different from fp32's), or
-                              fp32 throughout. Kept for the model's installed version, like the
-                              tag; the job keeps what it was given. Default: the model's choice
-                              ("neural_engine" of « models »). --ane only on a Mac whose measure
-                              offers the Neural Engine. Jobs say "neural_engine" there;
-                              images, when it ran.
+          --accelerators, --no-accelerators
+                              the DiT box's « Accelerators », as a click: part of the DiT on the
+                              Neural Engine (fp16) and on the GPU's tensor units (bf16, fp16),
+                              where this Mac's map chooses them — less time or energy, an image a
+                              little different from fp32's —, or fp32 throughout. Kept for the
+                              model's installed version, like the switch; the job keeps what it
+                              was given. Default: the model's choice ("accelerators" of
+                              « models »). --accelerators only on a Mac whose measure offers one.
+                              --ane, --no-ane: their former names. Jobs say "accelerators"
+                              there; images say what could run: "neural_engine": true,
+                              "tensor_units": "bf16".
           --batch N           N images (1 to 8) with seeds s, s+1, …; the prompt is encoded once
                               for the whole batch (faster than N requests).
           --ref IMAGE|i7      editing by instruction: an image file or an image of the history.
@@ -437,7 +443,7 @@ package enum RemoteControlHelp {
           estimate_s : the sum, null if one job has no estimate yet.
           With --wait: one "type": "added" line per job, then the lines of « wait » for all.
 
-        FAILURES: usage, prompt, model, solver, detail, neural_engine, lora, format, steps, edit, ref, img2img
+        FAILURES: usage, prompt, model, solver, detail, accelerators, lora, format, steps, edit, ref, img2img
         (--image/--strength: the app does none), subject (a named subject the prompt cites, help
         subjects), queue_full (64 waiting, or not enough room for every alternative), busy (an
         installation is running: no render until it is done), write.
@@ -503,7 +509,7 @@ package enum RemoteControlHelp {
           is « Finish This Image » on an exploration's cell, « sheet g2 » is « Add Sheet to History » (help finish).
 
         FAILURES: usage (no --x, --batch, --x given to « add »), grid (an axis that does not read or
-        does not make a grid, more than 64 cells), prompt, model, solver, detail, neural_engine, lora,
+        does not make a grid, more than 64 cells), prompt, model, solver, detail, accelerators, lora,
         format, steps, edit, ref, subject (a grid does not cite named subjects), queue_full, busy (an installation
         is running), write.
         """,
@@ -561,12 +567,12 @@ package enum RemoteControlHelp {
            "installing": {"title": "Installing Z-Image Turbo", "last": "forging the DiT → …"} | null,
            "queue_remaining_s": 66.5, "remaining_complete": true,
            "history_images": 12, "library": "/Users/…/Siliconed", "faster_rendering": true,
-           "neural_engine": false, "beta": {"more_solvers": false, "faster_rendering": true, …},
+           "accelerators": true, "beta": {"more_solvers": false, "faster_rendering": true, …},
            "writer": {"state": "ready", "installing": false, "failure": null, "bytes": 17…},
            "settings": {"read": true, "map": "2026-10-26T14:43:50Z", "warnings": []}}
 
         faster_rendering   : Faster Rendering of the model in the rack (help set).
-        neural_engine      : the Neural Engine choice of the model in the rack (help set); only on a Mac whose measure offers it.
+        accelerators       : the « Accelerators » choice of the model in the rack (help set); only on a Mac whose measure offers one.
         beta               : the four Beta options of Settings (help set): more_solvers, faster_rendering, size_scales, negative_lora.
         writer             : the Prompt Lab's writer (help rewrite): "state" is "ready", or the code rewrite would refuse with
                              (writer_absent, writer_head with "download_bytes", writer_memory with "gigabytes", writer_preparing);
@@ -627,23 +633,25 @@ package enum RemoteControlHelp {
 
         "set": """
         silicontrol set faster-rendering on|off [--model ID]
-        silicontrol set neural-engine on|off [--model ID]
+        silicontrol set accelerators on|off [--model ID]
         silicontrol set beta [OPTION on|off]
 
         Settings' switches, from the terminal. Each goes through the function its switch calls, so the choice is
         written and the window follows, exactly as a click.
 
         FASTER-RENDERING flips « Faster Rendering » for one model. It is chosen per installed version, like the
-        Neural Engine, and off by default. It is a Beta option (Settings ▸ Advanced ▸ Beta): "on" is
+        accelerators, and off by default. It is a Beta option (Settings ▸ Advanced ▸ Beta): "on" is
         refused ("faster_rendering") while the option is off, and no render is a faster one then. On, from
         1024 px on each side the first evaluations run on a grid of half the size: faster, another image than at
         full size. Off: full size, the image checked against the reference.
 
-        NEURAL-ENGINE flips the Neural Engine of one model (the DiT box's switch): part of the DiT in fp16 on the
-        Neural Engine, less energy, an image a little different; off, no product of the DiT in fp16. Also per
-        installed version; unless chosen, on, on every version. Refused
-        ("neural_engine"), on or off, on a Mac whose measure gives the Neural Engine nothing to do: the window greys
-        the switch there with that reason, and there is nothing to choose. For one render only: add --ane / --no-ane.
+        ACCELERATORS flips « Accelerators » for one model (the DiT box's switch): part of the DiT on the Neural
+        Engine (fp16) and on the GPU's tensor units (bf16, fp16), where this Mac's map chooses them — less time or
+        energy, an image a little different, checked against the reference in bf16; off, the DiT in fp32
+        throughout, checked against the reference in fp32. Also per installed version; unless chosen, on, on every
+        version. "neural-engine", its former name, still works. Refused ("accelerators"), on or off, on a Mac whose
+        measure gives the accelerators nothing to do: the window greys the switch there with that reason, and there
+        is nothing to choose. For one render only: add --accelerators / --no-accelerators.
 
         Both: without --model, the model in the rack. Only with nothing running or waiting (a job planned under
         one value and finished under the other would mix two recipes): else "busy". « models » tells each model's
@@ -661,11 +669,11 @@ package enum RemoteControlHelp {
         the window computes on another Mac, its copy is set too. « status » gives them as "beta".
 
         Answer: {"ok": true, "model": "krea2", "faster_rendering": false, "previous": true}
-                {"ok": true, "model": "z-image", "neural_engine": true, "previous": false}
+                {"ok": true, "model": "z-image", "accelerators": true, "previous": false}
                 {"ok": true, "option": "size-scales", "enabled": true, "previous": false,
                  "beta": {"more_solvers": false, "faster_rendering": false, "size_scales": true, "negative_lora": false}}
         FAILURES: usage (also: an unknown Beta option, "hint" lists them), model, busy, faster_rendering ("on" without
-        its Beta option), neural_engine (no Neural Engine to choose on this Mac).
+        its Beta option), accelerators (no accelerator to choose on this Mac).
         """,
 
         "history": """
@@ -1027,7 +1035,7 @@ package enum RemoteControlHelp {
           swapouts     pages swapped out during the render (vm_stat's Swapouts); disk_read_GB the app's reads
           md5          of the decoded 8-bit RGB pixels: same model, prompt, seed, size and settings must give
                        the same md5 on every run, every day (a mismatch is a defect: report it)
-        beside the model, variant, steps, seed, Neural Engine, app version, chip, memory, macOS, power
+        beside the model, variant, steps, seed, accelerators (column neural_engine), app version, chip, memory, macOS, power
         source and thermal state. A render's prompt is encoded once and cached: with several renders on
         one prompt the encoder runs only the first time; give several --prompt to include it each time.
 
@@ -1038,7 +1046,7 @@ package enum RemoteControlHelp {
         the current folder) has one line per render, the witnesses and the load included.
         --out keeps the PNGs there; otherwise they are deleted after they are hashed.
         --tag labels the series in the TSV. After --, options go to "add" as they are (--steps, --lora,
-        --ane, --no-ane); not --wait, --out, --batch, --ref, --model, --preview.
+        --accelerators, --no-accelerators); not --wait, --out, --batch, --ref, --model, --preview.
 
         For a comparison to mean something: the adapter plugged in, no other job on the Mac, the app
         freshly opened for a memory figure (a peak read after other models ran includes what they left).
@@ -1077,9 +1085,9 @@ package enum RemoteControlHelp {
                                                                            → leave it out
           detail               --detail more|most on a model without Detail (Anima, Krea 2)
                                                                            → leave it out
-          neural_engine        --ane, or set neural-engine, on a Mac whose measure does not offer the
-                               Neural Engine                               → leave it out: nothing to choose there
-                               set neural-engine on a Mac not measured yet → render once (it measures), or diagnose
+          accelerators         --accelerators, or set accelerators, on a Mac whose measure offers no
+                               accelerator                                 → leave it out: nothing to choose there
+                               set accelerators on a Mac not measured yet  → render once (it measures), or diagnose
           subject              a named subject: unknown, a name taken, too many images, a model
                                that reads none, a grid citing one          → help subjects
           grid                 an axis that does not read, two axes on one setting, a {…} group
@@ -1209,7 +1217,7 @@ package enum RemoteControlHelp {
       cancel [t3 …]                            arrête le rendu en cours, ou retire des travaux
       clear                                    vide la file et arrête le rendu en cours
       set faster-rendering on|off [--model ID] le rendu plus rapide d'un modèle, comme un clic (file vide)
-      set neural-engine on|off [--model ID]    le Neural Engine d'un modèle, comme un clic (file vide)
+      set accelerators on|off [--model ID]     les accélérateurs d'un modèle, comme un clic (file vide)
       set beta [OPTION on|off]                 les quatre options Bêta des Réglages, comme un clic ; seul, les lit
       history [N]                              les images de la session (la plus récente d'abord)
       save i7 [i8 …] DEST [--format F]         écrit des images (fichier .png/.jpg/.heic, ou dossier en png|jpeg|heic)
@@ -1318,9 +1326,11 @@ package enum RemoteControlHelp {
         max_references → combien de --ref il lit au plus (Qwen-Image-2.1 3, les autres 0) ;
                       null tant qu'il n'est pas installé
         formats     → les formats conseillés ; tout WxH valide est accepté (help add)
-        neural_engine → l'étiquette fp32 du rack pour la version installée : true = une part du
-                      DiT sur le Neural Engine (--ane, --no-ane de « add » ; help set). Seulement sur un Mac
-                      dont la mesure l'offre, et le modèle prêt
+        accelerators → les « Accélérateurs » de la boîte DiT pour la version installée : true = une
+                      part du DiT sur le Neural Engine et les unités tensorielles du GPU, là où la
+                      carte de ce Mac les choisit ; false = fp32 de bout en bout (--accelerators,
+                      --no-accelerators de « add » ; help set). Seulement sur un Mac dont la mesure
+                      en offre un, et le modèle prêt
         faster_rendering → le rendu plus rapide de la version installée (help set) : ce qu'un rendu
                       prend, donc faux tant que son option Bêta est éteinte ; éteint par défaut ; le modèle prêt
         license_urls → le(s) fichier(s) de licence sur Hugging Face, à la révision que l'installation
@@ -1477,14 +1487,18 @@ package enum RemoteControlHelp {
                               celui pour lequel le modèle a été distillé), euler-ancestral,
                               dpmpp-2m ou unipc. Mêmes pas, même durée, une autre image. Travaux
                               et images disent "solver" s'il n'est pas euler.
-          --ane, --no-ane     l'étiquette fp32 du rack, comme un clic : une part du DiT en fp16 sur
-                              le Neural Engine (moins d'énergie, une image un peu différente de
-                              celle du fp32), ou le fp32 de bout en bout. Gardé pour la version
-                              installée du modèle, comme l'étiquette ; le travail garde ce qu'on lui
-                              a donné. Défaut : le choix du modèle ("neural_engine" de « models »).
-                              --ane seulement sur un Mac dont la mesure offre le
-                              Neural Engine. Les travaux y disent "neural_engine" ; les images,
-                              quand il a tourné.
+          --accelerators, --no-accelerators
+                              les « Accélérateurs » de la boîte DiT, comme un clic : une part du
+                              DiT sur le Neural Engine (fp16) et sur les unités tensorielles du GPU
+                              (bf16, fp16), là où la carte de ce Mac les choisit — moins de temps
+                              ou d'énergie, une image un peu différente de celle du fp32 —, ou le
+                              fp32 de bout en bout. Gardé pour la version installée du modèle,
+                              comme l'interrupteur ; le travail garde ce qu'on lui a donné.
+                              Défaut : le choix du modèle ("accelerators" de « models »).
+                              --accelerators seulement sur un Mac dont la mesure en offre un.
+                              --ane, --no-ane : leurs anciens noms. Les travaux y disent
+                              "accelerators" ; les images, ce qui pouvait tourner :
+                              "neural_engine": true, "tensor_units": "bf16".
           --batch N           N images (1 à 8) aux graines s, s+1, … ; le prompt est encodé une
                               fois pour tout le lot (plus rapide que N demandes).
           --ref IMAGE|i7      édition par instruction : un fichier image ou une image de l'historique.
@@ -1535,7 +1549,7 @@ package enum RemoteControlHelp {
           estimate_s : la somme, null si un travail n'a pas encore d'estimation.
           Avec --wait : une ligne "type": "added" par travail, puis les lignes de « wait » pour tous.
 
-        ÉCHECS : usage, prompt, model, solver, detail, neural_engine, lora, format, steps, edit, ref, img2img
+        ÉCHECS : usage, prompt, model, solver, detail, accelerators, lora, format, steps, edit, ref, img2img
         (--image/--strength : l'app n'en fait pas), subject (un sujet nommé que le prompt cite,
         help subjects), queue_full (64 en attente, ou pas assez de place pour toutes les
         alternatives), busy (une installation tourne : pas de rendu avant qu'elle soit finie), write.
@@ -1601,7 +1615,7 @@ package enum RemoteControlHelp {
           « finish g2c3 » est « Finir cette image » sur une case d'exploration, « sheet g2 » est « Ajouter la planche à l'historique » (help finish).
 
         ÉCHECS : usage (pas de --x, --batch, --x donné à « add »), grid (un axe illisible ou qui ne
-        fait pas une grille, plus de 64 cases), prompt, model, solver, detail, neural_engine, lora,
+        fait pas une grille, plus de 64 cases), prompt, model, solver, detail, accelerators, lora,
         format, steps, edit, ref, subject (une grille ne cite pas de sujets nommés), queue_full, busy (une
         installation tourne), write.
         """,
@@ -1661,12 +1675,12 @@ package enum RemoteControlHelp {
            "installing": {"title": "Installing Z-Image Turbo", "last": "forging the DiT → …"} | null,
            "queue_remaining_s": 66.5, "remaining_complete": true,
            "history_images": 12, "library": "/Users/…/Siliconed", "faster_rendering": true,
-           "neural_engine": false, "beta": {"more_solvers": false, "faster_rendering": true, …},
+           "accelerators": true, "beta": {"more_solvers": false, "faster_rendering": true, …},
            "writer": {"state": "ready", "installing": false, "failure": null, "bytes": 17…},
            "settings": {"read": true, "map": "2026-10-26T14:43:50Z", "warnings": []}}
 
         faster_rendering   : le rendu plus rapide du modèle du rack (help set).
-        neural_engine      : le choix du Neural Engine du modèle du rack (help set) ; seulement sur un Mac dont la mesure l'offre.
+        accelerators       : le choix des « Accélérateurs » du modèle du rack (help set) ; seulement sur un Mac dont la mesure en offre un.
         beta               : les quatre options Bêta des Réglages (help set) : more_solvers, faster_rendering, size_scales, negative_lora.
         writer             : le rédacteur de l'Atelier (help rewrite) : "state" vaut "ready", ou le code dont rewrite refuserait
                              (writer_absent, writer_head avec "download_bytes", writer_memory avec "gigabytes", writer_preparing) ;
@@ -1729,24 +1743,26 @@ package enum RemoteControlHelp {
 
         "set": """
         silicontrol set faster-rendering on|off [--model ID]
-        silicontrol set neural-engine on|off [--model ID]
+        silicontrol set accelerators on|off [--model ID]
         silicontrol set beta [OPTION on|off]
 
         Les interrupteurs des Réglages, depuis le terminal. Chacun passe par la fonction que son interrupteur appelle : le
         choix est écrit et la fenêtre suit, exactement comme un clic.
 
-        FASTER-RENDERING bascule le « rendu plus rapide » d'un modèle. Il se choisit par version installée, comme le
-        Neural Engine, et éteint par défaut. C'est une option Bêta (Réglages ▸ Avancé ▸ Bêta) :
+        FASTER-RENDERING bascule le « rendu plus rapide » d'un modèle. Il se choisit par version installée, comme les
+        accélérateurs, et éteint par défaut. C'est une option Bêta (Réglages ▸ Avancé ▸ Bêta) :
         « on » est refusé (« faster_rendering ») tant qu'elle est éteinte, et aucun rendu n'est alors
         plus rapide. Allumé, dès 1024 px de chaque côté les premières évaluations se font sur une grille de
         demi-taille : plus vite, une autre image qu'en pleine taille. Éteint : pleine taille, l'image
         contrôlée contre la référence.
 
-        NEURAL-ENGINE bascule le Neural Engine d'un modèle (l'interrupteur de la boîte DiT) : une part du DiT en fp16 sur le
-        Neural Engine, moins d'énergie, une image un peu différente ; éteint, aucun produit du DiT en fp16. Aussi par
-        version installée ; faute de choix, allumé, sur toutes les versions.
-        Refusé (« neural_engine »), allumé ou éteint, sur un Mac dont la mesure ne donne rien à faire au Neural Engine : la
-        fenêtre y grise l'interrupteur avec cette raison, et il n'y a rien à choisir. Pour un seul rendu : add --ane / --no-ane.
+        ACCELERATORS bascule les « Accélérateurs » d'un modèle (l'interrupteur de la boîte DiT) : une part du DiT sur le
+        Neural Engine (fp16) et sur les unités tensorielles du GPU (bf16, fp16), là où la carte de ce Mac les choisit —
+        moins de temps ou d'énergie, une image un peu différente, contrôlée contre la référence en bf16 ; éteint, le DiT en
+        fp32 de bout en bout, contrôlé contre la référence en fp32. Aussi par version installée ; faute de choix, allumé,
+        sur toutes les versions. « neural-engine », son ancien nom, marche encore. Refusé (« accelerators »), allumé ou
+        éteint, sur un Mac dont la mesure ne donne rien à faire aux accélérateurs : la fenêtre y grise l'interrupteur avec
+        cette raison, et il n'y a rien à choisir. Pour un seul rendu : add --accelerators / --no-accelerators.
 
         Les deux : sans --model, le modèle du rack. Seulement quand rien ne tourne ni n'attend (un travail planifié sous
         une valeur et fini sous l'autre mélangerait deux recettes) : sinon « busy ». « models » donne les valeurs de chaque
@@ -1764,11 +1780,11 @@ package enum RemoteControlHelp {
         calcule sur un autre, sa copie est réglée aussi. « status » les donne sous "beta".
 
         Réponse : {"ok": true, "model": "krea2", "faster_rendering": false, "previous": true}
-                  {"ok": true, "model": "z-image", "neural_engine": true, "previous": false}
+                  {"ok": true, "model": "z-image", "accelerators": true, "previous": false}
                   {"ok": true, "option": "size-scales", "enabled": true, "previous": false,
                    "beta": {"more_solvers": false, "faster_rendering": false, "size_scales": true, "negative_lora": false}}
         ÉCHECS : usage (aussi : une option Bêta inconnue, "hint" les liste), model, busy, faster_rendering (« on » sans son
-        option Bêta), neural_engine (pas de Neural Engine à choisir sur ce Mac).
+        option Bêta), accelerators (pas d'accélérateur à choisir sur ce Mac).
         """,
 
         "history": """
@@ -2139,7 +2155,7 @@ package enum RemoteControlHelp {
           swapouts     pages écrites en swap pendant le rendu (Swapouts de vm_stat) ; disk_read_GB les lectures de l'app
           md5          des pixels décodés en RGB 8 bits : même modèle, prompt, graine, format et réglages doivent
                        donner le même md5 à chaque essai, chaque jour (un écart est un défaut : le signaler)
-        avec le modèle, la version, les pas, la graine, le Neural Engine, la version de l'app, la puce, la mémoire,
+        avec le modèle, la version, les pas, la graine, les accélérateurs (colonne neural_engine), la version de l'app, la puce, la mémoire,
         macOS, la source d'alimentation et l'état thermique. Le prompt d'un rendu est encodé une fois puis gardé :
         avec plusieurs rendus du même prompt, l'encodeur ne tourne que la première fois ; plusieurs --prompt
         l'incluent à chaque fois.
@@ -2151,7 +2167,7 @@ package enum RemoteControlHelp {
         dans le dossier courant) a une ligne par rendu, témoins et chargement compris.
         --out garde les PNG là ; sinon ils sont effacés une fois hachés.
         --tag nomme la série dans le TSV. Après --, les options vont à « add » telles quelles (--steps, --lora,
-        --ane, --no-ane) ; pas --wait, --out, --batch, --ref, --model, --preview.
+        --accelerators, --no-accelerators) ; pas --wait, --out, --batch, --ref, --model, --preview.
 
         Pour qu'une comparaison veuille dire quelque chose : le secteur branché, aucun autre travail sur le Mac,
         l'app fraîchement ouverte pour un chiffre de mémoire (un pic lu après d'autres modèles inclut ce qu'ils ont laissé).
@@ -2190,9 +2206,9 @@ package enum RemoteControlHelp {
                                qu'Euler                                    → le retirer
           detail               --detail more|most sur un modèle sans Détail (Anima, Krea 2)
                                                                            → le retirer
-          neural_engine        --ane, ou set neural-engine, sur un Mac dont la mesure n'offre pas le
-                               Neural Engine                               → le retirer : rien à choisir là
-                               set neural-engine sur un Mac pas encore mesuré → un rendu (il mesure), ou diagnose
+          accelerators         --accelerators, ou set accelerators, sur un Mac dont la mesure n'offre
+                               aucun accélérateur                          → le retirer : rien à choisir là
+                               set accelerators sur un Mac pas encore mesuré → un rendu (il mesure), ou diagnose
           subject              un sujet nommé : inconnu, nom déjà pris, trop d'images, modèle qui
                                n'en lit pas, une grille qui en cite un     → help subjects
           grid                 un axe illisible, deux axes sur un même réglage, un groupe {…} sur

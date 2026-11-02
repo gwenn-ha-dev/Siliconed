@@ -291,7 +291,7 @@ package final class QwenImage21DiT: BoundaryRecording, PhaseTiming {
     ///     otherwise; the unlinked file when keeping it would leave less than `reserve` bytes free.
     package init(artifact: Artifact, sequence: QwenImage21Sequence, lora: LoRA? = nil, fullPass: Bool = false,
                  storage: CacheStorage = .memory, kept: (path: String, key: String, reserve: Int64)? = nil,
-                 neuralEngine: Bool = EngineSettings.effective.plan.usesANE, plan: CapacityPlan? = nil) throws {
+                 accelerators: Accelerators = .process, plan: CapacityPlan? = nil) throws {
         guard let kind = artifact.header["kind"] as? String, Family(ditKind: kind) == .qwenImage21 else {
             if artifact.header["kind"] as? String == Family.supersededQwenImage21Kind {
                 throw Artifact.Failure.badHeader("map \(artifact.path): forged from the base model of Qwen-Image-2.1, which "
@@ -306,7 +306,7 @@ package final class QwenImage21DiT: BoundaryRecording, PhaseTiming {
         self.config = Config(header: artifact.header)
         self.sequence = sequence
         self.prefetcher = Prefetcher(artifact: artifact)
-        self.gemm = try GEMM(plan: plan ?? EngineSettings.effective.plan, neuralEngine: neuralEngine)
+        self.gemm = try GEMM(plan: plan ?? EngineSettings.effective.plan, accelerators: accelerators)
         self.elementwise = try ElementwiseGPU(device: gemm.device, queue: gemm.queue)
         self.allowsFullPass = fullPass || storage == .recompute
         self.storage = storage

@@ -96,7 +96,7 @@ package struct Krea2DenoisingModule: DenoisingModule {
         let modulationKey = "krea2.modulation " + map
         func build(height: Int, width: Int) throws -> Krea2DiT {
             let dit = try Krea2DiT(artifact: artifact, latentHeight: height, latentWidth: width, maxText: tokens,
-                                   neuralEngine: context.neuralEngine, lora: lora)
+                                   accelerators: context.accelerators, lora: lora)
             dit.cancellation = context.cancellation
             try context.check()
             if let table = context.reserve[modulationKey] as? Krea2DiT.ModulationTable { dit.modulations = table }
@@ -141,7 +141,7 @@ package struct Krea2DenoisingModule: DenoisingModule {
             return mergeDone.merged
         }
         let fusion = try Krea2TextFusion(artifact: artifact, maxTokens: text.rows,
-                                         neuralEngine: context.neuralEngine,
+                                         accelerators: context.accelerators,
                                          lora: lora)
         fusion.cancellation = context.cancellation
         let merged = try text.values.withUnsafeBufferPointer {

@@ -112,10 +112,11 @@ package struct RenderCache: Sendable {
 
     /// **What changes a computation's bits**: the plan the engine runs under (which engine takes which rows, which kernel runs
     /// each attention), plus the thread count.
-    package static func numerics(neuralEngine: Bool = false) -> String {
+    package static func numerics(_ accelerators: Accelerators = .on(neuralEngine: false)) -> String {
         let s = EngineSettings.effective
-        // The Neural Engine computes in fp16: a K/V the DiT wrote with it is not one written without.
-        let plan = s.plan.restricted(allowingANE: neuralEngine)
+        // The Neural Engine computes in fp16, the GPU's tensor units on rounded operands: a K/V the DiT wrote with them is not one
+        // written without (`… no-ane`), nor one written in fp32 throughout (`… fp32`).
+        let plan = s.plan.forDenoiser(accelerators)
         return "plan \(plan.identity) parallel \(s.parallel)"
     }
 

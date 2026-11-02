@@ -135,7 +135,7 @@ package final class AnimaDiT: BoundaryRecording, PhaseTiming {
     ///   padding its output with zeros up to that. The zeros **count**: the reference does not
     ///   mask cross-attention, so each zero row takes its share of the softmax.
     package init(artifact: Artifact, latentHeight: Int, latentWidth: Int, textLength: Int = 512,
-                neuralEngine: Bool = EngineSettings.effective.plan.usesANE, lora: LoRA? = nil) throws {
+                accelerators: Accelerators = .process, lora: LoRA? = nil) throws {
         guard artifact.header["kind"] as? String == "anima-turbo-dit" else {
             throw Artifact.Failure.badHeader("map \(artifact.header["kind"] ?? "?"): anima-turbo-dit expected")
         }
@@ -152,7 +152,7 @@ package final class AnimaDiT: BoundaryRecording, PhaseTiming {
                                             reason: .sideTooLong, bound: side)
         }
         self.prefetcher = Prefetcher(artifact: artifact)
-        self.gemm = try GEMM(neuralEngine: neuralEngine)
+        self.gemm = try GEMM(accelerators: accelerators)
         self.gelu = try AnimaGELU(device: gemm.device, queue: gemm.queue)
         self.transposed = artifact.linearWeightsTransposed
         self.latentHeight = latentHeight

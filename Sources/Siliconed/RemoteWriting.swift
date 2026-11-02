@@ -141,9 +141,16 @@ package enum BetaOption: String, CaseIterable, Sendable {
 
 // MARK: - The arguments of set
 
-/// **`set …`**, read: a model's switch (`faster-rendering`, `neural-engine`), or the Beta options.
+/// **`set …`**, read: a model's switch (`faster-rendering`, `accelerators` — `neural-engine`, its name before it covered the GPU's
+/// tensor units, still read), or the Beta options.
 package enum SetOrder: Equatable, Sendable {
-    package enum Switch: String, Sendable { case fasterRendering = "faster-rendering", neuralEngine = "neural-engine" }
+    package enum Switch: String, Sendable {
+        case fasterRendering = "faster-rendering", accelerators = "accelerators"
+        /// The switch's names, the former one included.
+        init?(argument: String) {
+            if argument == "neural-engine" { self = .accelerators } else { self.init(rawValue: argument) }
+        }
+    }
 
     case perModel(Switch, on: Bool, model: String?)
     /// `set beta OPTION on|off`.
@@ -156,7 +163,7 @@ package enum SetOrder: Equatable, Sendable {
         case unknownBeta(String)
     }
 
-    package static let usage = "set faster-rendering|neural-engine on|off [--model ID] · set beta [OPTION on|off]"
+    package static let usage = "set faster-rendering|accelerators on|off [--model ID] · set beta [OPTION on|off]"
 
     package static func parse(_ arguments: [String]) -> Result<SetOrder, Failure> {
         guard let what = arguments.first else { return .failure(.usage(usage)) }
@@ -168,7 +175,7 @@ package enum SetOrder: Equatable, Sendable {
             guard let option = BetaOption(argument: arguments[1]) else { return .failure(.unknownBeta(arguments[1])) }
             return .success(.beta(option, on: arguments[2] == "on"))
         }
-        guard let kind = Switch(rawValue: what) else { return .failure(.usage(usage)) }
+        guard let kind = Switch(argument: what) else { return .failure(.usage(usage)) }
         let line = "set \(what) on|off [--model ID]"
         guard arguments.count == 2 || (arguments.count == 4 && arguments[2] == "--model"),
               ["on", "off"].contains(arguments[1]) else { return .failure(.usage(line)) }

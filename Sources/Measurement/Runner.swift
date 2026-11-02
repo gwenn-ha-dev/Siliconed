@@ -67,8 +67,10 @@ package enum Runner {
             }
         }
         let variant = entry["variant"] as? String ?? "-"
-        let neuralOverride = o.extra.contains("--ane") ? true : o.extra.contains("--no-ane") ? false : nil
-        let neural = neuralOverride ?? entry["neural_engine"] as? Bool
+        // The « Accelerators » switch (`--ane`, `--no-ane` its former names; an app before it says "neural_engine").
+        let on = ["--accelerators", "--ane"], off = ["--no-accelerators", "--no-ane"]
+        let neuralOverride = o.extra.contains(where: on.contains) ? true : o.extra.contains(where: off.contains) ? false : nil
+        let neural = neuralOverride ?? (entry["accelerators"] ?? entry["neural_engine"]) as? Bool
         let host = Probes.Host.read()
         let bundle = Probes.bundle(of: pid)
         let faster = o.fasterRendering ?? original

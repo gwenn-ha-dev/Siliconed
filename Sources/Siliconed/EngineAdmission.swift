@@ -19,8 +19,11 @@ package struct Admission: Sendable {
     /// The first step executed (0 in txt2img).
     package let start: Int
     package let plan: DenoisingPlan
-    /// **The denoiser's products may take the Neural Engine**: asked (`Request.neuralEngine`) and offered by the plan (`usesANE`).
-    package let neuralEngine: Bool
+    /// **What the denoiser may compute on beyond fp32**: the switch asked (`Request.accelerators`), the Neural Engine where the plan
+    /// offers it (`usesANE`); off, fp32 throughout.
+    package let accelerators: Accelerators
+    /// The denoiser's products may take the Neural Engine: asked and offered by the plan.
+    package var neuralEngine: Bool { accelerators.neuralEngine }
     /// « Faster Rendering » as the request asks it (`Request.fasterRendering`): the plan above already honours it.
     package let fasterRendering: Bool
 
@@ -69,6 +72,6 @@ package struct Admission: Sendable {
                                                 floor: Double(steps - last - 1) / Double(steps))
         }
         return Admission(space: space, height: height, width: width, steps: steps, start: start, plan: plan,
-                         neuralEngine: request.neuralEngine && usesANE, fasterRendering: faster)
+                         accelerators: Accelerators(requested: request.accelerators, usesANE: usesANE), fasterRendering: faster)
     }
 }

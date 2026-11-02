@@ -58,8 +58,8 @@ extension RemoteControl {
                 }
             case "--ref": d.references.append(try value(a))
             case "--out": d.folder = try value(a)
-            case "--ane": d.neuralEngine = true
-            case "--no-ane": d.neuralEngine = false
+            case "--accelerators", "--ane": d.accelerators = true
+            case "--no-accelerators", "--no-ane": d.accelerators = false
             case "--preview": d.previews = true
             case "--no-preview": d.previews = false
             case "--wait": d.wait = true
@@ -156,10 +156,10 @@ extension RemoteControl {
             throw Refusal("detail", String(localized: "\(card?.name ?? model.name) doesn’t offer Detail"),
                           help: String(localized: "leave out --detail"))
         }
-        // The Neural Engine: only where this Mac's map turned it on (the rack shows no choice elsewhere).
-        if d.neuralEngine == true, !app.neuralEngineOffered {
-            throw Refusal("neural_engine", String(localized: "this Mac’s measure does not offer the Neural Engine"),
-                          help: String(localized: "leave out --ane"))
+        // The accelerators: only where this Mac's map chooses one (the DiT box greys its switch elsewhere).
+        if d.accelerators == true, !app.acceleratorsOffered {
+            throw Refusal("accelerators", String(localized: "this Mac’s measure offers no accelerator"),
+                          help: String(localized: "leave out --accelerators"))
         }
         guard let prompt = d.prompt, !prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             throw Refusal("usage", String(localized: "empty prompt"))
@@ -296,11 +296,11 @@ extension RemoteControl {
                           // Subjects' pictures make the plan unreduced (as `AppState.expectedPlan`); without
                           // them, the plan as it was.
                           defaultSteps: defaultSteps, plan: used.count > references.count ? plan.unreduced : plan)
-            job.neuralEngine = d.neuralEngine
+            job.accelerators = d.accelerators
             return job
         }
         app.enqueue(jobs)
-        if let on = d.neuralEngine { app.setNeuralEngine(on, for: model.identifier) }
+        if let on = d.accelerators { app.setAccelerators(on, for: model.identifier) }
         // The form takes what the job computes, as after a click: settings, edit images, seed — and
         // the prompt as typed, so that « Generate » would queue the same series.
         app.restoreSettings(jobs[0].settings)
@@ -399,9 +399,9 @@ extension RemoteControl {
                                       solver: d.solver)
         if d.sketch { app.stopExploring() }
         let (run, jobs) = app.enqueueGrid(g, settings: settings, references: references, previews: d.previews ?? app.previews,
-                                          sketch: d.sketch, neuralEngine: d.neuralEngine)
+                                          sketch: d.sketch, accelerators: d.accelerators)
         // The rack's tag of each model the cells render, as after a click.
-        if let on = d.neuralEngine { for id in Set(jobs.map(\.settings.identifier)) { app.setNeuralEngine(on, for: id) } }
+        if let on = d.accelerators { for id in Set(jobs.map(\.settings.identifier)) { app.setAccelerators(on, for: id) } }
         // The form takes the grid, as after a click: settings, prompt as typed, edit images, axes.
         app.restoreSettings(settings)
         app.prompt = prompt

@@ -261,6 +261,12 @@ siliconed check z-image dit --size 1024 --neural-engine
 siliconed check z-image dit --size 512 --bf16-activations
 ```
 
+**The accelerators off.** A render with the app's **Accelerators** switch off computes its DiT in fp32 throughout under this Mac's map: the engines and kernels the map chooses, the weights read as published beside fp32 activations, but no product on the Neural Engine and no operand rounded below fp32. `--no-accelerators` checks that path: with `SILICONED_MAP` naming this Mac's report (a measure of this Mac and this build), the stage runs under that map's plan with the switch off, judged by the fp32 rule against the fp32 reference; without one, the defaults run, which are fp32 already. The `dit` stages of the five models take it.
+
+```sh
+SILICONED_MAP=<report.json> siliconed check z-image dit --size 512 --no-accelerators
+```
+
 Qwen-Image-2.1's editing, with one and two reference pictures, is part of its `all` and of `siliconed check qwen-image-2.1`; one stage alone is `siliconed check qwen-image-2.1 dit --edit 2`. Its Neural Engine bar is written by `qwen-image-2.1.py bf16 --edit N`.
 
 **The Compact and the Light.** Their DiTs are third parties' files (8-bit GGUF Q8_0 and Comfy-Org's int8 convrot for the Compact, GGUF Q4_K_M for the Light; the app pins each by repository, revision and sha256). Two things are checked, both from outside.

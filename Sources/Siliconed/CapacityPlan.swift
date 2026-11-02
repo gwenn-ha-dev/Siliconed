@@ -30,8 +30,13 @@ import Synchronization
 ///     rows in units of 256 (or the whole product), no ANE on an encoder (P20: only the denoiser's fp16 rows), a bf16 weight read
 ///     as published goes whole to the GPU (`TensorGEMM`), a native 8-bit weight beside the AMX cuts columns on 64 (the GPU's tiles
 ///     write whole 64 × 64 blocks).
-///   - **A process without the ANE gets a plan computed without it** (`restricted(allowingANE:)`): the Standard, an encoder, a
-///     request that refused it. There is no fallback route behind a rule that names the ANE; the solver never named it.
+///   - **A process without the ANE gets a plan computed without it** (`restricted(allowingANE:)`): an encoder, a render on a Mac
+///     whose map gives the ANE nothing. There is no fallback route behind a rule that names the ANE; the solver never named it.
+///   - **A render with the accelerators off gets a plan computed in fp32** (`restricted(accelerators:)`, the app's « Accelerators »
+///     switch): no ANE (fp16, int8), no operand rounded on the GPU's tensor units (`bf16act`, `tiles16`, `tilesbf16`). What stays is
+///     exact against the fp32 product on the published weights widened: a bf16 weight read as published beside an fp32 activation
+///     (`float × bfloat`, the widening is a shift), an 8-bit weight read as published (`float × int8`, `× s` after; Q8_0's `q · s`
+///     in fp32) — one fp32 rounding where the widened weight had one, in another order, as the AMX's share moves the last bits.
 ///   - **No map, the engine's defaults** (`defaults`): the GPU alone on the widened weight, the attention cut by heads from 1 024
 ///     rows at the reference share — what every process ran before a plan existed, the same bits.
 ///   - **A probe or a check forces an answer** (`pin`, `forcing`): one key, or a rule over all of them; the engines the plan
@@ -66,7 +71,7 @@ package final class CapacityPlan: Sendable {
         /// `TensorGEMM` is built when any native form is.
         package var usesTensor: Bool { bf16Weights || int8Weights || q8Weights || roundedActivations }
         /// Some product may compute in half precision (the ANE's fp16, the activation rounded to bf16): the checks then
-        /// judge against the reference run in bf16 (`HalfPrecisionReference`).
+        /// judge against the reference run in bf16 (`HalfPrecisionReference`). False under `restricted(accelerators: false)`.
         package var halfPrecision: Bool { ane || roundedActivations || halfAttention }
     }
 
@@ -80,6 +85,10 @@ package final class CapacityPlan: Sendable {
     package let identity: String
     package let model: CapacityModel?
     package let allowsANE: Bool
+    /// **The GPU may compute on operands rounded below fp32**: the activation rounded to bf16 (`bf16act`), the attention on fp16 or
+    /// bf16 operands (`tiles16`, `tilesbf16`) — the GPU's tensor units in half precision. False: fp32 throughout on the GPU
+    /// (`restricted(accelerators: false)`).
+    package let allowsHalfPrecision: Bool
     package var usesAMX: Bool { resources.amx }
     package var usesANE: Bool { resources.ane }
     /// **The height under which no product has a row on the AMX or the ANE**: the model's domain (`CapacitySolver.Limits`) for a
@@ -90,9 +99,27 @@ package final class CapacityPlan: Sendable {
         return min(resources.amx ? limits.amxRows : .max, resources.ane ? limits.aneRows : .max)
     }
 
-    /// What the solver was given to answer for this plan: the same limits, sustained rate, refused kernels and ANE permission.
+    /// What the solver was given to answer for this plan: the same limits, sustained rate, refused kernels, ANE and half-precision
+    /// permissions (fp16 operands are the ANE's permission, as they always were; both need `allowsHalfPrecision`).
     package var constraints: CapacitySolver.Constraints {
-        CapacitySolver.Constraints(limits: limits, sustained: sustained, excluded: excluded, allowsANE: allowsANE)
+        CapacitySolver.Constraints(limits: limits, sustained: sustained, excluded: excluded, allowsANE: allowsANE,
+                                   allowsHalf: allowsANE && allowsHalfPrecision, allowsRounding: allowsHalfPrecision)
+    }
+
+    /// **The half precisions the GPU's tensor units may compute in under this plan**, in the order a sentence names them: `bf16`
+    /// (an activation rounded, the attention's bf16 operands), `fp16` (the attention's fp16 operands, the ANE's permission). Empty:
+    /// the GPU computes in fp32. What the app says a render may use (`AcceleratorOffer`); the solver still chooses class by class.
+    package var gpuHalfPrecisions: [String] {
+        guard allowsHalfPrecision else { return [] }
+        func has(_ f: CapacityModel.Form) -> Bool {
+            let k = CapacityModel.Kernel(.gpu, f)
+            return (model?.lines[k]?.rate ?? 0) > 0 && !excluded.contains(k)
+        }
+        guard model != nil else { return resources.roundedActivations ? ["bf16"] : [] }
+        var out: [String] = []
+        if resources.roundedActivations || has(.tilesbf16) { out.append("bf16") }
+        if allowsANE && has(.tiles16) { out.append("fp16") }
+        return out
     }
 
     private let limits: CapacitySolver.Limits
@@ -110,6 +137,8 @@ package final class CapacityPlan: Sendable {
     private let state = Mutex(State())
     /// The plan of a process without the ANE, made once: its memo is as valuable as this one's.
     private let withoutANE = Mutex<CapacityPlan?>(nil)
+    /// The plan of a render with the accelerators off (fp32 throughout), made once.
+    private let inFP32 = Mutex<CapacityPlan?>(nil)
 
     // MARK: - Making a plan
 
@@ -117,33 +146,37 @@ package final class CapacityPlan: Sendable {
     package static let defaults = CapacityPlan()
 
     private init() {
-        resources = Resources(); identity = "default"; model = nil; allowsANE = false
+        resources = Resources(); identity = "default"; model = nil; allowsANE = false; allowsHalfPrecision = true
         limits = CapacitySolver.Limits(); sustained = true; excluded = []; override = nil; attentionOverride = nil
     }
 
     /// **The plan of a Mac whose model was measured**: the solver answers from it. The engines it brings up are those the model
-    /// has a line for; the ANE only if `allowsANE` (a Standard does not).
+    /// has a line for; the ANE only if `allowsANE`, the rounded operands only if `allowsHalfPrecision`.
     package init(model: CapacityModel, limits: CapacitySolver.Limits = .init(), sustained: Bool = true,
-                 excluded: Set<CapacityModel.Kernel> = [], allowsANE: Bool = true) {
+                 excluded: Set<CapacityModel.Kernel> = [], allowsANE: Bool = true, allowsHalfPrecision: Bool = true) {
         func has(_ e: CapacityModel.Engine, _ f: CapacityModel.Form) -> Bool {
             let k = CapacityModel.Kernel(e, f)
             return (model.lines[k]?.rate ?? 0) > 0 && !excluded.contains(k)
         }
         self.model = model; self.limits = limits; self.sustained = sustained; self.excluded = excluded
-        self.allowsANE = allowsANE
+        self.allowsANE = allowsANE; self.allowsHalfPrecision = allowsHalfPrecision
         resources = Resources(amx: has(.amx, .fp32), ane: allowsANE && has(.ane, .fp16),
                               bf16Weights: has(.gpu, .bf16), int8Weights: has(.gpu, .int8), q8Weights: has(.gpu, .q8),
-                              roundedActivations: has(.gpu, .bf16act), aneInt8: allowsANE && has(.ane, .fp16) && has(.ane, .int8),
-                              halfAttention: (allowsANE && has(.gpu, .tiles16)) || has(.gpu, .tilesbf16))
+                              roundedActivations: allowsHalfPrecision && has(.gpu, .bf16act),
+                              aneInt8: allowsANE && has(.ane, .fp16) && has(.ane, .int8),
+                              halfAttention: allowsHalfPrecision && ((allowsANE && has(.gpu, .tiles16)) || has(.gpu, .tilesbf16)))
         override = nil; attentionOverride = nil
-        identity = "model " + Self.fingerprint(model) + (allowsANE ? "" : " no-ane")
+        identity = "model " + Self.fingerprint(model) + (allowsANE ? "" : " no-ane") + (allowsHalfPrecision ? "" : " fp32")
     }
 
     /// **A plan that forces its answers**: a check's strictest case, a probe's route. `resources` are the engines it brings up;
     /// the key it does not speak of gets the engine's defaults.
-    package init(resources: Resources, label: String, allowsANE: Bool = true, override: Override? = nil,
-                 attentionOverride: AttentionOverride? = nil) {
+    package init(resources: Resources, label: String, allowsANE: Bool = true, allowsHalfPrecision: Bool = true,
+                 override: Override? = nil, attentionOverride: AttentionOverride? = nil) {
+        var resources = resources
+        if !allowsHalfPrecision { resources.roundedActivations = false; resources.halfAttention = false }
         self.resources = resources; identity = label; model = nil; self.allowsANE = allowsANE && resources.ane
+        self.allowsHalfPrecision = allowsHalfPrecision
         limits = CapacitySolver.Limits(); sustained = true; excluded = []; self.override = override
         self.attentionOverride = attentionOverride
     }
@@ -164,13 +197,44 @@ package final class CapacityPlan: Sendable {
             var r = resources; r.ane = false; r.aneInt8 = false
             let made: CapacityPlan
             if let model {
-                made = CapacityPlan(model: model, limits: limits, sustained: sustained, excluded: excluded, allowsANE: false)
+                made = CapacityPlan(model: model, limits: limits, sustained: sustained, excluded: excluded, allowsANE: false,
+                                    allowsHalfPrecision: allowsHalfPrecision)
             } else {
-                made = CapacityPlan(resources: r, label: identity + " no-ane", allowsANE: false, override: override,
-                                    attentionOverride: attentionOverride)
+                made = CapacityPlan(resources: r, label: identity + " no-ane", allowsANE: false,
+                                    allowsHalfPrecision: allowsHalfPrecision, override: override, attentionOverride: attentionOverride)
             }
             kept = made
             return made
+        }
+    }
+
+    /// **The same model and rules with the accelerators off** (`accelerators: false`, the app's switch): fp32 throughout — no ANE,
+    /// no operand rounded on the GPU (`allowsHalfPrecision` false). Its own answers, its own memo, its own identity (`… fp32`):
+    /// the render cache never mistakes one for the other. `true` is this plan.
+    package func restricted(accelerators on: Bool) -> CapacityPlan {
+        if on || (!allowsANE && !allowsHalfPrecision) { return self }
+        return inFP32.withLock { kept in
+            if let kept { return kept }
+            var r = resources; r.ane = false; r.aneInt8 = false
+            let made: CapacityPlan
+            if let model {
+                made = CapacityPlan(model: model, limits: limits, sustained: sustained, excluded: excluded, allowsANE: false,
+                                    allowsHalfPrecision: false)
+            } else {
+                made = CapacityPlan(resources: r, label: identity + (allowsANE ? " no-ane" : "") + " fp32", allowsANE: false,
+                                    allowsHalfPrecision: false, override: override, attentionOverride: attentionOverride)
+            }
+            kept = made
+            return made
+        }
+    }
+
+    /// **The plan of a render's denoiser** under its resolved switch (`Accelerators`): this plan restricted to fp32 when they are
+    /// off, without the ANE when the render does not bring it up — the one `GEMM`, `MemoryNeed` and the render cache all ask.
+    package func forDenoiser(_ accelerators: Accelerators) -> CapacityPlan {
+        switch accelerators {
+        case .off: return restricted(accelerators: false)
+        case .on(let ane): return restricted(allowingANE: ane)
         }
     }
 
@@ -212,6 +276,8 @@ package final class CapacityPlan: Sendable {
         if a.ane > 0 && !allowsANE {
             if a.path == .native { a = .gpuAlone(key.m) } else { a.gpu += a.ane; a.ane = 0 }
         }
+        // A forcing that rounds the activation, in a plan computed in fp32: the same weight read as published, the operand fp32.
+        if a.roundsActivation && !allowsHalfPrecision { a.roundsActivation = false }
         let kept = a
         state.withLock { $0.products[key] = kept }
         return kept
@@ -219,9 +285,7 @@ package final class CapacityPlan: Sendable {
 
     private static func solved(_ plan: CapacityPlan, _ key: ProductKey) -> ProductAssignment {
         guard let model = plan.model else { return .gpuAlone(key.m) }
-        let c = CapacitySolver.Constraints(limits: plan.limits, sustained: plan.sustained, excluded: plan.excluded,
-                                           allowsANE: plan.allowsANE)
-        return CapacitySolver.product(key, model: model, constraints: c)?.assignment ?? .gpuAlone(key.m)
+        return CapacitySolver.product(key, model: model, constraints: plan.constraints)?.assignment ?? .gpuAlone(key.m)
     }
 
     /// **The assignment of an attention.** `flash`: the caller's code tries the flash kernel before the split (Z-Image's and
@@ -229,12 +293,16 @@ package final class CapacityPlan: Sendable {
     package func assign(_ key: AttentionKey, flash: Bool = false) -> AttentionAssignment {
         let memo = Memo(key: key, flash: flash)
         if let known = state.withLock({ $0.attentions[memo] }) { return known }
-        let a: AttentionAssignment
+        var a: AttentionAssignment
         if let forced = attentionOverride?(key, flash) {
             a = forced
+            // A forcing on half-precision operands, in a plan computed in fp32: the same tiles in fp32 (three stages).
+            if !allowsHalfPrecision {
+                if a.kernel == .tiles16 || a.kernel == .tilesbf16 { a.kernel = .tiles; a.tile = nil }
+                if a.splits && (a.gpuKernel == .tiles16 || a.gpuKernel == .tilesbf16) { a.gpuKernel = .tiles; a.tile = nil }
+            }
         } else if let model {
-            let c = CapacitySolver.Constraints(limits: limits, sustained: sustained, excluded: excluded, allowsANE: allowsANE)
-            a = CapacitySolver.attention(key, flash: flash, model: model, constraints: c)?.assignment ?? .defaults(key)
+            a = CapacitySolver.attention(key, flash: flash, model: model, constraints: constraints)?.assignment ?? .defaults(key)
         } else {
             a = .defaults(key)
         }
@@ -255,6 +323,48 @@ package final class CapacityPlan: Sendable {
     package var answered: [(ProductKey, ProductAssignment)] {
         state.withLock { $0.products.map { ($0.key, $0.value) } }.sorted { ($0.0.phase.rawValue, $0.0.m, $0.0.k, $0.0.n) < ($1.0.phase.rawValue, $1.0.m, $1.0.k, $1.0.n) }
     }
+}
+
+// MARK: - A render's accelerators
+
+/// **What a render's denoiser may compute on beyond fp32** — the app's « Accelerators » switch (`Request.accelerators`), resolved
+/// against this Mac's plan once, at admission (`Admission`). The encoders take none of it in either case.
+///
+///     on(neuralEngine: true)    the plan as measured: the ANE's rows (fp16; int8 as published) and the GPU's tensor units on
+///                               rounded operands (`bf16act`, `tiles16`, `tilesbf16`), where the map chooses them
+///     on(neuralEngine: false)   the same without the ANE: this Mac's map gives it nothing (`usesANE` false)
+///     off                       fp32 throughout (`CapacityPlan.restricted(accelerators: false)`), the image the fp32 checks compare
+package enum Accelerators: Sendable, Hashable {
+    case on(neuralEngine: Bool)
+    case off
+
+    /// The switch as a request carries it, resolved: `on` brings the ANE up where the plan uses it.
+    package init(requested: Bool, usesANE: Bool) { self = requested ? .on(neuralEngine: usesANE) : .off }
+    /// What a render not yet chosen may do: everything the process's plan offers.
+    package static var process: Accelerators { .on(neuralEngine: EngineSettings.effective.plan.usesANE) }
+    /// The denoiser's products may take the Neural Engine.
+    package var neuralEngine: Bool { if case .on(true) = self { true } else { false } }
+    package var isOn: Bool { self != .off }
+}
+
+/// **What the accelerators do on this Mac, for a render's denoiser** — what the app's sentences say (« the Neural Engine (fp16)
+/// and the GPU's tensor units (bf16) »): read from the plan the render runs under (`CapacityPlan.forDenoiser`), never from the chip's
+/// name. `none`: fp32 throughout — the switch is off, or this Mac's map chooses no accelerator.
+package struct AcceleratorOffer: Sendable, Hashable, Codable {
+    /// The Neural Engine takes rows of the denoiser's products (fp16).
+    package var neuralEngine: Bool
+    /// The half precisions the GPU's tensor units may compute in (`CapacityPlan.gpuHalfPrecisions`): `["bf16"]`, `["bf16", "fp16"]`…
+    package var tensorUnits: [String]
+    package init(neuralEngine: Bool = false, tensorUnits: [String] = []) {
+        self.neuralEngine = neuralEngine; self.tensorUnits = tensorUnits
+    }
+    package static let none = AcceleratorOffer()
+    /// What `plan` (a render's denoiser's) may use.
+    package init(plan: CapacityPlan) { self.init(neuralEngine: plan.usesANE, tensorUnits: plan.gpuHalfPrecisions) }
+    /// fp32 throughout.
+    package var isNone: Bool { !neuralEngine && tensorUnits.isEmpty }
+    /// The tensor units' precisions as a sentence writes them: `bf16`, `bf16, fp16`.
+    package var tensorUnitsText: String { tensorUnits.joined(separator: ", ") }
 }
 
 // MARK: - The weight's form

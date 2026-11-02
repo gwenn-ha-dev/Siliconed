@@ -236,9 +236,9 @@ package extension Model {
 package final class Context {
     /// **« Faster Rendering »** (`Request.fasterRendering`), resolved once by the engine: what every `plan` of this render reads.
     package var fasterRendering = false
-    /// **The denoiser's products may take the Neural Engine** (`Request.neuralEngine`), where this Mac's map
-    /// turned it on: resolved at render time. The encoders never do.
-    package var neuralEngine = EngineSettings.effective.plan.usesANE
+    /// **What the denoiser may compute on beyond fp32** (`Request.accelerators`, resolved against this Mac's map at render time):
+    /// the Neural Engine where the map turned it on, the GPU's rounded operands; fp32 throughout when off. The encoders never do.
+    package var accelerators = Accelerators.process
     /// The render's token; the modules pass it to their DiTs and encoders (between layers).
     package let cancellation: Cancellation?
     /// Compute each step's preview (`Request.previews`).

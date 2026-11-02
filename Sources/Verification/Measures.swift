@@ -139,6 +139,25 @@ package enum HalfPrecisionRun {
     }
 }
 
+/// **`--no-accelerators`: a render's plan with the « Accelerators » switch off.** The check runs under this Mac's map (`SILICONED_MAP`,
+/// a report of this Mac and this build) restricted to fp32 (`CapacityPlan.restricted(accelerators: false)`): the routes the map
+/// chooses — the AMX's rows, a weight read as published, the tiled attention — but no ANE and no operand rounded below fp32, judged by
+/// the fp32 rule. Without such a map the defaults run, which are fp32 already: the flag changes nothing, and says so.
+package enum FP32Run {
+    package static func enable() throws {
+        guard let named = ProcessInfo.processInfo.environment["SILICONED_MAP"], !named.isEmpty, named != "1",
+              let data = FileManager.default.contents(atPath: named), let report = Diagnostic.Report.read(data), report.isCurrent
+        else {
+            print("--no-accelerators: no map of this Mac and this build in SILICONED_MAP — the defaults run, fp32 already")
+            return
+        }
+        let plan = report.plan().restricted(accelerators: false)
+        do { try EngineSettings.designate(plan: plan) }
+        catch { throw UsageError("--no-accelerators: the engine's settings were read before it") }
+        print("--no-accelerators: this Mac's map, fp32 throughout (\(plan.identity))")
+    }
+}
+
 /// **The int8 route of a published int8 weight** (`gemm_int8`). A render of a map holding weights published as int8 with a scale
 /// per column or per tensor (a Compact from Comfy-Org's int8 convrot) reads them as published wherever its map says the int8
 /// kernel wins, else widened; `siliconed check` runs the defaults, which widen. A DiT stage on such a map therefore evaluates along

@@ -147,7 +147,7 @@ extension AppState {
                                       references: references.count, detail: effectiveDetail, solver: effectiveSolver)
         followsRender = false
         if let mirror {
-            do { try mirror.explore(g, settings: resolvingFaster(settings), references: references, stopAfter: exploreStop, neuralEngine: nil) }
+            do { try mirror.explore(g, settings: resolvingFaster(settings), references: references, stopAfter: exploreStop, accelerators: nil) }
             catch { problem = Problem(error); flash(Problem(error).text); return }
         } else {
             enqueueGrid(g, settings: settings, references: references, previews: true, sketch: true, stopAfter: exploreStop)

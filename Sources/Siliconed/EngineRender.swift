@@ -86,7 +86,7 @@ extension Engine {
             promptTokens: MemoryNeed.Request.promptTokens(request.prompt, family: model.card.family,
                                                            references: request.references.count))
         memoryRequest.solver = request.solver
-        memoryRequest.neuralEngine = admitted.neuralEngine
+        memoryRequest.accelerators = admitted.accelerators
         memoryRequest.batch = seeds.count
         memoryRequest.library = model.library ?? .processWide
         let lock = try Preflight.run(model, width: request.width, height: request.height,
@@ -108,7 +108,7 @@ extension Engine {
         let context = Context(cancellation: cancellation,
                                 previews: request.previews, onProgress: onProgress)
         context.cache = cache
-        context.neuralEngine = admitted.neuralEngine
+        context.accelerators = admitted.accelerators
         context.fasterRendering = admitted.fasterRendering
         // A sketch that reaches the plan's last evaluation is the whole render: no stop, no estimate.
         let sketch = request.sketch.map { max(1, $0) }.flatMap { $0 < plan.evaluations ? $0 : nil }
@@ -294,7 +294,9 @@ extension Engine {
                                   detail: request.detail, solver: request.solver,
                                   variations: request.variations.filter { $0.effectiveStrength > 0 },
                                   modelName: model.card.name, isImportedModel: model.card.isImported,
-                                  loraOrigins: stack?.origins ?? [], neuralEngine: context.neuralEngine,
+                                  loraOrigins: stack?.origins ?? [], neuralEngine: context.accelerators.neuralEngine,
+                                  accelerators: context.accelerators.isOn,
+                                  offer: AcceleratorOffer(plan: EngineSettings.effective.plan.forDenoiser(context.accelerators)),
                                   fasterRendering: admitted.fasterRendering, classes: classes,
                                   loraRank: stack?.maxRank ?? 0)
                 context.emit(.image(index: n, renderResult))

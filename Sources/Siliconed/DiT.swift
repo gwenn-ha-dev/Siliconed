@@ -109,12 +109,12 @@ package final class DiT: BoundaryRecording {
     ///   rank — the engine receives the request before building the DiT, so there is no
     ///   maximum to fix in advance and nothing to reload when the stack changes.
     package init(artifact: Artifact, latentHeight: Int, latentWidth: Int, capLength: Int,
-                neuralEngine: Bool = EngineSettings.effective.plan.usesANE, lora: LoRA? = nil) throws {
+                accelerators: Accelerators = .process, lora: LoRA? = nil) throws {
         self.lora = lora
         self.artifact = artifact
         self.prefetcher = Prefetcher(artifact: artifact)
         self.config = Config(header: artifact.header)
-        self.gemm = try GEMM(neuralEngine: neuralEngine)
+        self.gemm = try GEMM(accelerators: accelerators)
         self.rope = RopeTables(axesDims: config.axesDims, axesLens: config.axesLens, theta: config.theta)
         self.latentHeight = latentHeight
         self.latentWidth = latentWidth

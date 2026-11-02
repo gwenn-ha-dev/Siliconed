@@ -133,11 +133,11 @@ final class MirrorLink {
     /// `answered` (`silicontrol grid`): the other Mac's word on the grid, its cell jobs numbered; `sketch:
     /// false` is a grid whose cells join the history, and its sheet.
     func explore(_ grid: RenderGrid, settings: RenderSettings, references: [ReferenceImage], stopAfter: Int,
-                 neuralEngine: Bool?, sketch: Bool = true, previews: Bool = true,
+                 accelerators: Bool?, sketch: Bool = true, previews: Bool = true,
                  answered: ((RemoteAnswer) -> Void)? = nil) throws(EngineError) {
         if let down { answered?(.refused(.text(down))); return }
         var job = MirrorProjection.remote(settings, ordinal: 0, seeds: [], previews: previews, defaultSteps: nil,
-                                          neuralEngine: neuralEngine)
+                                          accelerators: accelerators)
         job.references = try remote(references)
         if sketch { exploreReferences = references }
         var request: Int?
@@ -190,15 +190,15 @@ final class MirrorLink {
 enum MirrorProjection {
     static func remote(_ j: Job) -> RemoteJob {
         remote(j.settings, ordinal: j.ordinal, seeds: j.seeds, previews: j.previews, defaultSteps: j.defaultSteps,
-               neuralEngine: j.neuralEngine)
+               accelerators: j.accelerators)
     }
 
     static func remote(_ s: RenderSettings, ordinal: Int, seeds: [UInt64], previews: Bool, defaultSteps: Int?,
-                       neuralEngine: Bool?) -> RemoteJob {
+                       accelerators: Bool?) -> RemoteJob {
         RemoteJob(ordinal: ordinal, model: s.identifier, modelName: s.modelName, prompt: s.prompt,
                   width: s.format.width, height: s.format.height, steps: s.steps, defaultSteps: defaultSteps,
                   loras: s.loras.map { RemoteLoRA(path: $0.path, strength: $0.strength) }, seeds: seeds,
-                  detail: s.detail, solver: s.solver, previews: previews, neuralEngine: neuralEngine,
+                  detail: s.detail, solver: s.solver, previews: previews, neuralEngine: accelerators,
                   variations: s.variations, modelPrompt: s.modelPrompt, subjectImages: s.subjectImages > 0 ? s.subjectImages : nil,
                   fasterRendering: s.fasterRendering)
     }
@@ -208,7 +208,6 @@ enum MirrorProjection {
                                format: RecommendedFormat(r.width, r.height), steps: r.steps,
                                loras: r.loras.map { LoRASlot(path: $0.path, strength: $0.strength) },
                                detail: r.detail, solver: r.solver)
-        s.neuralEngine = r.neuralEngine ?? false
         s.fasterRendering = r.fasterRendering
         s.variations = r.variations
         s.modelPrompt = r.modelPrompt
@@ -220,7 +219,7 @@ enum MirrorProjection {
     static func job(_ r: RemoteJob, ordinal: Int, plan: DenoisingPlan? = nil) -> Job {
         var j = Job(ordinal: ordinal, settings: settings(r), seeds: r.seeds, references: [], previews: r.previews,
                     defaultSteps: r.defaultSteps, plan: plan)
-        j.neuralEngine = r.neuralEngine
+        j.accelerators = r.neuralEngine
         return j
     }
 
@@ -369,7 +368,7 @@ extension AppState {
                 settings.format = RecommendedFormat(w, h)
                 var known = Job(ordinal: o, settings: settings, seeds: j.seeds, references: j.references, previews: j.previews,
                                 defaultSteps: j.defaultSteps, plan: nil)
-                known.neuralEngine = j.neuralEngine
+                known.accelerators = j.accelerators
                 link.jobs[o] = known
             }
             // A grid's cells are known by their answer, as a render is: they may end before a snapshot shows them.
@@ -479,7 +478,7 @@ extension AppState {
 
     private static func entry(_ e: RemoteEntry, png: Data, image: CGImage) -> Entry {
         var settings = MirrorProjection.settings(e.job)
-        settings.neuralEngine = e.neuralEngine
+        settings.offer = e.offer ?? AcceleratorOffer(neuralEngine: e.neuralEngine)
         let grid = e.sheet.flatMap { s in (try? s.spec.grid()).map { GridInfo(ordinal: s.ordinal, grid: $0, empty: s.empty) } }
         return Entry(ordinal: e.ordinal, job: e.job.ordinal, png: png,
                      vignette: FinishedImage.reduce(image, side: 240) ?? image, width: e.width, height: e.height,

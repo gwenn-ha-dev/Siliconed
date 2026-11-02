@@ -77,12 +77,13 @@ struct DiTBox: View {
 
     @ViewBuilder private var precision: some View {
         // What is stored, then what computes: two labels, two words, so that « int8 » and « fp32 » are never one thing.
-        WeightsTag(format: app.weightFormats?.dit)
-        // A label only: the choice is the switch below, in the settings of the box (`switches`).
-        let on = app.neuralEngineOffered && app.neuralEngine(for: app.identifier)
-        Tag(text: Text("computes \(on ? "fp32 · ANE" : "fp32")"), symbol: on ? "leaf" : nil)
-            .help(on ? String(localized: "fp32, except part of the DiT in fp16 on the Neural Engine")
-                     : String(localized: "The products of the DiT are computed in fp32, the image verified against the reference."))
+        WeightsTag(format: app.weightFormats?.dit, accelerators: app.acceleratorsInEffect)
+        // A label only: the choice is the switch below, in the settings of the box (`switches`). What it says is what this Mac's map
+        // gives the accelerators (`AcceleratorWords`), the Neural Engine first.
+        let offer = app.acceleratorsInEffect
+        Tag(text: Text("computes \(AcceleratorWords.tag(offer))"), symbol: offer.neuralEngine ? "leaf" : offer.isNone ? nil : "bolt")
+            .help(AcceleratorWords.place(offer).map { String(localized: "fp32, except part of the DiT \($0)") }
+                  ?? String(localized: "The products of the DiT are computed in fp32, the image verified against the reference."))
     }
 
     @ViewBuilder private var latent: some View {
@@ -273,15 +274,15 @@ struct DiTBox: View {
     /// greyed and says why, in a sentence, instead of disappearing or turning into a label. The decisions are `DiTSwitches`'s.
     @ViewBuilder private var switches: some View {
         let id = app.identifier
-        let aneReason = DiTSwitches.neuralEngineUnavailable(measured: app.settingsRead, offered: app.neuralEngineOffered)
+        let reason = DiTSwitches.acceleratorsUnavailable(measured: app.settingsRead, offered: app.acceleratorsOffered)
         VStack(alignment: .leading, spacing: 2) {
-            Toggle("Neural Engine", isOn: Binding(get: { aneReason == nil && app.neuralEngine(for: id) },
-                                                  set: { app.setNeuralEngine($0, for: id) }))
+            Toggle("Accelerators", isOn: Binding(get: { reason == nil && app.accelerators(for: id) },
+                                                 set: { app.setAccelerators($0, for: id) }))
                 .font(.callout)
-                .disabled(aneReason != nil)
-                .help("Runs part of the DiT in fp16 on the Neural Engine: less energy (about a fifth on an M1 Pro), an image a little different from fp32’s. Off, the DiT is in fp32 throughout, the image verified against the reference.")
-            if let aneReason {
-                Text(Self.sentence(aneReason))
+                .disabled(reason != nil)
+                .help(AcceleratorWords.switchHelp(app.acceleratorOffer ?? .none))
+            if let reason {
+                Text(Self.sentence(reason))
                     .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             }
         }
@@ -307,8 +308,7 @@ struct DiTBox: View {
         case .sizeUnder1024: String(localized: "Needs 1024 px or more on each side.")
         case .withLoRADetailOrEdit: String(localized: "Not with a LoRA, Detail or an edit.")
         case .stepsOffRecipe: String(localized: "Only at the model’s own step count.")
-        case .notMeasured: String(localized: "This Mac is not measured yet: its first render measures it, then the Neural Engine can be chosen.")
-        case .noNeuralEngineRow: String(localized: "This Mac’s measure gives the Neural Engine nothing to do: the DiT is computed in fp32.")
+        case .notMeasured, .noAccelerator: AcceleratorWords.unavailable(reason)
         }
     }
 
@@ -366,6 +366,45 @@ struct DiTBox: View {
 
 /// **« Add »**: the model's LoRAs not yet in the stack, in a menu — the pick goes in at 0.8, its
 /// slider ready. Greyed at three, the stack's limit.
+/// **What the accelerators do, in words** — one place for the DiT box, the rack's legend, the image's panel and `silicontrol`, read
+/// from what this Mac's map gives them (`AcceleratorOffer`), never from the chip's name: the Neural Engine first, the GPU's tensor
+/// units in half precision said in clear, « fp32 » where neither works (a Mac whose map chooses none, or the switch off).
+enum AcceleratorWords {
+    /// **Where part of the DiT goes**, as the end of a sentence: « on the Neural Engine (fp16) and the GPU’s tensor units (bf16) ».
+    /// `nil`: nowhere, fp32 throughout.
+    static func place(_ o: AcceleratorOffer) -> String? {
+        let units = o.tensorUnitsText
+        switch (o.neuralEngine, o.tensorUnits.isEmpty) {
+        case (true, true): return String(localized: "on the Neural Engine (fp16)")
+        case (true, false): return String(localized: "on the Neural Engine (fp16) and the GPU’s tensor units (\(units))")
+        case (false, false): return String(localized: "on the GPU’s tensor units (\(units))")
+        case (false, true): return nil
+        }
+    }
+
+    /// The DiT's « computes » tag: `fp32`, `fp32 · ANE`, `fp32 · GPU bf16`, `fp32 · ANE · GPU bf16, fp16` — names, not words.
+    static func tag(_ o: AcceleratorOffer) -> String {
+        (["fp32"] + (o.neuralEngine ? ["ANE"] : []) + (o.tensorUnits.isEmpty ? [] : ["GPU " + o.tensorUnitsText]))
+            .joined(separator: " · ")
+    }
+
+    /// The switch's hover: what it turns on, on this Mac, and what off gives.
+    static func switchHelp(_ o: AcceleratorOffer) -> String {
+        guard let place = place(o) else {
+            return String(localized: "The Neural Engine and the GPU’s tensor units (bf16), where this Mac’s measure chooses them; fp32 throughout when you turn them off.")
+        }
+        return String(localized: "Part of the DiT \(place), where this Mac’s measure finds it faster or more frugal: an image a little different from fp32’s, checked against the reference in bf16. Off, the DiT is in fp32 throughout, the image verified against the reference.")
+    }
+
+    /// Why the switch has nothing to choose.
+    static func unavailable(_ reason: DiTSwitchUnavailable) -> String {
+        switch reason {
+        case .notMeasured: String(localized: "This Mac is not measured yet: its first render measures it, then the accelerators can be chosen.")
+        default: String(localized: "This Mac’s measure gives the accelerators nothing to do: the DiT is computed in fp32.")
+        }
+    }
+}
+
 struct LoRAAddMenu: View {
     let app: AppState
 
