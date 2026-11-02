@@ -67,11 +67,18 @@ extension RemoteControl {
 
     // ── diagnose ──
 
-    /// `diagnose [--issue]`: **« Measure This Mac », from the terminal** — the sheet opens in the
+    /// `diagnose [--issue|--stop]`: **« Measure This Mac », from the terminal** — the sheet opens in the
     /// app and the diagnostic runs (~1 min, no weights, the queue held meanwhile); the answer is the
     /// report, the same JSON the issue carries. `--issue` then does what the sheet's
     /// « Open a GitHub Issue » does: GitHub's form opens in the browser, prefilled — the user submits it.
     func diagnose(_ arguments: [String], _ c: Connection) throws {
+        // The sheet's « Stop », from another connection: the diagnose that waits on the measure answers `stopped`.
+        if arguments == ["--stop"] {
+            let running = app.diagnosticRunning
+            app.cancelDiagnostic()
+            finish(c, ["ok": true, "stopped": running])
+            return
+        }
         let issue = arguments.contains("--issue")
         if let unknown = arguments.first(where: { $0 != "--issue" }) {
             throw Refusal("usage", String(localized: "unknown flag: \(unknown)"), help: "silicontrol help diagnose")
@@ -339,9 +346,23 @@ extension RemoteControl {
         return ["ok": true, "images": app.history.prefix(n).map { json($0) }]
     }
 
+    /// **`save i7 [i8 …] DEST [--format png|jpeg|heic]`**: « Save… » and « Export… » without the panel. One image to a file takes its format from the
+    /// file's extension (.png, .jpg/.jpeg, .heic), as the panel's Format pop-up does; into a folder, each image under its export name, in `--format`
+    /// (PNG by default). Only PNG keeps the prompt, the seed and the model.
     func save(_ arguments: [String], cwd: String) throws -> [String: Any] {
+        var arguments = arguments
+        var kind = ExportFormat.png
+        if let i = arguments.firstIndex(of: "--format") {
+            guard i + 1 < arguments.count else { throw Refusal("usage", String(localized: "--format expects a value")) }
+            guard let k = ExportFormat(extension: arguments[i + 1]) else {
+                let v = arguments[i + 1]
+                throw Refusal("usage", String(localized: "--format expects png, jpeg or heic, not \"\(v)\""))
+            }
+            kind = k
+            arguments.removeSubrange(i...(i + 1))
+        }
         guard arguments.count >= 2, let destination = arguments.last else {
-            throw Refusal("usage", "save <i7> [i8 …] <file.png|file.jpg|folder>")
+            throw Refusal("usage", "save <i7> [i8 …] <file.png|file.jpg|file.heic|folder> [--format png|jpeg|heic]")
         }
         let entries = try arguments.dropLast().map { a -> Entry in
             guard let e = image(a) else {
@@ -352,14 +373,14 @@ extension RemoteControl {
         let target = absolute(destination, cwd)
         let ext = (target as NSString).pathExtension.lowercased()
         var files: [[String: Any]] = []
-        if entries.count == 1, ["png", "jpg", "jpeg"].contains(ext) {
+        if entries.count == 1, ExportFormat(extension: ext) != nil {
             // A named file: written, or replaced — it is « Save as ».
             try createFolder((target as NSString).deletingLastPathComponent)
             try writeFile(entries[0], target)
             files.append(["image": entries[0].name, "path": target])
         } else {
             try createFolder(target)
-            for e in entries { files.append(["image": e.name, "path": try write(e, in: target)]) }
+            for e in entries { files.append(["image": e.name, "path": try write(e, in: target, as: kind)]) }
         }
         return ["ok": true, "files": files]
     }
@@ -453,8 +474,8 @@ extension RemoteControl {
 
     /// In a folder, under the app's export name (`AppState.exportName`: the model, the LoRAs, the steps
     /// if they are not the model's, the format, the seed). Never over an existing file (`-2`, `-3`…).
-    func write(_ e: Entry, in folder: String) throws -> String {
-        let path = AppState.freeURL(in: URL(fileURLWithPath: folder), base: app.exportName(e), ext: "png").path
+    func write(_ e: Entry, in folder: String, as kind: ExportFormat = .png) throws -> String {
+        let path = AppState.freeURL(in: URL(fileURLWithPath: folder), base: app.exportName(e), ext: kind.fileExtension).path
         try writeFile(e, path)
         return path
     }

@@ -42,7 +42,7 @@ The landscapes are the same sizes turned (3:2 is 1248 × 832 at 1K). The ≈: at
   - **Curtain**: drag a line across the images to see what changed. Zoom in toward the pointer to look at a detail: pinch, or a mouse's wheel (a horizontal wheel still moves the image).
   - **Switch**: the same two images one at a time, at the same place and zoom; click the image, or press ← for the first and → for the second.
 - **Named subjects**: name a person, an object or a style from a photo, then cite it as `@name` in the text of the Prompt Lab (see Prepare, below); the lab hands the rack the prompt translated and the images numbered.
-- **A history like Photos**: arrows, ⌫ and ⌘Z, multiple selection, export, drag and drop, Share.
+- **A history like Photos**: arrows, ⌫ and ⌘Z, multiple selection, export, drag and drop, Share. From a terminal: `silicontrol remove`, `undo`, `crop`, `again`, `reuse`, `save` (PNG, JPEG, HEIC).
 
 ![An edit by Qwen-Image-2.1 in the window: the Krea 2 photo of the surfer as image 1 in the Images box, the instruction “Convert this photo to a western comic book style with cel shading”, the cel-shaded result in the canvas](images/edit.jpg)
 
@@ -69,7 +69,7 @@ The **Prompt Lab** (Window › Prompt Lab, ⌥⌘L, or the wand beside the rack'
 
 ## Explore (sketch first, commit later)
 
-The exploration panel builds a grid in the canvas. Its axes: seeds, steps, the strength of a LoRA, LoRAs to try, models, the alternatives written in braces in the prompt, each image of an edit, or, with More Solvers on, the solvers. Each cell is a sketch, stopped after a few steps, at 512 on the short side (with Qwen-Image-2.1, a finished image); once a model has rendered at that size, the panel shows what the grid will cost on this Mac before you start. “Finish This Image” renders the chosen cell to the end with the same seed: the image its sketch announced.
+The exploration panel builds a grid in the canvas. Its axes: seeds, steps, the strength of a LoRA, LoRAs to try, models, the alternatives written in braces in the prompt, each image of an edit, or, with More Solvers on, the solvers. Each cell is a sketch, stopped after a few steps, at 512 on the short side (with Qwen-Image-2.1, a finished image); once a model has rendered at that size, the panel shows what the grid will cost on this Mac before you start. “Finish This Image” renders the chosen cell to the end with the same seed: the image its sketch announced. From a terminal: `silicontrol finish g2c3` and `silicontrol sheet g2`.
 
 ![An exploration with Anima Turbo and the inCase LoRA, filling in the canvas: sketches of a laughing red-haired Irish woman on a sunny cliff-top beach, the wetsuit's colour across (teal, coral red, mustard yellow, navy) and the LoRA's strength down (0, 0.5, 1), the axes as labels, the last row still rendering](images/grid.jpg)
 
@@ -94,7 +94,7 @@ The sheet shows, with its columns titled: each route's speed, its share of the G
 
 A measure you ask for applies to the **next** render, never to one under way, so from then on one seed can give a slightly different image from before the measure. When a render ran more than 10 % off what the measure predicted, the sidebar says so, once, beside the button that measures again.
 
-Models live in `~/Library/Application Support/Siliconed` (override with `SILICONED_ROOT`). To free the internal disk, Settings › Move Library… moves them to another one — an external disk, a network share: every file is copied, checked, then removed from the Mac. Siliconed then copies to the Mac only the models you render, for the session, and removes them when it quits; the licenses you accepted and this Mac's measurements stay on the Mac. Unplugged, the disk is flagged: nothing renders until it is back.
+Models live in `~/Library/Application Support/Siliconed` (override with `SILICONED_ROOT`). To free the internal disk, Settings › Move Library… moves them to another one — an external disk, a network share: every file is copied, checked, then removed from the Mac. Siliconed then copies to the Mac only the models you render, for the session, and removes them when it quits; the licenses you accepted and this Mac's measurements stay on the Mac. Unplugged, the disk is flagged: nothing renders until it is back. From a terminal: `silicontrol library move DIR` (without `--yes`, it says what would be copied and the room there is).
 
 ![The Models window: the five publishers' models installed in Compact, each with its license and its size on disk (Z-Image Turbo 11.74 GB, Qwen-Image-2.1 Turbo 17.3 GB, Anima Turbo 4.1 GB, Krea 2 Turbo 19.5 GB, MOSS-Image 17.88 GB, marked beta), the LoRAs below, the disk used and free at the bottom](images/models.jpg)
 
@@ -136,7 +136,7 @@ The other Compact versions use 8-bit weights published by third parties: [unslot
 
 ## Render on another Mac
 
-- **One Mac renders for another on the same network.** The MacBook in the living room computes on the Mac mini in the next room: **Render › Compute On** moves the whole window there — its queue, progress, preview, history, models, library, licenses and measure are the other Mac's — while the form, your selection, exports and the clipboard stay on yours. An “On:” menu beside Chain says where you compute, and the rack wears a blue edge while connected; one menu brings you back. Never two views at once.
+- **One Mac renders for another on the same network.** The MacBook in the living room computes on the Mac mini in the next room: **Render › Compute On** moves the whole window there — its queue, progress, preview, history, models, library, licenses and measure are the other Mac's — while the form, your selection, exports and the clipboard stay on yours. An “On:” menu beside Chain says where you compute, and the rack wears a blue edge while connected; one menu brings you back. Never two views at once. From a terminal: `silicontrol macs` and `silicontrol compute NAME|this`.
 - **Pair once.** On the Mac that lends itself: Settings › Other Macs › Lend This Mac, then Pair a Mac…. On yours: Settings › Other Macs › Pair With a Mac…, and choose it. Both screens show six digits; accept on the lending Mac only if they are the same. Both Macs must run the same version of Siliconed. Nothing connects before a pairing is accepted, and Forget undoes one on either side.
 - **Encrypted, nothing in clear.** TLS 1.2 with a key per paired Mac, kept in the Keychain. macOS asks once for the local network, the first time you lend this Mac or pair it; a Mac that never does either is never asked.
 - **Everything works there**: renders, edits with your references, variations, grids and explorations, enlarging and cropping, undo; the Prompt Lab fills the rack you see (images, subjects and Carry; Rewrite and Describe stay off); installing a model or importing a LoRA on the lending Mac, measuring it. Removing a model waits for a click on that Mac. Each Mac sees only its own jobs and images, and the lending Mac stays within its own memory budget. `silicontrol` follows Compute On ([REMOTE-CONTROL.md](REMOTE-CONTROL.md)).
@@ -145,7 +145,7 @@ The other Compact versions use 8-bit weights published by third parties: [unslot
 
 Siliconed › Settings… (⌘,), three tabs.
 
-- **General**: where the models live, with Move Library…, Open Library… and Move Back to This Mac.
+- **General**: where the models live, with Move Library…, Open Library… and Move Back to This Mac. From a terminal: `silicontrol import`, `uninstall` (with `--yes`) and `library`.
 - **Other Macs**: lend this Mac, pair with another ([Render on another Mac](#render-on-another-mac)).
 - **Advanced**, in this order: This Mac (the measure); Command Line (installs `silicontrol`, below); and **Beta**, off by default and liable to change: More Solvers (adds the solvers Euler a, DPM++ 2M and UniPC to the denoiser's box and to the exploration's axes; Euler, the default, is the one the models were distilled for), Faster Rendering (adds its switch to the denoiser's box), Size in Two Scales (the rack's Size becomes a proportion and a resolution, below), Negative LoRA Strengths (strengths from −1.5 to 1.5, for “slider” LoRAs; an ordinary LoRA is damaged by a negative strength). `silicontrol set beta` flips them like the switches.
 
@@ -188,4 +188,4 @@ silicontrol add --wait --out out "a woman posing in a library"
 silicontrol status
 ```
 
-It does what the window does, by the same functions as its buttons: it flips a model's Faster Rendering or Neural Engine (`silicontrol set faster-rendering on|off --model krea2`, `set neural-engine …`) and the Beta options (`silicontrol set beta`), rewrites and describes with the Prompt Lab's writer (`silicontrol rewrite`, `describe`, `install writer`), and repeats a timed series of renders on your Mac (`silicontrol measure`); it grids, varies, enlarges, follows a render step by step, and more: `silicontrol help all` lists every command. Output is JSON lines; the last one carries `"ok"`. How it works inside: [REMOTE-CONTROL.md](REMOTE-CONTROL.md).
+It does what the window does, by the same functions as its buttons: it flips a model's Faster Rendering or Neural Engine (`silicontrol set faster-rendering on|off --model krea2`, `set neural-engine …`) and the Beta options (`silicontrol set beta`), rewrites and describes with the Prompt Lab's writer (`silicontrol rewrite`, `describe`, `install writer`), and repeats a timed series of renders on your Mac (`silicontrol measure`); it removes and undoes, crops, renders an image again at its seed (even from a PNG of another day), finishes an exploration's cell and adds its sheet to the history (`silicontrol remove`, `undo`, `crop`, `again`, `finish`, `sheet`), imports and uninstalls models and LoRAs, switches Compute On to a paired Mac and moves the library (`silicontrol import`, `uninstall`, `compute`, `library`; what removes or moves needs `--yes`); it grids, varies, enlarges, follows a render step by step, and more: `silicontrol help all` lists every command. Output is JSON lines; the last one carries `"ok"`. How it works inside: [REMOTE-CONTROL.md](REMOTE-CONTROL.md).

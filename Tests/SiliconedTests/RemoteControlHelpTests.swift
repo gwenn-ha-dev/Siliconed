@@ -96,3 +96,44 @@ final class RemoteControlWriterHelpTests: XCTestCase {
         }
     }
 }
+
+/// **What `silicontrol` does of the window's other gestures is documented**, in both languages: the commands in the overview, a page for each
+/// (and the aliases of the ones that share a page), the `--yes` guard where something is destroyed, and every new refusal code in `help errors`.
+final class RemoteControlGestureHelpTests: XCTestCase {
+    func testTheGesturesAreDocumented() {
+        for pages in [RemoteControlHelp.english, RemoteControlHelp.french] {
+            for line in ["remove i7", "undo [--redo]", "again <i7|", "reuse <i7|", "crop i7 --box X,Y,W,H | --ratio P:Q", "finish <g2c3|t5>", "sheet g2",
+                         "import FI", "install stop", "uninstall ID|lora", "macs [connect|disconnect", "compute N", "library [move", "--format F"] {
+                XCTAssertTrue(pages.overview.contains(line), line)
+            }
+            for topic in ["remove", "undo", "again", "crop", "finish", "import", "uninstall", "macs", "library"] {
+                XCTAssertNotNil(pages.pages[topic], topic)
+                XCTAssertNotNil(RemoteControlHelp.answer([topic, "--help"], pages)?["help"] as? String, topic)
+            }
+            // The alias commands read the page they share.
+            for (command, topic) in [("reuse", "again"), ("sheet", "finish"), ("compute", "macs")] {
+                XCTAssertEqual(RemoteControlHelp.answer([command, "--help"], pages)?["help"] as? String, pages.pages[topic], command)
+            }
+            // What destroys says --yes, and what a dry run answers.
+            for topic in ["uninstall", "library"] {
+                XCTAssertTrue(pages.pages[topic]?.contains("--yes") == true, topic)
+                XCTAssertTrue(pages.pages[topic]?.contains("dry_run") == true, topic)
+            }
+            let errors = pages.pages["errors"] ?? ""
+            for code in ["nothing_to_undo", "crop", "cell", "import", "unknown_mac", "library", "link", "refused", "remote"] {
+                XCTAssertTrue(errors.contains(code), code)
+            }
+            XCTAssertTrue(pages.pages["save"]?.contains("heic") == true)
+            XCTAssertTrue(pages.pages["grid"]?.contains("g2c3") == true)
+            XCTAssertTrue(pages.pages["install"]?.contains("install stop") == true)
+        }
+    }
+
+    /// The commands the app routes (`GestureOrder.verbs`) each have a page, here or by alias.
+    func testEveryGestureVerbHasAPage() {
+        let verbs = ["remove", "undo", "again", "reuse", "crop", "finish", "sheet", "import", "uninstall", "macs", "compute", "library"]
+        for pages in [RemoteControlHelp.english, RemoteControlHelp.french] {
+            for verb in verbs { XCTAssertNotNil(RemoteControlHelp.text(for: verb, pages), verb) }
+        }
+    }
+}

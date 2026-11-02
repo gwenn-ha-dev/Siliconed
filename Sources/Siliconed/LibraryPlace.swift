@@ -192,21 +192,37 @@ package enum LibraryMove {
         if access(existing.path, W_OK) != 0 { throw .libraryRefused(path: folder.path, reason: .readOnly) }
     }
 
+    /// **What a move would carry**, judged before the first byte: the files still to copy (those already there, identical, are not), their
+    /// size, and the room the destination has. Refuses what `move` refuses first — the library unreachable, a destination `check` turns
+    /// away, a disk too small — so that a dry run (`silicontrol library move` without `--yes`) and the move cannot disagree.
+    package struct Plan: Sendable {
+        package let pending: [String]
+        package let bytes: Int
+        package let room: Int?
+    }
+
+    package static func plan(_ source: Library, to destination: URL) throws(EngineError) -> Plan {
+        let destination = Library.folder(destination)
+        try source.checkReachable()
+        try check(source, destination)
+        let pending = files(of: source).filter {
+            !FileCopy.isSame(source.root.appendingPathComponent($0).path, destination.appendingPathComponent($0).path)
+        }
+        let bytes = pending.reduce(0) { $0 + Library.size(source.root.appendingPathComponent($1).path) }
+        let room = Library(root: destination).freeSpace()
+        if let room, bytes > room { throw .diskFull(needed: bytes, available: room) }
+        return Plan(pending: pending, bytes: bytes, room: room)
+    }
+
     /// **Moves `source` to `destination`** (a folder from `destination(in:)`, or `source.local` to
     /// bring it back to this Mac), verified file by file; returns the library there, recorded as this
     /// Mac's. The old place is emptied last — this Mac's own files stay.
     package static func move(_ source: Library, to destination: URL, cancellation: Cancellation? = nil,
                              progress: (Progress) -> Void = { _ in }) throws(EngineError) -> Library {
         let destination = Library.folder(destination)
-        try source.checkReachable()
-        try check(source, destination)
         let fm = FileManager.default
-        let files = files(of: source)
-        let pending = files.filter { !FileCopy.isSame(source.root.appendingPathComponent($0).path,
-                                                       destination.appendingPathComponent($0).path) }
-        let bytes = pending.reduce(0) { $0 + Library.size(source.root.appendingPathComponent($1).path) }
-        let room = Library(root: destination).freeSpace()
-        if let room, bytes > room { throw .diskFull(needed: bytes, available: room) }
+        let plan = try plan(source, to: destination)
+        let pending = plan.pending, bytes = plan.bytes
 
         try EngineError.boundary {
             try fm.createDirectory(at: destination, withIntermediateDirectories: true)

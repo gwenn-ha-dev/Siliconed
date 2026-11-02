@@ -27,8 +27,9 @@ package enum RemoteControlHelp {
 
     /// The topics in reading order (`help all` follows it).
     static let order = ["contract", "open", "models", "install", "add", "grid", "edit", "wait", "status", "follow",
-                        "cancel", "clear", "set", "history", "save", "vary", "enlarge", "rewrite", "describe", "subjects", "diagnose", "measure", "errors", "recipes"]
-    static let aliases = ["examples": "recipes"]
+                        "cancel", "clear", "set", "history", "save", "vary", "enlarge", "crop", "again", "remove", "undo", "finish", "rewrite", "describe",
+                        "subjects", "import", "uninstall", "macs", "library", "diagnose", "measure", "errors", "recipes"]
+    static let aliases = ["examples": "recipes", "reuse": "again", "sheet": "finish", "compute": "macs"]
 
     /// French when the user puts it before English. Not `Bundle.main.preferredLocalizations`: the app's
     /// bundle has French phrases, `silicontrol` (a bare tool in `Contents/Helpers`) has none, and both
@@ -94,14 +95,14 @@ package enum RemoteControlHelp {
       A failure: "error" (stable code, see help errors), "message", often "hint" (what to do).
       Exit: 0 ok · 1 ok:false · 2 usage · 3 the app cannot be reached.
       Exception: help answers {"ok": true, "help": "<text>"} and the client prints the text.
-      t3 = a job (one request for one or more images) · i7 = an image of the history.
+      t3 = a job (one request for one or more images) · i7 = an image of the history · g2 = a grid · g2c3 = its cell.
 
     THE COMMANDS (details: help <command>, or <command> --help)
       open                                     launches the app and waits until it answers
       models                                   installed models, formats, LoRAs, default steps
       install ID [--standard|--compact|--light] shows a model's license and size in the app, to accept there
       install writer                           the Prompt Lab's writer (1.25 GB), no license of its own
-      diagnose [--issue]                       measures this Mac (≈ 1 min, no model) → the report's JSON
+      diagnose [--issue|--stop]                measures this Mac (≈ 1 min, no model) → the report's JSON; --stop: the sheet's Stop
       measure [options] [-- add options]       times and peak memory of a series of renders → a TSV and its summary
       add [options] "<prompt>" [format] [seed] puts a request in the queue → its job (t3)
       grid --x AXIS [--y AXIS] [options] "<prompt>" …
@@ -116,12 +117,26 @@ package enum RemoteControlHelp {
       set neural-engine on|off [--model ID]    a model's Neural Engine, as a click (queue empty)
       set beta [OPTION on|off]                 the four Beta options of Settings, as a click; alone, reads them
       history [N]                              the session's images (most recent first)
-      save i7 [i8 …] DEST                      writes images (.png/.jpg file, or folder)
+      save i7 [i8 …] DEST [--format F]         writes images (.png/.jpg/.heic file, or folder in png|jpeg|heic)
       vary i7 subtle|strong [--batch N]        variations of an image (same settings, same seed)
       enlarge i7 [--download]                  the image ×4, by macOS's super-resolution → its image (i8)
       rewrite "<text>" [--for ID]              the Prompt Lab's Rewrite: a prompt rewritten for a model → its text
       describe <image|i7> [--for ID]           the Prompt Lab's Describe: an image told as a prompt → its text
+      remove i7 [i8 …]                         Remove from History · undo [--redo]: ⌘Z, ⇧⌘Z
+      again <i7|file.png> · reuse <i7|file.png> Render Again (Same Seed) · Reuse These Settings (an image, or a PNG of another day)
+      crop i7 --box X,Y,W,H | --ratio P:Q      Crop… → a new image (i8)
+      finish <g2c3|t5> · sheet g2              Finish This Image · Add Sheet to History (an exploration's cell g2c3)
+      import FILE.safetensors|FILE.gguf …      Import a Model or LoRA… (⌘O); a family not installed shows its license in the app
+      install stop                             Stop the installation or import in progress
+      uninstall ID|lora NAME|downloads [--yes] Uninstall / Remove / Discard: without --yes, says what would go and the room freed
+      macs [connect|disconnect NAME] · compute NAME|this
+                                               the paired Macs and their state · Render › Compute On
+      library [move DIR|home [--yes]|open DIR|local]
+                                               where the models live: Move Library…, Move Back, Open, Use This Mac's
       help [topic]                             this reference
+
+    NOTHING DEPENDS ON A CLICK, but pairing a Mac, accepting a license, « Lend This Mac » and « Forget »: those stay in the window.
+    A command that removes or moves models acts only with --yes.
 
     EDITING: silicontrol add --model qwen-image-2.1 --ref photo.png --ref dog.png "put the dog of image 2 next to her"
       up to 3 --ref, in order; the first is image 1, the one edited (help edit)
@@ -137,7 +152,7 @@ package enum RemoteControlHelp {
         2. The LAST line is the verdict: {"ok": true, …} or {"ok": false, …}.
         3. The lines before it exist only for add --wait, grid --wait, wait and follow; they carry
            "type": added, image, sheet, start, stage, step, end. rewrite and describe have their own:
-           started, loading, text (help rewrite).
+           started, loading, text (help rewrite); library move, started and progress (help library).
         4. A failure: {"ok": false, "error": "<code>", "message": "<sentence>", "hint": "<what to do>"}.
            The code is stable (help errors); "hint" is not always there. "message" and "hint" are
            in the app's language; only "error" is meant for programs.
@@ -145,7 +160,8 @@ package enum RemoteControlHelp {
            reached (not running and not launchable, or not answering).
         6. Short names, numbered within the app's session and lost when it quits:
            t3 = a job (one request: 1 to 8 images) · i7 = an image of the history ·
-           g2 = a grid (one job per cell, then its sheet, an image of the history).
+           g2 = a grid (one job per cell, then its sheet, an image of the history) ·
+           g2c3 = a cell of a grid, by its rank in the sheet's reading order, from 0.
            A bare number is also accepted for a job (3 = t3).
         7. Nothing is written to disk without --out or save: the history lives in the app.
         8. Relative paths resolve against the terminal's current directory.
@@ -230,6 +246,7 @@ package enum RemoteControlHelp {
         "install": """
         silicontrol install ID [--standard|--compact|--light]
         silicontrol install writer
+        silicontrol install stop
 
         Opens the app's Models sheet on the model ID (an "id" of « models »), with its license and
         the space it will take on disk. NOTHING is downloaded by the command: the user reads, then
@@ -260,8 +277,11 @@ package enum RemoteControlHelp {
           {"ok": true, "installed": false, "installing": true, "download_bytes": 1244668…, "message": "…"}
           {"ok": true, "installed": true, "message": "already installed"}
         "status" says the progress ("installing") and the end ("writer": {"state": "ready"}); a failure is in
-        "writer"."failure". Stop it in the app. Like the install of a model, it acts on this Mac: it is refused
+        "writer"."failure". Stop it with « install stop ». Like the install of a model, it acts on this Mac: it is refused
         ("remote") while the window computes on another one.
+        install stop is « Stop » in the Models sheet and the sidebar: the installation, or the import, in progress stops; the files
+        already downloaded are kept, the one in progress starts over. It works on a Mac followed too (the lender's forge, or this Mac's
+        upload). Answer: {"ok": true, "stopped": true | false}.
         FAILURES (install writer): writer_absent (Qwen-Image-2.1 is not installed: no encoder to give a head to),
         writer_memory (this Mac is too small for the writer), writer_preparing, license_not_accepted, busy (a render,
         an installation or the diagnostic is running), remote.
@@ -274,6 +294,7 @@ package enum RemoteControlHelp {
 
         "diagnose": """
         silicontrol diagnose [--issue]
+        silicontrol diagnose --stop
 
         « Measure This Mac » (the app's Help menu), from the terminal. The sheet opens in
         the app and the diagnostic runs — about a minute, five at most, no model needed: what
@@ -307,6 +328,9 @@ package enum RemoteControlHelp {
                   sheet's « Open the Issue »); the user submits it. "issue_url_length" says how
                   long the link was; beyond ~8 000 characters the JSON goes to the clipboard
                   instead and "message" says so.
+
+        diagnose --stop is « Stop » in the sheet, from another terminal: the measure running stops (the diagnose that waits answers
+        "stopped"). Answer: {"ok": true, "stopped": true | false}.
 
         FAILURES: usage, busy (a render or an installation is running), render_already_running
         (another process renders), stopped (« Stop » in the sheet).
@@ -464,7 +488,7 @@ package enum RemoteControlHelp {
 
         ANSWER
           {"ok": true, "grid": "g2", "columns": 2, "rows": 2, "estimate_s": 128.4,
-           "jobs": [{"job": "t5", "grid": "g2", "column": 0, "row": 0, "prompt": "…",
+           "jobs": [{"job": "t5", "grid": "g2", "cell": "g2c0", "column": 0, "row": 0, "prompt": "…",
                      "seeds": [42], "position": 1, "estimate_s": 32.1, …}, …]}
           estimate_s: the cells' sum, null until the model has rendered at this format.
           With --wait: one "type": "added" line per cell, then the lines of « wait g2 »:
@@ -475,6 +499,8 @@ package enum RemoteControlHelp {
           A cell not "done": "ok": false, "error": "render" — the sheet is made all the same, that
           cell empty ("sheet": null if no cell rendered).
           « wait g2 [--out D] » follows a grid later: at once if it has ended.
+          A cell has a name of its own, g2c3 (its rank in the sheet's reading order, from 0 — row × columns + column): « finish g2c3 »
+          is « Finish This Image » on an exploration's cell, « sheet g2 » is « Add Sheet to History » (help finish).
 
         FAILURES: usage (no --x, --batch, --x given to « add »), grid (an axis that does not read or
         does not make a grid, more than 64 cells), prompt, model, solver, detail, neural_engine, lora,
@@ -762,13 +788,183 @@ package enum RemoteControlHelp {
         FAILURES: usage, ref (an image unreadable or missing), subject (unknown name, a name taken, too many images, a model that reads none).
         """,
 
-        "save": """
-        silicontrol save i7 [i8 …] DEST
+        "remove": """
+        silicontrol remove i7 [i8 …]
 
-        Writes images of the history to disk.
-          DEST = a .png or .jpg file (a single image): written, or REPLACED if it exists.
-          DEST = a folder (created if needed): naming and no-overwrite as in « wait ».
-        The PNG carries its metadata (prompt, seed, model, LoRAs).
+        « Remove from History » (⌫), as the menu does it: the images leave the history, in memory — nothing on disk is touched.
+        The window undoes it with ⌘Z, and so does « silicontrol undo ». An image that was never saved is gone for good once
+        the app quits (« save » first).
+
+        Answer: {"ok": true, "removed": ["i7", "i8"], "history_images": 5,
+                 "undo": {"can_undo": true, "action": "Remove 2 Images", "can_redo": false, "redo_action": ""}}
+        On a Mac followed (Compute On), the other Mac's images are removed, and undone, the same way.
+        FAILURES: usage, unknown_image.
+        """,
+
+        "undo": """
+        silicontrol undo [--redo]
+
+        Edit ▸ Undo (⌘Z), or with --redo Edit ▸ Redo (⇧⌘Z): whatever the window's undo manager would undo now, nothing more. What
+        it knows: removing images from the history, a crop, a prompt carried to the rack from the Prompt Lab. A removal of images
+        on a Mac followed is undone by asking the images back from that Mac while the session lasts.
+
+        Answer: {"ok": true, "done": "undo", "action": "Remove Image", "history_images": 6,
+                 "undo": {"can_undo": false, "action": "", "can_redo": true, "redo_action": "Remove Image"}}
+        FAILURES: usage, nothing_to_undo (nothing to undo, or to redo).
+        """,
+
+        "again": """
+        silicontrol again <i7|file.png>
+        silicontrol reuse <i7|file.png>
+
+        again is « Render Again (Same Seed) » (⌘R): the rack takes the image's settings (model, prompt, size, steps, LoRAs, edit
+        images, detail, solver, and its seed), then « Generate » renders it, at that seed. On a sheet (a grid's image) it explores
+        again at the sheet's seed. Same settings, same seed, same model: the same image, bit for bit.
+        With a PNG that Siliconed wrote — an image of another day, a file from out/ — it is a PNG dropped on the canvas, then
+        « Generate »: the rack reads the file's recipe (model, prompt, size, steps, LoRAs found in this library, seed, variations),
+        and what could not come back is in "notes" (a model not installed, a LoRA missing, a solver that needs More Solvers…).
+        The rack keeps what it took, as after a click: « silicontrol add » is unaffected, it never reads the rack.
+        reuse is « Reuse These Settings »: the same filling of the rack, with no render.
+
+        Answer (again): {"ok": true, "jobs": [{"job": "t6", "model": "z-image", "seeds": [42], …}]}
+        Answer (reuse): {"ok": true, "rack": {"model": "z-image", "prompt": "…", "steps": 8, "width": 1024, "height": 1024,
+                                              "seed": 42, "loras": []}, "notes": "…" (only when something did not come back)}
+        FAILURES: usage, unknown_image, ref (a file that is unreadable, or not a PNG Siliconed wrote), and for again the reasons « Generate » is
+          greyed out: model (not installed), library_absent, busy (an installation is running), queue_full, link (the session with the
+          other Mac is down), refused (anything else it says: "message" is the window's sentence — a memory refusal, a step count the
+          model has no schedule for…). On a Mac followed, each job is answered by that Mac.
+        """,
+
+        "crop": """
+        silicontrol crop i7 --box X,Y,W,H
+        silicontrol crop i7 --ratio P:Q
+
+        « Crop… » on a history image, with the frame given instead of dragged. --box is the frame in pixels of the image, the origin at
+        the top left (x, y, width, height); --ratio is the largest frame of that proportion, centered (4:5, 16:9, 1:1…), which is where the
+        editor's proportion menu starts. The frame's pixels become a NEW image at the head of the history; the original stays.
+        « silicontrol undo » removes the crop, as ⌘Z does. The rules are the editor's: a side is never under 512 px, the whole image
+        is no crop, a grid's sheet and a sketch are not cropped. The new image keeps the original's metadata plus "cropped".
+
+        Answer: {"ok": true, "image": {"image": "i8", "width": 1024, "height": 1024, …, "crop": {"x": 96, "y": 0, "width": 1024,
+                 "height": 1024}}, "undo": {…}}
+        FAILURES: usage, unknown_image, crop (the frame leaves the image, a side under 512 px, the whole image, a proportion the image
+          cannot hold, a sheet or a sketch), busy (the crop editor is open in the window).
+        """,
+
+        "finish": """
+        silicontrol finish <g2c3|t5>
+        silicontrol sheet <g2>
+
+        The exploration's two gestures (silicontrol grid --sketch, the Exploration window).
+        A cell is named gNcM: the grid and the cell's rank in the sheet's reading order, from 0, row by row — rank = row × columns +
+        column; "cell" in each job of the grid's answer gives it ("column" and "row" too). Every cell is also an ordinary job: its tN
+        names it as well. Why that name: t3 is a job, i7 an image, g2 a grid, and a cell is a part of a grid — g2c3.
+        finish is « Finish This Image »: the rack takes the cell whole (model, prompt, size, steps, LoRAs, edit images, seed), then
+        renders it to its end, at the same seed and size: the image its sketch announced, in the history. Only a cell whose picture is
+        there. Answer: the new job, as « add » gives it.
+          {"ok": true, "jobs": [{"job": "t9", "seeds": [42], "width": 512, "height": 768, …}]}
+        sheet is « Add Sheet to History »: the sketches side by side, labelled, as an image of the history, in memory. Each call adds one.
+        Answered once the sheet is drawn.
+          {"ok": true, "image": {"image": "i12", "grid": "g2", "sheet": true, "columns": 2, "rows": 2, "empty_cells": 0, …}}
+        Only the exploration shown in the window — the last one: a new one replaces it, and its names with it.
+        FAILURES: usage, unknown_job (no exploration is shown, or this is not the one shown, or no such cell), cell (the cell has no picture
+          yet, or none has: wait for it), busy (sheet: cells are still on their way), and for finish the reasons « Generate » is greyed
+          out — model, library_absent, busy, queue_full, link, refused (see « help again »).
+        """,
+
+        "import": """
+        silicontrol import FILE.safetensors|FILE.gguf …
+
+        « Import a Model or LoRA… » (⌘O), with the files given instead of chosen — what dropping them on the window does. A model (DiT, as
+        published on Civitai: bf16, fp16, fp32, 8 bits, or GGUF of 4 bits or more) or a LoRA. The same engine, the same rules, the same
+        result in the library: « models » lists the model, with its family's version, and the LoRA under the models it fits. The file
+        you give may be deleted afterwards. The answer comes when the import is done:
+          {"ok": true, "files": ["flat.safetensors"], "models": [], "loras": ["flat"]}
+        "models" and "loras" are what is new in the library. A VAE or an encoder file only completes the family: both lists are empty.
+        **A model whose family is not installed**: the app shows the Models sheet on that family, with its license and the space it takes,
+        and the import follows once the user has accepted there — the command never accepts a license, and answers at once:
+          {"ok": true, "imported": [], "needs_family": "z-image", "install": "silicontrol install z-image", "message": "…"}
+        Stop it with « install stop ». On a Mac followed (Compute On) the files would go up to the other Mac, whose owner confirms there:
+        refused (remote).
+        FAILURES: usage, ref (file unreadable or missing), import (not a .safetensors or a .gguf, or the engine refused the file: "message"
+          says why, in the window's words), busy (a render, an installation or the diagnostic is running), library_absent, remote.
+        """,
+
+        "uninstall": """
+        silicontrol uninstall ID [--yes]
+        silicontrol uninstall lora NAME [--yes]
+        silicontrol uninstall downloads [--yes]
+
+        The Models sheet's removals. ID is a model of « models »: a publisher's model (z-image…) is « Uninstall… » — its DiT, encoder
+        and VAE go, its imported models and LoRAs stay, as the sheet says —; an imported model is its trash; lora NAME is a LoRA's
+        ("lora" in « models »); downloads is « Discard » on the interrupted downloads. Reinstalling downloads again; an imported model
+        or a LoRA comes back by importing its file again.
+        **Without --yes nothing is removed**: the answer says what would go and the room it frees.
+          {"ok": true, "dry_run": true, "target": "z-image", "kind": "family", "frees_bytes": 11749122176, "stays": ["my-finetune"],
+           "message": "nothing was removed: add --yes to remove it"}
+        With --yes: the same answer with "removed": true instead of "dry_run".
+        Refused as the sheet greys it out: a render running or waiting, an installation or the measure under way (busy); the library's
+        disk absent (library_absent). On a Mac followed, the sheet asks the other Mac and waits for a click on its screen: refused here
+        (remote) — the removal belongs to whoever sits at the Mac whose models they are.
+        FAILURES: usage, model (unknown, or nothing of it installed, or no interrupted download), lora, busy, library_absent, remote.
+        """,
+
+        "macs": """
+        silicontrol macs
+        silicontrol macs connect NAME | disconnect NAME
+        silicontrol compute NAME|this
+
+        Render ▸ Compute On, from the terminal. macs lists the Macs paired to compute on, as the menu does, and their state; NAME is a Mac's
+        name (case and accents aside) or its "id". compute NAME makes the window compute on that Mac — its queue and its history are shown,
+        and every command follows (help contract) — and compute this brings it back to this Mac. A queue running here goes on. The switch
+        is made as the menu makes it; the command answers once the session is up, or lost, or after 15 s ("link" says where it stands).
+        macs connect and disconnect are Settings ▸ Other Macs' buttons: the session kept, or dropped.
+        Never a pairing, a loan or a forgetting: those are accepted by the person in front of the screens, in the window.
+
+        Answer (macs): {"ok": true, "computing_on": null | "Mac mini", "pairings_read": true,
+                        "macs": [{"name": "Mac mini", "id": "…", "state": "connected", "computing": false, "machine": "M4, 16 GB…"}],
+                        "lending": false, "lent_to": [{"name": "MacBook", "connected": false}]}
+          state: connected, connecting, lost (trying again), on_the_network, not_on_the_network, refused_forgotten (that Mac forgot this
+          one: pair again, in the window), refused_version (the two must run the same version of Siliconed).
+          "pairings_read" false: the app has not read the Keychain yet (it does at launch if a Mac was paired, never without the user): the
+          list is empty until Settings ▸ Other Macs has been opened.
+        Answer (compute): {"ok": true, "computing_on": "Mac mini", "changed": true, "link": "connected", "message": "…" (if not yet)}
+        FAILURES: usage, unknown_mac (no such paired Mac, or two of that name: use the "id"), link (that Mac refused the session).
+        """,
+
+        "library": """
+        silicontrol library
+        silicontrol library move DIR [--yes]
+        silicontrol library home [--yes]
+        silicontrol library open DIR
+        silicontrol library local
+
+        Settings ▸ General's library buttons. Alone: where the library is, its size and the room left.
+        move is « Move Library… »: DIR is a folder on another disk (a « Siliconed » folder is made in it, unless DIR is one or already holds
+        a library you are moving). The files are copied and read back one by one, the old place is emptied last; the licenses you accepted
+        and this Mac's settings stay on this Mac. home is « Move Back to This Mac ».
+        **Without --yes nothing is copied**: the answer says what would be and the room there is.
+          {"ok": true, "dry_run": true, "destination": "/Volumes/X/Siliconed", "files": 14, "bytes": 11749122176, "free_bytes": 400000000000,
+           "message": "nothing was moved: add --yes to move it"}
+        With --yes: {"type": "started", …}, then {"type": "progress", "percent": 37} lines, then the verdict with "library".
+        A move stopped in the app leaves the library where it was ("stopped").
+        open is « Open Library… » (a folder that already holds a library: nothing is moved), local « Use This Mac’s Library » (nothing is moved).
+        Refused as Settings greys them out: a render, an installation or the measure under way (busy), the disk absent (library_absent), and for
+        move and home a Mac followed (remote: the library shown is the other Mac's).
+        Answer: {"ok": true, "library": {"path": "…", "elsewhere": true, "reachable": true, "volume": "X", "free_bytes": …, "used_bytes": …,
+                 "this_mac": "…"}}
+        FAILURES: usage, busy, library_absent, remote, library (already on this Mac; or the engine refused the destination — the library
+          itself, a disk that is full, one that cannot be written to, another library's models: "message" says which), stopped.
+        """,
+
+        "save": """
+        silicontrol save i7 [i8 …] DEST [--format png|jpeg|heic]
+
+        Writes images of the history to disk, in the three formats of the window's Save and Export panels.
+          DEST = a .png, .jpg (.jpeg) or .heic file (a single image): written, or REPLACED if it exists; the extension decides.
+          DEST = a folder (created if needed): naming and no-overwrite as in « wait ». --format says the format of its files (png by
+                 default; the panel's pop-up remembers the last one used, the command does not).
+        The PNG carries its metadata (prompt, seed, model, LoRAs); JPEG (0.9) and HEIC (0.85) are plain pictures, without metadata.
 
         Answer: {"ok": true, "files": [{"image": "i7", "path": "/abs/…"}]}
         FAILURES: usage, unknown_image, write.
@@ -863,8 +1059,8 @@ package enum RemoteControlHelp {
                                more than 64 combinations                   → help add (ALTERNATIVES)
           model                unknown or not installed model
                                                                            → "hint" lists the ready ones; models
-          busy                 (install, diagnose, set) a render, an installation or the diagnostic is
-                               running; (rewrite, describe) an image renders or waits; (add, grid, vary) an installation is running;
+          busy                 (install, diagnose, set, import, uninstall, library) a render, an installation or the diagnostic is
+                               running; (crop) the crop editor is open; (sheet) cells are still on their way; (rewrite, describe) an image renders or waits; (add, grid, vary) an installation is running;
                                (any) more than 8 connections still sending their command
                                                                            → wait, then retry
           library_absent       (add, grid, vary) the library is on a disk that is not connected
@@ -889,8 +1085,20 @@ package enum RemoteControlHelp {
                                on no axis, more than 64 cells              → help grid
           queue_full           64 jobs waiting, or no room for every alternative or cell
                                                                            → wait, then retry
-          remote               (install, rewrite, describe) the window computes on another Mac; these act on
-                               this one                                    → Render › Compute On › This Mac
+          remote               (install, import, rewrite, describe) the window computes on another Mac; these act on
+                               this one; (uninstall, library move|home) a removal or a move there waits for a click on
+                               the other Mac                               → Render › Compute On › This Mac
+          link                 the session with the other Mac is down (add, grid, vary, again, finish); (compute, macs)
+                               that Mac refused the session                → macs
+          refused              (again, finish, vary, enlarge) the window would not do it, and says why in "message"
+          nothing_to_undo      (undo) nothing to undo, or to redo           → the window's own undo list
+          crop                 (crop) a frame the image cannot give: it leaves the image, a side under 512 px, the whole
+                               image, a proportion it cannot hold, a sheet or a sketch → help crop
+          cell                 (finish, sheet) no picture in that cell yet, or in any of the exploration → wait for it
+          import               (import) not a .safetensors or a .gguf, or the engine refused the file → "message"
+          unknown_mac          (macs, compute) no paired Mac of that name, or two → macs; the "id"
+          library              (library) the library is already where you ask, or the engine refused the destination
+                                                                           → "message"
           writer_absent        (rewrite, describe, install writer) no installed model carries a writer
                                                                            → install qwen-image-2.1
           writer_head          (rewrite, describe) the writer's head is to download (1.25 GB)
@@ -981,14 +1189,14 @@ package enum RemoteControlHelp {
       Échec : "error" (code stable, voir help errors), "message", souvent "hint" (quoi faire).
       Sortie : 0 ok · 1 ok:false · 2 usage · 3 l'app est injoignable.
       Exception : help répond {"ok": true, "help": "<texte>"} et le client imprime le texte.
-      t3 = un travail (une demande d'une ou plusieurs images) · i7 = une image de l'historique.
+      t3 = un travail (une demande d'une ou plusieurs images) · i7 = une image de l'historique · g2 = une grille · g2c3 = sa case.
 
     LES COMMANDES (détails : help <commande>, ou <commande> --help)
       open                                     lance l'app et attend qu'elle réponde
       models                                   modèles installés, formats, LoRA, pas par défaut
       install ID [--standard|--compact|--light] montre dans l'app la licence et la place d'un modèle, à accepter là
       install writer                           le rédacteur de l'Atelier de prompts (1,25 Go), sans licence propre
-      diagnose [--issue]                       mesure ce Mac (≈ 1 min, sans modèle) → le JSON du rapport
+      diagnose [--issue|--stop]                mesure ce Mac (≈ 1 min, sans modèle) → le JSON du rapport ; --stop : l'Arrêter de la feuille
       measure [options] [-- options de add]    temps et pic mémoire d'une série de rendus → un TSV et son résumé
       add [options] "<prompt>" [format] [seed] met une demande en file → son travail (t3)
       grid --x AXE [--y AXE] [options] "<prompt>" …
@@ -1003,12 +1211,26 @@ package enum RemoteControlHelp {
       set neural-engine on|off [--model ID]    le Neural Engine d'un modèle, comme un clic (file vide)
       set beta [OPTION on|off]                 les quatre options Bêta des Réglages, comme un clic ; seul, les lit
       history [N]                              les images de la session (la plus récente d'abord)
-      save i7 [i8 …] DEST                      écrit des images (fichier .png/.jpg, ou dossier)
+      save i7 [i8 …] DEST [--format F]         écrit des images (fichier .png/.jpg/.heic, ou dossier en png|jpeg|heic)
       vary i7 subtle|strong [--batch N]        variations d'une image (mêmes réglages, même graine)
       enlarge i7 [--download]                  l'image ×4, par la super-résolution de macOS → son image (i8)
       rewrite "<texte>" [--for ID]             « Réécrire » de l'Atelier : un prompt réécrit pour un modèle → son texte
       describe <image|i7> [--for ID]           « Décrire » de l'Atelier : une image racontée en prompt → son texte
+      remove i7 [i8 …]                         Retirer de l'historique · undo [--redo] : ⌘Z, ⇧⌘Z
+      again <i7|fichier.png> · reuse <i7|fichier.png> Rendre à nouveau (même graine) · Reprendre ces réglages (une image, ou un PNG d'un autre jour)
+      crop i7 --box X,Y,W,H | --ratio P:Q      Recadrer… → une nouvelle image (i8)
+      finish <g2c3|t5> · sheet g2              Finir cette image · Ajouter la planche à l'historique (la case g2c3 d'une exploration)
+      import FICHIER.safetensors|FICHIER.gguf … Importer un modèle ou une LoRA… (⌘O) ; une famille non installée montre sa licence dans l'app
+      install stop                             arrête l'installation ou l'import en cours
+      uninstall ID|lora NOM|downloads [--yes]  Désinstaller / Retirer / Jeter : sans --yes, dit ce qui partirait et la place libérée
+      macs [connect|disconnect NOM] · compute NOM|this
+                                               les Mac appairés et leur état · Rendu › Calculer sur
+      library [move DOSSIER|home [--yes]|open DOSSIER|local]
+                                               où vivent les modèles : Déplacer la bibliothèque…, Ramener, Ouvrir, Utiliser celle de ce Mac
       help [sujet]                             cette référence
+
+    RIEN NE DÉPEND D'UN CLIC, sauf appairer un Mac, accepter une licence, « Prêter ce Mac » et « Oublier » : ceux-là restent dans la fenêtre.
+    Une commande qui retire ou déplace des modèles n'agit qu'avec --yes.
 
     ÉDITER : silicontrol add --model qwen-image-2.1 --ref photo.png --ref chien.png "put the dog of image 2 next to her"
       jusqu'à 3 --ref, dans l'ordre ; le premier est l'image 1, celle qu'on édite (help edit)
@@ -1025,7 +1247,7 @@ package enum RemoteControlHelp {
         2. La DERNIÈRE ligne est le verdict : {"ok": true, …} ou {"ok": false, …}.
         3. Les lignes d'avant n'existent que pour add --wait, grid --wait, wait et follow ; elles
            portent "type" : added, image, sheet, start, stage, step, end. rewrite et describe ont les leurs :
-           started, loading, text (help rewrite).
+           started, loading, text (help rewrite) ; library move, started et progress (help library).
         4. Un échec : {"ok": false, "error": "<code>", "message": "<phrase>", "hint": "<quoi faire>"}.
            Le code est stable (help errors) ; "hint" n'est pas toujours là. "message" et "hint"
            sont dans la langue de l'app ; seul "error" est fait pour les programmes.
@@ -1033,7 +1255,8 @@ package enum RemoteControlHelp {
            injoignable (pas ouvert et impossible à lancer, ou ne répond pas).
         6. Noms courts, numérotés dans la session de l'app et perdus quand elle quitte :
            t3 = un travail (une demande : 1 à 8 images) · i7 = une image de l'historique ·
-           g2 = une grille (un travail par case, puis sa planche, une image de l'historique).
+           g2 = une grille (un travail par case, puis sa planche, une image de l'historique) ·
+           g2c3 = une case d'une grille, par son rang dans l'ordre de lecture de la planche, depuis 0.
            Un nombre nu est aussi accepté pour un travail (3 = t3).
         7. Rien n'est écrit sur disque sans --out ou save : l'historique vit dans l'app.
         8. Les chemins relatifs se résolvent contre le répertoire courant du terminal.
@@ -1118,6 +1341,7 @@ package enum RemoteControlHelp {
         "install": """
         silicontrol install ID [--standard|--compact|--light]
         silicontrol install writer
+        silicontrol install stop
 
         Ouvre la feuille Modèles de l'app sur le modèle ID (un "id" de « models »), avec sa licence
         et la place qu'il prendra sur le disque. La commande ne télécharge RIEN : l'utilisateur lit,
@@ -1149,8 +1373,11 @@ package enum RemoteControlHelp {
           {"ok": true, "installed": false, "installing": true, "download_bytes": 1244668…, "message": "…"}
           {"ok": true, "installed": true, "message": "already installed"}
         « status » dit l'avancement ("installing") et la fin ("writer" : {"state": "ready"}) ; un échec est dans
-        "writer"."failure". L'arrêter se fait dans l'app. Comme l'installation d'un modèle, elle agit sur ce Mac : refusée
+        "writer"."failure". L'arrêter se fait par « install stop ». Comme l'installation d'un modèle, elle agit sur ce Mac : refusée
         ("remote") tant que la fenêtre calcule sur un autre.
+        install stop est « Arrêter » dans la feuille Modèles et la barre latérale : l'installation, ou l'import, en cours s'arrête ; les
+        fichiers déjà téléchargés sont gardés, celui en cours repartira de zéro. Il marche aussi sur un Mac suivi (la forge du prêteur, ou
+        le téléversement de ce Mac). Réponse : {"ok": true, "stopped": true | false}.
         ÉCHECS (install writer) : writer_absent (Qwen-Image-2.1 n'est pas installé : pas d'encodeur à qui donner une tête),
         writer_memory (ce Mac est trop petit pour le rédacteur), writer_preparing, license_not_accepted, busy (un rendu,
         une installation ou le diagnostic tourne), remote.
@@ -1163,6 +1390,7 @@ package enum RemoteControlHelp {
 
         "diagnose": """
         silicontrol diagnose [--issue]
+        silicontrol diagnose --stop
 
         « Mesurer ce Mac » (menu Aide de l'app), depuis le terminal. La feuille s'ouvre
         dans l'app et le diagnostic tourne — une minute environ, cinq au plus, sans modèle : ce
@@ -1196,6 +1424,9 @@ package enum RemoteControlHelp {
                   rapport (« Ouvrir le signalement » de la feuille) ; c'est l'utilisateur qui l'envoie.
                   "issue_url_length" dit la longueur du lien ; au-delà de ~8 000 caractères le
                   JSON va dans le presse-papiers et "message" le dit.
+
+        diagnose --stop est « Arrêter » dans la feuille, depuis un autre terminal : la mesure en cours s'arrête (le diagnose qui attend répond
+        "stopped"). Réponse : {"ok": true, "stopped": true | false}.
 
         ÉCHECS : usage, busy (un rendu ou une installation tourne), render_already_running (un
         autre processus fait un rendu), stopped (« Arrêter » dans la feuille).
@@ -1354,7 +1585,7 @@ package enum RemoteControlHelp {
 
         RÉPONSE
           {"ok": true, "grid": "g2", "columns": 2, "rows": 2, "estimate_s": 128.4,
-           "jobs": [{"job": "t5", "grid": "g2", "column": 0, "row": 0, "prompt": "…",
+           "jobs": [{"job": "t5", "grid": "g2", "cell": "g2c0", "column": 0, "row": 0, "prompt": "…",
                      "seeds": [42], "position": 1, "estimate_s": 32.1, …}, …]}
           estimate_s : la somme des cases, null tant que le modèle n'a pas rendu à ce format.
           Avec --wait : une ligne "type": "added" par case, puis les lignes de « wait g2 » :
@@ -1365,6 +1596,8 @@ package enum RemoteControlHelp {
           Une case pas "done" : "ok": false, "error": "render" — la planche est faite quand même,
           cette case vide ("sheet": null si aucune case n'a été rendue).
           « wait g2 [--out D] » suit une grille plus tard : tout de suite si elle est finie.
+          Une case a son propre nom, g2c3 (son rang dans l'ordre de lecture de la planche, depuis 0 — ligne × colonnes + colonne) :
+          « finish g2c3 » est « Finir cette image » sur une case d'exploration, « sheet g2 » est « Ajouter la planche à l'historique » (help finish).
 
         ÉCHECS : usage (pas de --x, --batch, --x donné à « add »), grid (un axe illisible ou qui ne
         fait pas une grille, plus de 64 cases), prompt, model, solver, detail, neural_engine, lora,
@@ -1661,13 +1894,188 @@ package enum RemoteControlHelp {
         ÉCHECS : usage, ref (image illisible ou absente), subject (nom inconnu ou déjà pris, trop d'images, modèle qui n'en lit pas).
         """,
 
-        "save": """
-        silicontrol save i7 [i8 …] DEST
+        "remove": """
+        silicontrol remove i7 [i8 …]
 
-        Écrit des images de l'historique sur le disque.
-          DEST = un fichier .png ou .jpg (une seule image) : écrit, ou REMPLACÉ s'il existe.
-          DEST = un dossier (créé au besoin) : nommage et non-écrasement de « wait ».
-        Le PNG porte ses métadonnées (prompt, graine, modèle, LoRA).
+        « Retirer de l'historique » (⌫), comme le fait le menu : les images quittent l'historique, en mémoire — rien n'est touché sur le disque.
+        La fenêtre l'annule par ⌘Z, et « silicontrol undo » aussi. Une image jamais enregistrée est perdue pour de bon quand l'app
+        quitte (« save » d'abord).
+
+        Réponse : {"ok": true, "removed": ["i7", "i8"], "history_images": 5,
+                   "undo": {"can_undo": true, "action": "Retirer 2 images", "can_redo": false, "redo_action": ""}}
+        Sur un Mac suivi (Calculer sur), les images de l'autre Mac sont retirées, et rendues, de la même façon.
+        ÉCHECS : usage, unknown_image.
+        """,
+
+        "undo": """
+        silicontrol undo [--redo]
+
+        Édition ▸ Annuler (⌘Z), ou avec --redo Édition ▸ Rétablir (⇧⌘Z) : ce que le gestionnaire d'annulation de la fenêtre annulerait
+        maintenant, rien de plus. Ce qu'il connaît : le retrait d'images de l'historique, un recadrage, un prompt porté au rack depuis
+        l'Atelier de prompts. Un retrait d'images sur un Mac suivi s'annule en redemandant les images à ce Mac, tant que la session dure.
+
+        Réponse : {"ok": true, "done": "undo", "action": "Retirer l'image", "history_images": 6,
+                   "undo": {"can_undo": false, "action": "", "can_redo": true, "redo_action": "Retirer l'image"}}
+        ÉCHECS : usage, nothing_to_undo (rien à annuler, ni à rétablir).
+        """,
+
+        "again": """
+        silicontrol again <i7|fichier.png>
+        silicontrol reuse <i7|fichier.png>
+
+        again est « Rendre à nouveau (même graine) » (⌘R) : le rack prend les réglages de l'image (modèle, prompt, taille, pas, LoRA, images à
+        éditer, détail, solveur, et sa graine), puis « Générer » la rend, à cette graine. Sur une planche (l'image d'une grille), il refait
+        l'exploration à la graine de la planche. Mêmes réglages, même graine, même modèle : la même image, bit pour bit.
+        Avec un PNG que Siliconed a écrit — une image d'un autre jour, un fichier de out/ — c'est un PNG déposé sur le canevas, puis
+        « Générer » : le rack lit la recette du fichier (modèle, prompt, taille, pas, LoRA retrouvées dans cette bibliothèque, graine,
+        variations), et ce qui n'a pas pu revenir est dans "notes" (un modèle non installé, une LoRA absente, un solveur qui demande
+        Plus de solveurs…). Le rack garde ce qu'il a pris, comme après un clic : « silicontrol add » n'en est pas touché, il ne lit
+        jamais le rack.
+        reuse est « Reprendre ces réglages » : le même remplissage du rack, sans rendu.
+
+        Réponse (again) : {"ok": true, "jobs": [{"job": "t6", "model": "z-image", "seeds": [42], …}]}
+        Réponse (reuse) : {"ok": true, "rack": {"model": "z-image", "prompt": "…", "steps": 8, "width": 1024, "height": 1024,
+                                                "seed": 42, "loras": []}, "notes": "…" (seulement si quelque chose n'est pas revenu)}
+        ÉCHECS : usage, unknown_image, ref (un fichier illisible, ou qui n'est pas un PNG écrit par Siliconed), et pour again les raisons pour
+          lesquelles « Générer » est grisé : model (non installé), library_absent, busy (une installation tourne), queue_full, link (la
+          session avec l'autre Mac est coupée), refused (tout le reste : "message" est la phrase de la fenêtre — un refus mémoire, un
+          nombre de pas sans calendrier pour le modèle…). Sur un Mac suivi, chaque job reçoit la réponse de ce Mac.
+        """,
+
+        "crop": """
+        silicontrol crop i7 --box X,Y,W,H
+        silicontrol crop i7 --ratio P:Q
+
+        « Recadrer… » sur une image de l'historique, le cadre donné au lieu d'être tiré. --box est le cadre en pixels de l'image, l'origine en
+        haut à gauche (x, y, largeur, hauteur) ; --ratio est le plus grand cadre de cette proportion, centré (4:5, 16:9, 1:1…), d'où part le
+        menu des proportions de l'éditeur. Les pixels du cadre deviennent une NOUVELLE image en tête de l'historique ; l'originale reste.
+        « silicontrol undo » retire le recadrage, comme ⌘Z. Les règles sont celles de l'éditeur : un côté n'est jamais sous 512 px, l'image
+        entière n'est pas un recadrage, la planche d'une grille et une esquisse ne se recadrent pas. La nouvelle image garde les
+        métadonnées de l'originale, plus "cropped".
+
+        Réponse : {"ok": true, "image": {"image": "i8", "width": 1024, "height": 1024, …, "crop": {"x": 96, "y": 0, "width": 1024,
+                   "height": 1024}}, "undo": {…}}
+        ÉCHECS : usage, unknown_image, crop (le cadre sort de l'image, un côté sous 512 px, l'image entière, une proportion que l'image ne
+          peut pas tenir, une planche ou une esquisse), busy (l'éditeur de recadrage est ouvert dans la fenêtre).
+        """,
+
+        "finish": """
+        silicontrol finish <g2c3|t5>
+        silicontrol sheet <g2>
+
+        Les deux gestes de l'exploration (silicontrol grid --sketch, la fenêtre Exploration).
+        Une case se nomme gNcM : la grille et le rang de la case dans l'ordre de lecture de la planche, depuis 0, ligne par ligne — rang =
+        ligne × colonnes + colonne ; "cell" dans chaque job de la réponse de la grille le donne ("column" et "row" aussi). Chaque case est
+        aussi un job ordinaire : son tN la nomme tout autant. Pourquoi ce nom : t3 est un job, i7 une image, g2 une grille, et une case est
+        une part de grille — g2c3.
+        finish est « Finir cette image » : le rack prend la case en entier (modèle, prompt, taille, pas, LoRA, images à éditer, graine),
+        puis la rend jusqu'au bout, à la même graine et à la même taille : l'image que son esquisse annonçait, dans l'historique. Seulement
+        une case dont l'image est là. Réponse : le nouveau job, comme « add » le donne.
+          {"ok": true, "jobs": [{"job": "t9", "seeds": [42], "width": 512, "height": 768, …}]}
+        sheet est « Ajouter la planche à l'historique » : les esquisses côte à côte, étiquetées, en image de l'historique, en mémoire. Chaque
+        appel en ajoute une. Réponse quand la planche est dessinée.
+          {"ok": true, "image": {"image": "i12", "grid": "g2", "sheet": true, "columns": 2, "rows": 2, "empty_cells": 0, …}}
+        Seulement l'exploration montrée dans la fenêtre — la dernière : une nouvelle la remplace, et ses noms avec elle.
+        ÉCHECS : usage, unknown_job (aucune exploration montrée, ou ce n'est pas celle-là, ou pas de telle case), cell (la case n'a pas encore
+          d'image, ou aucune : l'attendre), busy (sheet : des cases sont encore en route), et pour finish les raisons pour lesquelles
+          « Générer » est grisé — model, library_absent, busy, queue_full, link, refused (voir « help again »).
+        """,
+
+        "import": """
+        silicontrol import FICHIER.safetensors|FICHIER.gguf …
+
+        « Importer un modèle ou une LoRA… » (⌘O), avec les fichiers donnés au lieu d'être choisis — ce que fait leur dépôt sur la fenêtre.
+        Un modèle (DiT, tel que publié sur Civitai : bf16, fp16, fp32, 8 bits, ou GGUF de 4 bits au moins) ou une LoRA. Le même moteur, les
+        mêmes règles, le même résultat dans la bibliothèque : « models » liste le modèle, avec la version de sa famille, et la LoRA sous les
+        modèles qu'elle sert. Le fichier donné peut être supprimé ensuite. La réponse vient quand l'import est fini :
+          {"ok": true, "files": ["flat.safetensors"], "models": [], "loras": ["flat"]}
+        "models" et "loras" sont ce qui est nouveau dans la bibliothèque. Un fichier de VAE ou d'encodeur ne fait que compléter la famille :
+        les deux listes sont vides.
+        **Un modèle dont la famille n'est pas installée** : l'app montre la feuille Modèles sur cette famille, avec sa licence et la place
+        qu'elle prend, et l'import suit quand l'utilisateur a accepté là — la commande n'accepte jamais une licence, et répond aussitôt :
+          {"ok": true, "imported": [], "needs_family": "z-image", "install": "silicontrol install z-image", "message": "…"}
+        L'arrêter se fait par « install stop ». Sur un Mac suivi (Calculer sur), les fichiers monteraient sur l'autre Mac, dont le
+        propriétaire confirme là : refusé (remote).
+        ÉCHECS : usage, ref (fichier illisible ou absent), import (ni .safetensors ni .gguf, ou le moteur a refusé le fichier : "message"
+          dit pourquoi, dans les mots de la fenêtre), busy (un rendu, une installation ou le diagnostic tourne), library_absent, remote.
+        """,
+
+        "uninstall": """
+        silicontrol uninstall ID [--yes]
+        silicontrol uninstall lora NOM [--yes]
+        silicontrol uninstall downloads [--yes]
+
+        Les retraits de la feuille Modèles. ID est un modèle de « models » : un modèle d'éditeur (z-image…) est « Désinstaller… » — son DiT,
+        son encodeur et son VAE partent, ses modèles importés et ses LoRA restent, comme la feuille le dit — ; un modèle importé est sa
+        corbeille ; lora NOM est une LoRA ("lora" dans « models ») ; downloads est « Jeter » sur les téléchargements interrompus. Réinstaller
+        télécharge de nouveau ; un modèle importé ou une LoRA revient en important son fichier de nouveau.
+        **Sans --yes rien n'est retiré** : la réponse dit ce qui partirait et la place libérée.
+          {"ok": true, "dry_run": true, "target": "z-image", "kind": "family", "frees_bytes": 11749122176, "stays": ["my-finetune"],
+           "message": "nothing was removed: add --yes to remove it"}
+        Avec --yes : la même réponse avec "removed": true au lieu de "dry_run".
+        Refusé comme la feuille le grise : un rendu en cours ou en attente, une installation ou la mesure en route (busy) ; le disque de la
+        bibliothèque absent (library_absent). Sur un Mac suivi, la feuille interroge l'autre Mac et attend un clic sur son écran : refusé ici
+        (remote) — le retrait revient à qui est assis devant le Mac dont ce sont les modèles.
+        ÉCHECS : usage, model (inconnu, ou rien d'installé, ou aucun téléchargement interrompu), lora, busy, library_absent, remote.
+        """,
+
+        "macs": """
+        silicontrol macs
+        silicontrol macs connect NOM | disconnect NOM
+        silicontrol compute NOM|this
+
+        Rendu ▸ Calculer sur, depuis le terminal. macs liste les Mac appairés pour calculer, comme le menu, et leur état ; NOM est le nom d'un
+        Mac (casse et accents mis à part) ou son "id". compute NOM fait calculer la fenêtre sur ce Mac — sa file et son historique sont
+        montrés, et toutes les commandes suivent (help contract) — et compute this la ramène sur ce Mac. Une file qui tourne ici continue.
+        Le basculement est fait comme le menu le fait ; la commande répond quand la session est établie, ou perdue, ou après 15 s ("link" dit
+        où elle en est). macs connect et disconnect sont les boutons de Réglages ▸ Autres Mac : la session gardée, ou lâchée.
+        Jamais un appairage, un prêt ni un oubli : ceux-là sont acceptés par la personne devant les écrans, dans la fenêtre.
+
+        Réponse (macs) : {"ok": true, "computing_on": null | "Mac mini", "pairings_read": true,
+                          "macs": [{"name": "Mac mini", "id": "…", "state": "connected", "computing": false, "machine": "M4, 16 GB…"}],
+                          "lending": false, "lent_to": [{"name": "MacBook", "connected": false}]}
+          state : connected, connecting, lost (nouvel essai), on_the_network, not_on_the_network, refused_forgotten (ce Mac a oublié celui-ci :
+          appairer de nouveau, dans la fenêtre), refused_version (les deux doivent faire tourner la même version de Siliconed).
+          "pairings_read" false : l'app n'a pas encore lu le Trousseau (elle le fait au lancement si un Mac a été appairé, jamais sans
+          l'utilisateur) : la liste est vide tant que Réglages ▸ Autres Mac n'a pas été ouvert.
+        Réponse (compute) : {"ok": true, "computing_on": "Mac mini", "changed": true, "link": "connected", "message": "…" (si pas encore)}
+        ÉCHECS : usage, unknown_mac (aucun Mac appairé de ce nom, ou deux : prendre l'"id"), link (ce Mac a refusé la session).
+        """,
+
+        "library": """
+        silicontrol library
+        silicontrol library move DOSSIER [--yes]
+        silicontrol library home [--yes]
+        silicontrol library open DOSSIER
+        silicontrol library local
+
+        Les boutons de bibliothèque de Réglages ▸ Général. Seul : où est la bibliothèque, sa taille et la place qui reste.
+        move est « Déplacer la bibliothèque… » : DOSSIER est un dossier d'un autre disque (un dossier « Siliconed » y est créé, sauf si DOSSIER
+        l'est déjà ou contient une bibliothèque qu'on déplace). Les fichiers sont copiés et relus un à un, l'ancien lieu est vidé en dernier ;
+        les licences acceptées et les réglages de ce Mac restent sur ce Mac. home est « Ramener sur ce Mac ».
+        **Sans --yes rien n'est copié** : la réponse dit ce qui le serait et la place qu'il y a.
+          {"ok": true, "dry_run": true, "destination": "/Volumes/X/Siliconed", "files": 14, "bytes": 11749122176, "free_bytes": 400000000000,
+           "message": "nothing was moved: add --yes to move it"}
+        Avec --yes : {"type": "started", …}, puis des lignes {"type": "progress", "percent": 37}, puis le verdict avec "library".
+        Un déplacement arrêté dans l'app laisse la bibliothèque où elle était ("stopped").
+        open est « Ouvrir une bibliothèque… » (un dossier qui contient déjà une bibliothèque : rien n'est déplacé), local « Utiliser la
+        bibliothèque de ce Mac » (rien n'est déplacé).
+        Refusés comme Réglages les grise : un rendu, une installation ou la mesure en route (busy), le disque absent (library_absent), et pour
+        move et home un Mac suivi (remote : la bibliothèque montrée est celle de l'autre Mac).
+        Réponse : {"ok": true, "library": {"path": "…", "elsewhere": true, "reachable": true, "volume": "X", "free_bytes": …, "used_bytes": …,
+                   "this_mac": "…"}}
+        ÉCHECS : usage, busy, library_absent, remote, library (déjà sur ce Mac ; ou le moteur a refusé la destination — la bibliothèque
+          elle-même, un disque plein, un dossier où l'on ne peut pas écrire, les modèles d'une autre bibliothèque : "message" dit laquelle), stopped.
+        """,
+
+        "save": """
+        silicontrol save i7 [i8 …] DEST [--format png|jpeg|heic]
+
+        Écrit des images de l'historique sur le disque, dans les trois formats des panneaux Enregistrer et Exporter de la fenêtre.
+          DEST = un fichier .png, .jpg (.jpeg) ou .heic (une seule image) : écrit, ou REMPLACÉ s'il existe ; l'extension décide.
+          DEST = un dossier (créé au besoin) : nommage et non-écrasement de « wait ». --format dit le format de ses fichiers (png par
+                 défaut ; le menu du panneau retient le dernier utilisé, la commande non).
+        Le PNG porte ses métadonnées (prompt, graine, modèle, LoRA) ; le JPEG (0,9) et le HEIC (0,85) sont des images simples, sans métadonnées.
 
         Réponse : {"ok": true, "files": [{"image": "i7", "path": "/abs/…"}]}
         ÉCHECS  : usage, unknown_image, write.
@@ -1763,8 +2171,8 @@ package enum RemoteControlHelp {
                                imbriqués, plus de 64 combinaisons          → help add (ALTERNATIVES)
           model                modèle inconnu ou pas installé
                                                                            → "hint" liste les prêts ; models
-          busy                 (install, diagnose, set) un rendu, une installation ou le diagnostic
-                               tourne ; (rewrite, describe) une image se rend ou attend ; (add, grid, vary) une installation tourne ;
+          busy                 (install, diagnose, set, import, uninstall, library) un rendu, une installation ou le diagnostic
+                               tourne ; (crop) l'éditeur de recadrage est ouvert ; (sheet) des cases sont encore en route ; (rewrite, describe) une image se rend ou attend ; (add, grid, vary) une installation tourne ;
                                (toutes) plus de 8 connexions qui envoient encore leur commande
                                                                            → attendre, puis réessayer
           library_absent       (add, grid, vary) la bibliothèque est sur un disque qui n'est pas branché
@@ -1789,8 +2197,20 @@ package enum RemoteControlHelp {
                                aucun axe, plus de 64 cases                 → help grid
           queue_full           64 travaux en attente, ou pas de place pour toutes les alternatives ou cases
                                                                            → wait, puis réessayer
-          remote               (install, rewrite, describe) la fenêtre calcule sur un autre Mac ; ces commandes
-                               agissent sur celui-ci                       → Rendu › Calculer sur › Ce Mac
+          remote               (install, import, rewrite, describe) la fenêtre calcule sur un autre Mac ; ces commandes
+                               agissent sur celui-ci ; (uninstall, library move|home) un retrait ou un déplacement
+                               attend là un clic sur l'autre Mac           → Rendu › Calculer sur › Ce Mac
+          link                 la session avec l'autre Mac est coupée (add, grid, vary, again, finish) ; (compute, macs)
+                               ce Mac a refusé la session                  → macs
+          refused              (again, finish, vary, enlarge) la fenêtre ne le ferait pas, et dit pourquoi dans "message"
+          nothing_to_undo      (undo) rien à annuler, ni à rétablir         → la liste d'annulation de la fenêtre
+          crop                 (crop) un cadre que l'image ne peut pas donner : il sort de l'image, un côté sous 512 px, l'image
+                               entière, une proportion qu'elle ne tient pas, une planche ou une esquisse → help crop
+          cell                 (finish, sheet) pas encore d'image dans cette case, ou dans aucune de l'exploration → l'attendre
+          import               (import) ni .safetensors ni .gguf, ou le moteur a refusé le fichier → "message"
+          unknown_mac          (macs, compute) aucun Mac appairé de ce nom, ou deux → macs ; l'"id"
+          library              (library) la bibliothèque est déjà où on la demande, ou le moteur a refusé la destination
+                                                                           → "message"
           writer_absent        (rewrite, describe, install writer) aucun modèle installé n'a de rédacteur
                                                                            → install qwen-image-2.1
           writer_head          (rewrite, describe) la tête du rédacteur est à télécharger (1,25 Go)

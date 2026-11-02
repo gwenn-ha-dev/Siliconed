@@ -449,7 +449,7 @@ final class AppState {
     var activity: NSObjectProtocol?
 
     // ── What the remote control reads (`RemoteControl.swift`) ──
-    private var lastJob = 0
+    private(set) var lastJob = 0
     var lastImage = 0
     /// **« Enlarge »** (`Enlarge.swift`): the image being enlarged, the model's download (0…1) while
     /// macOS fetches it, and the seconds per input megapixel learned this session.

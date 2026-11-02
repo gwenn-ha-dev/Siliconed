@@ -81,12 +81,14 @@ final class RemoteControl {
         let command = argv.first ?? ""
         let arguments = Array(argv.dropFirst())
         do {
-            try refuseOnMirror(command)
+            try refuseOnMirror(command, arguments)
             switch command {
             case "status": finish(c, state())
             case "models": finish(c, app.mirror == nil ? models() : mirroredModels())
             case "install":
-                finish(c, try arguments.contains("writer") ? installWriter(arguments.filter { $0 != "writer" }) : install(arguments))
+                if arguments == ["stop"] { finish(c, stopInstallation()) } else {
+                    finish(c, try arguments.contains("writer") ? installWriter(arguments.filter { $0 != "writer" }) : install(arguments))
+                }
             case "rewrite": try writing(.rewrite, arguments, cwd: cwd, c)
             case "describe": try writing(.describe, arguments, cwd: cwd, c)
             case "diagnose": try diagnose(arguments, c)
@@ -107,6 +109,8 @@ final class RemoteControl {
             case "enlarge":
                 if let mirror = app.mirror { try enlargeOnMirror(mirror, arguments, c) } else { try enlarge(arguments, c) }
             case "subjects": finish(c, try subjects(arguments, cwd: cwd))
+            case let verb where GestureOrder.verbs.contains(verb):
+                try gesture(try order(verb, arguments), cwd: cwd, c)
             default:
                 throw Refusal("usage", String(localized: "unknown command: \"\(command)\""),
                             help: "silicontrol help")
@@ -148,7 +152,8 @@ final class RemoteControl {
     /// A grid's cell: its grid, its column and its row (from 0) — empty for any other job.
     private func gridPlace(_ t: Job) -> [String: Any] {
         guard let at = app.gridPlace(of: t.ordinal), let run = app.gridRuns[at.grid] else { return [:] }
-        return ["grid": run.name, "column": at.cell % run.grid.columns, "row": at.cell / run.grid.columns]
+        return ["grid": run.name, "cell": CellName.name(grid: at.grid, cell: at.cell),
+                "column": at.cell % run.grid.columns, "row": at.cell / run.grid.columns]
     }
 
     func json(_ e: Entry, path: String? = nil) -> [String: Any] {

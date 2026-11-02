@@ -287,6 +287,52 @@
         }
       }
     },
+    "%@ does not read: \"%@\"" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ lässt sich nicht lesen: „%@“"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ does not read: \"%2$@\""
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ no se lee: «%@»"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ ne se lit pas : « %@ »"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ non si legge: «%@»"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ を読み取れません：「%@」"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 无法读取：“%@”"
+          }
+        }
+      }
+    },
     "%@ doesn’t offer Detail" : {
       "localizations" : {
         "de" : {
@@ -659,6 +705,52 @@
         }
       }
     },
+    "%@ has %@ cells: c0 to c%@" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ hat %@ Zellen: c0 bis c%@"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ has %2$@ cells: c0 to c%3$@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ tiene %@ celdas: de c0 a c%@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ a %@ cases : c0 à c%@"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ ha %@ celle: da c0 a c%@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ には %@ 個のセルがあります：c0 から c%@ まで"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 有 %@ 个单元格：c0 到 c%@"
+          }
+        }
+      }
+    },
     "%@ has no %@ version" : {
       "localizations" : {
         "de" : {
@@ -701,6 +793,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@ 没有 %@ 版本"
+          }
+        }
+      }
+    },
+    "%@ has no picture yet: wait for it, or it did not render" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ hat noch kein Bild: abwarten, oder die Zelle wurde nicht gerendert"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ aún no tiene imagen: espera, o no se renderizó"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ n’a pas encore d’image{N}: l’attendre, ou elle n’a pas été rendue"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ non ha ancora un’immagine: aspetta, oppure non è stata renderizzata"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ にはまだ画像がありません：待つか、生成されなかったセルです"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 还没有图像：请等待，或它没有生成"
           }
         }
       }
@@ -907,6 +1039,98 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@ 是模型，不是 LoRA。"
+          }
+        }
+      }
+    },
+    "%@ is not a cell of the exploration shown (%@)" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ ist keine Zelle der gezeigten Erkundung (%@)"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ is not a cell of the exploration shown (%2$@)"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ no es una celda de la exploración mostrada (%@)"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ n’est pas une case de l’exploration montrée (%@)"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ non è una cella dell’esplorazione mostrata (%@)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ は表示中の探索のセルではありません（%@）"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 不是当前所示探索的单元格（%@）"
+          }
+        }
+      }
+    },
+    "%@ is not the exploration shown (%@)" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ ist nicht die gezeigte Erkundung (%@)"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ is not the exploration shown (%2$@)"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ no es la exploración mostrada (%@)"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ n’est pas l’exploration montrée (%@)"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ non è l’esplorazione mostrata (%@)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ は表示中の探索ではありません（%@）"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 不是当前所示的探索（%@）"
           }
         }
       }
@@ -3895,6 +4119,86 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "--detail 需要 normal、more 或 most，而不是“%@”"
+          }
+        }
+      }
+    },
+    "--format expects a value" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "--format erwartet einen Wert"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "--format espera un valor"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "--format attend une valeur"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "--format richiede un valore"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "--format には値が必要です"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "--format 需要一个值"
+          }
+        }
+      }
+    },
+    "--format expects png, jpeg or heic, not \"%@\"" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "--format erwartet png, jpeg oder heic, nicht „%@“"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "--format espera png, jpeg o heic, no «%@»"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "--format attend png, jpeg ou heic, pas « %@ »"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "--format richiede png, jpeg o heic, non «%@»"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "--format には png、jpeg、heic のいずれかを指定してください。「%@」は指定できません"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "--format 需要 png、jpeg 或 heic，而不是“%@”"
           }
         }
       }
@@ -19155,6 +19459,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "LoRA"
+          }
+        }
+      }
+    },
+    "LoRA \"%@\" not found" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "LoRA „%@“ nicht gefunden"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "LoRA «%@» no encontrado"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "LoRA « %@ » introuvable"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "LoRA «%@» non trovata"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "LoRA「%@」が見つかりません"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未找到 LoRA“%@”"
           }
         }
       }
@@ -42273,6 +42617,46 @@
         }
       }
     },
+    "a side of the frame is under %@ px" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "eine Seite des Rahmens ist kleiner als %@ px"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "un lado del marco es menor de %@ px"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "un côté du cadre fait moins de %@ px"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "un lato del riquadro è sotto i %@ px"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "枠の一辺が %@ px 未満です"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "框的一边小于 %@ px"
+          }
+        }
+      }
+    },
     "a solver axis is offered only when More Solvers is on" : {
       "localizations" : {
         "de" : {
@@ -42749,6 +43133,86 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "每个完整步平均 %@"
+          }
+        }
+      }
+    },
+    "cell expected (g2c3 or t5), not \"%@\"" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zelle erwartet (g2c3 oder t5), nicht „%@“"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "se esperaba una celda (g2c3 o t5), no «%@»"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "case attendue (g2c3 ou t5), pas « %@ »"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "attesa una cella (g2c3 o t5), non «%@»"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "セル（g2c3 または t5）を指定してください。「%@」は指定できません"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "应为单元格（g2c3 或 t5），而不是“%@”"
+          }
+        }
+      }
+    },
+    "cells are still on their way" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zellen sind noch unterwegs"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "aún hay celdas en camino"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "des cases sont encore en route"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ci sono ancora celle in arrivo"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "まだ生成中のセルがあります"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仍有单元格在处理中"
           }
         }
       }
@@ -43597,6 +44061,86 @@
         }
       }
     },
+    "file unreadable or missing: %@" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Datei nicht lesbar oder fehlt: %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "archivo ilegible o ausente: %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "fichier illisible ou absent : %@"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "file illeggibile o assente: %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ファイルを読み取れないか、見つかりません：%@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "文件无法读取或不存在：%@"
+          }
+        }
+      }
+    },
+    "finish or cancel the crop there" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "den Zuschnitt dort beenden oder abbrechen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "termina o cancela el recorte allí"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "terminer ou annuler le recadrage là"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "termina o annulla il ritaglio lì"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ウインドウ側でトリミングを終えるか、取り消してください"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请在窗口中完成或取消裁剪"
+          }
+        }
+      }
+    },
     "folder cannot be created: %@ (%@)" : {
       "localizations" : {
         "de" : {
@@ -43873,6 +44417,92 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "fp32，DiT 的一部分在神经网络引擎上以 fp16 运行 · 相同种子，相同比特"
+          }
+        }
+      }
+    },
+    "g%@ is not the exploration shown (%@): a new one replaces the last" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "g%@ ist nicht die gezeigte Erkundung (%@): eine neue ersetzt die letzte"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "g%1$@ is not the exploration shown (%2$@): a new one replaces the last"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "g%@ no es la exploración mostrada (%@): una nueva sustituye a la última"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "g%@ n’est pas l’exploration montrée (%@) : une nouvelle remplace la dernière"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "g%@ non è l’esplorazione mostrata (%@): una nuova sostituisce l’ultima"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "g%@ は表示中の探索ではありません（%@）：新しい探索が前のものに置き換わります"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "g%@ 不是当前所示的探索（%@）：新的探索会取代上一个"
+          }
+        }
+      }
+    },
+    "grid expected (g2), not \"%@\"" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Raster erwartet (g2), nicht „%@“"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "se esperaba una cuadrícula (g2), no «%@»"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "grille attendue (g2), pas « %@ »"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "attesa una griglia (g2), non «%@»"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "グリッド（g2）を指定してください。「%@」は指定できません"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "应为网格（g2），而不是“%@”"
           }
         }
       }
@@ -44313,6 +44943,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "install 需要一个模型 ID"
+          }
+        }
+      }
+    },
+    "installed: %@" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "installiert: %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "instalados: %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "installées : %@"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "installate: %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "インストール済み：%@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已安装：%@"
           }
         }
       }
@@ -45083,6 +45753,46 @@
         }
       }
     },
+    "no LoRA installed" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "keine LoRA installiert"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ningún LoRA instalado"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "aucune LoRA installée"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "nessuna LoRA installata"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "インストール済みのLoRAはありません"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有已安装的 LoRA"
+          }
+        }
+      }
+    },
     "no LoRA installed for this model" : {
       "localizations" : {
         "de" : {
@@ -45119,6 +45829,86 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "没有为此模型安装的 LoRA"
+          }
+        }
+      }
+    },
+    "no cell has a picture yet, so there is no sheet to draw" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "noch keine Zelle hat ein Bild, es gibt also keine Tafel zu zeichnen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ninguna celda tiene imagen todavía, así que no hay lámina que dibujar"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "aucune case n’a encore d’image, il n’y a donc pas de planche à dessiner"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "nessuna cella ha ancora un’immagine, quindi non c’è nessuna tavola da disegnare"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "画像のあるセルがまだないため、描くシートがありません"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "还没有单元格有图像，所以没有图版可绘制"
+          }
+        }
+      }
+    },
+    "no exploration is shown" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "es wird keine Erkundung gezeigt"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "no se muestra ninguna exploración"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "aucune exploration n’est montrée"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "nessuna esplorazione è mostrata"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "探索は表示されていません"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当前没有显示探索"
           }
         }
       }
@@ -45203,6 +45993,46 @@
         }
       }
     },
+    "no interrupted download to discard" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "kein unterbrochener Download zu verwerfen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "no hay ninguna descarga interrumpida que descartar"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "aucun téléchargement interrompu à jeter"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "nessun download interrotto da scartare"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "破棄できる中断したダウンロードはありません"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有可丢弃的中断下载"
+          }
+        }
+      }
+    },
     "no job %@ in this session" : {
       "localizations" : {
         "de" : {
@@ -45279,6 +46109,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "本次会话中没有任务 t%lld"
+          }
+        }
+      }
+    },
+    "no paired Mac called \"%@\"" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "kein gekoppelter Mac namens „%@“"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ningún Mac emparejado se llama «%@»"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "aucun Mac appairé nommé « %@ »"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "nessun Mac associato si chiama «%@»"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「%@」という名前のペアリング済みMacはありません"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有名为“%@”的已配对 Mac"
           }
         }
       }
@@ -45403,6 +46273,86 @@
         }
       }
     },
+    "not a .safetensors or a .gguf: %@" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "keine .safetensors- oder .gguf-Datei: %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "no es un .safetensors ni un .gguf: %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ni .safetensors ni .gguf : %@"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "non è un .safetensors né un .gguf: %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : ".safetensors でも .gguf でもありません：%@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "不是 .safetensors 或 .gguf：%@"
+          }
+        }
+      }
+    },
+    "not a PNG that Siliconed wrote, or unreadable: %@" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "kein von Siliconed geschriebenes PNG, oder nicht lesbar: %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "no es un PNG escrito por Siliconed, o no se puede leer: %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "pas un PNG écrit par Siliconed, ou illisible : %@"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "non è un PNG scritto da Siliconed, oppure è illeggibile: %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Siliconed が書き出したPNGではないか、読み取れません：%@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "不是 Siliconed 写出的 PNG，或无法读取：%@"
+          }
+        }
+      }
+    },
     "not connected" : {
       "localizations" : {
         "de" : {
@@ -45523,6 +46473,246 @@
         }
       }
     },
+    "nothing of %@ is installed" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "von %@ ist nichts installiert"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "no hay nada de %@ instalado"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "rien de %@ n’est installé"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "di %@ non è installato nulla"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ はインストールされていません"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 没有任何已安装内容"
+          }
+        }
+      }
+    },
+    "nothing to redo" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "nichts zu wiederholen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "nada que rehacer"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "rien à rétablir"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "niente da ripetere"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "やり直す操作はありません"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有可重做的操作"
+          }
+        }
+      }
+    },
+    "nothing to undo" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "nichts zum Widerrufen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "nada que deshacer"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "rien à annuler"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "niente da annullare"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "取り消す操作はありません"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有可撤销的操作"
+          }
+        }
+      }
+    },
+    "nothing was moved: add --yes to move it" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "nichts wurde verschoben: --yes hinzufügen, um es zu verschieben"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "no se movió nada: añade --yes para moverlo"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "rien n’a été déplacé : ajouter --yes pour le déplacer"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "non è stato spostato nulla: aggiungi --yes per spostarlo"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "何も移動していません：移動するには --yes を付けてください"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有移动任何内容：添加 --yes 才会移动"
+          }
+        }
+      }
+    },
+    "nothing was queued" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "nichts wurde in die Warteschlange gestellt"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "no se puso nada en la cola"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "rien n’a été mis en file"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "non è stato messo nulla in coda"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "何もキューに入れていません"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有任何内容加入队列"
+          }
+        }
+      }
+    },
+    "nothing was removed: add --yes to remove it" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "nichts wurde entfernt: --yes hinzufügen, um es zu entfernen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "no se quitó nada: añade --yes para quitarlo"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "rien n’a été retiré : ajouter --yes pour le retirer"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "non è stato rimosso nulla: aggiungi --yes per rimuoverlo"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "何も削除していません：削除するには --yes を付けてください"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有移除任何内容：添加 --yes 才会移除"
+          }
+        }
+      }
+    },
     "on the network" : {
       "localizations" : {
         "de" : {
@@ -45599,6 +46789,86 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "最多一个版本：--standard、--compact 或 --light"
+          }
+        }
+      }
+    },
+    "pair a Mac in Settings › Other Macs, in the window" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "einen Mac in den Einstellungen › Andere Macs koppeln, im Fenster"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "empareja un Mac en Ajustes › Otros Mac, en la ventana"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "appairer un Mac dans Réglages › Autres Mac, dans la fenêtre"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "associa un Mac in Impostazioni › Altri Mac, nella finestra"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ウインドウで 設定 › ほかのMac から Mac をペアリングしてください"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请在窗口的 设置 › 其他 Mac 中配对 Mac"
+          }
+        }
+      }
+    },
+    "paired: %@" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "gekoppelt: %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "emparejados: %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "appairés : %@"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "associati: %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ペアリング済み：%@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已配对：%@"
           }
         }
       }
@@ -46119,6 +47389,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "剩余"
+          }
+        }
+      }
+    },
+    "removing from “%@” waits for a click on that Mac" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "das Entfernen von „%@“ wartet auf einen Klick an diesem Mac"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "quitar de «%@» espera un clic en ese Mac"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "retirer de « %@ » attend un clic sur ce Mac"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "la rimozione da «%@» aspetta un clic su quel Mac"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「%@」からの削除は、そのMacでのクリックを待ちます"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "从“%@”移除需要在那台 Mac 上点按确认"
           }
         }
       }
@@ -46935,6 +48245,46 @@
         }
       }
     },
+    "the app shows the family’s license and the space it takes: the user accepts there, and the import follows" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "die App zeigt die Lizenz der Familie und den Platz, den sie belegt: Der Benutzer akzeptiert dort, und der Import folgt"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "la app muestra la licencia de la familia y el espacio que ocupa: el usuario acepta allí, y la importación sigue"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "l’app montre la licence de la famille et la place qu’elle prend : l’utilisateur accepte là, et l’import suit"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "l’app mostra la licenza della famiglia e lo spazio che occupa: l’utente accetta lì, e l’importazione segue"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ファミリーのライセンスと必要な容量をAppが表示します：ユーザーがそこで同意すると、読み込みが続きます"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "App 会显示该系列的许可证和所占空间：由用户在那里接受，导入随后继续"
+          }
+        }
+      }
+    },
     "the app shows the license and the space on disk: the user accepts there" : {
       "localizations" : {
         "de" : {
@@ -46971,6 +48321,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "App 会显示许可证和磁盘空间：由用户在那里接受"
+          }
+        }
+      }
+    },
+    "the crop editor is open in the window" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "der Zuschnitt-Editor ist im Fenster geöffnet"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "el editor de recorte está abierto en la ventana"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "l’éditeur de recadrage est ouvert dans la fenêtre"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "l’editor di ritaglio è aperto nella finestra"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "トリミングエディタがウインドウで開いています"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "裁剪编辑器已在窗口中打开"
           }
         }
       }
@@ -47135,6 +48525,212 @@
         }
       }
     },
+    "the exploration is asked of the other Mac" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "die Erkundung wird beim anderen Mac angefragt"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "la exploración se pide al otro Mac"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "l’exploration est demandée à l’autre Mac"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "l’esplorazione è richiesta all’altro Mac"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "探索はもう一方のMacに依頼しました"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已向另一台 Mac 请求探索"
+          }
+        }
+      }
+    },
+    "the frame leaves the image (%@ × %@)" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "der Rahmen ragt über das Bild hinaus (%@ × %@)"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "the frame leaves the image (%1$@ × %2$@)"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "el marco sale de la imagen (%@ × %@)"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "le cadre sort de l’image (%@ × %@)"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "il riquadro esce dall’immagine (%@ × %@)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "枠が画像からはみ出しています（%@ × %@）"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "框超出了图像（%@ × %@）"
+          }
+        }
+      }
+    },
+    "the library is already on this Mac" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "die Bibliothek liegt schon auf diesem Mac"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "la biblioteca ya está en este Mac"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "la bibliothèque est déjà sur ce Mac"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "la libreria è già su questo Mac"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ライブラリはすでにこのMacにあります"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "资源库已经在这台 Mac 上"
+          }
+        }
+      }
+    },
+    "the library shown is that of “%@”" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "die gezeigte Bibliothek ist die von „%@“"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "la biblioteca mostrada es la de «%@»"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "la bibliothèque montrée est celle de « %@ »"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "la libreria mostrata è quella di «%@»"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "表示中のライブラリは「%@」のものです"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "所示的资源库是“%@”的"
+          }
+        }
+      }
+    },
+    "the move was stopped: the library stays where it was" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "das Verschieben wurde angehalten: Die Bibliothek bleibt, wo sie war"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "se detuvo el traslado: la biblioteca sigue donde estaba"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "le déplacement a été arrêté : la bibliothèque reste où elle était"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "lo spostamento è stato interrotto: la libreria resta dov’era"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移動を中止しました：ライブラリは元の場所にあります"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移动已停止：资源库仍在原处"
+          }
+        }
+      }
+    },
     "the prompt is ONE argument: put it in quotes — silicontrol help add" : {
       "localizations" : {
         "de" : {
@@ -47255,6 +48851,46 @@
         }
       }
     },
+    "the sheet was not drawn" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "die Tafel wurde nicht gezeichnet"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "no se dibujó la lámina"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "la planche n’a pas été dessinée"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "la tavola non è stata disegnata"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "シートは描かれませんでした"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有绘制图版"
+          }
+        }
+      }
+    },
     "the socket could not be opened (%@)" : {
       "localizations" : {
         "de" : {
@@ -47331,6 +48967,86 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "权重格式"
+          }
+        }
+      }
+    },
+    "the whole image is not a crop" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "das ganze Bild ist kein Zuschnitt"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "la imagen entera no es un recorte"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "l’image entière n’est pas un recadrage"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "l’immagine intera non è un ritaglio"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "画像全体はトリミングではありません"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "整张图像不算裁剪"
+          }
+        }
+      }
+    },
+    "the window computes on “%@” and is still joining it: see macs" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "das Fenster rechnet auf „%@“ und verbindet sich noch: siehe macs"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "la ventana calcula en «%@» y aún se está uniendo: mira macs"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "la fenêtre calcule sur « %@ » et la rejoint encore : voir macs"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "la finestra calcola su «%@» e lo sta ancora raggiungendo: vedi macs"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ウインドウは「%@」で計算しており、まだ接続中です：macs を確認してください"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "窗口在“%@”上计算，仍在连接：请查看 macs"
           }
         }
       }
@@ -47451,6 +49167,86 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "这台 Mac 的测量结果中没有可用的神经网络引擎"
+          }
+        }
+      }
+    },
+    "this image cannot be cropped: both sides must be %@ px or more, and one above" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "dieses Bild lässt sich nicht zuschneiden: Beide Seiten müssen mindestens %@ px lang sein, und eine länger"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "esta imagen no se puede recortar: los dos lados deben medir %@ px o más, y uno más"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "cette image ne peut pas être recadrée : les deux côtés doivent faire %@ px ou plus, et l’un davantage"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "questa immagine non può essere ritagliata: entrambi i lati devono essere di %@ px o più, e uno di più"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この画像はトリミングできません：両辺とも %@ px 以上で、どちらかがそれより大きい必要があります"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法裁剪这张图像：两边都须为 %@ px 或以上，且其中一边更大"
+          }
+        }
+      }
+    },
+    "this image cannot hold that proportion at 512 px or more" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "dieses Bild kann dieses Seitenverhältnis bei mindestens 512 px nicht halten"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "esta imagen no admite esa proporción con 512 px o más"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "cette image ne peut pas tenir cette proportion à 512 px ou plus"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "questa immagine non può contenere quella proporzione a 512 px o più"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この画像は 512 px 以上でその比率を保てません"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这张图像在 512 px 以上无法容纳该比例"
           }
         }
       }
@@ -48661,6 +50457,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "“%@”拒绝了配对。"
+          }
+        }
+      }
+    },
+    "“%@” refused the session" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "„%@“ hat die Sitzung abgelehnt"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "«%@» rechazó la sesión"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "« %@ » a refusé la session"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "«%@» ha rifiutato la sessione"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「%@」がセッションを拒否しました"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@”拒绝了会话"
           }
         }
       }

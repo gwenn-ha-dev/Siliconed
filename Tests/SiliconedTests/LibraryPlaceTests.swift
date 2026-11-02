@@ -72,6 +72,22 @@ final class LibraryPlaceTests: XCTestCase {
         XCTAssertTrue(moved.isReachable)
     }
 
+    /// **A dry run moves nothing and says what a move would carry** (`silicontrol library move` without `--yes`): the files, their bytes, the room —
+    /// and refuses what the move refuses.
+    func testAPlanCountsWhatAMoveCarriesAndTouchesNothing() throws {
+        let b = try space()
+        let destination = LibraryMove.destination(in: root.appendingPathComponent("disk"))
+        let plan = try LibraryMove.plan(b, to: destination)
+        XCTAssertFalse(plan.pending.isEmpty)
+        XCTAssertEqual(plan.bytes, plan.pending.reduce(0) { $0 + Library.size(b.root.appendingPathComponent($1).path) })
+        XCTAssertNotNil(plan.room)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: destination.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: b.map(Family.zImage.ditMap)))
+        XCTAssertThrowsError(try LibraryMove.plan(b, to: b.root.appendingPathComponent("store/inside"))) {
+            guard case .libraryRefused(_, .sameLibrary) = $0 as? EngineError else { return XCTFail("\($0)") }
+        }
+    }
+
     /// **Back to this Mac**: the location file goes, and so does the emptied folder on the other disk.
     func testALibraryMovedBackComesHome() throws {
         let b = try space()

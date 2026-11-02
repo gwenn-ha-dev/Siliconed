@@ -162,13 +162,23 @@ extension AppState {
         panel.prompt = String(localized: "Open")
         panel.message = String(localized: "A folder holding a Siliconed library. Nothing is moved: this library stays where it is.")
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        do { switchLibrary(to: try library.opening(url)) } catch { problem = Problem(error) }
+        openLibrary(at: url)
+    }
+
+    /// The folder chosen, or named by `silicontrol library open`. The problem, if the folder holds no library — also said in the window.
+    @discardableResult
+    func openLibrary(at url: URL) -> Problem? {
+        guard forgeInProgress == nil, !busy, !diagnosticRunning else { return nil }
+        do { switchLibrary(to: try library.opening(url)) } catch { problem = Problem(error); return problem }
+        return nil
     }
 
     /// « Use This Mac’s Library »: the disk is absent, or the user wants this Mac's — nothing moved.
-    func useLocalLibrary() {
-        guard forgeInProgress == nil, !busy, !diagnosticRunning else { return }
-        do { switchLibrary(to: try library.useLocal()) } catch { problem = Problem(error) }
+    @discardableResult
+    func useLocalLibrary() -> Problem? {
+        guard forgeInProgress == nil, !busy, !diagnosticRunning else { return nil }
+        do { switchLibrary(to: try library.useLocal()) } catch { problem = Problem(error); return problem }
+        return nil
     }
 
     /// **The app reads another library from now on**: its catalog, its copy; the form keeps what it can.

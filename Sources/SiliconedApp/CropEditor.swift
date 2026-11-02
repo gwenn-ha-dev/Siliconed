@@ -126,12 +126,25 @@ extension AppState {
         switch s.target {
         case .entry(let id):
             guard let entry = history.first(where: { $0.id == id }) else { return }
-            // In a mirror, the other Mac cuts its own pixels: the same box, the same image, in its history.
-            if let mirror { mirror.cropsAsked += 1; mirror.send(.crop(entry.ordinal, s.box)); return }
+            if askMirrorToCrop(entry, s.box) { return }
             Task { await cropped(entry, image: s.image, box: s.box) }
         case .reference(let id):
             cropReference(id, image: s.image, box: s.box)
         }
+    }
+
+    /// In a mirror, the other Mac cuts its own pixels: the same box, the same image, in its history. `false` on this Mac.
+    private func askMirrorToCrop(_ entry: Entry, _ box: Crop.Box) -> Bool {
+        guard let mirror else { return false }
+        mirror.cropsAsked += 1
+        mirror.send(.crop(entry.ordinal, box))
+        return true
+    }
+
+    /// **Return in the editor, for a frame given instead of dragged** (`silicontrol crop`): the box on an image of the history, as `commitCrop` does it.
+    func commitCrop(_ entry: Entry, box: Crop.Box) async {
+        if askMirrorToCrop(entry, box) { return }
+        await crop(entry, box: box)
     }
 
     /// The frame's pixels as an image of their own: copied out, so the parent's memory is not kept alive.

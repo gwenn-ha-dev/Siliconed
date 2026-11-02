@@ -25,11 +25,15 @@ import Siliconed
 
 extension RemoteControl {
     /// The commands a mirror does not take, with the sentence that says why.
-    func refuseOnMirror(_ command: String) throws {
+    func refuseOnMirror(_ command: String, _ arguments: [String] = []) throws {
         guard let mirror = app.mirror else { return }
         let name = mirror.macName
         switch command {
-        case "install":
+        // « Stop » works on the lender's forge as on this Mac's, with no click on the other.
+        case "install" where arguments == ["stop"]:
+            break
+        // Files go up to the other Mac, whose owner confirms there.
+        case "install", "import":
             throw Refusal("remote", String(localized: "\(command) acts on this Mac, and the window computes on “\(name)”"),
                           help: String(localized: "Render › Compute On › This Mac, then retry"))
         default:
@@ -397,7 +401,13 @@ extension RemoteControl {
         guard mirror.nextRequest - first == jobs.count else {
             throw Refusal("ref", app.problem?.text ?? String(localized: "This image could not be varied"))
         }
-        var answers: [RemoteAnswer?] = Array(repeating: nil, count: jobs.count)
+        answerQueued(mirror, from: first, count: jobs.count, c)
+    }
+
+    /// **The word of the other Mac on `count` jobs a gesture just sent** (from request `first`): the command answers once all are in, with
+    /// the jobs as the other Mac numbered them, or the first refusal.
+    func answerQueued(_ mirror: MirrorLink, from first: Int, count: Int, _ c: Connection) {
+        var answers: [RemoteAnswer?] = Array(repeating: nil, count: count)
         mirror.awaiting(from: first) { [self] i, a in
             answers[i] = a
             guard answers.allSatisfy({ $0 != nil }) else { return }
