@@ -149,4 +149,36 @@ final class VerificationCloudsAndGuideTests: XCTestCase {
         XCTAssertEqual(m.threshold, 0.125, accuracy: 1e-6)
         XCTAssertEqual(m.note, "clouds of one-ulp moves: engine median of 5 draws, oracle worst of 3")
     }
+
+    /// The trajectory's way in: a step's measure (`v_2`) judged under the draws' name (`model_out`), the oracle's order draws
+    /// read by `Clouds.orders` from the step's stem — `permgroup1` and up, never `permgroup0` (the identity by another path)
+    /// nor `permfull` — and the engine asked for exactly those seeds.
+    func testATrajectoryStepIsJudgedByTheOrdersOfItsStem() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("orders-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: directory.appendingPathComponent("krea2"), withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let stem = "krea2/draw-krea2-512-step2"
+        for (suffix, x) in [("permgroup0", Float(5)), ("permgroup1", 0.12), ("permgroup3", 0.30), ("permfull1", 5)] {
+            let path = directory.appendingPathComponent("\(stem)-\(suffix).safetensors").path
+            try ForgeDiT.writeSafetensors([(name: "model_out", dtype: "F32", shape: [2, 1], bytes: away(x).withUnsafeBytes { Data($0) })],
+                                          to: path)
+        }
+        let goldens = Goldens(directory: directory.path)
+        let orders = Clouds.orders(goldens, stem)
+        XCTAssertEqual(orders.map(\.seed), [1, 3])
+        var asked: [UInt64] = []
+        var clouds = Clouds(draws: [], orders: orders, engineOrder: { seed in
+            asked.append(seed)
+            return ["model_out": self.away(seed == 1 ? 0.1 : 0.3)]
+        }) { _ in XCTFail("no ulp draw where the orders judge"); return [:] }
+        let step = Measure(boundary: "v_2", worst: 0.3, median: 0.3, channel: 0, atWitness: (0.2, 0.08),
+                           threshold: 0.1, passed: false, note: "")
+        let m = try truth.withUnsafeBufferPointer { try clouds.arbitrate(step, exact: $0, columns: 1, as: "model_out") }
+        XCTAssertEqual(asked, [1, 3])
+        XCTAssertEqual(m.boundary, "v_2")
+        XCTAssertEqual(m.threshold, 0.375, accuracy: 1e-6)                  // 1.25 · 0.30
+        XCTAssertEqual(m.atWitness!.engine, 0.2, accuracy: 1e-6)            // sorted 0.1 0.2 0.3
+        XCTAssert(m.passed)
+        XCTAssertEqual(m.note, "clouds of summation orders: engine median of 3 (nominal + 2 orders), oracle worst of 3 (nominal + 0 ulp + 2 orders)")
+    }
 }

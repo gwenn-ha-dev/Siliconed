@@ -30,7 +30,10 @@ import Siliconed
 // routes overlap, int8 − widened per seed +0.27 ± 0.25: the order, not the route, moved the int8 past the
 // ulp clouds' bar (6.35, which the widened route itself fails on one order in eight). So when the oracle has
 // order draws of a boundary, the engine draws the same seeds (its nominal + 8 orders, the median judged), and
-// the oracle's cloud is its nominal, its ulp draws and its orders; the ulp moves judge otherwise.
+// the oracle's cloud is its nominal, its ulp draws and its orders; the ulp moves judge otherwise. The same rule
+// holds for each guided step of `trajectory`, whose velocity the oracle draws in orders at every step: there the
+// permuted map is the Standard's, ~26 GB rewritten per draw, one at a time — paid only by a step that fails at its
+// witness.
 
 enum Krea2Stages {
     static let all: [Stage] = [text, dit, trajectory, vae]
@@ -210,8 +213,8 @@ enum Krea2Stages {
         model: model, name: "trajectory",
         proves: "the seed's noise bit for bit, the schedule, then the 8 Euler steps: each step's velocity from the oracle's latent at that step, at the step's fp64 witness where it exists",
         sizes: ["512", "1024"], options: ["--map"],
-        oracle: "tools/oracle/krea2.py trajectory --size {size}; witness-step --size {size} --step 0 1 2 3 4 5 6 7", weights: ["DiT"],
-        rule: "σ within 1e-6; the rule on each guided velocity, floor 5e-4, at the step's fp64 witness where it exists, clouds when the oracle has draws; the free pass is shown, not judged"
+        oracle: "tools/oracle/krea2.py trajectory --size {size}; witness-step --size {size} --step 0 1 2 3 4 5 6 7; draw --size {size} --step i --permute 1 2 3 4 5 6 7 8 --permute-kind group, one run per step i from 0 to 7", weights: ["DiT"],
+        rule: "σ within 1e-6; the rule on each guided velocity, floor 5e-4, at the step's fp64 witness where it exists, clouds of summation orders when the oracle has order draws of the step (the same seeds drawn by the engine), of one-ulp moves when it has only those; the free pass is shown, not judged"
     ) { invocation in
         let report = Report(title: "\(model) trajectory \(invocation.size)")
         let trajectory = try invocation.goldens.open("krea2/goldens-krea2-trajectory-\(invocation.size).safetensors")
@@ -234,8 +237,8 @@ enum Krea2Stages {
         let sigmas = Krea2DiT.sigmas(steps: steps)
         report.add(Judge.schedule(sigmas, reference))
         let side = initEntry.shape[1], t = textEntry.shape[0], columns = side * side
-        let dit = try Krea2DiT(artifact: try Artifact(path: try invocation.ditMap(ditMap)), latentHeight: side, latentWidth: side,
-                               maxText: t)
+        let map = try invocation.ditMap(ditMap)
+        let dit = try Krea2DiT(artifact: try Artifact(path: map), latentHeight: side, latentWidth: side, maxText: t)
         // Like the product: the modulation of every σ in one pass, before the first step.
         try dit.tabulateModulation(sigmas: Array(sigmas.dropLast()))
         let velocity = { (latent: [Float], i: Int) in
@@ -250,8 +253,17 @@ enum Krea2Stages {
             guard !input.isEmpty, let expected = trajectory.float32("velocity_\(i)") else { continue }
             let step = "krea2/witness-krea2-f64-\(invocation.size)-step\(i)"
             let exact = invocation.goldens.optional(step + ".safetensors")?.float32("velocity")
-            var clouds = Clouds(draws: (1...8).compactMap {
-                invocation.goldens.optional("krea2/draw-krea2-\(invocation.size)-step\(i)-jitter\($0).safetensors")
+            // The step's draws: one-ulp moves (`-jitterN`) and summation orders (`-permgroupN`), the engine's of the same
+            // seeds on the map rewritten with its residual stream permuted (`Krea2PermutedMap.draw`), from the step's latent.
+            let stem = "krea2/draw-krea2-\(invocation.size)-step\(i)"
+            var clouds = Clouds(draws: (1...8).compactMap { invocation.goldens.optional(stem + "-jitter\($0).safetensors") },
+                                orders: Clouds.orders(invocation.goldens, stem), engineOrder: { seed in
+                try Krea2PermutedMap.draw(source: map, seed: seed, text: text) { permutedMap, movedText in
+                    let permuted = try Krea2DiT(artifact: permutedMap, latentHeight: side, latentWidth: side, maxText: t)
+                    return ["model_out": try input.withUnsafeBufferPointer {
+                        try permuted.forward(latent: $0.baseAddress!, text: movedText.baseAddress!, textRows: t, sigma: sigmas[i])
+                    }]
+                }
             }) { seed in
                 var moved = input
                 moveByOneULP(&moved, seed: seed)
