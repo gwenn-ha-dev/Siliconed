@@ -12,6 +12,20 @@ final class StartImageTests: XCTestCase {
 
     // ── the role, in the Prompt Lab ──
 
+    /// The defaults settled on the sheets, and what they redraw at eight steps: Krea 2 six steps of eight (as 75 % does),
+    /// Z-Image and Anima six, MOSS-Image seven — none so high that the image is ignored (the full schedule).
+    func testEachFamilyStartsFromItsOwnStrength() {
+        XCTAssertEqual(StartImage.defaultStrength(for: .krea2), 0.65)
+        XCTAssertEqual(StartImage.defaultStrength(for: .zImage), 0.75)
+        XCTAssertEqual(StartImage.defaultStrength(for: .anima), 0.75)
+        XCTAssertEqual(StartImage.defaultStrength(for: .mossImage), 0.80)
+        XCTAssertEqual(StartImage.defaultStrength(for: nil), 0.65)
+        XCTAssertEqual(Strength.startStep(steps: 8, strength: StartImage.defaultStrength(for: .krea2)), 2)
+        XCTAssertEqual(Strength.startStep(steps: 8, strength: StartImage.defaultStrength(for: .zImage)), 2)
+        XCTAssertEqual(Strength.startStep(steps: 8, strength: StartImage.defaultStrength(for: .mossImage)), 1)
+        for family in Family.allCases { XCTAssertEqual(StartImage.snapped(StartImage.defaultStrength(for: family)), StartImage.defaultStrength(for: family)) }
+    }
+
     func testAnImg2ImgModelOffersTheStartAndNoReference() {
         XCTAssertEqual(L.roles(capacity: 0, startsFromImage: true), [.start, .describeOnly])
         XCTAssertEqual(L.roles(capacity: 0, startsFromImage: false), [.describeOnly])

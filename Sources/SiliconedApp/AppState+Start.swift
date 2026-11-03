@@ -5,7 +5,7 @@
 //     Prompt Lab ── a picture made « Starting image », its strength ──▶ Carry to the Rack
 //                                                                        │ startImage, startStrength
 //                                                                        │ Size ← the recommended format nearest its proportions
-//     rack:  [ Images ▣ 65 % ━━●━━ ] ── right rail ──▶ Image encoder ── latent ──▶ DiT    (Request.image, Request.strength)
+//     rack:  [ Images ▣ 75 % ━━●━━ ] ── right rail ──▶ Image encoder ── latent ──▶ DiT    (Request.image, Request.strength)
 //
 // - **Only where the chain starts from an image** (`startsFromImage`: an image encoder and a denoiser that accepts a start —
 //   Z-Image, Anima, Krea 2). Qwen-Image-2.1 edits by reference instead: its image 1 stays the rack's references, untouched here.
@@ -21,9 +21,8 @@ import Siliconed
 import SwiftUI
 
 extension AppState {
-    /// **The strength a starting image comes with — provisional**: diffusers' `strength` 0.65, where the users' own img2img
-    /// settles (0.5 to 0.7) and Z-Image stays photographic up to 0.85. To be settled on a fixed-seed sheet.
-    static let defaultStartStrength = 0.65
+    /// **The strength a starting image comes with**: the rack's family's (`StartImage.defaultStrength`).
+    var defaultStartStrength: Double { StartImage.defaultStrength(for: card?.family) }
 
     /// Whether the rack's model starts from an image: its chain offers the image entry (`Chain.entries`). Never in a mirror: the
     /// other Mac's traits do not say it, and its jobs carry no starting image.

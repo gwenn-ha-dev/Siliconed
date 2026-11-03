@@ -14,6 +14,19 @@ import Foundation
 //   nearest the image's proportions, at the scale the rack had; any other format is still the user's to choose, the engine
 //   filling it and cropping the centre (`ImageRGB.fitted`). Nothing is stretched.
 package enum StartImage {
+    /// **The strength a starting image comes with, by family** — settled on fixed-seed sheets (a surfer and her two friends
+    /// turned into fishermen, then teenagers of the eighties; seed 7, strengths 0.30 to 0.90): where the people change and the
+    /// pose stays. Krea 2 keeps the pose best and changes them from 65 %; Z-Image and Anima at 75 %; MOSS-Image holds to the
+    /// image and needs 80 %. At eight steps the strength has eight real notches (`Strength.startStep`): 65 % redraws six of
+    /// them as 75 % does, 80 % seven. Another family (none starts from an image yet) takes 65 %.
+    package static func defaultStrength(for family: Family?) -> Double {
+        switch family {
+        case .zImage, .anima: 0.75
+        case .mossImage: 0.80
+        default: 0.65
+        }
+    }
+
     /// **How a strength is kept**: in hundredths, within `0…1` — what a slider dragged anywhere, a PNG's `%.2f` and a typed
     /// `0.655` all come back to.
     package static func snapped(_ strength: Double) -> Double {

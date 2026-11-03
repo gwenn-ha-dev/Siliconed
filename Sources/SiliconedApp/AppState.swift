@@ -237,7 +237,14 @@ final class AppState {
     private var defaultIdentifier: String { visibleReady.first?.id ?? ModelCard.zImage.id }
 
     // ── What the user sets ──
-    var identifier = "" { didSet { if identifier != oldValue { modelChanged() } } }
+    var identifier = "" {
+        didSet {
+            guard identifier != oldValue else { return }
+            // Each family has its own default strength: a strength chosen for one does not follow to another.
+            if cards.first(where: { $0.id == oldValue })?.family != card?.family { chosenStartStrength = nil }
+            modelChanged()
+        }
+    }
     var prompt = ""
     var orientation = RecommendedFormat.Orientation.square { didSet { orientationChanged() } }
     var format = ModelCard.recommendedFormats[0]
@@ -252,8 +259,13 @@ final class AppState {
     /// when the rack takes a model that does not start from an image, as the references a model does not read are.
     var startImage: ReferenceImage?
     /// **Its strength** (diffusers' `strength`, `StartImage`): how far the render moves from the image — retouched in the rack
-    /// between two renders. In hundredths.
-    var startStrength = AppState.defaultStartStrength
+    /// between two renders. In hundredths. The family's default (`StartImage.defaultStrength`) until one is chosen; forgotten
+    /// when the rack changes family.
+    var startStrength: Double {
+        get { chosenStartStrength ?? defaultStartStrength }
+        set { chosenStartStrength = newValue }
+    }
+    var chosenStartStrength: Double?
     var steps = 8
     /// **More detail** (`Detail`): Normal is the render as the model makes it. What a render takes is
     /// `effectiveDetail`: on a model that offers none (Anima, Krea 2: `DenoisingModule.acceptsDetail`), Normal.

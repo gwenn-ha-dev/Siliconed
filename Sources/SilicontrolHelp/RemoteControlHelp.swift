@@ -420,7 +420,7 @@ package enum RemoteControlHelp {
                               « start-image » does (help start-image).
           --strength S        with --image: how far the render moves away from it — diffusers'
                               strength, 0.65 or 65%, above 0 and at most 1 (1 ignores the image).
-                              Default 0.65. Jobs and images say "strength" and "start_image".
+                              Default: the model's. Jobs and images say "strength" and "start_image".
           --preview, --no-preview
                               a preview at every step in the app (writes nothing). Default: the
                               app's « Preview at every step » switch.
@@ -809,7 +809,8 @@ package enum RemoteControlHelp {
 
         THE STRENGTH is diffusers' strength: how far the render moves away from the image. 0.65 or 65%,
         above 0 and at most 1: low keeps its composition and colours, 1 ignores it. It counts in steps:
-        at 8 steps, 0.65 redraws 6 of them (0.63 and 0.74 too). Default 0.65 (provisional).
+        at 8 steps, 0.65 redraws 6 of them (0.63 and 0.74 too). Default: Krea 2 0.65, Z-Image and
+        Anima 0.75, MOSS-Image 0.80.
         Kept in hundredths: the PNG writes it ("Denoising strength"), « reuse » brings it back — the
         image itself is not in the file.
 
@@ -1579,7 +1580,7 @@ package enum RemoteControlHelp {
                               prend l'image, comme « start-image » (help start-image).
           --strength S        avec --image : jusqu'où le rendu s'en éloigne — la strength de
                               diffusers, 0.65 ou 65%, au-dessus de 0 et au plus 1 (1 ignore
-                              l'image). Défaut 0.65. Travaux et images disent "strength" et
+                              l'image). Défaut : celle du modèle. Travaux et images disent "strength" et
                               "start_image".
           --preview, --no-preview
                               un aperçu à chaque pas dans l'app (n'écrit rien). Défaut : l'interrupteur
@@ -1979,7 +1980,8 @@ package enum RemoteControlHelp {
 
         LA FORCE est la strength de diffusers : jusqu'où le rendu s'éloigne de l'image. 0.65 ou 65%,
         au-dessus de 0 et au plus 1 : basse, elle garde sa composition et ses couleurs ; 1 l'ignore. Elle
-        compte en pas : à 8 pas, 0.65 en redessine 6 (0.63 et 0.74 aussi). Défaut 0.65 (provisoire).
+        compte en pas : à 8 pas, 0.65 en redessine 6 (0.63 et 0.74 aussi). Défaut : Krea 2 0.65, Z-Image et
+        Anima 0.75, MOSS-Image 0.80.
         Gardée au centième : le PNG l'écrit ("Denoising strength"), « reuse » la rend — l'image
         elle-même n'est pas dans le fichier.
 

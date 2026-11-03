@@ -292,7 +292,7 @@ extension RemoteControl {
                         help: "--steps \(defaultSteps) (the model's \"default_steps\")")
         }
         let f = model.chain.denoising.space.factor
-        let strength = start == nil ? nil : StartImage.snapped(d.strength ?? AppState.defaultStartStrength)
+        let strength = start == nil ? nil : StartImage.snapped(d.strength ?? StartImage.defaultStrength(for: card?.family))
         let first = strength.map { min(steps, Strength.startStep(steps: steps, strength: $0)) } ?? 0
         if strength != nil, first >= steps {
             throw Refusal("img2img", String(localized: "At this strength the image would come back unchanged: raise it."),

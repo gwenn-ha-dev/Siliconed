@@ -133,7 +133,7 @@ extension RemoteControl {
         /// The `--ref`, in their order: the first is image 1, the one edited.
         var references: [String] = []
         /// `--image IMAGE|i7`: the starting image of an img2img (a model with "start_image": true); `--strength`: its strength,
-        /// diffusers' (`AppState.defaultStartStrength` when left out).
+        /// diffusers' (the family's, `StartImage.defaultStrength`, when left out).
         var image: String?
         var strength: Double?
         /// `nil`: like the app's « Preview at every step » switch.

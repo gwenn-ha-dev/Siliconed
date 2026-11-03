@@ -387,8 +387,8 @@ struct StartImageNode: View {
     var body: some View {
         PortBox(title: "Starting Image", symbol: "photo", kind: .image) {
             Text(verbatim: StartWords.percent(app.startStrength))
-                .onTapGesture(count: 2) { app.setStartStrength(AppState.defaultStartStrength) }
-                .help("Strength — double-click for \(StartWords.percent(AppState.defaultStartStrength))")
+                .onTapGesture(count: 2) { app.setStartStrength(app.defaultStartStrength) }
+                .help("Strength — double-click for \(StartWords.percent(app.defaultStartStrength))")
         } content: {
             if let start = app.usedStart {
                 HStack(alignment: .center, spacing: 10) {
@@ -414,7 +414,7 @@ struct StartImageNode: View {
             }
         }
         .contextMenu {
-            Button("Reset to \(StartWords.percent(AppState.defaultStartStrength))") { app.setStartStrength(AppState.defaultStartStrength) }
+            Button("Reset to \(StartWords.percent(app.defaultStartStrength))") { app.setStartStrength(app.defaultStartStrength) }
             Button("Replace…") { app.chooseStartReplacement() }
             Divider()
             Button("Remove", role: .destructive) { app.removeStart() }

@@ -196,7 +196,7 @@ private struct StartStrength: View {
                 Text("Strength").foregroundStyle(.secondary)
                 Spacer(minLength: 2)
                 Text(verbatim: StartWords.percent(model.startStrength)).monospacedDigit()
-                    .onTapGesture(count: 2) { model.setStartStrength(AppState.defaultStartStrength) }
+                    .onTapGesture(count: 2) { model.setStartStrength(model.defaultStartStrength) }
             }
             .font(.caption)
             Slider(value: Binding(get: { model.startStrength }, set: { model.setStartStrength($0) }), in: 0...1)

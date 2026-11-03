@@ -63,7 +63,10 @@ final class LabModel {
     }
 
     /// **The strength the starting image is carried with** (img2img), set on its tile — the rack's own is retouched there afterwards.
-    var startStrength = AppState.defaultStartStrength
+    /// The aimed family's default (`StartImage.defaultStrength`) until one is chosen.
+    var startStrength: Double { chosenStartStrength ?? defaultStartStrength }
+    var defaultStartStrength: Double { StartImage.defaultStrength(for: target) }
+    private var chosenStartStrength: Double?
 
     /// What a rewrite changed, to draw its marks while the text is still the one it wrote.
     struct Changes: Equatable { var before: String; var after: String }
@@ -447,7 +450,7 @@ final class LabModel {
     /// « Start From This Image »: the gesture that makes an img2img's start — the previous start, if any, goes back to « describe only ».
     func startFrom(_ picture: Picture) { setRole(.start, of: picture) }
 
-    func setStartStrength(_ s: Double) { startStrength = StartImage.snapped(s) }
+    func setStartStrength(_ s: Double) { chosenStartStrength = StartImage.snapped(s) }
 
     func setRole(_ role: LabInputs.Role, of picture: Picture) {
         for slot in LabInputs.assigning(role, to: picture.id, in: slots, capacity: capacity) {
