@@ -2,6 +2,47 @@
 
 # Siliconed — notes de version
 
+## 0.19
+
+### Partir d'une image (img2img)
+
+- **Z-Image, Anima, Krea 2 et MOSS-Image partent d'une image** au lieu du bruit et en gardent la composition : dans l'Atelier de prompts, **Partir de cette image** sur l'une de ses images, puis Porter dans le rack. Jamais par défaut : une image déposée pour être décrite ne fait pas du rendu suivant un img2img. ([#12](https://github.com/gwenn-ha-dev/Siliconed/issues/12), merci à vekakela)
+- **Sa force, de Fidèle à Libre** (0 à 100 %, la `strength` de diffusers, telle que le PNG l'écrit), pour commencer 65 % sur Krea 2, 75 % sur Z-Image et Anima, 80 % sur MOSS-Image. La boîte Images du rack montre l'image et sa force, à retoucher entre deux rendus ; le format prend le format recommandé le plus proche de ses proportions, et tout autre garde le centre de l'image. La vignette dit quand la force est si haute que le rendu ne voit plus l'image (à 8 pas, au-delà de 87,5 %).
+- **Contrôlé contre diffusers** sur les quatre familles, Standard et Compact (`siliconed check`) ; l'app donne l'image de la ligne de commande, au bit près. `silicontrol start-image` et `add --strength` font de même. Le départ de Qwen-Image-2.1 reste l'image qu'il édite.
+- **L'Atelier de prompts changera de forme** dans une prochaine version : ses gestes passent dans la fenêtre principale, à côté de l'image.
+
+### Les accélérateurs, allumés par défaut
+
+- **Un seul interrupteur, Accélérateurs**, dans la boîte du DiT, par modèle, et le choix est gardé : le Neural Engine, et maintenant les unités tensorielles du GPU. **Allumé par défaut sur chaque version, la Standard comprise** (un Neural Engine éteint avant la 0.19 reste éteint). Éteint, le DiT est en fp32 de bout en bout, comme avant. Grisé, avec sa raison, sur un Mac dont la mesure ne leur donne rien à faire, et il le dit avant la première mesure de ce Mac. ([#14](https://github.com/gwenn-ha-dev/Siliconed/issues/14), merci à mrdereksutton)
+- **Les unités tensorielles du GPU** : là où la mesure de ce Mac trouve le bf16 plus rapide que le fp32 (c'est le cas du GPU d'un M5, pas de celui d'un M1 Pro), le DiT arrondit une activation en bf16 avant un produit sur un poids bf16 et fait son attention sur des opérandes bf16 ou fp16, les sommes en fp32 ; la carte choisit la tuile de chaque produit. **Sur un tel Mac, l'image de la Standard aux réglages par défaut n'est donc plus celle du fp32** : elle est contrôlée contre diffusers en bf16, son erreur sous celle de la référence plus 25 %, comme l'étaient déjà les produits du Neural Engine. Accélérateurs éteints rendent l'image fp32.
+- **La Compact et la Légère aussi** : les poids int8 et Q8_0 publiés prennent leur activation arrondie en bf16, et les poids Q4_K et Q5_K de la Légère sont lus tels que publiés, dépliés une fois en entiers fp16 exacts (exacts à l'accumulation fp32 près, contre fp64). Sur un M5 Pro en 1024², les Compact int8 (Krea 2, Qwen-Image-2.1, MOSS-Image) prennent 18 à 32 % de temps de moins, les Légères 3 à 10 %.
+- **Sur un M5 Pro, la Standard en 1024² prend 34 à 72 % de temps de moins qu'en 0.18**, chaque version à ses réglages par défaut (Rendu plus rapide éteint), le prompt du témoin, graine 42 : Z-Image 28,6 s (75,0 en 0.18), Qwen-Image-2.1 32,4 s (89,6), Anima 10,5 s (16,0), MOSS-Image 29,8 s (47,8), Krea 2 53,4 s (189,9) ; pics de 1,6 à 2,1 Gio, aucun swap. Sur un M1 Pro, dont le GPU ne calcule pas le bf16 plus vite que le fp32, l'image de la Standard reste celle du fp32 et l'essentiel de ce gain ne s'applique pas.
+
+### La carte : un seul plan pour deux mesures
+
+- **Mesurer deux fois le même Mac donne le même plan** sur la Standard et sous une LoRA, donc la même image pour une graine ; sur la Compact et la Légère, presque. Les appels courts sont lus de leur côté rapide, une troisième chaîne est mesurée là où deux ne s'accordent pas, le réveil du GPU après un repos est mesuré et compté à chaque auto-attention.
+- **Le Neural Engine avant les unités matricielles du CPU** : là où les deux pourraient partager les produits du GPU, le Neural Engine est pris jusqu'à 15 % plus lent — moins de watts, aucun cœur du CPU à pleine charge — et à égalité sous l'erreur de la différence.
+
+### La fenêtre
+
+- **Déplacer une image zoomée en Rideau et Alterner** : zoomé, glisser n'importe où déplace l'image ; la ligne du rideau bouge par sa poignée et les flèches, un clic alterne. Le trackpad ne change pas. ([#10](https://github.com/gwenn-ha-dev/Siliconed/issues/10), merci à switchpants)
+- **Atelier de prompts** : une taille minimale de fenêtre, le texte écrit de haut en bas, un bouton pour effacer le prompt dans le rack et l'atelier (⌘Z le ramène) ; le rédacteur s'arrête quand il tombe dans une boucle et n'en garde qu'une occurrence ; celui de Krea 2 et de MOSS-Image décrit ce qui est là au lieu de lister ce qui manque, et étoffe un prompt d'un mot. ([#7](https://github.com/gwenn-ha-dev/Siliconed/issues/7), merci à switchpants)
+- **Enregistrer chaque image dans…** dans les Réglages : chaque image dans un dossier de votre choix, éteint par défaut, le PNG et ses métadonnées comme les écrit l'export ; `silicontrol set save-images`. Merci à mrdereksutton, dont le fork avait l'idée, et pour le libellé VoiceOver du menu Variations qui en est repris.
+- **Format en deux échelles (Bêta)** : Réglages › Avancé › Bêta peut couper le menu Format en une proportion (1:1, 4:5, 3:4, 2:3, 9:16 et leurs paysages) et une résolution, 1K ou 2K, côtés en multiples de 32 pour chaque modèle ; `silicontrol add` et `grid` lisent les mêmes formats, comme `3:4@2K`. ([#13](https://github.com/gwenn-ha-dev/Siliconed/issues/13), merci à mrdereksutton pour l'idée et le tableau derrière)
+- **Le Rendu plus rapide devient une option Bêta**, éteinte par défaut : une fois allumée, un interrupteur à côté d'Accélérateurs, par modèle, éteint pour chaque version. Option éteinte, aucun rendu n'est un rendu plus rapide.
+- **Un modèle de base est refusé par son nom** : importer le DiT de base de Qwen-Image-2.1, que l'app ne rend pas, le dit maintenant au lieu de le rendre avec les huit pas du Turbo. ([#15](https://github.com/gwenn-ha-dev/Siliconed/issues/15), merci à vekakela)
+
+### silicontrol fait ce que fait la fenêtre
+
+- `rewrite` et `describe` avec le rédacteur de l'atelier, `install writer`, `set accelerators`, `set beta` pour les options Bêta ; l'historique (`remove`, `undo`, `again`, `reuse`, `crop`, `save --format`), les cases d'exploration par leur nom (`g2c3`), `finish`, `sheet` ; `import`, `uninstall` et `library move` (un essai à blanc sans `--yes`) ; Calculer sur un Mac déjà appairé. Tout par les mêmes fonctions que les boutons. L'appairage, l'acceptation d'une licence, Prêter ce Mac et Oublier restent dans la fenêtre.
+
+### Aussi
+
+- **Chaque moteur, forme de poids et opérande que les règles permettent a sa route**, et un test le dit : un trou est listé avec sa raison, jamais découvert sur le Mac d'un utilisateur.
+- **Les contrôles de Krea 2** jugent leurs frontières mal conditionnées par des nuages d'ordres de sommation, à chaque pas de la trajectoire ; les contrôles Compact de Krea 2 et de MOSS-Image suivent la route int8 que prend le rendu.
+- **Des chiffres sur un MacBook Neo 8 Go** ([ENGINE.fr.md](ENGINE.fr.md#sur-un-macbook-neo)) : Anima Turbo 91,5 s, Z-Image Turbo 246,5 s en 1024², Compact.
+- **Compiler demande Xcode** : le README et `app.sh` le disent (les Command Line Tools seuls n'ont pas les macros de SwiftUI). Repris du fork de mrdereksutton.
+
 ## 0.18
 
 ### La carte mesure le Mac, puis planifie chaque calcul à partir de là

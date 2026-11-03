@@ -2,6 +2,47 @@ English · [Français](RELEASE-NOTES.fr.md)
 
 # Siliconed — release notes
 
+## 0.19
+
+### Start from an image (img2img)
+
+- **Z-Image, Anima, Krea 2 and MOSS-Image start from a picture** instead of noise and keep its composition: in the Prompt Lab, **Start From This Image** on one of its images, then Carry to the Rack. Never by default: a picture dropped to be described does not turn the next render into an img2img. ([#12](https://github.com/gwenn-ha-dev/Siliconed/issues/12), thanks to vekakela)
+- **Its strength, from Faithful to Free** (0 to 100 %, diffusers' `strength` as the PNG writes it), to begin with 65 % on Krea 2, 75 % on Z-Image and Anima, 80 % on MOSS-Image. The rack's Images box shows the picture and its strength, to retouch between two renders; the size takes the recommended format nearest its proportions, and any other keeps the picture's centre. The tile says when the strength is so high that the render no longer sees the picture (at 8 steps, above 87.5 %).
+- **Checked against diffusers** on the four families, Standard and Compact (`siliconed check`); the app gives the command line's image, to the bit. `silicontrol start-image` and `add --strength` do the same. Qwen-Image-2.1's start stays the image it edits.
+- **The Prompt Lab will change shape** in a coming version: its gestures move into the main window, beside the image.
+
+### The accelerators, on by default
+
+- **One switch, Accelerators**, in the DiT's box, per model, and the choice is kept: the Neural Engine, and now the GPU's tensor units. **On by default on every version, the Standard included** (a Neural Engine turned off before 0.19 stays off). Off, the DiT is in fp32 throughout, as before. Greyed, with its reason, on a Mac whose measure gives them nothing to do, and it says so before this Mac's first measure. ([#14](https://github.com/gwenn-ha-dev/Siliconed/issues/14), thanks to mrdereksutton)
+- **The GPU's tensor units**: where this Mac's measure finds bf16 faster than fp32 (an M5's GPU does, an M1 Pro's does not), the DiT rounds an activation to bf16 before a product on a bf16 weight and runs its attention on bf16 or fp16 operands, the sums in fp32; the map chooses each product's tile. **On such a Mac the Standard's image at the default settings is therefore no longer the fp32 one**: it is checked against diffusers run in bf16, its error within the reference's own plus 25 %, as the Neural Engine's products already were. Accelerators off gives the fp32 image back.
+- **The Compact and the Light too**: published int8 and Q8_0 weights take their activation rounded to bf16, and the Light's Q4_K and Q5_K weights are read as published, unpacked once into exact fp16 integers (exact to fp32 accumulation against fp64). On an M5 Pro at 1024², the int8 Compacts (Krea 2, Qwen-Image-2.1, MOSS-Image) take 18 to 32 % less time, the Lights 3 to 10 %.
+- **On an M5 Pro, the Standard at 1024² takes 34 to 72 % less time than in 0.18**, each version at its default settings (Faster Rendering off), the control prompt, seed 42: Z-Image 28.6 s (75.0 in 0.18), Qwen-Image-2.1 32.4 s (89.6), Anima 10.5 s (16.0), MOSS-Image 29.8 s (47.8), Krea 2 53.4 s (189.9); peaks 1.6 to 2.1 GiB, no swap. On an M1 Pro, whose GPU computes bf16 no faster than fp32, the Standard's image stays the fp32 one and most of this gain does not apply.
+
+### The map: one plan from two measures
+
+- **Measuring the same Mac twice gives the same plan** on the Standard and under a LoRA, so the same image for a seed; on the Compact and the Light, nearly so. Short calls are read on their fast side, a third chain is measured where two disagree, the GPU's wake after idle is measured and charged to every self-attention.
+- **The Neural Engine before the CPU's matrix units**: where both could share the GPU's products, the Neural Engine is taken up to 15 % slower — fewer watts, no CPU cores at full load — and on a tie within the error of the difference.
+
+### The window
+
+- **Pan a zoomed image in Curtain and Switch**: zoomed in, a drag anywhere moves the image; the curtain's line moves by its handle and the arrow keys, a click switches. The trackpad does not change. ([#10](https://github.com/gwenn-ha-dev/Siliconed/issues/10), thanks to switchpants)
+- **Prompt Lab**: a minimum window size, the text written from the top down, a button to clear the prompt in the rack and the Lab (⌘Z brings it back); the writer stops when it falls into a loop and keeps a single occurrence; Krea 2's and MOSS-Image's writer describe what is there instead of listing what is absent, and expand a one-word prompt. ([#7](https://github.com/gwenn-ha-dev/Siliconed/issues/7), thanks to switchpants)
+- **Save Every Image To…** in Settings: each image to a folder of your choice, off by default, the PNG and its metadata as Export writes them; `silicontrol set save-images`. Thanks to mrdereksutton, whose fork had the idea, and for the VoiceOver label of the Variations menu taken from it.
+- **Size in Two Scales (Beta)**: Settings › Advanced › Beta can split the Size menu into a proportion (1:1, 4:5, 3:4, 2:3, 9:16 and their landscapes) and a resolution, 1K or 2K, with sides in multiples of 32 for every model; `silicontrol add` and `grid` read the same sizes as `3:4@2K`. ([#13](https://github.com/gwenn-ha-dev/Siliconed/issues/13), thanks to mrdereksutton for the idea and the table behind it)
+- **Faster Rendering becomes a Beta option**, off by default: once on, a switch beside Accelerators, per model, off for every version. With the option off no render is a faster one.
+- **A base model is refused by name**: importing the Qwen-Image-2.1 base DiT, which the app does not render, now says so instead of rendering it with the Turbo's eight steps. ([#15](https://github.com/gwenn-ha-dev/Siliconed/issues/15), thanks to vekakela)
+
+### silicontrol does what the window does
+
+- `rewrite` and `describe` with the Prompt Lab's writer, `install writer`, `set accelerators`, `set beta` for the Beta options; the history (`remove`, `undo`, `again`, `reuse`, `crop`, `save --format`), exploration cells by name (`g2c3`), `finish`, `sheet`; `import`, `uninstall` and `library move` (a dry run without `--yes`); Compute On to a Mac already paired. All through the same functions as the buttons. Pairing, a licence's acceptance, Lend This Mac and Forget stay in the window.
+
+### Also
+
+- **Every engine, weight form and operand the rules allow has a route**, and a test says so: a hole is listed with its reason, never found on a user's Mac.
+- **Krea 2's checks** judge their ill-conditioned boundaries by clouds of summation orders, at every step of the trajectory; the Compact checks of Krea 2 and MOSS-Image follow the int8 route the render takes.
+- **Numbers on an 8 GB MacBook Neo** ([ENGINE.md](ENGINE.md#on-a-macbook-neo)): Anima Turbo 91.5 s, Z-Image Turbo 246.5 s at 1024², Compact.
+- **Building needs Xcode**: README and `app.sh` say it (the Command Line Tools alone lack the SwiftUI macros). From mrdereksutton's fork.
+
 ## 0.18
 
 ### The map measures the Mac, then plans every computation from it
