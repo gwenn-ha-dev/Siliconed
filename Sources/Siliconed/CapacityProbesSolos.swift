@@ -438,6 +438,19 @@ extension Diagnostic.CapacityProbes.Context {
            let timed = try? TiledAttention(device: bench.device, queue: bench.queue, heads: h, sequence: short, headDim: d, precision: .fp16, tile: forms[tiles16] ?? nil) {
             _ = guarded("gpu wake") { () -> Bool? in wake(&measurements, busy: busy, timed: timed, sequence: short, buffers: buffers); return true }
         }
+        // The QK-norm and RoPE on either side (`CapacityProbesWake.swift`), last: it rotates Q and K in place. The GPU's calls each after
+        // the tier's longest attention, as a render's follow its products: the half-precision kernel where it runs, the graph otherwise.
+        var busy: (() -> Void)?
+        if let long = sizes.attention.max() {
+            if !skipped.contains(tiles16), !measurements.wrong.contains(tiles16.description),
+               let t = try? TiledAttention(device: bench.device, queue: bench.queue, heads: h, sequence: long, headDim: d, precision: .fp16, tile: forms[tiles16] ?? nil) {
+                busy = { _ = t.run(q: buffers.q, k: buffers.k, v: buffers.v, into: buffers.out) }
+            } else {
+                let graph = Attention(device: bench.device, queue: bench.queue, heads: h, sequence: long, headDim: d)
+                busy = { _ = graph.run(q: buffers.q, k: buffers.k, v: buffers.v, into: buffers.out) }
+            }
+        }
+        normRope(&measurements, sequences: sizes.attention, q: pages.q, k: pages.k, buffers: (buffers.q, buffers.k), busy: busy)
     }
 
     /// **The attention as a set of two engines**: the system graph on the GPU's heads beside the CPU's, at the heads the two solo lines

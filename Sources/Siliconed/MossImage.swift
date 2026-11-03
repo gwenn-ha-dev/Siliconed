@@ -120,7 +120,7 @@ package final class MossImageDiT: BoundaryRecording, PhaseTiming {
     /// bound of precision, which the tiled kernels keep too until a check lifts it) — the memory need reads the same function.
     package static func attentionAssignment(_ plan: CapacityPlan, sequence: Int, heads: Int, headDim: Int) -> AttentionAssignment {
         let a = plan.assign(AttentionKey(sequence: sequence, heads: heads, headDim: headDim))
-        return (a.usesTiles || a.splits) && sequence >= headSplitRows ? a : .graph
+        return (a.usesTiles || a.splits) && sequence >= headSplitRows ? a : AttentionAssignment.graph.normRope(onGPU: a.normRopeOnGPU)
     }
     package static let headSplitRows = 2048
 
@@ -401,13 +401,8 @@ package final class MossImageDiT: BoundaryRecording, PhaseTiming {
             recordRows("block0_k_out", k, width: d, text: t)
             recordRows("block0_v_out", v, width: d, text: t)
         }
-        try headNorm(prefix + "q_norm.weight", q, rows: n * heads)
-        try headNorm(prefix + "k_norm.weight", k, rows: n * heads)
-        if tag != nil { recordRows("block0_q_norm_out", q, width: d, text: t) }
-        timed("rope") {
-            MossImageRope.apply(q, freqs: freqs, sequence: n, heads: heads, headDim: dh)
-            MossImageRope.apply(k, freqs: freqs, sequence: n, heads: heads, headDim: dh)
-        }
+        try headNormRope(prefix + "q_norm.weight", prefix + "k_norm.weight", rows: n,
+                         between: tag == nil ? nil : { self.recordRows("block0_q_norm_out", self.q, width: d, text: t) })
         try attend(rows: n)
         try linearGPU(prefix + "proj.o.weight", a: merged, into: o, m: n, k: d, n: d)
         if tag != nil { recordRows("block0_o_out", o, width: d, text: t) }
@@ -449,12 +444,7 @@ package final class MossImageDiT: BoundaryRecording, PhaseTiming {
                 (vOut + row * d).update(from: source + 2 * d, count: d)
             }
         }
-        try headNorm(prefix + "q_norm.weight", q, rows: t * heads)
-        try headNorm(prefix + "k_norm.weight", k, rows: t * heads)
-        timed("rope") {
-            MossImageRope.apply(q, freqs: freqs, sequence: t, heads: heads, headDim: config.headDim)
-            MossImageRope.apply(k, freqs: freqs, sequence: t, heads: heads, headDim: config.headDim)
-        }
+        try headNormRope(prefix + "q_norm.weight", prefix + "k_norm.weight", rows: t, between: nil)
         try attend(rows: t)
         try linearGPU(prefix + "proj.weight", a: merged, into: o, m: t, k: d, n: d)
         try addBias(prefix + "proj.bias", to: o, rows: t, columns: d)
@@ -496,6 +486,57 @@ package final class MossImageDiT: BoundaryRecording, PhaseTiming {
     }
 
     /// QK-Norm: RMSNorm over `head_dim`.
+    /// **QK-Norm then the half-split RoPE** over `rows` rows, Q and K on all the heads: on the CPU in one pass per row
+    /// (`Ops.rmsNormRope(halfSplit:)`, the same operations in the same order as `headNorm` then `MossImageRope.apply`, so the same bits),
+    /// or on the GPU, chained to the attention, where the plan says (`QKNormRope`, `.halfSplit`). `between`: a boundary recorded
+    /// after the norm and before the rotation — two passes then, waited for.
+    private func headNormRope(_ normQ: String, _ normK: String, rows n: Int, between: (() -> Void)?) throws {
+        let heads = config.heads, dh = config.headDim
+        let cut = MossImageDiT.attentionAssignment(gemm.plan, sequence: n, heads: heads, headDim: dh)
+        let clock = ProductLedger.pass(sequence: n, heads: heads, headDim: dh)
+        defer { clock?.finish() }
+        if cut.normRopeOnGPU, QKNormRope.runs(headDim: dh), let pass = QKNormRope.shared(device: gemm.device, queue: gemm.queue) {
+            var weights: [[Float]] = []
+            for name in [normQ, normK] {
+                try artifact.materialize(name, into: reserve, capacity: reserveCapacity)
+                weights.append(Array(UnsafeBufferPointer(start: reserve, count: dh)))
+            }
+            let (qb, kb) = (try slice(q), try slice(k))
+            let table = try gemm.region(freqs, bytes: n * dh * 4, name: "freqs")
+            let eps = MossImageDiT.eps
+            timed("qk-norm + rope") {
+                if let between {
+                    pass.run([.init(qb, heads: heads, weight: weights[0]), .init(kb, heads: heads, weight: weights[1])],
+                             rows: n, headDim: dh, eps: eps, freqs: nil, layout: .halfSplit)
+                    between()
+                    pass.run([.init(qb, heads: heads, weight: nil), .init(kb, heads: heads, weight: nil)],
+                             rows: n, headDim: dh, eps: eps, freqs: table, layout: .halfSplit)
+                } else {
+                    pass.run([.init(qb, heads: heads, weight: weights[0]), .init(kb, heads: heads, weight: weights[1])],
+                             rows: n, headDim: dh, eps: eps, freqs: table, layout: .halfSplit, wait: cut.splits)
+                }
+            }
+            return
+        }
+        if let between {
+            try headNorm(normQ, q, rows: n * heads)
+            try headNorm(normK, k, rows: n * heads)
+            between()
+            timed("rope") {
+                MossImageRope.apply(q, freqs: freqs, sequence: n, heads: heads, headDim: dh)
+                MossImageRope.apply(k, freqs: freqs, sequence: n, heads: heads, headDim: dh)
+            }
+            return
+        }
+        for (name, tensor) in [(normQ, q), (normK, k)] {
+            try artifact.materialize(name, into: reserve, capacity: reserveCapacity)
+            timed("qk-norm + rope") {
+                Ops.rmsNormRope(tensor, weight: reserve, freqs: freqs, sequence: n, heads: heads, headDim: dh, eps: MossImageDiT.eps,
+                                halfSplit: true)
+            }
+        }
+    }
+
     private func headNorm(_ name: String, _ tensor: UnsafeMutablePointer<Float>, rows: Int) throws {
         try artifact.materialize(name, into: reserve, capacity: reserveCapacity)
         timed("norm") { Ops.rmsNorm(tensor, weight: reserve, into: tensor, rows: rows,

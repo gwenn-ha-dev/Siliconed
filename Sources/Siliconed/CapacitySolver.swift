@@ -670,7 +670,8 @@ private struct ProductSolver {
     // MARK: Attentions
 
     /// The time and rows of an attention under a kernel and a number of CPU heads (flash: the GPU's, whole).
-    func timed(_ key: AttentionKey, _ a: AttentionAssignment) -> (route: String, rows: [Kernel: Int], seconds: Double, busy: [Engine: Double])? {
+    /// `pass: false`: without the QK-norm and RoPE's own seconds (the kernel's choice, which the pass does not change; the wake stays).
+    func timed(_ key: AttentionKey, _ a: AttentionAssignment, pass withPass: Bool = true) -> (route: String, rows: [Kernel: Int], seconds: Double, busy: [Engine: Double])? {
         let per = 2 * key.sequence * key.keys * key.headDim            // 2·k with n = 1: 4·S·keys·dim per head
         var rows: [Kernel: Int]
         switch a.kernel {
@@ -693,9 +694,47 @@ private struct ProductSolver {
         var b = Dictionary(model.busy(m: key.heads, k: per, n: 1, rows: rows, sustained: c.sustained).map { ($0.key.engine, $0.value) }, uniquingKeysWith: +)
         // A self-attention follows the CPU's QK-norm and RoPE, the GPU idle: its call pays the GPU's wake (`CapacityModel.wake`), whatever
         // the kernel — the same for every candidate, so it changes no choice, only the time. A cross-attention's keys are the text's.
-        let wake = key.cross ? 0 : model.wake ?? 0
+        // The pass on the GPU (`normRopeOnGPU`) leaves it no idle: no wake.
+        let wake = key.cross || a.normRopeOnGPU ? 0 : model.wake ?? 0
         if wake > 0 { b[.gpu, default: 0] += wake }
-        return (a.kernel.rawValue, rows, t + wake, b)
+        // The pass itself, where the map measured it (`CapacityModel.normRope`): the CPU's wall, or the GPU's kernel — chained to the
+        // attention, its own seconds; waited for under a cut by heads, its wall. A map without it: the CPU's, priced at nothing as before;
+        // the GPU's, not timed.
+        var pass = 0.0
+        if !key.cross, withPass || a.normRopeOnGPU {
+            if let p = normRope(key, onGPU: a.normRopeOnGPU, waited: a.splits) {
+                pass = p.seconds
+                b[p.engine, default: 0] += p.busy
+            } else if a.normRopeOnGPU { return nil }
+        }
+        return (a.kernel.rawValue, rows, t + wake + pass, b)
+    }
+
+    // MARK: The QK-norm and RoPE before a self-attention
+
+    /// The values the pass runs over: Q's `S · H · Dh` and K's `S · H_kv · Dh`.
+    func normRopeValues(_ key: AttentionKey) -> Double { Double(key.sequence) * Double(key.heads + key.kvHeads) * Double(key.headDim) }
+
+    /// The pass's seconds on a route, the engine it holds and for how long; `nil` without the map's lines (or a head dimension the
+    /// kernel does not take, on the GPU).
+    func normRope(_ key: AttentionKey, onGPU: Bool, waited: Bool) -> (seconds: Double, engine: Engine, busy: Double)? {
+        guard let n = model.normRope else { return nil }
+        let v = normRopeValues(key)
+        guard onGPU else { let t = n.cpu.seconds(v); return (t, .cpu, t) }
+        guard QKNormRope.runs(headDim: key.headDim) else { return nil }
+        return (waited ? n.gpuWaited.seconds(v) : n.gpu.seconds(v), .gpu, n.gpu.seconds(v))
+    }
+
+    /// **The pass on the GPU where it beats the CPU's past the noise** (the attentions' rule: the first in the written order within the
+    /// margin of the fastest — the CPU's pass, what every plan ran, before): the whole call weighed, the CPU's pass with the wake its idle
+    /// costs, the GPU's without. The kernel chosen stays the one chosen without it: the pass changes no kernel.
+    func withNormRope(_ key: AttentionKey, _ a: AttentionAssignment,
+                      _ t: (route: String, rows: [Kernel: Int], seconds: Double, busy: [Engine: Double]))
+        -> (AttentionAssignment, (route: String, rows: [Kernel: Int], seconds: Double, busy: [Engine: Double])) {
+        guard !key.cross, model.normRope != nil else { return (a, t) }
+        let gpu = a.normRope(onGPU: true)
+        guard let g = timed(key, gpu), t.seconds > g.seconds * (1 + margin()) else { return (a, t) }
+        return (gpu, g)
     }
 
     /// The line of a kernel the GPU runs (all the heads, or its share under a split); the fp16 one only where the request allows half
@@ -719,7 +758,7 @@ private struct ProductSolver {
 
     /// **Every way the solver may run `key`**, runnable and timed, in the order a tie is settled: the graph, flash, the tiled kernels,
     /// then the cut with each GPU kernel. What `solve` chooses among, and what the coverage guard reads.
-    func candidates(_ key: AttentionKey, flash: Bool) -> [(AttentionAssignment, (route: String, rows: [Kernel: Int], seconds: Double, busy: [Engine: Double]))] {
+    func candidates(_ key: AttentionKey, flash: Bool, pass: Bool = true) -> [(AttentionAssignment, (route: String, rows: [Kernel: Int], seconds: Double, busy: [Engine: Double]))] {
         var options: [AttentionAssignment] = [.graph]
         if flash, line(.gpu, .flash) != nil { options.append(.flash) }
         // The tiled kernels: a candidate wherever the map has its line (fp16 only where the request allows half precision, bf16 where it
@@ -734,17 +773,19 @@ private struct ProductSolver {
                 for cpu in 1..<groups { options.append(AttentionAssignment(kernel: .split, cpuHeads: cpu * key.group, gpuKernel: gpu)) }
             }
         }
-        return options.compactMap { o in o.isRunnable(for: key) ? timed(key, o).map { (o, $0) } : nil }
+        return options.compactMap { o in o.isRunnable(for: key) ? timed(key, o, pass: pass).map { (o, $0) } : nil }
     }
 
     func solve(_ key: AttentionKey, flash: Bool) -> CapacitySolver.AttentionSolution? {
         // The written order (`candidates`: the graph, flash, the tiled kernels from the finest operand, then the cut with the fewest CPU heads
         // first), the first within the noise of the fastest.
-        let all = candidates(key, flash: flash)
+        let all = candidates(key, flash: flash, pass: false)
         guard let fastest = all.map(\.1.seconds).min(), var (a, t) = all.first(where: { $0.1.seconds <= fastest * (1 + margin()) }) else { return nil }
+        if model.normRope != nil, let whole = timed(key, a) { t = whole }
         // The form its map chose for the tiled kernel that runs: what its line timed.
         let tiled = a.splits ? a.gpuKernel : a.kernel
         if tiled == .tiles16 || tiled == .tilesbf16 { a.tile = model.attentionTiles[Kernel(.gpu, tiled == .tiles16 ? .tiles16 : .tilesbf16)] }
+        (a, t) = withNormRope(key, a, t)
         return .init(assignment: a, route: t.route, rows: t.rows, compute: t.seconds, busy: t.busy)
     }
 }

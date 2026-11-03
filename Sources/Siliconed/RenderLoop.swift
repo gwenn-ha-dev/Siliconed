@@ -106,7 +106,7 @@ package enum RenderLoop {
         /// The routes the executions took, the one with the most seconds first.
         package var routes: [String]
         package var executions: Int
-        /// Wall seconds of the render's executions; 0 for a class the render did not run.
+        /// Wall seconds of the render's executions (an attention's with the QK-norm and RoPE before it); 0 for a class the render did not run.
         package var measured: Double
         package var predictedRoute: String?
         package var predictedExecutions: Int
@@ -160,6 +160,8 @@ package enum RenderLoop {
 
     private struct Item {
         var routes: [String: (executions: Int, seconds: Double)] = [:]
+        /// The QK-norm and RoPE's seconds before the class's attentions (`ProductLedger.pass`): measured, no route, no execution.
+        var pass = 0.0
         var predicted: [Predicted] = []
     }
 
@@ -177,6 +179,7 @@ package enum RenderLoop {
         for t in tallies {
             let (shape, x) = shape(of: t.work)
             var item = items[shape]?[x] ?? Item()
+            if t.route == ProductLedger.passRoute { item.pass += t.seconds; items[shape, default: [:]][x] = item; continue }
             let kept = item.routes[t.route] ?? (0, 0)
             item.routes[t.route] = (kept.executions + t.executions, kept.seconds + t.seconds)
             items[shape, default: [:]][x] = item
@@ -199,7 +202,9 @@ package enum RenderLoop {
             for cluster in clusters {
                 var routes: [String: (executions: Int, seconds: Double)] = [:]
                 var parts: [Predicted] = []
+                var pass = 0.0
                 for x in cluster {
+                    pass += heights[x]!.pass
                     for (route, v) in heights[x]!.routes {
                         let kept = routes[route] ?? (0, 0)
                         routes[route] = (kept.executions + v.executions, kept.seconds + v.seconds)
@@ -208,7 +213,7 @@ package enum RenderLoop {
                 }
                 // The class is named by the member that weighs most, prediction and measure together.
                 func weight(_ x: Int) -> Double {
-                    heights[x]!.routes.values.reduce(0) { $0 + $1.seconds } + heights[x]!.predicted.reduce(0) { $0 + $1.seconds }
+                    heights[x]!.routes.values.reduce(0) { $0 + $1.seconds } + heights[x]!.pass + heights[x]!.predicted.reduce(0) { $0 + $1.seconds }
                 }
                 let heaviest = cluster.max { (weight($0), $1) < (weight($1), $0) }!
                 let id: String
@@ -221,7 +226,7 @@ package enum RenderLoop {
                 let main = parts.max { ($0.seconds, $1.route) < ($1.seconds, $0.route) }
                 rows.append(Row(id: id, isAttention: shape.weight == nil, routes: ordered.map(\.key),
                                 executions: routes.values.reduce(0) { $0 + $1.executions },
-                                measured: routes.values.reduce(0) { $0 + $1.seconds },
+                                measured: routes.values.reduce(0) { $0 + $1.seconds } + pass,
                                 predictedRoute: main?.route,
                                 predictedExecutions: parts.reduce(0) { $0 + $1.executions },
                                 predicted: parts.isEmpty ? nil : parts.reduce(0) { $0 + $1.seconds }))

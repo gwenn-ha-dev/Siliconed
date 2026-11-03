@@ -272,6 +272,8 @@ package final class CapacityPlan: Sendable {
         }
         parts.append("kquant \(model.kquantPreparation.map { "\($0)" } ?? "-")")
         parts.append("noise \(model.noise.map { "\($0)" } ?? "-")")
+        // Only where the map has it: a map before the probe keeps its fingerprint (its plan is the same).
+        if let n = model.normRope { parts.append("normrope \(n.cpu.t0) \(n.cpu.rate) \(n.gpu.t0) \(n.gpu.rate) \(n.gpuWaited.t0) \(n.gpuWaited.rate)") }
         var hash: UInt64 = 0xcbf29ce484222325
         for byte in parts.joined(separator: "\n").utf8 { hash = (hash ^ UInt64(byte)) &* 0x100000001b3 }
         return String(hash, radix: 16)
@@ -556,9 +558,30 @@ package struct AttentionAssignment: Equatable, Sendable, Codable, CustomStringCo
     /// **The fused form's tile** of the tiled kernel that runs (the whole attention's, or the GPU's heads' under `split`): the map's
     /// choice for that kernel (`CapacityModel.attentionTiles`), attached by the solver; `nil`: the three stages.
     package var tile: AttentionTile?
-    package init(kernel: Kernel, cpuHeads: Int = 0, gpuKernel: Kernel = .graph, tile: AttentionTile? = nil) {
-        self.kernel = kernel; self.cpuHeads = cpuHeads; self.gpuKernel = gpuKernel; self.tile = tile
+    /// **The QK-norm and the RoPE before a self-attention on the GPU** (`QKNormRope`), queued after the products that wrote Q and K, instead
+    /// of the CPU's pass that leaves the GPU idle and the call paying its wake: the map times both, the solver chooses (`CapacitySolver`).
+    /// Never on a cross-attention. `false`: the CPU's pass, what every plan before it ran.
+    package var normRopeOnGPU: Bool
+    package init(kernel: Kernel, cpuHeads: Int = 0, gpuKernel: Kernel = .graph, tile: AttentionTile? = nil, normRopeOnGPU: Bool = false) {
+        self.kernel = kernel; self.cpuHeads = cpuHeads; self.gpuKernel = gpuKernel; self.tile = tile; self.normRopeOnGPU = normRopeOnGPU
     }
+    private enum CodingKeys: String, CodingKey { case kernel, cpuHeads, gpuKernel, tile, normRopeOnGPU }
+    /// An assignment written before the route reads as the CPU's pass.
+    package init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        kernel = try c.decode(Kernel.self, forKey: .kernel); cpuHeads = try c.decode(Int.self, forKey: .cpuHeads)
+        gpuKernel = try c.decode(Kernel.self, forKey: .gpuKernel); tile = try c.decodeIfPresent(AttentionTile.self, forKey: .tile)
+        normRopeOnGPU = try c.decodeIfPresent(Bool.self, forKey: .normRopeOnGPU) ?? false
+    }
+    package func encode(to encoder: any Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(kernel, forKey: .kernel); try c.encode(cpuHeads, forKey: .cpuHeads); try c.encode(gpuKernel, forKey: .gpuKernel)
+        try c.encodeIfPresent(tile, forKey: .tile)
+        if normRopeOnGPU { try c.encode(true, forKey: .normRopeOnGPU) }
+    }
+    /// The same assignment with the QK-norm and RoPE where `onGPU` says: what a family's own rule (`QwenImage21DiT.attentionAssignment`…)
+    /// keeps when it replaces the kernel.
+    package func normRope(onGPU: Bool) -> AttentionAssignment { var a = self; a.normRopeOnGPU = onGPU; return a }
     package var gpuUsesTiles: Bool { splits && gpuKernel.isTiled }
     package var gpuUsesFlash: Bool { splits && gpuKernel == .flash }
     package var gpuTilePrecision: TiledAttention.Precision { gpuKernel.precision }
@@ -577,7 +600,8 @@ package struct AttentionAssignment: Equatable, Sendable, Codable, CustomStringCo
     package var tilePrecision: TiledAttention.Precision { kernel.precision }
     package var description: String {
         let form = tile.map { " \($0)" } ?? ""
-        return kernel == .split ? "split \(cpuHeads)" + (gpuKernel == .graph ? "" : " + \(gpuKernel.rawValue)\(form)") : kernel.rawValue + form
+        let prologue = normRopeOnGPU ? " · norm+rope gpu" : ""
+        return (kernel == .split ? "split \(cpuHeads)" + (gpuKernel == .graph ? "" : " + \(gpuKernel.rawValue)\(form)") : kernel.rawValue + form) + prologue
     }
 
     /// **The engine's defaults**: the cut by heads from `HeadSplitAttention.minimumSequence` rows at the reference share, the
@@ -624,12 +648,14 @@ extension CapacityPlan {
     ///     tiles — **the split the judges' md5s were taken with**;
     ///   - `flash`: the flash kernel for every attention whose caller tries it (it falls back by itself on a length it does not
     ///     tile);
+    ///   - `normRope` (`normrope`): every self-attention's QK-norm and RoPE on the GPU (`QKNormRope`), whatever the kernel — the route
+    ///     the map may choose, forced where a check judges it against the reference;
     ///   - `tiles`, `tiles16`, `tilesbf16`: the three stages by tiles of query rows for every attention the plan speaks of (fp32; fp16
     ///     or bf16 operands with fp32 sums, whose checks judge against the half-precision reference like the ANE's); `fused`: the
     ///     half-precision one in the fused form, at the first candidate tile (`AttentionTile.candidates`) — a developer's forcing, the
     ///     map choosing otherwise.
     package static func forcing(neuralEngine: Bool = false, bf16Activations: Bool = false, amx: Bool = false, flash: Bool = false,
-                                tiles: Bool = false, tiles16: Bool = false, tilesbf16: Bool = false, fused: Bool = false, cut: Bool = false, aneInt8: Bool = false, int8: Bool = false, q8: Bool = false, aneMinimumRows: Int = 2 * NeuralEngine.rowUnit,
+                                tiles: Bool = false, tiles16: Bool = false, tilesbf16: Bool = false, fused: Bool = false, cut: Bool = false, aneInt8: Bool = false, int8: Bool = false, q8: Bool = false, normRope: Bool = false, aneMinimumRows: Int = 2 * NeuralEngine.rowUnit,
                                 roundingMinimumRows: Int = 256) -> CapacityPlan {
         let neuralEngine = neuralEngine || aneInt8
         let resources = Resources(amx: amx, ane: neuralEngine, bf16Weights: bf16Activations, int8Weights: aneInt8 || int8 || bf16Activations,
@@ -639,7 +665,7 @@ extension CapacityPlan {
             + (bf16Activations ? " bf16act≥\(roundingMinimumRows)" : "")
             + (amx ? " amx 0.631" : "") + (flash ? " flash" : "")
             + (tiles16 ? " tiles16" : tilesbf16 ? " tilesbf16" : tiles ? " tiles" : "") + (fused && (tiles16 || tilesbf16) ? " fused" : "")
-            + (cut && (tiles || tiles16 || tilesbf16) ? " cut" : "")
+            + (cut && (tiles || tiles16 || tilesbf16) ? " cut" : "") + (normRope ? " normrope" : "")
         var attention: AttentionOverride?
         if tiles16 || tilesbf16 || tiles {
             // Every attention the plan speaks of (the encoders', which no caller asks it, stay the graph's); a flash caller takes tiles too.
@@ -659,6 +685,14 @@ extension CapacityPlan {
                 return forced.isRunnable(for: key) ? forced : nil
             }
         } else if flash { attention = { (_: AttentionKey, tries: Bool) -> AttentionAssignment? in tries ? AttentionAssignment.flash : nil } }
+        if normRope {
+            // The kernel the other words force, or the engine's defaults (what `assign` answers without a rule), with the pass on the GPU.
+            let kernel = attention
+            attention = { (key: AttentionKey, tries: Bool) -> AttentionAssignment? in
+                guard !key.cross else { return kernel?(key, tries) }
+                return (kernel?(key, tries) ?? .defaults(key)).normRope(onGPU: true)
+            }
+        }
         return CapacityPlan(resources: resources, label: label, override: { (key: ProductKey) -> ProductAssignment? in
             // The activation rounded where the request rounds it: the denoiser's products of enough rows.
             let rounds = bf16Activations && key.phase == .denoising && key.m >= roundingMinimumRows
@@ -703,17 +737,17 @@ extension CapacityPlan {
     }
 
     /// **The forcing a developer names** (`SILICONED_PLAN`, a comma list of `amx`, `flash`, `tiles`, `tiles16`, `tilesbf16`, `fused`, `ane`,
-    /// `aneint8`, `int8`, `q8`, `bf16act`; `tiles16` before `tilesbf16` before `tiles` when several are named; `fused` with a half-precision one; `cut` with one of them: the default cut by heads, its GPU heads on that kernel): the
+    /// `aneint8`, `int8`, `q8`, `bf16act`, `normrope`; `tiles16` before `tilesbf16` before `tiles` when several are named; `fused` with a half-precision one; `cut` with one of them: the default cut by heads, its GPU heads on that kernel): the
     /// previous switches of the checks and the judges, in one place. `aneint8` is `ane` with the published int8 weights read as they
     /// are by the ANE's int8 program beside the GPU's int8 kernel; `int8` reads them as published by the GPU's kernel everywhere
     /// else (`aneint8,int8` is the integers' route at every height, as the former `gemm_int8` + `gemm_ane` + `ane_int8` ran it).
     /// `nil` for an empty list; a word it does not know makes the whole list unread.
     package static func forcing(named list: String) -> CapacityPlan? {
         let words = Set(list.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces).lowercased() }.filter { !$0.isEmpty })
-        guard !words.isEmpty, words.isSubset(of: ["amx", "flash", "tiles", "tiles16", "tilesbf16", "fused", "cut", "ane", "aneint8", "int8", "q8", "bf16act"]) else { return nil }
+        guard !words.isEmpty, words.isSubset(of: ["amx", "flash", "tiles", "tiles16", "tilesbf16", "fused", "cut", "ane", "aneint8", "int8", "q8", "bf16act", "normrope"]) else { return nil }
         return forcing(neuralEngine: words.contains("ane"), bf16Activations: words.contains("bf16act"),
                        amx: words.contains("amx"), flash: words.contains("flash"), tiles: words.contains("tiles"),
                        tiles16: words.contains("tiles16"), tilesbf16: words.contains("tilesbf16"), fused: words.contains("fused"), cut: words.contains("cut"), aneInt8: words.contains("aneint8"),
-                       int8: words.contains("int8"), q8: words.contains("q8"))
+                       int8: words.contains("int8"), q8: words.contains("q8"), normRope: words.contains("normrope"))
     }
 }

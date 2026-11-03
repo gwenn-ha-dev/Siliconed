@@ -294,13 +294,30 @@ package final class AnimaDiT: BoundaryRecording, PhaseTiming {
         try linearGPU(prefix + "attn1.to_k.weight", a: normed, into: k, m: s, k: d, n: d)
         try linearGPU(prefix + "attn1.to_v.weight", a: normed, into: v, m: s, k: d, n: d)
         // QK-Norm then RoPE, one pass per row (`Ops.rmsNormRope`): the same operations in the same order
-        // as the two passes, so the same bits (measured).
-        for (name, tensor) in [("attn1.norm_q.weight", q), ("attn1.norm_k.weight", k)] {
-            try artifact.materialize(prefix + name, into: reserve, capacity: reserveCapacity)
-            timed("qk-norm + rope") { Ops.rmsNormRope(tensor, weight: reserve, freqs: freqs, sequence: s,
-                                                      heads: heads, headDim: dh, eps: 1e-5) }
+        // as the two passes, so the same bits (measured). Or on the GPU, chained to the attention, where the plan says (`QKNormRope`).
+        let path = try selfAttention(s)
+        let assigned = gemm.assignment(AttentionKey(sequence: s, heads: heads, headDim: dh), flash: true)
+        let passClock = ProductLedger.pass(sequence: s, heads: heads, headDim: dh)
+        if assigned.normRopeOnGPU, QKNormRope.runs(headDim: dh), let pass = QKNormRope.shared(device: gemm.device, queue: gemm.queue) {
+            var operands: [QKNormRope.Operand] = []
+            for (name, tensor) in [("attn1.norm_q.weight", q), ("attn1.norm_k.weight", k)] {
+                try artifact.materialize(prefix + name, into: reserve, capacity: reserveCapacity)
+                let buffer = try gemm.wrap(UnsafeMutableRawPointer(tensor), bytes: imageTokens * d * 4, name: tensor == q ? "q" : "k")
+                operands.append(.init(buffer, heads: heads, weight: Array(UnsafeBufferPointer(start: reserve, count: dh))))
+            }
+            let table = try gemm.region(freqs, bytes: s * dh * 4, name: "freqs")
+            var waits = false
+            if case .split = path { waits = true }
+            timed("qk-norm + rope") { pass.run(operands, rows: s, headDim: dh, eps: 1e-5, freqs: table, layout: .interleaved, wait: waits) }
+        } else {
+            for (name, tensor) in [("attn1.norm_q.weight", q), ("attn1.norm_k.weight", k)] {
+                try artifact.materialize(prefix + name, into: reserve, capacity: reserveCapacity)
+                timed("qk-norm + rope") { Ops.rmsNormRope(tensor, weight: reserve, freqs: freqs, sequence: s,
+                                                          heads: heads, headDim: dh, eps: 1e-5) }
+            }
         }
-        try attend(selfAttention(s), "sdpa self", q: q, k: k, v: v, keyRows: imageTokens)
+        passClock?.finish()
+        try attend(path, "sdpa self", q: q, k: k, v: v, keyRows: imageTokens)
         try linearGPU(prefix + "attn1.to_out.0.weight", a: merged, into: o, m: s, k: d, n: d)
         if let tag { record(tag + "attn1_out", o, s * d) }
         timed("residual") { Ops.gatedResidual(x, plus: o, gate: gate, rows: s, columns: d) }
