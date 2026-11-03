@@ -20749,6 +20749,46 @@
         }
       }
     },
+    "Matrix products on the 8-bit weights, GPU tensor units, bf16 activations" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Matrixprodukte auf den 8-Bit-Gewichten, Tensoreinheiten der GPU, bf16-Aktivierungen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Productos matriciales sobre los pesos de 8 bits, unidades tensoriales de la GPU, activaciones en bf16"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Produits matriciels sur les poids 8 bits, unités tensorielles du GPU, activations en bf16"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prodotti matriciali sui pesi a 8 bit, unità tensoriali della GPU, attivazioni in bf16"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "8ビットの重みでの行列積（GPUのテンソルユニット、bf16のアクティベーション）"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "8 位权重的矩阵乘积（GPU 张量单元，bf16 激活）"
+          }
+        }
+      }
+    },
     "Matrix products on the 8-bit weights, Neural Engine" : {
       "localizations" : {
         "de" : {
@@ -20825,6 +20865,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "8 位权重的矩阵乘积，按发布时的样子读取"
+          }
+        }
+      }
+    },
+    "Matrix products on the GGUF 8-bit weights, GPU tensor units, bf16 activations" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Matrixprodukte auf den GGUF-8-Bit-Gewichten, Tensoreinheiten der GPU, bf16-Aktivierungen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Productos matriciales sobre los pesos GGUF de 8 bits, unidades tensoriales de la GPU, activaciones en bf16"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Produits matriciels sur les poids GGUF 8 bits, unités tensorielles du GPU, activations en bf16"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prodotti matriciali sui pesi GGUF a 8 bit, unità tensoriali della GPU, attivazioni in bf16"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GGUF 8ビットの重みでの行列積（GPUのテンソルユニット、bf16のアクティベーション）"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GGUF 8 位权重的矩阵乘积（GPU 张量单元，bf16 激活）"
           }
         }
       }

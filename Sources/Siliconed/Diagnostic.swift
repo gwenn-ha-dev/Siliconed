@@ -65,7 +65,9 @@ import Metal
 /// (`EngineSettings.adopt(map:)`), never during one. The command line, the checks and the close-out
 /// never designate one unless a developer names it (`SILICONED_MAP`): today's defaults.
 package enum Diagnostic {
-    /// The JSON's version: the script that aggregates the reports reads it. **19** (2/11/2026): the attention on bf16 operands
+    /// The JSON's version: the script that aggregates the reports reads it. **20** (3/11/2026): the 8-bit products on an activation
+    /// rounded to bf16 (`gpu/int8act`, its tile among candidates; `gpu/q8act`) are measured and judged at the half-precision bar, and
+    /// the ANE's integers beside the rounded one keep their own sharing (`gpu/int8act+ane/int8`); **19** (2/11/2026): the attention on bf16 operands
     /// (`gpu/tilesbf16`) is measured beside the others, and each half-precision attention kernel's form — three stages or fused at a
     /// tile — is chosen among candidates and kept in the model (`attentionTiles`, `AttentionTile`); **18** (2/11/2026): the `matmul2d` kernels' tile is measured
     /// among candidates and kept in the model (`tiles`, `MatmulTile`), each candidate's solo in the measurements; **17** (31/10/2026): the attention's
@@ -73,8 +75,8 @@ package enum Diagnostic {
     /// effect on the plan, replace the green flag and the defects, and the fit's aberrant figures are bounded; 15 (30/10/2026) was the
     /// capacity model — inventory, the probes' raw measurements, the model they fit, the judge per kernel, the memory, the stages and
     /// a verdict of defects; 14 and before were a table of routes timed against each other (grid of classes, pairs A B A B), which the
-    /// engine no longer reads. A report of a schema under 19 is not a map: the app measures again (`isCurrent`).
-    package static let schema = 19
+    /// engine no longer reads. A report of a schema under 20 is not a map: the app measures again (`isCurrent`).
+    package static let schema = 20
     package static let repository = "https://github.com/gwenn-ha-dev/Siliconed"
     /// **Wall seconds the whole diagnostic may take, inventory and witnesses included, on any Mac: a ceiling, not a target** (the
     /// user, 1/11/2026: a Mac pays once per version rather than a few percent at every render). The duration is a result: about forty

@@ -166,7 +166,8 @@ package enum FP32Run {
 /// per column or per tensor (a Compact from Comfy-Org's int8 convrot) reads them as published wherever its map says the int8
 /// kernel wins, else widened; `siliconed check` runs the defaults, which widen. A DiT stage on such a map therefore evaluates along
 /// the int8 route (`plan`), says how many products read the integers (`account`), and judges its output once more widened,
-/// by the same rule: both routes a render can take. A GGUF Q8_0's blocks (`gemm_q8`) are another route, not this one.
+/// by the same rule: both routes a render can take. Under `--bf16-activations` the process's plan reads them already, on the rounded
+/// activation (`gpu/int8act`), as it reads a GGUF Q8_0's blocks (`gpu/q8act`): this route then stands aside.
 package struct Int8Route {
     /// The plan the DiT under test runs under: `nil` when the process's plan already reads the integers (`SILICONED_PLAN=int8`).
     package let plan: CapacityPlan?
@@ -245,14 +246,18 @@ package enum FP16AttentionRun {
 }
 
 package enum BF16ActivationRun {
-    /// How many products rounded their activation. None (no Metal 4, a refused compiler): skipped, since what
-    /// would be judged is the fp32 path against a looser bar.
+    /// How many products rounded their activation, and how many read a published 8-bit weight (a Compact's or a Light's: under
+    /// `--bf16-activations` they are read as published on the rounded activation, `gpu/int8act` or `gpu/q8act` — a rounded activation
+    /// has no widened route). None rounded (no Metal 4, a refused compiler): skipped, since what would be judged is the fp32 path against
+    /// a looser bar.
     package static func account(_ report: Report) throws {
         let rounded = GEMM.roundedProducts.withLock { $0 }
         guard rounded > 0 else {
             throw Skip("--bf16-activations: no product rounded its activation on this Mac (Metal 4 missing, or the kernel refused)")
         }
-        report.add(Judge.holds("bf16 activations", true, note: "\(rounded) products on a rounded operand"))
+        let integers = GEMM.int8Products.withLock { $0 }
+        report.add(Judge.holds("bf16 activations", true, note: "\(rounded) products on a rounded operand"
+                                   + (integers > 0 ? ", \(integers) products on published 8-bit weights" : "")))
     }
 }
 

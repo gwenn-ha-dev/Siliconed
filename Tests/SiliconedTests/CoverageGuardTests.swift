@@ -15,7 +15,7 @@ import Testing
 ///                line the probes measure, for some class of the version (`CapacityClasses`, the five families, 1024²)
 ///     permitted  P20 (`p20` below), as the decisions of 2/11 and 3/11/2026 read it
 ///     listed     `gaps`: each permitted cell without a route matches the first entry that names it — hardware, a decision, or a
-///                lot still open (R5, R7…) — with its reason written
+///                lot still open (R7…) — with its reason written
 ///
 ///     fails      a permitted cell neither routed nor listed (a new hole) · a routed cell P20 forbids · an entry that names a routed
 ///                cell (a hole filled: narrow the entry) or none (stale) · a route that reads a line no probe measures, unless listed
@@ -30,8 +30,9 @@ import Testing
 ///   - **A pair is its own cell.** The ×1.52 once claimed for GPU + ANE was read off the members' lines; the pair of the
 ///     Standard's own route (`gpu·bf16 + ane·fp16`) has no route. A set is listed only where each of its lanes has a route alone;
 ///     a set with a lane that has none is that lane's hole.
-///   - **A map is the probes'**: the solver's lines are those the probes can measure. A route that reads another (the AMX's columns
-///     beside a native weight read `amx/int8`, `amx/q8`, which no probe measures) is offered on no Mac: listed in `deadRoutes`.
+///   - **A map is the probes'**: the solver's lines are those the probes can measure. A route that reads another is offered on no Mac:
+///     listed in `deadRoutes` (empty since the AMX's columns beside a native weight, which read `amx/int8` and `amx/q8`, left the
+///     solver on 3/11/2026).
 @Suite struct CoverageGuardTests {
     typealias M = CapacityModel
     typealias Engine = CapacityModel.Engine
@@ -76,15 +77,15 @@ import Testing
     }
 
     /// **What the rows of a kernel compute on.** Exhaustive over `CapacityModel.Form`: a new form is not a silent cell.
-    static func lane(_ k: M.Kernel, rounds: Bool) -> Lane {
+    static func lane(_ k: M.Kernel) -> Lane {
         let operand: Operand
         switch k.form {
         // The weight widened, or a bf16 weight read as published beside an fp32 activation (`float × bfloat`: the widening is a shift).
         case .fp32, .bf16: operand = .fp32
-        case .bf16act: operand = .bf16
-        // An 8-bit weight read as published: beside the GPU's fp32 activation (rounded to bf16 where the assignment says so — the AMX's
-        // columns read the fp32 one); the ANE's int8 program takes the integers as its fp16 input.
-        case .int8, .q8: operand = k.engine == .ane ? .fp16 : (rounds && k.engine == .gpu ? .bf16 : .fp32)
+        // A bf16 or 8-bit weight read as published beside the activation rounded to bf16 (the integers are exact in bf16).
+        case .bf16act, .int8act, .q8act: operand = .bf16
+        // An 8-bit weight read as published: beside the GPU's fp32 activation; the ANE's int8 program takes the integers as its fp16 input.
+        case .int8, .q8: operand = k.engine == .ane ? .fp16 : .fp32
         case .fp16: operand = .fp16
         case .graph, .flash, .heads, .tiles: operand = .fp32
         case .tiles16: operand = .fp16
@@ -179,13 +180,6 @@ import Testing
             "no AMX kernel on bf16 operands (BFMMLA/SME): the probes measure `amx/fp32` alone, so the map cannot say whether it pays") { c in
             c.lanes.contains { $0.engine == .amx && $0.operand == .bf16 }
         },
-        // R5: the 8-bit product on a rounded activation.
-        Gap("R5", .open,
-            "R5: the GPU's 8-bit product on an activation rounded to bf16 — the bfloat kernels are in `TensorGEMMBF16` and the engine "
-                + "takes the assignment (`WeightProducts`: `roundsHere`), the solver never offers it (no map form, no option)",
-            probe: (ProductKey(k: 3072, n: 3072, m: 4096, weight: .int8), ProductAssignment(path: .native, roundsActivation: true, gpu: 4096), true)) { c in
-            isProduct(c, [.int8, .q8]) && has(c, .gpu, .bf16)
-        },
         Gap("kquant-bf16", .open,
             "R7 (R3b3): the K-quants read without widening, after R5 — a widened Q4_K weight beside a rounded activation has no kernel",
             probe: (ProductKey(k: 3072, n: 3072, m: 4096, weight: .q4k), ProductAssignment(path: .native, roundsActivation: true, gpu: 4096), false)) { c in
@@ -205,6 +199,23 @@ import Testing
                     ProductAssignment(path: .bf16, roundsActivation: true, gpu: 2048, ane: 2048), false)) { c in
             isProduct(c, [.bf16]) && has(c, .gpu, .bf16) && c.lanes.count >= 2
         },
+        // The 8-bit products on a rounded activation, beside another engine.
+        Gap("rounded-8bit-amx", .decided,
+            "the AMX beside the GPU's rounded rows on an 8-bit weight: the AMX reads the fp32 activation (BNNS, `amx/fp32`), so one product "
+                + "would round some of its rows or columns and not the others, and its columns beside a native weight left the solver "
+                + "(no probe times them); `isRunnable` refuses a rounded assignment with AMX columns",
+            probe: (ProductKey(k: 3072, n: 3072, m: 4096, weight: .int8),
+                    ProductAssignment(path: .native, roundsActivation: true, gpu: 4096, amxColumns: 1024), false)) { c in
+            isProduct(c, [.int8, .q8]) && has(c, .gpu, .bf16) && has(c, .amx)
+        },
+        Gap("q8-ane", .hardware,
+            "the ANE beside a GGUF Q8_0 weight read as published: its int8 program takes a scale per column or for the tensor, never "
+                + "Q8_0's blocks (`NeuralEngine.readsInt8`, `isRunnable`), and its fp16 program reads the widened weight, which a native "
+                + "product never makes (the reserve holds the integers and their scales)",
+            probe: (ProductKey(k: 3072, n: 3072, m: 4096, weight: .q8),
+                    ProductAssignment(path: .native, roundsActivation: true, gpu: 2048, ane: 2048), false)) { c in
+            isProduct(c, [.q8]) && has(c, .gpu, .bf16) && has(c, .ane)
+        },
         Gap("lora-sets", .decided,
             "a LoRA's products are thin (`CapacityModel.isThin`): a set's loss was measured on products with no short side, none is "
                 + "offered on one — each engine alone is, by its thin line") { c in
@@ -213,11 +224,7 @@ import Testing
     ]
 
     /// **Routes the solver can name that no map can offer**: they read a line no probe measures. Each with its reason.
-    static let deadRoutes: [String: String] = [
-        "gpu+amx/int8": "the AMX's columns beside a published int8 weight time `amx/int8`, a line no probe measures (the AMX widens its "
-            + "columns: `amx/fp32` would time them) — `WeightProducts` runs the columns, no plan ever gives them",
-        "gpu+amx/q8": "the same beside a GGUF Q8_0 weight: `amx/q8` is measured by no probe",
-    ]
+    static let deadRoutes: [String: String] = [:]
 
     /// **What no class of the plan covers**, hence no cell: a stage of the chain with a single route.
     static let unplanned: [String: String] = [
@@ -240,6 +247,11 @@ import Testing
         for mask in 1..<(1 << engines.count) {
             let set = engines.indices.filter { mask & (1 << $0) != 0 }.map { engines[$0] }
             if set.count >= 2 { m.sharing[M.key(set)] = .init() }
+        }
+        // The pairs whose sharing the probes measure by kernels (the ANE's integers beside each GPU kernel that reads them).
+        for form in Diagnostic.CapacityProbes.Context.integerPairs {
+            let pair = [M.Kernel(.gpu, form), M.Kernel(.ane, .int8)]
+            if pair.allSatisfy(lines.contains) { m.sharing[M.key(pair)] = .init() }
         }
         return m
     }
@@ -278,7 +290,7 @@ import Testing
                     let subject = Subject.product(cl.phase, format)
                     o.present[variant, default: []].insert(subject)
                     for s in CapacitySolver.candidates(key, model: model, constraints: cl.phase == .encoding ? encoder : denoiser) {
-                        let lanes = Set(s.rows.filter { $0.value > 0 }.keys.map { lane($0, rounds: s.assignment.roundsActivation) })
+                        let lanes = Set(s.rows.filter { $0.value > 0 }.keys.map { lane($0) })
                         o.routed.insert(Cell(variant: variant, subject: subject, lanes: lanes))
                         o.routes.insert(s.route)
                         o.products.append((key, s))
@@ -288,7 +300,7 @@ import Testing
                     o.present[variant, default: []].insert(.attention)
                     for a in CapacitySolver.candidates(key, flash: CapacitySolver.triesFlash(family: family, cross: cross), model: model,
                                                        constraints: denoiser) {
-                        let lanes = Set(a.rows.filter { $0.value > 0 }.keys.map { lane($0, rounds: false) })
+                        let lanes = Set(a.rows.filter { $0.value > 0 }.keys.map { lane($0) })
                         o.routed.insert(Cell(variant: variant, subject: .attention, lanes: lanes))
                         o.routes.insert(a.route)
                         o.attentions.append(a)
@@ -380,6 +392,24 @@ import Testing
         }
     }
 
+    /// The 8-bit products on a rounded activation (3/11/2026): the GPU's rounded kernel alone on an int8 and on a Q8_0 weight, and beside
+    /// the ANE's integers on an int8 one — in the denoiser of the versions that publish them, and never in the encoder.
+    @Test func theRoundedEightBitProductsAreRoutes() {
+        let routed = Self.offer(Self.model(lines: Self.probed)).routed
+        let rounded = Lane(.gpu, .bf16)
+        for variant in Variant.allCases {
+            for (format, sets) in [(Format.int8, [[rounded], [rounded, Lane(.ane, .fp16)]]), (Format.q8, [[rounded]])] as [(Format, [Set<Lane>])] {
+                let subject = Subject.product(.denoising, format)
+                guard Self.classes(variant).contains(where: { if case let .product(_, _, _, f) = $0.1.shape { f == format && $0.1.phase == .denoising } else { false } })
+                else { continue }
+                for lanes in sets { #expect(routed.contains(Cell(variant: variant, subject: subject, lanes: lanes)), "\(variant) \(format) \(lanes)") }
+            }
+            #expect(!routed.contains { $0.variant == variant && $0.subject.phase == .encoding && $0.lanes.contains(rounded) })
+        }
+        #expect(routed.contains { $0.subject == .product(.denoising, .int8) }, "no version publishes int8 weights any more: update the test")
+        #expect(routed.contains { $0.subject == .product(.denoising, .q8) }, "no version publishes Q8_0 weights any more: update the test")
+    }
+
     @Test func aRouteReadsOnlyLinesAProbeMeasures() {
         let every = Set(Engine.allCases.flatMap { e in M.Form.allCases.map { M.Kernel(e, $0) } })
         let dead = Self.offer(Self.model(lines: every)).routes.subtracting(Self.offer(Self.model(lines: Self.probed)).routes)
@@ -387,8 +417,9 @@ import Testing
         // Every attention form is one the probes time: none is read by a route the map never measures.
         let attentionForms: Set<M.Form> = [.graph, .flash, .heads, .tiles, .tiles16, .tilesbf16]
         #expect(attentionForms.isSubset(of: Set(Self.probed.map(\.form))))
-        #expect(Set(M.Form.allCases).subtracting(attentionForms) == [.fp32, .bf16, .bf16act, .int8, .q8, .fp16],
+        #expect(Set(M.Form.allCases).subtracting(attentionForms) == [.fp32, .bf16, .bf16act, .int8, .q8, .fp16, .int8act, .q8act],
                 "a new form of kernel: say whether it is a product's or an attention's")
+        #expect(M.Form.allCases.allSatisfy { $0.isProduct != attentionForms.contains($0) })
     }
 
     @Test func eachGapsProbeSaysWhetherTheEngineRunsIt() {
@@ -409,6 +440,7 @@ import Testing
             if a.usesANE { #expect(r.ane && (a.path != .native || r.aneInt8), "\(key) \(s.route)") }
             if a.path == .bf16 { #expect(a.roundsActivation ? r.roundedActivations : r.bf16Weights, "\(key) \(s.route)") }
             if a.path == .native { #expect(key.weight == .int8 ? r.int8Weights : r.q8Weights, "\(key) \(s.route)") }
+            if a.roundsActivation { #expect(r.roundedActivations, "\(key) \(s.route)") }
         }
         for a in o.attentions where a.assignment.usesTiles && a.assignment.tilePrecision != .fp32 || a.assignment.gpuUsesTiles && a.assignment.gpuTilePrecision != .fp32 {
             #expect(r.halfAttention, "\(a.route)")

@@ -6,9 +6,10 @@ import Foundation
 /// time, the integers the engines will run, never a ratio for the engine to round.
 ///
 ///     product (k, n, m, weight format, phase)
-///         │   each path    widened (any set of gpu · amx · ane) · bf16 · bf16 rounded · native int8 / q8 (gpu · gpu + amx columns)
+///         │   each path    widened (any set of gpu · amx · ane) · bf16 · bf16 rounded · native int8 / q8 (gpu · gpu + ane on int8)
+///         │                · native rounded int8 / q8 (gpu · gpu + ane on int8)
 ///         │   each set     the balanced split on the lines (`CapacityModel.split`), then the integers around it on the lattice
-///         ▼                the engines can run: the GPU's rows on MPS's 64-row tile, the ANE's in units of 256, native columns on 64
+///         ▼                the engines can run: the GPU's rows on MPS's 64-row tile, the ANE's in units of 256
 ///     t = preparation(path) + T(rows)               one weight is prepared per call, at every height
 ///         ▼
 ///     the least t, the simplest set on a tie        ──▶  ProductAssignment
@@ -37,6 +38,12 @@ import Foundation
 ///     itself imposes none of them.
 ///   - **Neutral on tie**: candidates come simplest first (the GPU, then with the AMX, with the ANE, the three, then the AMX alone,
 ///     the ANE alone), and a more complex one must be faster by more than a part in a billion.
+///   - **No AMX beside a native weight.** Its columns would be widened on the CPU at every call and multiplied in fp32 — a widening,
+///     the cost the native path exists to avoid —, timed by a line (`amx/int8`, `amx/q8`) no probe can measure as the route runs (the
+///     widening of a share of columns inside the AMX's side, beside a GPU reading integers); the AMX beside the GPU on an 8-bit weight is
+///     the widened route's `gpu+amx`, whose lines, sharing and widening the map measures; and the rounded activation the GPU's tensor units
+///     take cannot have it beside (the AMX reads the fp32 one). Retired from the solver on 3/11/2026 (`ProductAssignment` still runs a
+///     pinned one).
 ///
 /// The second time (E5, the overlap between blocks) enters through `Combine`: the solver gives each block its preparation,
 /// its compute and what each engine is busy for, and `combine` turns the blocks into a total. `sequential` is the sum.
@@ -69,8 +76,9 @@ package enum CapacitySolver {
         /// the GPU, so fp16 keeps what bf16 holds). False: a Mac whose map gives it nothing, the accelerators off, an encoder.
         package var allowsANE: Bool
         /// **An operand may be rounded below fp32 on the GPU's tensor units**: an activation to bf16 before a product on a bf16 weight
-        /// (`gpu/bf16act`), the attention's operands to bf16 (`tilesbf16`) — P20: bf16 between two operations on bf16 published weights,
-        /// as a GPU in bf16 computes them, the sums fp32 — at every version, the Standard's included (decided 2/11/2026: the fp32
+        /// (`gpu/bf16act`) or on an 8-bit one read as published (`gpu/int8act`, `gpu/q8act`: the integers are exact in bf16, the scales
+        /// applied in fp32), the attention's operands to bf16 (`tilesbf16`) — P20: bf16 between two operations, never below the published
+        /// weight, as a GPU in bf16 computes them, the sums fp32 — at every version, the Standard's included (decided 2/11/2026: the fp32
         /// operand was the M1 Pro's choice of speed, not a rule). The map says where it is faster; an encoder never.
         package var allowsRounding: Bool
 
@@ -266,15 +274,13 @@ private struct ProductSolver {
         return k
     }
 
-    func seconds(_ rows: [Kernel: Int], m: Int, k: Int, n: Int, swapped: Bool = false) -> Double? {
+    func seconds(_ rows: [Kernel: Int], m: Int, k: Int, n: Int) -> Double? {
         // A set of engines the probes never measured is no candidate: keep 1 is not a measure.
         guard model.measures(rows.filter { $0.value > 0 }.map(\.key.engine)) else { return nil }
-        return swapped ? model.seconds(m: n, k: k, n: m, rows: rows, sustained: c.sustained)
-                : model.seconds(m: m, k: k, n: n, rows: rows, sustained: c.sustained)
+        return model.seconds(m: m, k: k, n: n, rows: rows, sustained: c.sustained)
     }
-    func busy(_ rows: [Kernel: Int], m: Int, k: Int, n: Int, swapped: Bool = false) -> [Engine: Double] {
-        let b = swapped ? model.busy(m: n, k: k, n: m, rows: rows, sustained: c.sustained)
-                        : model.busy(m: m, k: k, n: n, rows: rows, sustained: c.sustained)
+    func busy(_ rows: [Kernel: Int], m: Int, k: Int, n: Int) -> [Engine: Double] {
+        let b = model.busy(m: m, k: k, n: n, rows: rows, sustained: c.sustained)
         return Dictionary(b.map { ($0.key.engine, $0.value) }, uniquingKeysWith: +)
     }
 
@@ -304,20 +310,6 @@ private struct ProductSolver {
         return units.sorted().map { $0 * unit }
     }
 
-    /// The columns the AMX takes beside a native weight (the GPU's, multiples of 64, around the balance `g0`), as
-    /// `WeightProducts.amxColumns` lays them.
-    func gpuColumns(n: Int, balance g0: Double) -> [Int] {
-        let top = (n - 64) / 64 * 64
-        guard n >= 128, top >= 64 else { return [] }
-        let base = Int((g0 / 64).rounded())
-        var seen = Set<Int>(), out: [Int] = []
-        for d in -2...2 {
-            let g = min(top, max(64, (base + d) * 64))
-            if seen.insert(g).inserted { out.append(g) }
-        }
-        return out
-    }
-
     /// **What a `loraUp` product pays beyond its product, for it adds to the output instead of writing it**: the GPU's rows read the output once
     /// more (its kernel accumulates, `beta = 1`); the CPU engines' rows land in a scratch and a pass adds it to the output — `m' · n` floats read
     /// twice and written once. At the memory's bandwidth; 0 for any other class, and where the bandwidth was not measured.
@@ -331,8 +323,6 @@ private struct ProductSolver {
     struct Option {
         var assignment: ProductAssignment
         var rows: [Kernel: Int]
-        /// The split is along the columns (an AMX beside a native weight): the dimensions of the model's product are swapped.
-        var swapped = false
         var seconds: Double
     }
 
@@ -387,38 +377,29 @@ private struct ProductSolver {
         return out
     }
 
-    /// **A native 8-bit weight**: the GPU alone, or beside the AMX on the last columns (the GPU's a multiple of 64) — and, for an
-    /// int8 weight whose scales the ANE's program takes (per column or for the tensor, never Q8_0's blocks), the ANE's last rows
+    /// **A native 8-bit weight**: the GPU alone — and, for an int8 weight whose scales the ANE's program takes (per column or for the tensor, never Q8_0's blocks), the ANE's last rows
     /// beside the GPU's int8 kernel, both reading the integers: `[gpu/int8, ane/int8]`, a set with its own sharing in the model. It
     /// is offered only to the denoiser (P20), from the ANE's floor, where the model has the line `ane/int8` (a route the probes'
     /// judge refused has none) and `NeuralEngine.readsInt8` for the weight's rotation (`isRunnable`).
+    ///
+    /// **Then the same on the activation rounded to bf16** where operands may be rounded (`allowsRounding`, the denoiser, from the
+    /// rounding's floor): the GPU's rounded kernel alone (`gpu/int8act`, `gpu/q8act`) or beside the ANE's integers
+    /// (`[gpu/int8act, ane/int8]`) — that pair only where the probes measured its own sharing: the rounded kernel runs on the tensor
+    /// units, and the fp32 pair's κ is not its κ. No AMX beside it: the AMX reads the fp32 activation.
     func native(_ key: ProductKey) -> [Option] {
         let (k, n, m) = (key.k, key.n, key.m)
-        let form: CapacityModel.Form = key.weight == .int8 ? .int8 : .q8
-        guard let gpu = line(.gpu, form) else { return [] }
-        var out: [Option] = []
-        func option(_ columns: Int) -> Option? {
-            let assignment = ProductAssignment(path: .native, gpu: m, amxColumns: columns)
-            guard assignment.isRunnable(for: key) else { return nil }
-            if columns == 0 {
-                guard let t = seconds([gpu: m], m: m, k: k, n: n) else { return nil }
-                return Option(assignment: assignment, rows: [gpu: m], seconds: t)
-            }
-            guard let amx = line(.amx, form), let t = seconds([gpu: n - columns, amx: columns], m: m, k: k, n: n, swapped: true) else { return nil }
-            return Option(assignment: assignment, rows: [gpu: n - columns, amx: columns], swapped: true, seconds: t)
-        }
-        if let o = option(0) { out.append(o) }
+        let int8 = key.weight == .int8
         let short = CapacityModel.isThin(rows: m, k: k, n: n)     // no set on such a product: its loss was not measured there
-        if m >= c.limits.amxRows, !short, let amx = line(.amx, form),
-           let seed = model.split(m: n, k: k, n: m, kernels: [gpu, amx], sustained: c.sustained), let g0 = seed.rows[gpu] {
-            let cands = gpuColumns(n: n, balance: Double(g0)).compactMap { option(n - $0) }
-            if let b = cands.min(by: { $0.seconds < $1.seconds }) { out.append(b) }
-        }
         // The ANE's integers need the ANE itself: a map that left its fp16 out (judged wrong) brings no engine up (`Resources.ane`).
-        if key.weight == .int8, c.allowsANE, key.phase == .denoising, m >= c.limits.aneRows, !short, line(.ane, .fp16) != nil,
-           let ane = line(.ane, .int8) {
+        let ane = int8 && c.allowsANE && key.phase == .denoising && m >= c.limits.aneRows && !short && line(.ane, .fp16) != nil
+            ? line(.ane, .int8) : nil
+        var out: [Option] = []
+
+        /// The GPU's `gpu` kernel beside the ANE's integers, rows around the balance, then the ANE alone (`alone`).
+        func withANE(_ gpu: Kernel, rounds: Bool, alone: Bool) {
+            guard let ane else { return }
             func integers(_ rows: Int) -> Option? {
-                let assignment = ProductAssignment(path: .native, gpu: m - rows, ane: rows)
+                let assignment = ProductAssignment(path: .native, roundsActivation: rounds && rows < m, gpu: m - rows, ane: rows)
                 guard assignment.isRunnable(for: key) else { return nil }
                 var split: [Kernel: Int] = [ane: rows]
                 if rows < m { split[gpu] = m - rows }
@@ -429,7 +410,24 @@ private struct ProductSolver {
                let b = aneRows(m: m, balance: Double(r0)).compactMap(integers).min(by: { $0.seconds < $1.seconds }) {
                 out.append(b)
             }
-            if let o = integers(m) { out.append(o) }
+            if alone, let o = integers(m) { out.append(o) }
+        }
+
+        // On the fp32 activation.
+        if let gpu = line(.gpu, int8 ? .int8 : .q8) {
+            let assignment = ProductAssignment(path: .native, gpu: m)
+            if assignment.isRunnable(for: key), let t = seconds([gpu: m], m: m, k: k, n: n) {
+                out.append(Option(assignment: assignment, rows: [gpu: m], seconds: t))
+            }
+            withANE(gpu, rounds: false, alone: true)
+        }
+        // On the activation rounded to bf16.
+        if key.phase == .denoising, c.allowsRounding, m >= c.limits.roundingRows, let gpu = line(.gpu, int8 ? .int8act : .q8act) {
+            let assignment = ProductAssignment(path: .native, roundsActivation: true, gpu: m)
+            if assignment.isRunnable(for: key), let t = seconds([gpu: m], m: m, k: k, n: n) {
+                out.append(Option(assignment: assignment, rows: [gpu: m], seconds: t))
+            }
+            if let ane, model.sharing[CapacityModel.key([gpu, ane])] != nil { withANE(gpu, rounds: true, alone: false) }
         }
         return out
     }
@@ -471,7 +469,7 @@ private struct ProductSolver {
     func solution(_ o: Option, _ key: ProductKey) -> CapacitySolver.ProductSolution {
         let prep = preparation(format: key.weight, path: o.assignment.path, k: key.k, n: key.n)
         return .init(assignment: o.assignment, route: o.assignment.route(weight: key.weight), rows: o.rows, preparation: prep,
-                     compute: o.seconds, busy: busy(o.rows, m: key.m, k: key.k, n: key.n, swapped: o.swapped))
+                     compute: o.seconds, busy: busy(o.rows, m: key.m, k: key.k, n: key.n))
     }
 
     func solve(_ key: ProductKey) -> CapacitySolver.ProductSolution? {
@@ -488,7 +486,6 @@ private struct ProductSolver {
     func evaluate(_ a: ProductAssignment, _ key: ProductKey) -> CapacitySolver.ProductSolution? {
         let (k, n, m) = (key.k, key.n, key.m)
         var rows: [Kernel: Int] = [:]
-        var swapped = false
         switch a.path {
         case .widened:
             if a.gpu > 0 { guard let g = line(.gpu, .fp32) else { return nil }; rows[g] = a.gpu }
@@ -498,25 +495,22 @@ private struct ProductSolver {
             guard let g = line(.gpu, a.roundsActivation ? .bf16act : .bf16) else { return nil }
             rows[g] = a.gpu
         case .native:
-            let form: CapacityModel.Form = key.weight == .int8 ? .int8 : .q8
-            guard let g = line(.gpu, form) else { return nil }
-            if a.amxColumns > 0 {
-                guard let x = line(.amx, form) else { return nil }
-                rows = [g: n - a.amxColumns, x: a.amxColumns]; swapped = true
-            } else {
-                // The ANE's last rows beside the GPU's, both reading the integers: the same kernels `native` times its own candidates by.
-                if a.gpu > 0 { rows[g] = a.gpu }
-                if a.ane > 0 {
-                    guard key.weight == .int8, let e = line(.ane, .int8) else { return nil }
-                    rows[e] = a.ane
-                }
+            let int8 = key.weight == .int8
+            guard let g = line(.gpu, a.roundsActivation ? (int8 ? .int8act : .q8act) : (int8 ? .int8 : .q8)) else { return nil }
+            // The AMX's columns are no candidate (`native`): no line times them.
+            guard a.amxColumns == 0 else { return nil }
+            // The ANE's last rows beside the GPU's, both reading the integers: the same kernels `native` times its own candidates by.
+            if a.gpu > 0 { rows[g] = a.gpu }
+            if a.ane > 0 {
+                guard key.weight == .int8, let e = line(.ane, .int8) else { return nil }
+                rows[e] = a.ane
             }
         }
-        guard !rows.isEmpty, let t = seconds(rows, m: m, k: k, n: n, swapped: swapped) else { return nil }
+        guard !rows.isEmpty, let t = seconds(rows, m: m, k: k, n: n) else { return nil }
         let prep = preparation(format: key.weight, path: a.path, k: k, n: n)
         return .init(assignment: a, route: a.route(weight: key.weight), rows: rows, preparation: prep,
                      compute: t + accumulation(key, gpu: a.gpu, offGPU: a.amx + a.ane),
-                     busy: busy(rows, m: m, k: k, n: n, swapped: swapped))
+                     busy: busy(rows, m: m, k: k, n: n))
     }
 
     func evaluate(_ a: AttentionAssignment, _ key: AttentionKey) -> CapacitySolver.AttentionSolution? {

@@ -14,14 +14,26 @@ extension Diagnostic.CapacityProbes.Context {
     /// same shape) and a long k (pass 3, on pass 2's κ), the fit reading the passes from the second. The long k is the point: the
     /// « down » projections of the three int8 families (k = 8 192 to 16 384) were left to the ANE alone for want of a pair measured
     /// there, which cost them a third of their seconds.
+    ///
+    /// **Twice: beside the GPU's kernel on the fp32 activation, and on the activation rounded to bf16** (`gpu/int8act+ane/int8`). The
+    /// rounded kernel runs on the GPU's tensor units at another rate and draws another power: what the ANE beside it keeps, and what it
+    /// keeps of itself, is that pair's own measure — the fp32 pair's κ read for it would be a guess (each set keeps its own sharing).
     func sharingInt8(_ measurements: inout Fit.Measurements) {
+        for form in Self.integerPairs { sharingInt8(&measurements, gpu: Kernel(.gpu, form)) }
+    }
+
+    /// The GPU's kernels the ANE's integers are measured beside, each pair its own sharing (`gpu/int8+ane/int8`, `gpu/int8act+ane/int8`).
+    static let integerPairs: [CapacityModel.Form] = [.int8, .int8act]
+
+    func sharingInt8(_ measurements: inout Fit.Measurements, gpu g: Kernel) {
         restoreB()
         var model = Fit.model(from: measurements, allocationUnit: NeuralEngine.rowUnit)
-        let g = Kernel(.gpu, .int8), a = Kernel(.ane, .int8)
-        guard model.lines[g] != nil, model.lines[a] != nil, both.tensorInt8, neural.neuralEngine != nil, let short = sizes.chains.first else { return }
+        let a = Kernel(.ane, .int8), rounded = g.form == .int8act
+        guard model.lines[g] != nil, model.lines[a] != nil, rounded ? alone.tensorInt8 && alone.bf16Activations : both.tensorInt8,
+              neural.neuralEngine != nil, let short = sizes.chains.first else { return }
         let key = CapacityModel.key([g, a])
         for (pass, shape) in [(1, short), (2, short)] + (sizes.chains.count > 1 ? [(3, sizes.chains[1])] : []) {
-            if let t = trialInt8(key: key, shape: shape, model: model, pass: pass) {
+            if let t = trialInt8(key: key, gpu: g, shape: shape, model: model, pass: pass) {
                 measurements.trials.append(t)
                 log?(String(format: "  %@ pass %d  %dx%dx%d  wall %.2f ms  sides %@", key, pass, shape.m, shape.k, shape.n, t.wall * 1e3,
                             t.sides.map { String(format: "%@ %d rows line %.1f within %.1f", $0.kernel, $0.rows, $0.solo * 1e3, ($0.within ?? 0) * 1e3) }.joined(separator: " | ")))
@@ -31,28 +43,30 @@ extension Diagnostic.CapacityProbes.Context {
         }
     }
 
-    func trialInt8(key: String, shape: (m: Int, k: Int, n: Int), model: CapacityModel, pass: Int) -> Fit.Measurements.Trial? {
+    func trialInt8(key: String, gpu g: Kernel, shape: (m: Int, k: Int, n: Int), model: CapacityModel, pass: Int) -> Fit.Measurements.Trial? {
         let (m, k, n) = shape
-        let g = Kernel(.gpu, .int8), a = Kernel(.ane, .int8)
+        let a = Kernel(.ane, .int8), rounded = g.form == .int8act
+        // The rounded GPU side runs on `alone` (the rounding kernels), the plan's rounded copy in the reserve's tail beside the integers
+        // the ANE reads; the ANE is `neural`'s either way.
+        let gemm = rounded ? alone : both, buffers = rounded ? aloneB : bothB
         // The balance of a chain is asked of the model without the sets' domains: a chain at a k the pair was not measured at yet is how it gets it.
         var open = model
         for (name, var sharing) in model.sharing { sharing.kFrom = nil; sharing.kTo = nil; open.sharing[name] = sharing }
-        guard let plan = int8Plan(k, n), let engine = neural.neuralEngine,
+        guard let plan = int8Plan(k, n, rounded: rounded), let engine = neural.neuralEngine,
               let split = open.split(m: m, k: k, n: n, kernels: [g, a]), let aneRows = split.rows[a], let gpuRows = split.rows[g],
               aneRows > 0, gpuRows > 0 else { log?("  \(key) \(m)x\(k)x\(n) pass \(pass): the model gives a side no row"); return nil }
         // The rows the engines can run for this key: the plan's own rule (`isRunnable`) and the process's (the program loads).
-        guard ProductAssignment(path: .native, gpu: gpuRows, ane: aneRows).isRunnable(for: ProductKey(k: k, n: n, m: m, weight: .int8)),
+        guard ProductAssignment(path: .native, roundsActivation: rounded, gpu: gpuRows, ane: aneRows).isRunnable(for: ProductKey(k: k, n: n, m: m, weight: .int8)),
               engine.accepts(rows: aneRows, k: k, n: n, int8Group: plan.group) else {
             log?("  \(key) \(m)x\(k)x\(n) pass \(pass): rows \(aneRows) not accepted by the engines"); return nil
         }
         prime(.int8, ane: true, m: m, k: k, n: n)
         stageInt8(plan, k: k, n: n)
         RouteBeacon.announce(g.description); RouteBeacon.announce(a.description)
-        let buffers = bothB
         func once() -> (wall: Double, within: [String: Double])? {
             var result: (gpu: Double, computed: Bool, gpuWall: Double, aneWall: Double)?
             guard let wall = CapacityProbes.timed({
-                result = WeightProducts.int8Product(gemm: both, plan: plan, reserve: buffers.b, a: buffers.a, c: buffers.c,
+                result = WeightProducts.int8Product(gemm: gemm, plan: plan, reserve: buffers.b, a: buffers.a, c: buffers.c,
                                                     m: m, k: k, n: n, ane: engine, aneRows: aneRows)
                 return result?.computed == true
             }), let r = result else { return nil }

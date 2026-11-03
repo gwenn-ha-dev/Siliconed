@@ -137,8 +137,10 @@ extension Diagnostic.CapacityProbes {
         static let runs = 4.0
         /// Seconds of the CPU's fp64 truth per `k · n` values of a shape (64 rows: the widening of `B`, then `cblas_dgemm`).
         static let truthPerValue = 1.7e-9
-        /// What a kernel's rate is to the GPU's fp32 product (M1 Pro, three runs: bf16 0.62, bf16 rounded 0.49, int8 0.97, Q8_0 0.31).
-        static let formRatio: [String: Double] = ["bf16": 0.62, "bf16act": 0.49, "int8": 0.97, "q8": 0.31]
+        /// What a kernel's rate is to the GPU's fp32 product (M1 Pro, three runs: bf16 0.62, bf16 rounded 0.49, int8 0.97, Q8_0 0.31). The
+        /// 8-bit ones on a rounded activation were never run on a GPU without bf16 in hardware: priced as the rounded bf16 kernel (the same
+        /// bfloat operand) and as Q8_0's (the same fill of threadgroup memory).
+        static let formRatio: [String: Double] = ["bf16": 0.62, "bf16act": 0.49, "int8": 0.97, "q8": 0.31, "int8act": 0.49, "q8act": 0.31]
         /// Attention kernels' rates to the GPU's product (M1 Pro: the system graph 0.40, the flash kernel 0.46).
         static let graphRatio = 0.40, flashRatio = 0.46
         /// The three stages by tiles, fp32 and fp16 operands (M1 Pro: 0.43 and 0.49 of the GPU's product; the matrix units of a bigger GPU
@@ -151,6 +153,34 @@ extension Diagnostic.CapacityProbes {
         package func formSeconds(_ rates: Rates) -> Double {
             let l = Double(attention.max() ?? 0)
             return Self.formRuns * 4 * l * l * Double(Self.attentionHeads) * Double(Self.attentionHeadDim) / (rates.gpu * Self.tiles16Ratio)
+        }
+
+        /// **The seconds the 8-bit products on a rounded activation add to each stage** (`int8act`, `q8act`: their solos, their thin
+        /// runs, their pair with the ANE's integers), inside `projection`. No M1 Pro has timed them yet: the check against its stages leaves
+        /// them out until one does, as it does the attention's forms.
+        package func roundedEightBitSeconds(_ rates: Rates) -> [String: Double] {
+            let g = rates.gpu
+            func flop(_ s: Shape) -> Double { 2 * Double(s.m) * Double(s.k) * Double(s.n) }
+            func truth(_ shapes: [Shape], kinds: Double) -> Double {
+                Set(shapes.map { [$0.k, $0.n] }).reduce(0.0) { $0 + Double($1[0]) * Double($1[1]) } * Self.truthPerValue * kinds
+            }
+            let forms = ["int8act", "q8act"].reduce(0) { $0 + 1 / Self.formRatio[$1]! }
+            var p: [String: Double] = [:]
+            p["solos 8-bit and rounded"] = Self.runs * solo.reduce(0) { $0 + flop($1) } * forms / g + truth(solo, kinds: 2)
+            p["thin products"] = Self.runs * thin.reduce(0) { $0 + flop($1) } * forms / g + truth(thin, kinds: 2)
+            if let a = rates.ane {
+                p["sharing int8"] = pairPasses.reduce(0) { $0 + chain(flop($1), rate: 0.8 * (g * Self.formRatio["int8act"]! + a)) + 0.15 }
+            }
+            return p
+        }
+
+        /// The chain passes of the fp32 sets (two on the short shape, one on the long), which the integer pairs take too.
+        var pairPasses: [Shape] { [chains.first].compactMap { $0 } + [chains.first].compactMap { $0 } + (chains.count > 1 ? [chains[1]] : []) }
+
+        /// A chain's seconds: the ramp, the window, at most the cap — or the calls it needs where they are long (`chainCalls` after `chainWarmCalls`).
+        func chain(_ flop: Double, rate: Double) -> Double {
+            typealias P = Diagnostic.CapacityProbes
+            return min(P.chainCap, max(P.chainWarm + P.chainWindow, Double(P.chainWarmCalls + P.chainCalls) * flop / rate))
         }
 
         /// **The seconds each stage is projected to take** (the names of `m.budget`), from the engines' rates: `FLOP / rate` of each
@@ -172,11 +202,6 @@ extension Diagnostic.CapacityProbes {
             p["witnesses end"] = Double(Diagnostic.CapacityProbes.endRounds) * witnessTime + Double(Diagnostic.CapacityProbes.endRounds - 1) * Diagnostic.CapacityProbes.endPause
             p["bandwidth"] = 0.02
             p["disk"] = 2.0   // the default class's three passes, then the two lower ones beside a computation (`CapacityDisk.classBudget`)
-            // A chain's seconds: the ramp, the window, at most the cap — or the calls it needs where they are long (`chainCalls` after `chainWarmCalls`).
-            func chain(_ flop: Double, rate: Double) -> Double {
-                typealias P = Diagnostic.CapacityProbes
-                return min(P.chainCap, max(P.chainWarm + P.chainWindow, Double(P.chainWarmCalls + P.chainCalls) * flop / rate))
-            }
             // The GPU's fp32 solos are steady figures (it has no ramp), the AMX's and the ANE's chains.
             let productTime = product.reduce(0) { sum, s in
                 sum + Self.runs * flop(s) / g + (x.map { chain(flop(s), rate: $0) } ?? 0) + (a.map { chain(flop(s), rate: $0) } ?? 0) + 0.1
@@ -185,11 +210,11 @@ extension Diagnostic.CapacityProbes {
             p["solos fp32"] = productTime + smallTime + Self.runs * soloFlop / (g * Self.formRatio["bf16"]!) + truth(product + solo, kinds: a == nil ? 1 : 2)
             // The short-sided products: the GPU's forms steady, the AMX's and the ANE's, the truths.
             let thinFlop = thin.reduce(0) { $0 + flop($1) }
-            let gpuForms = 1 + ["bf16", "bf16act", "int8", "q8"].reduce(0) { $0 + 1 / Self.formRatio[$1]! }
+            let gpuForms = 1 + ["bf16", "bf16act", "int8", "q8", "int8act", "q8act"].reduce(0) { $0 + 1 / Self.formRatio[$1]! }
             // The ANE compiles a program per shape it takes (those of a whole unit of rows: ≈ 0.37 s each on the M1 Pro, the stage measured
             // 2.53 s); the GPU's and the AMX's runs are a few milliseconds.
             let aneShapes = thin.filter { $0.m >= NeuralEngine.rowUnit }.count
-            p["thin products"] = Self.runs * thinFlop * gpuForms / g + truth(thin, kinds: 4)
+            p["thin products"] = Self.runs * thinFlop * gpuForms / g + truth(thin, kinds: 6)
                 + (x.map { Self.runs * thinFlop / $0 + 0.1 } ?? 0)
                 + (a.map { Self.runs * thinFlop / $0 + Double(aneShapes) * 0.37 } ?? 0)
             let stairFlop = stairRows.reduce(0) { $0 + 2 * Double($1) * Double(Self.stair.k) * Double(Self.stair.n) }
@@ -204,16 +229,19 @@ extension Diagnostic.CapacityProbes {
             // A chain per set and pass (the pairs with the GPU, the three, the AMX beside the ANE; a pass 3 where a long k is run), at the sets' rate.
             let setRate = 0.75 * (g + (x ?? 0) + (a ?? 0))
             let sets = (x != nil ? 1 : 0) + (a != nil ? 1 : 0) + ((x != nil && a != nil) ? 2 : 0)
-            let passes = [chains.first].compactMap { $0 } + [chains.first].compactMap { $0 } + (chains.count > 1 ? [chains[1]] : [])
+            let passes = pairPasses
             p["sharing"] = Double(sets) * passes.reduce(0) { $0 + chain(flop($1), rate: setRate) + 0.15 } + truth(chains, kinds: 2)
             // The ANE's integers run as chains on the products' shapes (the host's passes are told apart by the thin one), the GPU's 8-bit kernels as steady figures.
             let integersAlone = a.map { rate in (integers + small).reduce(0) { $0 + chain(flop($1), rate: rate) + 0.1 } + truth(integers + small) } ?? 0
-            p["solos 8-bit and rounded"] = Self.runs * soloFlop * (1 / (g * Self.formRatio["bf16act"]!) + 1 / (g * Self.formRatio["int8"]!)
-                                                                       + 1 / (g * Self.formRatio["q8"]!)) + truth(solo, kinds: 3) + integersAlone
-            // The pair of integer kernels: the chain passes of the fp32 sets' (two on the short shape, one on the long), at the pair's rate.
+            // The rounded truths of the 8-bit ones are the floors of their half-precision bar (two kinds more).
+            p["solos 8-bit and rounded"] = Self.runs * soloFlop * ["bf16act", "int8", "q8", "int8act", "q8act"].reduce(0) { $0 + 1 / (g * Self.formRatio[$1]!) }
+                + truth(solo, kinds: 5) + integersAlone
+            // The pairs of integer kernels (the GPU's on the fp32 activation, then on the rounded one): the chain passes of the fp32 sets'
+            // (two on the short shape, one on the long), at the pair's rate.
             if let a {
-                let pairRate = 0.8 * (g * Self.formRatio["int8"]! + a)
-                p["sharing int8"] = passes.reduce(0) { $0 + chain(flop($1), rate: pairRate) + 0.15 } + truth(chains)
+                p["sharing int8"] = ["int8", "int8act"].reduce(0) { sum, form in
+                    sum + passes.reduce(0) { $0 + chain(flop($1), rate: 0.8 * (g * Self.formRatio[form]! + a)) + 0.15 }
+                } + truth(chains)
             }
             return p
         }

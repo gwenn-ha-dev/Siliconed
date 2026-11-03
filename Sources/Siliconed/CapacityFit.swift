@@ -526,9 +526,8 @@ package enum CapacityFit {
             guard !m.wrong.contains(s.kernel), let k = Kernel(s.kernel), s.seconds > 0 else { continue }
             points[k, default: []].append(Point(flop: s.flop, seconds: s.seconds))
         }
-        let products: Set<CapacityModel.Form> = [.fp32, .bf16, .bf16act, .int8, .q8, .fp16]
         for (k, p) in points {
-            if products.contains(k.form), let l = productLine(kernel: k, solos: m.solos.filter { $0.kernel == k.description && !m.wrong.contains($0.kernel) }) {
+            if k.form.isProduct, let l = productLine(kernel: k, solos: m.solos.filter { $0.kernel == k.description && !m.wrong.contains($0.kernel) }) {
                 model.lines[k] = l
             } else if let l = line(p) { model.lines[k] = l }
         }

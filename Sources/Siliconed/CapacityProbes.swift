@@ -22,7 +22,8 @@ import MetalPerformanceShadersGraph
 ///      ├─ attention                graph, flash, the CPU's heads, alone at two sequences                            → lines
 ///      ├─ sharing                  per set: each side alone at its rows, then the set (a balanced pass at three sizes) → keep, overhead
 ///      ├─ 8-bit and rounded kernels (they stage their weight in the reserve: after every fp32 route), `ane/int8` among them (as chains)
-///      ├─ sharing int8             the GPU's int8 kernel beside the ANE's, both reading the integers staged in the reserve (chains, a long k)
+///      ├─ sharing int8             the GPU's int8 kernel beside the ANE's, both reading the integers staged in the reserve (chains, a long k),
+///      │                           the GPU's on the fp32 activation, then on the activation rounded to bf16
 ///      └─ witnesses, end
 ///
 ///     every timed step goes through `Context.guarded`: measured, then a pulse (`Regime`), and again after a wait while the pulse or the
@@ -181,7 +182,7 @@ extension Diagnostic {
                     let mine = m.solos.filter { $0.kernel == k.description && $0.seconds > 0 }
                     // A product's line has its shape's terms (the weight's lift, the host's passes, the rate by k): its error is the model's seconds at the shape.
                     let shaped = mine.compactMap { s -> Double? in
-                        guard [.fp32, .bf16, .bf16act, .int8, .q8, .fp16].contains(k.form), s.shape.count == 3,
+                        guard k.form.isProduct, s.shape.count == 3,
                               let t = model.alone(k, rows: s.shape[0], k: s.shape[1], n: s.shape[2]) else { return nil }
                         return abs(t / s.seconds - 1)
                     }
@@ -298,7 +299,7 @@ extension Diagnostic {
 
         // MARK: - The context
 
-        enum Truth: Hashable { case fp32, rounded, int8, roundedInt8, q8 }
+        enum Truth: Hashable { case fp32, rounded, int8, roundedInt8, q8, roundedQ8 }
         struct TruthKey: Hashable { let truth: Truth; let m, k, n: Int }
 
         struct Buffers { let a, b, c: MTLBuffer }
@@ -402,7 +403,7 @@ extension Diagnostic {
                 self.validating = validating
                 let all = sizes.products + (validating ? CapacityProbes.validationShapes : [])
                 operands = Operands(Operands.sizes(products: all.map { ($0.m, $0.k, $0.n, WeightKind.q8) }))
-                alone = try GEMM(plan: .probing(bf16Weights: true, roundedActivations: true))
+                alone = try GEMM(plan: .probing(bf16Weights: true, int8Weights: true, q8Weights: true, roundedActivations: true))
                 both = try GEMM(plan: .probing(amx: true, int8Weights: true, q8Weights: true))
                 neural = try GEMM(plan: .probing(ane: true))
                 three = try GEMM(plan: .probing(amx: true, ane: true))
@@ -463,28 +464,40 @@ extension Diagnostic {
                 case .q8:
                     result = Diagnostic.exactRows(rows, a: a, q: operands.q.base.assumingMemoryBound(to: Int8.self),
                                                   blockScales: operands.q8Scales.floats(), block: Diagnostic.q8Block, k: k, n: n)
+                case .roundedQ8:
+                    var rounded = [Float](repeating: 0, count: rows.count * k)
+                    for (i, row) in rows.enumerated() { for j in 0..<k { rounded[i * k + j] = Half.bf16.round(a[row * k + j]) } }
+                    result = rounded.withUnsafeBufferPointer {
+                        Diagnostic.exactRows(Array(0..<rows.count), a: $0.baseAddress!, q: operands.q.base.assumingMemoryBound(to: Int8.self),
+                                             blockScales: operands.q8Scales.floats(), block: Diagnostic.q8Block, k: k, n: n)
+                    }
                 }
                 truths[key] = result
                 return result
             }
 
-            /// bf16's own rounding of this product: the floor no fp16 path can pass under (invariant 3). `truthKind`: the exact
-            /// product it is the floor of — the widened weight's (`fp32`) or the integers' with their rotation (`int8`).
+            /// bf16's own rounding of this product: the floor no half-precision path can pass under (invariant 3). `truthKind`: the exact
+            /// product it is the floor of — the widened weight's (`fp32`), the integers' with their rotation (`int8`), a Q8_0's (`q8`).
             func aneThreshold(_ truthKind: Truth, m: Int, k: Int, n: Int) -> Double {
-                let ints = truthKind == .int8
-                if let f = floors[[m, k, n, ints ? 1 : 0]] { return max(Diagnostic.fp32Threshold, Diagnostic.floorMargin * f) }
+                let (exact, witnessKind, code): (Truth, Truth, Int) = switch truthKind {
+                case .int8, .roundedInt8: (.int8, .roundedInt8, 1)
+                case .q8, .roundedQ8: (.q8, .roundedQ8, 2)
+                case .fp32, .rounded: (.fp32, .rounded, 0)
+                }
+                if let f = floors[[m, k, n, code]] { return max(Diagnostic.fp32Threshold, Diagnostic.floorMargin * f) }
                 let rows = Diagnostic.sampleRows(m, count: Diagnostic.sampledRows)
-                let witness = truth(ints ? .roundedInt8 : .rounded, m: m, k: k, n: n).map { Double(Half.bf16.round(Float($0))) }
-                let floor = Diagnostic.judge(witness.map(Float.init), truth(truthKind, m: m, k: k, n: n), columns: rows.count, threshold: 1).error
-                floors[[m, k, n, ints ? 1 : 0]] = floor
+                let witness = truth(witnessKind, m: m, k: k, n: n).map { Double(Half.bf16.round(Float($0))) }
+                let floor = Diagnostic.judge(witness.map(Float.init), truth(exact, m: m, k: k, n: n), columns: rows.count, threshold: 1).error
+                floors[[m, k, n, code]] = floor
                 return max(Diagnostic.fp32Threshold, Diagnostic.floorMargin * floor)
             }
 
-            /// The truth of a product and, for the ANE, bf16's floor under it — both computed before a weight is staged in `b`: a truth
-            /// not yet kept restores `b` from its bf16 copy, and would take the staged integers away.
+            /// The truth of a product and, for a half-precision route (the ANE's, an 8-bit product on a rounded activation), bf16's floor
+            /// under it — both computed before a weight is staged in `b`: a truth not yet kept restores `b` from its bf16 copy, and would
+            /// take the staged integers away.
             func prime(_ kind: Truth, ane: Bool, m: Int, k: Int, n: Int) {
                 _ = truth(kind, m: m, k: k, n: n)
-                if ane { _ = aneThreshold(kind == .int8 ? .int8 : .fp32, m: m, k: k, n: n) }
+                if ane { _ = aneThreshold(kind, m: m, k: k, n: n) }
             }
 
             /// Keeps the judge's word on `name` (a kernel, or a set of engines): the worst error in proportion to its threshold, and a verdict
@@ -511,7 +524,7 @@ extension Diagnostic {
             /// kernel (or the set) the judge's word is kept under.
             func judged(_ name: String, _ truthKind: Truth, ane: Bool, m: Int, k: Int, n: Int, _ body: () -> Bool) -> (pass: Bool, error: Double)? {
                 let exact = truth(truthKind, m: m, k: k, n: n)
-                let threshold = ane ? aneThreshold(truthKind == .int8 ? .int8 : .fp32, m: m, k: k, n: n) : Diagnostic.fp32Threshold
+                let threshold = ane ? aneThreshold(truthKind, m: m, k: k, n: n) : Diagnostic.fp32Threshold
                 let rows = Diagnostic.sampleRows(m, count: Diagnostic.sampledRows)
                 let out = operands.c.floats()
                 Diagnostic.poison(out, rows: rows, n: n)
@@ -596,9 +609,10 @@ extension Diagnostic {
 
             /// The int8 operands as a render stages them (`WeightProducts.int8Plan`: the integers at the reserve's head, the scale
             /// after, the rotation of group 256), no AMX columns; `nil` where the plan does not fit or K is not a whole number of groups.
-            func int8Plan(_ k: Int, _ n: Int) -> WeightProducts.Int8Plan? {
+            func int8Plan(_ k: Int, _ n: Int, rounded: Bool = false) -> WeightProducts.Int8Plan? {
                 guard (k * n) % 2 == 0, k % Diagnostic.int8Group == 0 else { return nil }
-                return WeightProducts.int8Plan(k: k, n: n, capacity: k * n, perColumn: false, group: Diagnostic.int8Group, amxColumns: 0)
+                return WeightProducts.int8Plan(k: k, n: n, capacity: k * n, perColumn: false, group: Diagnostic.int8Group, amxColumns: 0,
+                                               rounded: rounded)
             }
 
             /// The integers and their scale into the reserve (`b`), which the bf16 copy restores.
@@ -653,7 +667,11 @@ extension Diagnostic {
                 try stage("stairs") { stairs(&m) }
                 try stage("attention") { try attention(&m) }
                 try stage("sharing") { sharing(&m) }
-                try stage("solos 8-bit and rounded") { chooseTiles(.gpu_bf16act, &m); chooseTiles(.gpu_int8, &m); solos([.gpu_bf16act, .gpu_int8, .gpu_q8], &m); solos([.ane_int8], &m, shapes: sizes.integers + sizes.small, chained: true) }
+                try stage("solos 8-bit and rounded") {
+                    chooseTiles(.gpu_bf16act, &m); chooseTiles(.gpu_int8, &m); chooseTiles(.gpu_int8act, &m)
+                    solos([.gpu_bf16act, .gpu_int8, .gpu_q8, .gpu_int8act, .gpu_q8act], &m)
+                    solos([.ane_int8], &m, shapes: sizes.integers + sizes.small, chained: true)
+                }
                 try stage("thin products") { thinSolos(&m) }
                 try stage("sharing int8") { sharingInt8(&m) }
                 d.massive = massives

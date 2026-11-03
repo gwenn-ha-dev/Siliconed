@@ -59,12 +59,22 @@ package struct CapacityModel: Codable, Sendable, Equatable {
         /// Products: the weight widened to fp32; the bf16 weight as published, its activation in fp32 or rounded to
         /// bf16; the 8-bit weight as published (`gpu/int8`; `ane/int8`: the ANE's program that takes the integers as its
         /// input, scale per column or for the tensor, the rotation on the activation); fp16 (the ANE's programs, from the
-        /// widened weight).
-        case fp32, bf16, bf16act, int8, q8, fp16
+        /// widened weight); the 8-bit weight as published beside an activation rounded to bf16 (`gpu/int8act`: after its
+        /// rotation, `bfloat × int8`, the scale after the sums; `gpu/q8act`: a GGUF Q8_0, each block's scale applied in fp32
+        /// to its partial sums) — the integers are exact in bf16, so only the operand is rounded, as for `bf16act`.
+        case fp32, bf16, bf16act, int8, q8, fp16, int8act, q8act
         /// Attentions: the MPSGraph graph, the flash kernel, a share of the heads on the CPU, the three stages by tiles of query rows
         /// (`tiles`: fp32 throughout; `tiles16`: fp16 operands, fp32 sums; `tilesbf16`: bf16 operands, fp32 sums) — the last two in
         /// the form their map chose (`attentionTiles`).
         case graph, flash, heads, tiles, tiles16, tilesbf16
+
+        /// A product's form (its seconds a line of `k`, `n` and rows), not an attention's.
+        package var isProduct: Bool {
+            switch self {
+            case .fp32, .bf16, .bf16act, .int8, .q8, .fp16, .int8act, .q8act: return true
+            case .graph, .flash, .heads, .tiles, .tiles16, .tilesbf16: return false
+            }
+        }
     }
 
     /// One engine computing one form: `gpu/fp32`, `ane/fp16`, `cpu/heads`.
@@ -434,6 +444,9 @@ package struct CapacityModel: Codable, Sendable, Equatable {
         case .bf16act: return (2, 8)
         case .int8: return (1, 12)
         case .q8: return (1 + 4.0 / 64, 4)
+        // The rounded copy of the activation besides (read once in fp32, written and read in bf16).
+        case .int8act: return (1, 16)
+        case .q8act: return (1 + 4.0 / 64, 8)
         default: return (4, 4)
         }
     }

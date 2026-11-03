@@ -165,7 +165,7 @@ private struct ReportView: View {
     /// published, then the attentions. A route the model measured and this list does not know follows, by its engine and form.
     private static let order: [CapacityModel.Kernel] = [
         .init(.gpu, .fp32), .init(.amx, .fp32), .init(.ane, .fp16),
-        .init(.gpu, .bf16), .init(.gpu, .bf16act), .init(.gpu, .int8), .init(.ane, .int8), .init(.gpu, .q8),
+        .init(.gpu, .bf16), .init(.gpu, .bf16act), .init(.gpu, .int8), .init(.gpu, .int8act), .init(.ane, .int8), .init(.gpu, .q8), .init(.gpu, .q8act),
         .init(.gpu, .graph), .init(.gpu, .flash), .init(.gpu, .tiles), .init(.gpu, .tiles16), .init(.gpu, .tilesbf16), .init(.cpu, .heads)]
 
     /// The label of a route, as a person reads it.
@@ -178,7 +178,9 @@ private struct ReportView: View {
         case (.gpu, .bf16act): String(localized: "Matrix products, GPU tensor units, bf16 weights and activations")
         case (.gpu, .int8): String(localized: "Matrix products on the 8-bit weights, read as published")
         case (.ane, .int8): String(localized: "Matrix products on the 8-bit weights, Neural Engine")
+        case (.gpu, .int8act): String(localized: "Matrix products on the 8-bit weights, GPU tensor units, bf16 activations")
         case (.gpu, .q8): String(localized: "Matrix products on the GGUF 8-bit weights, read as published")
+        case (.gpu, .q8act): String(localized: "Matrix products on the GGUF 8-bit weights, GPU tensor units, bf16 activations")
         case (.gpu, .graph): String(localized: "Attention, system kernel")
         case (.gpu, .flash): String(localized: "Attention, Siliconed kernel")
         case (.gpu, .tiles): String(localized: "Attention, three stages by tiles")

@@ -201,14 +201,16 @@ package final class WeightProducts {
 
     /// **The class of the product that just ran, as the plan names it**: the weight's format (as published) and the route taken: the
     /// engines the widened product ran on (`GEMM.lastEngines`), or the weight's own form (`gpu/bf16`, `gpu/bf16act`, `gpu/int8`,
-    /// `gpu+amx/int8`, `gpu/q8`, `gpu+amx/q8`).
+    /// `gpu+amx/int8`, `gpu/q8`, `gpu+amx/q8`, and `…act` where the GPU's rows rounded their activation — what ran: a rounding the
+    /// reserve could not hold is the fp32 kernel's name).
     private func classification(of name: String, _ path: Path) -> (CapacityClasses.WeightFormat, String) {
         switch path {
         case .bf16(let rounding): return (.bf16, rounding == nil ? "gpu/bf16" : "gpu/bf16act")
         case .int8(let plan):
             let weight: CapacityClasses.WeightFormat = plan.block == nil ? .int8 : .q8
-            if aneTook { return (weight, (aneAlone ? "ane/" : "gpu+ane/") + weight.rawValue) }
-            return (weight, (plan.amxColumns > 0 && gemm.conductor != nil ? "gpu+amx/" : "gpu/") + weight.rawValue)
+            let act = plan.roundedOffset > 0 ? "act" : ""
+            if aneTook { return (weight, aneAlone ? "ane/" + weight.rawValue : "gpu+ane/" + weight.rawValue + act) }
+            return (weight, (plan.amxColumns > 0 && gemm.conductor != nil ? "gpu+amx/" : "gpu/") + weight.rawValue + act)
         case .widened:
             return (format(of: name), gemm.lastEngines)
         }
@@ -324,11 +326,12 @@ package final class WeightProducts {
     }
 
     /// **The ANE's rows of an int8 product read as published**: those the plan gave (`planned.ane`, the last ones), if this process
-    /// can run them — the ANE built, the weight the program's kind (scales per column or for the tensor, never Q8_0's blocks; no
-    /// activation rounded; no AMX columns), and a program that accepts its rotation's `group` — else 0, and the GPU takes the whole
-    /// product. The plan's own runnability (`ProductAssignment.isRunnable`) is the hardware's; this is the process's.
+    /// can run them — the ANE built, the weight the program's kind (scales per column or for the tensor, never Q8_0's blocks; no AMX
+    /// columns), and a program that accepts its rotation's `group` — else 0, and the GPU takes the whole product. The GPU's rows may
+    /// round their activation (its copy lies in the reserve's tail, past the integers and scales the ANE reads); the ANE's read the
+    /// fp32 one. The plan's own runnability (`ProductAssignment.isRunnable`) is the hardware's; this is the process's.
     private func aneInt8Rows(_ planned: ProductAssignment, _ plan: Int8Plan, m: Int, k: Int, n: Int) -> Int {
-        guard planned.path == .native, planned.ane > 0, plan.block == nil, plan.amxColumns == 0, plan.roundedOffset == 0,
+        guard planned.path == .native, planned.ane > 0, plan.block == nil, plan.amxColumns == 0,
               let ane = gemm.neuralEngine, planned.ane <= m,
               ane.accepts(rows: planned.ane, k: k, n: n, int8Group: plan.group) else { return 0 }
         return planned.ane

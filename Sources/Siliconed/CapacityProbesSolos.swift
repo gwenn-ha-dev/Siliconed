@@ -9,9 +9,11 @@ import MetalPerformanceShadersGraph
 extension Diagnostic.CapacityProbes.Context {
     // MARK: Solos
 
-    enum Probe: String, CaseIterable { case gpu_fp32, amx_fp32, ane_fp16, ane_int8, gpu_bf16, gpu_bf16act, gpu_int8, gpu_q8
+    enum Probe: String, CaseIterable { case gpu_fp32, amx_fp32, ane_fp16, ane_int8, gpu_bf16, gpu_bf16act, gpu_int8, gpu_q8, gpu_int8act, gpu_q8act
         var kernel: Kernel {
             switch self {
+            case .gpu_int8act: return Kernel(.gpu, .int8act)
+            case .gpu_q8act: return Kernel(.gpu, .q8act)
             case .gpu_fp32: return Kernel(.gpu, .fp32)
             case .amx_fp32: return Kernel(.amx, .fp32)
             case .ane_fp16: return Kernel(.ane, .fp16)
@@ -129,7 +131,7 @@ extension Diagnostic.CapacityProbes.Context {
     func thinSolos(_ m: inout Fit.Measurements) {
         guard !sizes.thin.isEmpty else { return }
         var kept: [Fit.Measurements.Solo] = []
-        for probe in [Probe.gpu_fp32, .amx_fp32, .ane_fp16, .gpu_bf16, .gpu_bf16act, .gpu_int8, .gpu_q8] {
+        for probe in [Probe.gpu_fp32, .amx_fp32, .ane_fp16, .gpu_bf16, .gpu_bf16act, .gpu_int8, .gpu_q8, .gpu_int8act, .gpu_q8act] {
             for (rows, k, n) in sizes.thin.map({ ($0.m, $0.k, $0.n) }) {
                 if probe == .ane_fp16, rows < NeuralEngine.rowUnit { continue }
                 guard let s = solo(probe, m: rows, k: k, n: n) else { continue }
@@ -154,6 +156,10 @@ extension Diagnostic.CapacityProbes.Context {
         let run: () -> Bool
         var truthKind = Truth.fp32
         var isANE = false
+        // Judged at the bar of a half-precision route (1.25 × bf16's own error on the product, invariant 3) rather than the fp32 one:
+        // the ANE's, and the 8-bit products on a rounded activation — whose operand is rounded after the rotation, where the fp64
+        // truth of the rounded operand would round the other side of a tie now and then.
+        var half = false
         var staged: (() -> Void)?
         switch probe {
         case .gpu_fp32:
@@ -185,12 +191,17 @@ extension Diagnostic.CapacityProbes.Context {
                                       c: self.aloneB.c, m: m, k: k, n: n, weightIsTransposed: true)
                 return true
             }
-        case .gpu_int8, .gpu_q8:
-            let isInt8 = probe == .gpu_int8
-            guard isInt8 ? both.tensorInt8 : both.tensorQ8, (k * n) % 2 == 0, isInt8 ? k % Diagnostic.int8Group == 0 : k % Diagnostic.q8Block == 0,
+        case .gpu_int8, .gpu_q8, .gpu_int8act, .gpu_q8act:
+            let isInt8 = probe == .gpu_int8 || probe == .gpu_int8act
+            // The rounded ones run on `alone`, which compiled the rounding kernels; the fp32 ones on `both`, as a render beside the AMX.
+            let rounded = probe == .gpu_int8act || probe == .gpu_q8act
+            let gemm = rounded ? alone : both, buffers = rounded ? aloneB : bothB
+            guard isInt8 ? gemm.tensorInt8 : gemm.tensorQ8, !rounded || (gemm.bf16Activations && (isInt8 || gemm.tensor?.roundsBlocks == true)),
+                  (k * n) % 2 == 0, isInt8 ? k % Diagnostic.int8Group == 0 : k % Diagnostic.q8Block == 0,
                   let plan = WeightProducts.int8Plan(k: k, n: n, capacity: k * n, perColumn: false, group: isInt8 ? Diagnostic.int8Group : nil,
-                                                     amxColumns: 0, block: isInt8 ? nil : Diagnostic.q8Block) else { return nil }
+                                                     amxColumns: 0, block: isInt8 ? nil : Diagnostic.q8Block, rounded: rounded) else { return nil }
             truthKind = isInt8 ? .int8 : .q8
+            half = rounded
             staged = { [self] in
                 Widen.copyBfloat16(source: operands.q.base, destination: operands.b.base, count: k * n / 2)
                 if isInt8 {
@@ -200,12 +211,12 @@ extension Diagnostic.CapacityProbes.Context {
                 }
                 dirty = max(dirty, k * n)
             }
-            run = { WeightProducts.int8Product(gemm: self.both, plan: plan, reserve: self.bothB.b, a: self.bothB.a, c: self.bothB.c, m: m, k: k, n: n).status == 0 }
+            run = { WeightProducts.int8Product(gemm: gemm, plan: plan, reserve: buffers.b, a: buffers.a, c: buffers.c, m: m, k: k, n: n).status == 0 }
         }
         // The truth first (it restores B for the fp32 ones), then the staged weight.
-        prime(truthKind, ane: isANE, m: m, k: k, n: n)
+        prime(truthKind, ane: isANE || half, m: m, k: k, n: n)
         staged?()
-        guard let verdict = judged(name, truthKind, ane: isANE, m: m, k: k, n: n, run) else { return nil }
+        guard let verdict = judged(name, truthKind, ane: isANE || half, m: m, k: k, n: n, run) else { return nil }
         guard verdict.pass else { return .init(kernel: name, shape: [m, k, n], flop: flop, seconds: 0, error: verdict.error) }
         // An ANE route is judged again on a massive activation, at the middle size (the exact product of a few more rows costs
         // what the solo does): over its bar there, the route is wrong on this Mac, as on any product.

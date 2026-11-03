@@ -197,17 +197,17 @@ import Testing
         #expect(s.assignment == .gpuAlone(1024), "a K-quant widens: no native form")
     }
 
-    @Test func theNativeInt8WeightGoesBesideTheAMXOnColumns() throws {
+    /// **No AMX beside a native weight**: the AMX's columns widened their share of the weight on every call, a line no probe measures
+    /// as the route runs, and the widened `gpu+amx` covers the case with lines measured; the solver never offers them.
+    @Test func theNativeInt8WeightNeverGoesBesideTheAMXOnColumns() throws {
         var m = machine(amxRate: 1e12)
         m.lines[M.Kernel(.gpu, .int8)] = .init(t0: 0, rate: 3e12)
         m.lines[M.Kernel(.amx, .int8)] = .init(t0: 0, rate: 1e12)
         m.preparation[.int8] = [.widened: 1e-9, .native: 1e-11]
         let s = try solve(m, key(4096, 4096, 4096, .int8))
-        #expect(s.route == "gpu+amx/int8")
-        #expect(s.assignment == ProductAssignment(path: .native, gpu: 4096, amxColumns: 1024))
-        #expect(s.rows[M.Kernel(.amx, .int8)] == 1024)
-        // the GPU's columns are whole tiles: an edge inside one would overwrite the AMX's first columns
-        #expect((4096 - s.assignment.amxColumns) % 64 == 0)
+        #expect(s.route != "gpu+amx/int8")
+        #expect(s.assignment.amxColumns == 0)
+        #expect(s.rows[M.Kernel(.amx, .int8)] == nil)
     }
 
     /// **The ANE beside the GPU's int8 kernel, both reading the integers**: offered where the model has the line `ane/int8`, chosen
