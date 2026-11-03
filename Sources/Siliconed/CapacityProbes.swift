@@ -75,6 +75,26 @@ extension Diagnostic {
         package static let chainWarm = 0.15, chainWarmCalls = 3, chainWindow = 0.4, chainCalls = 8, chainCap = 1.5
         /// **The end's witnesses, read in rounds** (the heat's numerator): three rounds a fifth of a second apart, the fast side kept.
         package static let endRounds = 3, endPause = 0.2
+
+        /// **What each stage's seconds buy: the error the plan would make without them** (`Diagnostic.StageTime.removes`). A stage that
+        /// removes no named bias has no place in the map; a stage added comes with its line here (a test holds every stage to one).
+        package static let biases: [String: String] = [
+            "setup": "a first call's compilation and buffers' first touch counted in a figure: paid before any figure is timed",
+            "preparation": "the weight's widening or staging counted as compute: its CPU seconds per value, measured apart, priced per call",
+            "witnesses start": "a Mac's state read as its speed: each engine's rate at the start, against which the end tells the heat",
+            "bandwidth": "a memory-bound product priced at the arithmetic rate: the memory's own rate",
+            "disk": "every volume and quality of service read at one speed: the stream's own volume, by class",
+            "solos fp32": "an engine's rate guessed from one shape: the lines (fixed cost, rate, per-weight cost) of the GPU, the AMX and the ANE, and the GPU's bf16 kernel at the tile chosen among candidates",
+            "stairs": "the GPU's time taken as smooth in rows: its steps at the tile's edges",
+            "attention": "an attention priced as products: its kernels and fused forms timed as they run, the form chosen among candidates",
+            "sharing": "two engines' rates added as if each ran alone: what each keeps beside the other (κ), by weight length",
+            "solos 8-bit and rounded": "a rounded or 8-bit product priced on the fp32 line, or on a line one disturbed figure bends: their own lines, the rounded ones on eight shapes so a disturbed figure is told apart, their tiles chosen above the rounds' spread",
+            "thin products": "a product of few rows or a short side priced on the wide line: its own per-row and per-weight costs",
+            "sharing int8": "the GPU and the ANE on the integers priced as two solos: what each keeps beside the other",
+            "sharing rounded": "the GPU's rounded rows and the ANE on one bf16 copy priced as two solos: what each keeps beside the other; the ANE's per-call widening of the copy is the preparation's rate, not a second probe",
+            "witnesses end": "the heat read as noise, or a burst read as heat: the end's witnesses in three rounds, their ratio applied to every rate",
+            "fit": "none: the fit's own seconds, so that the map's total is accounted for",
+        ]
         /// Products the fit never saw, for `validate`: the truth test of a model (a probe is judged against a long measure).
         package static let validationShapes: [(m: Int, k: Int, n: Int)] = [(2048, 3840, 10240), (1536, 4096, 4096), (3072, 3072, 3072), (1024, 2048, 8192)]
 
@@ -671,7 +691,10 @@ extension Diagnostic {
                 try stage("sharing") { sharing(&m) }
                 try stage("solos 8-bit and rounded") {
                     chooseTiles(.gpu_bf16act, &m); chooseTiles(.gpu_int8, &m); chooseTiles(.gpu_int8act, &m)
-                    solos([.gpu_bf16act, .gpu_int8, .gpu_q8, .gpu_int8act, .gpu_q8act], &m)
+                    // The rounded kernels the Standard and the Compact run on every large class take the fp32 solos' shapes too: eight points,
+                    // so that a figure the Mac disturbed is told from the line and left out (`CapacityFit.kept`) — of three, none can be.
+                    solos([.gpu_bf16act, .gpu_int8act], &m, shapes: sizes.solo + sizes.product)
+                    solos([.gpu_int8, .gpu_q8, .gpu_q8act], &m)
                     solos([.ane_int8], &m, shapes: sizes.integers + sizes.small, chained: true)
                 }
                 try stage("thin products") { thinSolos(&m) }
@@ -783,10 +806,12 @@ extension Diagnostic {
 
             /// Each stage's seconds with its projection, and the fixed costs beside them.
             func stageTimes(fit: Double) -> [String: Diagnostic.StageTime] {
-                var out = seconds.mapValues { Diagnostic.StageTime(seconds: $0) }
-                for (name, p) in projected { out[name] = Diagnostic.StageTime(seconds: seconds[name] ?? 0, projected: p) }
-                out["setup"] = Diagnostic.StageTime(seconds: setup)
-                out["fit"] = Diagnostic.StageTime(seconds: fit)
+                var out: [String: Diagnostic.StageTime] = [:]
+                for name in Set(seconds.keys).union(projected.keys) {
+                    out[name] = Diagnostic.StageTime(seconds: seconds[name] ?? 0, projected: projected[name], removes: CapacityProbes.biases[name])
+                }
+                out["setup"] = Diagnostic.StageTime(seconds: setup, removes: CapacityProbes.biases["setup"])
+                out["fit"] = Diagnostic.StageTime(seconds: fit, removes: CapacityProbes.biases["fit"])
                 return out
             }
 

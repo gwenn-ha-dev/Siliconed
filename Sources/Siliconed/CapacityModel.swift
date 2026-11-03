@@ -7,7 +7,9 @@ import Foundation
 ///     read (inventory)      crest[engine]           FLOP/s the silicon announces, nil where nothing says it
 ///     measured (the map)    lines[kernel]           t(W) = t₀ + W / rate          one kernel = an engine × what it reads
 ///                           aneRowUnit              the ANE's rows come in units: an odd unit costs a whole one
-///                           sharing[engines]        each engine keeps `keep` of its own rate, the set pays `overhead` once
+///                           sharing[engines]        each engine keeps `keep` of its own rate, the set pays `overhead` once;
+///                                                   a side may pay `perWeight`·k·n more inside the set than alone (`lift`)
+///                           noise                   the map's own repeatability: under twice it, two plans are one
 ///                           heat[engine]            sustained over cold time (≥ 1): the fanless Mac's late minute
 ///                           memory, disk            bytes per second
 ///                           preparation             seconds per value to bring a weight to the form a kernel reads
@@ -21,6 +23,10 @@ import Foundation
 ///     balanced (every side ends together), κᵢ the full set's:
 ///         sᵢ = κᵢ · T*        T* = (W + Σ fᵢ Rᵢ) / Σ κᵢ Rᵢ        fᵢ = t₀ᵢ + wᵢ·k·n        rᵢ = (κᵢT* − fᵢ) · Rᵢ / (2·k·n)
 ///         an engine whose rᵢ ≤ 0 leaves the set, and the rest is solved again
+///     inside a set whose side pays per call for the set's own operand (the ANE's fp16 program widening the GPU's bf16 copy:
+///     `gpu/bf16act+ane/fp16`), fᵢ += λᵢ·k·n, λᵢ = `Sharing.perWeight[i]` — a cost in k·n, not in rows: it does not shrink
+///     with the ANE's share, so at few rows (512² images: m ≈ 1 024) the ANE's balanced share falls to nothing and the pair
+///     leaves the candidates, while at m ≈ 4 096 it is a few percent of the ANE's side
 ///
 /// What sets it apart — what a model written by analogy with "add the engines' rates" would get wrong:
 ///
@@ -174,15 +180,26 @@ package struct CapacityModel: Codable, Sendable, Equatable {
         /// over its seconds), so the model gives no seconds to the set there. `nil`: no bound — the attention's pair has no ceiling
         /// (`CapacityFit.overlap`: it streams no weight, and no probe reaches the sequences of the large formats).
         package var kFrom: Int?, kTo: Int?
+        /// **Seconds per weight value a side pays at every call in this set, beyond its own line** (keyed by engine): what the side's line,
+        /// measured on another form of the weight, does not hold. The ANE's fp16 program beside the GPU's rounded rows reads the bf16 copy
+        /// as published (`gpu/bf16act+ane/fp16`): every call widens the whole copy once more before its lift and conversion than the
+        /// widened weight its line was measured on — `k·n` values whatever its rows, the bf16 widening's own rate (`preparation`). Read
+        /// into the κ of a chain of 1 024 ANE rows it cost each of them a quarter of a call; at 256 rows (a 512² render's half grid) the
+        /// same κ hid four times as much: the pair taken there ran 22–52 % over the GPU alone. `nil`: none.
+        package var perWeight: [Engine: Double]?
         package struct KeepAt: Codable, Sendable, Equatable {
             package var k: Int
             /// Keyed by the engine's name (`"gpu"`).
             package var keep: [String: Double]
             package init(k: Int, keep: [String: Double]) { self.k = k; self.keep = keep }
         }
-        package init(overhead: Double = 0, keep: [Engine: Double] = [:], sustained: Double? = nil, keepByK: [KeepAt]? = nil, kFrom: Int? = nil, kTo: Int? = nil) {
+        package init(overhead: Double = 0, keep: [Engine: Double] = [:], sustained: Double? = nil, keepByK: [KeepAt]? = nil, kFrom: Int? = nil, kTo: Int? = nil,
+                     perWeight: [Engine: Double]? = nil) {
             self.overhead = overhead; self.keep = keep; self.sustained = sustained; self.keepByK = keepByK; self.kFrom = kFrom; self.kTo = kTo
+            self.perWeight = perWeight
         }
+        /// The seconds `engine` pays per call in this set beyond its line, on a `k×n` weight (`perWeight`).
+        package func lift(_ engine: Engine, k: Int, n: Int) -> Double { (perWeight?[engine] ?? 0) * Double(k) * Double(n) }
         /// Whether a weight of length `k` is inside the set's domain.
         package func covers(k: Int) -> Bool { k >= (kFrom ?? 0) && k <= (kTo ?? Int.max) }
         /// The κ of `engine` in this set on a weight of length `k`.
@@ -198,7 +215,7 @@ package struct CapacityModel: Codable, Sendable, Equatable {
             return last.keep
         }
 
-        private enum CodingKeys: String, CodingKey { case overhead, keep, sustained, keepByK, kFrom, kTo }
+        private enum CodingKeys: String, CodingKey { case overhead, keep, sustained, keepByK, kFrom, kTo, perWeight }
         /// `keep` keyed by the engine's name (`{"gpu": 0.95}`), as a person reads it.
         package init(from decoder: any Decoder) throws {
             let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -208,6 +225,8 @@ package struct CapacityModel: Codable, Sendable, Equatable {
             keepByK = try c.decodeIfPresent([KeepAt].self, forKey: .keepByK)
             kFrom = try c.decodeIfPresent(Int.self, forKey: .kFrom)
             kTo = try c.decodeIfPresent(Int.self, forKey: .kTo)
+            perWeight = try c.decodeIfPresent([String: Double].self, forKey: .perWeight)
+                .map { try CapacityModel.engines($0, codingPath: c.codingPath + [CodingKeys.perWeight]) }
         }
         package func encode(to encoder: any Encoder) throws {
             var c = encoder.container(keyedBy: CodingKeys.self)
@@ -217,6 +236,7 @@ package struct CapacityModel: Codable, Sendable, Equatable {
             try c.encodeIfPresent(keepByK, forKey: .keepByK)
             try c.encodeIfPresent(kFrom, forKey: .kFrom)
             try c.encodeIfPresent(kTo, forKey: .kTo)
+            try c.encodeIfPresent(perWeight.map { Dictionary(uniqueKeysWithValues: $0.map { ($0.key.rawValue, $0.value) }) }, forKey: .perWeight)
         }
     }
 
@@ -258,13 +278,19 @@ package struct CapacityModel: Codable, Sendable, Equatable {
     /// the fastest of the candidates on this Mac, measured before its line (which is the line of that form). A kernel absent runs the
     /// three stages — what every map before the fused form planned with.
     package var attentionTiles: [Kernel: AttentionTile] = [:]
+    /// **How far this map's identical calls disagreed** (relative): the median, over every candidate the map timed in alternated rounds on
+    /// a wide product or an attention (`tileTrials`), of its slowest round over its fastest, less one (`CapacityFit.noise`). The solver
+    /// reads it as the width under which two assignments are one (`CapacitySolver`: twice it, the difference of two such figures) and
+    /// takes the first in its written order there — a choice the noise cannot flip from one map to the next. `nil`: a map without
+    /// rounds, whose choices are the fastest's (a part in a billion).
+    package var noise: Double?
 
     package init() {}
 
     // MARK: - JSON
 
     private enum CodingKeys: String, CodingKey {
-        case crest, lines, thin, aneRowUnit, sharing, heat, memoryBandwidth, diskBandwidth, diskClasses, preparation, kquantPreparation, tiles, thinTiles, attentionTiles
+        case crest, lines, thin, aneRowUnit, sharing, heat, memoryBandwidth, diskBandwidth, diskClasses, preparation, kquantPreparation, tiles, thinTiles, attentionTiles, noise
     }
 
     /// The engines of a dictionary keyed by their names.
@@ -335,6 +361,7 @@ package struct CapacityModel: Codable, Sendable, Equatable {
             }
             attentionTiles[kernel] = tile
         }
+        noise = try c.decodeIfPresent(Double.self, forKey: .noise)
     }
 
     package func encode(to encoder: any Encoder) throws {
@@ -361,6 +388,7 @@ package struct CapacityModel: Codable, Sendable, Equatable {
         if !attentionTiles.isEmpty {
             try c.encode(Dictionary(uniqueKeysWithValues: attentionTiles.map { ($0.key.description, $0.value) }), forKey: .attentionTiles)
         }
+        try c.encodeIfPresent(noise, forKey: .noise)
     }
 
     /// **Every number to `digits` significant digits**: what a report keeps (`Diagnostic.significant`), so that a model read back
@@ -372,12 +400,13 @@ package struct CapacityModel: Codable, Sendable, Equatable {
         m.crest = crest.mapValues(r)
         m.lines = lines.mapValues { Line(t0: r($0.t0), rate: r($0.rate), perWeight: $0.perWeight.map(r), rateByK: $0.rateByK?.map { .init(k: $0.k, rate: r($0.rate)) }, rowsFrom: $0.rowsFrom, perRow: $0.perRow.map(r)) }
         m.thin = thin.mapValues { Line(t0: r($0.t0), rate: r($0.rate), perWeight: $0.perWeight.map(r), rateByK: $0.rateByK?.map { .init(k: $0.k, rate: r($0.rate)) }, rowsFrom: $0.rowsFrom, perRow: $0.perRow.map(r)) }
-        m.sharing = sharing.mapValues { Sharing(overhead: r($0.overhead), keep: $0.keep.mapValues(r), sustained: $0.sustained.map(r), keepByK: $0.keepByK?.map { .init(k: $0.k, keep: $0.keep.mapValues(r)) }, kFrom: $0.kFrom, kTo: $0.kTo) }
+        m.sharing = sharing.mapValues { Sharing(overhead: r($0.overhead), keep: $0.keep.mapValues(r), sustained: $0.sustained.map(r), keepByK: $0.keepByK?.map { .init(k: $0.k, keep: $0.keep.mapValues(r)) }, kFrom: $0.kFrom, kTo: $0.kTo, perWeight: $0.perWeight?.mapValues(r)) }
         m.heat = heat.mapValues(r)
         m.memoryBandwidth = memoryBandwidth.map(r); m.diskBandwidth = diskBandwidth.map(r)
         m.diskClasses = diskClasses.mapValues { .init(rate: r($0.rate), mean: r($0.mean)) }
         m.preparation = preparation.mapValues { $0.mapValues(r) }
         m.kquantPreparation = kquantPreparation.map(r)
+        m.noise = noise.map(r)
         return m
     }
 
@@ -487,11 +516,12 @@ package struct CapacityModel: Codable, Sendable, Equatable {
     /// of the overlap, before the set's overhead.
     package func busy(m: Int, k: Int, n: Int, rows: [Kernel: Int], sustained: Bool = false) -> [Kernel: Double] {
         let running = rows.filter { $0.value > 0 }.map(\.key)
-        if running.count > 1, !sharing(running).covers(k: k) { return [:] }
+        let set = running.count > 1 ? sharing(running) : Sharing()
+        if running.count > 1, !set.covers(k: k) { return [:] }
         var solo: [Kernel: Double] = [:]
         for (kernel, r) in rows where r > 0 {
             guard let t = alone(kernel, rows: r, k: k, n: n, sustained: sustained) else { return [:] }
-            solo[kernel] = t
+            solo[kernel] = t + set.lift(kernel.engine, k: k, n: n)
         }
         return overlap(solo, k: k)
     }
@@ -525,7 +555,7 @@ package struct CapacityModel: Codable, Sendable, Equatable {
                 guard let (line, short) = self.line(for: kernel, rows: m, k: k, n: n), line.rate > 0 else { return nil }
                 let slow = sustained ? max(1, heat[kernel.engine] ?? 1) : 1
                 rate[kernel] = self.rate(kernel, line: line, k: k, n: n, short: short) / slow
-                fixed[kernel] = line.fixed(k: k, n: n)
+                fixed[kernel] = line.fixed(k: k, n: n) + set.lift(kernel.engine, k: k, n: n)
                 kappa[kernel] = speed(kernel, in: set, k: k)
             }
             let w = perRow * Double(m)

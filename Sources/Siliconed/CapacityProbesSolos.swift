@@ -62,7 +62,7 @@ extension Diagnostic.CapacityProbes.Context {
             guard v.pass else { refused.insert(c); m.tileTrials = (m.tileTrials ?? []) + [.init(kernel: name, shape: shape, flop: flop, seconds: 0, error: v.error)]; continue }
             built[c] = t
         }
-        var fastest: [AttentionTile?: Double] = [:]
+        var fastest: [AttentionTile?: Double] = [:], every: [AttentionTile?: [Double]] = [:]
         for _ in 0..<AttentionTile.rounds {
             for c in candidates {
                 guard let t = built[c], let seconds = guarded("\(kernel) form \(c?.description ?? "staged")", {
@@ -70,9 +70,10 @@ extension Diagnostic.CapacityProbes.Context {
                 }) else { continue }
                 m.tileTrials = (m.tileTrials ?? []) + [.init(kernel: "\(kernel) \(c?.description ?? "staged")", shape: shape, flop: flop, seconds: seconds, error: nil)]
                 fastest[c] = min(fastest[c] ?? .infinity, seconds)
+                every[c, default: []].append(seconds)
             }
         }
-        let chosen = MatmulTile.choose(fastest, among: candidates, standard: nil)
+        let chosen = MatmulTile.choose(fastest, among: candidates, standard: nil, spread: every.mapValues { MatmulTile.spread([0: $0]) })
         log?("  form \(kernel): " + candidates.compactMap { c in fastest[c].map { String(format: "%@ %.2f ms", c?.description ?? "staged", $0 * 1e3) } }
                 .joined(separator: " · ") + " → \(chosen?.description ?? "staged")")
         if let chosen { m.attentionTiles = (m.attentionTiles ?? [:]).merging([kernel.description: chosen.description]) { $1 } }
@@ -89,8 +90,8 @@ extension Diagnostic.CapacityProbes.Context {
         guard MatmulTile.kernels.contains(kernel), !skipped.contains(kernel), !sizes.solo.isEmpty,
               let tensor = (probe == .gpu_int8 ? both : alone).tensor else { return }
         let candidates = MatmulTile.candidates(for: kernel), standard = MatmulTile.standard(for: kernel)
-        func measure(_ shapes: [Sizes.Shape], thin: Bool) -> [MatmulTile: Double] {
-            var fastest: [MatmulTile: [Int: Double]] = [:]
+        func measure(_ shapes: [Sizes.Shape], thin: Bool) -> (seconds: [MatmulTile: Double], spread: [MatmulTile: Double]) {
+            var fastest: [MatmulTile: [Int: Double]] = [:], every: [MatmulTile: [Int: [Double]]] = [:]
             var refused: Set<MatmulTile> = []
             for _ in 0..<MatmulTile.rounds {
                 for tile in candidates where !refused.contains(tile) {
@@ -100,16 +101,23 @@ extension Diagnostic.CapacityProbes.Context {
                         m.tileTrials = (m.tileTrials ?? []) + [.init(kernel: "\(kernel) \(tile)", shape: s.shape, flop: s.flop, seconds: s.seconds, error: s.error)]
                         guard s.seconds > 0 else { refused.insert(tile); break }
                         fastest[tile, default: [:]][i] = min(fastest[tile]?[i] ?? .infinity, s.seconds)
+                        every[tile, default: [:]][i, default: []].append(s.seconds)
                     }
                 }
             }
             // A shape counts only where every candidate left kept a time for it: the sums compare the same products.
             let kept = fastest.filter { !refused.contains($0.key) }
             let common = kept.values.map { Set($0.keys) }.reduce(Set(shapes.indices)) { $0.intersection($1) }
-            return kept.mapValues { times in common.reduce(0) { $0 + times[$1]! } }.filter { $0.value > 0 }
+            let seconds = kept.mapValues { times in common.reduce(0) { $0 + times[$1]! } }.filter { $0.value > 0 }
+            let spread = Dictionary(uniqueKeysWithValues: seconds.keys.map { tile in
+                (tile, MatmulTile.spread((every[tile] ?? [:]).filter { common.contains($0.key) }))
+            })
+            return (seconds, spread)
         }
-        func decide(_ seconds: [MatmulTile: Double], thin: Bool) -> MatmulTile {
-            let chosen = MatmulTile.choose(seconds, among: candidates, standard: standard, margin: thin ? MatmulTile.thinMargin : MatmulTile.margin)
+        func decide(_ measured: (seconds: [MatmulTile: Double], spread: [MatmulTile: Double]), thin: Bool) -> MatmulTile {
+            let seconds = measured.seconds
+            let chosen = MatmulTile.choose(seconds, among: candidates, standard: standard, margin: thin ? MatmulTile.thinMargin : MatmulTile.margin,
+                                           spread: measured.spread)
             log?("  tiles \(kernel)\(thin ? " thin" : ""): " + candidates.compactMap { t in seconds[t].map { String(format: "%@ %.3f ms", t.description, $0 * 1e3) } }
                     .joined(separator: " · ") + " → \(chosen)")
             tensor.tiles.use(chosen, for: kernel, thin: thin)

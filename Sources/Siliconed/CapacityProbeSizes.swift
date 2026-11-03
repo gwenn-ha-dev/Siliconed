@@ -182,6 +182,16 @@ extension Diagnostic.CapacityProbes {
             return ["sharing rounded": pairPasses.reduce(0) { $0 + chain(flop($1), rate: 0.8 * (rates.gpu * Self.formRatio["bf16act"]! + a)) + 0.15 }]
         }
 
+        /// **The seconds the rounded kernels' extra points add** (`gpu/bf16act`, `gpu/int8act` on the fp32 solos' shapes besides their own), inside
+        /// `projection`'s « solos 8-bit and rounded »: eight points a line, so that one the Mac disturbed is told apart (`CapacityFit.kept`). No M1 Pro
+        /// has timed them.
+        package func roundedProductSeconds(_ rates: Rates) -> [String: Double] {
+            func flop(_ s: Shape) -> Double { 2 * Double(s.m) * Double(s.k) * Double(s.n) }
+            let values = Set(product.map { [$0.k, $0.n] }).reduce(0.0) { $0 + Double($1[0]) * Double($1[1]) }
+            let forms = ["bf16act", "int8act"].reduce(0) { $0 + 1 / (rates.gpu * Self.formRatio[$1]!) }
+            return ["solos 8-bit and rounded": Self.runs * product.reduce(0) { $0 + flop($1) } * forms + values * Self.truthPerValue * 2]
+        }
+
         /// The chain passes of the fp32 sets (two on the short shape, one on the long), which the integer pairs take too.
         var pairPasses: [Shape] { [chains.first].compactMap { $0 } + [chains.first].compactMap { $0 } + (chains.count > 1 ? [chains[1]] : []) }
 
@@ -252,6 +262,7 @@ extension Diagnostic.CapacityProbes {
                 } + truth(chains)
             }
             p.merge(roundedPairSeconds(rates)) { $1 }
+            p.merge(roundedProductSeconds(rates)) { $0 + $1 }
             return p
         }
 

@@ -225,8 +225,8 @@ import Testing
         let body = lines[2..<(2 + c.rows.count)]
         for line in body { #expect(line.split(separator: "\t", omittingEmptySubsequences: false).count == 7, "\(line)") }
         #expect(body.allSatisfy { !$0.hasPrefix("#") })
-        let heads: [String] = lines.suffix(4).map { (line: String) -> String in String(line.prefix(while: { $0 != "\t" })) }
-        #expect(heads == ["#total", "#products", "#attention", "#coverage"])
+        let heads: [String] = lines.suffix(5).map { (line: String) -> String in String(line.prefix(while: { $0 != "\t" })) }
+        #expect(heads == ["#total", "#products", "#attention", "#coverage", "#fallbacks"])
         #expect(body.first!.contains("+10.0%"))
         // Without a model the prediction columns are empty and the lines still parse.
         let bare = RenderLoop.lines(RenderLoop.compare(simulated(p)), title: "t")

@@ -237,9 +237,10 @@ package enum RenderLoop {
     // MARK: - As text
 
     /// **The comparison as a table a script can read**: a title line, then the header `#class` and one line per class, columns
-    /// separated by tabs, then `#total`, `#products`, `#attention` and `#coverage` lines. Seconds are wall seconds; `error` is
-    /// `measured / predicted − 1`, empty where either side is missing.
-    package static func lines(_ comparison: Comparison, title: String) -> [String] {
+    /// separated by tabs, then `#total`, `#products`, `#attention` and `#coverage` lines, then one `#fallback` line per product that
+    /// ran otherwise than planned (`ProductLedger.Fallback`: class, executions, the plan's route, the reason) and a `#fallbacks` count.
+    /// Seconds are wall seconds; `error` is `measured / predicted − 1`, empty where either side is missing.
+    package static func lines(_ comparison: Comparison, title: String, fallbacks: [ProductLedger.Fallback] = []) -> [String] {
         func s(_ x: Double?) -> String { x.map { String(format: "%.3f", $0) } ?? "" }
         func e(_ x: Double?) -> String { x.map { String(format: "%+.1f%%", $0 * 100) } ?? "" }
         var out = [title, ["#class", "route", "executions", "measured_s", "predicted_s", "error", "predicted_route"].joined(separator: "\t")]
@@ -253,6 +254,15 @@ package enum RenderLoop {
         out.append(["#attention", "", "", "", "", e(comparison.attentionError), ""].joined(separator: "\t"))
         out.append(["#coverage", "", "", "", "", String(format: "%.1f%%", comparison.coverage * 100),
                     String(format: "routes agree on %.1f%% of the matched seconds", comparison.routeAgreement * 100)].joined(separator: "\t"))
+        for f in fallbacks {
+            let id: String
+            switch f.work {
+            case let .product(k, n, m, weight): id = CapacityClasses.productID(k: k, n: n, m: m, format: weight)
+            case let .attention(s, h, d): id = CapacityClasses.attentionID(sequence: s, heads: h, headDim: d)
+            }
+            out.append(["#fallback", id, "\(f.executions)", f.planned, f.reason.rawValue].joined(separator: "\t"))
+        }
+        out.append(["#fallbacks", "", "\(fallbacks.reduce(0) { $0 + $1.executions })", "", ""].joined(separator: "\t"))
         return out
     }
 }

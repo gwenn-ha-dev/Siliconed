@@ -95,6 +95,8 @@ extension RenderLoop {
         package var coverage: Double
         package var verdict: String
         package var classes: [Line]
+        /// **Executions that ran otherwise than planned, by reason** (`ProductLedger.Reason`'s names); absent when none did.
+        package var fallbacks: [String: Int]?
 
         /// `[id, routes, executions, measured, predicted route, predicted, error]`.
         package struct Line: Codable, Sendable, Equatable {
@@ -127,7 +129,8 @@ extension RenderLoop {
         /// How many classes the note keeps.
         package static let linkClasses = 10
 
-        package init(request: CapacityClasses.Request, map: String, comparison: Comparison, verdict: Verdict) {
+        package init(request: CapacityClasses.Request, map: String, comparison: Comparison, verdict: Verdict,
+                     fallbacks: [ProductLedger.Fallback] = []) {
             family = request.family.rawValue; variant = request.variant.rawValue
             format = "\(request.width)x\(request.height)"; faster = request.fasterRendering; evaluations = request.steps
             self.map = map
@@ -142,6 +145,8 @@ extension RenderLoop {
                 Line(id: $0.id, route: $0.routes.first ?? "", executions: $0.executions, measured: $0.measured,
                      predictedRoute: $0.predictedRoute, predicted: $0.predicted, error: $0.error)
             }
+            let byReason = Dictionary(fallbacks.map { ($0.reason.rawValue, $0.executions) }, uniquingKeysWith: +)
+            self.fallbacks = byReason.isEmpty ? nil : byReason
         }
     }
 
@@ -160,7 +165,8 @@ extension RenderLoop {
                                     accelerators: render.accelerators) ?? []
         let comparison = compare(render.classes, predicted: predicted)
         let verdict = verdict(comparison, thresholds: thresholds)
-        return (comparison, verdict, Note(request: request, map: mapDate, comparison: comparison, verdict: verdict))
+        return (comparison, verdict, Note(request: request, map: mapDate, comparison: comparison, verdict: verdict,
+                                                 fallbacks: render.fallbacks))
     }
 }
 

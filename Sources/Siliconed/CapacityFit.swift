@@ -17,6 +17,12 @@ import Foundation
 ///   - **a line is fitted on the relative error** (weights 1/t²): the 300 GFLOP point is a hundred times the 4 GFLOP one in
 ///     seconds, and an unweighted fit would be the big one's alone — the small one is where t₀ lives. A negative t₀ is a
 ///     fit that reached past its data: it is clamped to 0 and the rate refitted through the origin.
+///   - **a disturbed figure is left out before the fit, not averaged in** (`kept`): the Mac only ever adds time, so the line under
+///     every point that sits highest on them all (the lower envelope) is the engine's, and a point more than the regime's spread
+///     (15 %) above it is a figure the Mac disturbed. A median or a Huber fit would still lean on it with three points; the envelope
+///     needs no scale but the spread the regime already judges by. With fewer than two points left, all are kept.
+///   - **the map's noise is the rounds' own** (`noise`): the median, over the tiles' and attention forms' candidates, of the spread of
+///     their repeated rounds — what a figure of this map is sure to; the solver's margin is twice it.
 ///   - **the ANE's unit is read, not assumed**: the candidates are fitted on the same rows and the *largest* unit that
 ///     explains them as well as the best (within half a percent) wins — samples all at multiples of 256 cannot tell 256 from
 ///     128, and the coarser is the one the model's rounding needs; an odd multiple of 256 in the samples is what rules 512 out.
@@ -66,7 +72,41 @@ package enum CapacityFit {
     }
 
     package static func line(_ points: [Point]) -> CapacityModel.Line? {
-        affine(points.map { ($0.flop, $0.seconds) }).map { .init(t0: $0.a, rate: 1 / $0.b) }
+        affine(kept(points).map { ($0.flop, $0.seconds) }).map { .init(t0: $0.a, rate: 1 / $0.b) }
+    }
+
+    /// **The points a line is fitted on: those the Mac did not disturb.** A busy Mac only adds time — a figure is never faster than
+    /// the silicon — so the undisturbed seconds lie on the *lower envelope* of the points: the highest line `t₀ + W·s` (t₀ ≥ 0, s > 0)
+    /// under every one of them, the highest in the relative sense the fit uses. A point more than `Regime.Rules.spread` above it is a
+    /// figure the regime's own rule would call disturbed (identical calls differing by more than that) and is left out; the weighted
+    /// least squares then run on the rest, as before. With fewer than three points there is nothing to tell an aberrant one from: all
+    /// are kept. On an M5 Pro a single point measured again after « busy » (512 × 2048², 1.61 ms where two other maps read 0.32 and
+    /// 0.64) took a line's t₀ from 0.32 to 0.94 ms and its rate from 17 to 30 TFLOP/s, and the next map's (1 024 × 3 840², 11 TFLOP/s
+    /// where the render ran 17–20) took them back: the small classes of the Standard changed routes, hence bits, map after map.
+    package static func kept(_ points: [Point]) -> [Point] {
+        let p = points.filter { $0.seconds > 0 && $0.flop > 0 }
+        guard p.count >= 3, let floor = envelope(p) else { return p }
+        let kept = p.filter { $0.seconds <= (floor.t0 + $0.flop * floor.slope) * (1 + Diagnostic.Regime.Rules.spread) }
+        return kept.count >= 2 ? kept : p
+    }
+
+    /// **The lower envelope** `t = t₀ + W·slope` of the points: among the lines through two points (and the line through the origin and
+    /// the point of least seconds per FLOP), those with t₀ ≥ 0 and a positive slope that no point lies under, the one that is highest
+    /// relative to the points (Σ line(Wᵢ)/tᵢ). `nil` under two points.
+    package static func envelope(_ points: [Point]) -> (t0: Double, slope: Double)? {
+        guard points.count >= 2 else { return nil }
+        var candidates: [(t0: Double, slope: Double)] = []
+        if let s = points.map({ $0.seconds / $0.flop }).min() { candidates.append((0, s)) }
+        for (i, a) in points.enumerated() {
+            for b in points[(i + 1)...] where b.flop != a.flop {
+                let slope = (b.seconds - a.seconds) / (b.flop - a.flop)
+                let t0 = a.seconds - slope * a.flop
+                if slope > 0, t0 >= 0 { candidates.append((t0, slope)) }
+            }
+        }
+        let under = candidates.filter { c in points.allSatisfy { c.t0 + $0.flop * c.slope <= $0.seconds * (1 + 1e-12) } }
+        func height(_ c: (t0: Double, slope: Double)) -> Double { points.reduce(0) { $0 + (c.t0 + $1.flop * c.slope) / $1.seconds } }
+        return under.max { height($0) < height($1) }
     }
 
     /// **The intercept the points give before it is clamped at 0**: the fit's own, on the same weights. A line through two points
@@ -465,6 +505,9 @@ package enum CapacityFit {
     package static func overlap(set: String, trials: [Measurements.Trial], model: CapacityModel) -> SharingFit? {
         let used = trials.filter { $0.set == set && $0.sides.count >= 2 && $0.shape.count == 3 && $0.wall > 0 }
         guard !used.isEmpty else { return nil }
+        // What a side pays per call in this set beyond its line, known before the chains (`lift(set:model:)`): out of the κ, into the solo.
+        let perWeight = lift(set: set, model: model)
+        let paid = CapacityModel.Sharing(perWeight: perWeight)
         var byEngine: [CapacityModel.Engine: [Double]] = [:]
         var byK: [Int: [CapacityModel.Engine: [Double]]] = [:]
         var keeps: [[Double?]] = [], overheads: [Double] = [], residuals: [Double] = []
@@ -473,7 +516,7 @@ package enum CapacityFit {
             var sides: [(kernel: Kernel, solo: Double, within: Double)] = []
             for side in trial.sides {
                 guard let kernel = Kernel(side.kernel), let s = model.alone(kernel, rows: side.rows, k: k, n: n) else { continue }
-                sides.append((kernel, s, side.within ?? trial.wall))
+                sides.append((kernel, s + paid.lift(kernel.engine, k: k, n: n), side.within ?? trial.wall))
             }
             guard sides.count == trial.sides.count, let ks = overlapKeeps(sides: sides, k: k, sub: { model.sharing($0) }) else { keeps.append([]); continue }
             keeps.append(trial.sides.map { Kernel($0.kernel).flatMap { ks[$0] } })
@@ -481,7 +524,7 @@ package enum CapacityFit {
             overheads.append(max(0, trial.wall - (sides.map(\.within).max() ?? trial.wall)))
         }
         guard !byEngine.isEmpty else { return nil }
-        var fit = CapacityModel.Sharing(overhead: median(overheads), keep: byEngine.mapValues(median))
+        var fit = CapacityModel.Sharing(overhead: median(overheads), keep: byEngine.mapValues(median), perWeight: perWeight)
         fit.overhead = fit.overhead.isFinite ? fit.overhead : 0
         // κ by k where the chains came at more than one: each engine's median at each k.
         if let low = byK.keys.min(), let high = byK.keys.max() { fit.kFrom = max(1, low / 2); fit.kTo = high * 2 }
@@ -504,6 +547,31 @@ package enum CapacityFit {
             if let t = check.seconds(m: trial.shape[0], k: trial.shape[1], n: trial.shape[2], rows: rows) { residuals.append((t - trial.wall) / trial.wall) }
         }
         return SharingFit(sharing: fit, keeps: keeps, overheads: overheads, residuals: residuals)
+    }
+
+    /// **What a side of `set` pays per call beyond its line, per weight value** (`Sharing.perWeight`), from what the map measured before
+    /// any chain: the rounded bf16 pair's ANE (`gpu/bf16act+ane/fp16`) reads the bf16 copy as published, and its program widens every value
+    /// of it at every call (the lift reads each row widened, the conversion widens it again where the widened weight's is read as it is:
+    /// one widening more than the line's weight, the shift that `preparation[bf16][widened]` times per value). `nil` for every other set:
+    /// its sides read the weight their lines were measured on (the integers' pairs read the integers alone as in the set).
+    package static func lift(set: String, model: CapacityModel) -> [CapacityModel.Engine: Double]? {
+        guard set == CapacityModel.key([Kernel(.gpu, .bf16act), Kernel(.ane, .fp16)]),
+              let widening = model.preparation[.bf16]?[.widened], widening > 0 else { return nil }
+        return [.ane: widening]
+    }
+
+    /// **How far the map's identical calls disagreed** (`CapacityModel.noise`): for every candidate timed in alternated rounds on a wide product
+    /// (no short side: a thin shape's first round pays what the next do not) or an attention, its slowest round over its fastest, less one;
+    /// the median of those. `nil` with no such rounds (a report that predates them).
+    package static func noise(_ trials: [Measurements.Solo]) -> Double? {
+        var rounds: [String: [Double]] = [:]
+        for t in trials where t.seconds > 0 && t.shape.count == 3 {
+            guard let name = t.kernel.split(separator: " ").first, let kernel = Kernel(String(name)) else { continue }
+            if kernel.form.isProduct, CapacityModel.isThin(rows: t.shape[0], k: t.shape[1], n: t.shape[2]) { continue }
+            rounds["\(t.kernel) \(t.shape)", default: []].append(t.seconds)
+        }
+        let spreads = rounds.values.filter { $0.count >= 2 }.map { $0.max()! / $0.min()! - 1 }
+        return spreads.isEmpty ? nil : median(spreads)
     }
 
     // MARK: - The model
@@ -537,6 +605,11 @@ package enum CapacityFit {
         // The unit the ANE *charges* can be finer than the one an engine *allocates* (rows are given in whole
         // `allocationUnit`s): the model's rounding is the larger.
         if let st = stairs(m.stairs.map { ($0.rows, $0.seconds) }) { model.aneRowUnit = max(st.unit, allocationUnit) }
+        // The preparation before the sets: a set's side may pay a widening its line does not hold (`lift(set:model:)`).
+        for (kindName, paths) in m.preparation {
+            guard let kind = WeightKind(rawValue: kindName) else { continue }
+            for (pathName, seconds) in paths { if let path = WeightPath(rawValue: pathName) { model.preparation[kind, default: [:]][path] = seconds } }
+        }
         // The sets from the smallest: a set's κ is read through the sets that remain when its first side has ended.
         func size(_ set: String) -> Int { set.split(separator: "+").count }
         let order: [String] = Set(m.trials.map(\.set)).sorted { (a: String, b: String) -> Bool in size(a) != size(b) ? size(a) < size(b) : a < b }
@@ -550,13 +623,10 @@ package enum CapacityFit {
         for w in m.witnesses {
             if let e = CapacityModel.Engine(rawValue: w.engine), w.before > 0, w.after > 0 { model.heat[e] = max(1, w.after / w.before) }
         }
+        model.noise = m.tileTrials.flatMap(noise)
         model.memoryBandwidth = m.memoryBandwidth
         model.diskBandwidth = m.diskBandwidth
         model.diskClasses = m.diskClasses
-        for (kindName, paths) in m.preparation {
-            guard let kind = WeightKind(rawValue: kindName) else { continue }
-            for (pathName, seconds) in paths { if let path = WeightPath(rawValue: pathName) { model.preparation[kind, default: [:]][path] = seconds } }
-        }
         return model
     }
 }

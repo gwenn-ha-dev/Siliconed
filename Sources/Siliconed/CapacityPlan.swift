@@ -136,6 +136,8 @@ package final class CapacityPlan: Sendable {
         var products: [ProductKey: ProductAssignment] = [:]
         var attentions: [Memo: AttentionAssignment] = [:]
         var pins: [ProductKey: ProductAssignment] = [:]
+        /// The products the solver had no answer for, and why (`ProductLedger.Reason`): the GPU alone, named rather than silent.
+        var unsolved: [ProductKey: ProductLedger.Reason] = [:]
     }
     private struct Memo: Hashable { var key: AttentionKey; var flash: Bool }
     private let state = Mutex(State())
@@ -254,7 +256,8 @@ package final class CapacityPlan: Sendable {
         for (k, l) in model.thin.sorted(by: { $0.key.description < $1.key.description }) { parts.append("thin \(k) \(l.t0) \(l.rate) \(l.perWeight ?? 0) \(l.perRow ?? 0) \(l.rowsFrom ?? 0)" + (l.rateByK?.map { " \($0.k):\($0.rate)" }.joined() ?? "")) }
         parts.append("unit \(model.aneRowUnit)")
         for (k, s) in model.sharing.sorted(by: { $0.key < $1.key }) {
-            parts.append("\(k) \(s.overhead) \(s.sustained.map { "\($0)" } ?? "-") \(s.kFrom ?? 0)-\(s.kTo ?? 0) " + (s.keepByK?.map { "\($0.k):" + $0.keep.sorted { $0.key < $1.key }.map { "\($0.key)=\($0.value)" }.joined(separator: ",") }.joined(separator: ";") ?? "") + " " + s.keep.sorted { $0.key < $1.key }.map { "\($0.key.rawValue)=\($0.value)" }.joined(separator: ","))
+            parts.append("\(k) \(s.overhead) \(s.sustained.map { "\($0)" } ?? "-") \(s.kFrom ?? 0)-\(s.kTo ?? 0) " + (s.keepByK?.map { "\($0.k):" + $0.keep.sorted { $0.key < $1.key }.map { "\($0.key)=\($0.value)" }.joined(separator: ",") }.joined(separator: ";") ?? "") + " " + s.keep.sorted { $0.key < $1.key }.map { "\($0.key.rawValue)=\($0.value)" }.joined(separator: ",")
+                         + (s.perWeight.map { " lift " + $0.sorted { $0.key < $1.key }.map { "\($0.key.rawValue)=\($0.value)" }.joined(separator: ",") } ?? ""))
         }
         for (e, h) in model.heat.sorted(by: { $0.key < $1.key }) { parts.append("heat \(e.rawValue) \(h)") }
         for (k, t) in model.tiles.sorted(by: { $0.key.description < $1.key.description }) { parts.append("tile \(k) \(t)") }
@@ -267,6 +270,7 @@ package final class CapacityPlan: Sendable {
             parts.append("prep \(kind.rawValue) " + paths.sorted { $0.key.rawValue < $1.key.rawValue }.map { "\($0.key.rawValue)=\($0.value)" }.joined(separator: ","))
         }
         parts.append("kquant \(model.kquantPreparation.map { "\($0)" } ?? "-")")
+        parts.append("noise \(model.noise.map { "\($0)" } ?? "-")")
         var hash: UInt64 = 0xcbf29ce484222325
         for byte in parts.joined(separator: "\n").utf8 { hash = (hash ^ UInt64(byte)) &* 0x100000001b3 }
         return String(hash, radix: 16)
@@ -279,7 +283,12 @@ package final class CapacityPlan: Sendable {
     package func assign(_ key: ProductKey) -> ProductAssignment {
         let known: ProductAssignment? = state.withLock { $0.pins[key] ?? $0.products[key] }
         if let known { return known }
-        var a = override?(key) ?? CapacityPlan.solved(self, key)
+        var a: ProductAssignment
+        if let forced = override?(key) { a = forced } else {
+            let (solved, reason) = CapacityPlan.solved(self, key)
+            a = solved
+            if let reason { state.withLock { $0.unsolved[key] = reason } }
+        }
         // A forcing that names the ANE is told to do without: the rows to the GPU, and a weight the ANE would have read as published
         // is the widened one again (the GPU's int8 kernel rounds in another order — not the route a process without the ANE ran).
         if a.ane > 0 && !allowsANE {
@@ -292,9 +301,16 @@ package final class CapacityPlan: Sendable {
         return kept
     }
 
-    private static func solved(_ plan: CapacityPlan, _ key: ProductKey) -> ProductAssignment {
-        guard let model = plan.model else { return .gpuAlone(key.m) }
-        return CapacitySolver.product(key, model: model, constraints: plan.constraints)?.assignment ?? .gpuAlone(key.m)
+    /// The solver's answer, or the GPU alone and the reason it is the GPU alone.
+    private static func solved(_ plan: CapacityPlan, _ key: ProductKey) -> (ProductAssignment, ProductLedger.Reason?) {
+        guard let model = plan.model else { return (.gpuAlone(key.m), .noModel) }
+        guard let a = CapacitySolver.product(key, model: model, constraints: plan.constraints)?.assignment else { return (.gpuAlone(key.m), .unsolved) }
+        return (a, nil)
+    }
+
+    /// **Why `key` is on the GPU alone**, when the solver gave it no answer (`assign` asked first); `nil` when it was solved or forced.
+    package func fallback(_ key: ProductKey) -> ProductLedger.Reason? {
+        state.withLock { $0.unsolved[key] }
     }
 
     /// **The assignment of an attention.** `flash`: the caller's code tries the flash kernel before the split (Z-Image's and

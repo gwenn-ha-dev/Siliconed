@@ -36,8 +36,14 @@ import Foundation
 ///   - **The model's domain is a floor, not a bound of the engine.** Its lines were measured from ≈ 4 GFLOP: below `Limits` the AMX,
 ///     the ANE and the rounding are not asked about (their t₀ would be extrapolated), and the GPU takes the product. The engine
 ///     itself imposes none of them.
-///   - **Neutral on tie**: candidates come simplest first (the GPU, then with the AMX, with the ANE, the three, then the AMX alone,
-///     the ANE alone), and a more complex one must be faster by more than a part in a billion.
+///   - **Under the noise, a written order — never the noise**: two assignments closer than the map's own noise (twice `CapacityModel.noise`,
+///     the difference of two figures each that uncertain, and never under the 5 % two calm maps differ by) are one, and the first in `canonical` order is taken: without the AMX before
+///     with it, with the ANE before without (on equal time the engines' efficiency decides: the ANE's watts are the fewest, the AMX's the
+///     most — a margin may favour the ANE, never the AMX), fewer engines, then the finer operand (the weight widened to fp32, the weight as
+///     published on an fp32 activation, its activation rounded; the integers on an fp32 activation, then rounded), then the order the
+///     candidates are listed in. Stateless: the same map gives the same plan, and
+///     a second map of the same Mac changes a choice only where the gain passes the noise. A map without rounds keeps the old rule (a part
+///     in a billion).
 ///   - **No AMX beside a native weight.** Its columns would be widened on the CPU at every call and multiplied in fp32 — a widening,
 ///     the cost the native path exists to avoid —, timed by a line (`amx/int8`, `amx/q8`) no probe can measure as the route runs (the
 ///     widening of a share of columns inside the AMX's side, beside a GPU reading integers); the AMX beside the GPU on an 8-bit weight is
@@ -496,12 +502,39 @@ private struct ProductSolver {
 
     func solve(_ key: ProductKey) -> CapacitySolver.ProductSolution? {
         guard line(.gpu, .fp32) != nil else { return nil }
-        var best: (Option, Double)?       // option, total
-        for o in candidates(key) {
-            let total = o.seconds + preparation(format: key.weight, path: o.assignment.path, k: key.k, n: key.n)
-            if best == nil || total < best!.1 * (1 - 1e-9) { best = (o, total) }
+        let timed = canonical(candidates(key)).map { o in (o, o.seconds + preparation(format: key.weight, path: o.assignment.path, k: key.k, n: key.n)) }
+        guard let fastest = timed.map(\.1).min() else { return nil }
+        let width = margin(thin: CapacityModel.isThin(rows: key.m, k: key.k, n: key.n))
+        return timed.first { $0.1 <= fastest * (1 + width) }.map { solution($0.0, key) }
+    }
+
+    /// **The width under which two candidates are one** (relative): twice the map's noise (`CapacityModel.noise`), never under the
+    /// noise between two calm maps of one Mac — the tiles' own floors, `MatmulTile.margin` for a wide product, `thinMargin` for a thin
+    /// one, whose fixed costs two maps read 10 % apart either way —; a part in a billion for a map without rounds.
+    func margin(thin: Bool = false) -> Double {
+        model.noise.map { max(thin ? MatmulTile.thinMargin : MatmulTile.margin, 2 * $0) } ?? 1e-9
+    }
+
+    /// **The written order a tie under the noise is settled by**: without the AMX first, then with the ANE, then fewer engines; then the
+    /// finer operand (`rank`); then the order `candidates` lists them in (the sort is stable).
+    func canonical(_ options: [Option]) -> [Option] {
+        func rank(_ a: ProductAssignment) -> Int {
+            switch a.path {
+            case .widened: return 0
+            case .bf16: return a.roundsActivation ? 2 : 1
+            case .native: return a.roundsActivation ? 4 : 3
+            }
         }
-        return best.map { solution($0.0, key) }
+        return options.enumerated().sorted { x, y in
+            let (a, b) = (x.element, y.element)
+            func uses(_ o: Option, _ engine: Engine) -> Bool { o.rows.contains { $0.key.engine == engine && $0.value > 0 } }
+            if uses(a, .amx) != uses(b, .amx) { return !uses(a, .amx) }
+            if uses(a, .ane) != uses(b, .ane) { return uses(a, .ane) }
+            let (ea, eb) = (a.rows.filter { $0.value > 0 }.count, b.rows.filter { $0.value > 0 }.count)
+            if ea != eb { return ea < eb }
+            if rank(a.assignment) != rank(b.assignment) { return rank(a.assignment) < rank(b.assignment) }
+            return x.offset < y.offset
+        }.map(\.element)
     }
 
     /// **An assignment decided elsewhere, timed here**: the kernels it reads, the rows each takes, plus the weight's preparation.
@@ -612,11 +645,10 @@ private struct ProductSolver {
     }
 
     func solve(_ key: AttentionKey, flash: Bool) -> CapacitySolver.AttentionSolution? {
-        var best: (AttentionAssignment, (route: String, rows: [Kernel: Int], seconds: Double, busy: [Engine: Double]))?
-        for (o, t) in candidates(key, flash: flash) {
-            if best == nil || t.seconds < best!.1.seconds * (1 - 1e-9) { best = (o, t) }
-        }
-        guard var (a, t) = best else { return nil }
+        // The written order (`candidates`: the graph, flash, the tiled kernels from the finest operand, then the cut with the fewest CPU heads
+        // first), the first within the noise of the fastest.
+        let all = candidates(key, flash: flash)
+        guard let fastest = all.map(\.1.seconds).min(), var (a, t) = all.first(where: { $0.1.seconds <= fastest * (1 + margin()) }) else { return nil }
         // The form its map chose for the tiled kernel that runs: what its line timed.
         let tiled = a.splits ? a.gpuKernel : a.kernel
         if tiled == .tiles16 || tiled == .tilesbf16 { a.tile = model.attentionTiles[Kernel(.gpu, tiled == .tiles16 ? .tiles16 : .tilesbf16)] }

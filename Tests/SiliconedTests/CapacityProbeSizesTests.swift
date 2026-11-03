@@ -55,6 +55,7 @@ import Testing
     @Test func theProjectionIsTheRightOrderOnTheMacItWasTunedOn() {
         let p = Sizes.full.projection(Self.m1Pro)
         let untimed = Sizes.full.roundedEightBitSeconds(Self.m1Pro).merging(Sizes.full.roundedPairSeconds(Self.m1Pro)) { $0 + $1 }
+            .merging(Sizes.full.roundedProductSeconds(Self.m1Pro)) { $0 + $1 }
         #expect(Set(p.keys) == Set(Self.measured.keys))
         for (stage, seconds) in Self.measured.sorted(by: { $0.key < $1.key }) {
             // The attention's 4.0 s were measured before the half-precision kernels chose their form (2/11/2026), the 8-bit stages before

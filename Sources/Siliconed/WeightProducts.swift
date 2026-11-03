@@ -104,7 +104,7 @@ package final class WeightProducts {
     package func linear(_ name: String, a: MTLBuffer, c: MTLBuffer, m: Int, k: Int, n: Int,
                         target: String? = nil) throws {
         let w = try gemm.wrap(UnsafeMutableRawPointer(reserve), bytes: capacity * 4, name: "w")
-        let (path, planned) = try prepare(name, count: k * n, m: m, n: n)
+        let (path, planned, skipped) = try prepare(name, count: k * n, m: m, n: n)
         let staged = path != .widened
         let target = target ?? String(name.dropLast(".weight".count))
         var stack: (down: MTLBuffer, up: MTLBuffer, rank: Int)?
@@ -124,6 +124,9 @@ package final class WeightProducts {
         // The render's check (`ProductLedger`): this product's wall seconds, as the class and the route it is.
         let ledger = ProductLedger.current
         let began = ledger == nil ? 0 : DispatchTime.now().uptimeNanoseconds
+        // The ANE's rows the plan gave and the process did not hand it (`ProductLedger.Reason.aneNotAccepted`).
+        var aneDeclined = false
+        let givenBackBefore = planned.ane > 0 && ledger != nil ? GEMM.neuralEngineTally.withLock { $0.givenBack } : 0
         timed("gemm wall") {
             switch path {
             case .bf16(let rounding?):
@@ -137,6 +140,7 @@ package final class WeightProducts {
                     aneTook = r.computed
                 } else {
                     aneTook = false
+                    aneDeclined = planned.ane > 0
                     timings["gemm GPU", default: 0] += gemm.linear(a: a, rounding: (w, rounding.offset, rounding.rows), bf16: w,
                                                                   c: c, m: m, k: k, n: n, weightIsTransposed: transposed)
                 }
@@ -155,6 +159,7 @@ package final class WeightProducts {
                     aneAlone = r.computed && aneRows == m
                 } else {
                     aneTook = false; aneAlone = false
+                    aneDeclined = planned.ane > 0
                     let r = Self.int8Product(gemm: gemm, plan: plan, reserve: w, a: a, c: c, m: m, k: k, n: n)
                     timings["gemm GPU", default: 0] += r.gpu
                     timings["widening", default: 0] += r.widening
@@ -170,6 +175,16 @@ package final class WeightProducts {
             let (weight, route) = classification(of: name, path)
             ledger.add(.product(k: k, n: n, m: m, weight: weight), route: route,
                        seconds: Double(DispatchTime.now().uptimeNanoseconds - began) * 1e-9)
+            // What ran otherwise than planned, and why: the plan's own fallback first, then the path skipped, then the ANE's rows.
+            let key = ProductKey(k: k, n: n, m: m, weight: format(of: name), phase: gemm.phase)
+            let reason: ProductLedger.Reason?
+            if let unsolved = gemm.plan.fallback(key) { reason = unsolved }
+            else if let skipped { reason = skipped }
+            else if planned.ane > 0 && !route.contains("ane") {
+                let givenBack = GEMM.neuralEngineTally.withLock { $0.givenBack } > givenBackBefore
+                reason = aneDeclined || !givenBack ? .aneNotAccepted : .aneGivenBack
+            } else { reason = nil }
+            if let reason { ledger.fellBack(.product(k: k, n: n, m: m, weight: weight), planned: planned.route(weight: key.weight), reason: reason) }
         }
         // A refused slice leaves its columns as they were: a plausible image, wrong exactly there.
         if let failure { throw Artifact.Failure.badHeader(failure) }
@@ -414,8 +429,9 @@ package final class WeightProducts {
 
     /// The weight into the reserve, by the path the plan assigned, and the assignment the widened product then runs under. A path
     /// this process cannot run (no `TensorGEMM`, no Q8_0 reading, no rounding kernels, a reserve too small for the rounding) is
-    /// skipped, not refused: the plain form of the same weight, down to the widened one on the GPU.
-    private func prepare(_ name: String, count: Int, m: Int, n: Int) throws -> (Path, ProductAssignment) {
+    /// skipped, not refused: the plain form of the same weight, down to the widened one on the GPU — and the skip is named
+    /// (`skipped`, into the render's ledger), never silent.
+    private func prepare(_ name: String, count: Int, m: Int, n: Int) throws -> (Path, ProductAssignment, skipped: ProductLedger.Reason?) {
         func expect(_ got: Int) throws {
             guard got == count else { throw Artifact.Failure.badHeader("\(name): \(got) values, \(count) expected") }
         }
@@ -432,7 +448,7 @@ package final class WeightProducts {
             if (rounding != nil || gemm.tensorBF16),
                let got = try timed("staging", { try artifact.stage(name, into: UnsafeMutableRawPointer(reserve), capacity: 2 * capacity) }) {
                 try expect(got)
-                return (.bf16(rounding), planned)
+                return (.bf16(rounding), planned, planned.roundsActivation && rounding == nil ? .roundingUnavailable : nil)
             }
         }
         if planned.path == .native, transposed, let tensor = artifact.tensors[name], tensor.dtype == .int8,
@@ -451,13 +467,18 @@ package final class WeightProducts {
                                      amxColumns: roundsHere ? 0 : amxColumns, block: scale.block)
                     ?? Self.int8Plan(k: k, n: n, capacity: capacity, perColumn: perColumn, group: group, amxColumns: 0,
                                      block: scale.block)
-            else { return (try widen(name, count: count), planned.path == .widened ? planned : .gpuAlone(m)) }
+            else { return (try widen(name, count: count), .gpuAlone(m), .int8Unavailable) }
             try expect(tensor.count)
             try timed("staging") { try artifact.stageInt8(name, into: UnsafeMutableRawPointer(reserve),
                                                           scalesAt: plan.scalesOffset) }
-            return (.int8(plan), planned)
+            return (.int8(plan), planned, planned.roundsActivation && plan.roundedOffset == 0 ? .roundingUnavailable : nil)
         }
-        return (try widen(name, count: count), planned.path == .widened ? planned : .gpuAlone(m))
+        let skipped: ProductLedger.Reason? = switch planned.path {
+        case .widened: nil
+        case .bf16: .bf16Unavailable
+        case .native: .int8Unavailable
+        }
+        return (try widen(name, count: count), planned.path == .widened ? planned : .gpuAlone(m), skipped)
     }
 
     /// The weight widened to fp32 into the reserve, on the CPU.

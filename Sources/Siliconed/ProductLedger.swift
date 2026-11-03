@@ -29,7 +29,41 @@ import Synchronization
 ///   - **Free in bits and nearly in time**: the ledger reads the clock twice around a product (a few tens of
 ///     nanoseconds for a product of milliseconds) and changes neither the order of the work nor a route.
 ///   - **Attentions under 64 rows are no class** (`CapacityClasses`), so they are not recorded.
+///   - **A route not taken is named, never only absent** (`Fallback`): the plan without an answer (`?? .gpuAlone`), a path the process
+///     cannot run (`WeightProducts.prepare` skips down to the plain or widened weight), the ANE's rows not accepted or given back. The
+///     tallies say what ran; the fallbacks say what was planned instead and why — a render on the GPU alone where the plan said
+///     `gpu+ane/bf16act` is otherwise a slow class with nothing to say why.
 package final class ProductLedger: Sendable {
+    /// **Why a product did not run as planned.** Each is a place the engine used to fall back without a word.
+    package enum Reason: String, Sendable, CaseIterable, Comparable {
+        /// The plan has no model: every product on the GPU alone, widened (`CapacityPlan.solved`).
+        case noModel = "no model"
+        /// The model gave no answer for this product (no line for the GPU in fp32): the GPU alone, widened.
+        case unsolved
+        /// The bf16 weight as published, planned, cannot be read here (no bf16 tensor or kernel): widened.
+        case bf16Unavailable = "bf16 unavailable"
+        /// The rounded activation, planned, does not fit the reserve or this caller does not round: the bf16 weight unrounded.
+        case roundingUnavailable = "rounding unavailable"
+        /// The 8-bit weight as published, planned, cannot be read here (no kernel, a layout or a reserve that does not fit): widened.
+        case int8Unavailable = "int8 unavailable"
+        /// The ANE's rows, planned, not handed to it (no ANE in this process, a shape it does not accept): the GPU took them.
+        case aneNotAccepted = "ane not accepted"
+        /// The ANE's rows refused or not finite after the call: the whole product again on the GPU.
+        case aneGivenBack = "ane given back"
+        package static func < (a: Reason, b: Reason) -> Bool { allCases.firstIndex(of: a)! < allCases.firstIndex(of: b)! }
+    }
+
+    /// One line of fallbacks: `executions` of `work` planned on `planned` (the plan's route name) that ran otherwise, for `reason`.
+    package struct Fallback: Sendable, Equatable {
+        package var work: Work
+        package var planned: String
+        package var reason: Reason
+        package var executions: Int
+        package init(work: Work, planned: String, reason: Reason, executions: Int) {
+            self.work = work; self.planned = planned; self.reason = reason; self.executions = executions
+        }
+    }
+
     /// What was computed: a product by a weight of a format, or an attention over `sequence` query rows.
     package enum Work: Hashable, Sendable {
         case product(k: Int, n: Int, m: Int, weight: CapacityClasses.WeightFormat)
@@ -50,6 +84,8 @@ package final class ProductLedger: Sendable {
 
     private struct Key: Hashable { var work: Work; var route: String }
     private let lines = Mutex<[Key: (executions: Int, seconds: Double)]>([:])
+    private struct FallbackKey: Hashable { var work: Work; var planned: String; var reason: Reason }
+    private let fallen = Mutex<[FallbackKey: Int]>([:])
 
     package init() {}
 
@@ -58,6 +94,21 @@ package final class ProductLedger: Sendable {
             let kept = $0[Key(work: work, route: route)] ?? (0, 0)
             $0[Key(work: work, route: route)] = (kept.executions + 1, kept.seconds + seconds)
         }
+    }
+
+    /// One execution of `work`, planned on `planned`, that ran otherwise for `reason`.
+    package func fellBack(_ work: Work, planned: String, reason: Reason) {
+        fallen.withLock { $0[FallbackKey(work: work, planned: planned, reason: reason), default: 0] += 1 }
+    }
+
+    /// The fallbacks, in a fixed order (reason, planned route, then the work's numbers); empty when every product ran as planned.
+    package var fallbacks: [Fallback] {
+        fallen.withLock { $0.map { Fallback(work: $0.key.work, planned: $0.key.planned, reason: $0.key.reason, executions: $0.value) } }
+            .sorted { a, b in
+                if a.reason != b.reason { return a.reason < b.reason }
+                if a.planned != b.planned { return a.planned < b.planned }
+                return String(describing: a.work) < String(describing: b.work)
+            }
     }
 
     /// The lines, in a fixed order (route, then the work's numbers): two renders list alike.
