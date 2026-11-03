@@ -101,7 +101,8 @@ extension AppState {
             }
             for r in results {
                 if r.kind == .encoder || r.kind == .vae {
-                    let names = r.families.map(\.name).joined(separator: ", ")
+                    // The catalog's name: « Qwen-Image-2.1 » alone reads as the base model, which no family renders.
+                    let names = r.families.map { ModelCard.of($0).name }.joined(separator: ", ")
                     if r.kind == .vae {
                         flash(r.placed ? String(localized: "VAE kept for \(names): its installation will not download it")
                                        : String(localized: "VAE already installed for \(names)"))
@@ -121,7 +122,7 @@ extension AppState {
                     loras.append(LoRASlot(path: r.path))
                     flash(String(localized: "LoRA imported: \(r.name)"))
                 } else {
-                    flash(String(localized: "LoRA imported for \(r.family.name): \(r.name)"))
+                    flash(String(localized: "LoRA imported for \(ModelCard.of(r.family).name): \(r.name)"))
                 }
             }
         }

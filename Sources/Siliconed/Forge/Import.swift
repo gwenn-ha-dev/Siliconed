@@ -11,6 +11,9 @@ import Foundation
 /// downloads** (`Adoption`): copied where the download would have put it, so that the installation
 /// does not fetch it. Any other encoder is refused as before.
 ///
+/// **A publisher's base model is refused where the family renders its Turbo** (`BaseModels`): it has
+/// the Turbo's names and shapes, and would be forged and rendered on the Turbo's recipe.
+///
 /// This is Draw Things' idea (`BaseModelImporter`, `LoRAImporter`): the architecture is detected,
 /// only the DiT is converted, the rest is the family's.
 package enum ModelImport {
@@ -38,6 +41,8 @@ package enum ModelImport {
     /// What the file is, without forging anything.
     package static func recognize(_ file: String) throws(EngineError) -> (Kind, Family?) {
         try refusingAs(file) {
+            // Before the family is read: the app offers to install a family a model lacks.
+            try BaseModels.refuse(file)
             let s = try TensorSource(paths: [file])
             if ForgeLoRA.isLoRA(s.names) { return (.lora, nil) }
             return (.model, Recipes.family(fromNames: s.names))
@@ -59,7 +64,7 @@ package enum ModelImport {
             }
             guard let f = Recipes.family(fromNames: s.names) else {
                 throw Numerics.Failure(description: "neither a LoRA nor a recognized DiT ("
-                                       + Family.allCases.map(\.name).joined(separator: ", ") + ")")
+                                       + Family.allCases.map { ModelCard.of($0).name }.joined(separator: ", ") + ")")
             }
             return (.model, f)
         }
@@ -111,6 +116,7 @@ package enum ModelImport {
         guard FileManager.default.fileExists(atPath: file) else { throw EngineError.fileMissing(path: file) }
         // The size is the cheap test; a file that is not an expected encoder goes on as before.
         if let a = try Adoption.adopt(file, in: b) { return adopted(a, file: file, journal: journal) }
+        try BaseModels.refuse(file)
         var rows: [String] = []
         let note: @Sendable (String) -> Void = { journal($0) }
         var installer = Installer(library: b)
@@ -149,10 +155,10 @@ package enum ModelImport {
         guard let family = Recipes.family(fromNames: source.names) else {
             throw EngineError.importRefused(
                 file: (file as NSString).lastPathComponent,
-                detail: "neither a LoRA nor a recognized DiT (\(Family.allCases.map(\.name).joined(separator: ", "))); "
+                detail: "neither a LoRA nor a recognized DiT (\(Family.allCases.map { ModelCard.of($0).name }.joined(separator: ", "))); "
                     + "an encoder, a VAE or a model of another architecture cannot be imported")
         }
-        logLine("model \(family.name) : \((file as NSString).lastPathComponent)")
+        logLine("model \(ModelCard.of(family).name) : \((file as NSString).lastPathComponent)")
         try prepare(family)
         let slug = slug(name ?? base)
         guard !slug.isEmpty else {
@@ -180,7 +186,7 @@ package enum ModelImport {
         let name = (file as NSString).lastPathComponent
         let kind: Kind = a.expected[0].file.destination == nil ? .encoder : .vae
         var rows = ["\(kind.rawValue): \(name), identical (size, sha256) to the one the installation of "
-                    + families.map(\.name).joined(separator: ", ") + " downloads"]
+                    + families.map { ModelCard.of($0).name }.joined(separator: ", ") + " downloads"]
         if a.placed.isEmpty {
             rows.append("every version that expects it has it already: nothing copied")
         } else {

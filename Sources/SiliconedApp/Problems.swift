@@ -87,6 +87,8 @@ struct Problem: Equatable, Sendable {
             return String(localized: "This file can’t be imported: \(file(f)).")
         case let .importNeedsFamily(f, m):                           // import_needs_family
             return String(localized: "To import \(file(f)), install \(name(m)) first.")
+        case let .importBaseModel(f, m):                             // import_base_model
+            return String(localized: "\(file(f)) is the base model of \(ModelCard.withID(m)?.family.name ?? m): Siliconed renders \(name(m)).")
         case .notAnImportedModel(let m):                             // not_an_imported_model
             return String(localized: "\(name(m)) wasn’t imported: uninstall it from the Models sheet.")
         case let .libraryAbsent(p, volume):                          // library_absent
@@ -226,6 +228,8 @@ struct Problem: Equatable, Sendable {
             return String(localized: "Import a LoRA or a full model of a supported family, as .safetensors (at least 8 bits) or .gguf (at least 4 bits).")
         case .importNeedsFamily:
             return String(localized: "Install it from the Models sheet (⇧⌘M), then import the file again: an import downloads nothing.")
+        case .importBaseModel(_, let m):
+            return String(localized: "Install \(name(m)) from the Models sheet (⇧⌘M), or import a model made from it.")
         case .libraryAbsent:
             return String(localized: "Connect the disk — or, in Settings, go back to this Mac’s library.")
         case .libraryRefused(_, .fileSizeLimit):

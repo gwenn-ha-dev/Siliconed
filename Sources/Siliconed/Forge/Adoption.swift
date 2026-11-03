@@ -50,11 +50,17 @@ enum Adoption {
     /// large file — only if some expectation agrees on it. Empty: not a file any installation expects.
     static func matches(_ path: String, among table: [Expectation],
                         hash: (String) throws -> String = Downloader.sha256) throws -> [Expectation] {
+        try matching(path, among: table, file: \.file, hash: hash)
+    }
+
+    /// The same test on any table of pinned files (`BaseModels` refuses by it).
+    static func matching<T>(_ path: String, among table: [T], file: (T) -> Installer.File,
+                            hash: (String) throws -> String) throws -> [T] {
         let size = (try FileManager.default.attributesOfItem(atPath: path)[.size] as? Int) ?? -1
-        let sized = table.filter { $0.file.size == size }
+        let sized = table.filter { file($0).size == size }
         guard !sized.isEmpty else { return [] }
         let sha = try hash(path)
-        return sized.filter { $0.file.sha256 == sha }
+        return sized.filter { file($0).sha256 == sha }
     }
 
     /// **Copies `path` where the installations that expect it will find it**, for those still lacking

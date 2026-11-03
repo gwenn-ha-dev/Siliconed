@@ -123,8 +123,9 @@ struct HubSheet: View {
     private func verdict(_ v: HubImport.Verdict?) -> some View {
         switch v {
         case nil: Text("Checking…")
-        case .lora(let f): Text("LoRA for \(f.name)")
-        case .loraNeedsFamily(let f): Text("LoRA for \(f.name), which will be installed first")
+        // The catalog's name: a LoRA applies to the Turbo the family renders.
+        case .lora(let f): Text("LoRA for \(ModelCard.of(f).name)")
+        case .loraNeedsFamily(let f): Text("LoRA for \(ModelCard.of(f).name), which will be installed first")
         case .model(let f): Text("Image model, \(f.name) family")
         case .unexamined: Text("Checked once downloaded")
         case .refused: Text("Not supported — hover for the reason")

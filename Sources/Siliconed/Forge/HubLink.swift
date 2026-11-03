@@ -186,7 +186,9 @@ package enum HubImport {
         case model(Family)
         /// A LoRA for a family not installed: its shapes are judged once the family is.
         case loraNeedsFamily(Family)
-        /// A GGUF whose header is longer than what was read: the import judges it once downloaded.
+        /// What the header alone cannot judge — a GGUF whose header is longer than what was read, ComfyUI
+        /// texts scattered through the data, an encoder or a VAE an installation expects: the import
+        /// judges it once downloaded.
         case unexamined
         /// The forge's refusal, as it would say it after the download.
         case refused(String)
@@ -195,13 +197,27 @@ package enum HubImport {
     /// **The forge's verdict before a byte of weights**: the safetensors header by two `Range`
     /// requests — a GGUF's first `ggufPrefix` bytes, its header having no length up front —, written
     /// to a file of the published size whose data stays sparse (APFS allocates nothing there), then
-    /// `ModelImport.examine` on it: the import's own rules, values aside.
+    /// `ModelImport.examine` on it: the import's own rules, values aside. **Values aside but the ones the
+    /// rules read**: ComfyUI's `comfy_quant` and `comfy_attention.config` are JSON texts in the data
+    /// (`QuantizedLayouts.readsContent`); left as zeros they read as « not JSON », and every int8 convrot of
+    /// Comfy-Org — the Qwen Compact's DiT among them — was refused. They are fetched by `Range` and written
+    /// in place (`contentRanges`), so that a wrong text is refused exactly as the import would; too scattered
+    /// to fetch in a few requests, the file is `unexamined` rather than judged on zeros.
     package static func examine(_ r: HubRepository, _ f: HubRepository.File, in b: Library) throws(EngineError) -> Verdict {
+        // The listing's size and sha256 say it before the header: a sparse file would hash to nothing published.
+        if let k = BaseModels.known(size: f.size, sha256: f.sha256) {
+            throw .importBaseModel(file: (f.path as NSString).lastPathComponent, model: ModelCard.of(k.family).id)
+        }
+        // An encoder or a VAE an installation downloads, byte for byte: no DiT, and the import takes it
+        // (`Adoption`) where the header would refuse it.
+        if Adoption.published().contains(where: { $0.file.size == f.size && $0.file.sha256 == f.sha256.lowercased() }) {
+            return .unexamined
+        }
         let gguf = f.path.lowercased().hasSuffix(".gguf")
         let temporary = FileManager.default.temporaryDirectory
             .appendingPathComponent("siliconed-hub-\(UUID().uuidString)" + (gguf ? ".gguf" : ".safetensors")).path
         defer { try? FileManager.default.removeItem(atPath: temporary) }
-        let read: Int = try EngineError.boundary {
+        let read: Int? = try EngineError.boundary {
             let u = r.downloadURL(f)
             var head: Data
             if gguf {
@@ -214,12 +230,11 @@ package enum HubImport {
                 }
                 head += try Downloader.range(u, 8, 8 + n - 1)
             }
-            FileManager.default.createFile(atPath: temporary, contents: head)
-            let h = try FileHandle(forWritingTo: URL(fileURLWithPath: temporary))
-            defer { try? h.close() }
-            try h.truncate(atOffset: UInt64(f.size))
+            guard let contents = gguf ? [] : contentRanges(header: head, size: f.size) else { return nil }
+            try sparse(head, size: f.size, contents: contents, at: temporary) { try Downloader.range(u, $0.lowerBound, $0.upperBound - 1) }
             return head.count
         }
+        guard let read else { return .unexamined }
         // A GGUF header that runs past what was read would be judged on zeros: no verdict from it.
         if gguf, let mapped = try? Data(contentsOf: URL(fileURLWithPath: temporary), options: .alwaysMapped) {
             do { _ = try mapped.withUnsafeBytes { try GGUF.parse($0.baseAddress!, size: mapped.count, readable: read) } }
@@ -233,6 +248,45 @@ package enum HubImport {
         } catch .importNeedsFamily(_, let model) {
             guard let f = Family.allCases.first(where: { ModelCard.of($0).id == model }) else { throw .importNeedsFamily(file: f.path, model: model) }
             return .loraNeedsFamily(f)
+        }
+    }
+
+    /// **The byte ranges to fetch so that the examination reads what the import would**: every tensor whose
+    /// content `QuantizedLayouts` reads, absolute in the file, those less than `gap` apart merged into one
+    /// request. Empty: nothing to fetch. `nil`: more than `requests` ranges or more than `bytes` in all —
+    /// the file is judged once downloaded. A header that does not parse, or an offset outside the file,
+    /// gives no range: the reader refuses the header itself.
+    static func contentRanges(header head: Data, size: Int, gap: Int = 1 << 20, requests: Int = 16,
+                              bytes: Int = 4 << 20) -> [Range<Int>]? {
+        guard head.count > 8, let o = try? JSONSerialization.jsonObject(with: head.subdata(in: 8..<head.count)) as? [String: Any] else { return [] }
+        var pieces: [Range<Int>] = []
+        for (name, v) in o {
+            guard let e = v as? [String: Any], let dtype = e["dtype"] as? String, QuantizedLayouts.readsContent(name, dtype: dtype),
+                  let d = e["data_offsets"] as? [Int], d.count == 2, d[0] >= 0, d[0] < d[1], head.count + d[1] <= size else { continue }
+            pieces.append((head.count + d[0])..<(head.count + d[1]))
+        }
+        var merged: [Range<Int>] = []
+        for p in pieces.sorted(by: { $0.lowerBound < $1.lowerBound }) {
+            if let last = merged.last, p.lowerBound - last.upperBound <= gap {
+                merged[merged.count - 1] = last.lowerBound..<max(last.upperBound, p.upperBound)
+            } else {
+                merged.append(p)
+            }
+        }
+        guard merged.count <= requests, merged.reduce(0, { $0 + $1.count }) <= bytes else { return nil }
+        return merged
+    }
+
+    /// The examined file: `head`, then `size` bytes in all, sparse but for `contents`, fetched by `fetch`.
+    static func sparse(_ head: Data, size: Int, contents: [Range<Int>], at path: String,
+                       fetch: (Range<Int>) throws -> Data) throws {
+        FileManager.default.createFile(atPath: path, contents: head)
+        let h = try FileHandle(forWritingTo: URL(fileURLWithPath: path))
+        defer { try? h.close() }
+        try h.truncate(atOffset: UInt64(size))
+        for c in contents {
+            try h.seek(toOffset: UInt64(c.lowerBound))
+            try h.write(contentsOf: try fetch(c))
         }
     }
 

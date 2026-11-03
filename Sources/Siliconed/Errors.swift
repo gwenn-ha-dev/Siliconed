@@ -55,6 +55,10 @@ package enum EngineError: Error, Equatable, Sendable, Codable, LocalizedError, C
     /// components — the published DiT's names and shapes, its config, encoder and VAE — are not in the
     /// library. Installing the family (license accepted, size shown) comes first.
     case importNeedsFamily(file: String, model: String)
+    /// **A publisher's base model where the family renders its Turbo**: `file` is, byte for byte, a
+    /// published base checkpoint (`BaseModels`) of the family of `model` (an identifier). It has the
+    /// Turbo's names and shapes, so the forge would take it — and the Turbo's few steps would ruin its image.
+    case importBaseModel(file: String, model: String)
     /// **The library is on a disk that is not there** — unplugged, a share not mounted (`Library.isReachable`).
     /// Nothing renders, installs or imports until it is back: never another library in its place.
     /// `volume`: the disk's name as the Finder shows it, `nil` when the path does not say.
@@ -231,6 +235,7 @@ package enum EngineError: Error, Equatable, Sendable, Codable, LocalizedError, C
         case .importRefused: return "import_refused"
         case .notAnImportedModel: return "not_an_imported_model"
         case .importNeedsFamily: return "import_needs_family"
+        case .importBaseModel: return "import_base_model"
         case .libraryAbsent: return "library_absent"
         case .libraryRefused: return "library_refused"
         case .emptyPrompt: return "empty_prompt"
@@ -290,6 +295,9 @@ package enum EngineError: Error, Equatable, Sendable, Codable, LocalizedError, C
         case .importRefused(let file, _): return "This file cannot be imported: \(file)."
         case .notAnImportedModel(let model): return "\(model) is not an imported model."
         case let .importNeedsFamily(file, model): return "To import \(file), install \(model) first."
+        case let .importBaseModel(file, model):
+            let card = ModelCard.withID(model)
+            return "\(file) is the base model of \(card?.family.name ?? model): Siliconed renders \(card?.name ?? model)."
         case let .libraryAbsent(path, volume):
             return volume.map { "The library is on \($0), which is not connected." } ?? "The library cannot be found: \(path)."
         case let .libraryRefused(path, reason):
@@ -394,6 +402,7 @@ package enum EngineError: Error, Equatable, Sendable, Codable, LocalizedError, C
         case .importRefused: return "Import a LoRA or a full model of a supported family, as .safetensors (not quantized)."
         case .notAnImportedModel: return nil
         case .importNeedsFamily: return "Install the model, then import the file again: an import downloads nothing."
+        case .importBaseModel(_, let model): return "Install \(ModelCard.withID(model)?.name ?? model), or import a model made from it."
         case .libraryAbsent: return "Connect the disk, or go back to this Mac's library in the settings."
         case .libraryRefused(_, .fileSizeLimit): return "Choose a disk formatted APFS, Mac OS Extended or exFAT."
         case .libraryRefused(_, .readOnly): return "Choose a folder you can write to."
@@ -567,6 +576,7 @@ package enum EngineError: Error, Equatable, Sendable, Codable, LocalizedError, C
         .downloadRefused(file: "vae.safetensors", status: 403), .downloadCorrupt(file: "vae.safetensors"),
         .importRefused(file: "x.safetensors", detail: "not recognized"), .notAnImportedModel(model: "Z-Image Turbo"),
         .importNeedsFamily(file: "x.safetensors", model: "anima"),
+        .importBaseModel(file: "qwen_image_2.1_bf16.safetensors", model: "qwen-image-2.1"),
         .libraryAbsent(path: "/Volumes/Models/Siliconed", volume: "Models"),
         .libraryRefused(path: "/Volumes/KEY/Siliconed", reason: .fileSizeLimit),
         .emptyPrompt, .invalidSteps(steps: 8, allowed: [5, 6, 7, 9]), .tooManyReferences(count: 4, max: 3),

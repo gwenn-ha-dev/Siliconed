@@ -318,6 +318,13 @@ enum QuantizedLayouts {
 
     static func refuse(_ why: String) -> Numerics.Failure { Numerics.Failure(description: why) }
 
+    /// **The tensors whose bytes `recognize` reads** — ComfyUI's JSON texts; every other rule judges the
+    /// header. What the Hub's examination fetches over its sparse file (`HubImport.contentRanges`): a rule
+    /// that comes to read another tensor's content says so here.
+    static func readsContent(_ name: String, dtype: String) -> Bool {
+        name.hasSuffix(".comfy_quant") || (name.hasSuffix(".comfy_attention.config") && dtype == "U8")
+    }
+
     /// A layer's convrot group, as ComfyUI's loader reads it (`comfy/ops.py`,
     /// `_load_quantized_module`): `convrot` at the top of the JSON or under `params`, the size beside
     /// it, 256 by default. `nil`: not rotated.

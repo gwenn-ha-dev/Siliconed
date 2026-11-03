@@ -57,7 +57,7 @@ package enum ForgeLoRA {
         package let ranks: [Int]
         package let notes: [String]
         package var rows: [String] {
-            ["target: \(family.name) — \(modules) modules, rank \(ranks.count == 1 ? "\(ranks[0])" : "\(ranks)")"] + notes
+            ["target: \(ModelCard.of(family).name) — \(modules) modules, rank \(ranks.count == 1 ? "\(ranks[0])" : "\(ranks)")"] + notes
                 + [String(format: "%@ : %.1f MB", (tally.path as NSString).lastPathComponent, Double(tally.bytes) / 1e6)]
         }
     }
@@ -521,7 +521,7 @@ package enum ForgeLoRA {
             }
         }
         guard let family else {
-            throw Numerics.Failure(description: "family not recognized: neither " + Family.allCases.map(\.name).joined(separator: ", "))
+            throw Numerics.Failure(description: "family not recognized: neither " + Family.allCases.map { ModelCard.of($0).name }.joined(separator: ", "))
         }
         guard let ref = try reference(family) else {
             throw EngineError.importNeedsFamily(file: (file as NSString).lastPathComponent, model: ModelCard.of(family).id)
