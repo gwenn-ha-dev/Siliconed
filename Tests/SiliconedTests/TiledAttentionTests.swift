@@ -3,7 +3,8 @@ import Testing
 @testable import Siliconed
 
 /// **The two tiled attention kernels as candidates of the map** (`tiles`, `tiles16`): the solver takes them where the machine's own lines
-/// make them faster, the fp16 one only where the request allows half precision (the ANE's permission), the memory need charges one term
+/// make them faster, the fp16 one only where fp16 is allowed (`Constraints.allowsHalf`: the ANE allowed and the accelerators on, at every
+/// version, the Standard's included — decided 3/11/2026), the memory need charges one term
 /// per buffer, and a developer can force them. No GPU, no weights, no chip name: the lines below are synthetic.
 @Suite struct TiledAttentionTests {
     typealias M = CapacityModel
@@ -35,21 +36,22 @@ import Testing
         #expect(try assignment(model()).assignment == .graph, "no line, no candidate")
     }
 
-    @Test func theHalfPrecisionKernelIsOfferedOnlyWhereTheRequestAllowsIt() throws {
+    @Test func theHalfPrecisionKernelIsOfferedOnlyWhereFP16IsAllowed() throws {
         let m = model(tiles: 2e12, tiles16: 4e12)
         #expect(try assignment(m, half: true).assignment == .tiles16)
-        #expect(try assignment(m, half: false).assignment == .tiles, "the Standard: the fp32 tiles, never the fp16")
-        // the same through a request, as the planner builds the constraints
-        for variant in [Variant.compact, .light] {
+        #expect(try assignment(m, half: false).assignment == .tiles, "no ANE (a map that gives it nothing): the fp32 tiles, never the fp16")
+        // the same through a request, as the planner builds the constraints: every version, the Standard's included (3/11/2026)
+        for variant in Variant.allCases {
             let c = CS.Constraints(request: .init(family: .zImage, variant: variant, includesEncoder: false), sustained: false)
             #expect(c.allowsHalf, "\(variant)")
-            #expect(CS.attention(key, flash: false, model: m, constraints: c)?.assignment == .tiles16)
+            #expect(CS.attention(key, flash: false, model: m, constraints: c)?.assignment == .tiles16, "\(variant)")
         }
-        let standard = CS.Constraints(request: .init(family: .zImage, variant: .standard, includesEncoder: false), sustained: false)
-        #expect(!standard.allowsHalf)
-        #expect(CS.attention(key, flash: false, model: m, constraints: standard)?.assignment == .tiles)
+        // the one rule: the ANE allowed and operands rounded at all
+        let withoutANE = CS.Constraints(sustained: false, allowsANE: false), fp32 = CS.Constraints(sustained: false, allowsRounding: false)
+        #expect(!withoutANE.allowsHalf && !fp32.allowsHalf)
+        #expect(CS.attention(key, flash: false, model: m, constraints: fp32)?.assignment == .tiles)
         // an assignment someone else chose is not timed when it is not allowed
-        #expect(CS.attention(assigned: .tiles16, key: key, model: m, constraints: standard) == nil)
+        #expect(CS.attention(assigned: .tiles16, key: key, model: m, constraints: withoutANE) == nil)
         #expect(CS.attention(assigned: .tiles16, key: key, model: m, constraints: .init(sustained: false))?.route == "tiles16")
     }
 
@@ -87,9 +89,10 @@ import Testing
         let compact = CapacityPlan(model: m, sustained: false, allowsANE: true)
         #expect(compact.assign(key) == .tiles16)
         #expect(compact.resources.halfAttention && compact.resources.halfPrecision, "its checks judge against the half-precision reference")
-        let standard = compact.restricted(allowingANE: false)
-        #expect(standard.assign(key) == .tiles)
-        #expect(!standard.resources.halfAttention)
+        let withoutANE = compact.restricted(allowingANE: false)
+        #expect(withoutANE.assign(key) == .tiles)
+        #expect(!withoutANE.resources.halfAttention)
+        #expect(!compact.restricted(accelerators: false).resources.halfAttention, "the accelerators off: fp32")
         #expect(CapacityPlan(model: m, allowsANE: false).identity.hasSuffix("no-ane"))
         // the memo is by exact key: two lengths, two answers from the same lines
         #expect(compact.assign(AttentionKey(sequence: 1024, heads: 30, headDim: 128)) == .tiles16)
@@ -183,8 +186,8 @@ import Testing
         let compact = try assignment(m, half: true)
         #expect(compact.assignment.splits && compact.assignment.gpuKernel == .tiles16, "\(compact.assignment)")
         #expect(compact.assignment.description.hasSuffix("+ tiles16"))
-        let standard = try assignment(m, half: false)
-        #expect(standard.assignment.splits && standard.assignment.gpuKernel == .tiles, "the fp16 kernel is the request's: \(standard.assignment)")
+        let withoutANE = try assignment(m, half: false)
+        #expect(withoutANE.assignment.splits && withoutANE.assignment.gpuKernel == .tiles, "no fp16 without its permission: \(withoutANE.assignment)")
         // a graph that is the best keeps the split as it was
         let plain = try assignment(cut(graph: 3e12, tiles: 2e12, tiles16: 2.5e12))
         #expect(plain.assignment.splits && plain.assignment.gpuKernel == .graph)

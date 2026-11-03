@@ -21,8 +21,9 @@ import Synchronization
 ///     applied in the softmax, where the products are plain `Q·Kᵀ`.
 ///   - **fp32 changes nothing but the order of the sums** (`tiles`): the same operands, the same fp32 sums, the softmax in fp32 with
 ///     `precise::exp`. The fp16 variant (`tilesHalf`) rounds Q, K, V and P to half — once each, nothing else — and sums, scales and
-///     normalizes in fp32: operands as the ANE's fp16, sums as P20 requires. Whether a Mac may run it is the request's (Compact and
-///     Light, never the Standard), whether it should is the map's.
+///     normalizes in fp32: operands as the ANE's fp16, sums as P20 requires. Whether a render may run it is one rule
+///     (`CapacitySolver.Constraints.allowsHalf`: the ANE allowed and the accelerators on, at every version, the Standard's included —
+///     decided 3/11/2026, checked against the reference in bf16 by `--fp16-attention`), whether it should is the map's.
 ///   - **The bf16 variant** (`tilesbf16`) is the fp16 one with bfloat operands: the range of fp32, three fewer bits — the rounding the
 ///     Standard may take (`Constraints.allowsRounding`, P20 on bf16 weights), judged against the reference in bf16 like `bf16act`.
 ///   - **The fused form** (`AttentionTile`, half and bfloat only) keeps nothing between the stages: per simdgroup a block of `rows` query
@@ -178,6 +179,8 @@ package final class TiledAttention {
 
     /// The attentions run on bf16 operands since the process started: the check under `--bf16-attention` says how many it judged.
     package static let bf16Runs = Mutex<Int>(0)
+    /// The same on fp16 operands, for `--fp16-attention`.
+    package static let fp16Runs = Mutex<Int>(0)
 
     /// The route the ledger and the logs name.
     package var route: String {
@@ -197,6 +200,7 @@ package final class TiledAttention {
     /// The same, **committed and not awaited**: the head split computes the CPU's heads meanwhile, then waits on the buffer.
     package func submit(q: MTLBuffer, k: MTLBuffer, v: MTLBuffer, into out: MTLBuffer) -> MTLCommandBuffer {
         if precision == .bf16 { Self.bf16Runs.withLock { $0 += 1 } }
+        if precision == .fp16 { Self.fp16Runs.withLock { $0 += 1 } }
         let commands = queue.checkedCommandBuffer()
         let e = commands.checkedEncoder()
         e.label = tile != nil ? "fused_sdpa_" + precision.suffix : precision == .fp32 ? "tiles_sdpa" : "tiles_sdpa_" + precision.suffix

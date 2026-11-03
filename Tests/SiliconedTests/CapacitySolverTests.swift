@@ -430,8 +430,8 @@ import Testing
                     let a = try #require(b.product, "\(key)")
                     #expect(a.isRunnable(for: key), "\(family) \(variant) \(key): \(a)")
                     #expect(b.route == a.route(weight: format))
-                    // the encoders and the Standard take no ANE
-                    if c.phase == .encoding || variant == .standard { #expect(!a.usesANE, "\(family) \(variant) \(key)") }
+                    // the encoders take no ANE (the Standard does, as a render: 2/11/2026)
+                    if c.phase == .encoding { #expect(!a.usesANE, "\(family) \(variant) \(key)") }
                     // the same answer alone, as the plan of a process gives it
                     #expect(CS.product(key, model: m, constraints: .init(request: request, sustained: false))?.assignment == a)
                 case let .attention(s, keys, heads, kv, dim, cross):
@@ -441,6 +441,7 @@ import Testing
                     if !CS.triesFlash(family: family, cross: cross) { #expect(!a.usesFlash, "\(family) \(key)") }
                 }
             }
+            if variant == .standard { #expect(plan.blocks.contains { $0.product?.usesANE == true }, "the Standard's request allows the ANE") }
             #expect(plan.seconds == plan.blocks.reduce(0) { $0 + $1.seconds })
             let data = try JSONEncoder().encode(plan.blocks.compactMap(\.product))
             #expect(try JSONDecoder().decode([ProductAssignment].self, from: data) == plan.blocks.compactMap(\.product))

@@ -133,8 +133,8 @@ enum ZImageStages {
     static let dit = Stage(
         model: "z-image", name: "dit",
         proves: "one evaluation of the DiT, latent to velocity: embedders, refiners, 30 blocks, head, unpatchify",
-        sizes: ["512", "1024", "768x512", "832x1216"], options: ["--map", "--neural-engine", "--bf16-activations", "--bf16-attention", "--no-accelerators", "--variant"],
-        oracle: "tools/oracle/z-image.py dit --size {size}; witness --size {size}; with --neural-engine, --bf16-activations or --bf16-attention, bf16 --size {size}; with --variant compact or light, the same three with --variant, at 512 \(Wording.publishers)", weights: ["DiT"],
+        sizes: ["512", "1024", "768x512", "832x1216"], options: ["--map", "--neural-engine", "--bf16-activations", "--bf16-attention", "--fp16-attention", "--no-accelerators", "--variant"],
+        oracle: "tools/oracle/z-image.py dit --size {size}; witness --size {size}; with --neural-engine, --bf16-activations, --bf16-attention or --fp16-attention, bf16 --size {size}; with --variant compact or light, the same three with --variant, at 512 \(Wording.publishers)", weights: ["DiT"],
         rule: "the rule, floor 5e-4; \(Wording.rectangle); \(Wording.halfPrecision)"
     ) { invocation in
         let version = try invocation.quantizedVariant()
@@ -176,6 +176,7 @@ enum ZImageStages {
         if invocation.neuralEngine { try NeuralEngineRun.account(report) }
         if invocation.bf16Activations { try BF16ActivationRun.account(report) }
         if invocation.bf16Attention { try BF16AttentionRun.account(report) }
+        if invocation.fp16Attention { try FP16AttentionRun.account(report) }
         return report
     }
 

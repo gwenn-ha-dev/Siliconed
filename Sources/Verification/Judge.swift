@@ -126,6 +126,6 @@ package enum Judge {
 /// The sentences the DiT stages of the four models share, in `check list` and in the table of VERIFY.md.
 enum Wording {
     static let rectangle = "on a rectangle, the transposed golden must deviate"
-    static let halfPrecision = "with --neural-engine, --bf16-activations or --bf16-attention, against bf16's own error + 25 %"
+    static let halfPrecision = "with --neural-engine, --bf16-activations, --bf16-attention or --fp16-attention, against bf16's own error + 25 %"
     static let publishers = "(the Compact's or the Light's published weights, dequantized by their publisher's library)"
 }

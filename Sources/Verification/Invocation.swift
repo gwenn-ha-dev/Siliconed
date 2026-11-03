@@ -4,7 +4,7 @@ import Siliconed
 // **One check's arguments, the same grammar for every stage**:
 //
 //     siliconed check <model> <stage> [--size 512|1024|WxH] [--edit N] [--goldens DIR] [--map PATH] [--profile]
-//                                     [--neural-engine] [--bf16-activations] [--long]
+//                                     [--neural-engine] [--bf16-activations] [--bf16-attention | --fp16-attention] [--long]
 //
 // Named options only, no positional magic: `--size` is the only thing that names a size, so a number
 // meant for something else is never taken for one. An option a stage does not accept is a usage
@@ -28,6 +28,11 @@ package struct Invocation: Sendable {
     package let bf16Activations: Bool
     /// `--bf16-attention`: the DiT's attention on bf16 operands, fused (`BF16AttentionRun`).
     package let bf16Attention: Bool
+    /// `--fp16-attention`: the DiT's attention on fp16 operands, fused (`FP16AttentionRun`) — the `tiles16` a render takes where the map
+    /// chooses it, at every version.
+    package let fp16Attention: Bool
+    /// Some half-precision flag is given: the stage is judged against the reference run in bf16.
+    package var halfPrecision: Bool { neuralEngine || bf16Activations || bf16Attention || fp16Attention }
     /// `--no-accelerators`: this Mac's map (`SILICONED_MAP`) with the « Accelerators » switch off — fp32 throughout (`FP32Run`).
     package let noAccelerators: Bool
     /// `--long`: the text stages on the oracle's long prompt (past 512 tokens), golden `…-text-long`.
@@ -72,12 +77,17 @@ package struct Invocation: Sendable {
         neuralEngine = flags.contains("--neural-engine")
         bf16Activations = flags.contains("--bf16-activations")
         bf16Attention = flags.contains("--bf16-attention")
+        fp16Attention = flags.contains("--fp16-attention")
         noAccelerators = flags.contains("--no-accelerators")
-        if noAccelerators && (neuralEngine || bf16Activations || bf16Attention) {
-            throw UsageError("--no-accelerators is fp32 throughout: not with --neural-engine, --bf16-activations or --bf16-attention")
+        if bf16Attention && fp16Attention {
+            throw UsageError("--bf16-attention and --fp16-attention: one precision of the attention at a time")
         }
-        if neuralEngine || bf16Activations || bf16Attention {
-            try HalfPrecisionRun.enable(neuralEngine: neuralEngine, bf16Activations: bf16Activations, bf16Attention: bf16Attention)
+        if noAccelerators && (neuralEngine || bf16Activations || bf16Attention || fp16Attention) {
+            throw UsageError("--no-accelerators is fp32 throughout: not with --neural-engine, --bf16-activations, --bf16-attention or --fp16-attention")
+        }
+        if neuralEngine || bf16Activations || bf16Attention || fp16Attention {
+            try HalfPrecisionRun.enable(neuralEngine: neuralEngine, bf16Activations: bf16Activations, bf16Attention: bf16Attention,
+                                        fp16Attention: fp16Attention)
         }
         if noAccelerators { try FP32Run.enable() }
         long = flags.contains("--long")
@@ -86,7 +96,8 @@ package struct Invocation: Sendable {
     }
 
     /// The options that take no value.
-    private static let flags: Set<String> = ["--profile", "--neural-engine", "--bf16-activations", "--bf16-attention", "--no-accelerators", "--long"]
+    private static let flags: Set<String> = ["--profile", "--neural-engine", "--bf16-activations", "--bf16-attention", "--fp16-attention",
+                                             "--no-accelerators", "--long"]
 
     /// The options parsed above; any other accepted option lands in `extras`.
     private static let known: Set<String> = ["--size", "--goldens", "--edit", "--map"]
@@ -99,11 +110,11 @@ package struct Invocation: Sendable {
         return try MapCheck.use(path, golden: golden)
     }
 
-    /// The bf16 reference beside `file` when the engine runs a half-precision path. Under `--neural-engine`
-    /// `--bf16-activations` or `--bf16-attention` it is required: the fp32 rule would fail the ANE's fp16 products for what they are, not for a fault.
+    /// The bf16 reference beside `file` when the engine runs a half-precision path. Under `--neural-engine`, `--bf16-activations`,
+    /// `--bf16-attention` or `--fp16-attention` it is required: the fp32 rule would fail the ANE's fp16 products for what they are, not for a fault.
     package func halfReference(_ file: String, script: String) throws -> HalfPrecisionReference? {
         let half = HalfPrecisionReference(goldens: goldens, file: file)
-        if neuralEngine || bf16Activations || bf16Attention, half == nil { throw Skip("bf16 reference missing beside \(file) — \(script)") }
+        if halfPrecision, half == nil { throw Skip("bf16 reference missing beside \(file) — \(script)") }
         return half
     }
 

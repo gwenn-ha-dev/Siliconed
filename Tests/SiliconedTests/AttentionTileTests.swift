@@ -3,7 +3,7 @@ import Testing
 @testable import Siliconed
 
 /// **The attention on bf16 operands and the fused form** (`tilesbf16`, `AttentionTile`): the bf16 kernel is the rounding a request
-/// allows (the Standard's too), the fp16 one keeps the ANE's permission and wins a tie; the form the map chose for a half-precision
+/// allows (the Standard's too), the fp16 one needs the ANE allowed as well (`Constraints.allowsHalf`, every version) and wins a tie; the form the map chose for a half-precision
 /// kernel travels from its measurements into the model, its JSON, the plan's identity and the assignment the solver hands the callers;
 /// the fused form holds its operands' copies alone. No GPU, no weights: synthetic lines.
 @Suite struct AttentionTileTests {
@@ -32,9 +32,12 @@ import Testing
     @Test func theBF16KernelIsTheRoundingTheStandardMayTake() throws {
         let m = model(tilesbf16: 6e12)
         let standard = CS.Constraints(request: .init(family: .zImage, variant: .standard, includesEncoder: false), sustained: false)
-        #expect(!standard.allowsHalf && standard.allowsRounding)
+        #expect(standard.allowsHalf && standard.allowsRounding, "the Standard: bf16 and fp16 both (2/11 and 3/11/2026)")
         let s = try #require(CS.attention(key, flash: false, model: m, constraints: standard))
         #expect(s.assignment.kernel == .tilesbf16 && s.route == "tilesbf16")
+        let withoutANE = CS.Constraints(sustained: false, allowsANE: false)
+        #expect(!withoutANE.allowsHalf && withoutANE.allowsRounding, "no ANE: the rounding stays, fp16 goes")
+        #expect(CS.attention(key, flash: false, model: model(tiles16: 9e12, tilesbf16: 6e12), constraints: withoutANE)?.assignment.kernel == .tilesbf16)
         let refused = CS.Constraints(sustained: false, allowsANE: false, allowsRounding: false)
         #expect(CS.attention(key, flash: false, model: m, constraints: refused)?.assignment == .graph, "no rounding allowed: no bf16")
         #expect(CS.attention(key, flash: false, model: model(tilesbf16: 1.2e12), constraints: standard)?.assignment == .graph,

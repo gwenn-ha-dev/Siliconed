@@ -54,8 +54,8 @@ package enum MossImageStages {
     static let dit = Stage(
         model: model, name: "dit",
         proves: "one evaluation of the DiT at σ = 1, boundary by boundary — time, modulations, RoPE, text path, block 0 inside out, blocks 1, 13, 27, 41, the head —, judged at the fp64 witness",
-        sizes: ["512", "1024"], options: ["--map", "--neural-engine", "--bf16-activations", "--bf16-attention", "--no-accelerators", "--variant"],
-        oracle: "tools/oracle/moss-image.py dit --size {size}; witness --size {size}; with --neural-engine, --bf16-activations or --bf16-attention, dit-bf16 --size {size}; with --variant compact, dit, witness and dit-bf16 with --variant at 512 \(Wording.publishers)",
+        sizes: ["512", "1024"], options: ["--map", "--neural-engine", "--bf16-activations", "--bf16-attention", "--fp16-attention", "--no-accelerators", "--variant"],
+        oracle: "tools/oracle/moss-image.py dit --size {size}; witness --size {size}; with --neural-engine, --bf16-activations, --bf16-attention or --fp16-attention, dit-bf16 --size {size}; with --variant compact, dit, witness and dit-bf16 with --variant at 512 \(Wording.publishers)",
         weights: ["DiT"],
         rule: "the rule, floor 5e-4, at the fp64 witness where it exists; model_out per latent plane at the witness; \(Wording.halfPrecision)"
     ) { invocation in try evaluate(invocation, lora: false) }
@@ -223,6 +223,7 @@ package enum MossImageStages {
         if invocation.neuralEngine { try NeuralEngineRun.account(report) }
         if invocation.bf16Activations { try BF16ActivationRun.account(report) }
         if invocation.bf16Attention { try BF16AttentionRun.account(report) }
+        if invocation.fp16Attention { try FP16AttentionRun.account(report) }
         return report
     }
 }

@@ -99,15 +99,19 @@ package final class CapacityPlan: Sendable {
         return min(resources.amx ? limits.amxRows : .max, resources.ane ? limits.aneRows : .max)
     }
 
-    /// What the solver was given to answer for this plan: the same limits, sustained rate, refused kernels, ANE and half-precision
-    /// permissions (fp16 operands are the ANE's permission, as they always were; both need `allowsHalfPrecision`).
+    /// **What the solver was given to answer for this plan** — the same limits, sustained rate, refused kernels, ANE and rounding
+    /// permissions, fp16 derived from both (`Constraints.allowsHalf(ane:rounding:)`, at every version): what a render's prediction
+    /// times the plan's answers with too (`RenderLoop.predictions`).
     package var constraints: CapacitySolver.Constraints {
         CapacitySolver.Constraints(limits: limits, sustained: sustained, excluded: excluded, allowsANE: allowsANE,
-                                   allowsHalf: allowsANE && allowsHalfPrecision, allowsRounding: allowsHalfPrecision)
+                                   allowsRounding: allowsHalfPrecision)
     }
 
+    /// fp16 operands may be asked for under this plan: the one rule (`Constraints.allowsHalf(ane:rounding:)`).
+    private var allowsHalf: Bool { CapacitySolver.Constraints.allowsHalf(ane: allowsANE, rounding: allowsHalfPrecision) }
+
     /// **The half precisions the GPU's tensor units may compute in under this plan**, in the order a sentence names them: `bf16`
-    /// (an activation rounded, the attention's bf16 operands), `fp16` (the attention's fp16 operands, the ANE's permission). Empty:
+    /// (an activation rounded, the attention's bf16 operands), `fp16` (the attention's fp16 operands, `allowsHalf`). Empty:
     /// the GPU computes in fp32. What the app says a render may use (`AcceleratorOffer`); the solver still chooses class by class.
     package var gpuHalfPrecisions: [String] {
         guard allowsHalfPrecision else { return [] }
@@ -118,7 +122,7 @@ package final class CapacityPlan: Sendable {
         guard model != nil else { return resources.roundedActivations ? ["bf16"] : [] }
         var out: [String] = []
         if resources.roundedActivations || has(.tilesbf16) { out.append("bf16") }
-        if allowsANE && has(.tiles16) { out.append("fp16") }
+        if allowsHalf && has(.tiles16) { out.append("fp16") }
         return out
     }
 
@@ -164,7 +168,8 @@ package final class CapacityPlan: Sendable {
                               bf16Weights: has(.gpu, .bf16), int8Weights: has(.gpu, .int8), q8Weights: has(.gpu, .q8),
                               roundedActivations: allowsHalfPrecision && has(.gpu, .bf16act),
                               aneInt8: allowsANE && has(.ane, .fp16) && has(.ane, .int8),
-                              halfAttention: allowsHalfPrecision && ((allowsANE && has(.gpu, .tiles16)) || has(.gpu, .tilesbf16)))
+                              halfAttention: (CapacitySolver.Constraints.allowsHalf(ane: allowsANE, rounding: allowsHalfPrecision) && has(.gpu, .tiles16))
+                                  || (allowsHalfPrecision && has(.gpu, .tilesbf16)))
         override = nil; attentionOverride = nil
         identity = "model " + Self.fingerprint(model) + (allowsANE ? "" : " no-ane") + (allowsHalfPrecision ? "" : " fp32")
     }
@@ -507,9 +512,9 @@ package struct AttentionKey: Hashable, Sendable, Codable, CustomStringConvertibl
 
 /// **What runs an attention**: the kernel, and for the split the heads the CPU takes (whole kv groups).
 package struct AttentionAssignment: Equatable, Sendable, Codable, CustomStringConvertible {
-    /// `tiles`: the three stages by tiles of query rows, fp32 throughout (`TiledAttention`); `tiles16`: fp16 operands and fp32 sums — a
-    /// request's permission (`Constraints.allowsHalf`), the ANE's; `tilesbf16`: bf16 operands and fp32 sums — the rounding a request
-    /// may allow (`Constraints.allowsRounding`, the Standard's too). The last two run three stages or fused, as their map chose (`tile`).
+    /// `tiles`: the three stages by tiles of query rows, fp32 throughout (`TiledAttention`); `tiles16`: fp16 operands and fp32 sums —
+    /// `Constraints.allowsHalf`, at every version; `tilesbf16`: bf16 operands and fp32 sums — the rounding a request may allow
+    /// (`Constraints.allowsRounding`, at every version too). The last two run three stages or fused, as their map chose (`tile`).
     package enum Kernel: String, Codable, Sendable { case graph, flash, split, tiles, tiles16, tilesbf16
         /// The three stages or the fused form (`TiledAttention`), in any precision.
         var isTiled: Bool { self == .tiles || self == .tiles16 || self == .tilesbf16 }

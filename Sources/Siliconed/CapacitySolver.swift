@@ -13,7 +13,7 @@ import Foundation
 ///         ▼
 ///     the least t, the simplest set on a tie        ──▶  ProductAssignment
 ///     attention (S, keys, heads, kv heads, dim, cross) ──▶ graph · flash (where the caller tries it) · split (whole kv groups on the CPU)
-///                                                          · tiles (three stages by tiles of rows, fp32) · tiles16 (fp16 operands: the ANE's permission)
+///                                                          · tiles (three stages by tiles of rows, fp32) · tiles16 (fp16 operands: `Constraints.allowsHalf`)
 ///
 /// What sets it apart — what a solver written by analogy with "choose the fastest route per class" would get wrong:
 ///
@@ -27,10 +27,11 @@ import Foundation
 ///   - **An engine may be alone.** The AMX alone, the ANE alone, are candidates like any set: a Mac whose GPU is the slow engine
 ///     is served without a line of the solver changing. The ANE alone is the whole product (the model rounds the rows it pays for
 ///     up to the unit).
-///   - **What the caller's code cannot do is not offered.** An encoder never has the ANE or a rounded activation (P20: only the
-///     denoiser's fp16 rows and bf16 operands, at the variants that publish them so); a process that did not bring the ANE up (the
-///     Standard) is solved without it (`Constraints.allowsANE`); flash is the caller's (`flash:`), not a family's guess; the split
-///     cuts by whole kv groups, the GPU keeping one at least.
+///   - **What the caller's code cannot do is not offered.** An encoder never has the ANE or a rounded activation (its products are
+///     thin — m is the prompt's tokens, under the floors of `Limits` for most prompts — and its output conditions every evaluation);
+///     a process that did not bring the ANE up (a Mac whose map gives it nothing, the accelerators off) is solved without it
+///     (`Constraints.allowsANE`); flash is the caller's (`flash:`), not a family's guess; the split cuts by whole kv groups, the GPU
+///     keeping one at least. The version restricts nothing here: it reaches the solver through the weight formats of its classes.
 ///   - **The model's domain is a floor, not a bound of the engine.** Its lines were measured from ≈ 4 GFLOP: below `Limits` the AMX,
 ///     the ANE and the rounding are not asked about (their t₀ would be extrapolated), and the GPU takes the product. The engine
 ///     itself imposes none of them.
@@ -63,28 +64,37 @@ package enum CapacitySolver {
         package var sustained: Bool
         /// Kernels not proven on this Mac (a route the judge refused), left out whatever their line says.
         package var excluded: Set<CapacityModel.Kernel>
-        /// The ANE may be asked for: this process brings it up (never the Standard's, fp32 products).
+        /// The ANE may be asked for: this process brings it up — at every version, the Standard's included (decided 2/11/2026: its
+        /// programs lift each weight column and activation row by a power of two into fp16's range and hand a row that overflows back to
+        /// the GPU, so fp16 keeps what bf16 holds). False: a Mac whose map gives it nothing, the accelerators off, an encoder.
         package var allowsANE: Bool
-        /// **fp16 may be asked for** — the attention on fp16 operands (`tiles16`: Q, K, V and P rounded to half, fp32 sums): the ANE's
-        /// permission, the request's — the Compact and the Light, never the Standard (P20: fp16 loses the range bf16 holds, P17). `nil` at
-        /// `init`: whatever `allowsANE` says.
-        package var allowsHalf: Bool
-        /// **An activation may be rounded to bf16 before a product on a bf16 weight** (`gpu/bf16act`): P20 — bf16 between two operations on
-        /// bf16 published weights, as a GPU in bf16 computes them, the sums fp32 — at every version, the Standard's included (decided
-        /// 2/11/2026: the fp32 operand was the M1 Pro's choice of speed, not a rule). The map says where it is faster; an encoder never.
+        /// **An operand may be rounded below fp32 on the GPU's tensor units**: an activation to bf16 before a product on a bf16 weight
+        /// (`gpu/bf16act`), the attention's operands to bf16 (`tilesbf16`) — P20: bf16 between two operations on bf16 published weights,
+        /// as a GPU in bf16 computes them, the sums fp32 — at every version, the Standard's included (decided 2/11/2026: the fp32
+        /// operand was the M1 Pro's choice of speed, not a rule). The map says where it is faster; an encoder never.
         package var allowsRounding: Bool
 
+        /// **fp16 may be asked for** — the attention on fp16 operands (`tiles16`: Q, K, V and P rounded to half, fp32 sums). Derived,
+        /// never set: `allowsHalf(ane:rounding:)` is the one rule, which the plan's resources and the app's sentence read too.
+        package var allowsHalf: Bool { Self.allowsHalf(ane: allowsANE, rounding: allowsRounding) }
+
+        /// **The one source of the fp16 permission**: where the ANE may compute (its rows are fp16 already) and operands may be rounded
+        /// at all (the accelerators on) — at every version, the Standard's included (decided 3/11/2026, checked against the reference
+        /// run in bf16 by `--fp16-attention`). What it rests on is the attention's operands, not the residual stream P17 measured: Q and
+        /// K come out of the norms, V is a projection of a normed input, P lies in [0, 1]; every sum stays fp32.
+        package static func allowsHalf(ane: Bool, rounding: Bool) -> Bool { ane && rounding }
+
         package init(limits: Limits = .init(), sustained: Bool = true, excluded: Set<CapacityModel.Kernel> = [],
-                     allowsANE: Bool = true, allowsHalf: Bool? = nil, allowsRounding: Bool = true) {
+                     allowsANE: Bool = true, allowsRounding: Bool = true) {
             self.limits = limits; self.sustained = sustained; self.excluded = excluded; self.allowsANE = allowsANE
-            self.allowsHalf = allowsHalf ?? allowsANE
             self.allowsRounding = allowsRounding
         }
 
-        /// The constraints of a request: the ANE for the versions that publish a non-bf16 weight.
+        /// The constraints of a request, as a render takes them: the version restricts nothing (the ANE, the rounding and fp16 at every
+        /// version, decided 2/11 and 3/11/2026) — it reaches the solver through the weight formats of its classes alone.
         package init(request: CapacityClasses.Request, limits: Limits = .init(), sustained: Bool = true,
                      excluded: Set<CapacityModel.Kernel> = []) {
-            self.init(limits: limits, sustained: sustained, excluded: excluded, allowsANE: request.variant != .standard)
+            self.init(limits: limits, sustained: sustained, excluded: excluded)
         }
     }
 
@@ -166,6 +176,21 @@ package enum CapacitySolver {
     /// **One attention's answer.** `flash`: the caller's code tries the flash kernel before the split.
     package static func attention(_ key: AttentionKey, flash: Bool, model: CapacityModel, constraints: Constraints) -> AttentionSolution? {
         ProductSolver(model: model, c: constraints).solve(key, flash: flash)
+    }
+
+    /// **Every candidate the solver weighs for a product** — not only the one it keeps: each set of engines and each form of the weight
+    /// it may offer under `constraints`, timed. Empty when the model has no line for the GPU's fp32 product. The coverage guard reads
+    /// it (`CoverageGuardTests`): what the solver can offer, beside what P20 permits.
+    package static func candidates(_ key: ProductKey, model: CapacityModel, constraints: Constraints) -> [ProductSolution] {
+        let solver = ProductSolver(model: model, c: constraints)
+        return solver.candidates(key).map { solver.solution($0, key) }
+    }
+
+    /// The same for an attention: every runnable assignment it weighs, timed.
+    package static func candidates(_ key: AttentionKey, flash: Bool, model: CapacityModel, constraints: Constraints) -> [AttentionSolution] {
+        ProductSolver(model: model, c: constraints).candidates(key, flash: flash).map {
+            AttentionSolution(assignment: $0.0, route: $0.1.route, rows: $0.1.rows, compute: $0.1.seconds, busy: $0.1.busy)
+        }
     }
 
     /// **The seconds the model gives an assignment someone else chose** — the plan's, a forcing's: what the engine ran, timed as the solver
@@ -423,8 +448,10 @@ private struct ProductSolver {
 
     // MARK: Products
 
-    func solve(_ key: ProductKey) -> CapacitySolver.ProductSolution? {
-        guard line(.gpu, .fp32) != nil else { return nil }
+    /// **Every way the solver may compute `key`**, in the order a tie is settled (simplest first): the widened sets, the bf16 weight as
+    /// published, its activation rounded, the native 8-bit weight's. What `solve` chooses among, and what the coverage guard reads.
+    func candidates(_ key: ProductKey) -> [Option] {
+        guard line(.gpu, .fp32) != nil else { return [] }
         let (k, n, m) = (key.k, key.n, key.m)
         var options = widened(key)
         if key.weight == .bf16 {
@@ -438,16 +465,23 @@ private struct ProductSolver {
             }
         }
         if key.weight == .int8 || key.weight == .q8 { options += native(key) }
+        return options
+    }
 
-        var best: (Option, Double, Double)?       // option, preparation, total
-        for o in options {
-            let prep = preparation(format: key.weight, path: o.assignment.path, k: k, n: n)
-            let total = o.seconds + prep
-            if best == nil || total < best!.2 * (1 - 1e-9) { best = (o, prep, total) }
-        }
-        guard let (o, prep, _) = best else { return nil }
+    func solution(_ o: Option, _ key: ProductKey) -> CapacitySolver.ProductSolution {
+        let prep = preparation(format: key.weight, path: o.assignment.path, k: key.k, n: key.n)
         return .init(assignment: o.assignment, route: o.assignment.route(weight: key.weight), rows: o.rows, preparation: prep,
-                     compute: o.seconds, busy: busy(o.rows, m: m, k: k, n: n, swapped: o.swapped))
+                     compute: o.seconds, busy: busy(o.rows, m: key.m, k: key.k, n: key.n, swapped: o.swapped))
+    }
+
+    func solve(_ key: ProductKey) -> CapacitySolver.ProductSolution? {
+        guard line(.gpu, .fp32) != nil else { return nil }
+        var best: (Option, Double)?       // option, total
+        for o in candidates(key) {
+            let total = o.seconds + preparation(format: key.weight, path: o.assignment.path, k: key.k, n: key.n)
+            if best == nil || total < best!.1 * (1 - 1e-9) { best = (o, total) }
+        }
+        return best.map { solution($0.0, key) }
     }
 
     /// **An assignment decided elsewhere, timed here**: the kernels it reads, the rows each takes, plus the weight's preparation.
@@ -536,7 +570,9 @@ private struct ProductSolver {
         }
     }
 
-    func solve(_ key: AttentionKey, flash: Bool) -> CapacitySolver.AttentionSolution? {
+    /// **Every way the solver may run `key`**, runnable and timed, in the order a tie is settled: the graph, flash, the tiled kernels,
+    /// then the cut with each GPU kernel. What `solve` chooses among, and what the coverage guard reads.
+    func candidates(_ key: AttentionKey, flash: Bool) -> [(AttentionAssignment, (route: String, rows: [Kernel: Int], seconds: Double, busy: [Engine: Double]))] {
         var options: [AttentionAssignment] = [.graph]
         if flash, line(.gpu, .flash) != nil { options.append(.flash) }
         // The tiled kernels: a candidate wherever the map has its line (fp16 only where the request allows half precision, bf16 where it
@@ -551,9 +587,12 @@ private struct ProductSolver {
                 for cpu in 1..<groups { options.append(AttentionAssignment(kernel: .split, cpuHeads: cpu * key.group, gpuKernel: gpu)) }
             }
         }
+        return options.compactMap { o in o.isRunnable(for: key) ? timed(key, o).map { (o, $0) } : nil }
+    }
+
+    func solve(_ key: AttentionKey, flash: Bool) -> CapacitySolver.AttentionSolution? {
         var best: (AttentionAssignment, (route: String, rows: [Kernel: Int], seconds: Double, busy: [Engine: Double]))?
-        for o in options where o.isRunnable(for: key) {
-            guard let t = timed(key, o) else { continue }
+        for (o, t) in candidates(key, flash: flash) {
             if best == nil || t.seconds < best!.1.seconds * (1 - 1e-9) { best = (o, t) }
         }
         guard var (a, t) = best else { return nil }

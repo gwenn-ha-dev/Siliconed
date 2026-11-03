@@ -126,14 +126,18 @@ extension Judge {
 ///     further from the fp64 witness than diffusers in bf16, + 25 %.
 ///   - **`--bf16-attention`**: the DiT's attention on bf16 operands (Q, K, V and the probabilities rounded once, the softmax and the
 ///     sums fp32), in the fused form at the first candidate tile — every attention the plan speaks of. Judged the same way.
+///   - **`--fp16-attention`**: the same on fp16 operands (`tiles16`) — what a render takes at every version where its map chooses
+///     it, the Standard's included (`CapacitySolver.Constraints.allowsHalf`, decided 3/11/2026). Judged the same way: against the
+///     reference run in bf16, + 25 %, as the ANE's fp16 products.
 package enum HalfPrecisionRun {
-    package static func enable(neuralEngine: Bool, bf16Activations: Bool, bf16Attention: Bool = false) throws {
+    package static func enable(neuralEngine: Bool, bf16Activations: Bool, bf16Attention: Bool = false, fp16Attention: Bool = false) throws {
         do {
             try EngineSettings.designate(plan: .forcing(neuralEngine: neuralEngine, bf16Activations: bf16Activations,
-                                                        tilesbf16: bf16Attention, fused: bf16Attention))
+                                                        tiles16: fp16Attention, tilesbf16: bf16Attention,
+                                                        fused: bf16Attention || fp16Attention))
         } catch {
             let flags = [neuralEngine ? "--neural-engine" : nil, bf16Activations ? "--bf16-activations" : nil,
-                         bf16Attention ? "--bf16-attention" : nil].compactMap { $0 }
+                         bf16Attention ? "--bf16-attention" : nil, fp16Attention ? "--fp16-attention" : nil].compactMap { $0 }
             throw UsageError("\(flags.joined(separator: " ")): the engine's settings were read before it")
         }
     }
@@ -188,7 +192,8 @@ package struct Int8Route {
         if let named = ProcessInfo.processInfo.environment["SILICONED_PLAN"], !named.isEmpty,
            let forced = CapacityPlan.forcing(named: named + ",int8") { return forced }
         return .forcing(neuralEngine: invocation.neuralEngine, bf16Activations: invocation.bf16Activations,
-                        tilesbf16: invocation.bf16Attention, fused: invocation.bf16Attention, int8: true)
+                        tiles16: invocation.fp16Attention, tilesbf16: invocation.bf16Attention,
+                        fused: invocation.bf16Attention || invocation.fp16Attention, int8: true)
     }
 
     /// The products that read the published integers since the route was taken: none fails, the route was not crossed.
@@ -225,6 +230,17 @@ package enum BF16AttentionRun {
             throw Skip("--bf16-attention: no attention ran on bf16 operands on this Mac (Metal 4 missing, or the kernel refused)")
         }
         report.add(Judge.holds("bf16 attention", true, note: "\(runs) attentions on bf16 operands"))
+    }
+}
+
+package enum FP16AttentionRun {
+    /// How many attentions ran on fp16 operands. None (no Metal 4, a refused compiler, a shape the kernel does not take): skipped.
+    package static func account(_ report: Report) throws {
+        let runs = TiledAttention.fp16Runs.withLock { $0 }
+        guard runs > 0 else {
+            throw Skip("--fp16-attention: no attention ran on fp16 operands on this Mac (Metal 4 missing, or the kernel refused)")
+        }
+        report.add(Judge.holds("fp16 attention", true, note: "\(runs) attentions on fp16 operands"))
     }
 }
 

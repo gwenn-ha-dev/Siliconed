@@ -100,8 +100,8 @@ enum Krea2Stages {
     static let dit = Stage(
         model: model, name: "dit",
         proves: "one evaluation of the DiT at σ = 1, boundary by boundary, judged at the fp64 witness where it exists",
-        sizes: ["512", "1024", "768x512"], options: ["--map", "--neural-engine", "--bf16-activations", "--bf16-attention", "--no-accelerators", "--variant"],
-        oracle: "tools/oracle/krea2.py dit --size {size}; witness --size {size}; witness-step --size {size} --step 0; draw --size {size} --step 0 --jitter 1 2 3; with --neural-engine, --bf16-activations or --bf16-attention, bf16 --size {size}; with --variant compact or light, dit, bf16, witness, witness-step --step 0, draw --step 0 --jitter 1 2 3 and draw --size {size} --step 0 --permute 1 2 3 4 5 6 7 8 --permute-kind group with --variant, at 512 \(Wording.publishers)", weights: ["DiT"],
+        sizes: ["512", "1024", "768x512"], options: ["--map", "--neural-engine", "--bf16-activations", "--bf16-attention", "--fp16-attention", "--no-accelerators", "--variant"],
+        oracle: "tools/oracle/krea2.py dit --size {size}; witness --size {size}; witness-step --size {size} --step 0; draw --size {size} --step 0 --jitter 1 2 3; with --neural-engine, --bf16-activations, --bf16-attention or --fp16-attention, bf16 --size {size}; with --variant compact or light, dit, bf16, witness, witness-step --step 0, draw --step 0 --jitter 1 2 3 and draw --size {size} --step 0 --permute 1 2 3 4 5 6 7 8 --permute-kind group with --variant, at 512 \(Wording.publishers)", weights: ["DiT"],
         rule: "the rule, floor 5e-4, at the fp64 witness where it exists, clouds of summation orders when the oracle has order draws (the same seeds drawn by the engine), of one-ulp moves when it has only those; model_out per latent plane at the witness; \(Wording.rectangle); \(Wording.halfPrecision)"
     ) { invocation in
         let version = try invocation.quantizedVariant()
@@ -206,6 +206,7 @@ enum Krea2Stages {
         if invocation.neuralEngine { try NeuralEngineRun.account(report) }
         if invocation.bf16Activations { try BF16ActivationRun.account(report) }
         if invocation.bf16Attention { try BF16AttentionRun.account(report) }
+        if invocation.fp16Attention { try FP16AttentionRun.account(report) }
         return report
     }
 

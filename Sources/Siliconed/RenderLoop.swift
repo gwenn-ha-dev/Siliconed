@@ -73,8 +73,7 @@ package enum RenderLoop {
                                     accelerators: Bool = true) -> [Predicted]? {
         guard let model = plan.model, let classes = CapacityClasses.classes(for: request) else { return nil }
         let plan = plan.restricted(accelerators: accelerators).restricted(allowingANE: aneBroughtUp)
-        let constraints = CapacitySolver.Constraints(allowsANE: plan.allowsANE, allowsHalf: plan.allowsANE && plan.allowsHalfPrecision,
-                                                     allowsRounding: plan.allowsHalfPrecision)
+        let constraints = plan.constraints
         var result: [Predicted] = []
         for c in classes where c.phase == .denoising {
             let executions = c.executions[request.family] ?? 0
