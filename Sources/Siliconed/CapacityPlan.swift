@@ -257,7 +257,8 @@ package final class CapacityPlan: Sendable {
         parts.append("unit \(model.aneRowUnit)")
         for (k, s) in model.sharing.sorted(by: { $0.key < $1.key }) {
             parts.append("\(k) \(s.overhead) \(s.sustained.map { "\($0)" } ?? "-") \(s.kFrom ?? 0)-\(s.kTo ?? 0) " + (s.keepByK?.map { "\($0.k):" + $0.keep.sorted { $0.key < $1.key }.map { "\($0.key)=\($0.value)" }.joined(separator: ",") }.joined(separator: ";") ?? "") + " " + s.keep.sorted { $0.key < $1.key }.map { "\($0.key.rawValue)=\($0.value)" }.joined(separator: ",")
-                         + (s.perWeight.map { " lift " + $0.sorted { $0.key < $1.key }.map { "\($0.key.rawValue)=\($0.value)" }.joined(separator: ",") } ?? ""))
+                         + (s.perWeight.map { " lift " + $0.sorted { $0.key < $1.key }.map { "\($0.key.rawValue)=\($0.value)" }.joined(separator: ",") } ?? "")
+                         + (s.noise.map { " noise \($0)" } ?? ""))
         }
         for (e, h) in model.heat.sorted(by: { $0.key < $1.key }) { parts.append("heat \(e.rawValue) \(h)") }
         for (k, t) in model.tiles.sorted(by: { $0.key.description < $1.key.description }) { parts.append("tile \(k) \(t)") }

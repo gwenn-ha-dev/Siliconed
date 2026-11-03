@@ -47,6 +47,10 @@ import Foundation
 ///     a second map of the same Mac changes a choice only where the gain passes the noise. A pair beside the ANE is offered at every
 ///     unit of the ANE's rows, the balance's or not, the most rows first (`pairRows`): a gap either side of zero is read the same way,
 ///     and the ANE's share within the margin is the written order's too. A map without rounds keeps the old rule (a part in a billion).
+///   - **A set is taken on what a render pays, past the error of the difference.** Its seconds against the simpler assignment's (the
+///     best on a strict subset of its kernels), the set kept only where the gap passes twice √(se_S² + se_alt²): the set's standard
+///     error from three chains where two disagreed (`Sharing.noise`, the MAD of the median chain), the map's σ for every other figure
+///     (`passingTheirError`). A gain under it is one the next map reverses.
 ///   - **The ANE against the AMX, and only there, a preference — not a figure of speed.** The best candidate with the ANE and
 ///     without the AMX may be up to `aneOverAMX` (15 %) slower than the best with the AMX: then every candidate with the AMX is
 ///     dropped, and the rest is solved as everywhere (the least t, the noise, the written order). Against the GPU alone, or between
@@ -526,12 +530,41 @@ private struct ProductSolver {
 
     func solve(_ key: ProductKey) -> CapacitySolver.ProductSolution? {
         guard line(.gpu, .fp32) != nil else { return nil }
-        let timed = arbitrated(canonical(candidates(key)).map { o in
+        let timed = passingTheirError(arbitrated(canonical(candidates(key)).map { o in
             (o, o.seconds + preparation(format: key.weight, path: o.assignment.path, k: key.k, n: key.n))
-        })
+        }))
         guard let fastest = timed.map(\.1).min() else { return nil }
         let width = margin(thin: CapacityModel.isThin(rows: key.m, k: key.k, n: key.n))
         return timed.first { $0.1 <= fastest * (1 + width) }.map { solution($0.0, key) }
+    }
+
+    /// The kernels `o` gives rows to, as a set's key reads them.
+    func kernels(_ o: Option) -> [Kernel] { o.rows.filter { $0.value > 0 }.map(\.key) }
+
+    /// **A set is taken only where what a render pays on it beats the simpler assignment by more than their figures' error.** A render
+    /// pays a set's mean seconds, call after call; the map knows that mean to a standard error: the set's own where its chains were
+    /// measured three times (`Sharing.noise`, the median chain's, from the MAD — `CapacityFit.chains`), the map's σ for any other figure
+    /// (`CapacityFit.sigma(mapNoise:)`, a single figure read once). The simpler assignment is the best candidate on a strict subset of the
+    /// set's kernels (the GPU alone against GPU + ANE). Each figure t ± e·t; their difference has the standard error
+    /// √(e_S² t_S² + e_alt² t_alt²), and a gain under twice it is one the next map reverses more than one time in forty-four (a normal's tail past 2σ): the set's
+    /// candidates are then dropped. Not twice a noise per chain (an earlier form: the integers' rounded pair dropped from
+    /// every Compact under one map of two, +10 to +15 % predicted at 1 024², its noise the gap of two chains, one of them disturbed).
+    func passingTheirError(_ timed: [(Option, Double)]) -> [(Option, Double)] {
+        let sigma = CapacityFit.sigma(mapNoise: model.noise) ?? 0
+        func error(_ ks: [Kernel]) -> Double { ks.count >= 2 ? (model.sharing(ks).noise ?? sigma) : sigma }
+        var sets: [String: [Kernel]] = [:]
+        for (o, _) in timed { let ks = kernels(o); if ks.count >= 2 { sets[CapacityModel.key(ks)] = ks } }
+        var out = timed
+        for (set, ks) in sets {
+            let mine = Set(ks)
+            guard let best = timed.filter({ CapacityModel.key(kernels($0.0)) == set }).min(by: { $0.1 < $1.1 }),
+                  let simpler = timed.filter({ (o: (Option, Double)) -> Bool in let ks = Set(kernels(o.0)); return !ks.isEmpty && ks.isStrictSubset(of: mine) }).min(by: { $0.1 < $1.1 })
+            else { continue }
+            let eS = error(ks) * best.1, eAlt = error(kernels(simpler.0)) * simpler.1
+            guard simpler.1 - best.1 <= 2 * (eS * eS + eAlt * eAlt).squareRoot() else { continue }
+            out.removeAll { CapacityModel.key(kernels($0.0)) == set }
+        }
+        return out
     }
 
     /// **The ANE against the AMX** (`CapacitySolver.aneOverAMX`): when the best candidate with the ANE and without the AMX is within

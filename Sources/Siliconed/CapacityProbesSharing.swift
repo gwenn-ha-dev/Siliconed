@@ -53,7 +53,10 @@ extension Diagnostic.CapacityProbes.Context {
         // pass is a measure, not a verdict — the long k (where the ANE's per-call cost weighs least) is measured whatever the short one
         // said; a pair skipped there is a pair one map has and the next has not.
         var last: (gpu: Int, ane: Int)?
-        for (pass, shape) in [(1, short), (2, short)] + (sizes.chains.count > 1 ? [(3, sizes.chains[1])] : []) {
+        var plan = [(1, short), (2, short)] + (sizes.chains.count > 1 ? [(3, sizes.chains[1])] : [])
+        var next = 0
+        while next < plan.count {
+            let (pass, shape) = plan[next]; next += 1
             if let t = trialPair(key: key, gpu: g, ane: a, shape: shape, model: model, pass: pass, previous: last) {
                 measurements.trials.append(t)
                 if let gr = t.sides.first(where: { $0.kernel == g.description })?.rows, let ar = t.sides.first(where: { $0.kernel == a.description })?.rows {
@@ -62,9 +65,21 @@ extension Diagnostic.CapacityProbes.Context {
                 log?(String(format: "  %@ pass %d  %dx%dx%d  wall %.2f ms  sides %@", key, pass, shape.m, shape.k, shape.n, t.wall * 1e3,
                             t.sides.map { String(format: "%@ %d rows line %.1f within %.1f", $0.kernel, $0.rows, $0.solo * 1e3, ($0.within ?? 0) * 1e3) }.joined(separator: " | ")))
             }
-            let trials = pass == 1 ? measurements.trials : measurements.trials.filter { $0.pass >= 2 }
-            if let fit = Fit.overlap(set: key, trials: trials, model: model) { model.sharing[key] = fit.sharing }
+            refit(key, pass: pass, shape: shape, measurements: measurements, model: &model, plan: &plan, at: next)
         }
+    }
+
+    /// **After a chain, the set's fit again** — on the passes so far, from the second the chains `Fit.chains` reads — **and, after the
+    /// second, a third chain at the same shape where the first two disagree beyond the map's noise** (`Fit.needsAgain`): two chains
+    /// cannot say which met a disturbance, the median of three can. The third is the measure the guard would have taken had it seen
+    /// the chain disturbed (a whole chain slowed evenly does not spread its calls).
+    func refit(_ key: String, pass: Int, shape: (m: Int, k: Int, n: Int), measurements: Fit.Measurements, model: inout CapacityModel,
+               plan: inout [(Int, (m: Int, k: Int, n: Int))], at next: Int) {
+        let trials = pass == 1 ? measurements.trials : Fit.chains(set: key, trials: measurements.trials, model: model).used
+        if let fit = Fit.overlap(set: key, trials: trials, model: model) { model.sharing[key] = fit.sharing }
+        guard pass == 2, Fit.needsAgain(set: key, shape: [shape.m, shape.k, shape.n], trials: measurements.trials, model: model) else { return }
+        log?("  \(key) \(shape.m)x\(shape.k)x\(shape.n): two chains apart beyond the map's noise — a third")
+        plan.insert((Fit.Measurements.Trial.again, shape), at: next)
     }
 
     /// **One chain of a pair on a weight read as published**: the weight staged as a render stages it, the rows the model's balance gives
@@ -190,14 +205,16 @@ extension Diagnostic.CapacityProbes.Context {
         let chains = sizes.chains
         for set in sets {
             let key = CapacityModel.key(set.map(\.engine))
-            for (pass, shape) in [(1, chains[0]), (2, chains[0])] + (chains.count > 1 ? [(3, chains[1])] : []) {
+            var plan = [(1, chains[0]), (2, chains[0])] + (chains.count > 1 ? [(3, chains[1])] : [])
+            var next = 0
+            while next < plan.count {
+                let (pass, shape) = plan[next]; next += 1
                 if let trial = trial(set, key: key, shape: shape, model: model, pass: pass) {
                     measurements.trials.append(trial)
                     log?(String(format: "  %@ pass %d  %dx%dx%d  wall %.2f ms  sides %@", key, pass, shape.m, shape.k, shape.n,
                                 trial.wall * 1e3, trial.sides.map { String(format: "%@ %d rows line %.1f within %.1f", $0.kernel, $0.rows, $0.solo * 1e3, ($0.within ?? 0) * 1e3) }.joined(separator: " | ")))
                 }
-                let trials = pass == 1 ? measurements.trials : measurements.trials.filter { $0.pass >= 2 }
-                if let fit = Fit.overlap(set: key, trials: trials, model: model) { model.sharing[key] = fit.sharing }
+                refit(key, pass: pass, shape: shape, measurements: measurements, model: &model, plan: &plan, at: next)
             }
         }
     }

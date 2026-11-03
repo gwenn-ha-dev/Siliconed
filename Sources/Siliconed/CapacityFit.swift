@@ -178,8 +178,10 @@ package enum CapacityFit {
             /// `gpu+ane`, in `CapacityModel.key` order.
             package var set: String
             package var shape: [Int]
-            /// 1: the rows the solo lines (no sharing) balance; 2: the rows the first pass's keep balances.
+            /// 1: the rows the solo lines (no sharing) balance; 2: the rows the first pass's keep balances; 3: a long k on pass 2's;
+            /// `again` (4): the short shape a third time, where the first two disagreed (`CapacityFit.needsAgain`).
             package var pass: Int
+            package static let again = 4
             package var sides: [Side]
             package var wall: Double
             package var error: Double?
@@ -533,6 +535,64 @@ package enum CapacityFit {
         return SharingFit(sharing: fit, keeps: keeps, overheads: overheads, residuals: residuals)
     }
 
+    /// **The chains a set's fit reads, and the error of its figure** (`Sharing.noise`). The passes from the second (pass 1 only balances
+    /// on the lines; a set with no long k is read on its last), except where a shape was chained three times or more — the third chain
+    /// is taken only when the first two disagree beyond what the map's noise allows (`needsAgain`) —: there, the median chain alone,
+    /// each wall over the seconds the model fitted on the usual passes gives its rows (two passes balanced at different rows compare).
+    ///
+    /// Two chains are one degree of freedom: their gap is the estimate a single disturbed chain decides — the rounded pair's 13 % and
+    /// the integers' rounded pair's 1.9 % in one map, 32 % in the next (7.01 against 5.32 ms at the same rows, the ANE side 7.0 ms inside
+    /// the pair against 5.2). Three chains have a median one disturbance cannot move and a spread it cannot fake: σ = 1.4826 · MAD over
+    /// the median (the median absolute deviation of the ratios, 1.4826 its factor to a normal's σ), and the median of n chains has the
+    /// standard error 1.2533 · σ / √n (its efficiency against the mean, π/2 in variance). `noise` is that standard error, relative; `nil`
+    /// where no shape was chained three times — two chains that agree within the map's noise carry the map's.
+    package static func chains(set: String, trials: [Measurements.Trial], model: CapacityModel) -> (used: [Measurements.Trial], noise: Double?) {
+        let mine = trials.filter { $0.set == set && $0.sides.count >= 2 && $0.shape.count == 3 && $0.wall > 0 }
+        let passes = Set(mine.map(\.pass)).subtracting([Measurements.Trial.again])
+        let from = passes.contains(3) ? 2 : (passes.max() ?? 0)
+        var used = mine.filter { $0.pass >= from && $0.pass != Measurements.Trial.again }
+        var reference = model
+        if let f = overlap(set: set, trials: used, model: model) { reference.sharing[set] = f.sharing }
+        var noise: Double?
+        for (shape, group) in Dictionary(grouping: mine, by: \.shape) where group.count >= 3 {
+            let ratios = group.compactMap { t -> (Measurements.Trial, Double)? in
+                guard let r = ratio(t, model: reference) else { return nil }
+                return (t, r)
+            }.sorted { $0.1 < $1.1 }
+            guard ratios.count >= 3 else { continue }
+            let mid = ratios[ratios.count / 2]
+            let m = median(ratios.map(\.1)), mad = median(ratios.map { abs($0.1 - m) })
+            let se = 1.2533 * (1.4826 * mad / m) / Double(ratios.count).squareRoot()
+            noise = max(noise ?? 0, se)
+            used.removeAll { $0.shape == shape }
+            used.append(mid.0)
+        }
+        return (used, noise)
+    }
+
+    /// A chain's wall over the seconds `model` gives its rows.
+    static func ratio(_ trial: Measurements.Trial, model: CapacityModel) -> Double? {
+        var rows: [Kernel: Int] = [:]
+        for side in trial.sides { if let kernel = Kernel(side.kernel) { rows[kernel] = side.rows } }
+        guard let t = model.seconds(m: trial.shape[0], k: trial.shape[1], n: trial.shape[2], rows: rows), t > 0 else { return nil }
+        return trial.wall / t
+    }
+
+    /// **A figure's own σ, from the map's noise** (`CapacityModel.noise`): the median over the candidates of the slowest of three alternated
+    /// rounds over the fastest, less one — a range of three, whose expectation is d₂(3) = 1.693 σ. `nil`: a map without rounds.
+    package static func sigma(mapNoise: Double?) -> Double? { mapNoise.map { $0 / 1.693 } }
+
+    /// **Whether a set's two chains at one shape call for a third** (`Measurements.Trial.again`): their ratios (wall over the model's
+    /// seconds at their rows) apart by more than twice the σ of a difference of two figures, 2√2 σ — under it, the gap is the map's own
+    /// noise; over it, one chain met what the other did not (a disturbance only adds time, and a pair's ANE side can run a third slower in
+    /// one chain), and only a third tells which. Without the map's noise, always.
+    package static func needsAgain(set: String, shape: [Int], trials: [Measurements.Trial], model: CapacityModel) -> Bool {
+        let ratios = trials.filter { $0.set == set && $0.shape == shape && $0.sides.count >= 2 && $0.wall > 0 }.compactMap { ratio($0, model: model) }
+        guard ratios.count == 2, let low = ratios.min(), let high = ratios.max() else { return false }
+        guard let sigma = sigma(mapNoise: model.noise) else { return true }
+        return high / low - 1 > 2 * 2.squareRoot() * sigma
+    }
+
     /// **What a side of `set` pays per call beyond its line, per weight value** (`Sharing.perWeight`), from what the map measured before
     /// any chain: the rounded bf16 pair's ANE (`gpu/bf16act+ane/fp16`) reads the bf16 copy as published, and its program widens every value
     /// of it at every call (the lift reads each row widened, the conversion widens it again where the widened weight's is read as it is:
@@ -600,9 +660,11 @@ package enum CapacityFit {
         for set in order {
             // The passes from the second were balanced on a κ measured (the first, on the lines, only gives it); a set with two passes only
             // is read on the second.
-            let passes = Set(m.trials.filter { $0.set == set }.map(\.pass))
-            let from = passes.contains(3) ? 2 : (passes.max() ?? 0)
-            if let f = overlap(set: set, trials: m.trials.filter { $0.pass >= from }, model: model) { model.sharing[set] = f.sharing }
+            let chosen = chains(set: set, trials: m.trials, model: model)
+            if let f = overlap(set: set, trials: chosen.used, model: model) {
+                model.sharing[set] = f.sharing
+                model.sharing[set]?.noise = chosen.noise
+            }
         }
         for w in m.witnesses {
             if let e = CapacityModel.Engine(rawValue: w.engine), w.before > 0, w.after > 0 { model.heat[e] = max(1, w.after / w.before) }

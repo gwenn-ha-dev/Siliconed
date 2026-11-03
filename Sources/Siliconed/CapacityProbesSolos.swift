@@ -44,13 +44,16 @@ extension Diagnostic.CapacityProbes.Context {
     }
 
     /// **The kernel's points far above the line of the others, measured once more** (`Fit.suspects`), the faster kept: a figure the Mac
-    /// disturbed comes back to the line, a shape the kernel is slow at stays. One solo per suspect (a few tenths of a second at most).
+    /// disturbed comes back to the line, a shape the kernel is slow at stays. One solo per suspect (a few tenths of a second at most), and
+    /// once only: `solos` runs a kernel at more than one set of shapes, and a point measured again stays a suspect of the next pass when
+    /// it is the kernel's own shape (`ane/fp16 2048x8192x1536`, 1 % apart, measured three times in two maps).
     func again(_ probe: Probe, _ m: inout Fit.Measurements, chained: Bool) {
         let name = probe.kernel.description
         let mine = m.solos.indices.filter { m.solos[$0].kernel == name && m.solos[$0].seconds > 0 }
         for i in Fit.suspects(mine.map { Fit.Point(flop: m.solos[$0].flop, seconds: m.solos[$0].seconds) }) {
             let j = mine[i], shape = m.solos[j].shape
-            guard shape.count == 3, let s = solo(probe, m: shape[0], k: shape[1], n: shape[2], chained: chained), s.seconds > 0 else { continue }
+            guard shape.count == 3, measuredAgain.insert("\(name) \(shape)").inserted,
+                  let s = solo(probe, m: shape[0], k: shape[1], n: shape[2], chained: chained), s.seconds > 0 else { continue }
             log?(String(format: "  %@ %dx%dx%d  again: %.2f ms (was %.2f)", name, shape[0], shape[1], shape[2], s.seconds * 1e3, m.solos[j].seconds * 1e3))
             if s.seconds < m.solos[j].seconds { m.solos[j].seconds = s.seconds }
         }

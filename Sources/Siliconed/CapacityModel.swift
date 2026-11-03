@@ -187,6 +187,13 @@ package struct CapacityModel: Codable, Sendable, Equatable {
         /// into the κ of a chain of 1 024 ANE rows it cost each of them a quarter of a call; at 256 rows (a 512² render's half grid) the
         /// same κ hid four times as much: the pair taken there ran 22–52 % over the GPU alone. `nil`: none.
         package var perWeight: [Engine: Double]?
+        /// **The standard error of the set's figure** (relative), where its chains at one shape were measured three times because the
+        /// first two disagreed beyond the map's noise (`CapacityFit.needsAgain`): 1.2533 · 1.4826 · MAD / median / √n over the chains'
+        /// ratios to the model (`CapacityFit.chains`). The map's noise is read on single engines in alternated rounds; a pair's chains,
+        /// two engines and the CPU's host passes beside them, can disagree more — the rounded pair 13 % in one map, the integers' rounded
+        /// pair 1.9 % in one and 32 % in the next at the same rows. The solver keeps the set only where its gain passes twice the error of
+        /// the difference (`CapacitySolver`'s `passingTheirError`). `nil`: two chains that agreed, a figure as sure as the map's.
+        package var noise: Double?
         package struct KeepAt: Codable, Sendable, Equatable {
             package var k: Int
             /// Keyed by the engine's name (`"gpu"`).
@@ -194,9 +201,9 @@ package struct CapacityModel: Codable, Sendable, Equatable {
             package init(k: Int, keep: [String: Double]) { self.k = k; self.keep = keep }
         }
         package init(overhead: Double = 0, keep: [Engine: Double] = [:], sustained: Double? = nil, keepByK: [KeepAt]? = nil, kFrom: Int? = nil, kTo: Int? = nil,
-                     perWeight: [Engine: Double]? = nil) {
+                     perWeight: [Engine: Double]? = nil, noise: Double? = nil) {
             self.overhead = overhead; self.keep = keep; self.sustained = sustained; self.keepByK = keepByK; self.kFrom = kFrom; self.kTo = kTo
-            self.perWeight = perWeight
+            self.perWeight = perWeight; self.noise = noise
         }
         /// The seconds `engine` pays per call in this set beyond its line, on a `k×n` weight (`perWeight`).
         package func lift(_ engine: Engine, k: Int, n: Int) -> Double { (perWeight?[engine] ?? 0) * Double(k) * Double(n) }
@@ -215,7 +222,7 @@ package struct CapacityModel: Codable, Sendable, Equatable {
             return last.keep
         }
 
-        private enum CodingKeys: String, CodingKey { case overhead, keep, sustained, keepByK, kFrom, kTo, perWeight }
+        private enum CodingKeys: String, CodingKey { case overhead, keep, sustained, keepByK, kFrom, kTo, perWeight, noise }
         /// `keep` keyed by the engine's name (`{"gpu": 0.95}`), as a person reads it.
         package init(from decoder: any Decoder) throws {
             let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -227,6 +234,7 @@ package struct CapacityModel: Codable, Sendable, Equatable {
             kTo = try c.decodeIfPresent(Int.self, forKey: .kTo)
             perWeight = try c.decodeIfPresent([String: Double].self, forKey: .perWeight)
                 .map { try CapacityModel.engines($0, codingPath: c.codingPath + [CodingKeys.perWeight]) }
+            noise = try c.decodeIfPresent(Double.self, forKey: .noise)
         }
         package func encode(to encoder: any Encoder) throws {
             var c = encoder.container(keyedBy: CodingKeys.self)
@@ -237,6 +245,7 @@ package struct CapacityModel: Codable, Sendable, Equatable {
             try c.encodeIfPresent(kFrom, forKey: .kFrom)
             try c.encodeIfPresent(kTo, forKey: .kTo)
             try c.encodeIfPresent(perWeight.map { Dictionary(uniqueKeysWithValues: $0.map { ($0.key.rawValue, $0.value) }) }, forKey: .perWeight)
+            try c.encodeIfPresent(noise, forKey: .noise)
         }
     }
 
@@ -400,7 +409,7 @@ package struct CapacityModel: Codable, Sendable, Equatable {
         m.crest = crest.mapValues(r)
         m.lines = lines.mapValues { Line(t0: r($0.t0), rate: r($0.rate), perWeight: $0.perWeight.map(r), rateByK: $0.rateByK?.map { .init(k: $0.k, rate: r($0.rate)) }, rowsFrom: $0.rowsFrom, perRow: $0.perRow.map(r)) }
         m.thin = thin.mapValues { Line(t0: r($0.t0), rate: r($0.rate), perWeight: $0.perWeight.map(r), rateByK: $0.rateByK?.map { .init(k: $0.k, rate: r($0.rate)) }, rowsFrom: $0.rowsFrom, perRow: $0.perRow.map(r)) }
-        m.sharing = sharing.mapValues { Sharing(overhead: r($0.overhead), keep: $0.keep.mapValues(r), sustained: $0.sustained.map(r), keepByK: $0.keepByK?.map { .init(k: $0.k, keep: $0.keep.mapValues(r)) }, kFrom: $0.kFrom, kTo: $0.kTo, perWeight: $0.perWeight?.mapValues(r)) }
+        m.sharing = sharing.mapValues { Sharing(overhead: r($0.overhead), keep: $0.keep.mapValues(r), sustained: $0.sustained.map(r), keepByK: $0.keepByK?.map { .init(k: $0.k, keep: $0.keep.mapValues(r)) }, kFrom: $0.kFrom, kTo: $0.kTo, perWeight: $0.perWeight?.mapValues(r), noise: $0.noise.map(r)) }
         m.heat = heat.mapValues(r)
         m.memoryBandwidth = memoryBandwidth.map(r); m.diskBandwidth = diskBandwidth.map(r)
         m.diskClasses = diskClasses.mapValues { .init(rate: r($0.rate), mean: r($0.mean)) }

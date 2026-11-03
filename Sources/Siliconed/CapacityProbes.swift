@@ -87,11 +87,11 @@ extension Diagnostic {
             "solos fp32": "an engine's rate guessed from one shape, or bent by one disturbed figure: the lines (fixed cost, rate, per-weight cost) of the GPU, the AMX and the ANE, each figure far over the line of the others measured once more, and the GPU's bf16 kernel at the tile chosen among candidates",
             "stairs": "the GPU's time taken as smooth in rows: its steps at the tile's edges",
             "attention": "an attention priced as products: its kernels and fused forms timed as they run, the form chosen among candidates",
-            "sharing": "two engines' rates added as if each ran alone: what each keeps beside the other (κ), by weight length",
+            "sharing": "two engines' rates added as if each ran alone, or one disturbed chain read as the set: what each keeps beside the other (κ), by weight length, and a third chain where two at one shape disagree beyond the map's noise",
             "solos 8-bit and rounded": "a rounded or 8-bit product priced on the fp32 line, or on a line one disturbed figure bends: their own lines, the rounded ones on eight shapes so a disturbed figure is told apart and measured once more, their tiles chosen on rounds paired with the fastest's, a candidate in doubt measured again beside it",
-            "thin products": "a product of few rows or a short side priced on the wide line, or its fixed cost traded against its streaming: its own per-row and per-weight costs, and a shape that does almost no work to hold the fixed cost",
-            "sharing int8": "the GPU and the ANE on the integers priced as two solos: what each keeps beside the other, at every weight length even when the model gives the ANE nothing (the last rows it had)",
-            "sharing rounded": "the GPU's rounded rows and the ANE on one bf16 copy priced as two solos: what each keeps beside the other; the ANE's per-call widening of the copy is the preparation's rate, not a second probe; every weight length measured, with the last rows the model gave when it gives the ANE nothing",
+            "thin products": "a product of few rows or a short side priced on the wide line, or its fixed cost traded against its streaming, or a call's completion latency read as its cost: its own per-row and per-weight costs, a shape that does almost no work to hold the fixed cost, each figure on the fast mode of fifteen calls",
+            "sharing int8": "the GPU and the ANE on the integers priced as two solos: what each keeps beside the other, at every weight length even when the model gives the ANE nothing (the last rows it had), and a third chain where two at one shape disagree beyond the map's noise",
+            "sharing rounded": "the GPU's rounded rows and the ANE on one bf16 copy priced as two solos, or a gain within the error of its figure taken for one: what each keeps beside the other, and a third chain where two at one shape disagree beyond the map's noise, the median of three read and its MAD for the error; the ANE's per-call widening of the copy is the preparation's rate, not a second probe; every weight length measured, with the last rows the model gave when it gives the ANE nothing",
             "witnesses end": "the heat read as noise, or a burst read as heat: the end's witnesses in three rounds, their ratio applied to every rate",
             "fit": "none: the fit's own seconds, so that the map's total is accounted for",
         ]
@@ -217,9 +217,7 @@ extension Diagnostic {
                 }
                 details.stairs = Fit.stairs(m.stairs.map { ($0.rows, $0.seconds) })
                 for set in Set(m.trials.map(\.set)) {
-                    let passes = Set(m.trials.filter { $0.set == set }.map(\.pass))
-                    let from = passes.contains(3) ? 2 : (passes.max() ?? 0)
-                    details.sharing[set] = Fit.overlap(set: set, trials: m.trials.filter { $0.pass >= from }, model: model)
+                    details.sharing[set] = Fit.overlap(set: set, trials: Fit.chains(set: set, trials: m.trials, model: model).used, model: model)
                 }
                 details.aneCompile = context.aneCompile()
                 let g = Kernel(.gpu, .fp32), a = Kernel(.ane, .fp16)
@@ -335,8 +333,18 @@ extension Diagnostic {
             return now() - t
         }
 
-        /// **A steady figure**: runs until one is no longer 10 % faster than the one before (at most six), then a few more
-        /// when the runs are short, and the median. A long run (> 150 ms) is its own figure.
+        /// **A steady figure**: runs until one is no longer 10 % faster than the one before (at most six), then more of them when the
+        /// runs are short — `shortCalls` in all, or as many as `shortWindow` holds, four at least — read as a chain is (`figure`: the
+        /// median, or the median of the quickest third when the calls disagree). Between 30 and 150 ms the median of two; a longer run
+        /// is its own figure.
+        ///
+        /// **A short call's completion reaches the CPU in one of two modes.** An empty submission's latency (the pulse's `late`) is
+        /// bimodal on an M5 Pro — 0.13–0.2 ms or 0.7–1.0 ms, about one call in two —, and a median of four sub-millisecond calls fell
+        /// in either: two maps read the same thin product 62 to 238 % apart (`gpu/bf16act 256x1536x3072`: 0.58 ms against 0.26), and
+        /// 40 classes of 342 changed route. A render pays that latency once per command buffer of many products, never per product: the
+        /// fast mode is the product's cost. With half the calls in the slow mode, the quickest third of fifteen holds fast ones only
+        /// with a probability of 0.94 (binomial); `shortWindow` bounds a figure at a fiftieth of a second, so that from 5 ms up the four
+        /// calls and their median are what they were.
         static func steady(_ body: () -> Bool) -> Double? {
             var previous = Double.infinity, last = Double.infinity
             for i in 0..<6 {
@@ -344,15 +352,24 @@ extension Diagnostic {
                 last = t
                 if i >= 1, t >= previous * 0.9 {
                     var sample = [t]
-                    for _ in 0..<(t < 0.03 ? 3 : t < 0.15 ? 1 : 0) {
+                    for _ in 0..<(steadyCalls(t) - 1) {
                         guard let u = timed(body) else { return nil }
                         sample.append(u)
                     }
-                    return Fit.median(sample)
+                    return figure(sample)
                 }
                 previous = t
             }
             return last
+        }
+
+        /// A short figure's calls (`steady`): fifteen at most, as many as a fiftieth of a second holds, four at least under 30 ms.
+        package static let shortCalls = 15, shortWindow = 0.02
+        /// The calls `steady` reads after the first steady one, that one included.
+        package static func steadyCalls(_ t: Double) -> Int {
+            if t >= 0.15 { return 1 }
+            if t >= 0.03 { return 2 }
+            return min(shortCalls, max(4, Int(shortWindow / max(t, 1e-9))))
         }
 
         /// **A chain's figure** (`chainWarm`…): the median call over the window after the ramp (its quickest third when the calls disagree,
@@ -396,6 +413,8 @@ extension Diagnostic {
             var truths: [TruthKey: [Double]] = [:]
             var massives: [Massive] = []
             var floors: [[Int]: Double] = [:]
+            /// The solos `again` has measured once more (kernel and shape): never a second time.
+            var measuredAgain: Set<String> = []
             var dirty = 0
             var clock = CapacityProbes.now()
             /// The sizes in force: the tier the memory was planned at, stepped down once the witnesses have said what the engines do.
