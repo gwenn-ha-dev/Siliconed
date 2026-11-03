@@ -49,9 +49,16 @@ extension Diagnostic.CapacityProbes.Context {
         }
         guard ready, model.lines[g] != nil, model.lines[a] != nil, neural.neuralEngine != nil, let short = sizes.chains.first else { return }
         let key = CapacityModel.key([g, a])
+        // The rows the last chain ran: where the model of the passes so far gives the ANE none, the next chain runs them again. Each
+        // pass is a measure, not a verdict — the long k (where the ANE's per-call cost weighs least) is measured whatever the short one
+        // said; a pair skipped there is a pair one map has and the next has not.
+        var last: (gpu: Int, ane: Int)?
         for (pass, shape) in [(1, short), (2, short)] + (sizes.chains.count > 1 ? [(3, sizes.chains[1])] : []) {
-            if let t = trialPair(key: key, gpu: g, ane: a, shape: shape, model: model, pass: pass) {
+            if let t = trialPair(key: key, gpu: g, ane: a, shape: shape, model: model, pass: pass, previous: last) {
                 measurements.trials.append(t)
+                if let gr = t.sides.first(where: { $0.kernel == g.description })?.rows, let ar = t.sides.first(where: { $0.kernel == a.description })?.rows {
+                    last = (gr, ar)
+                }
                 log?(String(format: "  %@ pass %d  %dx%dx%d  wall %.2f ms  sides %@", key, pass, shape.m, shape.k, shape.n, t.wall * 1e3,
                             t.sides.map { String(format: "%@ %d rows line %.1f within %.1f", $0.kernel, $0.rows, $0.solo * 1e3, ($0.within ?? 0) * 1e3) }.joined(separator: " | ")))
             }
@@ -63,14 +70,21 @@ extension Diagnostic.CapacityProbes.Context {
     /// **One chain of a pair on a weight read as published**: the weight staged as a render stages it, the rows the model's balance gives
     /// and the engines accept, the route a render takes (`WeightProducts.int8Product(…ane:)`, `WeightProducts.bf16Product`) judged once
     /// against the fp64 truth at the half-precision bar, then chained.
-    func trialPair(key: String, gpu g: Kernel, ane a: Kernel, shape: (m: Int, k: Int, n: Int), model: CapacityModel, pass: Int) -> Fit.Measurements.Trial? {
+    func trialPair(key: String, gpu g: Kernel, ane a: Kernel, shape: (m: Int, k: Int, n: Int), model: CapacityModel, pass: Int,
+                   previous: (gpu: Int, ane: Int)? = nil) -> Fit.Measurements.Trial? {
         let (m, k, n) = shape
         // The balance of a chain is asked of the model without the sets' domains: a chain at a k the pair was not measured at yet is how it gets it.
         var open = model
         for (name, var sharing) in model.sharing { sharing.kFrom = nil; sharing.kTo = nil; open.sharing[name] = sharing }
-        guard let engine = neural.neuralEngine, let split = open.split(m: m, k: k, n: n, kernels: [g, a]),
-              let aneRows = split.rows[a], let gpuRows = split.rows[g], aneRows > 0, gpuRows > 0
-        else { log?("  \(key) \(m)x\(k)x\(n) pass \(pass): the model gives a side no row"); return nil }
+        guard let engine = neural.neuralEngine else { return nil }
+        let gpuRows: Int, aneRows: Int
+        if let split = open.split(m: m, k: k, n: n, kernels: [g, a]), let e = split.rows[a], let r = split.rows[g], e > 0, r > 0 {
+            (gpuRows, aneRows) = (r, e)
+        } else if let previous, previous.gpu + previous.ane == m {
+            // The model of the passes so far gives the ANE no row: the last chain's rows again (`sharingPair`).
+            (gpuRows, aneRows) = previous
+            log?("  \(key) \(m)x\(k)x\(n) pass \(pass): the model gives a side no row — the last chain's rows, \(aneRows) on the ANE")
+        } else { log?("  \(key) \(m)x\(k)x\(n) pass \(pass): the model gives a side no row"); return nil }
         let truthKind: Truth
         let once: () -> (wall: Double, within: [String: Double])?
         func timedPair(_ run: () -> (gpu: Double, computed: Bool, gpuWall: Double, aneWall: Double)) -> (wall: Double, within: [String: Double])? {

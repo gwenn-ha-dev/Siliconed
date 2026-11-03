@@ -17,10 +17,10 @@ import Foundation
 ///   - **a line is fitted on the relative error** (weights 1/t²): the 300 GFLOP point is a hundred times the 4 GFLOP one in
 ///     seconds, and an unweighted fit would be the big one's alone — the small one is where t₀ lives. A negative t₀ is a
 ///     fit that reached past its data: it is clamped to 0 and the rate refitted through the origin.
-///   - **a disturbed figure is left out before the fit, not averaged in** (`kept`): the Mac only ever adds time, so the line under
-///     every point that sits highest on them all (the lower envelope) is the engine's, and a point more than the regime's spread
-///     (15 %) above it is a figure the Mac disturbed. A median or a Huber fit would still lean on it with three points; the envelope
-///     needs no scale but the spread the regime already judges by. With fewer than two points left, all are kept.
+///   - **a disturbed figure is measured again, never left out by the fit** (`suspects`): a point more than the regime's spread (15 %)
+///     above the line of the others is measured once more by the probes and the faster kept; the line is then fitted on every point.
+///     A kernel's own shape effects (tile counts against the GPU's cores) put genuine points 20–60 % off any line: a trim by distance
+///     cannot tell them from disturbances, a second measure can.
 ///   - **the map's noise is the rounds' own** (`noise`): the median, over the tiles' and attention forms' candidates, of the spread of
 ///     their repeated rounds — what a figure of this map is sure to; the solver's margin is twice it.
 ///   - **the ANE's unit is read, not assumed**: the candidates are fitted on the same rows and the *largest* unit that
@@ -71,42 +71,26 @@ package enum CapacityFit {
         return b > 0 ? (a, b) : nil
     }
 
+    /// **A kernel's line: the weighted least squares on every point.** None is left out: a point far from the line is either a figure
+    /// the Mac disturbed — measured again by the probes before the fit (`suspects`), the faster kept — or the kernel's own shape (a tile
+    /// count that fills the GPU's cores badly: on an M5 Pro the rounded bf16 kernel runs 1 024 × 3 840² at 11 TFLOP/s and 2 048 × 2 048 ×
+    /// 4 096 at 20, map after map), which a line must average, not drop. Leaving out what lies above a lower envelope dropped exactly those:
+    /// one map kept the small product and lost the 4 096-row ones the renders run (+21 and +34 % above its line), the next kept them and
+    /// lost a small product disturbed 2.2× — two lines 16 % apart from the same silicon.
     package static func line(_ points: [Point]) -> CapacityModel.Line? {
-        affine(kept(points).map { ($0.flop, $0.seconds) }).map { .init(t0: $0.a, rate: 1 / $0.b) }
+        affine(points.filter { $0.seconds > 0 && $0.flop > 0 }.map { ($0.flop, $0.seconds) }).map { .init(t0: $0.a, rate: 1 / $0.b) }
     }
 
-    /// **The points a line is fitted on: those the Mac did not disturb.** A busy Mac only adds time — a figure is never faster than
-    /// the silicon — so the undisturbed seconds lie on the *lower envelope* of the points: the highest line `t₀ + W·s` (t₀ ≥ 0, s > 0)
-    /// under every one of them, the highest in the relative sense the fit uses. A point more than `Regime.Rules.spread` above it is a
-    /// figure the regime's own rule would call disturbed (identical calls differing by more than that) and is left out; the weighted
-    /// least squares then run on the rest, as before. With fewer than three points there is nothing to tell an aberrant one from: all
-    /// are kept. On an M5 Pro a single point measured again after « busy » (512 × 2048², 1.61 ms where two other maps read 0.32 and
-    /// 0.64) took a line's t₀ from 0.32 to 0.94 ms and its rate from 17 to 30 TFLOP/s, and the next map's (1 024 × 3 840², 11 TFLOP/s
-    /// where the render ran 17–20) took them back: the small classes of the Standard changed routes, hence bits, map after map.
-    package static func kept(_ points: [Point]) -> [Point] {
-        let p = points.filter { $0.seconds > 0 && $0.flop > 0 }
-        guard p.count >= 3, let floor = envelope(p) else { return p }
-        let kept = p.filter { $0.seconds <= (floor.t0 + $0.flop * floor.slope) * (1 + Diagnostic.Regime.Rules.spread) }
-        return kept.count >= 2 ? kept : p
-    }
-
-    /// **The lower envelope** `t = t₀ + W·slope` of the points: among the lines through two points (and the line through the origin and
-    /// the point of least seconds per FLOP), those with t₀ ≥ 0 and a positive slope that no point lies under, the one that is highest
-    /// relative to the points (Σ line(Wᵢ)/tᵢ). `nil` under two points.
-    package static func envelope(_ points: [Point]) -> (t0: Double, slope: Double)? {
-        guard points.count >= 2 else { return nil }
-        var candidates: [(t0: Double, slope: Double)] = []
-        if let s = points.map({ $0.seconds / $0.flop }).min() { candidates.append((0, s)) }
-        for (i, a) in points.enumerated() {
-            for b in points[(i + 1)...] where b.flop != a.flop {
-                let slope = (b.seconds - a.seconds) / (b.flop - a.flop)
-                let t0 = a.seconds - slope * a.flop
-                if slope > 0, t0 >= 0 { candidates.append((t0, slope)) }
-            }
+    /// **The points to measure again before a line is fitted**: those more than `Regime.Rules.spread` above the line the *other* points
+    /// give (leave one out) — a busy Mac only adds time. The probes measure each once more and keep the faster: a disturbed figure comes
+    /// back to the line, a shape the kernel is slow at stays where it is. Under three points none can be told: none.
+    package static func suspects(_ points: [Point]) -> [Int] {
+        guard points.count >= 3 else { return [] }
+        return points.indices.filter { i in
+            let others = points.enumerated().filter { $0.offset != i }.map(\.element)
+            guard let l = line(others), points[i].seconds > 0 else { return false }
+            return points[i].seconds > (l.t0 + points[i].flop / l.rate) * (1 + Diagnostic.Regime.Rules.spread)
         }
-        let under = candidates.filter { c in points.allSatisfy { c.t0 + $0.flop * c.slope <= $0.seconds * (1 + 1e-12) } }
-        func height(_ c: (t0: Double, slope: Double)) -> Double { points.reduce(0) { $0 + (c.t0 + $1.flop * c.slope) / $1.seconds } }
-        return under.max { height($0) < height($1) }
     }
 
     /// **The intercept the points give before it is clamped at 0**: the fit's own, on the same weights. A line through two points

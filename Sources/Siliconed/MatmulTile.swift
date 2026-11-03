@@ -86,31 +86,57 @@ package struct MatmulTile: Hashable, Sendable, Codable, CustomStringConvertible 
     /// Alternated rounds per candidate; each shape keeps its fastest.
     package static let rounds = 3
 
+    /// Rounds a candidate in doubt and the fastest are measured again, alternated (`ambiguous`): a candidate's figures that straddle the
+    /// margin are a question three more paired rounds settle.
+    package static let extraRounds = 3
+
     /// **The choice, from each candidate's seconds** (the fast side of alternated rounds, or its sum over the thin shapes): the first candidate,
     /// in the list's order, within the margin of the fastest. The same Mac measured twice chooses the same tile wherever two candidates are
     /// within the noise of each other — a tile is bits, not only speed. No candidate timed: the standard one.
     ///
-    /// **The margin is the map's noise where it knows more of it than the floor**: `spread` is each candidate's own disagreement between its
-    /// rounds (the slowest over the fastest, less one); two figures each uncertain by their spread are told apart only past twice the larger
-    /// of the two, and never under `margin` (the noise between two calm maps, measured). An M5 Pro under a video call read 128 × 64 at 17.9–19.0 ms
-    /// and 128 × 128 at 16.2–16.6 (spreads 6 % and 2.5 %): 10 % apart, which the floor of 5 % called a gain and the next map, calm, a tie
-    /// (16.44 against 16.34); the noise's margin of 12 % keeps the tile listed first.
+    /// **The gap is read in pairs, the margin is one for all**: with `rounds` (each candidate's seconds round by round, the candidates
+    /// alternated within a round), a candidate's gap is the median over the rounds of its seconds over the fastest's *in the same round* —
+    /// a disturbance lasting a round slows both sides of the ratio, where fast sides taken rounds apart compare two moments. The margin is
+    /// the floor (`margin`, `thinMargin`) for every candidate alike: symmetric, and a candidate whose rounds scatter gains nothing by its
+    /// scatter (it is measured again instead, `ambiguous`). An M5 Pro under a video call read 128 × 64 at 3.4–14.3 % over 128 × 128 round
+    /// by round in one map and 11.6–14.7 % in the next: medians 7.0 and 12.0 %, both past 5 % — where a margin widened by each
+    /// candidate's own scatter (10.8 % in the first) called it a tie in one map and a gain in the other.
     package static func choose<Candidate: Hashable>(_ seconds: [Candidate: Double], among candidates: [Candidate], standard: Candidate,
-                                                margin: Double = MatmulTile.margin, spread: [Candidate: Double] = [:]) -> Candidate {
-        guard let (fastest, best) = seconds.filter({ $0.value > 0 }).min(by: { $0.value < $1.value }) else { return standard }
-        return candidates.first { c in
-            guard let s = seconds[c], s > 0 else { return false }
-            let noise = 2 * max(spread[c] ?? 0, spread[fastest] ?? 0)
-            return s <= best * (1 + max(margin, noise))
-        } ?? standard
+                                                margin: Double = MatmulTile.margin, rounds: [Candidate: [Double]] = [:]) -> Candidate {
+        guard let gaps = gaps(seconds, rounds: rounds) else { return standard }
+        return candidates.first { c in gaps[c].map { $0 <= margin } ?? false } ?? standard
     }
 
-    /// **A candidate's spread over its rounds**: for each shape the slowest round and the fastest, summed over the shapes every round kept, the
-    /// first sum over the second less one — what `choose` reads as that candidate's noise.
-    package static func spread(_ rounds: [Int: [Double]]) -> Double {
-        let kept = rounds.values.filter { !$0.isEmpty && $0.allSatisfy { $0 > 0 } }
-        let fast = kept.reduce(0) { $0 + $1.min()! }, slow = kept.reduce(0) { $0 + $1.max()! }
-        return fast > 0 ? slow / fast - 1 : 0
+    /// **Each candidate's gap to the fastest** (the least fast side): the median of the paired ratios where both have rounds, else the
+    /// ratio of the fast sides. `nil` when nothing was timed.
+    package static func gaps<Candidate: Hashable>(_ seconds: [Candidate: Double], rounds: [Candidate: [Double]] = [:]) -> [Candidate: Double]? {
+        guard let (fastest, best) = seconds.filter({ $0.value > 0 }).min(by: { $0.value < $1.value }) else { return nil }
+        var out: [Candidate: Double] = [:]
+        for (c, s) in seconds where s > 0 {
+            if let mine = rounds[c], let ref = rounds[fastest], !mine.isEmpty, !ref.isEmpty, mine.allSatisfy({ $0 > 0 }), ref.allSatisfy({ $0 > 0 }) {
+                out[c] = CapacityFit.median(zip(mine, ref).map { $0 / $1 }) - 1
+            } else {
+                out[c] = s / best - 1
+            }
+        }
+        return out
+    }
+
+    /// **The candidates whose choice is in doubt**: listed before the chosen one, or the chosen one itself, whose paired ratios to the
+    /// fastest fall on both sides of the margin — the rounds disagree on the answer. Measured again with the fastest (`extraRounds`).
+    package static func ambiguous<Candidate: Hashable>(_ seconds: [Candidate: Double], among candidates: [Candidate], standard: Candidate,
+                                                   margin: Double = MatmulTile.margin, rounds: [Candidate: [Double]]) -> [Candidate] {
+        guard let (fastest, _) = seconds.filter({ $0.value > 0 }).min(by: { $0.value < $1.value }), let ref = rounds[fastest] else { return [] }
+        let chosen = choose(seconds, among: candidates, standard: standard, margin: margin, rounds: rounds)
+        var out: [Candidate] = []
+        for c in candidates {
+            if c != fastest, let mine = rounds[c] {
+                let ratios = zip(mine, ref).map { $0 / $1 - 1 }
+                if let lo = ratios.min(), let hi = ratios.max(), lo <= margin, hi > margin { out.append(c) }
+            }
+            if c == chosen { break }
+        }
+        return out
     }
 
     /// The threadgroups that cover `rows × columns` of C.

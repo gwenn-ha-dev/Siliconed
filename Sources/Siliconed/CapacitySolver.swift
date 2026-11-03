@@ -42,8 +42,9 @@ import Foundation
 ///     most — a margin may favour the ANE, never the AMX), fewer engines, then the finer operand (the weight widened to fp32, the weight as
 ///     published on an fp32 activation, its activation rounded; the integers on an fp32 activation, then rounded), then the order the
 ///     candidates are listed in. Stateless: the same map gives the same plan, and
-///     a second map of the same Mac changes a choice only where the gain passes the noise. A map without rounds keeps the old rule (a part
-///     in a billion).
+///     a second map of the same Mac changes a choice only where the gain passes the noise. A pair beside the ANE is offered at every
+///     unit of the ANE's rows, the balance's or not, the most rows first (`pairRows`): a gap either side of zero is read the same way,
+///     and the ANE's share within the margin is the written order's too. A map without rounds keeps the old rule (a part in a billion).
 ///   - **No AMX beside a native weight.** Its columns would be widened on the CPU at every call and multiplied in fp32 — a widening,
 ///     the cost the native path exists to avoid —, timed by a line (`amx/int8`, `amx/q8`) no probe can measure as the route runs (the
 ///     widening of a share of columns inside the AMX's side, beside a GPU reading integers); the AMX beside the GPU on an 8-bit weight is
@@ -307,6 +308,19 @@ private struct ProductSolver {
         return out
     }
 
+    /// **The ANE's rows a pair beside the GPU is offered at**: every unit the GPU leaves a row beside, the balance's or not, each a
+    /// candidate — listed the most rows first, so that within the margin the written order gives the ANE the most rows (its watts are
+    /// the fewest), never the rows a flat minimum happens to fall on. Around the balance alone, the pair was no candidate wherever the
+    /// balance gave the ANE nothing — a gap of a hair over zero, and the next map's hair under it, made two plans (Z-Image's
+    /// `3840x10240` at 4 128 rows on an M5 Pro: 0.1 % under the GPU alone in one map, no candidate in the next); at its floor alone its
+    /// best time jumped by 4 % where the balance starts to give it 768 rows (the ANE's per-call lift, which no share of a few rows pays);
+    /// and the fastest split, 512 rows in one map and 768 in the next, was a minimum 1 % deep under a 5 % margin. Over the whole
+    /// lattice the pair's times move with the lines, and the gaps are the solver's to read against its margin.
+    func pairRows(m: Int) -> [Int] {
+        let unit = NeuralEngine.rowUnit
+        return unit < m ? Array(stride(from: unit, to: m, by: unit)) : []
+    }
+
     /// The ANE's rows of `m` (units of 256, the GPU or the AMX keeping a row at least) around the balance `r0`.
     func aneRows(m: Int, balance r0: Double) -> [Int] {
         let unit = NeuralEngine.rowUnit
@@ -401,7 +415,7 @@ private struct ProductSolver {
             ? line(.ane, .int8) : nil
         var out: [Option] = []
 
-        /// The GPU's `gpu` kernel beside the ANE's integers, rows around the balance, then the ANE alone (`alone`).
+        /// The GPU's `gpu` kernel beside the ANE's integers, the ANE's rows at every unit, the most first (`pairRows`), then the ANE alone (`alone`).
         func withANE(_ gpu: Kernel, rounds: Bool, alone: Bool) {
             guard let ane else { return }
             func integers(_ rows: Int) -> Option? {
@@ -412,10 +426,7 @@ private struct ProductSolver {
                 guard let t = seconds(split, m: m, k: k, n: n) else { return nil }
                 return Option(assignment: assignment, rows: split, seconds: t)
             }
-            if let seed = model.split(m: m, k: k, n: n, kernels: [gpu, ane], sustained: c.sustained), let r0 = seed.rows[ane],
-               let b = aneRows(m: m, balance: Double(r0)).compactMap(integers).min(by: { $0.seconds < $1.seconds }) {
-                out.append(b)
-            }
+            out += pairRows(m: m).reversed().compactMap(integers)
             if alone, let o = integers(m) { out.append(o) }
         }
 
@@ -439,7 +450,7 @@ private struct ProductSolver {
     }
 
     /// **The rounded bf16 weight shared with the ANE**: the GPU's rounded rows (`gpu/bf16act`) beside the ANE's fp16 program on the same
-    /// bf16 copy (`[gpu/bf16act, ane/fp16]`), the ANE's rows around the balance — on the denoiser, from the ANE's floor, on a product
+    /// bf16 copy (`[gpu/bf16act, ane/fp16]`), the ANE's rows at every unit, the most first (`pairRows`) — on the denoiser, from the ANE's floor, on a product
     /// with no short side, and only where the probes measured that pair's own sharing: the rounded kernel runs on the tensor units at
     /// another rate and draws another power than `gpu/fp32`, whose κ the ×1.52 of the members' lines once borrowed. No AMX beside it:
     /// the AMX reads a widened weight and the fp32 activation, and the reserve holds the bf16 copy and its rounded rows.
@@ -447,14 +458,14 @@ private struct ProductSolver {
         let (k, n, m) = (key.k, key.n, key.m)
         guard c.allowsANE, key.phase == .denoising, m >= c.limits.aneRows, !CapacityModel.isThin(rows: m, k: k, n: n),
               let ane = line(.ane, .fp16), model.sharing[CapacityModel.key([gpu, ane])] != nil,
-              let seed = model.split(m: m, k: k, n: n, kernels: [gpu, ane], sustained: c.sustained), let r0 = seed.rows[ane] else { return [] }
-        let options = aneRows(m: m, balance: Double(r0)).compactMap { rows -> Option? in
+              model.split(m: m, k: k, n: n, kernels: [gpu, ane], sustained: c.sustained) != nil else { return [] }
+        let options = pairRows(m: m).compactMap { rows -> Option? in
             let assignment = ProductAssignment(path: .bf16, roundsActivation: true, gpu: m - rows, ane: rows)
             let split: [Kernel: Int] = [gpu: m - rows, ane: rows]
             guard assignment.isRunnable(for: key), let t = seconds(split, m: m, k: k, n: n) else { return nil }
             return Option(assignment: assignment, rows: split, seconds: t)
         }
-        return options.min(by: { $0.seconds < $1.seconds }).map { [$0] } ?? []
+        return options.reversed()
     }
 
     // MARK: Preparation

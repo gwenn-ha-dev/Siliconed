@@ -66,6 +66,9 @@ extension Diagnostic.CapacityProbes {
         package var small: [Shape]
         /// **The products with a short side** (`CapacityModel.thinSide`), each kernel alone on each (one weight for all: a probe re-reads the same operand, a render does not): a short `k` or a short `n` at 2 048 rows (a LoRA's
         /// `x · down` and `mid · up`, whatever the model), few rows through a wide weight (a short prompt, a half grid's last rows). Generic shapes: no model's, no LoRA's rank — 128 and 256 are the sides the line is asked about.
+        /// The last one does almost no work (10 µs of streaming and arithmetic beside a 0.1 ms call): it holds the line's `t₀`, which the others,
+        /// all of them streaming and computing for as long as they wait, traded against the bandwidth's share — two maps a minute apart put the
+        /// rounded activation's cost per weight 2.5 times apart on the same points (within 10 % of each other), each with its own `t₀`.
         package var thin: [Shape]
         /// The ANE's integer route taken as chains (`ane/int8`): the products' shapes but one — the host's passes over the activation and the output are told
         /// from the weight's lift and the engine's rate by a thin product (n = 1 536) and a cut K (k = 8 192, 12 288).
@@ -92,7 +95,7 @@ extension Diagnostic.CapacityProbes {
             Sizes(tier: 0, solo: [(512, 2048, 2048), (1024, 3840, 3840), (4096, 6144, 6144)],
                   product: [(2048, 2048, 4096), (2048, 3840, 3840), (4096, 3840, 3840), (1024, 12288, 4096), (2048, 8192, 1536)],
                   small: [(512, 3840, 3840)],
-                  thin: [(256, 3072, 8192), (2048, 3072, 128), (2048, 128, 3072), (2048, 256, 8192), (32, 3072, 8192), (256, 1536, 3072)],
+                  thin: [(256, 3072, 8192), (2048, 3072, 128), (2048, 128, 3072), (2048, 256, 8192), (32, 3072, 8192), (256, 1536, 3072), (256, 256, 512)],
                   integers: [(2048, 2048, 4096), (2048, 3840, 3840), (1024, 12288, 4096), (2048, 8192, 1536)],
                   chains: [(4096, 3840, 3840), (4096, 12288, 4096)],
                   sharing: [(1024, 3840, 3840), (2048, 3840, 3840), (4096, 3840, 3840)], attention: [1024, 4096],
@@ -100,7 +103,7 @@ extension Diagnostic.CapacityProbes {
             Sizes(tier: 1, solo: [(512, 2048, 2048), (1024, 3840, 3840), (2048, 4096, 4096)],
                   product: [(1024, 2048, 4096), (2048, 3840, 3840), (1024, 12288, 4096), (1024, 8192, 1536)],
                   small: [(512, 3840, 3840)],
-                  thin: [(256, 3072, 8192), (2048, 3072, 128), (2048, 128, 3072), (32, 3072, 8192), (256, 1536, 3072)],
+                  thin: [(256, 3072, 8192), (2048, 3072, 128), (2048, 128, 3072), (32, 3072, 8192), (256, 1536, 3072), (256, 256, 512)],
                   integers: [(1024, 2048, 4096), (2048, 3840, 3840), (1024, 12288, 4096), (1024, 8192, 1536)],
                   chains: [(2048, 3840, 3840), (2048, 12288, 4096)],
                   sharing: [(1024, 3840, 3840), (2048, 3840, 3840)], attention: [1024, 2048],
@@ -108,7 +111,7 @@ extension Diagnostic.CapacityProbes {
             Sizes(tier: 2, solo: [(512, 2048, 2048), (1024, 3840, 3840)],
                   product: [(1024, 2048, 4096), (1024, 3840, 3840), (2048, 3840, 3840), (1024, 8192, 1536)],
                   small: [(512, 3840, 3840)],
-                  thin: [(256, 3072, 8192), (2048, 3072, 128), (2048, 128, 3072), (32, 3072, 8192), (256, 1536, 3072)],
+                  thin: [(256, 3072, 8192), (2048, 3072, 128), (2048, 128, 3072), (32, 3072, 8192), (256, 1536, 3072), (256, 256, 512)],
                   integers: [(1024, 2048, 4096), (1024, 3840, 3840), (2048, 3840, 3840), (1024, 8192, 1536)], chains: [(2048, 3840, 3840), (2048, 12288, 4096)], sharing: [(1024, 3840, 3840)], attention: [1024],
                   stairRows: [768, 1024, 1792, 2048]),
         ]
