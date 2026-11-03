@@ -17,6 +17,12 @@ import Foundation
 ///   - **The answer is the prompt alone**: it goes straight into the rack's prompt field.
 ///   - **Length**: diffusers cuts Z-Image, Anima and Krea 2 at 512 tokens, and Qwen-Image-2.1's own cut is
 ///     1 024 (`Request.maximumPromptTokens`); the rewrites ask for under 350 words (about 470 tokens), inside both.
+///     Krea 2 and MOSS-Image ask for the length their publisher's own prompts have (60 to 150 words, 60 to 120): with a
+///     ceiling alone, the greedy writer filled Krea 2's « cat » with « no … » clauses up to the token limit — a list that
+///     never repeats exactly, which the loop guard (`PromptWriterLoop`) cannot see — and MOSS-Image's « cat » stayed « a cat ».
+///   - **What is there, never what is not**: an exclusion the user did not write (« no text », « no people ») is a
+///     subject the text encoder reads all the same; Krea 2's and MOSS-Image's instructions forbid them. Their longer
+///     prose also turned the writer's quotes curly (« “CROZON” »): they ask for straight ones, as the user typed them.
 package enum PromptWriterInstructions {
     package enum Gesture: CaseIterable, Sendable { case rewrite, describe }
 
@@ -90,21 +96,35 @@ package enum PromptWriterInstructions {
             // Krea 2's expansion prompt and prompting guide, rules 1 to 7 and 9 (fidelity, subjects with their attributes,
             // quoted text, no over-specifying, one paragraph, light polish of a detailed prompt, the requested medium).
             // Its rule 8 ("Respect the Human Form") dresses people whatever the request says: not followed.
+            // The expansion prompt sets no length; the guide's twenty example prompts run from 10 to 180 words (half
+            // under 75), all of them descriptions of what is in the picture — none says "no" or "without".
             //   https://github.com/krea-ai/krea-2/blob/main/docs/expansion.txt
             //   https://github.com/krea-ai/krea-2/blob/main/docs/prompting.md
-            return "Write in natural language, one paragraph, no bullets. Group each subject with its attributes. "
+            return "Write in natural language, one cohesive paragraph of 60 to 150 words, no bullets. "
+                + "Describe only what is in the picture, never what is absent: write no phrase beginning with \"no\" or \"without\" "
+                + "unless the user wrote it. Quoted text keeps straight double quotes (\"), not curly ones. "
+                + "Group each subject with its attributes and actions. "
                 + "Do not add objects, props, characters or animals the text does not imply, and do not invent clothing, "
                 + "colours or materials it does not mention. Keep the medium the text asks for (\"photo of\", \"painting of\"). "
-                + "Add composition, framing, lighting and style where they are open. Under 350 words."
+                + "Add composition, framing, lighting and style where they are open. "
+                + "A very short text, even a single word, still becomes a full paragraph: give it a plausible setting, "
+                + "the pose or action, the light and the medium."
         case .mossImage:
             // MOSS-Image's user guide (English, the tag order, the @ before artists) and its prompt-enhancer skill
             // (keep subjects, counts, relations, medium, style and visible wording; no redundant quality tags;
-            // a minimal brief stays minimal):
+            // "Keep an explicit minimalist brief minimalist" — explicit: a short text is not a minimalist brief);
+            // the length is that of the global brief of MOSS-Image's reference enhancer (report, appendix F: "60–120
+            // English words"), the skill's own caption setting none:
             //   https://github.com/OpenMOSS/MOSS-Image/blob/main/USERGUIDE.md
             //   https://github.com/OpenMOSS/MOSS-Image/blob/main/skills/moss-image-prompt-enhancer/SKILL.md
-            return "Write in English, as cohesive prose with the spatial relationships in words: composition, subjects and their actions, "
-                + "setting, colours, lighting, style. No redundant quality tags, no style change the user did not ask for; "
-                + "a deliberately minimal text stays minimal. If the user's text is a tag sequence, keep it a tag sequence in this order: "
+            //   https://arxiv.org/abs/2610.23374
+            return "Write in English. Unless the user's text is a tag sequence, write one paragraph of cohesive prose of 60 to 120 words, "
+                + "with the spatial relationships in words: composition, subjects and their actions, setting, colours, lighting, style. "
+                + "Describe only what is in the image, never what is absent: write no phrase beginning with \"no\" or \"without\" "
+                + "unless the user wrote it. Quoted text keeps straight double quotes (\"), not curly ones. "
+                + "No redundant quality tags, no style change the user did not ask for. "
+                + "A short text, even a single word, is developed into a full description; only a text that asks for "
+                + "a minimalist image stays minimal. A tag sequence stays a tag sequence, in this order: "
                 + "quality, score, meta, year, character, series, artist (with @ in front of the name), general."
         }
     }

@@ -53,6 +53,18 @@ final class PromptWriterLabTests: XCTestCase {
         XCTAssertTrue(PromptWriterInstructions.instruction(for: .mossImage, .rewrite).contains("in English"))
     }
 
+    /// Krea 2's « cat » ran into « no … » clauses up to the token limit and MOSS-Image's stayed « a cat » (issue #7): both now
+    /// ask for their publisher's length, describe only what is there, and develop a one-word text.
+    func testKrea2AndMossImageAskForALengthAndWhatIsThere() {
+        for (family, length) in [(Family.krea2, "60 to 150 words"), (.mossImage, "60 to 120 words")] {
+            let text = PromptWriterInstructions.instruction(for: family, .rewrite)
+            XCTAssertTrue(text.contains(length), "\(family)")
+            XCTAssertTrue(text.contains("never what is absent"), "\(family)")
+            XCTAssertTrue(text.contains("unless the user wrote it"), "\(family)")
+            XCTAssertTrue(text.contains("even a single word"), "\(family)")
+        }
+    }
+
     func testDescribeNamesWhatIsVisiblePlainly() {
         for family in Family.allCases {
             let text = PromptWriterInstructions.instruction(for: family, .describe)
