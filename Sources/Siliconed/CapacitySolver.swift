@@ -12,6 +12,8 @@ import Foundation
 ///         ▼                the engines can run: the GPU's rows on MPS's 64-row tile, the ANE's in units of 256
 ///     t = preparation(path) + T(rows)               one weight is prepared per call, at every height
 ///         ▼
+///     the ANE before the AMX                        the best with the ANE within 15 % of the best with the AMX: the AMX's dropped
+///         ▼
 ///     the least t, the simplest set on a tie        ──▶  ProductAssignment
 ///     attention (S, keys, heads, kv heads, dim, cross) ──▶ graph · flash (where the caller tries it) · split (whole kv groups on the CPU)
 ///                                                          · tiles (three stages by tiles of rows, fp32) · tiles16 (fp16 operands: `Constraints.allowsHalf`)
@@ -45,6 +47,13 @@ import Foundation
 ///     a second map of the same Mac changes a choice only where the gain passes the noise. A pair beside the ANE is offered at every
 ///     unit of the ANE's rows, the balance's or not, the most rows first (`pairRows`): a gap either side of zero is read the same way,
 ///     and the ANE's share within the margin is the written order's too. A map without rounds keeps the old rule (a part in a billion).
+///   - **The ANE against the AMX, and only there, a preference — not a figure of speed.** The best candidate with the ANE and
+///     without the AMX may be up to `aneOverAMX` (15 %) slower than the best with the AMX: then every candidate with the AMX is
+///     dropped, and the rest is solved as everywhere (the least t, the noise, the written order). Against the GPU alone, or between
+///     two sets with the ANE, time alone decides: the preference is the ANE's watts and silence beside the CPU's cores, not a
+///     discount on the ANE. Decided by the user on 3/11/2026 (15 %; on the M1 Pro a render with the ANE drew 31–37 W where the
+///     AMX drew 38–45, 1.22–1.24×: the joules break even near 22 % slower). The rule of 30/10 (the ANE taken at 90 % of the
+///     best speed, a 10 % malus on the AMX) went with the old route table on the same day, without a decision; this replaces it.
 ///   - **No AMX beside a native weight.** Its columns would be widened on the CPU at every call and multiplied in fp32 — a widening,
 ///     the cost the native path exists to avoid —, timed by a line (`amx/int8`, `amx/q8`) no probe can measure as the route runs (the
 ///     widening of a share of columns inside the AMX's side, beside a GPU reading integers); the AMX beside the GPU on an 8-bit weight is
@@ -57,6 +66,9 @@ import Foundation
 package enum CapacitySolver {
     typealias Kernel = CapacityModel.Kernel
     typealias Engine = CapacityModel.Engine
+
+    /// How much slower than the best with the AMX the best with the ANE (and without the AMX) may be and still be taken.
+    package static let aneOverAMX = 0.15
 
     // MARK: - What goes in
 
@@ -344,6 +356,7 @@ private struct ProductSolver {
         var assignment: ProductAssignment
         var rows: [Kernel: Int]
         var seconds: Double
+        func uses(_ engine: Engine) -> Bool { rows.contains { $0.key.engine == engine && $0.value > 0 } }
     }
 
     /// **The widened path's candidates, one per set of engines** — the GPU alone, with the AMX, with the ANE, the three, then the
@@ -513,10 +526,21 @@ private struct ProductSolver {
 
     func solve(_ key: ProductKey) -> CapacitySolver.ProductSolution? {
         guard line(.gpu, .fp32) != nil else { return nil }
-        let timed = canonical(candidates(key)).map { o in (o, o.seconds + preparation(format: key.weight, path: o.assignment.path, k: key.k, n: key.n)) }
+        let timed = arbitrated(canonical(candidates(key)).map { o in
+            (o, o.seconds + preparation(format: key.weight, path: o.assignment.path, k: key.k, n: key.n))
+        })
         guard let fastest = timed.map(\.1).min() else { return nil }
         let width = margin(thin: CapacityModel.isThin(rows: key.m, k: key.k, n: key.n))
         return timed.first { $0.1 <= fastest * (1 + width) }.map { solution($0.0, key) }
+    }
+
+    /// **The ANE against the AMX** (`CapacitySolver.aneOverAMX`): when the best candidate with the ANE and without the AMX is within
+    /// 15 % of the best with the AMX, those with the AMX are dropped; otherwise nothing is.
+    func arbitrated(_ timed: [(Option, Double)]) -> [(Option, Double)] {
+        guard let ane = timed.filter({ $0.0.uses(.ane) && !$0.0.uses(.amx) }).map(\.1).min(),
+              let amx = timed.filter({ $0.0.uses(.amx) }).map(\.1).min(),
+              ane <= amx * (1 + CapacitySolver.aneOverAMX) else { return timed }
+        return timed.filter { !$0.0.uses(.amx) }
     }
 
     /// **The width under which two candidates are one** (relative): twice the map's noise (`CapacityModel.noise`), never under the
@@ -538,9 +562,8 @@ private struct ProductSolver {
         }
         return options.enumerated().sorted { x, y in
             let (a, b) = (x.element, y.element)
-            func uses(_ o: Option, _ engine: Engine) -> Bool { o.rows.contains { $0.key.engine == engine && $0.value > 0 } }
-            if uses(a, .amx) != uses(b, .amx) { return !uses(a, .amx) }
-            if uses(a, .ane) != uses(b, .ane) { return uses(a, .ane) }
+            if a.uses(.amx) != b.uses(.amx) { return !a.uses(.amx) }
+            if a.uses(.ane) != b.uses(.ane) { return a.uses(.ane) }
             let (ea, eb) = (a.rows.filter { $0.value > 0 }.count, b.rows.filter { $0.value > 0 }.count)
             if ea != eb { return ea < eb }
             if rank(a.assignment) != rank(b.assignment) { return rank(a.assignment) < rank(b.assignment) }

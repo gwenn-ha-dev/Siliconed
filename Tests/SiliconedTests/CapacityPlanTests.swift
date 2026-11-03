@@ -427,9 +427,10 @@ import Testing
     // MARK: the memory need asks the same questions
 
     @Test func theNeedAsksThePlanWhatTheEngineAsksIt() {
-        // An AMX worth the GPU's third: the three engines share the products (the AMX beside the ANE alone is not a candidate here).
+        // An AMX strong enough that the three engines beat gpu+ane by more than `aneOverAMX` (8.7 against 6.6 TFLOP/s once shared):
+        // the three share the products (the AMX beside the ANE alone is not a candidate here).
         var model = machine()
-        model.lines[amx] = .init(t0: 0, rate: 2.5e12)
+        model.lines[amx] = .init(t0: 0, rate: 5e12)
         let plan = CapacityPlan(model: model)
         let products = [(m: 4128, k: 3840, n: 3840), (m: 4128, k: 3840, n: 10240), (m: 1056, k: 3840, n: 3840)]
         let terms = MemoryNeed.gemm("t", products: products, plan: plan)

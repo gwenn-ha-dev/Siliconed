@@ -117,6 +117,45 @@ import Testing
         #expect(s.assignment == ProductAssignment(gpu: 3072, amx: 1024, ane: 3072))
     }
 
+    // MARK: the ANE against the AMX (`CapacitySolver.aneOverAMX`)
+
+    /// GPU 3, AMX 1 TFLOP/s, the ANE as given; the three engines together made useless, so the duel is gpu+ane against gpu+amx.
+    func duel(aneRate: Double) -> M {
+        var m = machine(amxRate: 1e12, aneRate: aneRate)
+        m.sharing["gpu+amx+ane"] = .init(overhead: 0, keep: [.gpu: 0.1, .amx: 0.1, .ane: 0.1])
+        return m
+    }
+
+    func best(_ model: M, _ key: ProductKey, route: String) throws -> Double {
+        try #require(CS.candidates(key, model: model, constraints: constraints()).filter { $0.route == route }.map(\.seconds).min())
+    }
+
+    @Test func theANEUpTo15PercentSlowerThanTheAMXIsTaken() throws {
+        // 7168 rows: gpu+amx 5376 + 1792 (t ∝ 1792), gpu+ane 6144 + 1024 (t ∝ 2048): the ANE 14.3 % slower.
+        let m = duel(aneRate: 0.5e12), k = key(4096, 4096, 7168)
+        let (ane, amx) = (try best(m, k, route: "gpu+ane"), try best(m, k, route: "gpu+amx"))
+        #expect(ane > amx && ane <= amx * (1 + CS.aneOverAMX))
+        let s = try solve(m, k)
+        #expect(s.route == "gpu+ane" && s.assignment == ProductAssignment(gpu: 6144, ane: 1024), "\(s.assignment)")
+    }
+
+    @Test func theANEMoreThan15PercentSlowerLeavesTheAMX() throws {
+        let m = duel(aneRate: 0.25e12), k = key(4096, 4096, 7168)
+        #expect(try best(m, k, route: "gpu+ane") > (try best(m, k, route: "gpu+amx")) * (1 + CS.aneOverAMX))
+        #expect(try solve(m, k).route == "gpu+amx")
+    }
+
+    @Test func thePreferenceIsAgainstTheAMXOnlyNeverAgainstTheGPUAlone() throws {
+        // The GPU alone on a rounded activation (3.8 TFLOP/s, t ∝ 1886) is slower than gpu+amx (1792) and faster than gpu+ane (2048,
+        // within 15 % of gpu+amx). The AMX is dropped, and between what is left time decides: the GPU alone, not the ANE.
+        var m = duel(aneRate: 0.5e12)
+        m.lines[M.Kernel(.gpu, .bf16act)] = .init(t0: 0, rate: 3.8e12)
+        let k = key(4096, 4096, 7168)
+        let (ane, amx, gpu) = (try best(m, k, route: "gpu+ane"), try best(m, k, route: "gpu+amx"), try best(m, k, route: "gpu/bf16act"))
+        #expect(amx < gpu && gpu < ane && ane <= amx * (1 + CS.aneOverAMX), "gpu+amx \(amx), gpu/bf16act \(gpu), gpu+ane \(ane)")
+        #expect(try solve(m, k).route == "gpu/bf16act")
+    }
+
     @Test func anEngineMayBeAlone() throws {
         // A Mac whose GPU is the slow engine: the AMX alone, then the ANE alone, with no GPU row.
         var slow = machine(gpuRate: 0.2e12, amxRate: 4e12)
