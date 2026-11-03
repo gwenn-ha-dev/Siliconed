@@ -668,8 +668,12 @@ private struct ProductSolver {
             rows = [g: key.heads - a.cpuHeads, cpu: a.cpuHeads]
         }
         guard let t = model.seconds(m: key.heads, k: per, n: 1, rows: rows, sustained: c.sustained) else { return nil }
-        let b = model.busy(m: key.heads, k: per, n: 1, rows: rows, sustained: c.sustained)
-        return (a.kernel.rawValue, rows, t, Dictionary(b.map { ($0.key.engine, $0.value) }, uniquingKeysWith: +))
+        var b = Dictionary(model.busy(m: key.heads, k: per, n: 1, rows: rows, sustained: c.sustained).map { ($0.key.engine, $0.value) }, uniquingKeysWith: +)
+        // A self-attention follows the CPU's QK-norm and RoPE, the GPU idle: its call pays the GPU's wake (`CapacityModel.wake`), whatever
+        // the kernel — the same for every candidate, so it changes no choice, only the time. A cross-attention's keys are the text's.
+        let wake = key.cross ? 0 : model.wake ?? 0
+        if wake > 0 { b[.gpu, default: 0] += wake }
+        return (a.kernel.rawValue, rows, t + wake, b)
     }
 
     /// The line of a kernel the GPU runs (all the heads, or its share under a split); the fp16 one only where the request allows half

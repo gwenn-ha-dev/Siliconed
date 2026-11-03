@@ -220,6 +220,9 @@ package enum CapacityFit {
         /// The form each half-precision attention kernel runs (`AttentionTile` text), measured before its line; absent: the three stages.
         package var attentionTiles: [String: String]?
         package var tileTrials: [Solo]?
+        /// **The GPU's wake** (`Context.wake`): the tier's shortest tiled attention timed after the longest and an idle, one per idle (its
+        /// microseconds last in `shape`). `nil` in a report that predates it.
+        package var wake: [Solo]?
         package init() {}
 
         /// **The same numbers to `digits` significant digits** — what a report keeps (an exact FLOP count stays exact). The model of a
@@ -242,6 +245,7 @@ package enum CapacityFit {
             m.diskBandwidth = diskBandwidth.map(r)
             m.diskClasses = diskClasses.mapValues { .init(rate: r($0.rate), mean: r($0.mean)) }
             m.preparation = preparation.mapValues { $0.mapValues(r) }
+            m.wake = wake?.map { Solo(kernel: $0.kernel, shape: $0.shape, flop: $0.flop, seconds: r($0.seconds)) }
             return m
         }
     }
@@ -670,6 +674,7 @@ package enum CapacityFit {
             if let e = CapacityModel.Engine(rawValue: w.engine), w.before > 0, w.after > 0 { model.heat[e] = max(1, w.after / w.before) }
         }
         model.noise = m.tileTrials.flatMap(noise)
+        if let w = wake(m.wake) { model.wake = w.seconds; model.wakeIdle = w.idle }
         model.memoryBandwidth = m.memoryBandwidth
         model.diskBandwidth = m.diskBandwidth
         model.diskClasses = m.diskClasses

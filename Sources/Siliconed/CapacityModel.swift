@@ -293,13 +293,19 @@ package struct CapacityModel: Codable, Sendable, Equatable {
     /// takes the first in its written order there — a choice the noise cannot flip from one map to the next. `nil`: a map without
     /// rounds, whose choices are the fastest's (a part in a billion).
     package var noise: Double?
+    /// **What a self-attention pays beyond its line, after the CPU left the GPU idle** (seconds per call, `Context.wake`): the CPU's QK-norm
+    /// and RoPE run before every self-attention of the five denoisers, and the GPU's governor makes the call after an idle past `wakeIdle`
+    /// pay its clock back. `nil`: a map without the probe, priced as before.
+    package var wake: Double?
+    /// The idle from which the wake is paid (seconds): the report's.
+    package var wakeIdle: Double?
 
     package init() {}
 
     // MARK: - JSON
 
     private enum CodingKeys: String, CodingKey {
-        case crest, lines, thin, aneRowUnit, sharing, heat, memoryBandwidth, diskBandwidth, diskClasses, preparation, kquantPreparation, tiles, thinTiles, attentionTiles, noise
+        case crest, lines, thin, aneRowUnit, sharing, heat, memoryBandwidth, diskBandwidth, diskClasses, preparation, kquantPreparation, tiles, thinTiles, attentionTiles, noise, wake, wakeIdle
     }
 
     /// The engines of a dictionary keyed by their names.
@@ -339,6 +345,8 @@ package struct CapacityModel: Codable, Sendable, Equatable {
         memoryBandwidth = try c.decodeIfPresent(Double.self, forKey: .memoryBandwidth)
         diskBandwidth = try c.decodeIfPresent(Double.self, forKey: .diskBandwidth)
         diskClasses = try c.decodeIfPresent([String: CapacityDisk.Reading].self, forKey: .diskClasses) ?? [:]
+        wake = try c.decodeIfPresent(Double.self, forKey: .wake)
+        wakeIdle = try c.decodeIfPresent(Double.self, forKey: .wakeIdle)
         let prepared = try c.decodeIfPresent([String: [String: Double]].self, forKey: .preparation) ?? [:]
         for (kindName, paths) in prepared {
             guard let kind = WeightKind(rawValue: kindName) else {
@@ -384,6 +392,8 @@ package struct CapacityModel: Codable, Sendable, Equatable {
         try c.encodeIfPresent(memoryBandwidth, forKey: .memoryBandwidth)
         try c.encodeIfPresent(diskBandwidth, forKey: .diskBandwidth)
         if !diskClasses.isEmpty { try c.encode(diskClasses, forKey: .diskClasses) }
+        try c.encodeIfPresent(wake, forKey: .wake)
+        try c.encodeIfPresent(wakeIdle, forKey: .wakeIdle)
         try c.encode(Dictionary(uniqueKeysWithValues: preparation.map { kind, paths in
             (kind.rawValue, Dictionary(uniqueKeysWithValues: paths.map { ($0.key.rawValue, $0.value) }))
         }), forKey: .preparation)
@@ -416,6 +426,7 @@ package struct CapacityModel: Codable, Sendable, Equatable {
         m.preparation = preparation.mapValues { $0.mapValues(r) }
         m.kquantPreparation = kquantPreparation.map(r)
         m.noise = noise.map(r)
+        m.wake = wake.map(r); m.wakeIdle = wakeIdle.map(r)
         return m
     }
 

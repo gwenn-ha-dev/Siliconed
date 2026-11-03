@@ -430,6 +430,14 @@ extension Diagnostic.CapacityProbes.Context {
                 }
             }
         }
+        // The GPU's wake (`CapacityProbesWake.swift`), on the half-precision kernel in the form its map chose.
+        let tiles16 = Kernel(.gpu, .tiles16)
+        if let short = sizes.attention.min(), let long = sizes.attention.max(), short < long, !skipped.contains(tiles16),
+           !measurements.wrong.contains(tiles16.description),
+           let busy = try? TiledAttention(device: bench.device, queue: bench.queue, heads: h, sequence: long, headDim: d, precision: .fp16, tile: forms[tiles16] ?? nil),
+           let timed = try? TiledAttention(device: bench.device, queue: bench.queue, heads: h, sequence: short, headDim: d, precision: .fp16, tile: forms[tiles16] ?? nil) {
+            _ = guarded("gpu wake") { () -> Bool? in wake(&measurements, busy: busy, timed: timed, sequence: short, buffers: buffers); return true }
+        }
     }
 
     /// **The attention as a set of two engines**: the system graph on the GPU's heads beside the CPU's, at the heads the two solo lines
