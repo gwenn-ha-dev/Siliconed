@@ -16,7 +16,7 @@ Il faut l'app (0.18 ou suivante), Python 3.12, et ce dépôt à la version de l'
 
 ```sh
 alias siliconed=/Applications/Siliconed.app/Contents/Helpers/siliconed
-git clone --branch v0.18 https://github.com/gwenn-ha-dev/Siliconed && cd Siliconed
+git clone --branch v0.19 https://github.com/gwenn-ha-dev/Siliconed && cd Siliconed
 python3.12 -m venv oracle-env && oracle-env/bin/pip install -r tools/oracle/requirements.txt
 ```
 
