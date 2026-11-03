@@ -142,8 +142,9 @@ extension Diagnostic.CapacityProbes {
         static let truthPerValue = 1.7e-9
         /// What a kernel's rate is to the GPU's fp32 product (M1 Pro, three runs: bf16 0.62, bf16 rounded 0.49, int8 0.97, Q8_0 0.31). The
         /// 8-bit ones on a rounded activation were never run on a GPU without bf16 in hardware: priced as the rounded bf16 kernel (the same
-        /// bfloat operand) and as Q8_0's (the same fill of threadgroup memory).
-        static let formRatio: [String: Double] = ["bf16": 0.62, "bf16act": 0.49, "int8": 0.97, "q8": 0.31, "int8act": 0.49, "q8act": 0.31]
+        /// bfloat operand) and as Q8_0's (the same fill of threadgroup memory); the K-quant's as the rounded bf16 kernel (its operands' rate).
+        static let formRatio: [String: Double] = ["bf16": 0.62, "bf16act": 0.49, "int8": 0.97, "q8": 0.31, "int8act": 0.49, "q8act": 0.31,
+                                                     "q4kact": 0.49]
         /// Attention kernels' rates to the GPU's product (M1 Pro: the system graph 0.40, the flash kernel 0.46).
         static let graphRatio = 0.40, flashRatio = 0.46
         /// The three stages by tiles, fp32 and fp16 operands (M1 Pro: 0.43 and 0.49 of the GPU's product; the matrix units of a bigger GPU
@@ -169,7 +170,9 @@ extension Diagnostic.CapacityProbes {
             }
             let forms = ["int8act", "q8act"].reduce(0) { $0 + 1 / Self.formRatio[$1]! }
             var p: [String: Double] = [:]
-            p["solos 8-bit and rounded"] = Self.runs * solo.reduce(0) { $0 + flop($1) } * forms / g + truth(solo, kinds: 2)
+            // The K-quant's solos (`q4kact`, its two truths) are on the big shapes only: no thin product takes it.
+            p["solos 8-bit and rounded"] = Self.runs * solo.reduce(0) { $0 + flop($1) } * (forms + 1 / Self.formRatio["q4kact"]!) / g
+                + truth(solo, kinds: 4)
             p["thin products"] = Self.runs * thin.reduce(0) { $0 + flop($1) } * forms / g + truth(thin, kinds: 2)
             if let a = rates.ane {
                 p["sharing int8"] = pairPasses.reduce(0) { $0 + chain(flop($1), rate: 0.8 * (g * Self.formRatio["int8act"]! + a)) + 0.15 }
@@ -255,8 +258,8 @@ extension Diagnostic.CapacityProbes {
             // The ANE's integers run as chains on the products' shapes (the host's passes are told apart by the thin one), the GPU's 8-bit kernels as steady figures.
             let integersAlone = a.map { rate in (integers + small).reduce(0) { $0 + chain(flop($1), rate: rate) + 0.1 } + truth(integers + small) } ?? 0
             // The rounded truths of the 8-bit ones are the floors of their half-precision bar (two kinds more).
-            p["solos 8-bit and rounded"] = Self.runs * soloFlop * ["bf16act", "int8", "q8", "int8act", "q8act"].reduce(0) { $0 + 1 / (g * Self.formRatio[$1]!) }
-                + truth(solo, kinds: 5) + integersAlone
+            p["solos 8-bit and rounded"] = Self.runs * soloFlop * ["bf16act", "int8", "q8", "int8act", "q8act", "q4kact"].reduce(0) { $0 + 1 / (g * Self.formRatio[$1]!) }
+                + truth(solo, kinds: 7) + integersAlone
             // The pairs of integer kernels (the GPU's on the fp32 activation, then on the rounded one): the chain passes of the fp32 sets'
             // (two on the short shape, one on the long), at the pair's rate.
             if let a {

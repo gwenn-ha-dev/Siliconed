@@ -186,13 +186,16 @@ extension Diagnostic {
     /// fp16 scales per `q8Block` rows and column.
     final class Operands {
         let a, b, c, bf16, q, q8Scales: Pages
+        /// A Q4_K weight's super-blocks for the `gpu/q4kact` products (`kquantBlocks`), as a map stores them (`[N][K / 256]`), sized for
+        /// the largest 8-bit product: deterministic bytes, `d` and `dmin` normal fp16 values.
+        let kquant: Pages
         /// **The bytes each operand maps**, from the shapes alone (`CapacityProbes.need` charges these):
         /// `a` and `b` at the largest of the shapes (`m · k`, `k · n`), `c` likewise, `bf16` half of `b`,
         /// `q` the int8 weight of the products' largest, `q8Scales` one fp32 per block of rows and column.
         struct Sizes: Equatable {
             var aFloats, bFloats, cFloats, qValues, scaleCount: Int
             var bytes: Int {
-                [aFloats * 4, bFloats * 4, bFloats * 2, cFloats * 4, qValues, scaleCount * 4]
+                [aFloats * 4, bFloats * 4, bFloats * 2, cFloats * 4, qValues, scaleCount * 4, Diagnostic.kquantBytes(qValues)]
                     .map { Arena.capacity(for: max(1, $0)) }.reduce(0, +)
             }
         }
@@ -219,6 +222,28 @@ extension Diagnostic {
             q8Scales = Pages(bytes: scaleCount * 4)
             let sp = q8Scales.floats()
             for i in 0..<scaleCount { sp[i] = q8Scale(i) }
+            kquant = Pages(bytes: Diagnostic.kquantBytes(qValues))
+            Diagnostic.fillKQuant(kquant.base, blocks: Diagnostic.kquantBytes(qValues) / 144)
+        }
+    }
+
+    /// The bytes of a Q4_K weight of `values` values (super-blocks of 256, 144 bytes each), one block more for a count not a multiple.
+    static func kquantBytes(_ values: Int) -> Int { (values / 256 + 1) * 144 }
+
+    /// **Q4_K super-blocks for the probes**: every byte of the scales and the integers from a deterministic sequence (each 6-bit scale
+    /// and min, each 4-bit integer, takes every value), `d` in [2⁻⁹, 2⁻⁸) and `dmin` in [2⁻⁷, 2⁻⁶) — normal fp16 values, as the forge
+    /// requires — so that a weight `d·sc·q − dmin·m` lies in about (−1, 2), the order of the other operands.
+    static func fillKQuant(_ base: UnsafeMutableRawPointer, blocks: Int) {
+        let bytes = base.assumingMemoryBound(to: UInt8.self)
+        var state: UInt64 = 0x51C0_4B11
+        for b in 0..<blocks {
+            let block = bytes + b * 144
+            for i in 4..<144 {
+                state = state &* 6364136223846793005 &+ 1442695040888963407
+                block[i] = UInt8(truncatingIfNeeded: state >> 33)
+            }
+            let d = Float16(Float(1 + (b % 7)) / 7 / 512 + 1.0 / 512).bitPattern, dmin = Float16(Float(1 + (b % 5)) / 5 / 128 + 1.0 / 128).bitPattern
+            block[0] = UInt8(d & 0xFF); block[1] = UInt8(d >> 8); block[2] = UInt8(dmin & 0xFF); block[3] = UInt8(dmin >> 8)
         }
     }
 

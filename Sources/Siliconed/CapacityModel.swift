@@ -67,8 +67,10 @@ package struct CapacityModel: Codable, Sendable, Equatable {
         /// input, scale per column or for the tensor, the rotation on the activation); fp16 (the ANE's programs, from the
         /// widened weight); the 8-bit weight as published beside an activation rounded to bf16 (`gpu/int8act`: after its
         /// rotation, `bfloat × int8`, the scale after the sums; `gpu/q8act`: a GGUF Q8_0, each block's scale applied in fp32
-        /// to its partial sums) — the integers are exact in bf16, so only the operand is rounded, as for `bf16act`.
-        case fp32, bf16, bf16act, int8, q8, fp16, int8act, q8act
+        /// to its partial sums) — the integers are exact in bf16, so only the operand is rounded, as for `bf16act`; a K-quant
+        /// (`gpu/q4kact`: Q4_K, Q5_K's `sc·q` exact in fp16, `bfloat × half` per super-block, its `d` in fp32 on the partial sums,
+        /// the mins apart — `KQuantKernels`).
+        case fp32, bf16, bf16act, int8, q8, fp16, int8act, q8act, q4kact
         /// Attentions: the MPSGraph graph, the flash kernel, a share of the heads on the CPU, the three stages by tiles of query rows
         /// (`tiles`: fp32 throughout; `tiles16`: fp16 operands, fp32 sums; `tilesbf16`: bf16 operands, fp32 sums) — the last two in
         /// the form their map chose (`attentionTiles`).
@@ -77,7 +79,7 @@ package struct CapacityModel: Codable, Sendable, Equatable {
         /// A product's form (its seconds a line of `k`, `n` and rows), not an attention's.
         package var isProduct: Bool {
             switch self {
-            case .fp32, .bf16, .bf16act, .int8, .q8, .fp16, .int8act, .q8act: return true
+            case .fp32, .bf16, .bf16act, .int8, .q8, .fp16, .int8act, .q8act, .q4kact: return true
             case .graph, .flash, .heads, .tiles, .tiles16, .tilesbf16: return false
             }
         }
@@ -278,6 +280,11 @@ package struct CapacityModel: Codable, Sendable, Equatable {
     /// Seconds per value to widen a K-quant (Q4_K to Q6_K) weight: it has no `WeightKind`, so `preparation` cannot say it,
     /// and a super-block's unpacking costs more than a bf16 shift. `nil`: the solver falls back on `preparation[.bf16]`.
     package var kquantPreparation: Double?
+    /// Seconds per value to copy a K-quant's blocks as they are into the reserve (`Artifact.stagePacked`, the `gpu/q4kact` route: the GPU
+    /// unpacks them). `nil`: a map before the route, priced as a Q8_0's copy.
+    package var kquantStaging: Double?
+    /// The name the probes' preparation gives the K-quant's two figures (`Fit.Measurements.preparation`), beside the `WeightKind`s.
+    package static let kquantKind = "q4k"
     /// **The `matmul2d` tile each kernel runs** (`MatmulTile`): the fastest of its candidates on this Mac, measured before its line (which is
     /// the line of that tile). A kernel absent runs its standard tile — what every map before tiles were measured planned with.
     package var tiles: [Kernel: MatmulTile] = [:]
@@ -305,7 +312,7 @@ package struct CapacityModel: Codable, Sendable, Equatable {
     // MARK: - JSON
 
     private enum CodingKeys: String, CodingKey {
-        case crest, lines, thin, aneRowUnit, sharing, heat, memoryBandwidth, diskBandwidth, diskClasses, preparation, kquantPreparation, tiles, thinTiles, attentionTiles, noise, wake, wakeIdle
+        case crest, lines, thin, aneRowUnit, sharing, heat, memoryBandwidth, diskBandwidth, diskClasses, preparation, kquantPreparation, kquantStaging, tiles, thinTiles, attentionTiles, noise, wake, wakeIdle
     }
 
     /// The engines of a dictionary keyed by their names.
@@ -360,6 +367,7 @@ package struct CapacityModel: Codable, Sendable, Equatable {
             }
         }
         kquantPreparation = try c.decodeIfPresent(Double.self, forKey: .kquantPreparation)
+        kquantStaging = try c.decodeIfPresent(Double.self, forKey: .kquantStaging)
         for (name, tile) in try c.decodeIfPresent([String: MatmulTile].self, forKey: .tiles) ?? [:] {
             guard let kernel = Kernel(name) else {
                 throw DecodingError.dataCorruptedError(forKey: .tiles, in: c, debugDescription: "kernel « \(name) »")
@@ -398,6 +406,7 @@ package struct CapacityModel: Codable, Sendable, Equatable {
             (kind.rawValue, Dictionary(uniqueKeysWithValues: paths.map { ($0.key.rawValue, $0.value) }))
         }), forKey: .preparation)
         try c.encodeIfPresent(kquantPreparation, forKey: .kquantPreparation)
+        try c.encodeIfPresent(kquantStaging, forKey: .kquantStaging)
         if !tiles.isEmpty {
             try c.encode(Dictionary(uniqueKeysWithValues: tiles.map { ($0.key.description, $0.value) }), forKey: .tiles)
         }
@@ -425,6 +434,7 @@ package struct CapacityModel: Codable, Sendable, Equatable {
         m.diskClasses = diskClasses.mapValues { .init(rate: r($0.rate), mean: r($0.mean)) }
         m.preparation = preparation.mapValues { $0.mapValues(r) }
         m.kquantPreparation = kquantPreparation.map(r)
+        m.kquantStaging = kquantStaging.map(r)
         m.noise = noise.map(r)
         m.wake = wake.map(r); m.wakeIdle = wakeIdle.map(r)
         return m
@@ -496,6 +506,8 @@ package struct CapacityModel: Codable, Sendable, Equatable {
         // The rounded copy of the activation besides (read once in fp32, written and read in bf16).
         case .int8act: return (1, 16)
         case .q8act: return (1 + 4.0 / 64, 8)
+        // The blocks (0.56 B), unpacked into `sc·q` (half: written, then read) and the mins; the activation's rounded copy and sums.
+        case .q4kact: return (0.5625 + 4 + 4.0 / 32, 9)
         default: return (4, 4)
         }
     }

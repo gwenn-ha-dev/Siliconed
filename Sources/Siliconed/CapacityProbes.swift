@@ -80,7 +80,7 @@ extension Diagnostic {
         /// removes no named bias has no place in the map; a stage added comes with its line here (a test holds every stage to one).
         package static let biases: [String: String] = [
             "setup": "a first call's compilation and buffers' first touch counted in a figure: paid before any figure is timed",
-            "preparation": "the weight's widening or staging counted as compute: its CPU seconds per value, measured apart, priced per call",
+            "preparation": "the weight's widening or staging counted as compute: its CPU seconds per value, measured apart, priced per call — a K-quant's own (its super-blocks decoded and transposed, or copied as stored), not a bf16 shift's",
             "witnesses start": "a Mac's state read as its speed: each engine's rate at the start, against which the end tells the heat",
             "bandwidth": "a memory-bound product priced at the arithmetic rate: the memory's own rate",
             "disk": "every volume and quality of service read at one speed: the stream's own volume, by class",
@@ -88,7 +88,7 @@ extension Diagnostic {
             "stairs": "the GPU's time taken as smooth in rows: its steps at the tile's edges",
             "attention": "an attention priced as products: its kernels and fused forms timed as they run, the form chosen among candidates, and the GPU's wake a call pays after the CPU left it idle (the render's QK-norm and RoPE)",
             "sharing": "two engines' rates added as if each ran alone, or one disturbed chain read as the set: what each keeps beside the other (κ), by weight length, and a third chain where two at one shape disagree beyond the map's noise",
-            "solos 8-bit and rounded": "a rounded or 8-bit product priced on the fp32 line, or on a line one disturbed figure bends: their own lines, the rounded ones on eight shapes so a disturbed figure is told apart and measured once more, their tiles chosen on rounds paired with the fastest's, a candidate in doubt measured again beside it",
+            "solos 8-bit and rounded": "a rounded, 8-bit or K-quant product priced on the fp32 line, or on a line one disturbed figure bends: their own lines, the rounded ones on eight shapes so a disturbed figure is told apart and measured once more, their tiles chosen on rounds paired with the fastest's, a candidate in doubt measured again beside it",
             "thin products": "a product of few rows or a short side priced on the wide line, or its fixed cost traded against its streaming, or a call's completion latency read as its cost: its own per-row and per-weight costs, a shape that does almost no work to hold the fixed cost, each figure on the fast mode of fifteen calls",
             "sharing int8": "the GPU and the ANE on the integers priced as two solos: what each keeps beside the other, at every weight length even when the model gives the ANE nothing (the last rows it had), and a third chain where two at one shape disagree beyond the map's noise",
             "sharing rounded": "the GPU's rounded rows and the ANE on one bf16 copy priced as two solos, or a gain within the error of its figure taken for one: what each keeps beside the other, and a third chain where two at one shape disagree beyond the map's noise, the median of three read and its MAD for the error; the ANE's per-call widening of the copy is the preparation's rate, not a second probe; every weight length measured, with the last rows the model gave when it gives the ANE nothing",
@@ -319,7 +319,7 @@ extension Diagnostic {
 
         // MARK: - The context
 
-        enum Truth: Hashable { case fp32, rounded, int8, roundedInt8, q8, roundedQ8 }
+        enum Truth: Hashable { case fp32, rounded, int8, roundedInt8, q8, roundedQ8, q4k, roundedQ4k }
         struct TruthKey: Hashable { let truth: Truth; let m, k, n: Int }
 
         struct Buffers { let a, b, c: MTLBuffer }
@@ -512,6 +512,21 @@ extension Diagnostic {
                         Diagnostic.exactRows(Array(0..<rows.count), a: $0.baseAddress!, q: operands.q.base.assumingMemoryBound(to: Int8.self),
                                              blockScales: operands.q8Scales.floats(), block: Diagnostic.q8Block, k: k, n: n)
                     }
+                case .q4k, .roundedQ4k:
+                    // The published values of the Q4_K blocks, widened into `b` by the engine's own decoder (ggml's arithmetic at the
+                    // bit), which `restoreB` puts back.
+                    Widen.dequantizePacked(operands.kquant.base, kind: .q4_k, rows: n, columns: k, transposing: true, into: operands.b.floats())
+                    dirty = max(dirty, k * n)
+                    if kind == .q4k {
+                        result = Diagnostic.exactRows(rows, a: a, b: operands.b.floats(), k: k, n: n)
+                    } else {
+                        var rounded = [Float](repeating: 0, count: rows.count * k)
+                        for (i, row) in rows.enumerated() { for j in 0..<k { rounded[i * k + j] = Half.bf16.round(a[row * k + j]) } }
+                        result = rounded.withUnsafeBufferPointer {
+                            Diagnostic.exactRows(Array(0..<rows.count), a: $0.baseAddress!, b: operands.b.floats(), k: k, n: n)
+                        }
+                    }
+                    restoreB()
                 }
                 truths[key] = result
                 return result
@@ -523,6 +538,7 @@ extension Diagnostic {
                 let (exact, witnessKind, code): (Truth, Truth, Int) = switch truthKind {
                 case .int8, .roundedInt8: (.int8, .roundedInt8, 1)
                 case .q8, .roundedQ8: (.q8, .roundedQ8, 2)
+                case .q4k, .roundedQ4k: (.q4k, .roundedQ4k, 3)
                 case .fp32, .rounded: (.fp32, .rounded, 0)
                 }
                 if let f = floors[[m, k, n, code]] { return max(Diagnostic.fp32Threshold, Diagnostic.floorMargin * f) }
@@ -713,7 +729,7 @@ extension Diagnostic {
                     // The rounded kernels the Standard and the Compact run on every large class take the fp32 solos' shapes too: eight points,
                     // so that a figure the Mac disturbed is told from the line and left out (`CapacityFit.kept`) — of three, none can be.
                     solos([.gpu_bf16act, .gpu_int8act], &m, shapes: sizes.solo + sizes.product)
-                    solos([.gpu_int8, .gpu_q8, .gpu_q8act], &m)
+                    solos([.gpu_int8, .gpu_q8, .gpu_q8act, .gpu_q4kact], &m)
                     solos([.ane_int8], &m, shapes: sizes.integers + sizes.small, chained: true)
                 }
                 try stage("thin products") { thinSolos(&m) }
@@ -846,7 +862,9 @@ extension Diagnostic {
                 }
                 return [WeightKind.bf16.rawValue: [WeightPath.widened.rawValue: per("bf16"), WeightPath.bf16.rawValue: per("bf16 copy")],
                         WeightKind.int8.rawValue: [WeightPath.widened.rawValue: per("int8 convrot"), WeightPath.native.rawValue: per("int8 copy")],
-                        WeightKind.q8.rawValue: [WeightPath.widened.rawValue: per("q8_0"), WeightPath.native.rawValue: per("q8_0 copy")]]
+                        WeightKind.q8.rawValue: [WeightPath.widened.rawValue: per("q8_0"), WeightPath.native.rawValue: per("q8_0 copy")],
+                        // A K-quant has no `WeightKind`: the fit reads these two into `kquantPreparation` and `kquantStaging`.
+                        CapacityModel.kquantKind: [WeightPath.widened.rawValue: per("q4_k"), WeightPath.native.rawValue: per("q4_k copy")]]
             }
 
             /// The same product on each engine alone, median of five (after two warm-ups).

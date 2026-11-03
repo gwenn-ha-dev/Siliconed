@@ -9,9 +9,10 @@ import MetalPerformanceShadersGraph
 extension Diagnostic.CapacityProbes.Context {
     // MARK: Solos
 
-    enum Probe: String, CaseIterable { case gpu_fp32, amx_fp32, ane_fp16, ane_int8, gpu_bf16, gpu_bf16act, gpu_int8, gpu_q8, gpu_int8act, gpu_q8act
+    enum Probe: String, CaseIterable { case gpu_fp32, amx_fp32, ane_fp16, ane_int8, gpu_bf16, gpu_bf16act, gpu_int8, gpu_q8, gpu_int8act, gpu_q8act, gpu_q4kact
         var kernel: Kernel {
             switch self {
+            case .gpu_q4kact: return Kernel(.gpu, .q4kact)
             case .gpu_int8act: return Kernel(.gpu, .int8act)
             case .gpu_q8act: return Kernel(.gpu, .q8act)
             case .gpu_fp32: return Kernel(.gpu, .fp32)
@@ -251,6 +252,17 @@ extension Diagnostic.CapacityProbes.Context {
                 dirty = max(dirty, k * n)
             }
             run = { WeightProducts.int8Product(gemm: gemm, plan: plan, reserve: buffers.b, a: buffers.a, c: buffers.c, m: m, k: k, n: n).status == 0 }
+        case .gpu_q4kact:
+            // Q4_K's blocks as a map stores them, in the reserve's head; the route's own function on them (`TensorGEMM.linear(a:kquant:…)`).
+            guard alone.bf16Activations, alone.tensor?.readsKQuants == true,
+                  let layout = TensorGEMM.kquantLayout(k: k, n: n, capacity: k * n * 4, five: false) else { return nil }
+            truthKind = .q4k
+            half = true
+            staged = { [self] in
+                operands.b.base.copyMemory(from: operands.kquant.base, byteCount: n * (k / 256) * 144)
+                dirty = max(dirty, k * n)
+            }
+            run = { _ = self.alone.tensor!.linear(a: self.aloneB.a, kquant: self.aloneB.b, layout: layout, c: self.aloneB.c, m: m, k: k, n: n); return true }
         }
         // The truth first (it restores B for the fp32 ones), then the staged weight.
         prime(truthKind, ane: isANE || half, m: m, k: k, n: n)

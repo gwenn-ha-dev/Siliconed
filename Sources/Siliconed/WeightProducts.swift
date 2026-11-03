@@ -18,6 +18,8 @@ import Metal
 ///              │                                computes the others
 ///              │     + the ANE's last rows      the same integers and scales, read in place ─▶ the ANE's int8 program,
 ///              │                                (`ProductAssignment.ane` on a native weight)   beside the GPU's rows
+///              │     or a K-quant (Q4_K, Q5_K)  its blocks copied as stored, unpacked on  ─▶ matmul2d bfloat × half per
+///              │                                the GPU into sc·q, d, dmin·m (`KQuantKernels`)  super-block, the activation rounded
 ///              └─ path widened                 widened on the CPU (`Artifact.materialize`) ─▶ MPS (+ AMX, + ANE rows)
 ///          ─▶ C = A · W
 ///          ─▶ + the LoRA stack:  mid = A · down, then C += mid · up      after the product, each one a product of the plan (`lora`), or
@@ -165,6 +167,11 @@ package final class WeightProducts {
                     timings["widening", default: 0] += r.widening
                     if r.status != 0 { failure = "\(name): the AMX refused its columns (BNNS \(r.status))" }
                 }
+            case .kquant(let layout):
+                GEMM.roundedProducts.withLock { $0 += 1 }
+                GEMM.kquantProducts.withLock { $0 += 1 }
+                aneTook = false; aneAlone = false
+                timings["gemm GPU", default: 0] += gemm.tensor!.linear(a: a, kquant: w, layout: layout, c: c, m: m, k: k, n: n)
             case .widened:
                 timings["gemm GPU", default: 0] += gemm.linear(a: a, b: w, c: c, m: m, k: k, n: n,
                                                               weightIsTransposed: transposed, weight: format(of: name),
@@ -243,6 +250,8 @@ package final class WeightProducts {
             let act = plan.roundedOffset > 0 ? "act" : ""
             if aneTook { return (weight, aneAlone ? "ane/" + weight.rawValue : "gpu+ane/" + weight.rawValue + act) }
             return (weight, (plan.amxColumns > 0 && gemm.conductor != nil ? "gpu+amx/" : "gpu/") + weight.rawValue + act)
+        case .kquant:
+            return (.q4k, "gpu/q4kact")
         case .widened:
             return (format(of: name), gemm.lastEngines)
         }
@@ -262,6 +271,8 @@ package final class WeightProducts {
         /// A bf16 weight staged as published; its activation rounded into the reserve's tail, or fp32.
         case bf16(Rounding?)
         case int8(Int8Plan)
+        /// A K-quant's blocks staged as stored, unpacked and multiplied on the GPU on the rounded activation (`gpu/q4kact`).
+        case kquant(TensorGEMM.KQuantLayout)
     }
 
     /// Where the rounded activation lies in the reserve and how many rows at a time (a multiple of 64).
@@ -472,6 +483,19 @@ package final class WeightProducts {
             try timed("staging") { try artifact.stageInt8(name, into: UnsafeMutableRawPointer(reserve),
                                                           scalesAt: plan.scalesOffset) }
             return (.int8(plan), planned, planned.roundsActivation && plan.roundedOffset == 0 ? .roundingUnavailable : nil)
+        }
+        if planned.path == .native, planned.roundsActivation, let tensor = artifact.tensors[name], tensor.dtype.isPacked {
+            // A K-quant's blocks as published, where this process reads their type (Q4_K, Q5_K) on a rounded activation and the
+            // reserve holds the layout; else the plan's answer without the route (a Q6_K beside Q4_K in one class keeps its widened
+            // route, the ANE's rows included), named in the render's record.
+            if transposed, KQuantKernels.reads(tensor.dtype), tensor.shape == [k, n], roundsActivations, gemm.bf16Activations,
+               gemm.tensor?.readsKQuants == true,
+               let layout = TensorGEMM.kquantLayout(k: k, n: n, capacity: capacity * 4, five: tensor.dtype == .q5_k) {
+                _ = try timed("staging") { try artifact.stagePacked(name, into: UnsafeMutableRawPointer(reserve), capacity: layout.integers) }
+                return (.kquant(layout), planned, nil)
+            }
+            let widened = gemm.plan.assignWidened(ProductKey(k: k, n: n, m: m, weight: .q4k, phase: gemm.phase))
+            return (try widen(name, count: count), widened, .kquantUnread)
         }
         let skipped: ProductLedger.Reason? = switch planned.path {
         case .widened: nil

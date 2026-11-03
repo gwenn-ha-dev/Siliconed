@@ -707,6 +707,11 @@ package enum CapacityFit {
         if let st = stairs(m.stairs.map { ($0.rows, $0.seconds) }) { model.aneRowUnit = max(st.unit, allocationUnit) }
         // The preparation before the sets: a set's side may pay a widening its line does not hold (`lift(set:model:)`).
         for (kindName, paths) in m.preparation {
+            if kindName == CapacityModel.kquantKind {
+                model.kquantPreparation = paths[WeightPath.widened.rawValue].flatMap { $0 > 0 ? $0 : nil }
+                model.kquantStaging = paths[WeightPath.native.rawValue].flatMap { $0 > 0 ? $0 : nil }
+                continue
+            }
             guard let kind = WeightKind(rawValue: kindName) else { continue }
             for (pathName, seconds) in paths { if let path = WeightPath(rawValue: pathName) { model.preparation[kind, default: [:]][path] = seconds } }
         }

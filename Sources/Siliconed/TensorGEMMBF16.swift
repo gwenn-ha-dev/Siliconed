@@ -9,6 +9,7 @@ import Metal
 ///     scratch × W       matmul2d  bfloat × bfloat → float     (a bf16 weight, as published)
 ///                                 bfloat × int8_t → float     (a published int8 weight, its scale after)
 ///                                 bfloat × float → float      (Q8_0: q · s into threadgroup memory)
+///                                 bfloat × half → float       (Q4_K, Q5_K: sc · q per super-block, `KQuantKernels`)
 ///
 /// What sets it apart:
 ///
@@ -26,6 +27,8 @@ import Metal
 package final class BFloatKernels {
     let round, byColumns, byRows, int8: MTLComputePipelineState
     let blocks: MTLComputePipelineState?
+    /// The K-quants' kernels (`KQuantKernels`, a library of their own: a refusal there widens the K-quants and nothing else).
+    let kquant: KQuantKernels?
 
     static let source = """
     #include <metal_stdlib>
@@ -135,6 +138,7 @@ package final class BFloatKernels {
               let byRows = pipeline("linear_nk"), let int8 = pipeline("linear_int8") else { return nil }
         self.round = round; self.byColumns = byColumns; self.byRows = byRows; self.int8 = int8
         blocks = pipeline("linear_q8")
+        kquant = KQuantKernels(device: device, options: options)
     }
 }
 

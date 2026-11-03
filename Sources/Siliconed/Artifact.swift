@@ -609,6 +609,21 @@ package final class Artifact {
         return tensor.count
     }
 
+    /// **A packed GGUF weight's blocks copied as they are** (`gpu/q4kact`): the map's bytes — `[N][K / 256]` super-blocks, by output
+    /// rows (`DType.q4_k`) — at `destination`, for the GPU to unpack. Returns the bytes copied; the caller checked the dtype and that
+    /// they fit.
+    package func stagePacked(_ name: String, into destination: UnsafeMutableRawPointer, capacity: Int) throws -> Int {
+        guard let tensor = tensors[name], let source = pointer(name), tensor.dtype.isPacked, let (qk, bytes) = tensor.dtype.packedBlock else {
+            throw Failure.badHeader("\(name): not a packed tensor")
+        }
+        defer { spent(name) }
+        let count = tensor.count / qk * bytes
+        guard count <= capacity else { throw Failure.inFile(path, .doesNotFit(name: name, count: count, capacity: capacity)) }
+        // Two bytes at a time over the cores (a block's bytes are even).
+        Widen.copyBfloat16(source: source, destination: destination, count: count / 2)
+        return count
+    }
+
     /// **A published int8 weight copied as it is** (`gemm_int8`): its bytes at `destination`, its scales
     /// widened to fp32 at `destination + scalesAt` (one per column, or one) — exact, the caller multiplies
     /// after the sums. The caller checked the dtype, the layout and that both fit.

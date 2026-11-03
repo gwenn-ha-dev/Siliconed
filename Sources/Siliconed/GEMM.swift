@@ -174,6 +174,8 @@ package final class GEMM {
     /// Products that read a published int8 weight as it is (`gemm_int8`, `WeightProducts.linear`) in this process: a check
     /// says the route it judged was the one taken.
     package static let int8Products = Mutex<Int>(0)
+    /// Products that read a K-quant's blocks as published (`gpu/q4kact`) in this process.
+    package static let kquantProducts = Mutex<Int>(0)
 
     /// - Parameter plan: the engines it brings up are built (`CapacityPlan.Resources`: the conductor, `TensorGEMM`, the Neural
     ///   Engine), and it answers each product. The process's by default; a probe or a check passes its own.

@@ -138,6 +138,8 @@ package final class CapacityPlan: Sendable {
         var pins: [ProductKey: ProductAssignment] = [:]
         /// The products the solver had no answer for, and why (`ProductLedger.Reason`): the GPU alone, named rather than silent.
         var unsolved: [ProductKey: ProductLedger.Reason] = [:]
+        /// The K-quant classes' answers without their native route (`assignWidened`).
+        var widened: [ProductKey: ProductAssignment] = [:]
     }
     private struct Memo: Hashable { var key: AttentionKey; var flash: Bool }
     private let state = Mutex(State())
@@ -168,7 +170,8 @@ package final class CapacityPlan: Sendable {
         self.allowsANE = allowsANE; self.allowsHalfPrecision = allowsHalfPrecision
         // An 8-bit weight is read as published by the GPU's kernel on the fp32 activation or, where operands may be rounded, on the
         // activation rounded to bf16 (`int8act`, `q8act`): either line brings the integers' kernels up.
-        let rounds = allowsHalfPrecision && (has(.gpu, .bf16act) || has(.gpu, .int8act) || has(.gpu, .q8act))
+        // A K-quant read as published (`q4kact`) rounds its activation too: its line brings the rounding's library up, the K-quants' with it.
+        let rounds = allowsHalfPrecision && (has(.gpu, .bf16act) || has(.gpu, .int8act) || has(.gpu, .q8act) || has(.gpu, .q4kact))
         resources = Resources(amx: has(.amx, .fp32), ane: allowsANE && has(.ane, .fp16),
                               bf16Weights: has(.gpu, .bf16), int8Weights: has(.gpu, .int8) || (allowsHalfPrecision && has(.gpu, .int8act)),
                               q8Weights: has(.gpu, .q8) || (allowsHalfPrecision && has(.gpu, .q8act)),
@@ -271,6 +274,7 @@ package final class CapacityPlan: Sendable {
             parts.append("prep \(kind.rawValue) " + paths.sorted { $0.key.rawValue < $1.key.rawValue }.map { "\($0.key.rawValue)=\($0.value)" }.joined(separator: ","))
         }
         parts.append("kquant \(model.kquantPreparation.map { "\($0)" } ?? "-")")
+        if let staging = model.kquantStaging { parts.append("kquant copy \(staging)") }
         parts.append("noise \(model.noise.map { "\($0)" } ?? "-")")
         var hash: UInt64 = 0xcbf29ce484222325
         for byte in parts.joined(separator: "\n").utf8 { hash = (hash ^ UInt64(byte)) &* 0x100000001b3 }
@@ -299,6 +303,28 @@ package final class CapacityPlan: Sendable {
         if a.roundsActivation && !allowsHalfPrecision { a.roundsActivation = false }
         let kept = a
         state.withLock { $0.products[key] = kept }
+        return kept
+    }
+
+    /// **The assignment of a K-quant weight the native route cannot read** (a Q6_K, a legacy type, a reserve too small for its layout)
+    /// in a class the plan gave that route (`gpu/q4kact`): what the plan answers without it — the solver with that kernel excluded, so
+    /// the widened route of a plan before it, at the bit; under a forcing or without a model, the GPU alone. Any other answer is `assign`'s.
+    /// The classes do not know which K-quant each module publishes (a Q4_K_M mixes Q4_K, Q5_K and Q6_K in one shape): the engine asks
+    /// here per tensor, and the render's record names the fallback (`ProductLedger.Reason.kquantUnread`).
+    package func assignWidened(_ key: ProductKey) -> ProductAssignment {
+        let planned = assign(key)
+        guard planned.path == .native, key.weight == .q4k else { return planned }
+        if let known = state.withLock({ $0.widened[key] }) { return known }
+        var a = ProductAssignment.gpuAlone(key.m)
+        if override == nil, let model {
+            var c = constraints
+            c.excluded.insert(CapacityModel.Kernel(.gpu, .q4kact))
+            if let solved = CapacitySolver.product(key, model: model, constraints: c)?.assignment { a = solved }
+        }
+        if a.ane > 0 && !allowsANE { a.gpu += a.ane; a.ane = 0 }
+        if a.roundsActivation && !allowsHalfPrecision { a.roundsActivation = false }
+        let kept = a
+        state.withLock { $0.widened[key] = kept }
         return kept
     }
 
@@ -396,7 +422,7 @@ package struct AcceleratorOffer: Sendable, Hashable, Codable {
 // MARK: - The weight's form
 
 /// What a weight is, for the plan: the form it is published in. (A K-quant is none of these: `CapacityClasses.WeightFormat.q4k`
-/// has no native form, it widens.)
+/// is widened, or read as published on a rounded activation alone — `gpu/q4kact` —, its preparation `CapacityModel.kquant…`.)
 package enum WeightKind: String, Codable, Sendable, CaseIterable { case bf16, int8, q8 }
 
 /// How a product reads its weight.
@@ -405,7 +431,7 @@ package enum WeightPath: String, Codable, Sendable {
     case widened
     /// The bf16 weight as published (`TensorGEMM`).
     case bf16
-    /// The 8-bit weight as published (int8 convrot, Q8_0).
+    /// The 8-bit weight as published (int8 convrot, Q8_0), or a K-quant's blocks (Q4_K, Q5_K: `KQuantKernels`).
     case native
 }
 
@@ -473,7 +499,7 @@ package struct ProductAssignment: Equatable, Sendable, Codable, CustomStringConv
         case .native:
             // The ANE beside the GPU's int8 kernel reads the integers (`ane > 0`): `gpu+ane/int8`, `ane/int8` alone.
             let engines = amxColumns > 0 ? "gpu+amx" : ane > 0 ? (gpu > 0 ? "gpu+ane" : "ane") : "gpu"
-            return engines + "/" + (weight == .int8 ? "int8" : "q8") + (roundsActivation ? "act" : "")
+            return engines + "/" + (weight == .int8 ? "int8" : weight == .q4k ? "q4k" : "q8") + (roundsActivation ? "act" : "")
         }
     }
 
@@ -498,6 +524,9 @@ package struct ProductAssignment: Equatable, Sendable, Codable, CustomStringConv
             guard amx == 0, amxColumns == 0, key.weight == .bf16 else { return false }
             return ane == 0 || (roundsActivation && gpu > 0)
         case .native:
+            // A K-quant's blocks: the GPU's rounded kernel, whole — no fp32-activation kernel (it would compute `float × half` at the
+            // shader cores' rate), no ANE (its programs read a widened weight or per-column integers, never K-quant blocks), no AMX.
+            if key.weight == .q4k { return roundsActivation && gpu == key.m && ane == 0 && amxColumns == 0 && amx == 0 }
             guard amx == 0, key.weight == .int8 || key.weight == .q8 else { return false }
             if roundsActivation && (gpu == 0 || amxColumns > 0) { return false }
             // The ANE beside the GPU's int8 kernel, both reading the integers: the program takes a scale per column or for the tensor
@@ -663,6 +692,8 @@ extension CapacityPlan {
             // The activation rounded where the request rounds it: the denoiser's products of enough rows.
             let rounds = bf16Activations && key.phase == .denoising && key.m >= roundingMinimumRows
             let eightBit = key.weight == .int8 || key.weight == .q8
+            // A K-quant on a rounded activation is read as published too (`gpu/q4kact`), the GPU alone.
+            let published = eightBit || key.weight == .q4k
             if key.phase == .denoising {
                 if rounds, key.weight == .bf16 {
                     if neuralEngine, key.m >= aneMinimumRows {
@@ -684,10 +715,10 @@ extension CapacityPlan {
                             if native.isRunnable(for: key) { return native }
                         }
                         // A rounded activation has no widened route: the 8-bit weight to the GPU's rounded kernel, whole.
-                        if !(rounds && eightBit) { return ProductAssignment(gpu: key.m - rows, ane: rows) }
+                        if !(rounds && published) { return ProductAssignment(gpu: key.m - rows, ane: rows) }
                     }
                 }
-                if rounds, eightBit { return ProductAssignment(path: .native, roundsActivation: true, gpu: key.m) }
+                if rounds, published { return ProductAssignment(path: .native, roundsActivation: true, gpu: key.m) }
             }
             // `int8`, `q8`: a published 8-bit weight is read as published by the GPU's kernel wherever the ANE takes none of its rows,
             // in every phase (what the switches `gemm_int8` and `gemm_q8` were) — the AMX leaves it.

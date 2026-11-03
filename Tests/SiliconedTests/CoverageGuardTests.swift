@@ -82,8 +82,9 @@ import Testing
         switch k.form {
         // The weight widened, or a bf16 weight read as published beside an fp32 activation (`float × bfloat`: the widening is a shift).
         case .fp32, .bf16: operand = .fp32
-        // A bf16 or 8-bit weight read as published beside the activation rounded to bf16 (the integers are exact in bf16).
-        case .bf16act, .int8act, .q8act: operand = .bf16
+        // A bf16, 8-bit or K-quant weight read as published beside the activation rounded to bf16 (the integers are exact in bf16; a
+        // K-quant's `sc·q` in fp16, its scales applied in fp32).
+        case .bf16act, .int8act, .q8act, .q4kact: operand = .bf16
         // An 8-bit weight read as published: beside the GPU's fp32 activation; the ANE's int8 program takes the integers as its fp16 input.
         case .int8, .q8: operand = k.engine == .ane ? .fp16 : .fp32
         case .fp16: operand = .fp16
@@ -180,10 +181,13 @@ import Testing
             "no AMX kernel on bf16 operands (BFMMLA/SME): the probes measure `amx/fp32` alone, so the map cannot say whether it pays") { c in
             c.lanes.contains { $0.engine == .amx && $0.operand == .bf16 }
         },
-        Gap("kquant-bf16", .open,
-            "R7 (R3b3): the K-quants read without widening, after R5 — a widened Q4_K weight beside a rounded activation has no kernel",
-            probe: (ProductKey(k: 3072, n: 3072, m: 4096, weight: .q4k), ProductAssignment(path: .native, roundsActivation: true, gpu: 4096), false)) { c in
-            isProduct(c, [.q4k]) && has(c, .gpu, .bf16)
+        Gap("kquant-ane", .hardware,
+            "the ANE beside the GPU's K-quant kernel: its int8 program takes a scale per column or for the tensor, never a K-quant's "
+                + "super-blocks, and its fp16 program reads a widened weight, which the native route never makes (the reserve holds the "
+                + "blocks and their unpacked `sc·q`, whose `d` changes every 256 rows of K); widened, the ANE's rows stay (`gpu+ane`)",
+            probe: (ProductKey(k: 3072, n: 3072, m: 4096, weight: .q4k),
+                    ProductAssignment(path: .native, roundsActivation: true, gpu: 2048, ane: 2048), false)) { c in
+            isProduct(c, [.q4k]) && has(c, .gpu, .bf16) && has(c, .ane)
         },
         Gap("lora-bf16", .open,
             "a LoRA's two products: their operand is the stack's fp32 expansion (`CacheLoRA`), widened only — thin products (the rank, "
@@ -202,12 +206,13 @@ import Testing
             isProduct(c, [.bf16]) && has(c, .gpu, .bf16) && has(c, .amx)
         },
         Gap("rounded-8bit-amx", .decided,
-            "the AMX beside the GPU's rounded rows on an 8-bit weight: the AMX reads the fp32 activation (BNNS, `amx/fp32`), so one product "
-                + "would round some of its rows or columns and not the others, and its columns beside a native weight left the solver "
-                + "(no probe times them); `isRunnable` refuses a rounded assignment with AMX columns",
+            "the AMX beside the GPU's rounded rows on an 8-bit or K-quant weight: the AMX reads the fp32 activation (BNNS, `amx/fp32`), so "
+                + "one product would round some of its rows or columns and not the others, and its columns beside a native weight left the "
+                + "solver (no probe times them; a K-quant's would need its blocks widened beside); `isRunnable` refuses a rounded "
+                + "assignment with AMX columns, and any AMX beside a K-quant's blocks",
             probe: (ProductKey(k: 3072, n: 3072, m: 4096, weight: .int8),
                     ProductAssignment(path: .native, roundsActivation: true, gpu: 4096, amxColumns: 1024), false)) { c in
-            isProduct(c, [.int8, .q8]) && has(c, .gpu, .bf16) && has(c, .amx)
+            isProduct(c, [.int8, .q8, .q4k]) && has(c, .gpu, .bf16) && has(c, .amx)
         },
         Gap("q8-ane", .hardware,
             "the ANE beside a GGUF Q8_0 weight read as published: its int8 program takes a scale per column or for the tensor, never "
@@ -401,12 +406,13 @@ import Testing
     }
 
     /// The 8-bit products on a rounded activation (3/11/2026): the GPU's rounded kernel alone on an int8 and on a Q8_0 weight, and beside
-    /// the ANE's integers on an int8 one — in the denoiser of the versions that publish them, and never in the encoder.
+    /// the ANE's integers on an int8 one; a Light's K-quant blocks on the GPU's rounded kernel alone — in the denoiser of the versions
+    /// that publish them, and never in the encoder.
     @Test func theRoundedEightBitProductsAreRoutes() {
         let routed = Self.offer(Self.model(lines: Self.probed)).routed
         let rounded = Lane(.gpu, .bf16)
         for variant in Variant.allCases {
-            for (format, sets) in [(Format.int8, [[rounded], [rounded, Lane(.ane, .fp16)]]), (Format.q8, [[rounded]])] as [(Format, [Set<Lane>])] {
+            for (format, sets) in [(Format.int8, [[rounded], [rounded, Lane(.ane, .fp16)]]), (Format.q8, [[rounded]]), (Format.q4k, [[rounded]])] as [(Format, [Set<Lane>])] {
                 let subject = Subject.product(.denoising, format)
                 guard Self.classes(variant).contains(where: { if case let .product(_, _, _, f) = $0.1.shape { f == format && $0.1.phase == .denoising } else { false } })
                 else { continue }
@@ -416,6 +422,8 @@ import Testing
         }
         #expect(routed.contains { $0.subject == .product(.denoising, .int8) }, "no version publishes int8 weights any more: update the test")
         #expect(routed.contains { $0.subject == .product(.denoising, .q8) }, "no version publishes Q8_0 weights any more: update the test")
+        #expect(routed.contains { $0.variant == .light && $0.subject == .product(.denoising, .q4k) && $0.lanes == [rounded] },
+                "the Light's K-quants on a rounded activation (`gpu/q4kact`)")
     }
 
     @Test func aRouteReadsOnlyLinesAProbeMeasures() {
@@ -425,7 +433,7 @@ import Testing
         // Every attention form is one the probes time: none is read by a route the map never measures.
         let attentionForms: Set<M.Form> = [.graph, .flash, .heads, .tiles, .tiles16, .tilesbf16]
         #expect(attentionForms.isSubset(of: Set(Self.probed.map(\.form))))
-        #expect(Set(M.Form.allCases).subtracting(attentionForms) == [.fp32, .bf16, .bf16act, .int8, .q8, .fp16, .int8act, .q8act],
+        #expect(Set(M.Form.allCases).subtracting(attentionForms) == [.fp32, .bf16, .bf16act, .int8, .q8, .fp16, .int8act, .q8act, .q4kact],
                 "a new form of kernel: say whether it is a product's or an attention's")
         #expect(M.Form.allCases.allSatisfy { $0.isProduct != attentionForms.contains($0) })
     }
@@ -447,7 +455,9 @@ import Testing
             if a.usesAMX { #expect(r.amx, "\(key) \(s.route)") }
             if a.usesANE { #expect(r.ane && (a.path != .native || r.aneInt8), "\(key) \(s.route)") }
             if a.path == .bf16 { #expect(a.roundsActivation ? r.roundedActivations : r.bf16Weights, "\(key) \(s.route)") }
-            if a.path == .native { #expect(key.weight == .int8 ? r.int8Weights : r.q8Weights, "\(key) \(s.route)") }
+            if a.path == .native {
+                #expect(key.weight == .int8 ? r.int8Weights : key.weight == .q4k ? r.roundedActivations : r.q8Weights, "\(key) \(s.route)")
+            }
             if a.roundsActivation { #expect(r.roundedActivations, "\(key) \(s.route)") }
         }
         for a in o.attentions where a.assignment.usesTiles && a.assignment.tilePrecision != .fp32 || a.assignment.gpuUsesTiles && a.assignment.gpuTilePrecision != .fp32 {

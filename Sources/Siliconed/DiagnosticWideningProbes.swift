@@ -140,6 +140,28 @@ extension Diagnostic {
         results.append(Widening(kind: "q8_0 copy", values: count,
                                 cpu: Widening.Rate(rate: Double(count) / tCopyQ8 / 1e9,
                                              error: memcmp(copy8.base, int8.base, count) == 0 && scalesRight ? 0 : .infinity)))
+
+        // Q4_K: a Light's default path decodes the super-blocks and transposes them to `[K, N]` fp32 on the CPU (`Widen.dequantizePacked`);
+        // the `gpu/q4kact` route copies the blocks as stored (`Artifact.stagePacked`) and the GPU unpacks them. A weight of `dim` inputs
+        // and 1 024 outputs (the rate per value is the figure; the transposition's tiles are 256 × 256). Exact: the transposed values
+        // against the same blocks decoded in place, every one.
+        try bench.check()
+        let kn = (k: rows / 256 * 256, n: min(1024, columns)), kValues = kn.k * kn.n
+        let blocksBytes = kValues / 256 * 144
+        let packed = Pages(bytes: blocksBytes), straight = Pages(bytes: kValues * 4)
+        fillKQuant(packed.base, blocks: blocksBytes / 144)
+        Widen.dequantizePacked(packed.base, kind: .q4_k, rows: kn.n, columns: kn.k, transposing: false, into: straight.floats())
+        nonisolated(unsafe) let inPlace = straight.floats()
+        let q4Exact: @Sendable (Int) -> Float = { i in inPlace[(i % kn.n) * kn.k + i / kn.n] }
+        memset(destination.base, 0xFF, kValues * 4)
+        let tQ4 = seconds { Widen.dequantizePacked(packed.base, kind: .q4_k, rows: kn.n, columns: kn.k, transposing: true, into: floats) }
+        results.append(Widening(kind: "q4_k", values: kValues,
+                                cpu: Widening.Rate(rate: Double(kValues) / tQ4 / 1e9, error: worstRelative(floats, count: kValues, exact: q4Exact))))
+        let copyK = Pages(bytes: blocksBytes)
+        let tCopyK = seconds { Widen.copyBfloat16(source: packed.base, destination: copyK.base, count: blocksBytes / 2) }
+        results.append(Widening(kind: "q4_k copy", values: kValues,
+                                cpu: Widening.Rate(rate: Double(kValues) / tCopyK / 1e9,
+                                                   error: memcmp(copyK.base, packed.base, blocksBytes) == 0 ? 0 : .infinity)))
         return results
     }
 

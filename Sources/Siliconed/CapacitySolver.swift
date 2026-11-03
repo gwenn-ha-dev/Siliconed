@@ -468,6 +468,18 @@ private struct ProductSolver {
         return out
     }
 
+    /// **A K-quant's blocks read as published** (`gpu/q4kact`, `KQuantKernels`): the GPU's kernel on the activation rounded to bf16,
+    /// alone — where operands may be rounded, on the denoiser, from the rounding's floor, as the other rounded kernels; never on a product
+    /// with a short side (no thin line times it, and a weight of 64 outputs leaves the reserve too little room for its layout). No pair: the
+    /// ANE's programs read a widened weight or per-column integers, never K-quant blocks, and the route widens nothing.
+    func kquant(_ key: ProductKey) -> [Option] {
+        guard key.phase == .denoising, c.allowsRounding, key.m >= c.limits.roundingRows,
+              !CapacityModel.isThin(rows: key.m, k: key.k, n: key.n), let gpu = line(.gpu, .q4kact) else { return [] }
+        let assignment = ProductAssignment.gpuAlone(key.m, path: .native, rounds: true)
+        guard assignment.isRunnable(for: key), let t = seconds([gpu: key.m], m: key.m, k: key.k, n: key.n) else { return [] }
+        return [Option(assignment: assignment, rows: [gpu: key.m], seconds: t)]
+    }
+
     /// **The rounded bf16 weight shared with the ANE**: the GPU's rounded rows (`gpu/bf16act`) beside the ANE's fp16 program on the same
     /// bf16 copy (`[gpu/bf16act, ane/fp16]`), the ANE's rows at every unit, the most first (`pairRows`) — on the denoiser, from the ANE's floor, on a product
     /// with no short side, and only where the probes measured that pair's own sharing: the rounded kernel runs on the tensor units at
@@ -495,6 +507,8 @@ private struct ProductSolver {
         // A LoRA's operands are the stack's fp32, expanded and cached beforehand (`CacheLoRA`): nothing to prepare at the call.
         if format.isLoRA { return 0 }
         if let kind = format.kind { perValue = model.preparation[kind]?[path] ?? 0 }
+        // A K-quant's blocks copied as they are (the GPU unpacks them, inside its line), or widened on the CPU.
+        else if path == .native { perValue = model.kquantStaging ?? model.preparation[.q8]?[.native] ?? 0 }
         else { perValue = model.kquantPreparation ?? model.preparation[.bf16]?[.widened] ?? 0 }
         return Double(k) * Double(n) * perValue * heat
     }
@@ -521,6 +535,7 @@ private struct ProductSolver {
             }
         }
         if key.weight == .int8 || key.weight == .q8 { options += native(key) }
+        if key.weight == .q4k { options += kquant(key) }
         return options
     }
 
@@ -658,6 +673,11 @@ private struct ProductSolver {
             }
         case .native:
             let int8 = key.weight == .int8
+            if key.weight == .q4k {
+                guard a.isRunnable(for: key), let g = line(.gpu, .q4kact) else { return nil }
+                rows[g] = a.gpu
+                break
+            }
             guard let g = line(.gpu, a.roundsActivation ? (int8 ? .int8act : .q8act) : (int8 ? .int8 : .q8)) else { return nil }
             // The AMX's columns are no candidate (`native`): no line times them.
             guard a.amxColumns == 0 else { return nil }

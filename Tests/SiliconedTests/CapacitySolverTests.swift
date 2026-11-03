@@ -237,6 +237,35 @@ import Testing
         #expect(s.assignment == .gpuAlone(1024), "a K-quant widens: no native form")
     }
 
+    /// **A K-quant's blocks read as published** (`gpu/q4kact`): on the denoiser where the map has the line and it beats the widened
+    /// route with its preparation — the GPU alone, the activation rounded —; the encoder, a slower line, a refused rounding keep the
+    /// widened weight. A tensor of the class the kernels cannot read (a Q6_K) asks the plan its answer without the route.
+    @Test func aKQuantIsReadAsPublishedOnARoundedActivationWhereItIsFaster() throws {
+        var m = machine(aneRate: 1e12)
+        m.lines[M.Kernel(.gpu, .q4kact)] = .init(t0: 0, rate: 6e12)
+        m.kquantPreparation = 5e-10
+        m.kquantStaging = 1e-11
+        let q4k = key(4096, 4096, 4096, .q4k)
+        let s = try solve(m, q4k)
+        #expect(s.route == "gpu/q4kact" && s.assignment == .gpuAlone(4096, path: .native, rounds: true))
+        #expect(abs(s.preparation - 4096 * 4096 * 1e-11) < 1e-9, "the blocks copied, not widened")
+        #expect(try solve(m, key(4096, 4096, 4096, .q4k, phase: .encoding)).assignment.path == .widened)
+        let refused = try #require(CS.product(q4k, model: m, constraints: CS.Constraints(allowsANE: true, allowsRounding: false)))
+        #expect(refused.assignment.path == .widened)
+        var slow = m
+        slow.lines[M.Kernel(.gpu, .q4kact)] = .init(t0: 0, rate: 1e11)
+        #expect(try solve(slow, q4k).assignment.path == .widened)
+        // The kernels alone: no ANE, no AMX, no fp32 activation on the blocks.
+        #expect(!ProductAssignment(path: .native, roundsActivation: true, gpu: 2048, ane: 2048).isRunnable(for: q4k))
+        #expect(!ProductAssignment(path: .native, roundsActivation: false, gpu: 4096).isRunnable(for: q4k))
+        // The fallback of an unread tensor is the plan without the route, the widened one, and the plan's own answer elsewhere.
+        let plan = CapacityPlan(model: m)
+        #expect(plan.assign(q4k).path == .native)
+        let widened = plan.assignWidened(q4k)
+        #expect(widened.path == .widened && widened.isRunnable(for: q4k))
+        #expect(plan.assignWidened(key(4096, 4096, 4096)) == plan.assign(key(4096, 4096, 4096)))
+    }
+
     /// **No AMX beside a native weight**: the AMX's columns widened their share of the weight on every call, a line no probe measures
     /// as the route runs, and the widened `gpu+amx` covers the case with lines measured; the solver never offers them.
     @Test func theNativeInt8WeightNeverGoesBesideTheAMXOnColumns() throws {

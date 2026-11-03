@@ -46,6 +46,9 @@ package final class ProductLedger: Sendable {
         case roundingUnavailable = "rounding unavailable"
         /// The 8-bit weight as published, planned, cannot be read here (no kernel, a layout or a reserve that does not fit): widened.
         case int8Unavailable = "int8 unavailable"
+        /// A K-quant's blocks, planned as published (`gpu/q4kact`), are of a type the kernels do not read (Q6_K, a legacy one), or the
+        /// route cannot run here (no kernel, a reserve too small, a caller that does not round): the plan's answer without that route.
+        case kquantUnread = "k-quant unread"
         /// The ANE's rows, planned, not handed to it (no ANE in this process, a shape it does not accept): the GPU took them.
         case aneNotAccepted = "ane not accepted"
         /// The ANE's rows refused or not finite after the call: the whole product again on the GPU.

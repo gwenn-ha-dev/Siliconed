@@ -251,7 +251,8 @@ package enum FP16AttentionRun {
 
 package enum BF16ActivationRun {
     /// How many products rounded their activation, and how many read a published 8-bit weight (a Compact's or a Light's: under
-    /// `--bf16-activations` they are read as published on the rounded activation, `gpu/int8act` or `gpu/q8act` — a rounded activation
+    /// `--bf16-activations` they are read as published on the rounded activation, `gpu/int8act` or `gpu/q8act`, and a Light's Q4_K and
+    /// Q5_K blocks `gpu/q4kact` (its Q6_K widened) — a rounded activation
     /// has no widened route). None rounded (no Metal 4, a refused compiler): skipped, since what would be judged is the fp32 path against
     /// a looser bar.
     package static func account(_ report: Report) throws {
@@ -259,9 +260,10 @@ package enum BF16ActivationRun {
         guard rounded > 0 else {
             throw Skip("--bf16-activations: no product rounded its activation on this Mac (Metal 4 missing, or the kernel refused)")
         }
-        let integers = GEMM.int8Products.withLock { $0 }
+        let integers = GEMM.int8Products.withLock { $0 }, kquants = GEMM.kquantProducts.withLock { $0 }
         report.add(Judge.holds("bf16 activations", true, note: "\(rounded) products on a rounded operand"
-                                   + (integers > 0 ? ", \(integers) products on published 8-bit weights" : "")))
+                                   + (integers > 0 ? ", \(integers) products on published 8-bit weights" : "")
+                                   + (kquants > 0 ? ", \(kquants) on published K-quant blocks" : "")))
     }
 }
 
