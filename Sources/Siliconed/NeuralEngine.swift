@@ -24,6 +24,11 @@ import Synchronization
 ///       C = Y · (64 · s_j / √G) / σ_i     fp32, s_j the weight's scale per column or for the tensor
 ///     L = max_j Σ_k |q_kj| / 64, the largest column's L1 norm: the bound that keeps Y under 2¹⁵ is `max|R·A_i| · σ_i · L`.
 ///
+///     **The same product on a bf16 weight read as published** (`ProductAssignment` with `path: .bf16` and `ane > 0`: the GPU's rows on
+///     the activation rounded to bf16, `gpu/bf16act`, the ANE's last rows beside them): the weight is the reserve's bf16 copy, not a
+///     widened one — each value widened as it is read (a shift), then the same λ, L, σ and fp16 conversion as above: the same fp16
+///     operand, so the same bits as the widened weight's rows.
+///
 /// **The rows are the plan's** (`CapacityPlan`, `ProductAssignment.ane`): the solver wrote how many the ANE takes — in units of
 /// 256, or the whole product when it runs alone — where the model measures it faster than the GPU alone and the ANE's rows hold
 /// the half-precision threshold; the defaults give it none. A render may still refuse it (`Request.neuralEngine`: the app's default
@@ -252,7 +257,12 @@ package final class NeuralEngine: @unchecked Sendable {
     private enum Weight {
         case widened(UnsafePointer<Float>)
         case int8(Int8Weight)
+        /// The bf16 weight as `Artifact.stage` copied it, `[k, n]`.
+        case bf16(UnsafePointer<UInt16>)
     }
+
+    /// Products whose ANE rows read a bf16 weight as published (beside the GPU's rounded rows), and were computed: what a check says it ran.
+    package static let bf16Tally = Mutex<Int>(0)
 
     /// **Rows `first ..< first + rows` of `C = A · W`** on the ANE, `W` fp32 `[k, n]`. `false` when the rows
     /// must be computed elsewhere: the program refused, or a non-finite output (`C`'s rows then undefined).
@@ -261,6 +271,15 @@ package final class NeuralEngine: @unchecked Sendable {
     package func product(a: UnsafePointer<Float>, w: UnsafePointer<Float>, c: UnsafeMutablePointer<Float>,
                          first: Int, rows: Int, k: Int, n: Int, into: UnsafeMutablePointer<Float>? = nil) -> Bool {
         run(a: a, weight: .widened(w), c: c, first: first, rows: rows, k: k, n: n, into: into)
+    }
+
+    /// **The same product on a bf16 weight read as published** (`[k, n]` bf16 values, the reserve's copy): read and widened row by row
+    /// into the lift and the fp16 conversion — the same fp16 operand as the widened weight's, nothing widened beside it.
+    package func product(a: UnsafePointer<Float>, bf16 w: UnsafePointer<UInt16>, c: UnsafeMutablePointer<Float>,
+                         first: Int, rows: Int, k: Int, n: Int) -> Bool {
+        let ok = run(a: a, weight: .bf16(w), c: c, first: first, rows: rows, k: k, n: n)
+        if ok { NeuralEngine.bf16Tally.withLock { $0 += 1 } }
+        return ok
     }
 
     /// **The same product on a published int8 weight**, the integers the program's input (`Int8Weight`).
@@ -301,7 +320,8 @@ package final class NeuralEngine: @unchecked Sendable {
         let sideStarted = DispatchTime.now().uptimeNanoseconds
         defer { timings["side", default: 0] += Double(DispatchTime.now().uptimeNanoseconds - sideStarted) * 1e-9 }
         switch weight {
-        case .widened(let w): timed("lift") { liftColumns(w, k: k, n: n, scratch: rowScratch, stride: stride) }
+        case .widened(let w): timed("lift") { liftColumns(.widened(w), k: k, n: n, scratch: rowScratch, stride: stride) }
+        case .bf16(let w): timed("lift") { liftColumns(.bf16(w), k: k, n: n, scratch: rowScratch, stride: stride) }
         case .int8(let i): timed("lift") { prepareColumns(i, k: k, n: n) }
         }
 
@@ -357,6 +377,9 @@ package final class NeuralEngine: @unchecked Sendable {
                 switch weight {
                 case .widened(let w):
                     convertWeight(w + k0 * n, rows: count, n: n,
+                                  into: CVPixelBufferGetBaseAddress(binding.w)!.assumingMemoryBound(to: Float16.self))
+                case .bf16(let w):
+                    convertWeight(bf16: w + k0 * n, rows: count, n: n,
                                   into: CVPixelBufferGetBaseAddress(binding.w)!.assumingMemoryBound(to: Float16.self))
                 case .int8(let q):
                     copyIntegers(q.values + k0 * n, count: count * n, into: CVPixelBufferGetBaseAddress(binding.w)!)
@@ -463,19 +486,28 @@ package final class NeuralEngine: @unchecked Sendable {
     // MARK: - the weight
 
     /// `λ_j = 2^−⌊log₂ max_i |W_ij|⌋` per column, and its inverse; 1 for a column of zeros. And `L`, from
-    /// each column's L1 norm, in the same pass.
-    private func liftColumns(_ w: UnsafePointer<Float>, k: Int, n: Int, scratch rowScratch: UnsafeMutablePointer<Float>, stride: Int) {
+    /// each column's L1 norm, in the same pass. A bf16 weight's row is widened into the chunk's scratch first, then read as an fp32 one:
+    /// the same values, the same operations, the same λ and L.
+    private func liftColumns(_ weight: Weight, k: Int, n: Int, scratch rowScratch: UnsafeMutablePointer<Float>, stride: Int) {
         let chunks = min(k, NeuralEngine.chunks), per = (k + chunks - 1) / chunks
         let lift = columns!.floats(), unlift = lift + n
         nonisolated(unsafe) let p = lift + 2 * n, sums = p + chunks * n
-        nonisolated(unsafe) let (rowScratch, w) = (rowScratch, w)
+        nonisolated(unsafe) let (rowScratch, weight) = (rowScratch, weight)
         DispatchQueue.concurrentPerform(iterations: chunks) { chunk in
             let (m, s, magnitude) = (p + chunk * n, sums + chunk * n, rowScratch + chunk * stride)
             m.update(repeating: 0, count: n)
             s.update(repeating: 0, count: n)
             for row in min(k, chunk * per)..<min(k, (chunk + 1) * per) {
-                vDSP_vmaxmg(m, 1, w + row * n, 1, m, 1, vDSP_Length(n))
-                vDSP_vabs(w + row * n, 1, magnitude, 1, vDSP_Length(n))
+                let values: UnsafePointer<Float>
+                switch weight {
+                case .widened(let w): values = w + row * n
+                case .bf16(let w):
+                    Widen.bfloat16ToFloat32(source: w + row * n, destination: magnitude, count: n)
+                    values = UnsafePointer(magnitude)
+                case .int8: return
+                }
+                vDSP_vmaxmg(m, 1, values, 1, m, 1, vDSP_Length(n))
+                vDSP_vabs(values, 1, magnitude, 1, vDSP_Length(n))
                 vDSP_vadd(s, 1, magnitude, 1, s, 1, vDSP_Length(n))
             }
         }
@@ -593,6 +625,18 @@ package final class NeuralEngine: @unchecked Sendable {
             for row in min(rows, chunk * per)..<min(rows, (chunk + 1) * per) {
                 let s = w + row * n, t = target + row * n
                 for j in 0..<n { t[j] = Float16(s[j] * l[j]) }
+            }
+        }
+    }
+
+    /// The same from a bf16 weight's rows, each value widened (a shift) before its lift: the fp16 values of the widened weight's.
+    private func convertWeight(bf16 w: UnsafePointer<UInt16>, rows: Int, n: Int, into target: UnsafeMutablePointer<Float16>) {
+        let chunks = 32, per = (rows + chunks - 1) / chunks
+        nonisolated(unsafe) let (w, target, l) = (w, target, columns!.floats())
+        DispatchQueue.concurrentPerform(iterations: chunks) { chunk in
+            for row in min(rows, chunk * per)..<min(rows, (chunk + 1) * per) {
+                let s = w + row * n, t = target + row * n
+                for j in 0..<n { t[j] = Float16(Float(bitPattern: UInt32(s[j]) << 16) * l[j]) }
             }
         }
     }

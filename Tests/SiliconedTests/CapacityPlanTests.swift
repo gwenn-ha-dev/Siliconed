@@ -203,8 +203,11 @@ import Testing
                 "a caller that does not try the flash kernel never gets it")
         let all = CapacityPlan.forcing(named: "amx,ane,bf16act")
         #expect(all?.resources == .init(amx: true, ane: true, bf16Weights: true, int8Weights: true, q8Weights: true, roundedActivations: true))
-        // the rounding's rule is ahead of the ANE's on the products it takes (a rounded activation has no widened route); the AMX serves the rest
-        #expect(all?.assign(key(3840, 3840, 4096)) == ProductAssignment(path: .bf16, roundsActivation: true, gpu: 4096))
+        // the rounding's rule is ahead of the widened ANE's on the products it takes (a rounded activation has no widened route): on a bf16
+        // weight the ANE's half beside the GPU's rounded rows, the pair a Standard's map may choose; the AMX serves the rest
+        #expect(all?.assign(key(3840, 3840, 4096)) == ProductAssignment(path: .bf16, roundsActivation: true, gpu: 2048, ane: 2048))
+        #expect(all?.assign(key(3840, 3840, 300)) == ProductAssignment(path: .bf16, roundsActivation: true, gpu: 300), "under the ANE's rows: the GPU alone")
+        #expect(CapacityPlan.forcing(named: "bf16act")?.assign(key(3840, 3840, 4096)) == ProductAssignment(path: .bf16, roundsActivation: true, gpu: 4096))
         #expect(all?.assign(key(3840, 3840, 4096, .int8)) == ProductAssignment(path: .native, roundsActivation: true, gpu: 4096))
         #expect(all?.assign(key(3840, 3840, 300, .int8)) == ProductAssignment(path: .native, roundsActivation: true, gpu: 300))
         #expect(all?.assign(key(3840, 3840, 200, .int8)) == .gpuAlone(200), "under the rounding's rows: the widened weight")
@@ -260,6 +263,14 @@ import Testing
         #expect(ProductAssignment(path: .bf16, roundsActivation: true, gpu: 4096).isRunnable(for: k))
         #expect(!ProductAssignment(path: .bf16, roundsActivation: true, gpu: 4096).isRunnable(for: key(3840, 3840, 4096, phase: .encoding)))
         #expect(!ProductAssignment(path: .bf16, gpu: 2048, amx: 2048).isRunnable(for: k), "TensorGEMM takes the product whole")
+        // the ANE's last rows beside the GPU's rounded ones, its fp16 program on the bf16 copy
+        #expect(ProductAssignment(path: .bf16, roundsActivation: true, gpu: 2048, ane: 2048).isRunnable(for: k))
+        #expect(!ProductAssignment(path: .bf16, gpu: 2048, ane: 2048).isRunnable(for: k), "beside the GPU's rounded rows only")
+        #expect(!ProductAssignment(path: .bf16, roundsActivation: true, gpu: 0, ane: 4096).isRunnable(for: k), "the ANE alone is the widened route's")
+        #expect(!ProductAssignment(path: .bf16, roundsActivation: true, gpu: 2000, ane: 2096).isRunnable(for: k), "the ANE's unit")
+        #expect(!ProductAssignment(path: .bf16, roundsActivation: true, gpu: 1024, amx: 1024, ane: 2048).isRunnable(for: k), "no AMX beside it")
+        #expect(!ProductAssignment(path: .bf16, roundsActivation: true, gpu: 2048, ane: 2048).isRunnable(for: key(3840, 3840, 4096, phase: .encoding)))
+        #expect(!ProductAssignment(path: .bf16, roundsActivation: true, gpu: 2048, ane: 2048).isRunnable(for: key(3840, 3840, 4096, .int8)))
         #expect(!ProductAssignment(path: .bf16, gpu: 4096).isRunnable(for: key(3840, 3840, 4096, .int8)))
         #expect(!ProductAssignment(roundsActivation: true, gpu: 4096).isRunnable(for: k), "a widened weight is not rounded")
         let int8 = key(3840, 3840, 4096, .int8)
@@ -397,6 +408,7 @@ import Testing
         #expect(ProductAssignment(gpu: 0, ane: 10).engines == "ane")
         #expect(ProductAssignment(path: .bf16, gpu: 10).route(weight: .bf16) == "gpu/bf16")
         #expect(ProductAssignment(path: .bf16, roundsActivation: true, gpu: 10).route(weight: .bf16) == "gpu/bf16act")
+        #expect(ProductAssignment(path: .bf16, roundsActivation: true, gpu: 10, ane: 256).route(weight: .bf16) == "gpu+ane/bf16act")
         #expect(ProductAssignment(path: .native, gpu: 10).route(weight: .int8) == "gpu/int8")
         #expect(ProductAssignment(path: .native, gpu: 10, amxColumns: 64).route(weight: .q8) == "gpu+amx/q8")
     }

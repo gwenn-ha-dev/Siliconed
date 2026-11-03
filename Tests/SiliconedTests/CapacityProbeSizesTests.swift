@@ -12,7 +12,8 @@ import Testing
     /// What the probes measured on the M1 Pro in the runs of the report's version (seconds per stage), against which the projection is checked.
     static let measured: [String: Double] = ["preparation": 0.18, "witnesses start": 0.5, "bandwidth": 0.04, "disk": 2.0, "solos fp32": 7.8, "stairs": 1.0,
                                               "attention": 4.0, "sharing": 9.0, "solos 8-bit and rounded": 5.3, "sharing int8": 2.1,
-                                              "witnesses end": 3 * 0.43 + 2 * 0.2, "thin products": 2.53]   // the end: three rounds of 0.43 s, two pauses
+                                              "witnesses end": 3 * 0.43 + 2 * 0.2, "thin products": 2.53,   // the end: three rounds of 0.43 s, two pauses
+                                              "sharing rounded": 0]   // never run on an M1 Pro: wholly untimed (`roundedPairSeconds`)
     /// The engines alone on the witness (2 048 × 3 840²: 60.4 GFLOP in 17.2, 26.2 and 12.4 ms): TFLOP/s.
     static let m1Pro = Rates(gpu: 3.51e12, amx: 2.30e12, ane: 4.87e12, cpu: 1.0e12)
     /// A Neo's order: a 5-core GPU, the AMX and the ANE of its generation (the fleet's: 1.43 · 1.52 (0.83 hot) · 4.13 TFLOP/s).
@@ -52,11 +53,13 @@ import Testing
     }
 
     @Test func theProjectionIsTheRightOrderOnTheMacItWasTunedOn() {
-        let p = Sizes.full.projection(Self.m1Pro), untimed = Sizes.full.roundedEightBitSeconds(Self.m1Pro)
+        let p = Sizes.full.projection(Self.m1Pro)
+        let untimed = Sizes.full.roundedEightBitSeconds(Self.m1Pro).merging(Sizes.full.roundedPairSeconds(Self.m1Pro)) { $0 + $1 }
         #expect(Set(p.keys) == Set(Self.measured.keys))
         for (stage, seconds) in Self.measured.sorted(by: { $0.key < $1.key }) {
             // The attention's 4.0 s were measured before the half-precision kernels chose their form (2/11/2026), the 8-bit stages before
-            // the products on a rounded activation joined them (3/11/2026): the parts of the projection no M1 Pro has timed yet, left out
+            // the products on a rounded activation and the rounded bf16 pair joined them (3/11/2026): the parts of the projection no M1 Pro
+            // has timed yet, left out
             // until one does.
             let projected = p[stage]! - (stage == "attention" ? Sizes.full.formSeconds(Self.m1Pro) : 0) - (untimed[stage] ?? 0)
             #expect(abs(projected / seconds - 1) < 0.35 || abs(projected - seconds) < 0.1, "\(stage): projected \(projected), measured \(seconds)")

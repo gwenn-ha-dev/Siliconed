@@ -27,9 +27,9 @@ import Testing
 ///     does not compile until this file says what its rows compute on), the lines a map can hold (`CapacityProbes.Context.Probe`),
 ///     what the solver weighs (`candidates`, not only the one it keeps).
 ///   - **Both directions.** A route P20 forbids fails as surely as a permission without a route.
-///   - **A pair is its own cell.** The ×1.52 once claimed for GPU + ANE was read off the members' lines; the pair of the
-///     Standard's own route (`gpu·bf16 + ane·fp16`) has no route. A set is listed only where each of its lanes has a route alone;
-///     a set with a lane that has none is that lane's hole.
+///   - **A pair is its own cell.** The ×1.52 once claimed for GPU + ANE was read off the members' lines, while the pair of the
+///     Standard's own route (`gpu·bf16 + ane·fp16`) had no route — it has one since 3/11/2026, with its own sharing in the map. A set
+///     is listed only where each of its lanes has a route alone; a set with a lane that has none is that lane's hole.
 ///   - **A map is the probes'**: the solver's lines are those the probes can measure. A route that reads another is offered on no Mac:
 ///     listed in `deadRoutes` (empty since the AMX's columns beside a native weight, which read `amx/int8` and `amx/q8`, left the
 ///     solver on 3/11/2026).
@@ -191,15 +191,16 @@ import Testing
             probe: (ProductKey(k: 3072, n: 64, m: 4096, weight: .loraDown), .gpuAlone(4096, path: .bf16, rounds: true), false)) { c in
             isProduct(c, [.loraDown, .loraUp]) && has(c, .gpu, .bf16)
         },
-        // The sets.
-        Gap("bf16-shares", .open,
-            "the Standard's own route does not share: `isRunnable` admits neither the AMX nor the ANE beside a bf16 weight read as "
-                + "published, and the map measures the sharing on `gpu/fp32` only — the ×1.52 once claimed for GPU + ANE has no route",
+        // The products on a rounded activation, beside another engine.
+        Gap("rounded-bf16-amx", .decided,
+            "the AMX beside the GPU's rounded rows on a bf16 weight read as published: its rows need the weight widened to fp32 (no AMX "
+                + "kernel reads bf16, `amx-bf16`) and the fp32 activation — a widening of the whole weight at every call, beside a reserve "
+                + "that holds the bf16 copy and the rounded rows and has no room for it — for what the members' lines gave the AMX on the "
+                + "M5 Pro, ~2 % beside GPU + ANE; `isRunnable` refuses AMX rows on a bf16 path (decided 3/11/2026)",
             probe: (ProductKey(k: 3072, n: 3072, m: 4096, weight: .bf16),
-                    ProductAssignment(path: .bf16, roundsActivation: true, gpu: 2048, ane: 2048), false)) { c in
-            isProduct(c, [.bf16]) && has(c, .gpu, .bf16) && c.lanes.count >= 2
+                    ProductAssignment(path: .bf16, roundsActivation: true, gpu: 2048, amx: 1024, ane: 1024), false)) { c in
+            isProduct(c, [.bf16]) && has(c, .gpu, .bf16) && has(c, .amx)
         },
-        // The 8-bit products on a rounded activation, beside another engine.
         Gap("rounded-8bit-amx", .decided,
             "the AMX beside the GPU's rounded rows on an 8-bit weight: the AMX reads the fp32 activation (BNNS, `amx/fp32`), so one product "
                 + "would round some of its rows or columns and not the others, and its columns beside a native weight left the solver "
@@ -248,10 +249,11 @@ import Testing
             let set = engines.indices.filter { mask & (1 << $0) != 0 }.map { engines[$0] }
             if set.count >= 2 { m.sharing[M.key(set)] = .init() }
         }
-        // The pairs whose sharing the probes measure by kernels (the ANE's integers beside each GPU kernel that reads them).
-        for form in Diagnostic.CapacityProbes.Context.integerPairs {
-            let pair = [M.Kernel(.gpu, form), M.Kernel(.ane, .int8)]
-            if pair.allSatisfy(lines.contains) { m.sharing[M.key(pair)] = .init() }
+        // The pairs whose sharing the probes measure by kernels (the ANE's integers beside each GPU kernel that reads them, the rounded
+        // bf16 pair).
+        for pair in Diagnostic.CapacityProbes.Context.integerPairs.map({ [M.Kernel(.gpu, $0), M.Kernel(.ane, .int8)] })
+            + [Diagnostic.CapacityProbes.Context.roundedPair] where pair.allSatisfy(lines.contains) {
+            m.sharing[M.key(pair)] = .init()
         }
         return m
     }
@@ -379,17 +381,23 @@ import Testing
         #expect(!v.routed.isEmpty)
     }
 
-    /// The Standard takes what the decisions gave it: bf16 on its own weights, the ANE beside the GPU on the widened ones, the
-    /// attention on fp16 and bf16 operands — the permissions of 2/11 and 3/11/2026, seen from the table.
+    /// The Standard takes what the decisions gave it: bf16 on its own weights, the ANE beside the GPU on the widened ones and beside
+    /// its rounded rows on the bf16 copy, the attention on fp16 and bf16 operands — the permissions of 2/11 and 3/11/2026, seen from
+    /// the table.
     @Test func theStandardsDecisionsAreRoutes() {
         let routed = Self.offer(Self.model(lines: Self.probed)).routed
         let bf16 = Subject.product(.denoising, .bf16)
-        for lanes: Set<Lane> in [[Lane(.gpu, .bf16)], [Lane(.gpu, .fp32), Lane(.ane, .fp16)], [Lane(.gpu, .fp32), Lane(.amx, .fp32), Lane(.ane, .fp16)]] {
+        for lanes: Set<Lane> in [[Lane(.gpu, .bf16)], [Lane(.gpu, .fp32), Lane(.ane, .fp16)], [Lane(.gpu, .fp32), Lane(.amx, .fp32), Lane(.ane, .fp16)],
+                                 [Lane(.gpu, .bf16), Lane(.ane, .fp16)]] {
             #expect(routed.contains(Cell(variant: .standard, subject: bf16, lanes: lanes)), "\(lanes)")
         }
         for lanes: Set<Lane> in [[Lane(.gpu, .fp16)], [Lane(.gpu, .bf16)], [Lane(.gpu, .fp16), Lane(.cpu, .fp32)]] {
             #expect(routed.contains(Cell(variant: .standard, subject: .attention, lanes: lanes)), "attention \(lanes)")
         }
+        // The rounded pair only where the map measured its own sharing: the engines' `gpu+ane`, measured on `gpu/fp32`, is not its κ.
+        var borrowed = Self.model(lines: Self.probed)
+        borrowed.sharing[M.key(Diagnostic.CapacityProbes.Context.roundedPair)] = nil
+        #expect(!Self.offer(borrowed).routed.contains(Cell(variant: .standard, subject: bf16, lanes: [Lane(.gpu, .bf16), Lane(.ane, .fp16)])))
     }
 
     /// The 8-bit products on a rounded activation (3/11/2026): the GPU's rounded kernel alone on an int8 and on a Q8_0 weight, and beside

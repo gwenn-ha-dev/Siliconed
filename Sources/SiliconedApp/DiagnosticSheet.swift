@@ -448,6 +448,8 @@ private struct ReportView: View {
             guard !keeps.isEmpty else { return nil }
             var name = attention ? String(localized: "Attention, split between GPU and CPU") : members.map(engineName).joined(separator: " + ")
             if kernels.contains(where: { $0?.form == .int8 }) { name += ", " + String(localized: "8-bit weights") }
+            // The GPU's rows on the activation rounded to bf16 (the Standard's pair, the integers' beside the rounded kernel): not the fp32 pair.
+            if kernels.contains(where: { [.bf16act, .int8act, .q8act].contains($0?.form) }) { name += ", " + String(localized: "bf16 activations") }
             return Together(name: name, keeps: keeps.sorted { engines.firstIndex(of: $0.engine)! < engines.firstIndex(of: $1.engine)! },
                             ofSum: sum > 0 ? joint / sum : nil)
         }

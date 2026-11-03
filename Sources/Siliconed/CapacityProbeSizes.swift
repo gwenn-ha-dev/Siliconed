@@ -174,6 +174,14 @@ extension Diagnostic.CapacityProbes {
             return p
         }
 
+        /// **The seconds the rounded bf16 pair adds** (`gpu/bf16act+ane/fp16`, its own stage `sharing rounded`), inside `projection`: the chain
+        /// passes of the fp32 sets at the pair's rate; its truths and floors are the fp32 sets' (the same shapes, kept). No M1 Pro has timed it.
+        package func roundedPairSeconds(_ rates: Rates) -> [String: Double] {
+            guard let a = rates.ane else { return [:] }
+            func flop(_ s: Shape) -> Double { 2 * Double(s.m) * Double(s.k) * Double(s.n) }
+            return ["sharing rounded": pairPasses.reduce(0) { $0 + chain(flop($1), rate: 0.8 * (rates.gpu * Self.formRatio["bf16act"]! + a)) + 0.15 }]
+        }
+
         /// The chain passes of the fp32 sets (two on the short shape, one on the long), which the integer pairs take too.
         var pairPasses: [Shape] { [chains.first].compactMap { $0 } + [chains.first].compactMap { $0 } + (chains.count > 1 ? [chains[1]] : []) }
 
@@ -243,6 +251,7 @@ extension Diagnostic.CapacityProbes {
                     sum + passes.reduce(0) { $0 + chain(flop($1), rate: 0.8 * (g * Self.formRatio[form]! + a)) + 0.15 }
                 } + truth(chains)
             }
+            p.merge(roundedPairSeconds(rates)) { $1 }
             return p
         }
 

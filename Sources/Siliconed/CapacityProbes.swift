@@ -24,6 +24,8 @@ import MetalPerformanceShadersGraph
 ///      ├─ 8-bit and rounded kernels (they stage their weight in the reserve: after every fp32 route), `ane/int8` among them (as chains)
 ///      ├─ sharing int8             the GPU's int8 kernel beside the ANE's, both reading the integers staged in the reserve (chains, a long k),
 ///      │                           the GPU's on the fp32 activation, then on the activation rounded to bf16
+///      ├─ sharing rounded          the GPU's rounded rows on a bf16 weight read as published beside the ANE's fp16 program on the same copy
+///      │                           (chains, a long k: the Standard's own pair, `gpu/bf16act+ane/fp16`)
 ///      └─ witnesses, end
 ///
 ///     every timed step goes through `Context.guarded`: measured, then a pulse (`Regime`), and again after a wait while the pulse or the
@@ -674,6 +676,7 @@ extension Diagnostic {
                 }
                 try stage("thin products") { thinSolos(&m) }
                 try stage("sharing int8") { sharingInt8(&m) }
+                try stage("sharing rounded") { sharingRounded(&m) }
                 d.massive = massives
                 try stage("witnesses end") {
                     restoreB()

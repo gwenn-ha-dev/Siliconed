@@ -9,6 +9,8 @@ import Metal
 ///              ├─ path bf16, a bf16 weight     copied as it is (`Artifact.stage`)       ─▶ TensorGEMM
 ///              │     rounding                  the same, the activation rounded to bf16 first ─▶ TensorGEMM
 ///              │                               (`roundsActivations`, `BFloatKernels`)
+///              │     + the ANE's last rows     the same bf16 copy, read in place            ─▶ the ANE's fp16 program
+///              │                               (`ProductAssignment.ane` on a rounded bf16 weight) beside the GPU's rows
 ///              ├─ path native, a published int8  copied as it is, scale fp32 after it   ─▶ TensorGEMM, × s after the
 ///              │                                (convrot: x · R by chunks of rows in the reserve's tail)  sums
 ///              │     or a GGUF Q8_0             (scales per 32 rows: q · s in threadgroup memory)
@@ -43,6 +45,10 @@ import Metal
 ///   - **the ANE reads the integers where the plan gives it rows of a native weight** (`aneInt8Rows`): nothing is widened, nothing
 ///     copied for it but its surface; the GPU's rows run the int8 kernel on the same reserve, each row one engine's. A program the
 ///     process cannot run for the weight (`NeuralEngine.accepts`: its rotation's groups, a refusal) hands its rows to the GPU;
+///   - **the ANE reads the bf16 copy where the plan gives it rows beside the GPU's rounded ones** (`bf16Product`): its program lifts and
+///     converts the bf16 values as they are (a widening is a shift: the fp16 operand of the widened route, bit for bit), its rows read
+///     the fp32 activation; the GPU's rows round theirs into the reserve's tail, past the weight the ANE reads. A program the process
+///     cannot run (a refusal, a weight laid out `[n, k]`) or a non-finite output hands the rows back to the GPU's rounded kernel;
 ///   - **a rounded activation rounds the operand of a product and nothing else** (`roundsActivations`, which a
 ///     DiT sets and a text encoder does not): the caller's activation stays fp32 — the LoRA stack reads it —,
 ///     the rounded copy lives in the reserve's tail beside the weight (`roundingPlan`), the sums and the
@@ -63,7 +69,7 @@ package final class WeightProducts {
     private let mergesLoRA: Bool
     /// The operand of a product is rounded to bf16 where the settings and the machine allow it (`gemm_bf16_act`).
     private let roundsActivations: Bool
-    /// The last int8 product had rows on the ANE, and it computed them (`classification`).
+    /// The last int8 or rounded bf16 product had rows on the ANE, and it computed them (`classification`).
     private var aneTook = false
     /// ... and it took every row of the product: the ledger names the route `ane/int8`, as the plan does (`ProductAssignment.route`).
     private var aneAlone = false
@@ -121,8 +127,19 @@ package final class WeightProducts {
         timed("gemm wall") {
             switch path {
             case .bf16(let rounding?):
-                timings["gemm GPU", default: 0] += gemm.linear(a: a, rounding: (w, rounding.offset, rounding.rows), bf16: w,
-                                                              c: c, m: m, k: k, n: n, weightIsTransposed: transposed)
+                // The ANE beside the GPU's rounded rows: the plan's last rows, read from the bf16 copy (`bf16Product`), where the process
+                // can run them.
+                let aneRows = planned.path == .bf16 && planned.ane > 0 && planned.ane < m && transposed ? planned.ane : 0
+                if aneRows > 0, let ane = gemm.neuralEngine, ane.accepts(rows: aneRows, k: k, n: n) {
+                    let r = Self.bf16Product(gemm: gemm, rounding: (w, rounding.offset, rounding.rows), reserve: w, a: a, c: c,
+                                             m: m, k: k, n: n, ane: ane, aneRows: aneRows)
+                    timings["gemm GPU", default: 0] += r.gpu
+                    aneTook = r.computed
+                } else {
+                    aneTook = false
+                    timings["gemm GPU", default: 0] += gemm.linear(a: a, rounding: (w, rounding.offset, rounding.rows), bf16: w,
+                                                                  c: c, m: m, k: k, n: n, weightIsTransposed: transposed)
+                }
             case .bf16(nil):
                 timings["gemm GPU", default: 0] += gemm.linear(a: a, bf16: w, c: c, m: m, k: k, n: n,
                                                               weightIsTransposed: transposed)
@@ -205,7 +222,7 @@ package final class WeightProducts {
     /// reserve could not hold is the fp32 kernel's name).
     private func classification(of name: String, _ path: Path) -> (CapacityClasses.WeightFormat, String) {
         switch path {
-        case .bf16(let rounding): return (.bf16, rounding == nil ? "gpu/bf16" : "gpu/bf16act")
+        case .bf16(let rounding): return (.bf16, rounding == nil ? "gpu/bf16" : aneTook ? "gpu+ane/bf16act" : "gpu/bf16act")
         case .int8(let plan):
             let weight: CapacityClasses.WeightFormat = plan.block == nil ? .int8 : .q8
             let act = plan.roundedOffset > 0 ? "act" : ""
@@ -364,6 +381,34 @@ package final class WeightProducts {
         group.wait()
         GEMM.neuralEngineTally.withLock { $0.handed += 1; if !computed { $0.givenBack += 1 } }
         if !computed { gpu += int8Product(gemm: gemm, plan: plan, reserve: w, a: a, c: c, m: m, k: k, n: n).gpu }
+        return (gpu, computed, gpuWall, aneWall)
+    }
+
+    /// **The rounded bf16 product cut between the GPU and the ANE**, at the same time: the first `m − aneRows` rows on the GPU's
+    /// kernel on the activation rounded to bf16 (`GEMM.linear(a:rounding:bf16:…)`, its rounded rows in the reserve's tail), the last
+    /// `aneRows` on the ANE's fp16 program, which reads the same bf16 copy at the reserve's head (`NeuralEngine.product(a:bf16:…)`) and
+    /// the fp32 activation. Each row is one engine's. The ANE's rows refused or non-finite: the whole product again on the GPU's rounded
+    /// kernel. What the map measures for the pair (`gpu/bf16act+ane/fp16`) is this function. The weight is `[k, n]`. Returns as
+    /// `int8Product(…ane:)`.
+    package static func bf16Product(gemm: GEMM, rounding: TensorGEMM.Rounding, reserve w: MTLBuffer, a: MTLBuffer, c: MTLBuffer,
+                                    m: Int, k: Int, n: Int, ane: NeuralEngine, aneRows: Int)
+        -> (gpu: Double, computed: Bool, gpuWall: Double, aneWall: Double) {
+        let first = m - aneRows
+        nonisolated(unsafe) let (pa, pc) = (a.contents().assumingMemoryBound(to: Float.self), c.contents().assumingMemoryBound(to: Float.self))
+        nonisolated(unsafe) let weight = UnsafePointer(w.contents().assumingMemoryBound(to: UInt16.self))
+        nonisolated(unsafe) var computed = false
+        nonisolated(unsafe) var aneWall = 0.0
+        let began = DispatchTime.now().uptimeNanoseconds
+        let group = DispatchGroup()
+        DispatchQueue.global(qos: .userInitiated).async(group: group) {
+            computed = ane.product(a: pa, bf16: weight, c: pc, first: first, rows: aneRows, k: k, n: n)
+            aneWall = Double(DispatchTime.now().uptimeNanoseconds - began) * 1e-9
+        }
+        var gpu = first > 0 ? gemm.linear(a: a, rounding: rounding, bf16: w, c: c, m: first, k: k, n: n, weightIsTransposed: true) : 0
+        let gpuWall = Double(DispatchTime.now().uptimeNanoseconds - began) * 1e-9
+        group.wait()
+        GEMM.neuralEngineTally.withLock { $0.handed += 1; if !computed { $0.givenBack += 1 } }
+        if !computed { gpu += gemm.linear(a: a, rounding: rounding, bf16: w, c: c, m: m, k: k, n: n, weightIsTransposed: true) }
         return (gpu, computed, gpuWall, aneWall)
     }
 

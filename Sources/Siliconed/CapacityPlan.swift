@@ -447,12 +447,12 @@ package struct ProductAssignment: Equatable, Sendable, Codable, CustomStringConv
     }
 
     /// The route as the render's record (`ProductLedger`) names it: the engines for a widened weight, `gpu/bf16`, `gpu/bf16act`,
-    /// `gpu/int8`, `gpu/int8act`, `gpu+ane/int8act`, `gpu+amx/q8`… for a weight read as published (`act`: the GPU's rows on the
-    /// rounded activation).
+    /// `gpu+ane/bf16act`, `gpu/int8`, `gpu/int8act`, `gpu+ane/int8act`, `gpu+amx/q8`… for a weight read as published (`act`: the GPU's
+    /// rows on the rounded activation).
     package func route(weight: CapacityClasses.WeightFormat) -> String {
         switch path {
         case .widened: return engines
-        case .bf16: return roundsActivation ? "gpu/bf16act" : "gpu/bf16"
+        case .bf16: return roundsActivation ? (ane > 0 ? "gpu+ane/bf16act" : "gpu/bf16act") : "gpu/bf16"
         case .native:
             // The ANE beside the GPU's int8 kernel reads the integers (`ane > 0`): `gpu+ane/int8`, `ane/int8` alone.
             let engines = amxColumns > 0 ? "gpu+amx" : ane > 0 ? (gpu > 0 ? "gpu+ane" : "ane") : "gpu"
@@ -462,7 +462,8 @@ package struct ProductAssignment: Equatable, Sendable, Codable, CustomStringConv
 
     /// **Whether the engines can run it for `key`** — the hardware and precision limits, nothing else: no negative rows, rows
     /// that add up to the height; the ANE's in units of 256 or the whole product, and never on an encoder; a bf16 weight read
-    /// as published whole on the GPU; a native 8-bit weight with its AMX columns beside a GPU side of whole 64-column tiles (the
+    /// as published whole on the GPU — or, its GPU rows on the rounded activation, with the ANE's last rows beside them (its fp16
+    /// program reads the bf16 copy, lifted by powers of two as the widened weight; no AMX, which would need the weight widened); a native 8-bit weight with its AMX columns beside a GPU side of whole 64-column tiles (the
     /// kernel writes whole tiles, an edge inside one would overwrite the AMX's first columns) — or, if it is int8 with a scale per
     /// column or for the tensor, with the ANE's last rows beside the GPU's (the program reads the integers: `readsInt8`, no AMX). A
     /// rounded activation is the GPU's: it has rows, and no AMX columns beside it (the AMX reads the fp32 activation — one rounding for
@@ -470,15 +471,15 @@ package struct ProductAssignment: Equatable, Sendable, Codable, CustomStringConv
     package func isRunnable(for key: ProductKey) -> Bool {
         guard gpu >= 0, amx >= 0, ane >= 0, amxColumns >= 0, rows == key.m, key.m > 0 else { return false }
         if ane > 0 {
-            guard ane % NeuralEngine.rowUnit == 0 || ane == key.m, key.phase == .denoising, path == .widened || path == .native
-            else { return false }
+            guard ane % NeuralEngine.rowUnit == 0 || ane == key.m, key.phase == .denoising else { return false }
         }
         if roundsActivation && (path == .widened || key.phase == .encoding) { return false }
         switch path {
         case .widened:
             return amxColumns == 0
         case .bf16:
-            return amx == 0 && ane == 0 && amxColumns == 0 && key.weight == .bf16
+            guard amx == 0, amxColumns == 0, key.weight == .bf16 else { return false }
+            return ane == 0 || (roundsActivation && gpu > 0)
         case .native:
             guard amx == 0, key.weight == .int8 || key.weight == .q8 else { return false }
             if roundsActivation && (gpu == 0 || amxColumns > 0) { return false }
@@ -596,7 +597,9 @@ extension CapacityPlan {
     ///   - `neuralEngine` (`--neural-engine`): the denoiser's widened products of `aneMinimumRows` rows or more give half their
     ///     rows (rounded to the unit) to the ANE, the GPU beside it alone;
     ///   - `bf16Activations` (`--bf16-activations`): the denoiser's bf16 weights of `roundingMinimumRows` rows or more are read as
-    ///     published, the activation rounded; so are its 8-bit ones (`gpu/int8act`, `gpu/q8act`: a rounded activation has no other way
+    ///     published, the activation rounded — and with `neuralEngine`, from `aneMinimumRows`, half their rows (rounded to the unit) go
+    ///     to the ANE's fp16 program on the same bf16 copy, beside the GPU's rounded rows (`gpu+ane/bf16act`, the pair a Standard's map
+    ///     may choose); so are its 8-bit ones (`gpu/int8act`, `gpu/q8act`: a rounded activation has no other way
     ///     to a published 8-bit weight), the ANE's integers beside them under `aneInt8`;
     ///   - `int8`, `q8`: a published int8 (Q8_0) weight is read as published by the GPU's kernel wherever no other rule speaks of it, in
     ///     every phase — on the fp32 activation, or the rounded one where `bf16Activations` says;
@@ -645,6 +648,12 @@ extension CapacityPlan {
             let eightBit = key.weight == .int8 || key.weight == .q8
             if key.phase == .denoising {
                 if rounds, key.weight == .bf16 {
+                    if neuralEngine, key.m >= aneMinimumRows {
+                        let unit = NeuralEngine.rowUnit
+                        let rows = Int((Double(key.m) * 0.5 / Double(unit)).rounded()) * unit
+                        let pair = ProductAssignment(path: .bf16, roundsActivation: true, gpu: key.m - rows, ane: rows)
+                        if rows > 0 && rows < key.m && pair.isRunnable(for: key) { return pair }
+                    }
                     return ProductAssignment(path: .bf16, roundsActivation: true, gpu: key.m)
                 }
                 if neuralEngine, key.m >= aneMinimumRows {

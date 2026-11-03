@@ -6,7 +6,7 @@ import Foundation
 /// time, the integers the engines will run, never a ratio for the engine to round.
 ///
 ///     product (k, n, m, weight format, phase)
-///         │   each path    widened (any set of gpu · amx · ane) · bf16 · bf16 rounded · native int8 / q8 (gpu · gpu + ane on int8)
+///         │   each path    widened (any set of gpu · amx · ane) · bf16 · bf16 rounded (gpu · gpu + ane) · native int8 / q8 (gpu · gpu + ane on int8)
 ///         │                · native rounded int8 / q8 (gpu · gpu + ane on int8)
 ///         │   each set     the balanced split on the lines (`CapacityModel.split`), then the integers around it on the lattice
 ///         ▼                the engines can run: the GPU's rows on MPS's 64-row tile, the ANE's in units of 256
@@ -432,6 +432,25 @@ private struct ProductSolver {
         return out
     }
 
+    /// **The rounded bf16 weight shared with the ANE**: the GPU's rounded rows (`gpu/bf16act`) beside the ANE's fp16 program on the same
+    /// bf16 copy (`[gpu/bf16act, ane/fp16]`), the ANE's rows around the balance — on the denoiser, from the ANE's floor, on a product
+    /// with no short side, and only where the probes measured that pair's own sharing: the rounded kernel runs on the tensor units at
+    /// another rate and draws another power than `gpu/fp32`, whose κ the ×1.52 of the members' lines once borrowed. No AMX beside it:
+    /// the AMX reads a widened weight and the fp32 activation, and the reserve holds the bf16 copy and its rounded rows.
+    func roundedShares(_ key: ProductKey, gpu: Kernel) -> [Option] {
+        let (k, n, m) = (key.k, key.n, key.m)
+        guard c.allowsANE, key.phase == .denoising, m >= c.limits.aneRows, !CapacityModel.isThin(rows: m, k: k, n: n),
+              let ane = line(.ane, .fp16), model.sharing[CapacityModel.key([gpu, ane])] != nil,
+              let seed = model.split(m: m, k: k, n: n, kernels: [gpu, ane], sustained: c.sustained), let r0 = seed.rows[ane] else { return [] }
+        let options = aneRows(m: m, balance: Double(r0)).compactMap { rows -> Option? in
+            let assignment = ProductAssignment(path: .bf16, roundsActivation: true, gpu: m - rows, ane: rows)
+            let split: [Kernel: Int] = [gpu: m - rows, ane: rows]
+            guard assignment.isRunnable(for: key), let t = seconds(split, m: m, k: k, n: n) else { return nil }
+            return Option(assignment: assignment, rows: split, seconds: t)
+        }
+        return options.min(by: { $0.seconds < $1.seconds }).map { [$0] } ?? []
+    }
+
     // MARK: Preparation
 
     func preparation(format: CapacityClasses.WeightFormat, path: WeightPath, k: Int, n: Int) -> Double {
@@ -458,8 +477,11 @@ private struct ProductSolver {
             }
             // Rounding the activation to bf16 trades the operand's last bits for time, within P20 (`allowsRounding`); taken where this
             // Mac's line says it is faster, and only there — on a GPU without bf16 in hardware the fp32 operand stays.
-            if key.phase == .denoising, c.allowsRounding, m >= c.limits.roundingRows, let gpu = line(.gpu, .bf16act), let t = seconds([gpu: m], m: m, k: k, n: n) {
-                options.append(Option(assignment: .gpuAlone(m, path: .bf16, rounds: true), rows: [gpu: m], seconds: t))
+            if key.phase == .denoising, c.allowsRounding, m >= c.limits.roundingRows, let gpu = line(.gpu, .bf16act) {
+                if let t = seconds([gpu: m], m: m, k: k, n: n) {
+                    options.append(Option(assignment: .gpuAlone(m, path: .bf16, rounds: true), rows: [gpu: m], seconds: t))
+                }
+                options += roundedShares(key, gpu: gpu)
             }
         }
         if key.weight == .int8 || key.weight == .q8 { options += native(key) }
@@ -493,7 +515,12 @@ private struct ProductSolver {
             if a.ane > 0 { guard let e = line(.ane, .fp16) else { return nil }; rows[e] = a.ane }
         case .bf16:
             guard let g = line(.gpu, a.roundsActivation ? .bf16act : .bf16) else { return nil }
-            rows[g] = a.gpu
+            if a.gpu > 0 { rows[g] = a.gpu }
+            // The ANE's last rows beside the GPU's rounded ones, its fp16 program on the bf16 copy: the kernels `roundedShares` times.
+            if a.ane > 0 {
+                guard let e = line(.ane, .fp16) else { return nil }
+                rows[e] = a.ane
+            }
         case .native:
             let int8 = key.weight == .int8
             guard let g = line(.gpu, a.roundsActivation ? (int8 ? .int8act : .q8act) : (int8 ? .int8 : .q8)) else { return nil }

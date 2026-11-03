@@ -123,7 +123,9 @@ extension Judge {
 ///     run in bf16 (`HalfPrecisionReference`); the tally then says what the ANE computed.
 ///   - **`--bf16-activations`**: the DiT's products on an activation rounded to bf16, the weights as published, the sums and the
 ///     output fp32, every product of 256 rows or more. Judged like the ANE's, against the reference run in bf16: invariant 3, no
-///     further from the fp64 witness than diffusers in bf16, + 25 %.
+///     further from the fp64 witness than diffusers in bf16, + 25 %. **With `--neural-engine`**, the pair a Standard's map may choose:
+///     half the rows of every bf16 product of 512 rows or more to the ANE's fp16 program on the same bf16 copy, beside the GPU's
+///     rounded rows (`gpu+ane/bf16act`).
 ///   - **`--bf16-attention`**: the DiT's attention on bf16 operands (Q, K, V and the probabilities rounded once, the softmax and the
 ///     sums fp32), in the fused form at the first candidate tile — every attention the plan speaks of. Judged the same way.
 ///   - **`--fp16-attention`**: the same on fp16 operands (`tiles16`) — what a render takes at every version where its map chooses
@@ -215,10 +217,12 @@ package enum NeuralEngineRun {
         }
         // Under `SILICONED_PLAN=aneint8` the integers of a published int8 weight are the program's input: the verdict says how many
         // of the products read them so.
-        let integers = NeuralEngine.int8Tally.withLock { $0 }
+        // With `--bf16-activations` the ANE reads a bf16 weight's copy beside the GPU's rounded rows (`gpu+ane/bf16act`): said too.
+        let integers = NeuralEngine.int8Tally.withLock { $0 }, copies = NeuralEngine.bf16Tally.withLock { $0 }
         report.add(Judge.holds("Neural Engine", true,
                                note: "half the rows of \(handed - givenBack) products"
                                    + (integers > 0 ? ", \(integers) of them on the weight's integers" : "")
+                                   + (copies > 0 ? ", \(copies) of them on the bf16 weight beside the GPU's rounded rows" : "")
                                    + (givenBack > 0 ? ", \(givenBack) given back to the GPU" : "")))
     }
 }

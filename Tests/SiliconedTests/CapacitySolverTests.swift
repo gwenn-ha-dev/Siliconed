@@ -328,6 +328,42 @@ import Testing
         #expect(!refused.assignment.roundsActivation)
     }
 
+    /// **The ANE beside the GPU's rounded rows on a bf16 weight read as published** (`gpu+ane/bf16act`): offered only where the model
+    /// has that pair's own sharing — the engines' `gpu+ane` was measured on `gpu/fp32` and is not its κ —, chosen when faster, with the
+    /// integers the engines run; never on an encoder, a process without the ANE, under the ANE's floor, or with the rounding refused.
+    @Test func theANESharesTheRoundedBF16WeightOnlyByItsOwnSharing() throws {
+        let rounded = M.Kernel(.gpu, .bf16act)
+        var m = machine(aneRate: 6e12)
+        m.lines[rounded] = .init(t0: 0, rate: 12e12)
+        m.preparation[.bf16] = [.widened: 1e-10, .bf16: 1e-11]
+        let bf16 = key(4096, 4096, 4096, .bf16)
+        #expect(try solve(m, bf16).route == "gpu/bf16act", "no sharing of its own: the GPU's rounded kernel alone")
+        // 6 / (12 + 6) of 4 096 rows = 1 365 → the units around it, 1 280 (5 units) and 1 536 (6): 1 280 ends both sides nearest
+        m.sharing["gpu/bf16act+ane/fp16"] = .init(overhead: 0, keep: [.gpu: 1, .ane: 1])
+        var s = try solve(m, bf16)
+        #expect(s.route == "gpu+ane/bf16act" && s.assignment.path == .bf16 && s.assignment.roundsActivation, "\(s.route)")
+        #expect(s.assignment.ane % NeuralEngine.rowUnit == 0 && s.assignment.ane > 0 && s.assignment.gpu + s.assignment.ane == 4096)
+        #expect(s.rows == [rounded: s.assignment.gpu, ane: s.assignment.ane])
+        #expect(abs(s.preparation - 4096 * 4096 * 1e-11) < 1e-9, "the bf16 copy, not a widening")
+        // the pair's answer is the plan's, and the assigned product is timed the same
+        #expect(CapacityPlan(model: m).assign(bf16) == s.assignment)
+        let timed = try #require(CS.product(assigned: s.assignment, key: bf16, model: m, constraints: constraints()))
+        #expect(timed.route == s.route && abs(timed.compute - s.compute) < 1e-12)
+        // a keep that ruins it: the GPU's rounded kernel alone again
+        m.sharing["gpu/bf16act+ane/fp16"] = .init(overhead: 0, keep: [.gpu: 0.3, .ane: 0.3])
+        #expect(try solve(m, bf16).route == "gpu/bf16act")
+        m.sharing["gpu/bf16act+ane/fp16"] = .init(overhead: 0, keep: [.gpu: 1, .ane: 1])
+        // never an encoder, never without the ANE, never under its floor, never with the rounding refused
+        #expect(try solve(m, key(4096, 4096, 4096, .bf16, phase: .encoding)).route == "gpu")
+        #expect(try solve(m, bf16, ane: false).route == "gpu/bf16act")
+        #expect(try solve(m, key(4096, 4096, 512, .bf16)).route == "gpu/bf16act")
+        s = try #require(CS.product(bf16, model: m, constraints: CS.Constraints(sustained: false, allowsRounding: false)))
+        #expect(!s.assignment.roundsActivation && s.route != "gpu+ane/bf16act")
+        // an ANE the judge refused is no candidate
+        let refused = try #require(CS.product(bf16, model: m, constraints: .init(sustained: false, excluded: [ane], allowsANE: true)))
+        #expect(refused.route == "gpu/bf16act")
+    }
+
     // MARK: attention
 
     @Test func theHeadsOfAnAttentionAreBalancedLikeAProduct() throws {
