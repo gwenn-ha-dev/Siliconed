@@ -528,6 +528,7 @@ extension RemoteControl {
         var o: [String: Any] = ["name": s.name, "width": s.width, "height": s.height,
                                 "strength": Response.number(app.startStrength), "used": app.usedStart != nil]
         if let r = app.startRedraws { o["redrawn_steps"] = r.redrawn; o["of_steps"] = r.of }
+        if app.usedStart != nil { o["image_ignored"] = app.startIgnored }
         return o
     }
 }

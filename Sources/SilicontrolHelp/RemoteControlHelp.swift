@@ -810,14 +810,15 @@ package enum RemoteControlHelp {
         THE STRENGTH is diffusers' strength: how far the render moves away from the image. 0.65 or 65%,
         above 0 and at most 1: low keeps its composition and colours, 1 ignores it. It counts in steps:
         at 8 steps, 0.65 redraws 6 of them (0.63 and 0.74 too). Default: Krea 2 0.65, Z-Image and
-        Anima 0.75, MOSS-Image 0.80.
+        Anima 0.75, MOSS-Image 0.80. A strength that redraws every step (at 8 steps, above 0.875)
+        starts from noise alone: the image is ignored ("image_ignored": true), the render goes on.
         Kept in hundredths: the PNG writes it ("Denoising strength"), « reuse » brings it back — the
         image itself is not in the file.
 
         ANSWER
           {"ok": true, "rack": {"model": "z-image", "width": 1024, "height": 1024, …,
             "start_image": {"name": "photo.png", "width": 3024, "height": 4032, "strength": 0.65,
-                            "used": true, "redrawn_steps": 6, "of_steps": 8}}}
+                            "used": true, "redrawn_steps": 6, "of_steps": 8, "image_ignored": false}}}
           "start_image": null when the rack holds none; "used": false when the rack's model does not
           start from an image (it is then dropped at the next change of model). « status » says the same.
 
@@ -1981,14 +1982,15 @@ package enum RemoteControlHelp {
         LA FORCE est la strength de diffusers : jusqu'où le rendu s'éloigne de l'image. 0.65 ou 65%,
         au-dessus de 0 et au plus 1 : basse, elle garde sa composition et ses couleurs ; 1 l'ignore. Elle
         compte en pas : à 8 pas, 0.65 en redessine 6 (0.63 et 0.74 aussi). Défaut : Krea 2 0.65, Z-Image et
-        Anima 0.75, MOSS-Image 0.80.
+        Anima 0.75, MOSS-Image 0.80. Une force qui redessine tous les pas (à 8 pas, au-delà de 0.875)
+        part du bruit seul : l'image est ignorée ("image_ignored": true), le rendu se fait quand même.
         Gardée au centième : le PNG l'écrit ("Denoising strength"), « reuse » la rend — l'image
         elle-même n'est pas dans le fichier.
 
         RÉPONSE
           {"ok": true, "rack": {"model": "z-image", "width": 1024, "height": 1024, …,
             "start_image": {"name": "photo.png", "width": 3024, "height": 4032, "strength": 0.65,
-                            "used": true, "redrawn_steps": 6, "of_steps": 8}}}
+                            "used": true, "redrawn_steps": 6, "of_steps": 8, "image_ignored": false}}}
           "start_image" : null quand le rack n'en tient pas ; "used": false quand le modèle du rack ne
           part pas d'une image (elle part alors au prochain changement de modèle). « status » dit pareil.
 

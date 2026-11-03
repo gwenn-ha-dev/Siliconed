@@ -408,8 +408,11 @@ struct StartImageNode: View {
                     }
                     .help(StartWords.explanation(app.startRedraws))
                 }
-                Text(app.startBlocker ?? String(localized: "The render starts from this image and keeps its composition. The size can differ: the centre is kept."))
-                    .font(.caption).foregroundStyle(app.startBlocker == nil ? .secondary : Palette.failure)
+                let caption = app.startCaption
+                Text(caption.text)
+                    .font(.caption)
+                    .foregroundStyle(caption.tone == .failure ? Palette.failure
+                                     : caption.tone == .warning ? Color(nsColor: .systemOrange) : Color.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }

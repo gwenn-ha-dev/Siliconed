@@ -8061,6 +8061,46 @@
         }
       }
     },
+    "At this strength the image is ignored: the render starts from noise alone. Lower it to keep its composition." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bei dieser Stärke wird das Bild ignoriert: Das Rendern beginnt nur mit Rauschen. Senken Sie sie, um seine Komposition zu behalten."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Con esta fuerza la imagen se ignora: el render parte solo del ruido. Bájala para conservar su composición."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "À cette force, l’image est ignorée : le rendu part du bruit seul. Baissez-la pour garder sa composition."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Con questa forza l’immagine viene ignorata: il rendering parte dal solo rumore. Abbassala per mantenerne la composizione."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この強さでは画像は無視され、ノイズだけから生成されます。構図を残すには強さを下げてください。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在此强度下图像会被忽略：渲染仅从噪声开始。请调低强度以保留其构图。"
+          }
+        }
+      }
+    },
     "At this strength the image would come back unchanged: raise it." : {
       "localizations" : {
         "de" : {

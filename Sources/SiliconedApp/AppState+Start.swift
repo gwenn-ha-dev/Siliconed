@@ -59,6 +59,25 @@ extension AppState {
         return String(localized: "At this strength the image would come back unchanged: raise it.")
     }
 
+    /// **Whether the strength ignores the image**: it redraws the whole schedule, from σ = 1 — pure noise, the image weighs
+    /// nothing (at 8 steps, above 7/8). Rendered all the same, as diffusers does; said under the slider.
+    var startIgnored: Bool {
+        guard usedStart != nil, steps >= 1, let denoising = chain?.denoising,
+              Strength.startStep(steps: steps, strength: startStrength) == 0 else { return false }
+        return (denoising.sigmas(steps: steps).first ?? 0) >= 1
+    }
+
+    /// What the rack says under the slider: why « Generate » waits, that the image is ignored, or what a start does.
+    var startCaption: (text: String, tone: StartTone) {
+        if let blocker = startBlocker { return (blocker, .failure) }
+        if startIgnored {
+            return (String(localized: "At this strength the image is ignored: the render starts from noise alone. Lower it to keep its composition."), .warning)
+        }
+        return (String(localized: "The render starts from this image and keeps its composition. The size can differ: the centre is kept."), .plain)
+    }
+
+    enum StartTone { case plain, warning, failure }
+
     // MARK: Carrying, retouching, removing
 
     /// **A starting image comes into the rack** — from the Prompt Lab or the remote control: with its strength (the rack's when
