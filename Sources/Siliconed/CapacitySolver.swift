@@ -50,7 +50,8 @@ import Foundation
 ///   - **A set is taken on what a render pays, past the error of the difference.** Its seconds against the simpler assignment's (the
 ///     best on a strict subset of its kernels), the set kept only where the gap passes twice √(se_S² + se_alt²): the set's standard
 ///     error from three chains where two disagreed (`Sharing.noise`, the MAD of the median chain), the map's σ for every other figure
-///     (`passingTheirError`). A gain under it is one the next map reverses.
+///     (`passingTheirError`). A gain under it is one the next map reverses. **A set with the ANE is read the other way** (the ANE on a
+///     tie, decided 3/11/2026): dropped only where proven slower by as much, taken within that error of the fastest, its most rows first.
 ///   - **The ANE against the AMX, and only there, a preference — not a figure of speed.** The best candidate with the ANE and
 ///     without the AMX may be up to `aneOverAMX` (15 %) slower than the best with the AMX: then every candidate with the AMX is
 ///     dropped, and the rest is solved as everywhere (the least t, the noise, the written order). Against the GPU alone, or between
@@ -533,9 +534,26 @@ private struct ProductSolver {
         let timed = passingTheirError(arbitrated(canonical(candidates(key)).map { o in
             (o, o.seconds + preparation(format: key.weight, path: o.assignment.path, k: key.k, n: key.n))
         }))
-        guard let fastest = timed.map(\.1).min() else { return nil }
+        guard let fastest = timed.min(by: { $0.1 < $1.1 }) else { return nil }
         let width = margin(thin: CapacityModel.isThin(rows: key.m, k: key.k, n: key.n))
-        return timed.first { $0.1 <= fastest * (1 + width) }.map { solution($0.0, key) }
+        // Within the margin the written order decides; a candidate with the ANE is also taken anywhere within the error of its
+        // difference with the fastest (the ANE on a tie: decided 3/11/2026), the first in that order — the most rows first.
+        return timed.first { o in
+            o.1 <= fastest.1 * (1 + width) || (o.0.uses(.ane) && o.1 - fastest.1 <= 2 * differenceError(o, fastest))
+        }.map { solution($0.0, key) }
+    }
+
+    /// The standard error of a figure's seconds, relative: a set's own where its chains were measured three times (`Sharing.noise`),
+    /// the map's σ for any other figure.
+    func relativeError(_ ks: [Kernel]) -> Double {
+        let sigma = CapacityFit.sigma(mapNoise: model.noise) ?? 0
+        return ks.count >= 2 ? (model.sharing(ks).noise ?? sigma) : sigma
+    }
+
+    /// √(e_a² t_a² + e_b² t_b²): the standard error of the difference of two candidates' seconds.
+    func differenceError(_ a: (Option, Double), _ b: (Option, Double)) -> Double {
+        let (ea, eb) = (relativeError(kernels(a.0)) * a.1, relativeError(kernels(b.0)) * b.1)
+        return (ea * ea + eb * eb).squareRoot()
     }
 
     /// The kernels `o` gives rows to, as a set's key reads them.
@@ -549,9 +567,12 @@ private struct ProductSolver {
     /// √(e_S² t_S² + e_alt² t_alt²), and a gain under twice it is one the next map reverses more than one time in forty-four (a normal's tail past 2σ): the set's
     /// candidates are then dropped. Not twice a noise per chain (an earlier form: the integers' rounded pair dropped from
     /// every Compact under one map of two, +10 to +15 % predicted at 1 024², its noise the gap of two chains, one of them disturbed).
+    ///
+    /// **A set with the ANE is the other way round** (the user's decision, 3/11/2026: the ANE on a tie — the same speed for fewer
+    /// watts): it is dropped only where it is proven slower than the simpler assignment, by more than twice the same error; within
+    /// it, it stays, and `solve` takes it within the error of the fastest, its most rows first. Both sides are as stable from one map
+    /// to the next: the boundary is the same error, read on the other side.
     func passingTheirError(_ timed: [(Option, Double)]) -> [(Option, Double)] {
-        let sigma = CapacityFit.sigma(mapNoise: model.noise) ?? 0
-        func error(_ ks: [Kernel]) -> Double { ks.count >= 2 ? (model.sharing(ks).noise ?? sigma) : sigma }
         var sets: [String: [Kernel]] = [:]
         for (o, _) in timed { let ks = kernels(o); if ks.count >= 2 { sets[CapacityModel.key(ks)] = ks } }
         var out = timed
@@ -560,8 +581,9 @@ private struct ProductSolver {
             guard let best = timed.filter({ CapacityModel.key(kernels($0.0)) == set }).min(by: { $0.1 < $1.1 }),
                   let simpler = timed.filter({ (o: (Option, Double)) -> Bool in let ks = Set(kernels(o.0)); return !ks.isEmpty && ks.isStrictSubset(of: mine) }).min(by: { $0.1 < $1.1 })
             else { continue }
-            let eS = error(ks) * best.1, eAlt = error(kernels(simpler.0)) * simpler.1
-            guard simpler.1 - best.1 <= 2 * (eS * eS + eAlt * eAlt).squareRoot() else { continue }
+            let bound = 2 * differenceError(best, simpler)
+            let dropped = ks.contains { $0.engine == .ane } ? best.1 - simpler.1 > bound : simpler.1 - best.1 <= bound
+            guard dropped else { continue }
             out.removeAll { CapacityModel.key(kernels($0.0)) == set }
         }
         return out

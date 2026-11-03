@@ -111,16 +111,27 @@ import Testing
         return try #require(CS.product(key, model: m, constraints: .init(sustained: false))).route
     }
 
-    @Test func aPairWithinTheErrorOfTheDifferenceIsNotTaken() throws {
-        // ANE 0.25 TFLOP/s beside a GPU of 3: the pair ≈ 7 % faster than the GPU alone.
-        #expect(try route(machine(aneRate: 0.25e12, error: nil)) == "gpu+ane")
-        // its figure known to 5 %: the gap is under twice the error of the difference
-        #expect(try route(machine(aneRate: 0.25e12, error: 0.05)) == "gpu")
-        // known to 1 %: kept
-        #expect(try route(machine(aneRate: 0.25e12, error: 0.01)) == "gpu+ane")
-        // the map's own σ on both figures: 2.17 % of rounds (σ 1.28 %) passes, 8 % (σ 4.7 %) does not
-        #expect(try route(machine(aneRate: 0.25e12, error: nil, mapNoise: 0.0217)) == "gpu+ane")
-        #expect(try route(machine(aneRate: 0.25e12, error: nil, mapNoise: 0.08)) == "gpu")
+    @Test func aPairWithTheANEWithinTheErrorOfTheDifferenceIsTaken() throws {
+        // ANE 0.25 TFLOP/s beside a GPU of 3: the pair ≈ 7 % faster than the GPU alone, kept whatever its figure's error —
+        // a set with the ANE is dropped only where proven slower (the ANE on a tie, decided 3/11/2026)
+        for (error, noise) in [(nil, nil), (0.05, nil), (0.01, nil), (nil, 0.0217), (nil, 0.08)] as [(Double?, Double?)] {
+            #expect(try route(machine(aneRate: 0.25e12, error: error, mapNoise: noise)) == "gpu+ane", "error \(error ?? -1), noise \(noise ?? -1)")
+        }
+    }
+
+    @Test func aSetWithoutTheANEMustPassTheErrorOfTheDifference() throws {
+        // the same gap with the AMX in the ANE's place: taken only past twice the error of the difference
+        func amxMachine(error: Double?, mapNoise: Double? = nil) -> M {
+            var m = M()
+            m.lines[gpu] = .init(t0: 0, rate: 3e12)
+            m.lines[M.Kernel(.amx, .fp32)] = .init(t0: 0, rate: 0.25e12)
+            m.sharing["gpu+amx"] = .init(overhead: 0, keep: [.gpu: 1, .amx: 1], noise: error)
+            m.noise = mapNoise
+            return m.withFreeSharing()
+        }
+        #expect(try route(amxMachine(error: 0.01)) == "gpu+amx")
+        #expect(try route(amxMachine(error: 0.05)) == "gpu")
+        #expect(try route(amxMachine(error: nil, mapNoise: 0.08)) == "gpu")
     }
 
     @Test func aPairWinningByMoreThanTheErrorIsTaken() throws {

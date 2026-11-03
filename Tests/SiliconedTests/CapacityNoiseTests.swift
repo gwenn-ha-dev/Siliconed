@@ -40,17 +40,14 @@ import Testing
         for (k, n) in [(12288, 4096), (10240, 3840), (16384, 6144), (4096, 4096)] {
             let small = try #require(CS.product(ProductKey(k: k, n: n, m: 1024, weight: .bf16, phase: .denoising), model: model, constraints: c))
             #expect(small.route == "gpu/bf16act", "\(k)x\(n)@1024: \(small.route)")
-            // at 4 096 rows the pair stays ahead by a few percent; it is taken only past twice the error of the difference
-            // (the map's σ on both figures, `passingTheirError`), the GPU alone under it
+            // at 4 096 rows the pair stays ahead by a few percent: a set with the ANE is kept unless proven slower (the ANE on a tie)
             let largeKey = ProductKey(k: k, n: n, m: 4096, weight: .bf16, phase: .denoising)
             let all = CS.candidates(largeKey, model: model, constraints: c)
             let pair = try #require(all.filter { $0.route == "gpu+ane/bf16act" }.map { $0.compute + $0.preparation }.min())
             let alone = try #require(all.first { $0.route == "gpu/bf16act" }.map { $0.compute + $0.preparation })
             #expect(pair < alone, "\(k)x\(n)@4096: \(pair) against \(alone)")
-            let sigma = try #require(CapacityFit.sigma(mapNoise: model.noise))
-            let passes = alone - pair > 2 * sigma * (pair * pair + alone * alone).squareRoot()
             let large = try #require(CS.product(largeKey, model: model, constraints: c))
-            #expect(large.route == (passes ? "gpu+ane/bf16act" : "gpu/bf16act"), "\(k)x\(n)@4096: \(large.route), gap \(1 - pair / alone)")
+            #expect(large.route == "gpu+ane/bf16act", "\(k)x\(n)@4096: \(large.route), gap \(1 - pair / alone)")
         }
         // the same map without the term: its 256 ANE rows priced the copy's widening lower. With it, the pair at the ANE's floor is
         // still a candidate (the balance gives the ANE nothing), but far past the margin
@@ -136,14 +133,14 @@ import Testing
      "preparation": {"bf16": {"bf16": 1.5248e-11, "widened": 2.3016e-11}}}
     """#
 
-    /// **The pair 0.1 % either side of the GPU alone is the GPU alone, whichever map measured what** (a set is taken past twice
-    /// the error of the difference, `passingTheirError`; before, under the margin, the written order gave it the pair): Z-Image's `3840x10240` at a 1 024²
+    /// **The pair 0.1 % either side of the GPU alone is the pair, whichever map measured what** (a set with the ANE is dropped only
+    /// where proven slower, past twice the error of the difference — the ANE on a tie, decided 3/11/2026): Z-Image's `3840x10240` at a 1 024²
     /// image's 4 128 rows, which the first map priced 0.1 % under the GPU alone (the pair taken) and the second left out (the balance
     /// gave the ANE no row: no candidate, the GPU alone; offered at its floor alone, the pair's best time jumped by 4 % where the balance
     /// starts to give it rows). Each map's lines with each map's sharing, the ANE's speed set so that the pair
-    /// lands 0.1 % under, then 0.1 % over the GPU alone: the GPU alone in all eight, never the sign of the gap; a tenth under, the pair,
-    /// at the ANE's most rows within the margin (never the rows a flat minimum falls on); and the GPU alone once the pair is past it.
-    @Test func thePairATenthOfAPercentAwayIsTheGPUAlone() throws {
+    /// lands 0.1 % under, then 0.1 % over the GPU alone: the pair in all eight, never the sign of the gap, at the ANE's most rows
+    /// within the margin (never the rows a flat minimum falls on); a tenth under, the pair; and the GPU alone once the pair is past it.
+    @Test func thePairATenthOfAPercentAwayIsThePair() throws {
         let a = try JSONDecoder().decode(M.self, from: Data(Self.pairMapA.utf8))
         let b = try JSONDecoder().decode(M.self, from: Data(Self.pairMapB.utf8))
         let key = ProductKey(k: 3840, n: 10240, m: 4128, weight: .bf16, phase: .denoising)
@@ -178,13 +175,8 @@ import Testing
             for sharing in [a, b] {
                 var m = lines
                 m.sharing[pairKey] = sharing.sharing[pairKey]
-                // a tenth of a percent either side: within the error of the difference, the GPU alone in all eight
-                for ratio in [0.999, 1.001] {
-                    let s = try #require(CS.product(key, model: try tuned(m, ratio), constraints: c))
-                    #expect(s.route == "gpu/bf16act", "ratio \(ratio), noise \(m.noise ?? 0): \(s.route)")
-                }
-                // a tenth off: past twice the error of the difference (2√2 σ, 2.1 to 4 % under these maps), the pair
-                for ratio in [0.90] {
+                // a tenth of a percent either side (within the error of the difference: the ANE on a tie), and a tenth under
+                for ratio in [0.999, 1.001, 0.90] {
                     let t = try tuned(m, ratio)
                     let s = try #require(CS.product(key, model: t, constraints: c))
                     #expect(s.route == "gpu+ane/bf16act", "ratio \(ratio), noise \(m.noise ?? 0): \(s.route)")
