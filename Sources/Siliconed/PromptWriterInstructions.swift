@@ -17,9 +17,11 @@ import Foundation
 ///   - **The answer is the prompt alone**: it goes straight into the rack's prompt field.
 ///   - **Length**: diffusers cuts Z-Image, Anima and Krea 2 at 512 tokens, and Qwen-Image-2.1's own cut is
 ///     1 024 (`Request.maximumPromptTokens`); the rewrites ask for under 350 words (about 470 tokens), inside both.
-///     Krea 2 and MOSS-Image ask for the length their publisher's own prompts have (60 to 150 words, 60 to 120): with a
-///     ceiling alone, the greedy writer filled Krea 2's « cat » with « no … » clauses up to the token limit — a list that
-///     never repeats exactly, which the loop guard (`PromptWriterLoop`) cannot see — and MOSS-Image's « cat » stayed « a cat ».
+///     MOSS-Image asks for the length its publisher's enhancer gives (60 to 120 words): a minimal text left as it was
+///     stayed « a cat ». Krea 2 keeps the ceiling alone: a range of 60 to 150 words cut its rich rewrites down to the
+///     length where the concrete words go first (camera angle, focus, texture, a poster's flat colours) and mood prose
+///     and one golden light come in. What filled its « cat » up to the token limit was « no … » clauses — a list that
+///     never repeats exactly, which the loop guard (`PromptWriterLoop`) cannot see —, not the missing range.
 ///   - **What is there, never what is not**: an exclusion the user did not write (« no text », « no people ») is a
 ///     subject the text encoder reads all the same; Krea 2's and MOSS-Image's instructions forbid them. Their longer
 ///     prose also turned the writer's quotes curly (« “CROZON” »): they ask for straight ones, as the user typed them.
@@ -96,19 +98,22 @@ package enum PromptWriterInstructions {
             // Krea 2's expansion prompt and prompting guide, rules 1 to 7 and 9 (fidelity, subjects with their attributes,
             // quoted text, no over-specifying, one paragraph, light polish of a detailed prompt, the requested medium).
             // Its rule 8 ("Respect the Human Form") dresses people whatever the request says: not followed.
-            // The expansion prompt sets no length; the guide's twenty example prompts run from 10 to 180 words (half
-            // under 75), all of them descriptions of what is in the picture — none says "no" or "without".
+            // The guide's twenty example prompts are all descriptions of what is in the picture — none says "no" or
+            // "without". The length stays a ceiling: a range (60 to 150 words) and "cohesive" turned the rich rewrites
+            // into shorter mood prose under one golden light, and a short text's development is asked without a setting
+            // or a light to impose. The rule against absences comes second: placed last, the greedy writer let « no … »
+            // clauses back into « cat » and the library.
             //   https://github.com/krea-ai/krea-2/blob/main/docs/expansion.txt
             //   https://github.com/krea-ai/krea-2/blob/main/docs/prompting.md
-            return "Write in natural language, one cohesive paragraph of 60 to 150 words, no bullets. "
+            return "Write in natural language, one paragraph, no bullets. "
                 + "Describe only what is in the picture, never what is absent: write no phrase beginning with \"no\" or \"without\" "
-                + "unless the user wrote it. Quoted text keeps straight double quotes (\"), not curly ones. "
-                + "Group each subject with its attributes and actions. "
+                + "unless the user wrote it, not even at the end to say what the picture leaves out. "
+                + "Quoted text keeps straight double quotes (\"), not curly ones. "
+                + "Group each subject with its attributes. "
                 + "Do not add objects, props, characters or animals the text does not imply, and do not invent clothing, "
                 + "colours or materials it does not mention. Keep the medium the text asks for (\"photo of\", \"painting of\"). "
                 + "Add composition, framing, lighting and style where they are open. "
-                + "A very short text, even a single word, still becomes a full paragraph: give it a plausible setting, "
-                + "the pose or action, the light and the medium."
+                + "A very short text, even a single word, still becomes a full paragraph. Under 350 words."
         case .mossImage:
             // MOSS-Image's user guide (English, the tag order, the @ before artists) and its prompt-enhancer skill
             // (keep subjects, counts, relations, medium, style and visible wording; no redundant quality tags;
