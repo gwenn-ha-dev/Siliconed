@@ -43,7 +43,8 @@ import Foundation
 ///     with it, with the ANE before without (on equal time the engines' efficiency decides: the ANE's watts are the fewest, the AMX's the
 ///     most — a margin may favour the ANE, never the AMX), fewer engines, then the finer operand (the weight widened to fp32, the weight as
 ///     published on an fp32 activation, its activation rounded; the integers on an fp32 activation, then rounded), then the order the
-///     candidates are listed in. Stateless: the same map gives the same plan, and
+///     candidates are listed in. Two GPU forms of a thin product pay one fixed cost (`CapacityFit.thinLines`): their gap is read to the wide
+///     margin, the thin one being the width of fixed costs (`oneFixedCost`). Stateless: the same map gives the same plan, and
 ///     a second map of the same Mac changes a choice only where the gain passes the noise. A pair beside the ANE is offered at every
 ///     unit of the ANE's rows, the balance's or not, the most rows first (`pairRows`): a gap either side of zero is read the same way,
 ///     and the ANE's share within the margin is the written order's too. A map without rounds keeps the old rule (a part in a billion).
@@ -535,12 +536,24 @@ private struct ProductSolver {
             (o, o.seconds + preparation(format: key.weight, path: o.assignment.path, k: key.k, n: key.n))
         }))
         guard let fastest = timed.min(by: { $0.1 < $1.1 }) else { return nil }
-        let width = margin(thin: CapacityModel.isThin(rows: key.m, k: key.k, n: key.n))
+        let thin = CapacityModel.isThin(rows: key.m, k: key.k, n: key.n)
         // Within the margin the written order decides; a candidate with the ANE is also taken anywhere within the error of its
         // difference with the fastest (the ANE on a tie: decided 3/11/2026), the first in that order — the most rows first.
         return timed.first { o in
-            o.1 <= fastest.1 * (1 + width) || (o.0.uses(.ane) && o.1 - fastest.1 <= 2 * differenceError(o, fastest))
+            o.1 <= fastest.1 * (1 + margin(thin: thin && !oneFixedCost(o.0, fastest.0)))
+                || (o.0.uses(.ane) && o.1 - fastest.1 <= 2 * differenceError(o, fastest))
         }.map { solution($0.0, key) }
+    }
+
+    /// **Whether two candidates pay one fixed cost**: both on the GPU alone, whose thin lines share one `t₀` (`CapacityFit.thinLines`). The
+    /// thin margin is the width of the fixed costs two maps read apart (`MatmulTile.thinMargin`); where both candidates pay the same one, it
+    /// is no part of their difference, and what is left — what each streams and computes — is read to the wide margin. Two GPU forms of a
+    /// text encoder's 19-row product, 14.6 % apart in one map and 15.5 % in the next, made two plans under the thin margin's 15 %.
+    func oneFixedCost(_ a: Option, _ b: Option) -> Bool {
+        let engines = Set(kernels(a).map(\.engine)).union(kernels(b).map(\.engine))
+        guard engines == [.gpu], kernels(a).count == 1, kernels(b).count == 1, let ka = kernels(a).first, let kb = kernels(b).first,
+              let ta = model.thin[ka]?.t0, let tb = model.thin[kb]?.t0 else { return false }
+        return ta == tb
     }
 
     /// The standard error of a figure's seconds, relative: a set's own where its chains were measured three times (`Sharing.noise`),
@@ -689,13 +702,24 @@ private struct ProductSolver {
             guard let g = gpuLine(a.gpuKernel), let cpu = line(.cpu, .heads), model.measures([.gpu, .cpu]) else { return nil }
             rows = [g: key.heads - a.cpuHeads, cpu: a.cpuHeads]
         }
-        guard let t = model.seconds(m: key.heads, k: per, n: 1, rows: rows, sustained: c.sustained) else { return nil }
-        var b = Dictionary(model.busy(m: key.heads, k: per, n: 1, rows: rows, sustained: c.sustained).map { ($0.key.engine, $0.value) }, uniquingKeysWith: +)
+        guard var t = model.seconds(m: key.heads, k: per, n: 1, rows: rows, sustained: c.sustained) else { return nil }
+        let ends = model.busy(m: key.heads, k: per, n: 1, rows: rows, sustained: c.sustained)
+        var b = Dictionary(ends.map { ($0.key.engine, $0.value) }, uniquingKeysWith: +)
         // A self-attention follows the CPU's QK-norm and RoPE, the GPU idle: its call pays the GPU's wake (`CapacityModel.wake`), whatever
-        // the kernel — the same for every candidate, so it changes no choice, only the time. A cross-attention's keys are the text's.
+        // the kernel. A cross-attention's keys are the text's. **The GPU's side alone is late**: under a cut by heads the CPU's heads start
+        // as the call does, so the wake moves the GPU's end, and the call's only where the GPU's side is the last (the overlap's own end
+        // plus the wake, against the CPU's; the set's regime and overhead as `CapacityModel.seconds` applies them). Alone on the GPU, the
+        // same as before: the time plus the wake.
         let wake = key.cross ? 0 : model.wake ?? 0
-        if wake > 0 { b[.gpu, default: 0] += wake }
-        return (a.kernel.rawValue, rows, t + wake, b)
+        if wake > 0 {
+            b[.gpu, default: 0] += wake
+            let running = rows.filter { $0.value > 0 }.map(\.key)
+            if running.count > 1, let last = ends.map({ $0.value + ($0.key.engine == .gpu ? wake : 0) }).max() {
+                let set = model.sharing(running)
+                t = last * (c.sustained ? max(1, set.sustained ?? 1) : 1) + set.overhead
+            } else { t += wake }
+        }
+        return (a.kernel.rawValue, rows, t, b)
     }
 
     /// The line of a kernel the GPU runs (all the heads, or its share under a split); the fp16 one only where the request allows half
