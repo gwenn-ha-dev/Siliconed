@@ -274,8 +274,9 @@ extension RemoteControl {
     /// installed version; without `--model`, the model in the rack. Only with the queue empty, so that a series is not started
     /// under one recipe and finished under the other (a job keeps the value it was queued with:
     /// `RenderSettings.fasterRendering`). Setting the value it already has is not a change. The Beta options are the window's
-    /// switches, which have no such wait, and nor do these.
-    func set(_ arguments: [String]) throws -> [String: Any] {
+    /// switches, which have no such wait, and nor do these. `set save-images FOLDER|off` is Settings ▸ General's Save Every
+    /// Image To… (`EveryImage`), this Mac's: an existing folder, never created, as the panel only offers one.
+    func set(_ arguments: [String], cwd: String) throws -> [String: Any] {
         let order: SetOrder
         switch SetOrder.parse(arguments) {
         case .success(let parsed): order = parsed
@@ -285,6 +286,20 @@ extension RemoteControl {
                           help: String(localized: "Beta options: \(BetaOption.names)"))
         }
         switch order {
+        case .saveImagesState: return ["ok": true, "save_images": EveryImage.shared.folder?.path ?? NSNull()]
+        case .saveImages(let typed):
+            let previous: Any = EveryImage.shared.folder?.path ?? NSNull()
+            if let typed {
+                let path = absolute(typed, cwd)
+                var isFolder: ObjCBool = false
+                guard FileManager.default.fileExists(atPath: path, isDirectory: &isFolder), isFolder.boolValue else {
+                    throw Refusal("write", String(localized: "not a folder: \(path)"), help: String(localized: "give an existing folder"))
+                }
+                EveryImage.shared.folder = URL(fileURLWithPath: path, isDirectory: true)
+            } else {
+                EveryImage.shared.folder = nil
+            }
+            return ["ok": true, "save_images": EveryImage.shared.folder?.path ?? NSNull(), "previous": previous]
         case .betaList: return ["ok": true, "beta": betaState()]
         case .beta(let option, let on): return setBeta(option, on)
         case .perModel(let kind, let on, let model):

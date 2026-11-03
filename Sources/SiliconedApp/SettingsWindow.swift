@@ -11,7 +11,7 @@
 //     │ └──────────────────────────────────────────────────┘ │
 //     └──────────────────────────────────────────────────────┘
 //
-//     General     what an everyday user touches: the library.
+//     General     what an everyday user touches: the library; Save Every Image To… (off by default: `EveryImage`).
 //     Other Macs  lend this Mac, compute on another (`OtherMacsView.swift`).
 //     Advanced    kept out of the way: This Mac (the capacity map, measured only when asked), Command
 //                 Line (silicontrol, linked into /usr/local/bin), Beta (More Solvers, Faster Rendering,
@@ -102,8 +102,27 @@ struct SettingsView: View {
                 Text(verbatim: app.library.displayPath).font(.caption).textSelection(.enabled)
                 library
             }
+            everyImage
         }
         .formStyle(.grouped)
+    }
+
+    /// **Save Every Image To…**: off, the app keeps its images in memory only; turned on, the folder panel first — Cancel
+    /// leaves it off.
+    private var everyImage: some View {
+        let every = EveryImage.shared
+        return Section {
+            Toggle(isOn: Binding(get: { every.folder != nil }, set: { on in if on { every.choose() } else { every.folder = nil } })) {
+                SettingLabel("Save Every Image To…", "Off by default: images stay in memory until you save them. On, each new image — a render, a crop, an enlargement, a grid’s sheet — is also saved to this folder as a PNG, with its prompt, seed and model.")
+            }
+            if let folder = every.folder {
+                Text(verbatim: folder.path).font(.caption).textSelection(.enabled)
+                HStack {
+                    Button("Change Folder…") { every.choose() }
+                    Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([folder]) }
+                }
+            }
+        }
     }
 
     /// Out of the everyday way: the capacity map that renders are planned from, the terminal, then what

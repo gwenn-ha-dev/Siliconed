@@ -101,7 +101,7 @@ final class RemoteControl {
             case "cancel": finish(c, try cancel(arguments))
             case "clear": finish(c, clear())
             case "set":
-                finish(c, try set(arguments))
+                finish(c, try set(arguments, cwd: cwd))
             case "history": finish(c, try history(arguments))
             case "save": finish(c, try save(arguments, cwd: cwd))
             case "vary":

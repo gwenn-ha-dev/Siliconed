@@ -20,7 +20,7 @@ One developer, one MacBook Pro with 16 GB, and a stubborn rule: if a result cann
 
 ## Download (it is a .dmg, nothing exotic)
 
-The app ships as a `.dmg` on the [Releases](https://github.com/gwenn-ha-dev/Siliconed/releases) page. Requirements: macOS 26 or later, Apple silicon. Nothing comes preinstalled: you pick the models from inside the app, read each license, and only then does a byte download. To build it yourself: [Build from source](docs/ENGINE.md#build-from-source).
+The app ships as a `.dmg` on the [Releases](https://github.com/gwenn-ha-dev/Siliconed/releases) page. Requirements: macOS 26 or later, Apple silicon. Nothing comes preinstalled: you pick the models from inside the app, read each license, and only then does a byte download. To build it yourself: [Build from source](docs/ENGINE.md#build-from-source); Xcode 26 or later is required (the Command Line Tools alone cannot build the app).
 
 ## What it does
 

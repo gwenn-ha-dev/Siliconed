@@ -293,17 +293,18 @@ final class MainWindow: NSObject, NSWindowDelegate {
     /// field's text view uses — takes the old prompt: ⌘Z in the field, or Edit ▸ Undo, brings it back, ⇧⌘Z carries again.
     /// **The field gives the keyboard up first**: a text view being edited keeps its own text over the binding's, so a
     /// carry made while the rack's Prompt had the caret (after a ⌘Z there, say) left the old prompt on screen and in the
-    /// form. Writing into the text view itself was the first way, and it lost to that too.
-    func setPrompt(_ text: String, of app: AppState) {
+    /// form. Writing into the text view itself was the first way, and it lost to that too. The prompt's clear button
+    /// comes through here as well, under its own name in Edit ▸ Undo (`action`).
+    func setPrompt(_ text: String, of app: AppState, action: String = String(localized: "Carry to the Rack")) {
         let old = app.prompt
         guard old != text else { return }
         if app === self.app, let w = window, w.firstResponder is NSText { w.makeFirstResponder(nil) }
         app.prompt = text
         guard let undo = app.undoManager else { return }
         undo.registerUndo(withTarget: app) { [weak self] app in
-            if let self { self.setPrompt(old, of: app) } else { app.prompt = old }
+            if let self { self.setPrompt(old, of: app, action: action) } else { app.prompt = old }
         }
-        undo.setActionName(String(localized: "Carry to the Rack"))
+        undo.setActionName(action)
     }
 
     /// Empties `<root>/cache/` (incognito, `Delegate`). A failure costs nothing but disk: the next
@@ -323,7 +324,6 @@ final class MainWindow: NSObject, NSWindowDelegate {
         f.toolbarStyle = .unified
         f.titlebarSeparatorStyle = .automatic
         f.setContentSize(NSSize(width: 1480, height: 940))
-        f.contentMinSize = NSSize(width: 1000, height: 680)
         f.isReleasedWhenClosed = false
         f.delegate = self
         // Incognito: no window position retained, no state restored at the next launch.
@@ -646,6 +646,16 @@ final class MainWindow: NSObject, NSWindowDelegate {
         }
     }
 
+    /// **The smallest the window gets** (`MinimumContent`), read on screen (3/11/2026) with the column at its usual 380 pt: 1000 wide
+    /// leaves the canvas 620, where the bar under an image keeps its legend on one line beside its six or seven buttons (at 860 it
+    /// takes two lines, at 760 three and the prompt is cut to a word); 680 high leaves the rack its Prompt box above a footer that
+    /// grows with a queue (four rows and a half) and a problem's card, and the canvas an image of about 480 pt over its strip.
+    static let minimumContent = NSSize(width: 1000, height: 680)
+
+    func windowWillResize(_ sender: NSWindow, to frameSize: NSSize) -> NSSize {
+        sender === window ? MinimumContent.clamp(frameSize, of: sender, to: Self.minimumContent) : frameSize
+    }
+
     func windowWillClose(_ notification: Notification) {
         // The palette closes by itself; only the main window tears down.
         guard (notification.object as? NSWindow) === window else { return }
@@ -653,6 +663,18 @@ final class MainWindow: NSObject, NSWindowDelegate {
         // Nothing must keep occupying the GPU with no view to show the result.
         app.unmount()
         window = nil
+    }
+}
+
+/// **A window's minimum, held by its delegate.** `contentMinSize` does not hold under SwiftUI: the hosting controller sets it
+/// back to zero once it lays the window out (read on macOS 27, 3/11/2026: 0 × 0 on the main window and the Prompt Lab's,
+/// both set to more before), and a window could then be dragged down to its title bar (issue #7).
+enum MinimumContent {
+    /// The frame size a live resize asks for, grown so that its content is never smaller than `minimum`.
+    @MainActor static func clamp(_ frameSize: NSSize, of window: NSWindow, to minimum: NSSize) -> NSSize {
+        let content = window.contentRect(forFrameRect: NSRect(origin: .zero, size: frameSize)).size
+        return NSSize(width: frameSize.width + max(0, minimum.width - content.width),
+                      height: frameSize.height + max(0, minimum.height - content.height))
     }
 }
 

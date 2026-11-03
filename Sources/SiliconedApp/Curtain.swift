@@ -16,6 +16,8 @@
 // - **The switch** (`Mode.alternate`, issue #10): the same two layers, the line hidden and parked at an end — one image
 //   at a time, at the same place and zoom, which is what the eye compares best. A click on the image shows the other;
 //   ← shows A and → shows B (A is the left one in the strip). The swap is instant: a fade would blend them.
+// - **Zoomed in, a drag moves the images** (issue #10, `CurtainGesture`): anywhere in the switch — a click still
+//   switches —, anywhere but on the line in the curtain, whose line then moves only by its handle and ← →.
 // - Zoom (pinch, a mouse's wheel, ⌘+ ⌘− ⌘0 — the app's `zoom`) and the two-finger scroll apply to the two images
 //   together, at the same place: one transform, two layers. The line stays where it is on screen.
 //   A zoom keeps the point under the pointer still (`ZoomAnchor`), as on the canvas.
@@ -26,6 +28,7 @@
 //   « Seed 43 »; nothing → their short names, as the remote control gives them.
 
 import AppKit
+import Siliconed
 import SwiftUI
 
 /// What the curtain keeps between two comparisons: its mode (remembered across launches) and where the
@@ -138,6 +141,10 @@ struct CurtainView: View {
     @State private var offset: CGSize = .zero
     @GestureState private var pinch: CGFloat = 1
     @State private var dragging = false
+    /// What the press under way carries (`CurtainGesture.role`), decided where it began; `nil` between presses.
+    @State private var pressRole: CurtainGesture.Role?
+    /// How far the press under way has moved the images (zoomed in), not yet added to `offset`.
+    @State private var panning: CGSize = .zero
     @State private var frame: CGSize = .zero
     @State private var hovering = false
     /// Where the pointer is over the frame — what a zoom keeps still (`ZoomAnchor`).
@@ -167,8 +174,8 @@ struct CurtainView: View {
         .animation(Motion.pick(.easeOut(duration: 0.15)), value: curtain.position < 0.88)
         .onGeometryChange(for: CGSize.self) { $0.size } action: { frame = $0 }
         .contentShape(Rectangle())
-        .pointerStyle(curtain.alternates ? .default : .columnResize)
-        .gesture(curtain.alternates ? AnyGesture(swapGesture.map { _ in () }) : AnyGesture(lineGesture.map { _ in () }))
+        .pointerStyle(cursor)
+        .gesture(pressGesture)
         .simultaneousGesture(zoomGesture)
         .simultaneousGesture(TapGesture(count: 2).onEnded {
             withAnimation(Motion.pick(.spring(duration: 0.3))) { app.zoom = 1; offset = .zero }
@@ -189,8 +196,7 @@ struct CurtainView: View {
         }
         .onAppear(perform: watchScroll)
         .onDisappear { scrollMonitor.map(NSEvent.removeMonitor); scrollMonitor = nil; hovering = false }
-        .help(curtain.alternates ? "Click the image, or press ← →, to show one image or the other"
-                                 : "Drag the line, or press ← →, to reveal one image or the other")
+        .help(help)
         // The line is dragged: VoiceOver moves it with the adjustable actions instead (up and down).
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text(verbatim: tagA + " / " + tagB))
@@ -210,9 +216,35 @@ struct CurtainView: View {
             .offset(o)
     }
 
-    /// The offset as drawn: during a pinch, moved so that the point under the fingers stays there.
+    /// The offset as drawn: during a drag, where the hand has carried the images; during a pinch, moved so that the
+    /// point under the fingers stays there.
     private var liveOffset: CGSize {
-        pinch == 1 ? offset : ZoomAnchor.offset(offset, from: app.zoom, to: zoom, at: pointer, in: frame)
+        let o = panning == .zero ? offset : clamped(CGSize(width: offset.width + panning.width, height: offset.height + panning.height))
+        return pinch == 1 ? o : ZoomAnchor.offset(o, from: app.zoom, to: zoom, at: pointer, in: frame)
+    }
+
+    private var zoomed: Bool { app.zoom > 1 }
+    private var lineX: CGFloat { frame.width * curtain.position }
+
+    /// The pointer says what a press would carry: the line (on it, or anywhere when fitted), the images (zoomed in),
+    /// nothing to drag in the fitted switch.
+    private var cursor: PointerStyle {
+        let role = pressRole ?? CurtainGesture.role(alternates: curtain.alternates, zoomed: zoomed,
+                                                    startX: pointer?.x ?? -.infinity, lineX: lineX)
+        switch role {
+        case .line: return .columnResize
+        case .pan: return pressRole == .pan ? .grabActive : .grabIdle
+        case .none: return .default
+        }
+    }
+
+    private var help: LocalizedStringKey {
+        switch (curtain.alternates, zoomed) {
+        case (true, false): "Click the image, or press ← →, to show one image or the other"
+        case (false, false): "Drag the line, or press ← →, to reveal one image or the other"
+        case (true, true): "Click the image, or press ← →, to show one image or the other; drag it to move it"
+        case (false, true): "Drag the line, or press ← →, to reveal one image or the other; drag the image to move it"
+        }
     }
 
     /// The line and its knob: white with a shadow, legible on any image; the knob takes the accent
@@ -249,24 +281,38 @@ struct CurtainView: View {
             .allowsHitTesting(false)
     }
 
-    /// A press anywhere brings the line there; dragging carries it.
-    private var lineGesture: some Gesture {
+    /// **One gesture for every press** (`CurtainGesture`): where it begins decides whether it carries the line or the
+    /// images; its release, whether it was the switch's click.
+    private var pressGesture: some Gesture {
         DragGesture(minimumDistance: 0)
             .onChanged { value in
-                dragging = true
-                MainWindow.shared.releaseTextFocus()
-                guard frame.width > 0 else { return }
-                curtain.position = min(max(value.location.x / frame.width, 0), 1)
+                let role: CurtainGesture.Role
+                if let r = pressRole { role = r } else {
+                    MainWindow.shared.releaseTextFocus()
+                    role = CurtainGesture.role(alternates: curtain.alternates, zoomed: zoomed, startX: value.startLocation.x, lineX: lineX)
+                    pressRole = role
+                }
+                switch role {
+                case .line:
+                    dragging = true
+                    guard frame.width > 0 else { return }
+                    curtain.position = min(max(value.location.x / frame.width, 0), 1)
+                case .pan:
+                    panning = CurtainGesture.panned(value.translation, role: role)
+                case .none:
+                    break
+                }
             }
-            .onEnded { _ in dragging = false }
-    }
-
-    /// The switch: a click shows the other image.
-    private var swapGesture: some Gesture {
-        TapGesture().onEnded {
-            MainWindow.shared.releaseTextFocus()
-            curtain.swap()
-        }
+            .onEnded { value in
+                switch CurtainGesture.release(alternates: curtain.alternates, role: pressRole ?? .none, translation: value.translation) {
+                case .swap: curtain.swap()
+                case .keepPan: offset = clamped(CGSize(width: offset.width + value.translation.width, height: offset.height + value.translation.height))
+                case .nothing: break
+                }
+                pressRole = nil
+                panning = .zero
+                dragging = false
+            }
     }
 
     private var zoomGesture: some Gesture {

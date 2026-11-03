@@ -128,7 +128,7 @@ Each stage (text encoder, denoiser, VAE) is compared with the reference implemen
 
 ## Build from source
 
-macOS 26 or later, Apple silicon, Xcode 26 or later.
+macOS 26 or later, Apple silicon, Xcode 26 or later. The Command Line Tools alone are not enough: their SDK lacks SwiftUI's macros, and the app's phrases are compiled by `xcstringstool`, which only Xcode ships (`tools/app.sh` says so and stops).
 
 ```
 swift build                 the app and silicontrol

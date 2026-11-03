@@ -96,6 +96,15 @@ final class RemoteWritingTests: XCTestCase {
         guard case .failure(.usage) = SetOrder.parse(["beta", "more-solvers", "1"]) else { return XCTFail() }
     }
 
+    func testSetReadsSaveEveryImage() throws {
+        // Save Every Image To…: a folder turns it on, `off` turns it off, alone it is read; `./off` is a folder.
+        XCTAssertEqual(try SetOrder.parse(["save-images"]).get(), .saveImagesState)
+        XCTAssertEqual(try SetOrder.parse(["save-images", "off"]).get(), .saveImages(folder: nil))
+        XCTAssertEqual(try SetOrder.parse(["save-images", "~/Pictures/Siliconed"]).get(), .saveImages(folder: "~/Pictures/Siliconed"))
+        XCTAssertEqual(try SetOrder.parse(["save-images", "./off"]).get(), .saveImages(folder: "./off"))
+        guard case .failure(.usage) = SetOrder.parse(["save-images", "on", "~/Pictures"]) else { return XCTFail() }
+    }
+
     /// The four options of Settings › Advanced › Beta, no more: a fifth has to be added here, in the app's `AppState.beta`
     /// (a `switch` the compiler checks) and in the help.
     func testTheBetaOptionsAreTheSettingsFour() {

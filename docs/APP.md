@@ -145,7 +145,7 @@ The other Compact versions use 8-bit weights published by third parties: [unslot
 
 Siliconed › Settings… (⌘,), three tabs.
 
-- **General**: where the models live, with Move Library…, Open Library… and Move Back to This Mac. From a terminal: `silicontrol import`, `uninstall` (with `--yes`) and `library`.
+- **General**: where the models live, with Move Library…, Open Library… and Move Back to This Mac. From a terminal: `silicontrol import`, `uninstall` (with `--yes`) and `library`. Then **Save Every Image To…**, off by default: the history stays in memory, as everywhere else in the app. Turned on, it asks for a folder, and each new image (a render, a variation, an edit, a crop, an enlargement, a grid's sheet; not an exploration's sketches) is also saved there as a PNG with its prompt, seed and model, under the name Save… gives it, never over another file. A failure to write is said like a failed Save…. From a terminal: `silicontrol set save-images FOLDER|off`.
 - **Other Macs**: lend this Mac, pair with another ([Render on another Mac](#render-on-another-mac)).
 - **Advanced**, in this order: This Mac (the measure); Command Line (installs `silicontrol`, below); and **Beta**, off by default and liable to change: More Solvers (adds the solvers Euler a, DPM++ 2M and UniPC to the denoiser's box and to the exploration's axes; Euler, the default, is the one the models were distilled for), Faster Rendering (adds its switch to the denoiser's box), Size in Two Scales (the rack's Size becomes a proportion and a resolution, below), Negative LoRA Strengths (strengths from −1.5 to 1.5, for “slider” LoRAs; an ordinary LoRA is damaged by a negative strength). `silicontrol set beta` flips them like the switches.
 

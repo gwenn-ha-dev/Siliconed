@@ -128,7 +128,7 @@ Chaque étage (encodeur de texte, débruitage, VAE) est comparé à l'implément
 
 ## Construire depuis les sources
 
-macOS 26 ou plus, Apple silicon, Xcode 26 ou plus.
+macOS 26 ou plus, Apple silicon, Xcode 26 ou plus. Les seuls Command Line Tools ne suffisent pas : leur SDK n'a pas les macros de SwiftUI, et les phrases de l'app sont compilées par `xcstringstool`, que seul Xcode fournit (`tools/app.sh` le dit et s'arrête).
 
 ```
 swift build                 l'app et silicontrol

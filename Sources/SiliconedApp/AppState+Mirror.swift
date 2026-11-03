@@ -467,6 +467,7 @@ extension AppState {
         // The history is newest first; entries arrive in their order, the first connection's oldest first.
         let at = history.firstIndex { $0.ordinal < e.ordinal } ?? history.count
         history.insert(entry, at: at)
+        saveIfAsked(entry)
         lastImage = max(lastImage, e.ordinal)
         if at == 0, followsRender {
             selectedImage = (entry.id, image)

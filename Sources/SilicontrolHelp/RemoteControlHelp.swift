@@ -116,6 +116,7 @@ package enum RemoteControlHelp {
       set faster-rendering on|off [--model ID] a model's Faster Rendering, as a click (queue empty)
       set accelerators on|off [--model ID]     a model's accelerators, as a click (queue empty)
       set beta [OPTION on|off]                 the four Beta options of Settings, as a click; alone, reads them
+      set save-images [FOLDER|off]             Save Every Image To… of Settings: each new image as a PNG there; alone, reads it
       history [N]                              the session's images (most recent first)
       save i7 [i8 …] DEST [--format F]         writes images (.png/.jpg/.heic file, or folder in png|jpeg|heic)
       vary i7 subtle|strong [--batch N]        variations of an image (same settings, same seed)
@@ -652,6 +653,7 @@ package enum RemoteControlHelp {
         silicontrol set faster-rendering on|off [--model ID]
         silicontrol set accelerators on|off [--model ID]
         silicontrol set beta [OPTION on|off]
+        silicontrol set save-images [FOLDER|off]
 
         Settings' switches, from the terminal. Each goes through the function its switch calls, so the choice is
         written and the window follows, exactly as a click.
@@ -685,12 +687,19 @@ package enum RemoteControlHelp {
         Like the switches, they wait for nothing and apply to what is queued next. They are this Mac's preferences; when
         the window computes on another Mac, its copy is set too. « status » gives them as "beta".
 
+        SAVE-IMAGES is Settings ▸ General's « Save Every Image To… », off by default: given a folder (relative to the current
+        directory; one named "off" is ./off), each new image of the history — a render, a crop, an enlargement, a grid's
+        sheet; not an exploration's sketches — is also written there as a PNG with its prompt, seed and model, under its
+        « save » name, never over another file. "off" turns it off; alone, it is read. The folder must exist ("write"
+        otherwise): it is never created. This Mac's preference, whichever Mac computes.
+
         Answer: {"ok": true, "model": "krea2", "faster_rendering": false, "previous": true}
                 {"ok": true, "model": "z-image", "accelerators": true, "previous": false}
                 {"ok": true, "option": "size-scales", "enabled": true, "previous": false,
                  "beta": {"more_solvers": false, "faster_rendering": false, "size_scales": true, "negative_lora": false}}
+                {"ok": true, "save_images": "/Users/me/Pictures/Siliconed", "previous": null}
         FAILURES: usage (also: an unknown Beta option, "hint" lists them), model, busy, faster_rendering ("on" without
-        its Beta option), accelerators (no accelerator to choose on this Mac).
+        its Beta option), accelerators (no accelerator to choose on this Mac), write (save-images: not a folder).
         """,
 
         "history": """
@@ -1275,6 +1284,7 @@ package enum RemoteControlHelp {
       set faster-rendering on|off [--model ID] le rendu plus rapide d'un modèle, comme un clic (file vide)
       set accelerators on|off [--model ID]     les accélérateurs d'un modèle, comme un clic (file vide)
       set beta [OPTION on|off]                 les quatre options Bêta des Réglages, comme un clic ; seul, les lit
+      set save-images [FOLDER|off]             Enregistrer chaque image dans… des Réglages : chaque image nouvelle en PNG ; seul, le lit
       history [N]                              les images de la session (la plus récente d'abord)
       save i7 [i8 …] DEST [--format F]         écrit des images (fichier .png/.jpg/.heic, ou dossier en png|jpeg|heic)
       vary i7 subtle|strong [--batch N]        variations d'une image (mêmes réglages, même graine)
@@ -1819,6 +1829,7 @@ package enum RemoteControlHelp {
         silicontrol set faster-rendering on|off [--model ID]
         silicontrol set accelerators on|off [--model ID]
         silicontrol set beta [OPTION on|off]
+        silicontrol set save-images [FOLDER|off]
 
         Les interrupteurs des Réglages, depuis le terminal. Chacun passe par la fonction que son interrupteur appelle : le
         choix est écrit et la fenêtre suit, exactement comme un clic.
@@ -1853,12 +1864,20 @@ package enum RemoteControlHelp {
         n'attendent rien et valent pour ce qui se met en file ensuite. Ce sont les préférences de ce Mac ; quand la fenêtre
         calcule sur un autre, sa copie est réglée aussi. « status » les donne sous "beta".
 
+        SAVE-IMAGES, c'est « Enregistrer chaque image dans… » de Réglages ▸ Général, éteint par défaut : avec un dossier
+        (relatif au répertoire courant ; un dossier nommé « off » s'écrit ./off), chaque image nouvelle de l'historique — un
+        rendu, un recadrage, un agrandissement, la planche d'une grille ; pas les esquisses d'une exploration — s'y écrit
+        aussi en PNG avec son prompt, sa graine et son modèle, sous son nom de « save », jamais sur un autre fichier. « off »
+        l'éteint ; seul, il est lu. Le dossier doit exister (sinon « write ») : il n'est jamais créé. Préférence de ce Mac,
+        quel que soit le Mac qui calcule.
+
         Réponse : {"ok": true, "model": "krea2", "faster_rendering": false, "previous": true}
                   {"ok": true, "model": "z-image", "accelerators": true, "previous": false}
                   {"ok": true, "option": "size-scales", "enabled": true, "previous": false,
                    "beta": {"more_solvers": false, "faster_rendering": false, "size_scales": true, "negative_lora": false}}
+                  {"ok": true, "save_images": "~/Pictures/Siliconed", "previous": null}
         ÉCHECS : usage (aussi : une option Bêta inconnue, "hint" les liste), model, busy, faster_rendering (« on » sans son
-        option Bêta), accelerators (pas d'accélérateur à choisir sur ce Mac).
+        option Bêta), accelerators (pas d'accélérateur à choisir sur ce Mac), write (save-images : pas un dossier).
         """,
 
         "history": """

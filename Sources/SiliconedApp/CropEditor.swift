@@ -185,6 +185,7 @@ extension AppState {
                            metadata: metadata, enlarged: entry.enlarged, cropped: box, owner: entry.owner)
         // Kept: the crop is still an enlargement's pixels, and `enlargeRefusal` refuses a second pass.
         history.insert(result, at: 0)
+        saveIfAsked(result)
         selectedImage = (result.id, image)
         selection = result.id
         marked = []; anchor = result.id

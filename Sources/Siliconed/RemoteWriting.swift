@@ -142,7 +142,8 @@ package enum BetaOption: String, CaseIterable, Sendable {
 // MARK: - The arguments of set
 
 /// **`set …`**, read: a model's switch (`faster-rendering`, `accelerators` — `neural-engine`, its name before it covered the GPU's
-/// tensor units, still read), or the Beta options.
+/// tensor units, still read), the Beta options, or Save Every Image To… (`save-images`: a folder, or `off`; a folder named
+/// `off` is `./off`).
 package enum SetOrder: Equatable, Sendable {
     package enum Switch: String, Sendable {
         case fasterRendering = "faster-rendering", accelerators = "accelerators"
@@ -157,13 +158,17 @@ package enum SetOrder: Equatable, Sendable {
     case beta(BetaOption, on: Bool)
     /// `set beta`: reads them all.
     case betaList
+    /// `set save-images FOLDER|off`: the folder as typed (relative to the caller's directory), `nil` for off.
+    case saveImages(folder: String?)
+    /// `set save-images`: reads it.
+    case saveImagesState
 
     package enum Failure: Error, Equatable, Sendable {
         case usage(String)
         case unknownBeta(String)
     }
 
-    package static let usage = "set faster-rendering|accelerators on|off [--model ID] · set beta [OPTION on|off]"
+    package static let usage = "set faster-rendering|accelerators on|off [--model ID] · set beta [OPTION on|off] · set save-images [FOLDER|off]"
 
     package static func parse(_ arguments: [String]) -> Result<SetOrder, Failure> {
         guard let what = arguments.first else { return .failure(.usage(usage)) }
@@ -174,6 +179,13 @@ package enum SetOrder: Equatable, Sendable {
             }
             guard let option = BetaOption(argument: arguments[1]) else { return .failure(.unknownBeta(arguments[1])) }
             return .success(.beta(option, on: arguments[2] == "on"))
+        }
+        if what == "save-images" {
+            switch arguments.count {
+            case 1: return .success(.saveImagesState)
+            case 2: return .success(.saveImages(folder: arguments[1] == "off" ? nil : arguments[1]))
+            default: return .failure(.usage("set save-images [FOLDER|off]"))
+            }
         }
         guard let kind = Switch(argument: what) else { return .failure(.usage(usage)) }
         let line = "set \(what) on|off [--model ID]"

@@ -207,7 +207,11 @@ struct SceneView: View {
                     .help("Render again: same settings, same seed (⌘R)")
                     .accessibilityLabel(Text("Render Again (Same Seed)"))
                 if e.grid == nil {
-                    Menu { VariationButtons(app: app, entry: e) } label: { Image(systemName: "square.on.square.dashed") }
+                    // A titled label shown as its icon: with a bare symbol, VoiceOver could read the symbol's own name
+                    // (« Square On A Dashed Square ») whatever the menu's accessibility label.
+                    Menu { VariationButtons(app: app, entry: e) } label: {
+                        Label("Variations", systemImage: "square.on.square.dashed").labelStyle(.iconOnly)
+                    }
                         .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
                         .disabled(!app.canVary(e))
                         .help("Variations: cousins of this image, same scene, slightly different — as many as the rack’s Batch")

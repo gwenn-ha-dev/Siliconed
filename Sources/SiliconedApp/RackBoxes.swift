@@ -243,7 +243,7 @@ struct Cost: View {
 /// **The prompt is typed in its box**: what to make — or, when editing, what changes. A real text view
 /// (`TextEditor`, an `NSTextView`): ⌘A, ⌘C, ⌘Z, the spelling, a long prompt that scrolls. The grip
 /// under it gives it the height one wants; Esc leaves it (the arrows then walk the strip). The wand facing
-/// its title opens the Prompt Lab.
+/// its title opens the Prompt Lab; the cross in its corner empties it, and ⌘Z brings it back.
 struct PromptNode: View {
     @Bindable var app: AppState
     @FocusState private var typing: Bool
@@ -273,12 +273,26 @@ struct PromptNode: View {
                         .font(.body)
                         .scrollContentBackground(.hidden)
                         .scrollIndicators(.automatic)
+                        // Room for the clear button: a line never runs under it.
+                        .contentMargins(.trailing, app.prompt.isEmpty ? 0 : 18, for: .scrollContent)
                         .focused($typing)
                     if app.prompt.isEmpty {
                         Text(app.references.isEmpty ? "Describe the image…" : "Say what changes…")
                             .font(.body).foregroundStyle(.tertiary)
                             .padding(.leading, 5)
                             .allowsHitTesting(false)
+                    }
+                }
+                .overlay(alignment: .topTrailing) {
+                    // A search field's clear button, where the eye looks for it; ⌘Z (Edit ▸ Undo) brings the prompt back.
+                    if !app.prompt.isEmpty {
+                        Button { MainWindow.shared.setPrompt("", of: app, action: String(localized: "Clear Prompt")) } label: {
+                            Image(systemName: "xmark.circle.fill").foregroundStyle(.tertiary)
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.trailing, 2)
+                        .help("Clear the prompt (⌘Z brings it back)")
+                        .accessibilityLabel(Text("Clear Prompt"))
                     }
                 }
                 .frame(height: min(max(height + stretch, Self.heights.lowerBound), Self.heights.upperBound))

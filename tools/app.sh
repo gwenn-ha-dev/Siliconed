@@ -41,6 +41,14 @@ while (( $# )); do
   shift
 done
 
+# **Xcode, not the Command Line Tools alone**: their SDK lacks SwiftUI's macros (the build would fail deep in the
+# app's sources), and the phrases need `xcstringstool`, which only Xcode ships. Said here, before minutes of building.
+if ! xcrun --find xcstringstool >/dev/null 2>&1; then
+  echo "app: Xcode is required (xcstringstool not found: the Command Line Tools alone cannot build the app)." >&2
+  echo "     Install Xcode 26 or later, then: sudo xcode-select -s /Applications/Xcode.app" >&2
+  exit 69
+fi
+
 swift build -c release --product SiliconedApp
 swift build -c release --product silicontrol
 swift build -c release --product siliconed

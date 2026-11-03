@@ -1261,6 +1261,52 @@
         }
       }
     },
+    "%@ is the base model of %@: Siliconed renders %@." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ ist das Basismodell von %2$@: Siliconed rendert %3$@."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ is the base model of %2$@: Siliconed renders %3$@."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ es el modelo base de %2$@: Siliconed renderiza %3$@."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ est le modèle de base de %2$@ : Siliconed rend %3$@."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ è il modello base di %2$@: Siliconed esegue il rendering di %3$@."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@は%2$@のベースモデルです。Siliconedが生成するのは%3$@です。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ 是 %2$@ 的基础模型：Siliconed 生成的是 %3$@。"
+          }
+        }
+      }
+    },
     "%@ isn’t installed" : {
       "localizations" : {
         "de" : {
@@ -9141,6 +9187,46 @@
         }
       }
     },
+    "Change Folder…" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ordner ändern …"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cambiar de carpeta…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Changer de dossier…"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cambia cartella…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "フォルダを変更…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更改文件夹…"
+          }
+        }
+      }
+    },
     "Check for Updates…" : {
       "localizations" : {
         "de" : {
@@ -10461,6 +10547,46 @@
         }
       }
     },
+    "Clear" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Löschen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Borrar"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Effacer"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cancella"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "消去"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "清除"
+          }
+        }
+      }
+    },
     "Clear History" : {
       "localizations" : {
         "de" : {
@@ -10537,6 +10663,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "清除历史记录…"
+          }
+        }
+      }
+    },
+    "Clear Prompt" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prompt löschen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Borrar el prompt"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Effacer le prompt"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cancella il prompt"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "プロンプトを消去"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "清除提示词"
           }
         }
       }
@@ -10621,6 +10787,46 @@
         }
       }
     },
+    "Clear the prompt (⌘Z brings it back)" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prompt löschen (⌘Z holt ihn zurück)"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Borrar el prompt (⌘Z lo recupera)"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Effacer le prompt (⌘Z le rétablit)"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cancella il prompt (⌘Z lo ripristina)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "プロンプトを消去（⌘Zで元に戻ります）"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "清除提示词（按 ⌘Z 可恢复）"
+          }
+        }
+      }
+    },
     "Clear the queue and stop the current render" : {
       "localizations" : {
         "de" : {
@@ -10697,6 +10903,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "点击图像，或按 ← →，以显示其中一张图像"
+          }
+        }
+      }
+    },
+    "Click the image, or press ← →, to show one image or the other; drag it to move it" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Auf das Bild klicken oder ← → drücken, um das eine oder das andere Bild zu zeigen; ziehen, um es zu verschieben"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Haz clic en la imagen, o pulsa ← →, para mostrar una imagen u otra; arrástrala para moverla"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cliquer sur l’image, ou appuyer sur ← →, pour afficher l’une ou l’autre image ; la faire glisser pour la déplacer"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fai clic sull’immagine, o premi ← →, per mostrare l’una o l’altra immagine; trascinala per spostarla"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "画像をクリックするか← →を押して、一方の画像ともう一方の画像を切り替えます。ドラッグすると画像を移動します"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "点击图像，或按 ← →，以显示其中一张图像；拖移可移动图像"
           }
         }
       }
@@ -13720,6 +13966,46 @@
         }
       }
     },
+    "Drag the line, or press ← →, to reveal one image or the other; drag the image to move it" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Linie ziehen oder ← → drücken, um das eine oder das andere Bild zu zeigen; das Bild ziehen, um es zu verschieben"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Arrastra la línea, o pulsa ← →, para mostrar una imagen u otra; arrastra la imagen para moverla"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Faire glisser la ligne, ou appuyer sur ← →, pour révéler l’une ou l’autre image ; faire glisser l’image pour la déplacer"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trascina la linea, o premi ← →, per mostrare l’una o l’altra immagine; trascina l’immagine per spostarla"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "線をドラッグするか← →を押して、一方の画像ともう一方の画像を表示します。画像をドラッグすると移動します"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "拖移分隔线，或按 ← →，以显示其中一张图像；拖移图像可移动它"
+          }
+        }
+      }
+    },
     "Drag to frame what the model should look at: inside to move, an edge to resize, outside to draw another frame." : {
       "localizations" : {
         "de" : {
@@ -14116,6 +14402,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "每个模型使用各自的步数；LoRA 会略去，因为每个 LoRA 只适用于一个模型"
+          }
+        }
+      }
+    },
+    "Each new image will be saved here as a PNG, with its prompt, seed and model." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Jedes neue Bild wird hier als PNG gesichert, mit Prompt, Seed und Modell."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cada imagen nueva se guardará aquí en PNG, con su prompt, su semilla y su modelo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chaque image nouvelle sera enregistrée ici en PNG, avec son prompt, sa graine et son modèle."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ogni nuova immagine sarà salvata qui in PNG, con il suo prompt, il seme e il modello."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新しい画像はすべて、プロンプト、シード、モデルとともにPNGでここに保存されます。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "每张新图像都会以 PNG 格式存储在这里，并附带其提示词、种子和模型。"
           }
         }
       }
@@ -14556,6 +14882,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "编辑…"
+          }
+        }
+      }
+    },
+    "Empties the text. ⌘Z in the text brings it back." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Leert den Text. ⌘Z im Text holt ihn zurück."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vacía el texto. ⌘Z en el texto lo recupera."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vide le texte. ⌘Z dans le texte le rétablit."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Svuota il testo. ⌘Z nel testo lo ripristina."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "テキストを空にします。テキスト内で⌘Zを押すと元に戻ります。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "清空文本。在文本中按 ⌘Z 可恢复。"
           }
         }
       }
@@ -18625,6 +18991,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "请提高强度或增加步数。"
+          }
+        }
+      }
+    },
+    "Install %@ from the Models sheet (⇧⌘M), or import a model made from it." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Installieren Sie %@ im Fenster „Modelle“ (⇧⌘M) oder importieren Sie ein daraus abgeleitetes Modell."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Instala %@ desde la hoja Modelos (⇧⌘M) o importa un modelo derivado de él."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Installez %@ depuis la feuille Modèles (⇧⌘M), ou importez un modèle qui en est tiré."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Installa %@ dalla finestra Modelli (⇧⌘M) o importa un modello derivato da esso."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@を「モデル」シート（⇧⌘M）からインストールするか、それをもとに作られたモデルを読み込んでください。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请在“模型”面板（⇧⌘M）中安装 %@，或导入基于它制作的模型。"
           }
         }
       }
@@ -24325,6 +24731,46 @@
         }
       }
     },
+    "Off by default: images stay in memory until you save them. On, each new image — a render, a crop, an enlargement, a grid’s sheet — is also saved to this folder as a PNG, with its prompt, seed and model." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Standardmäßig aus: Die Bilder bleiben im Arbeitsspeicher, bis Sie sie sichern. Eingeschaltet wird jedes neue Bild – ein Bild, ein Zuschnitt, eine Vergrößerung, ein Rasterbogen – zusätzlich als PNG in diesem Ordner gesichert, mit Prompt, Seed und Modell."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Desactivado por defecto: las imágenes se quedan en memoria hasta que las guardes. Activado, cada imagen nueva — un render, un recorte, una ampliación, una hoja de contactos — también se guarda en esta carpeta en PNG, con su prompt, su semilla y su modelo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Désactivé par défaut : les images restent en mémoire tant que vous ne les enregistrez pas. Activé, chaque image nouvelle — un rendu, un recadrage, un agrandissement, la planche d’une grille — est aussi enregistrée dans ce dossier en PNG, avec son prompt, sa graine et son modèle."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Disattivato per impostazione predefinita: le immagini restano in memoria finché non le salvi. Attivato, ogni nuova immagine — un rendering, un ritaglio, un ingrandimento, una tavola di griglia — viene salvata anche in questa cartella in PNG, con il suo prompt, il seme e il modello."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "初期状態ではオフです。画像は保存するまでメモリ上にだけあります。オンにすると、新しい画像（生成した画像、トリミング、拡大、グリッドのシート）はすべて、プロンプト、シード、モデルとともにPNGでこのフォルダにも保存されます。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "默认关闭：图像在你存储之前只保存在内存中。打开后，每张新图像（生成的图像、裁剪、放大、网格总图）都会同时以 PNG 格式存储到此文件夹，并附带其提示词、种子和模型。"
+          }
+        }
+      }
+    },
     "Off by default; they may change." : {
       "localizations" : {
         "de" : {
@@ -29434,6 +29880,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "存储"
+          }
+        }
+      }
+    },
+    "Save Every Image To…" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Jedes Bild sichern in …"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Guardar cada imagen en…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enregistrer chaque image dans…"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Salva ogni immagine in…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "すべての画像の保存先…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "将每张图像存储到…"
           }
         }
       }
@@ -46153,6 +46639,46 @@
         }
       }
     },
+    "give an existing folder" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "einen vorhandenen Ordner angeben"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "indica una carpeta existente"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "donner un dossier existant"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "indica una cartella esistente"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "既存のフォルダを指定してください"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请指定一个已存在的文件夹"
+          }
+        }
+      }
+    },
     "grid expected (g2), not \"%@\"" : {
       "localizations" : {
         "de" : {
@@ -48115,6 +48641,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "不是 Siliconed 写出的 PNG，或无法读取：%@"
+          }
+        }
+      }
+    },
+    "not a folder: %@" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "kein Ordner: %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "no es una carpeta: %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "pas un dossier : %@"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "non è una cartella: %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "フォルダではありません：%@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "不是文件夹：%@"
           }
         }
       }

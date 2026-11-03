@@ -68,6 +68,10 @@ struct LabView: View {
             HStack {
                 Text("Text").font(.callout.weight(.semibold))
                 Spacer()
+                Button("Clear") { model.text = "" }
+                    .buttonStyle(.link).font(.callout)
+                    .disabled(model.text.isEmpty || model.isWriting)
+                    .help("Empties the text. ⌘Z in the text brings it back.")
                 Button("Use the Rack’s Prompt") { model.useRackPrompt() }
                     .buttonStyle(.link).font(.callout)
                     .disabled(model.rack.prompt.isEmpty || model.isWriting)
@@ -87,8 +91,12 @@ struct LabView: View {
                         Text(Self.shown(PromptDiff.pieces(from: changes.before, to: changes.after)))
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
-                    // While it comes, the last words stay in sight.
-                    .defaultScrollAnchor(model.isWriting ? .bottom : .top)
+                    // The text starts at the top and grows down, as typed text does; once it fills the field, the last words
+                    // stay in sight while it comes. A single anchor at the bottom drew a short text at the foot of the field,
+                    // and threw it back to the top when the writer ended.
+                    .defaultScrollAnchor(.top, for: .alignment)
+                    .defaultScrollAnchor(.top, for: .initialOffset)
+                    .defaultScrollAnchor(model.isWriting ? .bottom : nil, for: .sizeChanges)
                     .background(Palette.surface)
                     .allowsHitTesting(false)
                 }

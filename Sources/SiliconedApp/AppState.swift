@@ -6,7 +6,8 @@
 // could find. **The exceptions**, each a gesture of the user: the preferences (UserDefaults) — the « More
 // Solvers » switch (`developerModeKey`), « Faster Rendering », the comparison's curtain, switch or side by side
 // (`Curtain.mode`), the beta « Negative LoRA Strengths » switch
-// (`negativeLoRAKey`), the file format of the last export (`exportFormatKey`), the Neural Engine's choice per
+// (`negativeLoRAKey`), the file format of the last export (`exportFormatKey`), the folder of « Save Every Image To… », off
+// unless the user turns it on — each new image is then written there (`EveryImage`) —, the Neural Engine's choice per
 // model (`choiceKey`), the Macs paired and the lending switch (`OtherMacs`), and this Mac's capacity map
 // with the last render's note against it (`capacityMapKey`, `renderNoteKey`), measured when
 // the user asks, like the system language the app follows —, the licenses accepted, which the library keeps itself (`<local>/accepted-licenses.json`) because its

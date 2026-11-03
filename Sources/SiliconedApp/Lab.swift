@@ -683,11 +683,18 @@ final class LabWindow: NSObject, NSWindowDelegate {
         w.isRestorable = false
         w.delegate = self
         w.setContentSize(NSSize(width: 640, height: 780))
-        w.contentMinSize = NSSize(width: 560, height: 640)
         w.center()
         window = w
         NSApp.activate()
         w.makeKeyAndOrderFront(nil)
+    }
+
+    /// **The smallest the Lab gets** (`MinimumContent`, issue #7): its pieces with the text at about twice its own minimum (110 pt),
+    /// and room for the status lines a rewrite adds.
+    static let minimumContent = NSSize(width: 560, height: 640)
+
+    func windowWillResize(_ sender: NSWindow, to frameSize: NSSize) -> NSSize {
+        MinimumContent.clamp(frameSize, of: sender, to: Self.minimumContent)
     }
 
     func windowWillClose(_ notification: Notification) { LabModel.shared.windowClosed() }
