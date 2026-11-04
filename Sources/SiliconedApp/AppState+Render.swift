@@ -67,6 +67,8 @@ extension AppState {
             for (i, f) in cell.loraStrengths.enumerated() where s.loras.indices.contains(i) { s.loras[i].strength = f }
             if let l = cell.addedLoRA { s.loras.append(LoRASlot(path: l, strength: cell.addedStrength)) }
             if let solver = cell.solver { s.solver = solver }
+            if let detail = cell.detail { s.detail = detail }
+            if let strength = cell.startStrength { s.strength = strength }
             let used = cell.image.map { references.indices.contains($0) ? [references[$0]] : [] } ?? references
             s.references = used.count
             let model = try? Model.named(s.identifier, in: library)

@@ -26,7 +26,8 @@ import Foundation
 //   multiplied as `PromptAlternatives` alone would: a cell holds one image, and a forgotten group
 //   would silently make each cell a stack — and double the bill. Put it on an axis, or escape it.
 // - **Only what varies is an axis.** The prompt's groups, the seed, the step count, one LoRA's
-//   strength, the model, the image an edit starts from, the solver. Not a batch: a cell is one image
+//   strength, the model, the image an edit starts from, the solver, the starting image's strength
+//   (img2img), the Detail. Not a batch: a cell is one image
 //   (the seed axis is the batch of a grid).
 // - **A solver axis names solvers, not what a model takes**: a cell keeps its solver (`Cell.solver`),
 //   and the app that queues it decides what a model walking Euler alone does with it — as it does
@@ -74,6 +75,10 @@ package struct RenderGrid: Equatable, Sendable {
         case images
         /// These solvers, in this order.
         case solvers([Solver])
+        /// These strengths of the starting image (img2img), from 0 (the image kept) to 1 (ignored).
+        case startStrength([Double])
+        /// These levels of Detail, in this order.
+        case detail([Detail])
     }
 
     /// One value of an axis, as an app labels it (and formats it in its language).
@@ -89,6 +94,8 @@ package struct RenderGrid: Equatable, Sendable {
         /// An edit image, by its index in the base's images (from 0).
         case image(Int)
         case solver(Solver)
+        case startStrength(Double)
+        case detail(Detail)
     }
 
     /// **What every cell shares**, unless an axis says otherwise. `prompt` is the prompt as typed,
@@ -100,13 +107,17 @@ package struct RenderGrid: Equatable, Sendable {
         package var loraStrengths: [Double]
         /// How many images the edit has — what an image axis splits (0: no edit).
         package var images: Int
+        /// Whether the cells start from an image (img2img) — what a start strength axis needs.
+        package var start: Bool
 
-        package init(prompt: String, seed: UInt64, steps: Int, loraStrengths: [Double] = [], images: Int = 0) {
+        package init(prompt: String, seed: UInt64, steps: Int, loraStrengths: [Double] = [], images: Int = 0,
+                     start: Bool = false) {
             self.prompt = prompt
             self.seed = seed
             self.steps = steps
             self.loraStrengths = loraStrengths
             self.images = images
+            self.start = start
         }
     }
 
@@ -129,6 +140,10 @@ package struct RenderGrid: Equatable, Sendable {
         package let image: Int?
         /// The cell's solver; `nil`: the base's (no solver axis).
         package let solver: Solver?
+        /// The starting image's strength; `nil`: the base's (no start strength axis).
+        package let startStrength: Double?
+        /// The cell's Detail; `nil`: the base's (no Detail axis).
+        package let detail: Detail?
     }
 
     /// **The most cells a grid may have** — the app's queue holds that many renders.
@@ -178,6 +193,13 @@ package struct RenderGrid: Equatable, Sendable {
             case .solvers(let s):
                 guard !s.isEmpty else { throw .gridRefused(reason: .emptyAxis) }
                 guard Set(s).count == s.count else { throw .gridRefused(reason: .invalidValue) }
+            case .startStrength(let v):
+                guard base.start else { throw .gridRefused(reason: .noStartImage) }
+                guard !v.isEmpty else { throw .gridRefused(reason: .emptyAxis) }
+                guard v.allSatisfy({ $0.isFinite && (0...1).contains($0) }) else { throw .gridRefused(reason: .invalidValue) }
+            case .detail(let d):
+                guard !d.isEmpty else { throw .gridRefused(reason: .emptyAxis) }
+                guard Set(d).count == d.count else { throw .gridRefused(reason: .invalidValue) }
             }
         }
         // A LoRA is forged for one model: none across models, neither the stack nor an added one.
@@ -207,6 +229,8 @@ package struct RenderGrid: Equatable, Sendable {
         case .images: "image"
         case .addedLoRAs: "added lora"
         case .solvers: "solver"
+        case .startStrength: "start"
+        case .detail: "detail"
         }
     }
 
@@ -221,6 +245,8 @@ package struct RenderGrid: Equatable, Sendable {
         case .images: images
         case .addedLoRAs(let l, _): l.count
         case .solvers(let s): s.count
+        case .startStrength(let v): v.count
+        case .detail(let d): d.count
         }
     }
 
@@ -241,6 +267,8 @@ package struct RenderGrid: Equatable, Sendable {
         case .images: (0..<base.images).map(Value.image)
         case .addedLoRAs(let l, _): l.map(Value.addedLoRA)
         case .solvers(let s): s.map(Value.solver)
+        case .startStrength(let v): v.map(Value.startStrength)
+        case .detail(let d): d.map(Value.detail)
         }
     }
 
@@ -256,6 +284,7 @@ package struct RenderGrid: Equatable, Sendable {
                 var seed = base.seed, strengths = base.loraStrengths
                 var steps: Int? = base.steps, model: String? = nil, image: Int? = nil
                 var added: String? = nil, addedStrength = 0.0, solver: Solver? = nil
+                var start: Double? = nil, detail: Detail? = nil
                 var stepsSet = false
                 for (axis, v) in [(Optional(x), Optional(vx)), (y, vy)] {
                     guard let axis, let v else { continue }
@@ -268,6 +297,8 @@ package struct RenderGrid: Equatable, Sendable {
                     case (_, .image(let i)): image = i
                     case (.addedLoRAs(_, let f), .addedLoRA(let l)): added = l.isEmpty ? nil : l; addedStrength = f
                     case (_, .solver(let s)): solver = s
+                    case (_, .startStrength(let f)): start = f
+                    case (_, .detail(let d)): detail = d
                     default: break
                     }
                 }
@@ -275,7 +306,7 @@ package struct RenderGrid: Equatable, Sendable {
                 result.append(Cell(column: column, row: row, prompt: prompt(choice), seed: seed, steps: steps,
                                    loraStrengths: strengths, model: model,
                                    addedLoRA: added, addedStrength: added == nil ? 0 : addedStrength, image: image,
-                                   solver: solver))
+                                   solver: solver, startStrength: start, detail: detail))
             }
         }
         return result
@@ -316,6 +347,8 @@ package struct RenderGrid: Equatable, Sendable {
     ///     model=z-image,qwen-image-2.1                    image         each edit image alone
     ///     loras=none,flat,ink   one LoRA added per cell   loras:0.6=…   at that strength (1 otherwise)
     ///     solver=euler,dpmpp-2m these solvers, by `Solver.rawValue`
+    ///     start=0.45,0.6,0.75   the starting image's strengths (img2img)
+    ///     detail=normal,more,most   these levels of Detail, by `Detail.rawValue`
     ///
     /// Values are separated by commas, decimals written with a point: the syntax of a command line,
     /// not of a language. `loras`: the stack's names, in its order. What does not read is
@@ -364,6 +397,10 @@ package struct RenderGrid: Equatable, Sendable {
             return .images
         case "solver" where which == nil, "solvers" where which == nil:
             return .solvers(try values { Solver(rawValue: $0.lowercased()) })
+        case "start" where which == nil:
+            return .startStrength(try values { Double($0).flatMap { $0.isFinite ? $0 : nil } })
+        case "detail" where which == nil:
+            return .detail(try values { Detail(rawValue: $0.lowercased()) })
         case "loras":
             let strength: Double
             if let which {

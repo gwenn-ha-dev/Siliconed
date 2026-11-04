@@ -497,6 +497,8 @@ package enum RemoteControlHelp {
           loras:0.6=…         strength 1 — or the one given; names as --lora takes them
           solver=euler,dpmpp-2m   these solvers (euler, euler-ancestral, dpmpp-2m, unipc), same seed
                               and steps; More Solvers, like --solver
+          start=0.45,0.6,0.75 strengths of the starting image (--image), from 0 (kept) to 1 (ignored)
+          detail=normal,more,most   these levels of Detail, where the model offers it
           --x gives the columns, --y the rows (without --y: one row). X and Y vary two different
           settings. EVERY {…} GROUP OF THE PROMPT MUST BE AN AXIS: a group left out would stack
           several images in a cell (error "grid"); write \\{ \\} for braces that are not
@@ -1704,6 +1706,10 @@ package enum RemoteControlHelp {
           image               chaque image --ref seule, avec la même instruction (une édition)
           loras=none,flat,ink une LoRA ajoutée à la pile par case (none : la case sans), à la
           loras:0.6=…         force 1 — ou celle donnée ; noms comme --lora les prend
+          solver=euler,dpmpp-2m   ces solveurs (euler, euler-ancestral, dpmpp-2m, unipc), même graine
+                              et mêmes pas ; Plus de solveurs, comme --solver
+          start=0.45,0.6,0.75 forces de l'image de départ (--image), de 0 (gardée) à 1 (ignorée)
+          detail=normal,more,most   ces niveaux de Détail, là où le modèle l'offre
           --x donne les colonnes, --y les rangées (sans --y : une rangée). X et Y font varier deux
           réglages différents. TOUT GROUPE {…} DU PROMPT DOIT ÊTRE UN AXE : un groupe oublié
           empilerait plusieurs images dans une case (erreur "grid") ; écrire \\{ \\} pour des

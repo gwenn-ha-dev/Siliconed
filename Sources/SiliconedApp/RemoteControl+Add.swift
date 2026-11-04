@@ -406,7 +406,7 @@ extension RemoteControl {
             let x = try resolved(RenderGrid.axis(d.x ?? "", loras: names))
             let y = try d.y.map { try resolved(RenderGrid.axis($0, loras: names)) }
             g = try RenderGrid(.init(prompt: prompt, seed: seed, steps: steps, loraStrengths: stack.map(\.strength),
-                                     images: references.count), x: x, y: y)
+                                     images: references.count, start: start != nil), x: x, y: y)
             guard !app.refusesNegativeStrength(g) else { throw EngineError.gridRefused(reason: .invalidValue) }
         } catch {
             let p = Problem(error)

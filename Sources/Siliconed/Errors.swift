@@ -186,6 +186,8 @@ package enum EngineError: Error, Equatable, Sendable, Codable, LocalizedError, C
         case unreadableAxis = "unreadable_axis"
         /// A model axis under a LoRA stack: a LoRA is forged for one model.
         case loraAcrossModels = "lora_across_models"
+        /// A start strength axis without a starting image.
+        case noStartImage = "no_start_image"
     }
 
     /// Why a library cannot go somewhere, or be opened — `code` refines into `library_refused.<rawValue>`.
@@ -349,6 +351,7 @@ package enum EngineError: Error, Equatable, Sendable, Codable, LocalizedError, C
             case .invalidValue: return "An axis of the grid has a value no render takes."
             case .unreadableAxis: return "An axis of the grid cannot be read."
             case .loraAcrossModels: return "A grid that varies the model cannot take a LoRA: each LoRA is made for one model."
+            case .noStartImage: return "A grid that varies the starting image's strength needs a starting image."
             }
         case let .tooManyGridCells(count, max):
             return "The grid makes \(count) cells: \(max) at most."
@@ -427,9 +430,10 @@ package enum EngineError: Error, Equatable, Sendable, Codable, LocalizedError, C
             case .groupNotOnAxis: return "Make every group an axis, or write its braces as \\{ and \\}."
             case .sameAxisTwice: return "Choose another setting for one of the axes."
             case .invalidValue: return "Steps are integers from 1, strengths numbers, seeds at least one."
-            case .unreadableAxis: return "Write an axis as prompt[:N], seed=42,43, seeds=4, steps=6,8, lora[:NAME]=0.4,0.8, loras[:STRENGTH]=none,flat,ink, model=z-image,qwen-image-2.1, image or solver=euler,dpmpp-2m."
+            case .unreadableAxis: return "Write an axis as prompt[:N], seed=42,43, seeds=4, steps=6,8, lora[:NAME]=0.4,0.8, loras[:STRENGTH]=none,flat,ink, model=z-image,qwen-image-2.1, image, solver=euler,dpmpp-2m, start=0.45,0.6 or detail=normal,more."
             case .emptyAxis, .noSuchGroup, .noSuchLoRA: return "Give each axis at least one value, from the prompt and the stack."
             case .loraAcrossModels: return "Remove the LoRAs, or vary something other than the model."
+            case .noStartImage: return "Start from an image (--image), or vary something else."
             }
         case .tooManyGridCells: return "Remove values from an axis."
         case .imageTooSmall, .formatRefused, .formatUnreadable:

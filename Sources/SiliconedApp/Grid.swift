@@ -136,6 +136,7 @@ struct GridAxisForm: Equatable {
         case let .addedLoRAs(l, f)?: kind = .addedLoRA; addedNone = l.contains(""); added = l.filter { !$0.isEmpty }; addedStrength = f
         case .images?: kind = .image
         case .solvers(let s)?: kind = .solver; solvers = s
+        case .startStrength?, .detail?: break
         }
     }
 
@@ -192,6 +193,8 @@ enum GridWords {
         case .addedLoRAs: return "LoRA"
         case .images: return String(localized: "image to edit")
         case .solvers: return String(localized: "solver")
+        case .startStrength: return String(localized: "starting image")
+        case .detail: return String(localized: "Detail")
         }
     }
 
@@ -210,6 +213,8 @@ enum GridWords {
         case .addedLoRA(let l): return l.isEmpty ? String(localized: "no LoRA") : addedName(l)
         case .image(let i): return String(localized: "image \(i + 1)")
         case .solver(let s): return s.choice
+        case .startStrength(let f): return String(localized: "start \(StartWords.percent(f))")
+        case .detail(let d): return d.choice
         }
     }
 
@@ -229,6 +234,8 @@ enum GridWords {
             return "loras:" + String(format: "%.2f", f) + "=" + l.map { $0.isEmpty ? "none" : RemoteControl.shortName($0) }.joined(separator: ",")
         case .images: return "image"
         case .solvers(let s): return "solver=" + s.map(\.rawValue).joined(separator: ",")
+        case .startStrength(let v): return "start=" + v.map { String(format: "%.2f", $0) }.joined(separator: ",")
+        case .detail(let d): return "detail=" + d.map(\.rawValue).joined(separator: ",")
         }
     }
 
