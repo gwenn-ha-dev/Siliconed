@@ -56,7 +56,7 @@ enum Adoption {
     /// The same test on any table of pinned files (`BaseModels` refuses by it).
     static func matching<T>(_ path: String, among table: [T], file: (T) -> Installer.File,
                             hash: (String) throws -> String) throws -> [T] {
-        let size = (try FileManager.default.attributesOfItem(atPath: path)[.size] as? Int) ?? -1
+        guard let size = Library.fileSize(path) else { throw CocoaError(.fileReadNoSuchFile, userInfo: [NSFilePathErrorKey: path]) }
         let sized = table.filter { file($0).size == size }
         guard !sized.isEmpty else { return [] }
         let sha = try hash(path)
@@ -68,6 +68,9 @@ enum Adoption {
     /// like a download, so that a cut leaves nothing a later installation could take for whole.
     static func adopt(_ path: String, in library: Library, among table: [Expectation] = published(),
                       hash: (String) throws -> String = Downloader.sha256) throws -> Result? {
+        // A link is followed to its file: `copyItem` would copy the link itself, and the store would
+        // then read the user's file — which can be thrown away once imported.
+        let path = URL(fileURLWithPath: path).resolvingSymlinksInPath().path
         let found = try matches(path, among: table, hash: hash)
         guard let size = found.first?.file.size else { return nil }
         let installer = Installer(library: library)

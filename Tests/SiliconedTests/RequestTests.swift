@@ -33,39 +33,6 @@ final class RequestTests: XCTestCase {
     /// B1: with a single step, the schedule of the three models is finite (Anima rendered σ₀ = NaN).
     /// **A request is comparable**: a SwiftUI app relaunches a preview on `onChange(of: request)`.
     /// Two requests equal at construction, then the seed, then the image, tell them apart.
-    /// **Where a sketch stops**: σ, not a count — at σ ≤ 0.5 (0.12), Z-Image's 8 steps stop after 6
-    /// evaluations (4 at the 0.8 before), a 6-step schedule ending .632, .3 after 5; a plan sketched
-    /// keeps its first evaluations.
-    func testASketchStopsWhereSigmaReachesTheThreshold() {
-        XCTAssertEqual(Sketch.evaluations(sigmas: FlowMatchSchedule(steps: 8).sigmas), 6)
-        XCTAssertEqual(zImage.sketchEvaluations(steps: nil, width: 512, height: 512), 6)
-        XCTAssertEqual(Sketch.evaluations(sigmas: [1, 0.963, 0.923, 0.837, 0.632, 0.3, 0]), 5)
-        XCTAssertEqual(Sketch.evaluations(sigmas: [1, 0.95, 0.9, 0.5, 0]), 3)
-        XCTAssertEqual(Sketch.evaluations(sigmas: [1, 0]), 1)
-        XCTAssertEqual(zImage.chain.denoising.plan(height: 128, width: 128, steps: 8, start: 0).reduced, 0)
-        // A plan with half-size steps (Qwen-Image-2.1's at 1024²): sketching keeps the first evaluations,
-        // half-size ones included.
-        let plan = DenoisingPlan(startStep: 0, startSigma: 1, evaluations: 8, reduced: 2, reducedHeight: 32, reducedWidth: 32)
-        XCTAssertEqual([plan.evaluations, plan.reduced], [8, 2])
-        XCTAssertEqual([plan.sketched(3).evaluations, plan.sketched(3).reduced], [3, 2])
-        XCTAssertEqual([plan.sketched(1).evaluations, plan.sketched(1).reduced], [1, 1])
-        XCTAssertEqual(plan.sketched(99).evaluations, 8)
-    }
-
-    /// **Qwen-Image-2.1 does not sketch** (its noise leaves in the last evaluations: an early x̂₀ is blurred and grainy): its
-    /// « automatic » stop is the plan's end, a finished image; Z-Image still stops at 3.
-    func testQwenSketchesAreFinishedImages() {
-        let qwen = Model(card: .qwenImage21, chain: try! Chain(
-            text: QwenImage21TextModule(map: "", tokenizer: ""),
-            denoising: QwenImage21DenoisingModule(map: "", scheduler: .init()),
-            decoding: QwenImage21DecodingModule(path: ""), encoding: QwenImage21EncodingModule(path: "")))
-        let d = qwen.chain.denoising
-        XCTAssertFalse(d.sketches)
-        XCTAssertEqual(qwen.sketchEvaluations(steps: nil, width: 512, height: 512),
-                       d.plan(height: 32, width: 32, steps: d.defaultSteps, start: 0).evaluations)
-        XCTAssertTrue(zImage.chain.denoising.sketches)
-    }
-
     func testARequestIsComparable() {
         let a = Request("une bibliothèque", resolution: 512)
         var b = Request("une bibliothèque", resolution: 512)

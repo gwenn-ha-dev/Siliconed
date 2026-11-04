@@ -50,6 +50,22 @@ final class MemoryNeedTests: XCTestCase {
 
     // ── the formula is the allocation ─────────────────────────────────────────────────────────
 
+    /// A map linked into the store weighs what it points to, alone or in a folder: read on the link,
+    /// a few dozen bytes made the need wrong and a render was refused.
+    func testAFileReachedByALinkWeighsItsFile() throws {
+        let file = root.appendingPathComponent("map.bin").path
+        try Data(count: 4_096).write(to: URL(fileURLWithPath: file))
+        let folder = root.appendingPathComponent("store")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let link = folder.appendingPathComponent("linked.bin").path
+        try FileManager.default.createSymbolicLink(atPath: link, withDestinationPath: file)
+        XCTAssertEqual(Library.fileSize(link), 4_096)
+        XCTAssertEqual(MemoryNeed.InstalledFiles.size(link), 4_096)
+        XCTAssertEqual(Library.size(link), 4_096)
+        XCTAssertEqual(Library.size(folder.path), 4_096)
+        XCTAssertNil(Library.fileSize(root.appendingPathComponent("absent").path))
+    }
+
     func testTheEncoderArenaIsTheFormula() throws {
         let artifact = try Artifact(path: try map(tinyEncoder))
         let config = try TextEncoder.Config(header: artifact.header)

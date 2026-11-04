@@ -110,9 +110,6 @@ extension Engine {
         context.cache = cache
         context.accelerators = admitted.accelerators
         context.fasterRendering = admitted.fasterRendering
-        // A sketch that reaches the plan's last evaluation is the whole render: no stop, no estimate.
-        let sketch = request.sketch.map { max(1, $0) }.flatMap { $0 < plan.evaluations ? $0 : nil }
-        context.stopAfter = sketch
         context.detail = request.detail
         context.detailScale = Detail.scale(width: request.width, height: request.height)
         context.solver = request.solver
@@ -145,9 +142,8 @@ extension Engine {
             let totalStart = Date()
             context.footprints.start = Arena.processFootprint()
             PhaseBoundary.mark("start")
-            // A sketch announces the evaluations it will do: the progress reaches 1 at its image.
             context.emit(.start(Plan(
-                denoising: sketch.map { plan.sketched($0) } ?? plan, seeds: seeds,
+                denoising: plan, seeds: seeds,
                 stages: request.image != nil || !request.references.isEmpty ? [.text, .image, .denoising, .decoding]
                                                                             : [.text, .denoising, .decoding])))
 
@@ -245,15 +241,11 @@ extension Engine {
                 let denoisingStart = Date()
                 // The classes this image's evaluations ran, by route (`ProductLedger`): armed for the denoising alone.
                 let ledger = ProductLedger()
-                do {
-                    try autoreleasepool {
-                        try ProductLedger.recording(into: ledger) {
-                            try chain.denoising.denoise(&latent, text: text, steps: steps, start: start,
-                                                        references: references, lora: stack, context: context)
-                        }
+                try autoreleasepool {
+                    try ProductLedger.recording(into: ledger) {
+                        try chain.denoising.denoise(&latent, text: text, steps: steps, start: start,
+                                                    references: references, lora: stack, context: context)
                     }
-                } catch is Context.Sketched {
-                    latent.values = context.estimate!
                 }
                 context.timings.denoising = Date().timeIntervalSince(denoisingStart)
                 PhaseBoundary.mark("denoising")
@@ -287,7 +279,7 @@ extension Engine {
 
                 var renderResult = Render(model: chain.denoising.model, prompt: request.prompt, seed: seed,
                                   steps: steps, loras: request.loras, loraSummary: stack?.summary, image: image,
-                                  evaluations: sketch ?? plan.evaluations, sketch: sketch, spectral: plan.reduced,
+                                  evaluations: plan.evaluations, spectral: plan.reduced,
                                   strength: request.image != nil ? request.strength : nil, startStep: plan.startStep,
                                   startSigma: plan.startSigma,
                                   timings: context.timings, footprints: context.footprints, tokens: text.tokens,

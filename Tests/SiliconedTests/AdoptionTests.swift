@@ -90,6 +90,20 @@ final class AdoptionTests: XCTestCase {
         XCTAssertEqual(again.copied, 0)
     }
 
+    func testALinkIsFollowedAndItsFileCopied() throws {
+        let expected = try file("a/enc", "the expected bytes")
+        let table = [Adoption.Expectation(family: .zImage, variant: .compact, file: expected)]
+        let mine = try write("comfy-copy.safetensors", "the expected bytes")
+        let link = root.appendingPathComponent("linked.safetensors").path
+        try FileManager.default.createSymbolicLink(atPath: link, withDestinationPath: mine)
+        let r = try XCTUnwrap(Adoption.adopt(link, in: library, among: table), "a link weighs its file")
+        let place = Installer(library: library).source(expected)
+        XCTAssertEqual(r.copied, 1)
+        let type = try FileManager.default.attributesOfItem(atPath: place)[.type] as? FileAttributeType
+        XCTAssertEqual(type, .typeRegular, "the file is copied, never the link")
+        XCTAssertEqual(try Downloader.sha256(place), expected.sha256)
+    }
+
     func testFileExpectedByTwoFamiliesIsPlacedForEach() throws {
         let one = try file("repo/one", "shared bytes")
         let two = Installer.File(repository: .init(name: "repo/two", revision: "r"), path: one.path, destination: nil,

@@ -53,7 +53,7 @@ extension LabModel {
         let task = Task { [writer] in
             do {
                 var last = "", tokens = 0
-                for try await event in writer.write(input, target: family) {
+                for try await event in writer.write(input, instruction: instruction(for: family, input)) {
                     if Task.isCancelled { return }
                     switch event {
                     case .loading(let fraction): progress(.loading(fraction))

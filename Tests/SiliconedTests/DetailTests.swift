@@ -142,7 +142,7 @@ final class DetailTests: XCTestCase {
     func testThePNGCarriesTheDetail() throws {
         func render(_ detail: Detail) -> Engine.Render {
             Engine.Render(model: "z-image", prompt: "woman posing in a library", seed: 42, steps: 8, loras: [],
-                          loraSummary: nil, image: ImageRGB(pixels: [Float](repeating: 0, count: 3 * 4), height: 2, width: 2), evaluations: 8, sketch: nil, spectral: 0, strength: nil,
+                          loraSummary: nil, image: ImageRGB(pixels: [Float](repeating: 0, count: 3 * 4), height: 2, width: 2), evaluations: 8, spectral: 0, strength: nil,
                           startStep: 0, startSigma: 1, timings: .init(), footprints: .init(), tokens: 1, detail: detail)
         }
         XCTAssertNil(render(.normal).metadata["detail"])

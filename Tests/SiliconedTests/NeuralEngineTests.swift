@@ -72,7 +72,7 @@ final class NeuralEngineTests: XCTestCase {
     func testEveryVersionTakesTheEngineByDefaultAndThePNGSaysWhenItWasTaken() throws {
         for variant in Variant.allCases { XCTAssertTrue(variant.acceleratorsByDefault) }
         var render = Engine.Render(model: "krea2", prompt: "woman posing in a library", seed: 42, steps: 8, loras: [],
-                                   loraSummary: nil, image: ImageRGB(pixels: [Float](repeating: 0, count: 3 * 4), height: 2, width: 2), evaluations: 8, sketch: nil, spectral: 0, strength: nil,
+                                   loraSummary: nil, image: ImageRGB(pixels: [Float](repeating: 0, count: 3 * 4), height: 2, width: 2), evaluations: 8, spectral: 0, strength: nil,
                                    startStep: 0, startSigma: 1, timings: .init(), footprints: .init(), tokens: 1)
         XCTAssertNil(render.metadata["neural-engine"])
         XCTAssertEqual(Engine.Render.Recipe(metadata: render.metadata)?.neuralEngine, false)

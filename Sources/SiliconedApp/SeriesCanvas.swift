@@ -13,8 +13,8 @@
 //
 // What an analogy with a contact sheet would miss:
 //
-// - **A cell is a finished image** (4/11): the render « Generate » would make alone, at the rack's size and steps — no
-//   sketch, nothing to finish. The grid only lays the history's images out.
+// - **A cell is a finished image** (4/11): the render « Generate » would make alone, at the rack's size and steps —
+//   nothing to finish. The grid only lays the history's images out.
 // - **A new series does not replace the last one's cells**: « Generate » queues, as it always does; the canvas shows the
 //   newest grid, and « Stop » takes the shown one's waiting cells out of the queue.
 // - **The sheet only when asked**: the canvas is the series' sheet; `silicontrol grid` draws its own when its last

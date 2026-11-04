@@ -115,7 +115,7 @@ extension MemoryNeed {
             }
         }
         static func size(_ path: String) -> Int {
-            ((try? FileManager.default.attributesOfItem(atPath: path))?[.size] as? NSNumber)?.intValue ?? .max
+            Library.fileSize(path) ?? .max
         }
     }
 

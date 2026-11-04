@@ -189,9 +189,8 @@ enum BaseModels {
         private var known: [String: String] = [:]
 
         func sha256(_ path: String) throws -> String {
-            let a = try FileManager.default.attributesOfItem(atPath: path)
-            let date = (a[.modificationDate] as? Date)?.timeIntervalSinceReferenceDate ?? 0
-            let key = "\(path)|\(a[.size] as? Int ?? -1)|\(date)|\(a[.systemFileNumber] as? Int ?? -1)"
+            // The stamps of what the hash reads, through a link (`stat`): the link's own would not change with its file.
+            let key = "\(path)|\(MemoryNeed.InstalledFiles(paths: [path]).stamps)"
             if let sha = lock.withLock({ known[key] }) { return sha }
             let sha = try Downloader.sha256(path)
             lock.withLock {

@@ -91,6 +91,7 @@ final class RemoteControl {
                 }
             case "rewrite": try writing(.rewrite, arguments, cwd: cwd, c)
             case "describe": try writing(.describe, arguments, cwd: cwd, c)
+            case "instructions": finish(c, try instructions(arguments, cwd: cwd))
             case "diagnose": try diagnose(arguments, c)
             case "add":
                 if let mirror = app.mirror { try addOnMirror(mirror, arguments, cwd: cwd, c) } else { try add(arguments, cwd: cwd, c) }

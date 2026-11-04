@@ -350,11 +350,12 @@ extension Library {
         let fm = FileManager.default
         var folder: ObjCBool = false
         guard fm.fileExists(atPath: path, isDirectory: &folder) else { return 0 }
-        guard folder.boolValue else { return (try? fm.attributesOfItem(atPath: path)[.size] as? Int) ?? 0 }
+        guard folder.boolValue else { return Library.fileSize(path) ?? 0 }
         var total = 0
         let e = fm.enumerator(at: URL(fileURLWithPath: path), includingPropertiesForKeys: [.fileSizeKey, .isRegularFileKey])
         while let u = e?.nextObject() as? URL {
-            let v = try? u.resourceValues(forKeys: [.fileSizeKey, .isRegularFileKey])
+            // Through a link, like a file alone (`fileSize`): a linked map weighs what it points to.
+            let v = try? u.resolvingSymlinksInPath().resourceValues(forKeys: [.fileSizeKey, .isRegularFileKey])
             if v?.isRegularFile == true { total += v?.fileSize ?? 0 }
         }
         return total

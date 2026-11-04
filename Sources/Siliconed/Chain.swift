@@ -163,62 +163,6 @@ package struct DenoisingPlan: Sendable {
         DenoisingPlan(startStep: startStep, startSigma: startSigma, evaluations: evaluations,
                       reduced: 0, reducedHeight: reducedHeight, reducedWidth: reducedWidth)
     }
-
-    /// **The same plan, stopped as a sketch** (`Request.sketch`): its first `n` evaluations — what an
-    /// app estimates a sketch's duration from. `n` at or past `evaluations`: the plan itself.
-    package func sketched(_ n: Int) -> DenoisingPlan {
-        let kept = min(max(1, n), evaluations)
-        return DenoisingPlan(startStep: startStep, startSigma: startSigma, evaluations: kept,
-                             reduced: min(reduced, kept), reducedHeight: reducedHeight, reducedWidth: reducedWidth)
-    }
-}
-
-/// **Where a sketch stops** (`Request.sketch`): after the first evaluation that brings σ to
-/// `threshold` or below — the evaluations it takes depend on the schedule, not on a count.
-///
-/// Measured (512², estimate x̂₀ against the final image reduced ×4, by eye on the sheets):
-///
-///     Z-Image, 7 (before 0.8.2)   σ after:  .947  .882  .800  .692 …      stop at 3 → 21 dB, pose,
-///                                                                         clothes and light final
-///     Z-Image, 8 (since 0.8.2)    σ after:  .955  .900  .833  .750 …      stop at 4 (rule, not re-measured)
-///     Qwen-Image-2.1, 6           σ after:  .963  .923  .837  .632 …      stop at 4 → 20 dB,
-///                                                                         composition, soft
-///
-/// A step count is no rule — Qwen's schedule keeps σ high longer, and at 3 of 6 its estimate is a
-/// blur (17 dB); σ is. (Qwen's line was measured on the 6-step third-party turbo the family carried
-/// before the official Turbo; the Turbo's 8 fixed steps reach 0.8 only after the 6th evaluation,
-/// σ 0.705.) Under a LoRA, Z-Image's pose still moved between 3 and 4: a sketch shows
-/// where the image goes, the finished render is the judge.
-///
-/// **Qwen-Image-2.1 does not sketch** (`DenoisingModule.sketches`, 2026-10-06): its « soft » at 4 is,
-/// seen through the app, blurred and grainy, and still at 5 (22 dB) — it removes the noise in its
-/// last two evaluations. A sketch of it saves 15 s of 51 for an image no one can judge: its cells
-/// are finished images. Re-judged on the Turbo's 8 steps (512², seeds 42, 7, 1000, against the
-/// finished image reduced ×4): after 6 evaluations a blur (24.5–26 dB), after 7 nearly finished
-/// (30–32 dB) for 3 s saved at 512², 14 s at 1024² — the threshold's stop, and not worth a sketch.
-///
-/// **0.5 since 0.12, 0.8 before** (the user, 18/10/2026): at 0.8 a LoRA's style had not landed — Anima
-/// under inCase, 4 of 8, showed the strengths 0.6 and 1 alike, the fine line still to come. 0.5 costs
-/// 6 of 8 on Z-Image and Anima; the panel's stepper still stops anywhere.
-package enum Sketch {
-    package static let threshold: Float = 0.5
-
-    /// The evaluations a sketch of `sigmas` (a full schedule, ending in 0, one evaluation per step)
-    /// takes. Never fewer than 1, never more than the schedule's.
-    package static func evaluations(sigmas: [Float]) -> Int {
-        for i in 0..<max(0, sigmas.count - 1) where sigmas[i + 1] <= threshold { return i + 1 }
-        return max(1, sigmas.count - 1)
-    }
-}
-
-package extension Model {
-    /// The evaluations a sketch of this model takes at this format (`Sketch`); `steps` nil: the
-    /// model's default.
-    func sketchEvaluations(steps: Int?, width: Int, height: Int) -> Int {
-        chain.denoising.sketchEvaluations(steps: steps ?? chain.denoising.defaultSteps,
-                                          height: height / chain.denoising.space.factor,
-                                          width: width / chain.denoising.space.factor)
-    }
 }
 
 // ── the modules ─────────────────────────────────────────────────────────────────────────────
@@ -263,10 +207,6 @@ package final class Context {
     var image = 0
     private var stepsDone = 0
     private(set) var plannedEvaluations = 0
-    /// **A sketch** (`Request.sketch`): after this many evaluations `stepDone` keeps x̂₀ in
-    /// `estimate` and throws `Sketched` — the way out that cancellation already proved through every
-    /// denoiser, arenas unwound by the scopes. `nil`: the whole render.
-    package var stopAfter: Int?
     /// **More detail** (`Request.detail`): every sampler asks it what σ to tell its DiT (`told`).
     package var detail: Detail = .normal
     /// `Detail.scale` of the render's size: the bell's amount shrinks as the image grows.
@@ -280,10 +220,6 @@ package final class Context {
     package func told(_ sigmas: [Float], start: Int, bell: Detail.Bell? = nil) -> [Float] {
         detail.modelSigmas(sigmas, start: start, bell: bell, scale: detailScale)
     }
-    /// x̂₀ at the sketch's last evaluation, `[channels, fullHeight, fullWidth]`.
-    package private(set) var estimate: [Float]?
-    /// Thrown by `stepDone` when the sketch is done; caught by the engine, never seen by a caller.
-    package struct Sketched: Error {}
 
     /// For the checks, which drive one of the product's modules outside a render.
     package init(cancellation: Cancellation? = nil, previews: Bool = false,
@@ -298,8 +234,8 @@ package final class Context {
 
     /// The denoiser announces its evaluations before the first: that is the events' `total`.
     func beginDenoising(evaluations: Int) {
-        stepsDone = 0; estimate = nil
-        plannedEvaluations = min(evaluations, stopAfter ?? evaluations)
+        stepsDone = 0
+        plannedEvaluations = evaluations
     }
 
     /// **An evaluation is done**: the numbered `step` event (1 … `total`), then the preview if
@@ -319,13 +255,6 @@ package final class Context {
                                             height: fullHeight, width: fullWidth)
             emit(.preview(Engine.Preview(image: image, index: stepsDone, total: total, height: fullHeight,
                                           width: fullWidth, rgba: rgba)))
-        }
-        if let stopAfter, stepsDone >= stopAfter {
-            let count = space.channels * fullHeight * fullWidth
-            var x0 = [Float](repeating: 0, count: count)
-            for i in 0..<count { x0[i] = x[i] - nextSigma * v[i] }
-            estimate = x0
-            throw Sketched()
         }
         try check()
     }
@@ -396,9 +325,6 @@ package protocol DenoisingModule: Sendable {
     /// Whether the denoiser starts from an encoded image (img2img). By default yes; a pipeline
     /// without img2img (Qwen-Image-2.1) says no, and the chain then offers no image entry.
     var acceptsStartImage: Bool { get }
-    /// Whether its estimate x̂₀ is readable early (`Sketch`). By default yes; a denoiser that clears
-    /// its noise only at the end says no, and its sketches are finished images.
-    var sketches: Bool { get }
     /// The update rules its sampler walks (`Solver`). By default Euler alone: the chain refuses
     /// another before any computation rather than render Euler under another name.
     var solvers: [Solver] { get }
@@ -451,16 +377,8 @@ package extension DenoisingModule {
     }
     func check(steps: Int, startImage: Bool) throws {}
     var acceptsStartImage: Bool { true }
-    var sketches: Bool { true }
     var solvers: [Solver] { [.euler] }
     var acceptsDetail: Bool { true }
-    /// The evaluations a sketch takes on the latent grid `height × width`: where σ reaches the
-    /// threshold, or all of them for a denoiser that does not sketch.
-    func sketchEvaluations(steps: Int, height: Int, width: Int) -> Int {
-        let all = plan(height: height, width: width, steps: steps, start: 0).evaluations
-        guard sketches else { return all }
-        return min(all, Sketch.evaluations(sigmas: sigmas(steps: steps)))
-    }
 }
 
 /// A module without a name of its own carries its type's: a hand-composed chain can still be

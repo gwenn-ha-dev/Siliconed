@@ -89,6 +89,7 @@ struct PromptField: NSViewRepresentable {
             // The list leaves with the keyboard: left open, it would keep Esc from every other field.
             if !typing { coordinator?.completion.close() }
         }
+        view.listShown = { [weak coordinator = context.coordinator] in coordinator?.completion.isShown ?? false }
         view.setAccessibilityLabel(String(localized: "Prompt"))
         view.setAccessibilityHelp(String(localized: "Write @ and a subject’s name to cite it."))
         layout.thumbnail = { [weak coordinator = context.coordinator] key in coordinator?.thumbnail(key) }
@@ -358,6 +359,8 @@ final class PromptTextView: NSTextView {
     /// The field on screen — at most one: the lab has one text.
     @MainActor static weak var current: PromptTextView?
     var focusChanged: ((Bool) -> Void)?
+    /// Whether the list of subjects is shown under the caret: Esc closes it before it leaves the field.
+    var listShown: (() -> Bool)?
     /// A group clicked, or words to vary: the bubble, at this rectangle of the view.
     var openBracket: ((BracketTarget, NSRect) -> Void)?
 

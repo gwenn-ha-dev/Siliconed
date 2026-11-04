@@ -129,7 +129,7 @@ final class SolverTests: XCTestCase {
         XCTAssertEqual(x, y)
     }
 
-    /// The estimate a preview and a sketch show: `x − σ·m` on the sample the DiT saw, for every rule
+    /// The estimate a preview shows: `x − σ·m` on the sample the DiT saw, for every rule
     /// but Euler (whose `x' − σ'·m` is it already).
     func testTheEstimateIsTheLastLanding() {
         let σ = FlowMatchSchedule(steps: 8).sigmas

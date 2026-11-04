@@ -82,7 +82,7 @@ final class VariationTests: XCTestCase {
         let vs = [Variation(seed: 4_000_000_000_123, strength: Variation.Amount.subtle.strength(for: .zImage)), Variation(seed: 9, strength: 0.1)]
         var r = Engine.Render(model: "z-image", prompt: "a 30 year old woman posing in a library", seed: 42, steps: 8,
                               loras: [], loraSummary: nil,
-                              image: ImageRGB(pixels: [Float](repeating: 0, count: 3 * 16 * 16), height: 16, width: 16), evaluations: 8, sketch: nil, spectral: 0, strength: nil,
+                              image: ImageRGB(pixels: [Float](repeating: 0, count: 3 * 16 * 16), height: 16, width: 16), evaluations: 8, spectral: 0, strength: nil,
                               startStep: 0, startSigma: 1, timings: .init(), footprints: .init(), tokens: 1)
         XCTAssertNil(r.metadata["variation"], "an ordinary render writes no variation")
         r.variations = vs

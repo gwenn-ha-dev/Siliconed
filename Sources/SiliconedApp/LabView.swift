@@ -127,6 +127,7 @@ struct LabView: View {
         HStack(spacing: 8) {
             Text("Prompt Lab").font(.callout.weight(.semibold))
             if let modelName { Text("Write for \(modelName)").font(.caption).foregroundStyle(.secondary) }
+            yourInstructions
             Spacer(minLength: 8)
             if model.isWriting {
                 Button("Stop") { model.stop() }.controlSize(.small)
@@ -140,6 +141,21 @@ struct LabView: View {
                 .help(model.writerPause.map { Text(verbatim: $0.sentence) } ?? Text("Rewrite"))
             }
             chevron
+        }
+    }
+
+    /// **The writer follows the user's instruction** for this model (Settings › Prompt Lab): said where it acts, a click
+    /// opens it.
+    @ViewBuilder private var yourInstructions: some View {
+        let edited = model.editedInstructions
+        if let target = model.target, let first = edited.first {
+            Button(edited.count > 1 ? "Your Instructions" : "Your Instruction") {
+                SettingsWindow.shared.showInstruction(target, first)
+            }
+            .buttonStyle(.chartLink).font(.caption)
+            .help(edited.count > 1 ? String(localized: "Rewrite and Describe follow your instructions for \(target.name), not Siliconed’s.")
+                  : first == .rewrite ? String(localized: "Rewrite follows your instruction for \(target.name), not Siliconed’s.")
+                  : String(localized: "Describe follows your instruction for \(target.name), not Siliconed’s."))
         }
     }
 

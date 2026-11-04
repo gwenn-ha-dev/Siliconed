@@ -336,7 +336,7 @@ final class LabModel {
         task = Task { [writer] in
             do {
                 var last = ""
-                for try await event in writer.write(input, target: target) {
+                for try await event in writer.write(input, instruction: instruction(for: target, input)) {
                     guard mine == self.generation else { return }
                     switch event {
                     case .loading(let f): phase = .loading(f)
@@ -440,6 +440,26 @@ final class LabModel {
 
     /// ⌥⌘L, and the bar's chevron.
     func toggle() { if unfolded { fold() } else { unfold() } }
+
+    // MARK: The instructions
+
+    /// **What the writer is told**, family by family and gesture by gesture: ours, or the user's own written in Settings ›
+    /// Prompt Lab (`PromptWriterInstructions.Edits`), kept in this Mac's preferences — the writer is this Mac's.
+    var instructions = PromptWriterInstructions.Edits(UserDefaults.standard.dictionary(forKey: LabModel.instructionsKey) as? [String: String] ?? [:]) {
+        didSet { UserDefaults.standard.set(instructions.texts, forKey: Self.instructionsKey) }
+    }
+    static let instructionsKey = "writerInstructions"
+
+    /// The system turn for a gesture: Rewrite reads a text, Describe an image.
+    func instruction(for family: Family, _ input: LabInput) -> String {
+        instructions.instruction(for: family, input.gesture)
+    }
+
+    /// The gestures whose instruction for the family the lab writes for is the user's, in the order of the bar.
+    var editedInstructions: [PromptWriterInstructions.Gesture] {
+        guard let target else { return [] }
+        return PromptWriterInstructions.Gesture.allCases.filter { instructions.sent(target, $0) != nil }
+    }
 
     /// **Unfolded when the window opens** (4/11): where the idea is written is the first thing seen — folded, the eye went to
     /// the rack's text port and looked for a field there. Once per launch: a fold after it is the hand's, and stays.

@@ -22,6 +22,14 @@ enum LabInput: Sendable, Equatable {
     case text(String)
     /// An image to describe: the file's bytes as they were dropped or opened (any format the system reads).
     case image(Data)
+
+    /// The gesture it is: Rewrite reads a text, Describe an image.
+    var gesture: PromptWriterInstructions.Gesture {
+        switch self {
+        case .text: .rewrite
+        case .image: .describe
+        }
+    }
 }
 
 enum LabEvent: Sendable, Equatable {
@@ -63,8 +71,8 @@ enum LabUnavailable: Equatable, Sendable {
 protocol LabWriter: AnyObject, Sendable {
     /// Read when the window opens, when it comes forward and when a render ends — cheap, no loading.
     var availability: LabAvailability { get }
-    /// `target` writes for that family (its publisher's guidance decides how). The stream ends after
-    /// `finished` or `cancelled`, or throws.
-    func write(_ input: LabInput, target: Family) -> AsyncThrowingStream<LabEvent, Error>
+    /// `instruction` is the system turn: ours for `target` and the gesture, or the user's (`LabModel.instruction`). The stream
+    /// ends after `finished` or `cancelled`, or throws.
+    func write(_ input: LabInput, instruction: String) -> AsyncThrowingStream<LabEvent, Error>
     func release() async
 }

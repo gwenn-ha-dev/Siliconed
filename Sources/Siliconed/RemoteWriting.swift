@@ -114,6 +114,59 @@ package struct WriterOrder: Equatable, Sendable {
     }
 }
 
+// MARK: - The arguments of instructions
+
+/// **`instructions [rewrite|describe] [--for ID] [--set "<text>" | --file PATH | --restore]`**, read: Settings › Prompt Lab
+/// from the terminal. Without a gesture, the list (of one family with `--for`); with one, that instruction, shown or
+/// changed — a change names its gesture, as the pane's field is one gesture's. `--for` names any family, installed or not:
+/// the instructions are the app's, not the library's.
+package struct InstructionOrder: Equatable, Sendable {
+    package enum Change: Equatable, Sendable {
+        case set(String)
+        /// A path as typed: the app reads it against the command's directory.
+        case file(String)
+        case restore
+    }
+
+    package var gesture: PromptWriterInstructions.Gesture?
+    package var target: String?
+    package var change: Change?
+
+    package static let usage = "instructions [rewrite|describe] [--for ID] [--set \"<text>\" | --file PATH | --restore]"
+
+    package static func parse(_ arguments: [String]) -> Result<InstructionOrder, WriterOrder.Failure> {
+        var order = InstructionOrder()
+        var i = 0
+        while i < arguments.count {
+            let a = arguments[i]
+            switch a {
+            case "--for", "--set", "--file":
+                guard i + 1 < arguments.count else { return .failure(.flagWithoutValue(a)) }
+                let value = arguments[i + 1]
+                if a == "--for" {
+                    guard order.target == nil else { return .failure(.usage(usage)) }
+                    order.target = value
+                } else {
+                    guard order.change == nil else { return .failure(.usage(usage)) }
+                    order.change = a == "--set" ? .set(value) : .file(value)
+                }
+                i += 2
+            case "--restore":
+                guard order.change == nil else { return .failure(.usage(usage)) }
+                order.change = .restore
+                i += 1
+            default:
+                if a.hasPrefix("--") { return .failure(.unknownFlag(a)) }
+                guard order.gesture == nil, let gesture = PromptWriterInstructions.Gesture(rawValue: a) else { return .failure(.usage(usage)) }
+                order.gesture = gesture
+                i += 1
+            }
+        }
+        if order.change != nil, order.gesture == nil { return .failure(.usage(usage)) }
+        return .success(order)
+    }
+}
+
 // MARK: - The Beta options
 
 /// **The four switches of Settings › Advanced › Beta**, by the name `silicontrol set beta` gives them.

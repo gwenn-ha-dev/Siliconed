@@ -54,7 +54,7 @@ package enum RenderLoop {
     }
 
     /// **The render's request, as the catalogue sees it**: the family and the version it ran with, its pixels, the
-    /// half-grid evaluations it did (`Render.spectral`), its evaluations as the steps (a sketch or an img2img did fewer),
+    /// half-grid evaluations it did (`Render.spectral`), its evaluations as the steps (an img2img did fewer),
     /// the text encoder left out (the ledger is of the denoising). `nil` for a model that is not one of the five families.
     package static func request(of render: Engine.Render, variant: Variant) -> CapacityClasses.Request? {
         guard let family = Family(rawValue: render.model) else { return nil }

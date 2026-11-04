@@ -115,7 +115,7 @@ package final class Sampler {
     /// may throw, and the loop stops. `onStep`, for its part, remains the instrument of the checks.
     ///
     /// Under Euler, `x` is the latent after the update and `σₓ` the next σ — as it always was, so a
-    /// sketch keeps its bits. Under another solver the latent after the update is not on the line
+    /// render keeps its bits. Under another solver the latent after the update is not on the line
     /// `x̂₀ + σ'·m` (the ancestral rule has fresh noise in it, the multistep rules a correction), so
     /// `x` is the walk's own x̂₀ (`SolverWalk.estimate`) and `σₓ` is 0.
     package var afterEvaluation: ((Int, Double, Int, Int, UnsafePointer<Float>, UnsafePointer<Float>, Float) throws -> Void)?

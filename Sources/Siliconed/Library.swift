@@ -105,4 +105,12 @@ package struct Library: Sendable {
         }
         return .placed(in: Library.standard.root)
     }()
+
+    /// **A file's size, through a symbolic link**: `stat`, never `attributesOfItem`, which describes the
+    /// link itself (a few dozen bytes) — a map linked into the store, or an encoder linked from another
+    /// app's folder, would weigh nothing and the memory need would come out wrong. `nil` if nothing is there.
+    package static func fileSize(_ path: String) -> Int? {
+        var info = stat()
+        return stat(path, &info) == 0 ? Int(info.st_size) : nil
+    }
 }

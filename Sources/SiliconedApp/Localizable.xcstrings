@@ -8899,6 +8899,46 @@
         }
       }
     },
+    "Brings back Siliconed’s instruction for this model and gesture." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stellt die Anweisung von Siliconed für dieses Modell und diese Geste wieder her."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recupera la instrucción de Siliconed para este modelo y este gesto."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ramène la consigne de Siliconed pour ce modèle et ce geste."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ripristina l’istruzione di Siliconed per questo modello e questo gesto."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このモデルと操作について、Siliconed の指示に戻します。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "恢复 Siliconed 对此模型和此操作的指令。"
+          }
+        }
+      }
+    },
     "Budget %@" : {
       "localizations" : {
         "de" : {
@@ -13419,6 +13459,46 @@
         }
       }
     },
+    "Describe follows your instruction for %@, not Siliconed’s." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Beschreiben folgt deiner Anweisung für %@, nicht der von Siliconed."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Describir sigue tu instrucción para %@, no la de Siliconed."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Décrire suit votre consigne pour %@, pas celle de Siliconed."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Descrivi segue la tua istruzione per %@, non quella di Siliconed."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「説明する」は %@ についてあなたの指示に従います。Siliconed の指示ではありません。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“描述”遵循你为 %@ 编写的指令，而非 Siliconed 的指令。"
+          }
+        }
+      }
+    },
     "Detail" : {
       "localizations" : {
         "de" : {
@@ -14833,6 +14913,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "空单元格"
+          }
+        }
+      }
+    },
+    "Empty: Siliconed’s instruction is sent instead." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Leer: Stattdessen wird die Anweisung von Siliconed gesendet."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vacía: se envía la instrucción de Siliconed en su lugar."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vide : c’est la consigne de Siliconed qui part."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vuota: viene inviata invece l’istruzione di Siliconed."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "空欄：代わりに Siliconed の指示が送られます。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "为空：将改为发送 Siliconed 的指令。"
           }
         }
       }
@@ -16724,6 +16844,46 @@
         }
       }
     },
+    "Gesture" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Geste"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gesto"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Geste"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gesto"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "操作"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "操作"
+          }
+        }
+      }
+    },
     "GitHub could not be reached. New versions are also listed on the project’s page." : {
       "localizations" : {
         "de" : {
@@ -17052,6 +17212,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "此处：%@ 个步骤中的 %@ 个将被重绘。"
+          }
+        }
+      }
+    },
+    "Hide Prompt Lab" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prompt-Labor ausblenden"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ocultar Laboratorio de prompts"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Masquer l’Atelier de prompts"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nascondi Laboratorio dei prompt"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "プロンプトラボを非表示"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "隐藏提示词实验室"
           }
         }
       }
@@ -19179,6 +19379,86 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "安装…"
+          }
+        }
+      }
+    },
+    "Instruction" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Anweisung"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Instrucción"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Consigne"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Istruzione"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "指示"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "指令"
+          }
+        }
+      }
+    },
+    "Instructions" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Anweisungen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Instrucciones"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Consignes"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Istruzioni"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "指示"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "指令"
           }
         }
       }
@@ -29273,6 +29553,46 @@
         }
       }
     },
+    "Restore" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wiederherstellen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restaurar"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rétablir"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ripristina"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "元に戻す"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "恢复"
+          }
+        }
+      }
+    },
     "Resumed at the next installation, or discarded." : {
       "localizations" : {
         "de" : {
@@ -29473,6 +29793,46 @@
         }
       }
     },
+    "Rewrite and Describe follow your instructions for %@, not Siliconed’s." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Umschreiben und Beschreiben folgen deinen Anweisungen für %@, nicht denen von Siliconed."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reescribir y Describir siguen tus instrucciones para %@, no las de Siliconed."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Réécrire et Décrire suivent vos consignes pour %@, pas celles de Siliconed."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Riscrivi e Descrivi seguono le tue istruzioni per %@, non quelle di Siliconed."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「書き直す」と「説明する」は %@ についてあなたの指示に従います。Siliconed の指示ではありません。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“改写”和“描述”遵循你为 %@ 编写的指令，而非 Siliconed 的指令。"
+          }
+        }
+      }
+    },
     "Rewrite and Describe wait while an image renders." : {
       "localizations" : {
         "de" : {
@@ -29509,6 +29869,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "图像生成期间，“改写”和“描述”会等待。"
+          }
+        }
+      }
+    },
+    "Rewrite follows your instruction for %@, not Siliconed’s." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Umschreiben folgt deiner Anweisung für %@, nicht der von Siliconed."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reescribir sigue tu instrucción para %@, no la de Siliconed."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Réécrire suit votre consigne pour %@, pas celle de Siliconed."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Riscrivi segue la tua istruzione per %@, non quella di Siliconed."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「書き直す」は %@ についてあなたの指示に従います。Siliconed の指示ではありません。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“改写”遵循你为 %@ 编写的指令，而非 Siliconed 的指令。"
           }
         }
       }
@@ -30039,6 +30439,46 @@
         }
       }
     },
+    "Sent in English, as written, to the writer (Qwen3-VL) before each Rewrite or Describe for this model. What you leave untouched follows Siliconed’s own instructions from version to version." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wird auf Englisch, so wie geschrieben, vor jedem Umschreiben oder Beschreiben für dieses Modell an den Schreiber (Qwen3-VL) gesendet. Was du nicht änderst, folgt von Version zu Version den Anweisungen von Siliconed."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Se envía en inglés, tal como está escrita, al redactor (Qwen3-VL) antes de cada Reescribir o Describir para este modelo. Lo que no toques sigue las instrucciones de Siliconed de una versión a otra."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Envoyée en anglais, telle qu’écrite, au rédacteur (Qwen3-VL) avant chaque Réécrire ou Décrire pour ce modèle. Ce que vous ne touchez pas suit les consignes de Siliconed d’une version à l’autre."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Inviata in inglese, così come è scritta, al redattore (Qwen3-VL) prima di ogni Riscrivi o Descrivi per questo modello. Ciò che non tocchi segue le istruzioni di Siliconed da una versione all’altra."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このモデルで「書き直す」または「説明する」を行うたびに、書いたままの英語でライター（Qwen3-VL）に送られます。変更していない指示は、バージョンごとに Siliconed の指示に従います。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "每次为此模型“改写”或“描述”之前，按原文以英文发送给写作模型（Qwen3-VL）。你未改动的指令会随版本更新沿用 Siliconed 的指令。"
+          }
+        }
+      }
+    },
     "Session" : {
       "localizations" : {
         "de" : {
@@ -30395,6 +30835,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "请缩短提示词。"
+          }
+        }
+      }
+    },
+    "Show Prompt Lab" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prompt-Labor einblenden"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostrar Laboratorio de prompts"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Afficher l’Atelier de prompts"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostra Laboratorio dei prompt"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "プロンプトラボを表示"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示提示词实验室"
           }
         }
       }
@@ -31355,6 +31835,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Siliconed 不附带权重：模型从其发布方下载，遵循发布方的许可证。"
+          }
+        }
+      }
+    },
+    "Siliconed’s instruction, as this version sends it." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Anweisung von Siliconed, wie diese Version sie sendet."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La instrucción de Siliconed, tal como la envía esta versión."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La consigne de Siliconed, telle que cette version l’envoie."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’istruzione di Siliconed, come la invia questa versione."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このバージョンが送る、Siliconed の指示です。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Siliconed 的指令，即此版本发送的内容。"
           }
         }
       }
@@ -43544,6 +44064,126 @@
         }
       }
     },
+    "Your Instruction" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deine Anweisung"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu instrucción"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Votre consigne"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La tua istruzione"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "あなたの指示"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你的指令"
+          }
+        }
+      }
+    },
+    "Your Instructions" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deine Anweisungen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tus instrucciones"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vos consignes"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le tue istruzioni"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "あなたの指示"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你的指令"
+          }
+        }
+      }
+    },
+    "Yours: sent instead of Siliconed’s." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deine: wird statt der von Siliconed gesendet."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La tuya: se envía en lugar de la de Siliconed."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La vôtre : elle part à la place de celle de Siliconed."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La tua: viene inviata al posto di quella di Siliconed."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "あなたの指示：Siliconed の指示の代わりに送られます。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你的指令：代替 Siliconed 的指令发送。"
+          }
+        }
+      }
+    },
     "Zoom In" : {
       "localizations" : {
         "de" : {
@@ -44420,6 +45060,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "bf16 激活"
+          }
+        }
+      }
+    },
+    "cannot read %@ as UTF-8 text" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ kann nicht als UTF-8-Text gelesen werden"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "no se puede leer %@ como texto UTF-8"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "impossible de lire %@ comme du texte UTF-8"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "impossibile leggere %@ come testo UTF-8"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ を UTF-8 テキストとして読み込めません"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法将 %@ 读取为 UTF-8 文本"
           }
         }
       }
@@ -47430,6 +48110,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "本次会话中没有任务 t%lld"
+          }
+        }
+      }
+    },
+    "no model installed: name one with --for" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "kein Modell installiert: nenne eines mit --for"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ningún modelo instalado: nombra uno con --for"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "aucun modèle installé : nommez-en un avec --for"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "nessun modello installato: indicane uno con --for"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "インストール済みのモデルがありません：--for で指定してください"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未安装模型：请用 --for 指定一个"
           }
         }
       }

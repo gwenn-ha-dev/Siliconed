@@ -103,7 +103,7 @@ package enum Downloader {
         let label = "\(repository.split(separator: "/").last!)/\(path)"
         let sha = try expectedSHA(path: path, pinned: pinned, announced: announced, status: status, file: label)
         if fm.fileExists(atPath: destination) {
-            let t = (try? fm.attributesOfItem(atPath: destination)[.size] as? Int) ?? -1
+            let t = Library.fileSize(destination) ?? -1
             if size == nil || t == size, sha == nil || (try? sha256(destination)) == sha { return }
             try fm.removeItem(atPath: destination)
         }

@@ -107,8 +107,6 @@ package struct QwenImage21DenoisingModule: DenoisingModule {
 
     /// Its pipeline has no img2img: the image encoder serves the references only.
     package var acceptsStartImage: Bool { false }
-    /// Its noise leaves in the last two evaluations: an early x̂₀ is blurred and grainy (`Sketch`).
-    package var sketches: Bool { false }
     /// Every `Solver`: its sampler walks them all (`SolverWalk`), Euler in its own loop.
     package var solvers: [Solver] { Solver.allCases }
 

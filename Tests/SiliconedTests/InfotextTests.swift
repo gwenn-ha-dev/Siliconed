@@ -12,7 +12,7 @@ final class InfotextTests: XCTestCase {
                         strength: Double? = nil, solver: Solver = .euler, imported: Bool = false,
                         name: String? = "Z-Image Turbo") -> Engine.Render {
         var r = Engine.Render(model: model, prompt: prompt, seed: 1_303_787_694, steps: 8, loras: loras,
-                              loraSummary: nil, image: ImageRGB(pixels: [Float](repeating: 0, count: 3 * 2 * 3), height: 2, width: 3), evaluations: 8, sketch: nil, spectral: 0, strength: strength,
+                              loraSummary: nil, image: ImageRGB(pixels: [Float](repeating: 0, count: 3 * 2 * 3), height: 2, width: 3), evaluations: 8, spectral: 0, strength: strength,
                               startStep: 0, startSigma: 1, timings: .init(), footprints: .init(), tokens: 1)
         r.solver = solver
         r.modelName = name

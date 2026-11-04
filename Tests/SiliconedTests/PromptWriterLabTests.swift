@@ -76,6 +76,41 @@ final class PromptWriterLabTests: XCTestCase {
         }
     }
 
+    /// **The user's own instruction** (Settings › Prompt Lab): theirs is sent for its family and gesture only; equal to ours, it
+    /// is not kept (it would stop following ours); blank, it stays in the field but ours is sent; a key this version
+    /// does not know is dropped on reading.
+    func testTheUsersInstructionReplacesOursForItsFamilyAndGestureOnly() {
+        typealias I = PromptWriterInstructions
+        var edits = I.Edits()
+        XCTAssertEqual(edits.instruction(for: .krea2, .rewrite), I.instruction(for: .krea2, .rewrite))
+        edits.set("Rewrite it as a haiku.", for: .krea2, .rewrite)
+        XCTAssertEqual(edits.instruction(for: .krea2, .rewrite), "Rewrite it as a haiku.")
+        XCTAssertTrue(edits.isEdited(.krea2, .rewrite))
+        XCTAssertEqual(edits.sent(.krea2, .rewrite), "Rewrite it as a haiku.")
+        XCTAssertEqual(edits.instruction(for: .krea2, .describe), I.instruction(for: .krea2, .describe))
+        XCTAssertEqual(edits.instruction(for: .zImage, .rewrite), I.instruction(for: .zImage, .rewrite))
+        XCTAssertNil(edits.sent(.zImage, .rewrite))
+
+        // Blank: the field keeps it, ours is sent.
+        edits.set(" \n", for: .anima, .describe)
+        XCTAssertTrue(edits.isEdited(.anima, .describe))
+        XCTAssertEqual(edits.text(.anima, .describe), " \n")
+        XCTAssertNil(edits.sent(.anima, .describe))
+        XCTAssertEqual(edits.instruction(for: .anima, .describe), I.instruction(for: .anima, .describe))
+
+        // Ours typed back, or restored: not theirs any more.
+        edits.set(I.instruction(for: .krea2, .rewrite), for: .krea2, .rewrite)
+        XCTAssertFalse(edits.isEdited(.krea2, .rewrite))
+        edits.set(nil, for: .anima, .describe)
+        XCTAssertEqual(edits.texts, [:])
+
+        // Read back from the preferences: what this version cannot send is dropped.
+        let read = I.Edits(["moss-image.describe": "Mine.", "z-image.rewrite": I.instruction(for: .zImage, .rewrite),
+                            "flux.rewrite": "gone", "krea2.caption": "gone"])
+        XCTAssertEqual(read.texts, ["moss-image.describe": "Mine."])
+        XCTAssertEqual(I.Edits.key(.qwenImage21, .describe), "qwen-image-2.1.describe")
+    }
+
     // ── the image ──────────────────────────────────────────────────────────────────────────────
 
     /// A PNG of `width × height` RGBA pixels (straight alpha stored premultiplied, as Core Graphics wants), with the EXIF orientation.

@@ -28,7 +28,7 @@ package enum RemoteControlHelp {
     /// The topics in reading order (`help all` follows it).
     static let order = ["contract", "open", "models", "install", "add", "grid", "edit", "wait", "status", "follow",
                         "cancel", "clear", "set", "history", "save", "vary", "enlarge", "crop", "again", "remove", "undo", "sheet", "rewrite", "describe",
-                        "start-image", "lab", "subjects", "import", "uninstall", "macs", "library", "diagnose", "measure", "errors", "recipes"]
+                        "instructions", "start-image", "lab", "subjects", "import", "uninstall", "macs", "library", "diagnose", "measure", "errors", "recipes"]
     static let aliases = ["examples": "recipes", "reuse": "again", "compute": "macs"]
 
     /// French when the user puts it before English. Not `Bundle.main.preferredLocalizations`: the app's
@@ -123,6 +123,8 @@ package enum RemoteControlHelp {
       enlarge i7 [--download]                  the image ×4, by macOS's super-resolution → its image (i8)
       rewrite "<text>" [--for ID]              the Prompt Lab's Rewrite: a prompt rewritten for a model → its text
       describe <image|i7> [--for ID]           the Prompt Lab's Describe: an image told as a prompt → its text
+      instructions [rewrite|describe] [--for ID] [--set "<text>" | --file PATH | --restore]
+                                               what the writer is told, per model and gesture (Settings › Prompt Lab)
       start-image [<image|i7>] [--strength S] · start-image --remove
                                                the starting image (img2img): an image of the Prompt Lab, and its strength
       lab [open|close] · lab add|role|remove … the Prompt Lab: its images, a role each; folded or not
@@ -749,7 +751,7 @@ package enum RemoteControlHelp {
         "rewrite": """
         silicontrol rewrite "<text>" [--for ID]
 
-        The Prompt Lab's « Rewrite » (Window ▸ Prompt Lab), from the terminal: a language model installed with the app
+        The Prompt Lab's « Rewrite » (View ▸ Show Prompt Lab), from the terminal: a language model installed with the app
         (Qwen3-VL-8B, the text encoder of Qwen-Image-2.1 made to write) rewrites a prompt the way the model it is aimed
         at reads best. The writer, its instructions for each model, the protection of the @names and the refusals are
         the Lab's own: a command and a click give the same text. Nothing is written to disk — the text comes back on
@@ -800,6 +802,33 @@ package enum RemoteControlHelp {
         --for ID   as in « rewrite ».
         FAILURES: those of « rewrite »; ref (the file is unreadable or missing, or not an image); unknown_image (an i… that is
         not in the history).
+        """,
+
+        "instructions": """
+        silicontrol instructions [--for ID]
+        silicontrol instructions rewrite|describe [--for ID] [--set "<text>" | --file PATH | --restore]
+
+        Settings › Prompt Lab, from the terminal: the instruction the writer is sent before each Rewrite and each Describe,
+        one per model and gesture — Siliconed's, or yours in its place. The whole text, in English, as it is sent. What you
+        leave untouched follows Siliconed's from version to version; a text equal to Siliconed's is not kept as yours.
+
+          silicontrol instructions                                  the ten: whose each one is
+          silicontrol instructions rewrite --for krea2              one: its text
+          silicontrol instructions rewrite --for krea2 --file mine.txt
+          silicontrol instructions describe --for anima --set "Write danbooru tags only."
+          silicontrol instructions rewrite --for krea2 --restore    Siliconed's back
+
+        --for ID    a model's id or a family, installed or not. Without it, the model the Lab writes for.
+        --set TEXT  yours, one argument in quotes; --file PATH reads it from a UTF-8 file. A blank one is kept as typed,
+                    and Siliconed's is sent.
+        --restore   Siliconed's, as « Restore » in Settings.
+
+        Answer, one instruction:
+          {"ok": true, "for": "krea2", "gesture": "rewrite", "edited": true, "sent": "yours", "text": "…", "instruction": "…"}
+          "text" is what Settings shows, "instruction" what the writer is sent. The list: {"ok": true, "instructions":
+          [{"for": "z-image", "gesture": "rewrite", "edited": false, "sent": "ours"}, …]}.
+        Allowed while the window computes on another Mac: the instructions are this Mac's, as its writer is.
+        FAILURES: usage (a change names its gesture), model (--for names no model), unreadable (--file).
         """,
 
         "lab": """
@@ -1321,6 +1350,8 @@ package enum RemoteControlHelp {
       enlarge i7 [--download]                  l'image ×4, par la super-résolution de macOS → son image (i8)
       rewrite "<texte>" [--for ID]             « Réécrire » de l'Atelier : un prompt réécrit pour un modèle → son texte
       describe <image|i7> [--for ID]           « Décrire » de l'Atelier : une image racontée en prompt → son texte
+      instructions [rewrite|describe] [--for ID] [--set "<texte>" | --file CHEMIN | --restore]
+                                               ce qu'on dit au rédacteur, par modèle et par geste (Réglages › Atelier de prompts)
       start-image [<image|i7>] [--strength S] · start-image --remove
                                                l'image de départ (img2img) : une image de l'Atelier, et sa force
       lab [open|close] · lab add|role|remove … l'Atelier : ses images, un rôle chacune ; replié ou non
@@ -1961,7 +1992,7 @@ package enum RemoteControlHelp {
         "rewrite": """
         silicontrol rewrite "<texte>" [--for ID]
 
-        « Réécrire » de l'Atelier de prompts (Fenêtre ▸ Atelier de prompts), depuis le terminal : un modèle de langage installé
+        « Réécrire » de l'Atelier de prompts (Présentation ▸ Afficher l'Atelier de prompts), depuis le terminal : un modèle de langage installé
         avec l'app (Qwen3-VL-8B, l'encodeur de texte de Qwen-Image-2.1 mis à écrire) réécrit un prompt comme le modèle visé le lit
         le mieux. Le rédacteur, ses consignes pour chaque modèle, la protection des @noms et les refus sont ceux de l'Atelier :
         une commande et un clic donnent le même texte. Rien n'est écrit sur disque — le texte ne revient que par la socket
@@ -2013,6 +2044,34 @@ package enum RemoteControlHelp {
         --for ID   comme dans « rewrite ».
         ÉCHECS : ceux de « rewrite » ; ref (le fichier est illisible ou absent, ou n'est pas une image) ; unknown_image (un i… qui
         n'est pas dans l'historique).
+        """,
+
+        "instructions": """
+        silicontrol instructions [--for ID]
+        silicontrol instructions rewrite|describe [--for ID] [--set "<texte>" | --file CHEMIN | --restore]
+
+        Réglages › Atelier de prompts, depuis le terminal : la consigne envoyée au rédacteur avant chaque Réécrire et chaque
+        Décrire, une par modèle et par geste — celle de Siliconed, ou la vôtre à sa place. Le texte entier, en anglais, tel qu'il
+        part. Ce que vous ne touchez pas suit celle de Siliconed d'une version à l'autre ; un texte égal à celui de Siliconed
+        n'est pas gardé comme le vôtre.
+
+          silicontrol instructions                                  les dix : à qui chacune
+          silicontrol instructions rewrite --for krea2              une : son texte
+          silicontrol instructions rewrite --for krea2 --file la-mienne.txt
+          silicontrol instructions describe --for anima --set "Write danbooru tags only."
+          silicontrol instructions rewrite --for krea2 --restore    celle de Siliconed revient
+
+        --for ID      l'id d'un modèle ou une famille, installé ou non. Sans lui, le modèle pour lequel écrit l'Atelier.
+        --set TEXTE   la vôtre, un seul argument entre guillemets ; --file CHEMIN la lit dans un fichier UTF-8. Vide, elle
+                      est gardée telle quelle, et c'est celle de Siliconed qui part.
+        --restore     celle de Siliconed, comme « Rétablir » dans les Réglages.
+
+        Réponse, une consigne :
+          {"ok": true, "for": "krea2", "gesture": "rewrite", "edited": true, "sent": "yours", "text": "…", "instruction": "…"}
+          "text" est ce que montrent les Réglages, "instruction" ce que reçoit le rédacteur. La liste : {"ok": true,
+          "instructions": [{"for": "z-image", "gesture": "rewrite", "edited": false, "sent": "ours"}, …]}.
+        Permis quand la fenêtre calcule sur un autre Mac : les consignes sont celles de ce Mac, comme son rédacteur.
+        ÉCHECS : usage (un changement nomme son geste), model (--for ne nomme aucun modèle), unreadable (--file).
         """,
 
         "lab": """

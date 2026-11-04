@@ -70,11 +70,8 @@ package final class Engine: Sendable {
         package let loraSummary: String?
         /// The image, planar `[3, height, width]`, fp32 around `[-1, 1]` (not clamped).
         package let image: ImageRGB
-        /// The evaluations done — for a sketch, those it stopped after.
+        /// The evaluations done.
         package let evaluations: Int
-        /// **A sketch** (`Request.sketch`): the evaluations it stopped after, the image being the
-        /// estimate x̂₀ there. `nil`: the whole render.
-        package let sketch: Int?
         /// The `k` actually applied — the half-size evaluations the plan took, not what was asked
         /// (`fasterRendering`) — which a file name must carry on pain of lying.
         package let spectral: Int
@@ -143,7 +140,6 @@ package final class Engine: Sendable {
                 m["strength"] = String(format: "%.2f", strength)
                 m["image"] = "source not included"
             }
-            if let sketch { m["sketch"] = "\(sketch)" }
             if detail != .normal { m["detail"] = detail.rawValue }
             if solver != .euler { m["solver"] = solver.rawValue }
             if neuralEngine { m["neural-engine"] = "true" }

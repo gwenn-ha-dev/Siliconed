@@ -58,7 +58,7 @@ final class EngineLabWriter: LabWriter, @unchecked Sendable {
         }
     }
 
-    func write(_ input: LabInput, target: Family) -> AsyncThrowingStream<LabEvent, Error> {
+    func write(_ input: LabInput, instruction: String) -> AsyncThrowingStream<LabEvent, Error> {
         AsyncThrowingStream { continuation in
             let task = Task { [self] in
                 do {
@@ -66,10 +66,9 @@ final class EngineLabWriter: LabWriter, @unchecked Sendable {
                     let request: PromptWriter.Request
                     switch input {
                     case .text(let text):
-                        request = .rewrite(text: text, instruction: PromptWriterInstructions.instruction(for: target, .rewrite))
+                        request = .rewrite(text: text, instruction: instruction)
                     case .image(let data):
-                        request = .describe(image: try PromptWriterImage.rgb8(from: data),
-                                            instruction: PromptWriterInstructions.instruction(for: target, .describe))
+                        request = .describe(image: try PromptWriterImage.rgb8(from: data), instruction: instruction)
                     }
                     for try await event in engine.write(request) {
                         switch event {

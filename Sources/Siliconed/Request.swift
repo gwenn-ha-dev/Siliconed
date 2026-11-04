@@ -72,15 +72,6 @@ package struct Request: Sendable, Equatable {
     /// **A preview at each step** (`Event.preview`, `Engine.Preview`). False by default: nothing
     /// is then computed or copied.
     package var previews: Bool
-    /// **A sketch: stop after this many evaluations** and decode the denoiser's estimate of the
-    /// final image, x̂₀ = x − σ·v, instead of the image. `nil`: the whole render. The estimate is free
-    /// (the evaluation computed `v` anyway) and speaks early: on Z-Image at 512², after 3 of its
-    /// former 7 evaluations (4 of 8 since 0.8.2) the pose, the clothes and the light are those of
-    /// the final image. The
-    /// evaluations done are **the first ones of the whole render, bit for bit** — a sketch is a
-    /// prefix, not another render: the same request without `sketch` finishes the image it showed.
-    /// Under 1, one evaluation; at or past the plan's count, the whole render (`Render.sketch` nil).
-    package var sketch: Int?
     /// **More detail** (`Detail`): the denoiser is told, mid-trajectory, that a little less noise
     /// remains than really does, and leaves finer texture. Same evaluations, same cost; `normal` is
     /// the render without it, to the bit. The models whose `DenoisingModule.acceptsDetail` says so

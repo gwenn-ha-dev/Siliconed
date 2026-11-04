@@ -1,12 +1,12 @@
-// **The app's settings, in one window** — three panes chosen by icons at the top, as in the Mac’s
+// **The app's settings, in one window** — four panes chosen by icons at the top, as in the Mac’s
 // own apps; each setting a row with its tile, its name, one line of what it does or where it stands,
 // and the whole sentence on hover.
 //
 //     Siliconed ▸ Settings… (⌘,)
 //     ┌───────────────────────────────────────────────────────┐
 //     │                       General                         │
-//     │        [⚙︎]          [💻]          [☰]                 │
-//     │       General        Macs       Advanced              │
+//     │     [⚙︎]        [💻]         [✦]          [☰]          │
+//     │    General      Macs     Prompt Lab    Advanced       │
 //     ├───────────────────────────────────────────────────────┤
 //     │  MODELS                                               │
 //     │  ┌─────────────────────────────────────────────────┐  │
@@ -25,6 +25,7 @@
 //               disk; Save Every Image To… (off by default: `EveryImage`).
 //     Macs      this Mac — its name, its chip, its measure (the capacity map, taken only when asked) — and
 //               the other Macs: lend this one, compute on another (`OtherMacsView.swift`).
+//     Prompt Lab the writer's ten instructions, each the user's to rewrite (`SettingsLab.swift`).
 //     Advanced  kept out of the way: Command Line (silicontrol, linked into /usr/local/bin), Beta (More
 //               Solvers, Faster Rendering, Size in Two Scales, Negative LoRA Strengths: off by default).
 //
@@ -57,13 +58,14 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
     private let selection = SettingsSelection()
 
     enum Pane: String, CaseIterable, Identifiable {
-        case general, macs, advanced
+        case general, macs, lab, advanced
         var id: String { rawValue }
 
         var title: String {
             switch self {
             case .general: String(localized: "General")
             case .macs: String(localized: "Macs")
+            case .lab: String(localized: "Prompt Lab")
             case .advanced: String(localized: "Advanced")
             }
         }
@@ -72,6 +74,7 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
             switch self {
             case .general: "gearshape"
             case .macs: "desktopcomputer.and.macbook"
+            case .lab: "sparkles"
             case .advanced: "slider.horizontal.3"
             }
         }
@@ -123,16 +126,25 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
         w.setFrame(frame, display: true, animate: w.isVisible)
     }
 
+    /// **Settings › Prompt Lab on one instruction**: the lab's mark opens it on the model it writes for.
+    func showInstruction(_ family: Family, _ gesture: PromptWriterInstructions.Gesture) {
+        selection.instructionFamily = family
+        selection.instructionGesture = gesture
+        show(MainWindow.shared.local, pane: .lab)
+    }
+
     func select(_ pane: Pane) {
         selection.pane = pane
         window?.title = pane.title
     }
 }
 
-/// The pane shown, kept while the app runs.
+/// The pane shown, kept while the app runs — and, in Prompt Lab, the instruction shown.
 @MainActor @Observable
 final class SettingsSelection {
     var pane: SettingsWindow.Pane = .general
+    var instructionFamily: Family = .zImage
+    var instructionGesture: PromptWriterInstructions.Gesture = .rewrite
 }
 
 /// **What the window shows**: the chosen pane, on the column's ground.
@@ -159,6 +171,7 @@ struct SettingsView: View {
                     switch selection.pane {
                     case .general: general
                     case .macs: thisMac; OtherMacsSection(macs: macs)
+                    case .lab: LabInstructionsPane(selection: selection)
                     case .advanced: advanced
                     }
                 }

@@ -97,8 +97,8 @@ package final class SolverWalk {
     /// The ancestral rule's `x̂₀`.
     private var landing: UnsafeMutablePointer<Float>?
 
-    /// **The last step's estimate x̂₀ = x − σ·m**, on the sample the DiT saw — what a preview and a
-    /// sketch show. `nil` under Euler, whose `x' − σ'·m` is the same estimate (`Sampler.afterEvaluation`).
+    /// **The last step's estimate x̂₀ = x − σ·m**, on the sample the DiT saw — what a preview
+    /// shows. `nil` under Euler, whose `x' − σ'·m` is the same estimate (`Sampler.afterEvaluation`).
     package var estimate: UnsafePointer<Float>? {
         switch solver {
         case .euler: return nil

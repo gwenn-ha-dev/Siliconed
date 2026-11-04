@@ -189,8 +189,8 @@ package struct QwenImageDecodingModule: DecodingModule {
 /// and between layers in the DiT.
 ///
 /// **Another `Solver`** (`context.solver`, Anima's since 0.10, and Krea 2's) walks the
-/// same σ through `SolverWalk` — `v` is already its `m = dx/dσ`, no negation — and the preview and a
-/// sketch read the walk's own x̂₀ with σₓ = 0, as in `Sampler`. Euler keeps the loop below: its two
+/// same σ through `SolverWalk` — `v` is already its `m = dx/dσ`, no negation — and the preview
+/// reads the walk's own x̂₀ with σₓ = 0, as in `Sampler`. Euler keeps the loop below: its two
 /// roundings (`dt` in float, then `x + dt·v`) are the reference's `scheduler.step`, to the bit.
 ///
 /// **The half-size start** (`half`, Anima's and Krea 2's; from `start` 0 only): its first `half.steps`

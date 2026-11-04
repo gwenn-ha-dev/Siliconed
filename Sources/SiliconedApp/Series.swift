@@ -21,7 +21,7 @@
 //
 // What an analogy with the former exploration, or with a camera's bracketing, would miss:
 //
-// - **Finished images only** (4/11): no sketch, no small format — each cell is the render « Generate » would make alone,
+// - **Finished images only** (4/11): no small format — each cell is the render « Generate » would make alone,
 //   at the rack's size and steps, at its seed, and it goes to the history like any other.
 // - **The lot is the seed axis** (4/11): « Batch 3 » is three seeds from the rack's (s, s+1, s+2) — drawn, or the fixed
 //   one's. Its ± is on the Seed's line (the user, 4/11: « celle des graines sur la ligne des graines »). Alone, it renders as it always did, one job of three images (same pixels); beside another axis, it is a row or
