@@ -248,6 +248,7 @@ private struct StartStrength: View {
             }
         }
         .help(StartWords.explanation(rack.startRedraws))
+        .bracketable(rack, .startStrength)
     }
 }
 

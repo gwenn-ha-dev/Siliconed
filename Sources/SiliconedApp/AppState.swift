@@ -78,9 +78,6 @@ final class AppState {
             // A solver the models no longer offer leaves the form.
             if !developerMode {
                 solver = .euler
-                // The solver axis is the rack's choice swept: it leaves with it.
-                if gridX.kind == .solver { gridX.kind = .seed }
-                if gridY.kind == .solver { gridY.kind = .none }
             }
         }
     }
@@ -96,8 +93,12 @@ final class AppState {
             UserDefaults.standard.set(negativeLoRAStrengths, forKey: Self.negativeLoRAKey)
             if !negativeLoRAStrengths {
                 loras = loras.map(allowedStrength)
-                gridX.addedStrength = max(0, gridX.addedStrength)
-                gridY.addedStrength = max(0, gridY.addedStrength)
+                brackets = brackets.map { b in
+                    var b = b
+                    b.numbers = b.key == .startStrength ? b.numbers : b.numbers.map { max(0, $0) }
+                    b.strength = max(0, b.strength)
+                    return b
+                }
             }
         }
     }
@@ -295,19 +296,18 @@ final class AppState {
     var previews = true
     /// **The named subjects** (`Subjects.swift`): the Prompt Lab's library, in memory. The rack does not read them.
     let subjects: SubjectLibrary
-    /// **The exploration's form** (`Exploration.swift`): a small format, the two axes — the prompt is the rack's.
-    var exploreShape = ExploreShape.square
-    var gridX = GridAxisForm(kind: .seed)
-    var gridY = GridAxisForm(kind: .none)
-    /// **The exploration shown**: its cells as they arrive, kept once ended — until the next one.
+    /// **The knobs bracketed** (`Series.swift`), in the order bracketed — the words are the text's groups, the seeds the lot.
+    var brackets: [Bracket] = []
+    /// Where the hand put the series' axes, `[columns, rows]` (`SeriesLayout`).
+    var seriesPlaced: [SeriesKey?] = [nil, nil]
+    /// The knob whose « Bracket… » bubble is open.
+    var bracketing: SeriesKey?
+    /// **The series shown**: its cells as they arrive, kept once ended — until the next one.
     var explored: GridRun?
-    /// The canvas shows the exploration's grid rather than an image (`ExplorationCanvas`).
+    /// The canvas shows the series' grid rather than an image (`SeriesCanvas`).
     var showsExploration = false
     /// A grid cell's long side on the canvas, in points: the slider, the pinch, ⌘+ ⌘−.
     var exploreCellSide: CGFloat = 220
-    /// **Where the exploration's sketches stop**: 0, where the image is readable (`Sketch`); n, after n
-    /// evaluations — more for a LoRA, whose style can settle late; at the plan's count, finished images.
-    var exploreStop = 0
     static let cellSides: ClosedRange<CGFloat> = 96...1024
     static func clampedCellSide(_ s: CGFloat) -> CGFloat { min(max(s, cellSides.lowerBound), cellSides.upperBound) }
 

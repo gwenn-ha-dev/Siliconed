@@ -189,8 +189,6 @@ struct Entry: Identifiable {
     /// **A grid's sheet** (`Grid.swift`): its `settings` are what the cells share — the prompt as
     /// typed, braces included —, its `timings` the cells' sum, its `footprints` their peaks.
     var grid: GridInfo? = nil
-    /// **A sketch** (an exploration's cell): the evaluations it stopped after. Never in the history.
-    var sketch: Int? = nil
     /// **An enlargement** (`Enlarge.swift`): its factor. Its settings stay the render's — what « Reuse
     /// These Settings » and « Redo » bring back is the image it was made from.
     var enlarged: Int? = nil
@@ -316,11 +314,8 @@ struct Job: Identifiable {
     let defaultSteps: Int?
     /// The denoiser's plan for one image (evaluations, including those reduced by the spectral), LoRA
     /// included — `nil` if the model is not installed. What, with the learned speed, estimates
-    /// its duration before it runs. A sketch's plan is already cut to its evaluations.
+    /// its duration before it runs.
     let plan: DenoisingPlan?
-    /// **A sketch** (`Request.sketch`): the evaluations it stops after; its image is the estimate,
-    /// kept by its exploration and never put in the history. `nil`: a finished image.
-    var sketch: Int? = nil
     /// **The accelerators as the remote control asked them** (`add --accelerators`, `--no-accelerators`), frozen in the job;
     /// `nil`, the model's choice when the job starts (`AppState.accelerators(for:)`), like a click.
     var accelerators: Bool? = nil

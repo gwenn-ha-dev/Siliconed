@@ -252,14 +252,14 @@ final class RemoteNetworkTests: XCTestCase {
                                   x: .prompt(group: 0), y: .loraStrength(slot: 0, values: [0.5, 1]))
         XCTAssertEqual(try RemoteGridSpec(grid).grid(), grid)
         let exploration = RemoteExploration(ordinal: 2, spec: RemoteGridSpec(grid), job: job, cells: [job, job],
-                                            issues: [0: .finished, 1: .failed("No.")], sketch: true)
+                                            issues: [0: .finished, 1: .failed("No.")])
         var q = RemoteQueue()
         q.current = job; q.fraction = 0.5; q.stage = "denoising"; q.remaining = 41.5
         var t = Engine.Timings(); t.total = 83.1
         let messages: [SessionMessage] = [
             .render(job), .render(edit), .quote(quote), .quoted(RemoteQuoteAnswer(quote: quote, width: 896, height: 1184, need: 3 << 30)),
             .enlarge(7, download: true), .crop(7, Crop.Box(x: 64, y: 0, width: 768, height: 1024)), .enlargeNeedsDownload(7),
-            .grid(RemoteGridRequest(spec: RemoteGridSpec(grid), job: edit, sketch: true, stopAfter: 0)), .addSheet(2),
+            .grid(RemoteGridRequest(spec: RemoteGridSpec(grid), job: edit, sheet: false)), .addSheet(2),
             .explored(exploration), .explored(nil),
             .answer(request: 3, .queued(ordinal: 12, estimate: 41.5, width: 896, height: 1184)), .answer(request: 4, .refused("No.")),
             .ended(RemoteEnded(ordinal: 12, issue: .failed("No."), images: [7, 8], warnings: ["w"])),
@@ -291,7 +291,7 @@ final class RemoteNetworkTests: XCTestCase {
         var t = Engine.Timings(); t.total = 83.1
         let messages: [SessionMessage] = [
             .render(job),
-            .grid(RemoteGridRequest(spec: RemoteGridSpec(grid), job: job, sketch: false, stopAfter: 0, request: 5)),
+            .grid(RemoteGridRequest(spec: RemoteGridSpec(grid), job: job, sheet: true, request: 5)),
             .answer(request: 5, .gridQueued(grid: 2, cells: [job, job], estimate: 90.5)),
             .answer(request: 6, .gridQueued(grid: 3, cells: [], estimate: nil)),
             .entry(RemoteEntry(ordinal: 9, job: job, width: 4096, height: 4096, seed: 42, timings: t, footprints: Engine.Footprints(),
@@ -312,7 +312,7 @@ final class RemoteNetworkTests: XCTestCase {
         fields["enlargedFrom"] = nil
         XCTAssertNil(try JSONDecoder().decode(RemoteEntry.self, from: JSONSerialization.data(withJSONObject: fields)).enlargedFrom)
         var request = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(
-            RemoteGridRequest(spec: RemoteGridSpec(grid), job: job, sketch: true, stopAfter: 0))) as? [String: Any])
+            RemoteGridRequest(spec: RemoteGridSpec(grid), job: job, sheet: false))) as? [String: Any])
         request["request"] = nil
         XCTAssertNil(try JSONDecoder().decode(RemoteGridRequest.self, from: JSONSerialization.data(withJSONObject: request)).request)
     }

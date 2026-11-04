@@ -273,8 +273,6 @@ extension AppState {
                 + r.loras.map { "lora-" + RemoteControl.shortName($0.path) + ($0.strength == 1 ? "" : String(format: "@%.2f", $0.strength)) }
                 + (r.steps != modelSteps ? ["p\(r.steps)"] : [])
                 + (r.editing ? ["edit"] : [])
-                // A sketch never takes a finished image's name.
-                + (e.sketch.map { ["sketch\($0)"] } ?? [])
                 + ["\(e.width)x\(e.height)", "\(e.seed)"]
                 // A variation is another image of the same seed: `v<seed>x<strength in hundredths>`, in
                 // order — the CLI's name for it.

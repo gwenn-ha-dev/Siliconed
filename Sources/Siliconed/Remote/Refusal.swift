@@ -26,7 +26,7 @@ package enum AppRefusal: Codable, Equatable, Sendable {
     /// The lender's queue has no room for what was asked (`AppState.maxQueueLength`).
     case queueFull
     case enlargeModelDownload, enlargeFailed
-    case gridNotCropped, sketchNotCropped
+    case gridNotCropped
     case cropNeeds(side: Int), cropSmallest(side: Int)
     /// A restore asked for images the session's trash no longer holds (it holds 64 per Mac, and empties when this Mac quits).
     case imagesNotRestorable

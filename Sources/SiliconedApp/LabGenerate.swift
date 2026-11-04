@@ -5,10 +5,10 @@
 //     unfolded   …the text, the images…
 //                1024 × 1024 · 9.2 GB · ≈ 31 s                               [ Generate ]
 //
-// - **No « Explore » beside it** (4/11): a series is the knobs' and the words' bracketing, which « Generate » renders whole;
-//   until it comes, the exploration's panel opens from the Render menu (⌥⌘G).
-// - **The cost before the click** (rule 7): folded, the time alone (and how many renders a text with alternatives makes);
-//   unfolded, the size, the memory the engine will compare to this Mac's, how many renders, the time — learned on this Mac.
+// - **No « Explore » beside it** (4/11): a series is the knobs' and the words' bracketing, which « Generate » renders
+//   whole, in finished images; what varies is said above it, one line per axis (`SeriesSummary`).
+// - **The cost before the click** (rule 7): folded, the time alone (and how many renders a series makes); unfolded, the
+//   size, the memory the engine will compare to this Mac's, how many renders, the time — learned on this Mac.
 // - **What stops it is said beside it**, in place of the cost: the reason (the whole sentence unfolded, cut to the line
 //   folded, whole on hover), and for a size this Mac cannot hold, the largest it can. An empty text says nothing folded: the
 //   field's own « Type the idea… » says it.
@@ -42,6 +42,7 @@ struct GenerateControls: View {
             }
         } else {
             VStack(alignment: .leading, spacing: 6) {
+                SeriesSummary(app: app)
                 unusedLine
                 HStack(alignment: .center, spacing: 10) {
                     VStack(alignment: .leading, spacing: 3) {
@@ -77,10 +78,10 @@ struct GenerateControls: View {
 
     /// The button's words: what the click makes — several images, an edit, a place in the queue.
     static func title(_ app: AppState) -> String {
-        let n = app.variantCount
+        let n = app.seriesRenders
         if app.busy { return n > 1 ? String(localized: "Add \(n) Renders to Queue") : String(localized: "Add to Queue") }
         if !app.references.isEmpty { return n > 1 ? String(localized: "Edit Image \(n) Ways") : String(localized: "Edit Image") }
-        let images = n * max(1, app.batch)
+        let images = app.seriesImages
         return images > 1 ? String(localized: "Generate \(images) Images") : String(localized: "Generate")
     }
 
@@ -101,8 +102,8 @@ struct GenerateControls: View {
     @ViewBuilder private var time: some View {
         if app.missing == nil, app.card != nil {
             HStack(spacing: 6) {
-                if app.variantCount > 1 {
-                    Text("\(app.variantCount) renders").help(app.alternativesHelp)
+                if app.seriesRenders > 1 {
+                    Text("\(app.seriesRenders) renders").help(app.seriesHelp)
                 }
                 if let t = app.plannedCost {
                     Text(verbatim: "≈ " + Figures.duration(t))
@@ -158,12 +159,12 @@ struct GenerateControls: View {
                     } icon: { Image(systemName: "memorychip") }
                     .help(String(localized: "The memory \(card.name) needs at this size (computed)"))
                 }
-                if app.variantCount > 1 {
-                    // A prompt with alternatives is a series: how many renders, before the click.
+                if app.seriesRenders > 1 {
+                    // A series: how many renders, before the click.
                     Label {
-                        Text("\(app.variantCount) renders").monospacedDigit()
-                    } icon: { Image(systemName: "square.stack") }
-                    .help(app.alternativesHelp)
+                        Text("\(app.seriesRenders) renders").monospacedDigit()
+                    } icon: { Image(systemName: "square.grid.3x3") }
+                    .help(app.seriesHelp)
                 }
                 Label {
                     if let t = app.plannedCost {

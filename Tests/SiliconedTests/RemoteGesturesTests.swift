@@ -36,16 +36,9 @@ final class RemoteGesturesTests: XCTestCase {
 
     // ── Naming a cell ──────────────────────────────────────────────────────────────────────
 
-    func testACellIsAGridAndARankOrItsJob() {
-        XCTAssertEqual(CellName("g2c3"), .cell(grid: 2, index: 3))
-        XCTAssertEqual(CellName("g12c0"), .cell(grid: 12, index: 0))
-        XCTAssertEqual(CellName("t5"), .job(5))
+    func testACellIsAGridAndARank() {
         XCTAssertEqual(CellName.name(grid: 2, cell: 3), "g2c3")
-        // The names of other things, and half-written ones, name no cell.
-        for word in ["g2", "g2c", "gc3", "c3", "i7", "g2c3c4", "g-1c0", "g2c-1", "", "5", "t", "tx"] { XCTAssertNil(CellName(word), word) }
-        XCTAssertEqual(parse("finish", ["g2c3"]), .finish(.cell(grid: 2, index: 3)))
-        XCTAssertEqual(parse("finish", ["t9"]), .finish(.job(9)))
-        XCTAssertEqual(GestureOrder.parse("finish", ["i7"]), .failure(.badValue("cell", "i7")))
+        XCTAssertFalse(GestureOrder.verbs.contains("finish"), "a cell is a finished image: nothing left to finish")
         XCTAssertEqual(parse("sheet", ["g2"]), .sheet(grid: 2))
         XCTAssertEqual(GestureOrder.parse("sheet", ["t2"]), .failure(.badValue("grid", "t2")))
     }

@@ -63,7 +63,6 @@ extension RemoteControl {
             case "--preview": d.previews = true
             case "--no-preview": d.previews = false
             case "--wait": d.wait = true
-            case "--sketch": d.sketch = true
             case "--image": d.image = try value(a)
             case "--strength":
                 let v = try value(a)
@@ -123,9 +122,6 @@ extension RemoteControl {
         // One big job at a time on 16 GB: no render while an installation or an import runs.
         if let reason = app.libraryBlocker { throw Refusal("library_absent", reason, help: String(localized: "connect the disk, then retry")) }
         if let reason = app.installBlocker { throw Refusal("busy", reason, help: String(localized: "retry once the installation is done (silicontrol models)")) }
-        if !grid, d.sketch {
-            throw Refusal("usage", String(localized: "--sketch belongs to “silicontrol grid”"), help: "silicontrol help grid")
-        }
         if !grid, d.x != nil || d.y != nil {
             throw Refusal("usage", String(localized: "--x and --y belong to “silicontrol grid”"), help: "silicontrol help grid")
         }
@@ -442,19 +438,19 @@ extension RemoteControl {
                                       format: format, steps: steps, loras: stack, references: references.count, detail: d.detail,
                                       solver: d.solver)
         settings.strength = strength
-        if d.sketch { app.stopExploring() }
         let (run, jobs) = app.enqueueGrid(g, settings: settings, references: references, previews: d.previews ?? app.previews,
-                                          sketch: d.sketch, accelerators: d.accelerators, start: start)
+                                          accelerators: d.accelerators, start: start)
         // The rack's tag of each model the cells render, as after a click.
         if let on = d.accelerators { for id in Set(jobs.map(\.settings.identifier)) { app.setAccelerators(on, for: id) } }
-        // The form takes the grid, as after a click: settings, prompt as typed, edit images, axes.
+        // The form takes the grid, as after a click: settings, prompt as typed, edit images, and the axes the window brackets
+        // (a models, steps, listed seeds or images axis stays silicontrol's).
         app.restoreSettings(settings)
         app.prompt = prompt
         app.setEditImages(references)
         app.setStart(start)
         if let strength { app.startStrength = strength }
         if let s = d.seed { app.fixedSeed = true; app.seed = s } else { app.fixedSeed = false }
-        app.setGridForm(g, prompt: prompt)
+        _ = app.setSeries(from: g)
 
         let added = jobs.map { job -> [String: Any] in
             var o = json(job)

@@ -120,15 +120,13 @@ private struct AppCommands: Commands {
             Divider()
         }
         CommandMenu("Render") {
-            // ⌘↩ is also « Explore » in the exploration's panel and « Rewrite » in the Lab: while one of
-            // them is the key window the menu item steps aside, so that the key reaches that window's button.
+            // ⌘↩ is also a sheet's or a panel's own button: while another window is key the menu item steps
+            // aside, so that the key reaches that window's button.
             Button("Generate") { app.render() }
                 .keyboardShortcut(.return)
                 .disabled(!window.carrier.mainIsKey)
             Button("Render Again (Same Seed)") { app.selectedEntry.map(app.redo) }
                 .keyboardShortcut("r")
-            Button("Exploration") { window.showExploration() }
-                .keyboardShortcut("g", modifiers: [.command, .option])
             Divider()
             Button("Stop Render") { app.cancel() }
                 .keyboardShortcut(".")
@@ -270,8 +268,6 @@ final class MainWindow: NSObject, NSWindowDelegate {
     static let shared = MainWindow()
 
     private var window: NSWindow?
-    /// The exploration's panel (`Exploration.swift`), kept once opened.
-    var explorationPanel: NSPanel?
     /// **The state shown**: this Mac's, or another Mac's mirror (`compute(on:)`) — every window and
     /// menu reads it here, so that the switch moves them all.
     var app: AppState { carrier.mirror ?? local }
@@ -382,7 +378,6 @@ final class MainWindow: NSObject, NSWindowDelegate {
             carrier.showing = nil
         }
         statistics?.close(); statistics = nil
-        explorationPanel?.close(); explorationPanel = nil
         guard let window else { return }
         window.subtitle = mac.map { String(localized: "Computing on “\($0.name)”") } ?? Self.instanceName
         app.undoManager = window.undoManager

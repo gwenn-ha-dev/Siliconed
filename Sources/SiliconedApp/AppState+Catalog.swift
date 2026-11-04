@@ -76,17 +76,16 @@ extension AppState {
         if let reason = installBlocker { return reason }
         if missing != nil { return String(localized: "This model isn’t installed.") }
         if prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return String(localized: "Write a prompt.") }
-        let n: Int
-        switch alternatives {
-        case .failure(let e): return Problem(e).text
-        case .success(let a): n = a.count
-        }
+        if case .failure(let e) = alternatives { return Problem(e).text }
         // An unknown `@name`, too many images, a mention inside a group: said before the click (`LabInputs.carry`).
         if case .failure(let refusal) = carried { return refusal.sentence }
+        // Three things varying, a bracket the library refuses (`Series.swift`).
+        if let reason = seriesBlocker { return reason }
         if file.count >= Self.maxQueueLength { return String(localized: "The queue is full.") }
+        let n = seriesRenders
         if file.count + n > Self.maxQueueLength {
             let room = Self.maxQueueLength - file.count
-            return String(localized: "These alternatives make \(String(n)) renders: the queue has room for \(String(room)).")
+            return String(localized: "This series makes \(String(n)) renders: the queue has room for \(String(room)).")
         }
         if let q = editQuote, quoted(q) == nil, let mirror {
             return String(localized: "Asking “\(mirror.macName)” for the edit’s size…")
@@ -207,10 +206,6 @@ extension AppState {
         Result { () throws(EngineError) in try PromptAlternatives(prompt) }
     }
 
-    /// How many renders "Generate" queues: one per expanded prompt (1 when the prompt does not parse —
-    /// the button is greyed out then, and `blocker` says why).
-    var variantCount: Int { (try? alternatives.get())?.count ?? 1 }
-
     // ── The XY grid ──
 
     /// A model as the user knows it: its card's name, or its identifier.
@@ -220,54 +215,16 @@ extension AppState {
     /// The LoRAs a render takes: chosen, and switched on.
     var activeLoRAs: [LoRASlot] { loras.filter { !$0.path.isEmpty && $0.on } }
 
-    /// The prompt's `{…}` groups — what the grid's axes offer (none when it does not parse).
+    /// The prompt's `{…}` groups — each an axis of the series (none when it does not parse).
     var promptGroups: [[String]] { (try? PromptAlternatives(prompt, limit: .max).groups) ?? [] }
 
     /// A LoRA as the user knows it: its card's name, or its short name.
     func loraName(_ path: String) -> String { loraCard(path)?.name ?? RemoteControl.shortName(path) }
 
-    /// **The grid the exploration's form describes**, checked by the library. `seed`: the base seed
-    /// (the rack's; the one drawn at the click for a random seed). A model axis drops the stack: a
-    /// LoRA is forged for one model (`loraAcrossModels` otherwise).
-    func grid(seed: UInt64) -> Result<RenderGrid, EngineError> {
-        let models = [gridX, gridY].contains { $0.kind == .model }
-        let stack = models ? [] : activeLoRAs
-        return Result { () throws(EngineError) in
-            guard let x = try gridX.axis(stack: stack) else { throw .gridRefused(reason: .emptyAxis) }
-            let g = try RenderGrid(.init(prompt: prompt, seed: seed, steps: steps,
-                                         loraStrengths: stack.map(\.strength), images: references.count),
-                                   x: x, y: try gridY.axis(stack: stack))
-            guard !refusesNegativeStrength(g) else { throw .gridRefused(reason: .invalidValue) }
-            // A solver the form's model does not offer (More Solvers off) renders nothing new.
-            guard g.cells.allSatisfy({ $0.solver.map(offeredSolvers.contains) ?? true }) else { throw .gridRefused(reason: .invalidValue) }
-            return g
-        }
-    }
-    var grid: Result<RenderGrid, EngineError> { grid(seed: seed) }
-
-    /// Axes that make sense for this prompt — its groups first, the seed otherwise.
-    func gridDefaults() {
-        guard (try? grid.get()) == nil else { return }
-        let groups = promptGroups.count
-        gridX = GridAxisForm(kind: groups > 0 ? .prompt(0) : .seed)
-        gridY = GridAxisForm(kind: groups > 1 ? .prompt(1) : groups == 1 ? .seed : .none)
-        if groups == 1 { gridY.seedCount = 2 }
-    }
-
-    /// **The exploration's form takes a grid** — a sheet's settings reused, or a grid the remote
-    /// control queued: its prompt as typed, its groups unescaped (they are the grid's axes), its axes.
-    func setGridForm(_ g: RenderGrid, prompt typed: String) {
-        let stack = activeLoRAs
-        prompt = typed
-        gridX = GridAxisForm(g.x, stack: stack)
-        gridY = GridAxisForm(g.y, stack: stack)
-    }
-
-    /// The series, one expanded prompt per line — the tooltip of the render count.
-    var alternativesHelp: String {
-        guard let a = try? alternatives.get(), a.hasAlternatives else { return "" }
-        let list = a.prompts.prefix(12).joined(separator: "\n")
-        return a.count > 12 ? list + "\n…" : list
+    /// The series, one axis per line — the tooltip of the render count.
+    var seriesHelp: String {
+        let layout = seriesLayout
+        return zip(["X", "Y"], layout.axes).map { "\($0): \(axisWords($1))" }.joined(separator: "\n")
     }
 
     /// **What the render will cost as it is set**, if it has already been measured in the session at
@@ -279,8 +236,9 @@ extension AppState {
         guard let v = speeds[Speed.key(identifier, format, references: images, lora: withLoRA)] else { return nil }
         guard let plan = expectedPlan(steps: steps, format: format, withLoRA: withLoRA || !plainSampling,
                                       references: references.count, strength: usedStart.map { _ in startStrength }) else { return nil }
-        // One render per alternative, each the cost of one: same model, format, plan and batch.
-        return Double(variantCount) * v.duration(plan, images: max(1, batch))
+        // A series: one image per cell, each the cost of one (same model, format and plan, near enough); else the lot.
+        if case .success(let g?) = seriesGrid(seed: seed) { return Double(g.count) * v.duration(plan, images: 1) }
+        return v.duration(plan, images: max(1, batch))
     }
 
     /// **One stage's share of that cost**, per image — what the rack writes under each box. Learned

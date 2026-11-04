@@ -47,7 +47,6 @@ extension AppState {
     /// The same, as a code: what a lending Mac sends (`MirrorServer`), said in the borrower's language.
     func cropRefusalCode(_ entry: Entry) -> AppRefusal? {
         if entry.grid != nil { return .gridNotCropped }
-        if entry.sketch != nil { return .sketchNotCropped }
         return cropRefusalCode(width: entry.width, height: entry.height)
     }
 

@@ -239,6 +239,8 @@ struct DiTBox: View {
                 .fixedSize()
         }
         .help("Consecutive seeds; the prompt is encoded only once")
+        // The lot is the series' seed axis (4/11): bracketing the seed is choosing how many, and where they go.
+        .bracketable(app, .seeds)
         // **The steps, only off the recipe**: the five models are distilled for 8, and fewer is softer, more is longer and no
         // better — a choice that only costs. The line comes when something else set them (a PNG's settings reused, a cell of
         // an exploration finished, `silicontrol`), as the variation's does, with its way back.
@@ -262,6 +264,7 @@ struct DiTBox: View {
                 .pickerStyle(.segmented).labelsHidden().fixedSize()
             }
             .help("Adds fine texture and small details; Most can over-sharpen")
+            .bracketable(app, .detail)
         }
         // More Solvers, the models in front: how a step moves to the next. Euler is the distillation's own.
         if app.offeredSolvers.count > 1 {
@@ -272,6 +275,7 @@ struct DiTBox: View {
                 .labelsHidden().fixedSize()
             }
             .help("How each step moves to the next, with the same steps: Euler is the one this model was distilled for")
+            .bracketable(app, .solver)
         }
         Toggle("Preview every step", isOn: $app.previews)
             .font(.callout)
@@ -422,11 +426,16 @@ struct LoRAAddMenu: View {
             if !app.compatibleLoras.isEmpty { Divider() }
             Button("Import…") { app.chooseToImport() }
                 .disabled(!app.importPossible)
+            Divider()
+            // A series: one of them added per image, and the image without (`SeriesKey.comparedLoRAs`).
+            Button("Compare LoRAs…") { app.bracketing = .comparedLoRAs }
+                .disabled(!app.canAddLoRA || app.compatibleLoras.allSatisfy { used.contains($0.path) })
         } label: {
             Label("Add", systemImage: "plus")
         }
         .menuStyle(.button).buttonStyle(.bordered).controlSize(.small).fixedSize()
         .help("A LoRA of this model (3 at most), or one to import: a .safetensors as published on Civitai")
+        .bracketable(app, .comparedLoRAs, menu: false)
     }
 }
 
@@ -466,6 +475,7 @@ struct LoRARow: View {
                     .multilineTextAlignment(.trailing).frame(width: 48)
                     .help("Strength: 0.8 attenuates, 1 as trained, more emphasizes")
             }
+            .bracketable(app, .loraStrength(slot.path), menu: false)
             .padding(.leading, 22)
             .opacity(slot.on ? 1 : 0.45)
             if let card, !card.triggers.isEmpty {
@@ -484,6 +494,7 @@ struct LoRARow: View {
                 }
             }
             Button("Reset to 0.8") { slot.strength = LoRASlot().strength }
+            Button("Bracket…") { app.bracketing = .loraStrength(slot.path) }
             Divider()
             Button("Remove", action: remove)
         }

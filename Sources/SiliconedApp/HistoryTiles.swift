@@ -256,15 +256,15 @@ struct MenuEntry: View {
             Button("Full Screen") { app.show(entry.id); app.fullScreen = true }
             Divider()
             Button(app.busy ? "Render Again (Same Seed), Queued" : "Render Again (Same Seed)") { app.redo(entry) }
-            if entry.grid == nil, entry.sketch == nil {
+            if entry.grid == nil {
                 Menu("Variations") { VariationButtons(app: app, entry: entry) }
                     .disabled(!app.canVary(entry))
             }
-            if entry.grid == nil, entry.sketch == nil {
+            if entry.grid == nil {
                 Button("Enlarge ×4") { app.enlarge(entry) }
                     .disabled(app.enlargeRefusal(entry) != nil)
             }
-            if entry.grid == nil, entry.sketch == nil {
+            if entry.grid == nil {
                 Button("Crop…") { app.beginCrop(entry) }
                     .disabled(app.cropRefusal(entry) != nil)
             }

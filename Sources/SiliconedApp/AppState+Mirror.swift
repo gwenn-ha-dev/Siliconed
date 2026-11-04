@@ -78,10 +78,7 @@ final class MirrorLink {
     private var nextBlob: UInt32 = 1
     /// The quotes asked and not yet answered: each is asked once.
     var asked: Set<RemoteQuote> = []
-    /// The exploration's cell images, by grid then cell; a cell image waits for its PNG.
-    var cells: [Int: [Int: Entry]] = [:]
-    var pendingCells: [UInt32: (grid: Int, cell: Int, entry: RemoteEntry)] = [:]
-    /// The edit's images the last exploration was asked with: what « Use These Settings » puts back.
+    /// The edit's images the last series was asked with: its cells' own, as the canvas says them.
     var exploreReferences: [ReferenceImage] = []
     /// The installed version of the family whose license is asked: its links, on the other Mac.
     var licenseVariant: Variant?
@@ -95,9 +92,8 @@ final class MirrorLink {
     /// consent alert, the flash).
     var enlargeWaiters: [(Enlarged) -> Void] = []
     enum Enlarged { case done(Entry), downloadRequired, refused(String) }
-    /// The grids the other Mac made for `silicontrol grid`: their cell jobs in order, and whether they are sketches.
-    var grids: [Int: (jobs: [Int], sketch: Bool)] = [:]
-    private var sketches: [Int: Bool] = [:]
+    /// The grids the other Mac made for `silicontrol grid`: their cell jobs in order.
+    var grids: [Int: [Int]] = [:]
 
     /// The files this Mac offers to import there (`MirrorUpload.swift`).
     let uploads: UploadBorrower
@@ -129,31 +125,30 @@ final class MirrorLink {
         sender(.render(r))
     }
 
-    /// An exploration: the cells are made there (`enqueueGrid`), where a sketch's stop is known.
-    /// `answered` (`silicontrol grid`): the other Mac's word on the grid, its cell jobs numbered; `sketch:
-    /// false` is a grid whose cells join the history, and its sheet.
-    func explore(_ grid: RenderGrid, settings: RenderSettings, references: [ReferenceImage], stopAfter: Int,
-                 accelerators: Bool?, sketch: Bool = true, previews: Bool = true,
+    /// A series, or a grid: the cells are made there (`enqueueGrid`), each judged as a render is. `answered`
+    /// (`silicontrol grid`): the other Mac's word on the grid, its cell jobs numbered, its sheet drawn at the end;
+    /// without, the window's series, which the other Mac publishes back (`explored`).
+    func explore(_ grid: RenderGrid, settings: RenderSettings, references: [ReferenceImage],
+                 accelerators: Bool?, previews: Bool = true,
                  answered: ((RemoteAnswer) -> Void)? = nil) throws(EngineError) {
         if let down { answered?(.refused(.text(down))); return }
         var job = MirrorProjection.remote(settings, ordinal: 0, seeds: [], previews: previews, defaultSteps: nil,
                                           accelerators: accelerators)
         job.references = try remote(references)
-        if sketch { exploreReferences = references }
         var request: Int?
         if let answered {
             request = nextRequest
             nextRequest += 1
             waiters[request!] = answered
-            sketches[request!] = sketch
+        } else {
+            exploreReferences = references
         }
-        sender(.grid(RemoteGridRequest(spec: RemoteGridSpec(grid), job: job, sketch: sketch, stopAfter: stopAfter,
-                                       request: request)))
+        sender(.grid(RemoteGridRequest(spec: RemoteGridSpec(grid), job: job, sheet: answered != nil, request: request)))
     }
 
     /// A grid answered: its cells are known, to follow.
     func made(_ grid: Int, cells: [Int], request: Int) {
-        grids[grid] = (cells, sketches.removeValue(forKey: request) ?? true)
+        grids[grid] = cells
     }
 
     /// The word of the other Mac on every request numbered from `first` (those a gesture of the window,
@@ -337,15 +332,18 @@ extension AppState {
             guard let x, let grid = try? x.spec.grid() else { explored = nil; return }
             let refs = link.exploreReferences
             var run = GridRun(ordinal: x.ordinal, grid: grid, settings: MirrorProjection.settings(x.job),
-                              jobs: x.cells.map(\.ordinal), references: x.job.references.count, sketch: x.sketch)
+                              jobs: x.cells.map(\.ordinal), references: x.job.references.count, sheet: false)
             run.cellJobs = zip(grid.cells, x.cells).map { cell, r in
                 let j = MirrorProjection.job(r, ordinal: r.ordinal)
-                // The cell's images are the ones this Mac sent: « Use These Settings » puts them back.
+                // The cell's images are the ones this Mac sent.
                 let used = cell.image.map { refs.indices.contains($0) ? [refs[$0]] : [] } ?? refs
                 return Job(ordinal: j.ordinal, settings: j.settings, seeds: j.seeds, references: used, previews: j.previews,
                            defaultSteps: j.defaultSteps, plan: nil)
             }
-            run.entries = link.cells[x.ordinal] ?? [:]
+            // Its cells are history images, come as any other: laid out by their job.
+            for (i, j) in run.jobs.enumerated() {
+                if let e = link.entries.values.first(where: { $0.job == j }) { run.entries[i] = e }
+            }
             run.issues = x.issues.mapValues { i -> Issue in
                 switch i {
                 case .finished: .finished
@@ -354,10 +352,7 @@ extension AppState {
                 case .failed(let r): .failed(Problem(r))
                 }
             }
-            link.cells = link.cells.filter { $0.key == x.ordinal }
             explored = run
-        case .cellImage(let grid, let cell, let e):
-            link.pendingCells[e.png] = (grid, cell, e)
         case .enlargeNeedsDownload(let o):
             // The consent is asked where the user is; the other Mac downloads Apple's model.
             if !link.enlargeWaiters.isEmpty { link.enlargeWaiters.removeFirst()(.downloadRequired); return }
@@ -436,16 +431,6 @@ extension AppState {
             preview = Self.decode(data)
             return
         }
-        if let (grid, cell, e) = link.pendingCells.removeValue(forKey: id) {
-            guard let image = Self.decode(data) else { return }
-            var entry = Self.entry(e, png: data, image: image)
-            entry.sketch = e.evaluations
-            link.cells[grid, default: [:]][cell] = entry
-            if explored?.ordinal == grid { explored?.entries[cell] = entry }
-            // As here, a sketch's image is told to whoever follows its job (`silicontrol grid --wait`).
-            if let run = explored, run.ordinal == grid, run.cellJobs.indices.contains(cell) { signal(.image(run.cellJobs[cell], entry)) }
-            return
-        }
         guard let e = link.pending.removeValue(forKey: id), link.entries[e.ordinal] == nil,
               let image = Self.decode(data) else { return }
         var entry = Self.entry(e, png: data, image: image)
@@ -468,6 +453,7 @@ extension AppState {
         let at = history.firstIndex { $0.ordinal < e.ordinal } ?? history.count
         history.insert(entry, at: at)
         saveIfAsked(entry)
+        if let i = explored?.jobs.firstIndex(of: e.job.ordinal) { explored?.entries[i] = entry }
         lastImage = max(lastImage, e.ordinal)
         if at == 0, followsRender {
             selectedImage = (entry.id, image)

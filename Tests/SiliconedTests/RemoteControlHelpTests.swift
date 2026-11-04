@@ -102,16 +102,16 @@ final class RemoteControlWriterHelpTests: XCTestCase {
 final class RemoteControlGestureHelpTests: XCTestCase {
     func testTheGesturesAreDocumented() {
         for pages in [RemoteControlHelp.english, RemoteControlHelp.french] {
-            for line in ["remove i7", "undo [--redo]", "again <i7|", "reuse <i7|", "crop i7 --box X,Y,W,H | --ratio P:Q", "finish <g2c3|t5>", "sheet g2",
+            for line in ["remove i7", "undo [--redo]", "again <i7|", "reuse <i7|", "crop i7 --box X,Y,W,H | --ratio P:Q", "sheet g2",
                          "import FI", "install stop", "uninstall ID|lora", "macs [connect|disconnect", "compute N", "library [move", "--format F"] {
                 XCTAssertTrue(pages.overview.contains(line), line)
             }
-            for topic in ["remove", "undo", "again", "crop", "finish", "import", "uninstall", "macs", "library"] {
+            for topic in ["remove", "undo", "again", "crop", "sheet", "import", "uninstall", "macs", "library"] {
                 XCTAssertNotNil(pages.pages[topic], topic)
                 XCTAssertNotNil(RemoteControlHelp.answer([topic, "--help"], pages)?["help"] as? String, topic)
             }
             // The alias commands read the page they share.
-            for (command, topic) in [("reuse", "again"), ("sheet", "finish"), ("compute", "macs")] {
+            for (command, topic) in [("reuse", "again"), ("compute", "macs")] {
                 XCTAssertEqual(RemoteControlHelp.answer([command, "--help"], pages)?["help"] as? String, pages.pages[topic], command)
             }
             // What destroys says --yes, and what a dry run answers.
@@ -131,7 +131,7 @@ final class RemoteControlGestureHelpTests: XCTestCase {
 
     /// The commands the app routes (`GestureOrder.verbs`) each have a page, here or by alias.
     func testEveryGestureVerbHasAPage() {
-        let verbs = ["remove", "undo", "again", "reuse", "crop", "finish", "sheet", "import", "uninstall", "macs", "compute", "library"]
+        let verbs = ["remove", "undo", "again", "reuse", "crop", "sheet", "import", "uninstall", "macs", "compute", "library"]
         for pages in [RemoteControlHelp.english, RemoteControlHelp.french] {
             for verb in verbs { XCTAssertNotNil(RemoteControlHelp.text(for: verb, pages), verb) }
         }

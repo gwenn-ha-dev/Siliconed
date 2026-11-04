@@ -1,21 +1,18 @@
 // **The XY grid in the app: the form's two axes, the cells in the queue, the sheet.**
 //
-//     the exploration  X and Y: a group of the prompt, the seed, the steps, a LoRA's strength, the
-//     window           model, the edit's images, the solver (More Solvers) — and their values
-//                      (`GridAxisForm`, `Exploration.swift`)
-//        │ « Explore » (or `silicontrol grid`)
+//     a series         what « Generate » varies — the text's groups, the lot, the knobs bracketed
+//                      (`Series.swift`) — or the axes of `silicontrol grid`
+//        │
 //        ▼
 //     RenderGrid       the library checks it and lists its cells, row by row (`RenderGrid.swift`)
 //        │ `AppState.enqueueGrid`: one ordinary job per cell, the run remembered (`GridRun`)
 //        ▼
-//     the queue        each cell renders like any other job — a sketch from the window (it stops where
-//                      the image is already readable, `Sketch`, and stays in the window), a finished
-//                      image from `silicontrol grid` (it joins the history)
+//     the queue        each cell renders like any other job, a finished image into the history
 //        │ the last cell ends (done, failed, stopped or removed)
 //        ▼
 //     the sheet        drawn off the main thread (`SheetDrawing`): title, labels, each cell reduced to
 //                      512 px at most — an entry of the history, saved, copied, dragged like the others;
-//                      for an exploration, only when asked (« Add Sheet to History »)
+//                      for a series, only when asked (« Add Sheet to History »)
 //
 // Choices an analogy with ComfyUI's « XY plot » would not make:
 //
@@ -35,114 +32,6 @@ import ImageIO
 import Siliconed
 import SwiftUI
 
-// MARK: - The form
-
-/// **One axis as the form sets it**: what it varies, and the values typed.
-struct GridAxisForm: Equatable {
-    enum Kind: Hashable {
-        /// No Y axis: one row.
-        case none
-        /// The `n`-th `{…}` of the prompt (from 0).
-        case prompt(Int)
-        case seed
-        case steps
-        /// The strength of this LoRA of the stack.
-        case lora(LoRASlot.ID)
-        /// The models ticked in `models`.
-        case model
-        /// The LoRAs ticked in `added` (and none, if `addedNone`), one per cell, at `addedStrength`.
-        case addedLoRA
-        /// Each image of the edit, alone.
-        case image
-        /// The solvers ticked in `solvers` (More Solvers, `AppState.offeredSolvers`).
-        case solver
-    }
-    var kind: Kind
-    /// The seed axis: `seedCount` seeds from the form's seed, or the list typed.
-    var listSeeds = false
-    var seedCount = 4
-    var seeds = ""
-    var steps = "4, 8, 12"
-    var strengths = ""
-    var models: [String] = []
-    var added: [String] = []
-    var addedNone = true
-    var addedStrength = 0.8
-    var solvers = Solver.allCases
-
-    /// **Integers separated by commas, semicolons or spaces** — `nil` when one does not read.
-    static func integers<T: FixedWidthInteger>(_ text: String) -> [T]? {
-        let tokens = text.components(separatedBy: CharacterSet(charactersIn: ",; \t\n")).filter { !$0.isEmpty }
-        let values = tokens.compactMap { T($0) }
-        return values.count == tokens.count ? values : nil
-    }
-
-    /// **Decimals in the user's language**: `0.4, 0.8` in English, `0,4 ; 0,8` (or `0,4 0,8`) in French —
-    /// where the comma is the decimal separator, it separates nothing — unless a point is typed: then
-    /// the point is the decimal one and the comma separates (`0.4, 0.8` reads in French too). A
-    /// typographic minus (−) is a minus.
-    static func decimals(_ text: String) -> [Double]? {
-        let text = text.replacingOccurrences(of: "−", with: "-")
-        let comma = Locale.current.decimalSeparator == "," && !text.contains(".")
-        let tokens = text.components(separatedBy: CharacterSet(charactersIn: comma ? "; \t\n" : ",; \t\n")).filter { !$0.isEmpty }
-        let values = tokens.compactMap { Double(comma ? $0.replacingOccurrences(of: ",", with: ".") : $0) }
-        return values.count == tokens.count ? values : nil
-    }
-
-    /// Strengths written back as the user types them.
-    static func written(_ values: [Double]) -> String {
-        let comma = Locale.current.decimalSeparator == ","
-        return values.map(Figures.strength).joined(separator: comma ? " ; " : ", ")
-    }
-
-    /// The axis the library checks, or why not: `stack` is the LoRA stack the render will take.
-    func axis(stack: [LoRASlot]) throws(EngineError) -> RenderGrid.Axis? {
-        switch kind {
-        case .none: return nil
-        case .prompt(let g): return .prompt(group: g)
-        case .seed:
-            if !listSeeds { return .consecutiveSeeds(count: seedCount) }
-            guard let s: [UInt64] = Self.integers(seeds) else { throw .gridRefused(reason: .unreadableAxis) }
-            return .seeds(s)
-        case .steps:
-            guard let s: [Int] = Self.integers(steps) else { throw .gridRefused(reason: .unreadableAxis) }
-            return .steps(s)
-        case .lora(let id):
-            guard let slot = stack.firstIndex(where: { $0.id == id }) else { throw .gridRefused(reason: .noSuchLoRA) }
-            // Left empty, the strengths the field shows as its placeholder: what is seen is what renders.
-            let typed = strengths.trimmingCharacters(in: .whitespaces)
-            guard let v = typed.isEmpty ? [0.4, 0.6, 0.8, 1] : Self.decimals(typed) else { throw .gridRefused(reason: .unreadableAxis) }
-            return .loraStrength(slot: slot, values: v)
-        case .model: return .models(models)
-        case .addedLoRA: return .addedLoRAs((addedNone ? [""] : []) + added, strength: addedStrength)
-        case .image: return .images
-        case .solver: return .solvers(solvers)
-        }
-    }
-
-    /// The form of an axis the library describes — a sheet's « Reuse These Settings », a remote grid.
-    init(_ axis: RenderGrid.Axis?, stack: [LoRASlot]) {
-        self.init(kind: .none)
-        switch axis {
-        case nil: break
-        case .prompt(let g)?: kind = .prompt(g)
-        case .seeds(let s)?: kind = .seed; listSeeds = true; seeds = s.map(String.init).joined(separator: ", ")
-        case .consecutiveSeeds(let n)?: kind = .seed; seedCount = n
-        case .steps(let s)?: kind = .steps; steps = s.map(String.init).joined(separator: ", ")
-        case let .loraStrength(slot, values)?:
-            kind = stack.indices.contains(slot) ? .lora(stack[slot].id) : .none
-            strengths = Self.written(values)
-        case .models(let m)?: kind = .model; models = m
-        case let .addedLoRAs(l, f)?: kind = .addedLoRA; addedNone = l.contains(""); added = l.filter { !$0.isEmpty }; addedStrength = f
-        case .images?: kind = .image
-        case .solvers(let s)?: kind = .solver; solvers = s
-        case .startStrength?, .detail?: break
-        }
-    }
-
-    init(kind: Kind) { self.kind = kind }
-}
-
 // MARK: - A grid on its way
 
 /// **A grid in the queue**: its cells' jobs, what each became, and what its sheet will say. In memory,
@@ -154,11 +43,11 @@ struct GridRun {
     let settings: RenderSettings
     /// The job of each cell, in the grid's order (`RenderGrid.cells`).
     let jobs: [Int]
-    /// The same jobs whole: what « Finish This Image » and « Use These Settings » start from.
+    /// The same jobs whole: each cell's settings, as the canvas says them.
     var cellJobs: [Job] = []
     let references: Int
-    /// An exploration: its cells are sketches (`Job.sketch`), kept here and not in the history.
-    var sketch = false
+    /// The sheet is drawn when the last cell ends (`silicontrol grid`); a series' only when asked.
+    var sheet = true
     var entries: [Int: Entry] = [:]
     var issues: [Int: Issue] = [:]
     /// Who asked for it (`Entry.owner`).
@@ -370,130 +259,6 @@ struct SheetDrawing: Sendable {
             c.textPosition = CGPoint(x: x, y: r.minY + (r.height - ascent - descent) / 2 + descent)
             CTLineDraw(line, c)
             return ascent + descent
-        }
-    }
-}
-
-// MARK: - An axis in the form
-
-/// One axis: what it varies, then its values.
-struct AxisRow: View {
-    @Bindable var app: AppState
-    let title: String
-    @Binding var form: GridAxisForm
-    let allowsNone: Bool
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 6) {
-                Text(verbatim: title).font(.callout.weight(.semibold)).foregroundStyle(.secondary).frame(width: 14)
-                Picker("Axis \(title)", selection: $form.kind) {
-                    if allowsNone { Text("None").tag(GridAxisForm.Kind.none) }
-                    ForEach(Array(app.promptGroups.enumerated()), id: \.offset) { g, options in
-                        Text(verbatim: "{" + options.joined(separator: "|") + "}").tag(GridAxisForm.Kind.prompt(g))
-                    }
-                    Text("Seed").tag(GridAxisForm.Kind.seed)
-                    Text("Steps").tag(GridAxisForm.Kind.steps)
-                    ForEach(app.loras.filter { !$0.path.isEmpty }) { slot in
-                        Text("LoRA \(app.loraName(slot.path))").tag(GridAxisForm.Kind.lora(slot.id))
-                    }
-                    if !app.compatibleLoras.isEmpty { Text("LoRA to Compare").tag(GridAxisForm.Kind.addedLoRA) }
-                    Text("Model").tag(GridAxisForm.Kind.model)
-                    if !app.references.isEmpty { Text("Image to Edit").tag(GridAxisForm.Kind.image) }
-                    if app.offeredSolvers.count > 1 { Text("Solver").tag(GridAxisForm.Kind.solver) }
-                }
-                .labelsHidden()
-                .help("What varies from one column (X) or row (Y) to the next")
-            }
-            values.padding(.leading, 20)
-        }
-    }
-
-    @ViewBuilder private var values: some View {
-        switch form.kind {
-        case .none:
-            EmptyView()
-        case .prompt(let g):
-            Text(app.promptGroups.indices.contains(g) ? app.promptGroups[g].map { $0.isEmpty ? "∅" : $0 }.joined(separator: " · ") : "—")
-                .font(.caption).foregroundStyle(.secondary).lineLimit(2)
-        case .seed:
-            HStack(spacing: 6) {
-                Picker("Seeds", selection: $form.listSeeds) {
-                    Text("Consecutive").tag(false)
-                    Text("List").tag(true)
-                }
-                .pickerStyle(.segmented).labelsHidden().fixedSize()
-                .help("The seeds that follow the rack’s seed, or the seeds you list")
-                if form.listSeeds {
-                    TextField("Seeds", text: $form.seeds, prompt: Text(verbatim: "42, 7, 1000"))
-                        .labelsHidden().textFieldStyle(.roundedBorder)
-                } else {
-                    Stepper(value: $form.seedCount, in: 1...RenderGrid.maxCells) {
-                        Text("\(form.seedCount) from the seed").monospacedDigit()
-                    }
-                    .fixedSize()
-                }
-            }
-            .font(.caption)
-        case .steps:
-            TextField("Steps", text: $form.steps, prompt: Text(verbatim: "4, 8, 12"))
-                .labelsHidden().textFieldStyle(.roundedBorder).font(.caption)
-                .help("Step counts, separated by commas")
-        case .lora:
-            TextField("Strengths", text: $form.strengths, prompt: Text(verbatim: GridAxisForm.written([0.4, 0.6, 0.8, 1])))
-                .labelsHidden().textFieldStyle(.roundedBorder).font(.caption)
-                .help("Strengths for this LoRA; the other LoRAs keep theirs")
-        case .model:
-            // The models ready and shown, ticked in the order they are listed; each at its own steps.
-            VStack(alignment: .leading, spacing: 2) {
-                ForEach(app.visibleReady, id: \.id) { card in
-                    Toggle(card.name, isOn: Binding(
-                        get: { form.models.contains(card.id) },
-                        set: { on in
-                            if on { form.models = app.visibleReady.map(\.id).filter { form.models.contains($0) || $0 == card.id } }
-                            else { form.models.removeAll { $0 == card.id } }
-                        }))
-                }
-            }
-            .font(.caption)
-            .help("Each model at its own number of steps; the LoRAs are left out, each is made for one model")
-        case .solver:
-            // The solvers ticked, in the rack's order: same seed, same σ, only the rule between steps.
-            VStack(alignment: .leading, spacing: 2) {
-                ForEach(app.offeredSolvers, id: \.self) { solver in
-                    Toggle(solver.choice, isOn: Binding(
-                        get: { form.solvers.contains(solver) },
-                        set: { on in
-                            if on { form.solvers = app.offeredSolvers.filter { form.solvers.contains($0) || $0 == solver } }
-                            else { form.solvers.removeAll { $0 == solver } }
-                        }))
-                }
-            }
-            .font(.caption)
-            .help("The same seed and steps under each solver: Euler is the one this model was distilled for")
-        case .addedLoRA:
-            // One LoRA per cell, added to the stack — and the cell without, to see what it changes.
-            VStack(alignment: .leading, spacing: 2) {
-                Toggle("No LoRA", isOn: $form.addedNone)
-                ForEach(app.compatibleLoras) { card in
-                    Toggle(card.name, isOn: Binding(
-                        get: { form.added.contains(card.path) },
-                        set: { on in
-                            if on { form.added = app.compatibleLoras.map(\.path).filter { form.added.contains($0) || $0 == card.path } }
-                            else { form.added.removeAll { $0 == card.path } }
-                        }))
-                }
-                HStack {
-                    Slider(value: $form.addedStrength, in: app.loraStrengthRange)
-                    Text(Figures.strength(form.addedStrength)).monospacedDigit().frame(width: 38, alignment: .trailing)
-                }
-                .help("The strength of each LoRA compared")
-            }
-            .font(.caption)
-            .help("Each cell adds one of these LoRAs to the stack, at one strength")
-        case .image:
-            Text("Each of the \(app.references.count) images alone, with the same instruction")
-                .font(.caption).foregroundStyle(.secondary)
         }
     }
 }

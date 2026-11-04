@@ -130,7 +130,7 @@ private struct GraphCanvas: View {
         return VStack(spacing: 0) {
             Group {
                 if app.showsExploration, let run = app.explored {
-                    ExplorationCanvas(app: app, run: run)
+                    SeriesCanvas(app: app, run: run)
                 } else {
                     SceneView(app: app)
                 }
