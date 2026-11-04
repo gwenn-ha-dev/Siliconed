@@ -192,7 +192,9 @@ struct PromptField: NSViewRepresentable {
                     let why = greyed ? String(localized: "\(reading?.model ?? "") does not read subjects") : s.kind.label
                     storage.addAttributes([.subjectChip: "\(s.kind.rawValue):\(s.id)", .toolTip: "@\(s.name) — \(why)"], range: r)
                     if greyed {
-                        storage.addAttributes([.subjectChipInert: true, .foregroundColor: NSColor.tertiaryLabelColor], range: r)
+                        // Secondary, not tertiary as the greyed words: on the chip's fill, tertiary left the name unreadable
+                        // (seen on capture); the faded thumbnail and the grey edge already say it does not go.
+                        storage.addAttributes([.subjectChipInert: true, .foregroundColor: NSColor.secondaryLabelColor], range: r)
                     }
                     // The `@`, not drawn: its advance makes the thumbnail's room.
                     storage.addAttributes([.foregroundColor: NSColor.clear, .kern: PromptStyle.atKern],
