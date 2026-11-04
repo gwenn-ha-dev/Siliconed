@@ -47,7 +47,6 @@ extension AppState {
     /// The same, as a code: what a lending Mac sends (`MirrorServer`), said in the borrower's language.
     func cropRefusalCode(_ entry: Entry) -> AppRefusal? {
         if entry.grid != nil { return .gridNotCropped }
-        if entry.sketch != nil { return .sketchNotCropped }
         return cropRefusalCode(width: entry.width, height: entry.height)
     }
 
@@ -80,7 +79,7 @@ extension AppState {
         let id = reference.id, w = reference.width, h = reference.height
         Task {
             let image = await Task.detached(priority: .userInitiated) { Decoded(reference.displayed(width: w, height: h)) }.value.image
-            guard let image, cropping == nil, references.contains(where: { $0.id == id }) else { return }
+            guard let image, cropping == nil, inputIndex(shown: id) != nil else { return }
             startCrop(CropSession(target: .reference(id), image: image))
         }
     }
@@ -194,18 +193,23 @@ extension AppState {
     }
 
     private func cropReference(_ id: ReferenceImage.ID, image: CGImage, box: Crop.Box) {
-        guard let i = references.firstIndex(where: { $0.id == id }), let part = Self.cut(image, box) else { return }
-        let old = references[i]
+        guard let k = inputIndex(shown: id), let part = Self.cut(image, box) else { return }
+        let old = inputs[k]
+        let number = (editInputs.firstIndex { $0.id == old.id } ?? 0) + 1
         let vignette = FinishedImage.reduce(part, side: 240) ?? part
-        let new = ReferenceImage(source: .image(part), vignette: NSImage(cgImage: vignette, size: .zero), name: old.name,
+        let new = ReferenceImage(source: .image(part), vignette: NSImage(cgImage: vignette, size: .zero), name: old.shown.name,
                                  width: part.width, height: part.height)
-        references[i] = new
+        // The cut is the image now: its pixels, whatever role it has.
+        replaceInput(old.id, with: new)
+        let replaced = inputs[k].id
         undoManager?.registerUndo(withTarget: self) { app in
-            guard let j = app.references.firstIndex(where: { $0.id == new.id }) else { return }
-            app.references[j] = old
+            guard let j = app.inputs.firstIndex(where: { $0.id == replaced }) else { return }
+            var back = old
+            back.role = app.inputs[j].role
+            app.inputs[j] = back
         }
         undoManager?.setActionName(String(localized: "Crop"))
-        flash(String(localized: "Image \(i + 1) cropped to \(part.width) × \(part.height)"))
+        flash(String(localized: "Image \(number) cropped to \(part.width) × \(part.height)"))
     }
 }
 

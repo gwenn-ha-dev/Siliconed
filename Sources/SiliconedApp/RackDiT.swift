@@ -8,7 +8,7 @@ import SwiftUI
 // MARK: - The DiT: the stage with choices
 
 /// **The DiT and everything it is told**: the model, its license, the size, the seed, how many
-/// images, the steps, the LoRA stack — then what it costs, or its steps while it runs.
+/// images (the steps only off the model's recipe), the LoRA stack — then what it costs, or its steps while it runs.
 struct DiTBox: View {
     @Bindable var app: AppState
     @State private var customSize = false
@@ -239,11 +239,22 @@ struct DiTBox: View {
                 .fixedSize()
         }
         .help("Consecutive seeds; the prompt is encoded only once")
-        Field(title: "Steps") {
-            Stepper(value: $app.steps, in: 1...50) { Text(verbatim: "\(app.steps)").monospacedDigit() }
-                .fixedSize()
+        // The lot is the series' seed axis (4/11): bracketing the seed is choosing how many, and where they go.
+        .bracketable(app, .seeds)
+        // **The steps, only off the recipe**: the five models are distilled for 8, and fewer is softer, more is longer and no
+        // better — a choice that only costs. The line comes when something else set them (a PNG's settings reused,
+        // `silicontrol`), as the variation's does, with its way back.
+        let recipe = app.card?.defaultSteps ?? 8
+        if app.steps != recipe {
+            Field(title: "Steps") {
+                Text(verbatim: "\(app.steps)").monospacedDigit()
+                Button { app.steps = recipe } label: { Image(systemName: "xmark.circle.fill").frame(width: 24, height: 24).contentShape(Rectangle()) }
+                    .buttonStyle(.borderless).foregroundStyle(.secondary)
+                    .help(String(localized: "Back to \(recipe) steps, the count this model is distilled for"))
+                    .accessibilityLabel(Text("Back to \(recipe) steps, the count this model is distilled for"))
+            }
+            .help(String(localized: "\(recipe) steps: the count this Turbo model is distilled for"))
         }
-        .help(String(localized: "\(app.card?.defaultSteps ?? 8) steps: the count this Turbo model is distilled for"))
         // Not on a model that offers none (Anima): a choice that changes nothing is not shown.
         if app.offersDetail {
             Field(title: "Detail") {
@@ -253,6 +264,7 @@ struct DiTBox: View {
                 .pickerStyle(.segmented).labelsHidden().fixedSize()
             }
             .help("Adds fine texture and small details; Most can over-sharpen")
+            .bracketable(app, .detail)
         }
         // More Solvers, the models in front: how a step moves to the next. Euler is the distillation's own.
         if app.offeredSolvers.count > 1 {
@@ -263,6 +275,7 @@ struct DiTBox: View {
                 .labelsHidden().fixedSize()
             }
             .help("How each step moves to the next, with the same steps: Euler is the one this model was distilled for")
+            .bracketable(app, .solver)
         }
         Toggle("Preview every step", isOn: $app.previews)
             .font(.callout)
@@ -312,9 +325,9 @@ struct DiTBox: View {
         }
     }
 
-    /// **The LoRA stack, in the open** — as reachable as the steps or the seed: a title with « Add »
-    /// (a menu of this model's LoRAs: one click opens it, one picks), then one row per LoRA with its
-    /// strength's slider always under the hand. Nothing hides behind a popover.
+    /// **The LoRA stack, in the open** — as reachable as the steps or the seed: a title with one « Add » (this model's LoRAs,
+    /// then Import…), then one card per LoRA: on or off, its strength under the hand, its trigger words a click away from
+    /// the prompt. Nothing hides behind a popover or a hover.
     @ViewBuilder private var loras: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 8) {
@@ -323,17 +336,12 @@ struct DiTBox: View {
                     Text(verbatim: "\(app.loras.count)/\(AppState.maxLoRA)").monospacedDigit().foregroundStyle(.secondary)
                 }
                 Spacer(minLength: 4)
-                if app.compatibleLoras.isEmpty {
-                    Text("No LoRA for this model").foregroundStyle(.secondary)
-                } else {
-                    LoRAAddMenu(app: app)
-                }
-                Button("Import…") { app.chooseToImport() }
-                    .buttonStyle(.link)
-                    .disabled(!app.importPossible)
-                    .help("A model (.safetensors or .gguf) or a LoRA (.safetensors), as published on Civitai")
+                LoRAAddMenu(app: app)
             }
             .font(.callout)
+            if app.compatibleLoras.isEmpty, app.loras.isEmpty {
+                Text("No LoRA for this model").font(.caption).foregroundStyle(.secondary)
+            }
             ForEach($app.loras) { $slot in LoRARow(app: app, slot: $slot) }
         }
     }
@@ -364,8 +372,6 @@ struct DiTBox: View {
     }
 }
 
-/// **« Add »**: the model's LoRAs not yet in the stack, in a menu — the pick goes in at 0.8, its
-/// slider ready. Greyed at three, the stack's limit.
 /// **What the accelerators do, in words** — one place for the DiT box, the rack's legend, the image's panel and `silicontrol`, read
 /// from what this Mac's map gives them (`AcceleratorOffer`), never from the chip's name: the Neural Engine first, the GPU's tensor
 /// units in half precision said in clear, « fp32 » where neither works (a Mac whose map chooses none, or the switch off).
@@ -405,70 +411,109 @@ enum AcceleratorWords {
     }
 }
 
+/// **« Add »**, the stack's one way in: the model's LoRAs (those in the stack greyed; all greyed at three, the limit), then
+/// Import… for a file from Civitai. The pick goes in at 0.8, on.
 struct LoRAAddMenu: View {
     let app: AppState
 
     var body: some View {
         let used = Set(app.loras.map(\.path))
         Menu {
-            ForEach(app.compatibleLoras.filter { !used.contains($0.path) }) { l in
+            ForEach(app.compatibleLoras) { l in
                 Button(l.name) { app.loras.append(LoRASlot(path: l.path)) }
+                    .disabled(used.contains(l.path) || !app.canAddLoRA)
             }
+            if !app.compatibleLoras.isEmpty { Divider() }
+            Button("Import…") { app.chooseToImport() }
+                .disabled(!app.importPossible)
+            Divider()
+            // A series: one of them added per image, and the image without (`SeriesKey.comparedLoRAs`).
+            Button("Compare LoRAs…") { app.bracketing = .comparedLoRAs }
+                .disabled(!app.canAddLoRA || app.compatibleLoras.allSatisfy { used.contains($0.path) })
         } label: {
             Label("Add", systemImage: "plus")
         }
-        .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
-        .disabled(!app.canAddLoRA || app.compatibleLoras.allSatisfy { used.contains($0.path) })
-        .help("Add a LoRA to the stack (3 at most)")
+        .menuStyle(.button).buttonStyle(.bordered).controlSize(.small).fixedSize()
+        .help("A LoRA of this model (3 at most), or one to import: a .safetensors as published on Civitai")
+        .bracketable(app, .comparedLoRAs, menu: false)
     }
 }
 
-/// **A LoRA of the stack, in the open**: its name (a menu to swap it for another), its strength and a
-/// remove button on one line; the slider under them, full width. A double click on the figure puts the
-/// strength back to 0.8.
+/// **A LoRA of the stack, a card**: on top, its switch, its name and the button that takes it out; under them its strength,
+/// a slider and the figure, which can be typed; then its trigger words when its file gives them — without them many LoRAs
+/// do nothing, and a hover was the only place they showed: a click puts them at the head of the prompt. Off, the card stays,
+/// greyed, its strength kept. Right-click: Replace With, Reset to 0.8, Remove.
 struct LoRARow: View {
     let app: AppState
     @Binding var slot: LoRASlot
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
+        let card = app.loraCard(slot.path)
+        VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 6) {
-                Menu {
-                    ForEach(app.compatibleLoras) { l in
-                        Button(l.name) { slot.path = l.path }.disabled(l.path == slot.path)
-                    }
-                } label: {
-                    Text(app.loraCard(slot.path)?.name ?? String(localized: "Choose…"))
-                        .lineLimit(1).truncationMode(.middle)
-                }
-                .menuStyle(.borderlessButton).menuIndicator(.hidden)
-                .help(details)
+                Toggle(isOn: $slot.on) { EmptyView() }
+                    .toggleStyle(.checkbox).labelsHidden()
+                    .help("On, it goes into the render. Off, it stays here with its strength, out of the render.")
+                    .accessibilityLabel(Text("Use this LoRA"))
+                Text(card?.name ?? String(localized: "Choose…"))
+                    .fontWeight(.medium).lineLimit(1).truncationMode(.middle)
+                    .help(details)
                 Spacer(minLength: 4)
-                Text(Figures.strength(slot.strength)).monospacedDigit().foregroundStyle(.secondary)
-                    .onTapGesture(count: 2) { slot.strength = LoRASlot().strength }
-                    .help("Strength — double-click for 0.8")
-                    .accessibilityLabel(Text("Strength"))
-                    .accessibilityAddTraits(.isStaticText)
-                Button {
-                    // The id is read BEFORE: `slot` is a binding on `app.loras`, and re-reading it
-                    // in `removeAll`'s predicate accesses the array during its mutation.
-                    let id = slot.id
-                    app.loras.removeAll { $0.id == id }
-                } label: { Image(systemName: "xmark.circle.fill").frame(width: 24, height: 24).contentShape(Rectangle()) }
-                    .buttonStyle(.borderless).foregroundStyle(.secondary)
-                    .help("Remove this LoRA from the stack")
-                    .accessibilityLabel(Text("Remove this LoRA from the stack"))
+                Button(action: remove) {
+                    Image(systemName: "xmark.circle.fill").frame(width: 20, height: 20).contentShape(Rectangle())
+                }
+                .buttonStyle(.borderless).foregroundStyle(.secondary)
+                .help("Remove this LoRA from the stack")
+                .accessibilityLabel(Text("Remove this LoRA from the stack"))
             }
-            Slider(value: $slot.strength, in: app.loraStrengthRange)
-                .controlSize(.small)
-                .accessibilityLabel(Text("Strength"))
+            HStack(spacing: 8) {
+                Slider(value: $slot.strength, in: app.loraStrengthRange)
+                    .controlSize(.small)
+                    .accessibilityLabel(Text("Strength"))
+                TextField(value: strength, format: .number.precision(.fractionLength(2))) { Text("Strength") }
+                    .labelsHidden().textFieldStyle(.roundedBorder).controlSize(.small).monospacedDigit()
+                    .multilineTextAlignment(.trailing).frame(width: 48)
+                    .help("Strength: 0.8 attenuates, 1 as trained, more emphasizes")
+            }
+            .bracketable(app, .loraStrength(slot.path), menu: false)
+            .padding(.leading, 22)
+            .opacity(slot.on ? 1 : 0.45)
+            if let card, !card.triggers.isEmpty {
+                VStack(alignment: .leading, spacing: 3) {
+                    ForEach(card.triggers, id: \.self) { trigger in TriggerButton(app: app, trigger: trigger) }
+                }
+                .padding(.leading, 22)
+                .opacity(slot.on ? 1 : 0.45)
+            }
         }
         .contextMenu {
+            Menu("Replace With") {
+                ForEach(app.compatibleLoras) { l in
+                    Button(l.name) { slot.path = l.path }
+                        .disabled(l.path == slot.path || app.loras.contains { $0.path == l.path })
+                }
+            }
             Button("Reset to 0.8") { slot.strength = LoRASlot().strength }
+            Button("Bracket…") { app.bracketing = .loraStrength(slot.path) }
+            Divider()
+            Button("Remove", action: remove)
         }
         .font(.callout)
         .padding(.horizontal, 8).padding(.vertical, 6)
         .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(Palette.well))
+    }
+
+    /// The figure, typed: held within the slider's range.
+    private var strength: Binding<Double> {
+        let range = app.loraStrengthRange
+        return Binding(get: { slot.strength }, set: { slot.strength = min(max($0, range.lowerBound), range.upperBound) })
+    }
+
+    private func remove() {
+        // The id is read BEFORE: `slot` is a binding on `app.loras`, and re-reading it
+        // in `removeAll`'s predicate accesses the array during its mutation.
+        let id = slot.id
+        app.loras.removeAll { $0.id == id }
     }
 
     /// The name's tooltip: what the file says of itself.
@@ -477,6 +522,28 @@ struct LoRARow: View {
         let line = ([f.name, (f.smallestRank == f.rank ? String(localized: "rank \(f.rank)") : String(localized: "ranks \(f.smallestRank)–\(f.rank)")), f.resolution.map { String(localized: "trained at \($0)") }, f.trainedOn]
             .compactMap { $0 }).joined(separator: " · ")
         return ([line] + f.fromItsMetadata).joined(separator: "\n")
+    }
+}
+
+/// **A trigger word, a click from the prompt**: it goes at the head of the text, where LoRAs are trained to find it; once
+/// there, the button says so and does nothing more.
+private struct TriggerButton: View {
+    let app: AppState
+    let trigger: String
+
+    var body: some View {
+        let there = app.prompt.localizedCaseInsensitiveContains(trigger)
+        Button {
+            let text = app.prompt.trimmingCharacters(in: .whitespacesAndNewlines)
+            app.prompt = text.isEmpty ? trigger : trigger + ", " + text
+        } label: {
+            Label { Text(verbatim: trigger).lineLimit(2).multilineTextAlignment(.leading) }
+                icon: { Image(systemName: there ? "checkmark" : "plus") }
+                .font(.caption)
+        }
+        .buttonStyle(.bordered).controlSize(.small)
+        .disabled(there)
+        .help(there ? Text("In the prompt") : Text("Its trigger words, as its file gives them: a click puts them at the head of the prompt."))
     }
 }
 

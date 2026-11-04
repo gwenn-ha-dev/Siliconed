@@ -26,8 +26,6 @@ extension AppRefusal {
             String(localized: "This image could not be enlarged")
         case .gridNotCropped:
             String(localized: "A grid is not cropped")
-        case .sketchNotCropped:
-            String(localized: "A sketch is not cropped")
         case .cropNeeds(let side):
             String(localized: "Cropping needs \(String(side)) px or more on each side")
         case .cropSmallest(let side):

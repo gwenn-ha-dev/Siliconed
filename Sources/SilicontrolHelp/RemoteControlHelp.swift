@@ -27,9 +27,9 @@ package enum RemoteControlHelp {
 
     /// The topics in reading order (`help all` follows it).
     static let order = ["contract", "open", "models", "install", "add", "grid", "edit", "wait", "status", "follow",
-                        "cancel", "clear", "set", "history", "save", "vary", "enlarge", "crop", "again", "remove", "undo", "finish", "rewrite", "describe",
-                        "start-image", "subjects", "import", "uninstall", "macs", "library", "diagnose", "measure", "errors", "recipes"]
-    static let aliases = ["examples": "recipes", "reuse": "again", "sheet": "finish", "compute": "macs"]
+                        "cancel", "clear", "set", "history", "save", "vary", "enlarge", "crop", "again", "remove", "undo", "sheet", "rewrite", "describe",
+                        "start-image", "lab", "subjects", "import", "uninstall", "macs", "library", "diagnose", "measure", "errors", "recipes"]
+    static let aliases = ["examples": "recipes", "reuse": "again", "compute": "macs"]
 
     /// French when the user puts it before English. Not `Bundle.main.preferredLocalizations`: the app's
     /// bundle has French phrases, `silicontrol` (a bare tool in `Contents/Helpers`) has none, and both
@@ -124,11 +124,12 @@ package enum RemoteControlHelp {
       rewrite "<text>" [--for ID]              the Prompt Lab's Rewrite: a prompt rewritten for a model → its text
       describe <image|i7> [--for ID]           the Prompt Lab's Describe: an image told as a prompt → its text
       start-image [<image|i7>] [--strength S] · start-image --remove
-                                               the rack's starting image (img2img), as the Prompt Lab carries it
+                                               the starting image (img2img): an image of the Prompt Lab, and its strength
+      lab [open|close] · lab add|role|remove … the Prompt Lab: its images, a role each; folded or not
       remove i7 [i8 …]                         Remove from History · undo [--redo]: ⌘Z, ⇧⌘Z
       again <i7|file.png> · reuse <i7|file.png> Render Again (Same Seed) · Reuse These Settings (an image, or a PNG of another day)
       crop i7 --box X,Y,W,H | --ratio P:Q      Crop… → a new image (i8)
-      finish <g2c3|t5> · sheet g2              Finish This Image · Add Sheet to History (an exploration's cell g2c3)
+      sheet g2                                 Add Sheet to History (the series shown, its images side by side)
       import FILE.safetensors|FILE.gguf …      Import a Model or LoRA… (⌘O); a family not installed shows its license in the app
       install stop                             Stop the installation or import in progress
       uninstall ID|lora NAME|downloads [--yes] Uninstall / Remove / Discard: without --yes, says what would go and the room freed
@@ -470,18 +471,18 @@ package enum RemoteControlHelp {
         """,
 
         "grid": """
-        silicontrol grid --x AXIS [--y AXIS] [options] "<prompt>" [512|1024|WxH|P:Q@1K|2K] [seed]
+        silicontrol grid --x AXIS [--y AXIS] [--no-sheet] [options] "<prompt>" [512|1024|WxH|P:Q@1K|2K] [seed]
 
         An XY grid: one or two settings swept, ONE JOB PER CELL in the queue — each an ordinary
         job, its image in the history like any other —, then, when the last cell ends, a SHEET:
         one image with every cell side by side, the axes' values as labels and the prompt as its
         title, added to the history (i…). Nothing is written to disk without --out or save.
         Options and arguments are those of « add » (help add), except --batch: a cell is one image.
-        --sketch: an EXPLORATION — each cell stops as soon as its image is readable (σ ≤ 0.5: 6
-          evaluations of 8 for z-image, about three quarters of the time) and shows the model's estimate of the
-          final image (qwen-image-2.1 does not sketch: its cells are finished images); the cells go to the app's Exploration window and
-          their "type": "image" lines (with "sketch": n), not to the history, and no sheet is drawn.
-          A new exploration replaces the last one's cells still waiting. Keep 512 on the short side.
+        The window's series (« Bracket… » on a knob, a {…} group in the prompt, the lot) are grids too, drawn on its canvas: the
+        same cells, the same images, the sheet only on « Add Sheet to History » (« sheet g2 »): --no-sheet renders a grid so,
+        its verdict with "sheet": null. The window takes the grid's axes as its series; a models, steps, listed seeds or images
+        axis stays silicontrol's. « reuse » answers the rack's series ("series": its x and y as --x and --y read them, "excess"
+        beyond two, "renders" the jobs « Generate » would queue).
 
         AXES — kind[:which][=values]; values separated by commas, decimals with a point
           prompt              the prompt's {…} group      prompt:2      its second group
@@ -496,6 +497,8 @@ package enum RemoteControlHelp {
           loras:0.6=…         strength 1 — or the one given; names as --lora takes them
           solver=euler,dpmpp-2m   these solvers (euler, euler-ancestral, dpmpp-2m, unipc), same seed
                               and steps; More Solvers, like --solver
+          start=0.45,0.6,0.75 strengths of the starting image (--image), from 0 (kept) to 1 (ignored)
+          detail=normal,more,most   these levels of Detail, where the model offers it
           --x gives the columns, --y the rows (without --y: one row). X and Y vary two different
           settings. EVERY {…} GROUP OF THE PROMPT MUST BE AN AXIS: a group left out would stack
           several images in a cell (error "grid"); write \\{ \\} for braces that are not
@@ -523,8 +526,8 @@ package enum RemoteControlHelp {
           A cell not "done": "ok": false, "error": "render" — the sheet is made all the same, that
           cell empty ("sheet": null if no cell rendered).
           « wait g2 [--out D] » follows a grid later: at once if it has ended.
-          A cell has a name of its own, g2c3 (its rank in the sheet's reading order, from 0 — row × columns + column): « finish g2c3 »
-          is « Finish This Image » on an exploration's cell, « sheet g2 » is « Add Sheet to History » (help finish).
+          A cell has a name of its own, g2c3 (its rank in the sheet's reading order, from 0 — row × columns + column), and its
+          job's, t5. « sheet g2 » is « Add Sheet to History » on the series shown (help sheet).
 
         FAILURES: usage (no --x, --batch, --x given to « add »), grid (an axis that does not read or
         does not make a grid, more than 64 cells), prompt, model, solver, detail, accelerators, lora,
@@ -550,10 +553,9 @@ package enum RemoteControlHelp {
           Without --out, the image is ONLY in the app's memory (history, lost when it quits):
           « save i7 DEST » writes it later.
 
-        FILE NAMES: <model>[-lora-<name>[@<strength>]…][-p<steps>][-edit][-sketch<n>]-<W>x<H>-<seed>[-v<seed>x<strength>…].png
-          (the strength if it is not 1, the steps if they are not the model's; a sketch, the
-          evaluations it stopped after; a variation, each variation seed and its strength in
-          hundredths). An existing file is never overwritten: -2, -3… are appended.
+        FILE NAMES: <model>[-lora-<name>[@<strength>]…][-p<steps>][-edit]-<W>x<H>-<seed>[-v<seed>x<strength>…].png
+          (the strength if it is not 1, the steps if they are not the model's; a variation, each
+          variation seed and its strength in hundredths). An existing file is never overwritten: -2, -3… are appended.
 
         VERDICT:
           {"ok": true, "jobs": [{"job": "t3", "outcome": "done", "images": ["i7"]}]}
@@ -600,7 +602,7 @@ package enum RemoteControlHelp {
                              taken (one of another Mac or build). A measure is applied as it stands, whatever it found (see help diagnose). Two
                              series compared across launches compare their measures too.
         stage              : text, image (encoding a reference), denoising, decoding.
-        steps_total        : the model's evaluations, not the requested steps (a sketch: those it stops after).
+        steps_total        : the model's evaluations, not the requested steps.
         remaining_s        : null until the app has a measurement for this render.
         remaining_complete : false if a waiting job has no estimate (queue_remaining_s is a minimum).
         installing         : an installation or an import in progress, and its last journal line;
@@ -689,7 +691,7 @@ package enum RemoteControlHelp {
 
         SAVE-IMAGES is Settings ▸ General's « Save Every Image To… », off by default: given a folder (relative to the current
         directory; one named "off" is ./off), each new image of the history — a render, a crop, an enlargement, a grid's
-        sheet; not an exploration's sketches — is also written there as a PNG with its prompt, seed and model, under its
+        sheet — is also written there as a PNG with its prompt, seed and model, under its
         « save » name, never over another file. "off" turns it off; alone, it is read. The folder must exist ("write"
         otherwise): it is never created. This Mac's preference, whichever Mac computes.
 
@@ -800,18 +802,52 @@ package enum RemoteControlHelp {
         not in the history).
         """,
 
+        "lab": """
+        silicontrol lab [open|close]
+        silicontrol lab add <image|i7> …
+        silicontrol lab role <n> edited|reference|start|none
+        silicontrol lab remove <n>
+
+        THE PROMPT LAB — the bar under the image, where the next render's text and images are prepared:
+        what a drop on the canvas, ⌘V, « Send to the Prompt Lab » and the role menus of its images do. Its
+        text is the rack's prompt (add and reuse write it); its images are numbered as the bar shows
+        them, from 1.
+
+          lab                          what it holds: folded or not, the text, the images and their roles
+          lab open · lab close         unfolds or folds the bar (⌥⌘L); folding stops a Rewrite or a Describe
+                                       under way and gives the writer's memory back
+          lab add IMAGE|i7 …           files, or images of the history: each takes the role a newcomer
+                                       takes — the next place under Qwen-Image-2.1 (edited, then references,
+                                       three at most with the subjects the text cites), none elsewhere
+          lab role N ROLE              edited · reference (Qwen-Image-2.1) · start (Z-Image, Anima, Krea 2,
+                                       MOSS-Image: the render starts from it, the size takes the model's
+                                       format nearest its proportions) · none. One image to edit and one
+                                       start: choosing another sends the previous image to edit to the
+                                       references, the previous start to none.
+          lab remove N                 takes image N out
+
+        A CHANGE OF MODEL never gives a role, nor turns one into another: a reference keeps its role under
+        Z-Image, without effect ("used": false), and works again back on Qwen-Image-2.1. "unused" counts
+        what the next render will not read, as the line beside Generate does.
+
+        ANSWER
+          {"ok": true, "lab": {"unfolded": false, "model": "qwen-image-2.1", "text": "@alice on the quay",
+            "images": [{"n": 1, "name": "quay.jpg", "width": 1536, "height": 1024, "role": "edited",
+                        "used": true}], "unused": 0}}
+        """,
+
         "start-image": """
         silicontrol start-image [<image|i7>] [--strength S]
         silicontrol start-image --remove
 
-        THE RACK'S STARTING IMAGE (img2img) — what the Prompt Lab's « Carry to the Rack » puts in the rack's
-        Images box when a picture is the starting image, and what that box retouches. Only for a model that
-        starts from an image ("start_image": true in « models »: Z-Image, Anima, Krea 2). Qwen-Image-2.1
-        edits by reference instead (--ref, help edit).
+        THE STARTING IMAGE (img2img) — an image of the Prompt Lab given the start's role (« Start From This
+        Image », or « lab role N start »), and its strength, a setting of the rack. Only for a model that
+        starts from an image ("start_image": true in « models »: Z-Image, Anima, Krea 2, MOSS-Image).
+        Qwen-Image-2.1 edits by reference instead (--ref, help edit).
 
           start-image                  what the rack holds
-          start-image IMAGE|i7         carries an image (a file, or an image of the history): the next
-                                       renders start from it. The size is set to the model's format
+          start-image IMAGE|i7         brings an image into the lab as the start (a file, or an image of the
+                                       history): the next renders start from it. The size is set to the model's format
                                        nearest its proportions, at the rack's scale — and stays free.
           … --strength S               with it, its strength; alone, retouches the one carried
           start-image --remove         takes it out: the next renders start from noise
@@ -888,8 +924,8 @@ package enum RemoteControlHelp {
         silicontrol reuse <i7|file.png>
 
         again is « Render Again (Same Seed) » (⌘R): the rack takes the image's settings (model, prompt, size, steps, LoRAs, edit
-        images, detail, solver, and its seed), then « Generate » renders it, at that seed. On a sheet (a grid's image) it explores
-        again at the sheet's seed. Same settings, same seed, same model: the same image, bit for bit.
+        images, detail, solver, and its seed), then « Generate » renders it, at that seed. On a sheet (a grid's image) the rack takes
+        its series and renders it again at the sheet's seed. Same settings, same seed, same model: the same image, bit for bit.
         With a PNG that Siliconed wrote — an image of another day, a file from out/ — it is a PNG dropped on the canvas, then
         « Generate »: the rack reads the file's recipe (model, prompt, size, steps, LoRAs found in this library, seed, variations),
         and what could not come back is in "notes" (a model not installed, a LoRA missing, a solver that needs More Solvers…).
@@ -898,7 +934,8 @@ package enum RemoteControlHelp {
 
         Answer (again): {"ok": true, "jobs": [{"job": "t6", "model": "z-image", "seeds": [42], …}]}
         Answer (reuse): {"ok": true, "rack": {"model": "z-image", "prompt": "…", "steps": 8, "width": 1024, "height": 1024,
-                                              "seed": 42, "loras": []}, "notes": "…" (only when something did not come back)}
+                                              "seed": 42, "loras": [], "series": {"x": null, "y": null, "excess": [], "renders": 1}},
+                         "notes": "…" (only when something did not come back). A sheet's series comes back with it (help grid).
         FAILURES: usage, unknown_image, ref (a file that is unreadable, or not a PNG Siliconed wrote), and for again the reasons « Generate » is
           greyed out: model (not installed), library_absent, busy (an installation is running), queue_full, link (the session with the
           other Mac is down), refused (anything else it says: "message" is the window's sentence — a memory refusal, a step count the
@@ -913,33 +950,26 @@ package enum RemoteControlHelp {
         the top left (x, y, width, height); --ratio is the largest frame of that proportion, centered (4:5, 16:9, 1:1…), which is where the
         editor's proportion menu starts. The frame's pixels become a NEW image at the head of the history; the original stays.
         « silicontrol undo » removes the crop, as ⌘Z does. The rules are the editor's: a side is never under 512 px, the whole image
-        is no crop, a grid's sheet and a sketch are not cropped. The new image keeps the original's metadata plus "cropped".
+        is no crop, a grid's sheet is not cropped. The new image keeps the original's metadata plus "cropped".
 
         Answer: {"ok": true, "image": {"image": "i8", "width": 1024, "height": 1024, …, "crop": {"x": 96, "y": 0, "width": 1024,
                  "height": 1024}}, "undo": {…}}
         FAILURES: usage, unknown_image, crop (the frame leaves the image, a side under 512 px, the whole image, a proportion the image
-          cannot hold, a sheet or a sketch), busy (the crop editor is open in the window).
+          cannot hold, a sheet), busy (the crop editor is open in the window).
         """,
 
-        "finish": """
-        silicontrol finish <g2c3|t5>
+        "sheet": """
         silicontrol sheet <g2>
 
-        The exploration's two gestures (silicontrol grid --sketch, the Exploration window).
-        A cell is named gNcM: the grid and the cell's rank in the sheet's reading order, from 0, row by row — rank = row × columns +
-        column; "cell" in each job of the grid's answer gives it ("column" and "row" too). Every cell is also an ordinary job: its tN
-        names it as well. Why that name: t3 is a job, i7 an image, g2 a grid, and a cell is a part of a grid — g2c3.
-        finish is « Finish This Image »: the rack takes the cell whole (model, prompt, size, steps, LoRAs, edit images, seed), then
-        renders it to its end, at the same seed and size: the image its sketch announced, in the history. Only a cell whose picture is
-        there. Answer: the new job, as « add » gives it.
-          {"ok": true, "jobs": [{"job": "t9", "seeds": [42], "width": 512, "height": 768, …}]}
-        sheet is « Add Sheet to History »: the sketches side by side, labelled, as an image of the history, in memory. Each call adds one.
-        Answered once the sheet is drawn.
+        « Add Sheet to History » on the series shown on the canvas — a « Generate » with something bracketed, or a « grid » —:
+        its images side by side, labelled, as one image of the history, in memory. Each call adds one. A « grid » draws its
+        own when its last cell ends; a series of the window only when asked. Answered once the sheet is drawn.
           {"ok": true, "image": {"image": "i12", "grid": "g2", "sheet": true, "columns": 2, "rows": 2, "empty_cells": 0, …}}
-        Only the exploration shown in the window — the last one: a new one replaces it, and its names with it.
-        FAILURES: usage, unknown_job (no exploration is shown, or this is not the one shown, or no such cell), cell (the cell has no picture
-          yet, or none has: wait for it), busy (sheet: cells are still on their way), and for finish the reasons « Generate » is greyed
-          out — model, library_absent, busy, queue_full, link, refused (see « help again »).
+        The series' images are in the history already, one by one, as any render's: the sheet only lays them out. A cell is
+        named gNcM (help grid), and its job tN.
+        Only the series shown — the newest: a new one takes the canvas.
+        FAILURES: usage, unknown_job (no series is shown, or this is not the one shown), cell (no cell has a picture yet: wait
+          for it), busy (cells are still on their way: « wait g2 »).
         """,
 
         "import": """
@@ -1162,13 +1192,13 @@ package enum RemoteControlHelp {
           remote               (install, import, rewrite, describe) the window computes on another Mac; these act on
                                this one; (uninstall, library move|home) a removal or a move there waits for a click on
                                the other Mac                               → Render › Compute On › This Mac
-          link                 the session with the other Mac is down (add, grid, vary, again, finish); (compute, macs)
+          link                 the session with the other Mac is down (add, grid, vary, again); (compute, macs)
                                that Mac refused the session                → macs
-          refused              (again, finish, vary, enlarge) the window would not do it, and says why in "message"
+          refused              (again, vary, enlarge) the window would not do it, and says why in "message"
           nothing_to_undo      (undo) nothing to undo, or to redo           → the window's own undo list
           crop                 (crop) a frame the image cannot give: it leaves the image, a side under 512 px, the whole
-                               image, a proportion it cannot hold, a sheet or a sketch → help crop
-          cell                 (finish, sheet) no picture in that cell yet, or in any of the exploration → wait for it
+                               image, a proportion it cannot hold, a sheet → help crop
+          cell                 (sheet) no cell of the series has a picture yet → wait for it
           import               (import) not a .safetensors or a .gguf, or the engine refused the file → "message"
           unknown_mac          (macs, compute) no paired Mac of that name, or two → macs; the "id"
           library              (library) the library is already where you ask, or the engine refused the destination
@@ -1292,11 +1322,12 @@ package enum RemoteControlHelp {
       rewrite "<texte>" [--for ID]             « Réécrire » de l'Atelier : un prompt réécrit pour un modèle → son texte
       describe <image|i7> [--for ID]           « Décrire » de l'Atelier : une image racontée en prompt → son texte
       start-image [<image|i7>] [--strength S] · start-image --remove
-                                               l'image de départ du rack (img2img), comme l'Atelier la porte
+                                               l'image de départ (img2img) : une image de l'Atelier, et sa force
+      lab [open|close] · lab add|role|remove … l'Atelier : ses images, un rôle chacune ; replié ou non
       remove i7 [i8 …]                         Retirer de l'historique · undo [--redo] : ⌘Z, ⇧⌘Z
       again <i7|fichier.png> · reuse <i7|fichier.png> Rendre à nouveau (même graine) · Reprendre ces réglages (une image, ou un PNG d'un autre jour)
       crop i7 --box X,Y,W,H | --ratio P:Q      Recadrer… → une nouvelle image (i8)
-      finish <g2c3|t5> · sheet g2              Finir cette image · Ajouter la planche à l'historique (la case g2c3 d'une exploration)
+      sheet g2                                 Ajouter la planche à l'historique (la série montrée, ses images côte à côte)
       import FICHIER.safetensors|FICHIER.gguf … Importer un modèle ou une LoRA… (⌘O) ; une famille non installée montre sa licence dans l'app
       install stop                             arrête l'installation ou l'import en cours
       uninstall ID|lora NOM|downloads [--yes]  Désinstaller / Retirer / Jeter : sans --yes, dit ce qui partirait et la place libérée
@@ -1642,7 +1673,7 @@ package enum RemoteControlHelp {
         """,
 
         "grid": """
-        silicontrol grid --x AXE [--y AXE] [options] "<prompt>" [512|1024|WxH|P:Q@1K|2K] [seed]
+        silicontrol grid --x AXE [--y AXE] [--no-sheet] [options] "<prompt>" [512|1024|WxH|P:Q@1K|2K] [seed]
 
         Une grille XY : un ou deux réglages balayés, UN TRAVAIL PAR CASE dans la file — chacun un
         travail ordinaire, son image dans l'historique comme les autres —, puis, quand la dernière
@@ -1650,12 +1681,12 @@ package enum RemoteControlHelp {
         en étiquettes et le prompt en titre, ajoutée à l'historique (i…). Rien n'est écrit sur
         disque sans --out ou save.
         Options et arguments sont ceux de « add » (help add), sauf --batch : une case est une image.
-        --sketch : une EXPLORATION — chaque case s'arrête dès que son image se lit (σ ≤ 0,5 : 6
-          évaluations sur 8 pour z-image, environ les trois quarts du temps) et montre l'estimation par le
-          modèle de l'image finale (qwen-image-2.1 n'esquisse pas : ses cases sont des images finies) ; les cases vont dans la fenêtre
-          Exploration de l'app et dans leurs lignes "type": "image" (avec "sketch": n), pas dans
-          l'historique, et aucune planche n'est dessinée. Une nouvelle exploration remplace les cases
-          encore en attente de la précédente. Garder 512 sur le petit côté.
+        Les séries de la fenêtre (« Bracketer… » sur une molette, un groupe {…} dans le prompt, le lot) sont aussi des grilles,
+        dessinées sur son canevas : les mêmes cases, les mêmes images, la planche seulement sur « Ajouter la planche à
+        l'historique » (« sheet g2 ») : --no-sheet rend ainsi une grille, son verdict avec "sheet": null. La fenêtre prend les
+        axes de la grille pour sa série ; un axe de modèles, de pas, de graines listées ou d'images reste à silicontrol.
+        « reuse » répond la série du rack ("series" : son x et son y comme --x et --y les lisent, "excess" au-delà de deux,
+        "renders" les travaux que « Générer » mettrait en file).
 
         AXES — sorte[:lequel][=valeurs] ; valeurs séparées par des virgules, décimales avec un point
           prompt              le groupe {…} du prompt     prompt:2      son deuxième groupe
@@ -1668,6 +1699,10 @@ package enum RemoteControlHelp {
           image               chaque image --ref seule, avec la même instruction (une édition)
           loras=none,flat,ink une LoRA ajoutée à la pile par case (none : la case sans), à la
           loras:0.6=…         force 1 — ou celle donnée ; noms comme --lora les prend
+          solver=euler,dpmpp-2m   ces solveurs (euler, euler-ancestral, dpmpp-2m, unipc), même graine
+                              et mêmes pas ; Plus de solveurs, comme --solver
+          start=0.45,0.6,0.75 forces de l'image de départ (--image), de 0 (gardée) à 1 (ignorée)
+          detail=normal,more,most   ces niveaux de Détail, là où le modèle l'offre
           --x donne les colonnes, --y les rangées (sans --y : une rangée). X et Y font varier deux
           réglages différents. TOUT GROUPE {…} DU PROMPT DOIT ÊTRE UN AXE : un groupe oublié
           empilerait plusieurs images dans une case (erreur "grid") ; écrire \\{ \\} pour des
@@ -1695,8 +1730,8 @@ package enum RemoteControlHelp {
           Une case pas "done" : "ok": false, "error": "render" — la planche est faite quand même,
           cette case vide ("sheet": null si aucune case n'a été rendue).
           « wait g2 [--out D] » suit une grille plus tard : tout de suite si elle est finie.
-          Une case a son propre nom, g2c3 (son rang dans l'ordre de lecture de la planche, depuis 0 — ligne × colonnes + colonne) :
-          « finish g2c3 » est « Finir cette image » sur une case d'exploration, « sheet g2 » est « Ajouter la planche à l'historique » (help finish).
+          Une case a son propre nom, g2c3 (son rang dans l'ordre de lecture de la planche, depuis 0 — ligne × colonnes + colonne), et
+          celui de son job, t5. « sheet g2 » est « Ajouter la planche à l'historique » sur la série montrée (help sheet).
 
         ÉCHECS : usage (pas de --x, --batch, --x donné à « add »), grid (un axe illisible ou qui ne
         fait pas une grille, plus de 64 cases), prompt, model, solver, detail, accelerators, lora,
@@ -1723,10 +1758,9 @@ package enum RemoteControlHelp {
           Sans --out, l'image n'est QUE dans la mémoire de l'app (historique, perdu quand elle
           quitte) : « save i7 DEST » l'écrit plus tard.
 
-        NOMS DES FICHIERS : <model>[-lora-<nom>[@<force>]…][-p<pas>][-edit][-sketch<n>]-<W>x<H>-<seed>[-v<graine>x<force>…].png
-          (la force si elle n'est pas 1, les pas s'ils ne sont pas ceux du modèle ; une esquisse,
-          les évaluations après lesquelles elle s'est arrêtée ; une variation, chaque graine de
-          variation et sa force en centièmes). Un fichier présent n'est jamais écrasé : -2, -3…
+        NOMS DES FICHIERS : <model>[-lora-<nom>[@<force>]…][-p<pas>][-edit]-<W>x<H>-<seed>[-v<graine>x<force>…].png
+          (la force si elle n'est pas 1, les pas s'ils ne sont pas ceux du modèle ; une variation,
+          chaque graine de variation et sa force en centièmes). Un fichier présent n'est jamais écrasé : -2, -3…
           sont ajoutés.
 
         VERDICT :
@@ -1774,7 +1808,7 @@ package enum RemoteControlHelp {
                              pas été prise (celle d'un autre Mac ou d'un autre build). Une mesure s'applique telle quelle, quoi qu'elle ait trouvé (voir
                              help diagnose). Deux séries de deux lancements comparent aussi leurs mesures.
         stage              : text, image (encodage d'une référence), denoising, decoding.
-        steps_total        : les évaluations du modèle, pas les pas demandés (une esquisse : celles après lesquelles elle s'arrête).
+        steps_total        : les évaluations du modèle, pas les pas demandés.
         remaining_s        : null tant que l'app n'a pas de mesure pour ce rendu.
         remaining_complete : false si un travail en attente n'a pas d'estimation (queue_remaining_s est un minimum).
         installing         : une installation ou un import en cours, et la dernière ligne de son
@@ -1866,7 +1900,7 @@ package enum RemoteControlHelp {
 
         SAVE-IMAGES, c'est « Enregistrer chaque image dans… » de Réglages ▸ Général, éteint par défaut : avec un dossier
         (relatif au répertoire courant ; un dossier nommé « off » s'écrit ./off), chaque image nouvelle de l'historique — un
-        rendu, un recadrage, un agrandissement, la planche d'une grille ; pas les esquisses d'une exploration — s'y écrit
+        rendu, un recadrage, un agrandissement, la planche d'une grille — s'y écrit
         aussi en PNG avec son prompt, sa graine et son modèle, sous son nom de « save », jamais sur un autre fichier. « off »
         l'éteint ; seul, il est lu. Le dossier doit exister (sinon « write ») : il n'est jamais créé. Préférence de ce Mac,
         quel que soit le Mac qui calcule.
@@ -1981,18 +2015,53 @@ package enum RemoteControlHelp {
         n'est pas dans l'historique).
         """,
 
+        "lab": """
+        silicontrol lab [open|close]
+        silicontrol lab add <image|i7> …
+        silicontrol lab role <n> edited|reference|start|none
+        silicontrol lab remove <n>
+
+        L'ATELIER — la barre sous l'image, où se préparent le texte et les images du prochain rendu : ce que
+        font un dépôt sur le canevas, ⌘V, « Envoyer à l'atelier » et les menus de rôle de ses images. Son
+        texte est le prompt du rack (add et reuse l'écrivent) ; ses images sont numérotées comme la
+        barre les montre, à partir de 1.
+
+          lab                          ce qu'il tient : replié ou non, le texte, les images et leurs rôles
+          lab open · lab close         déplie ou replie la barre (⌥⌘L) ; replier arrête un Réécrire ou un
+                                       Décrire en cours et rend la mémoire du rédacteur
+          lab add IMAGE|i7 …           des fichiers, ou des images de l'historique : chacune prend le rôle
+                                       d'une arrivante — la place suivante sous Qwen-Image-2.1 (éditée, puis
+                                       références, trois au plus avec les sujets que cite le texte), aucun
+                                       ailleurs
+          lab role N RÔLE              edited (à éditer) · reference (Qwen-Image-2.1) · start (Z-Image,
+                                       Anima, Krea 2, MOSS-Image : le rendu part d'elle, la taille prend le
+                                       format du modèle le plus proche de ses proportions) · none (aucun).
+                                       Une image à éditer et un départ : en choisir une autre envoie la
+                                       précédente image à éditer aux références, le départ précédent à aucun.
+          lab remove N                 retire l'image N
+
+        UN CHANGEMENT DE MODÈLE ne donne jamais de rôle et n'en change aucun en un autre : une référence
+        garde son rôle sous Z-Image, sans effet ("used": false), et resert de retour sous Qwen-Image-2.1.
+        "unused" compte ce que le prochain rendu ne lira pas, comme la ligne à côté de Générer.
+
+        RÉPONSE
+          {"ok": true, "lab": {"unfolded": false, "model": "qwen-image-2.1", "text": "@alice on the quay",
+            "images": [{"n": 1, "name": "quai.jpg", "width": 1536, "height": 1024, "role": "edited",
+                        "used": true}], "unused": 0}}
+        """,
+
         "start-image": """
         silicontrol start-image [<image|i7>] [--strength S]
         silicontrol start-image --remove
 
-        L'IMAGE DE DÉPART DU RACK (img2img) — ce que « Porter dans le rack » de l'Atelier met dans la boîte
-        Images du rack quand une image a le rôle de départ, et ce que cette boîte retouche. Seulement pour
-        un modèle qui part d'une image ("start_image": true dans « models » : Z-Image, Anima, Krea 2).
+        L'IMAGE DE DÉPART (img2img) — une image de l'Atelier à qui on donne le rôle de départ (« Partir de
+        cette image », ou « lab role N start »), et sa force, un réglage du rack. Seulement pour un modèle
+        qui part d'une image ("start_image": true dans « models » : Z-Image, Anima, Krea 2, MOSS-Image).
         Qwen-Image-2.1 édite par référence à la place (--ref, help edit).
 
           start-image                  ce que le rack tient
-          start-image IMAGE|i7         porte une image (un fichier, ou une image de l'historique) : les
-                                       rendus suivants partent d'elle. La taille prend le format du
+          start-image IMAGE|i7         met une image dans l'Atelier comme départ (un fichier, ou une image de
+                                       l'historique) : les rendus suivants partent d'elle. La taille prend le format du
                                        modèle le plus proche de ses proportions, à l'échelle du rack —
                                        et reste libre.
           … --strength S               avec elle, sa force ; seul, retouche celle de l'image portée
@@ -2021,7 +2090,7 @@ package enum RemoteControlHelp {
         "subjects": """
         SUJETS NOMMÉS — silicontrol subjects [add … | remove NOM]
 
-        La même bibliothèque que celle du Labo (Fenêtre → Atelier de prompts). Un sujet est une image (ou deux du même sujet) avec un nom, un genre et
+        La même bibliothèque que celle de l'atelier (Fenêtre → Atelier de prompts). Un sujet est une image (ou deux du même sujet) avec un nom, un genre et
         un cadre ; le prompt le cite par @nom, et ses images vont au modèle comme références, après
         celles des --ref. Un modèle qui lit les images seulement (Qwen-Image-2.1) ; 3 images au plus
         par rendu. En mémoire dans l'app, comme l'historique : les sujets partent quand l'app quitte
@@ -2071,8 +2140,8 @@ package enum RemoteControlHelp {
         silicontrol reuse <i7|fichier.png>
 
         again est « Rendre à nouveau (même graine) » (⌘R) : le rack prend les réglages de l'image (modèle, prompt, taille, pas, LoRA, images à
-        éditer, détail, solveur, et sa graine), puis « Générer » la rend, à cette graine. Sur une planche (l'image d'une grille), il refait
-        l'exploration à la graine de la planche. Mêmes réglages, même graine, même modèle : la même image, bit pour bit.
+        éditer, détail, solveur, et sa graine), puis « Générer » la rend, à cette graine. Sur une planche (l'image d'une grille), le rack
+        prend sa série et la rend à nouveau à la graine de la planche. Mêmes réglages, même graine, même modèle : la même image, bit pour bit.
         Avec un PNG que Siliconed a écrit — une image d'un autre jour, un fichier de out/ — c'est un PNG déposé sur le canevas, puis
         « Générer » : le rack lit la recette du fichier (modèle, prompt, taille, pas, LoRA retrouvées dans cette bibliothèque, graine,
         variations), et ce qui n'a pas pu revenir est dans "notes" (un modèle non installé, une LoRA absente, un solveur qui demande
@@ -2082,7 +2151,8 @@ package enum RemoteControlHelp {
 
         Réponse (again) : {"ok": true, "jobs": [{"job": "t6", "model": "z-image", "seeds": [42], …}]}
         Réponse (reuse) : {"ok": true, "rack": {"model": "z-image", "prompt": "…", "steps": 8, "width": 1024, "height": 1024,
-                                                "seed": 42, "loras": []}, "notes": "…" (seulement si quelque chose n'est pas revenu)}
+                                                "seed": 42, "loras": [], "series": {"x": null, "y": null, "excess": [], "renders": 1}},
+                          "notes": "…" (seulement si quelque chose n'est pas revenu). La série d'une planche revient avec elle (help grid).
         ÉCHECS : usage, unknown_image, ref (un fichier illisible, ou qui n'est pas un PNG écrit par Siliconed), et pour again les raisons pour
           lesquelles « Générer » est grisé : model (non installé), library_absent, busy (une installation tourne), queue_full, link (la
           session avec l'autre Mac est coupée), refused (tout le reste : "message" est la phrase de la fenêtre — un refus mémoire, un
@@ -2097,35 +2167,28 @@ package enum RemoteControlHelp {
         haut à gauche (x, y, largeur, hauteur) ; --ratio est le plus grand cadre de cette proportion, centré (4:5, 16:9, 1:1…), d'où part le
         menu des proportions de l'éditeur. Les pixels du cadre deviennent une NOUVELLE image en tête de l'historique ; l'originale reste.
         « silicontrol undo » retire le recadrage, comme ⌘Z. Les règles sont celles de l'éditeur : un côté n'est jamais sous 512 px, l'image
-        entière n'est pas un recadrage, la planche d'une grille et une esquisse ne se recadrent pas. La nouvelle image garde les
+        entière n'est pas un recadrage, la planche d'une grille ne se recadre pas. La nouvelle image garde les
         métadonnées de l'originale, plus "cropped".
 
         Réponse : {"ok": true, "image": {"image": "i8", "width": 1024, "height": 1024, …, "crop": {"x": 96, "y": 0, "width": 1024,
                    "height": 1024}}, "undo": {…}}
         ÉCHECS : usage, unknown_image, crop (le cadre sort de l'image, un côté sous 512 px, l'image entière, une proportion que l'image ne
-          peut pas tenir, une planche ou une esquisse), busy (l'éditeur de recadrage est ouvert dans la fenêtre).
+          peut pas tenir, une planche), busy (l'éditeur de recadrage est ouvert dans la fenêtre).
         """,
 
-        "finish": """
-        silicontrol finish <g2c3|t5>
+        "sheet": """
         silicontrol sheet <g2>
 
-        Les deux gestes de l'exploration (silicontrol grid --sketch, la fenêtre Exploration).
-        Une case se nomme gNcM : la grille et le rang de la case dans l'ordre de lecture de la planche, depuis 0, ligne par ligne — rang =
-        ligne × colonnes + colonne ; "cell" dans chaque job de la réponse de la grille le donne ("column" et "row" aussi). Chaque case est
-        aussi un job ordinaire : son tN la nomme tout autant. Pourquoi ce nom : t3 est un job, i7 une image, g2 une grille, et une case est
-        une part de grille — g2c3.
-        finish est « Finir cette image » : le rack prend la case en entier (modèle, prompt, taille, pas, LoRA, images à éditer, graine),
-        puis la rend jusqu'au bout, à la même graine et à la même taille : l'image que son esquisse annonçait, dans l'historique. Seulement
-        une case dont l'image est là. Réponse : le nouveau job, comme « add » le donne.
-          {"ok": true, "jobs": [{"job": "t9", "seeds": [42], "width": 512, "height": 768, …}]}
-        sheet est « Ajouter la planche à l'historique » : les esquisses côte à côte, étiquetées, en image de l'historique, en mémoire. Chaque
-        appel en ajoute une. Réponse quand la planche est dessinée.
+        « Ajouter la planche à l'historique » sur la série montrée sur le canevas — un « Générer » avec quelque chose de bracketé,
+        ou une « grid » — : ses images côte à côte, étiquetées, en une image de l'historique, en mémoire. Chaque appel en ajoute
+        une. Une « grid » dessine la sienne quand sa dernière case finit ; une série de la fenêtre seulement sur demande. Réponse
+        quand la planche est dessinée.
           {"ok": true, "image": {"image": "i12", "grid": "g2", "sheet": true, "columns": 2, "rows": 2, "empty_cells": 0, …}}
-        Seulement l'exploration montrée dans la fenêtre — la dernière : une nouvelle la remplace, et ses noms avec elle.
-        ÉCHECS : usage, unknown_job (aucune exploration montrée, ou ce n'est pas celle-là, ou pas de telle case), cell (la case n'a pas encore
-          d'image, ou aucune : l'attendre), busy (sheet : des cases sont encore en route), et pour finish les raisons pour lesquelles
-          « Générer » est grisé — model, library_absent, busy, queue_full, link, refused (voir « help again »).
+        Les images de la série sont déjà dans l'historique, une à une, comme celles de tout rendu : la planche ne fait que les
+        disposer. Une case se nomme gNcM (help grid), et son job tN.
+        Seulement la série montrée — la plus récente : une nouvelle prend le canevas.
+        ÉCHECS : usage, unknown_job (aucune série montrée, ou ce n'est pas celle-là), cell (aucune case n'a encore d'image :
+          l'attendre), busy (des cases sont encore en route : « wait g2 »).
         """,
 
         "import": """
@@ -2351,13 +2414,13 @@ package enum RemoteControlHelp {
           remote               (install, import, rewrite, describe) la fenêtre calcule sur un autre Mac ; ces commandes
                                agissent sur celui-ci ; (uninstall, library move|home) un retrait ou un déplacement
                                attend là un clic sur l'autre Mac           → Rendu › Calculer sur › Ce Mac
-          link                 la session avec l'autre Mac est coupée (add, grid, vary, again, finish) ; (compute, macs)
+          link                 la session avec l'autre Mac est coupée (add, grid, vary, again) ; (compute, macs)
                                ce Mac a refusé la session                  → macs
-          refused              (again, finish, vary, enlarge) la fenêtre ne le ferait pas, et dit pourquoi dans "message"
+          refused              (again, vary, enlarge) la fenêtre ne le ferait pas, et dit pourquoi dans "message"
           nothing_to_undo      (undo) rien à annuler, ni à rétablir         → la liste d'annulation de la fenêtre
           crop                 (crop) un cadre que l'image ne peut pas donner : il sort de l'image, un côté sous 512 px, l'image
-                               entière, une proportion qu'elle ne tient pas, une planche ou une esquisse → help crop
-          cell                 (finish, sheet) pas encore d'image dans cette case, ou dans aucune de l'exploration → l'attendre
+                               entière, une proportion qu'elle ne tient pas, une planche → help crop
+          cell                 (sheet) aucune case de la série n'a encore d'image → l'attendre
           import               (import) ni .safetensors ni .gguf, ou le moteur a refusé le fichier → "message"
           unknown_mac          (macs, compute) aucun Mac appairé de ce nom, ou deux → macs ; l'"id"
           library              (library) la bibliothèque est déjà où on la demande, ou le moteur a refusé la destination

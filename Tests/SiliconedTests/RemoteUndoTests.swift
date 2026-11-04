@@ -45,7 +45,7 @@ final class RemoteUndoTests: XCTestCase {
         let sentences: [AppRefusal] = [
             .imageGone(7), .tooManyReferences(count: 4, model: "qwen-image-2.1", max: 3), .editSurface(width: 1536, height: 1024),
             .loraNotInstalled(name: "Gwenn"), .seedCount, .enlargeModelDownload, .enlargeFailed, .gridNotCropped,
-            .sketchNotCropped, .cropNeeds(side: 512), .cropSmallest(side: 512), .imagesNotRestorable,
+            .cropNeeds(side: 512), .cropSmallest(side: 512), .imagesNotRestorable,
         ]
         for s in sentences {
             let r = RemoteRefusal.app(s)

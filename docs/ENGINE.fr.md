@@ -61,16 +61,9 @@ Chaque ligne est une série `silicontrol measure` dans une app tout juste ouvert
 
 ### Sur un MacBook Neo
 
-Un Mac de 8 Go : un MacBook Neo (A18 Pro), sur secteur. App 0.18 telle que publiée, le 1/11/2026, les séries ci-dessus lancées sur le Neo lui-même, sur la carte des capacités que l'app venait de mesurer (45,2 s), dans la version qui y est installée, la Compact, Neural Engine allumé.
+Un Mac de 8 Go : un MacBook Neo (A18 Pro). Avec la 0.19, Anima Turbo y fait un carré de 1024² en moins d'une minute, en Compact. C'est un rendu vu dans l'app, pas une série `silicontrol measure` : nous n'avons plus de Neo pour en lancer une. Le budget d'un Mac de 8 Go est de 4 Go (les ¾ de 8 Go moins 2 Go, [La mémoire et le budget](#la-mémoire-et-le-budget)).
 
-| 1024², Compact | Z-Image Turbo | Anima Turbo |
-|---|---|---|
-| toutes les évaluations en pleine taille | **246,5 s** | **91,5 s** |
-| avec le rendu plus rapide | 188,7 s | 67,7 s |
-| pic mémoire de l'app | 2,0 Gio | 1,4 Gio |
-| lu sur le disque par image | 44 Go | 0 Go |
-
-Le budget d'un Mac de 8 Go est de 4 Go (les ¾ de 8 Go moins 2 Go, [La mémoire et le budget](#la-mémoire-et-le-budget)) : chaque pic en reste à la moitié au plus, et aucune série n'a swappé une page. Les poids de la Compact de Z-Image ne restent pas dans la mémoire du Neo et sont relus sur le disque à chaque pas, 44 Go par image. C'est 2,1 à 2,4 fois le temps de la machine de référence sur les mêmes lignes. Chaque série a donné une seule image, identique au bit près d'un rendu à l'autre. Z-Image en pleine taille est la moyenne des deux premiers rendus de sa série, 247,0 et 246,1 s : le troisième, le témoin de clôture, a pris 312,2 s, 26 % de plus que le premier, au-delà des 13 % dans lesquels `silicontrol measure` tient une série pour comparable ; les trois autres séries ont gardé leurs rendus à 7 % les uns des autres.
+Si vous avez un Neo, ou un Mac que nous n'avons jamais tenu, vos chiffres sont les bienvenus. Faites un rendu, puis ouvrez **Mesurer ce Mac…** (menu Aide) : **Partager… ▸ Ouvrir un signalement GitHub** prépare le rapport, la carte et les temps prévus et mesurés de votre dernier rendu, et rien ne part tant que vous ne le soumettez pas ([Le diagnostic communautaire](#le-diagnostic-communautaire)). Une série `silicontrol measure` ([REMOTE-CONTROL.fr.md](REMOTE-CONTROL.fr.md)) vaut mieux encore.
 
 ### Rendu plus rapide
 

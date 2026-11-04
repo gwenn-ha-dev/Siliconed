@@ -10,7 +10,7 @@
 //   says) — refuses; `diagnose` and `set faster-rendering|accelerators` act on the other Mac's
 //   (`MirrorMachine.swift`, `diagnose` in `RemoteControl+Commands.swift`); `set beta` writes this Mac's preferences and the
 //   mirror's copy of them; the window says where it computes.
-// - `grid` (and `add` of a series with `--sketch`, `--x`, `--y`) is asked whole of the other Mac, which
+// - `grid` is asked whole of the other Mac, which
 //   makes the cells (`MirrorLink.explore`) and answers with them (`gridQueued`); `wait g2` follows it
 //   from what it publishes. `vary` is the window's « Variations » (the same jobs, each answered by the
 //   other Mac); `enlarge` asks the other Mac, which enlarges its own pixels and says if it needs Apple's
@@ -82,11 +82,8 @@ extension RemoteControl {
                           help: String(localized: "Render › Compute On › This Mac, then retry"))
         }
         // The same usage rules as here (`add`).
-        if !grid, d.sketch {
-            throw Refusal("usage", String(localized: "--sketch belongs to “silicontrol grid”"), help: "silicontrol help grid")
-        }
-        if !grid, d.x != nil || d.y != nil {
-            throw Refusal("usage", String(localized: "--x and --y belong to “silicontrol grid”"), help: "silicontrol help grid")
+        if !grid, d.x != nil || d.y != nil || !d.sheet {
+            throw Refusal("usage", String(localized: "--x, --y and --no-sheet belong to “silicontrol grid”"), help: "silicontrol help grid")
         }
         if grid, d.x == nil {
             throw Refusal("usage", String(localized: "a grid needs --x (and optionally --y)"), help: "silicontrol help grid")
@@ -307,8 +304,8 @@ extension RemoteControl {
                                       loras: stack, references: references.count, detail: d.detail, solver: d.solver)
         let on = mirror.macName
         do {
-            try mirror.explore(g, settings: app.resolvingFaster(settings), references: references, stopAfter: 0, accelerators: d.accelerators,
-                               sketch: d.sketch, previews: d.previews ?? app.previews) { [self] answer in
+            try mirror.explore(g, settings: app.resolvingFaster(settings), references: references, accelerators: d.accelerators,
+                               sheet: d.sheet, previews: d.previews ?? app.previews) { [self] answer in
                 switch answer {
                 case .refused(let text):
                     finish(c, Response.failure("refused", Problem(text).text))
@@ -336,10 +333,9 @@ extension RemoteControl {
     }
 
     /// **`wait g2` and `grid --wait` on a mirror**: each cell's image as it comes (written into `folder`
-    /// if given), the sheet of a grid that has one, then the verdict. A sketch's cells come with their
-    /// exploration, one image each; a grid's sheet is the image of the history that cites it.
+    /// if given), the sheet, then the verdict. The sheet is the image of the history that cites the grid.
     func followMirroredGrid(_ mirror: MirrorLink, _ g: Int, folder: String?, _ c: Connection) {
-        guard let (jobs, sketch) = mirror.grids[g] else {
+        guard let (jobs, drawn) = mirror.grids[g] else {
             finish(c, Response.failure("unknown_job", String(localized: "no grid \("g\(g)") in this session"), help: "silicontrol status"))
             return
         }
@@ -351,8 +347,8 @@ extension RemoteControl {
         func conclude() {
             guard !concluded, tallies.count == jobs.count else { return }
             let done = jobs.filter { tallies[$0]?["outcome"] as? String == "done" }
-            // The verdict comes after the images: a sketch's cells arrive after their end, a sheet after the last cell.
-            if sketch { guard done.allSatisfy(told.contains) else { return } } else if !done.isEmpty, sheet == nil { return }
+            // The verdict comes after the images: the sheet, if the grid draws one, after the last cell.
+            if drawn, !done.isEmpty, sheet == nil { return }
             concluded = true
             if let token { app.unsubscribe(token) }
             let allFinished = done.count == jobs.count
@@ -369,10 +365,10 @@ extension RemoteControl {
             else if jobs.contains(job), told.insert(job).inserted { emitImage(e, folder: folder, c) }
         }
         // What already came (a grid waited for later).
-        for (i, n) in jobs.enumerated() {
+        for n in jobs {
             guard let t = app.completed[n] else { continue }
             tallies[n] = Self.json(t.issue, job: n, images: t.images, warnings: t.warnings)
-            if let e = t.images.compactMap({ k in app.history.first { $0.ordinal == k } }).first ?? mirror.cells[g]?[i] { image(n, e) }
+            if let e = t.images.compactMap({ k in app.history.first { $0.ordinal == k } }).first { image(n, e) }
         }
         if let e = app.history.first(where: { $0.grid?.ordinal == g }) { image(e.job, e) }
         conclude()

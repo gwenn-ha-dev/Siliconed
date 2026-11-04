@@ -6,8 +6,7 @@
 //     a grid's sheet, its finished cells ├─▶ <folder>/<exportName>.png   (-2, -3… beside a different file of that name)
 //     a crop, an enlargement             ┘
 //
-// - **What is saved is what enters the history new**: an exploration's sketches stay in their panel, as they stay
-//   out of the history; an image ⌘Z brings back is not new, nor one another Mac's user rendered here (`owner`): their
+// - **What is saved is what enters the history new**: an image ⌘Z brings back is not new, nor one another Mac's user rendered here (`owner`): their
 //   images are theirs. Computing on another Mac, the images that come back are this Mac's, and are saved here.
 // - **The same file is never written twice**: a file of that name holding the same bytes is the image already
 //   saved — what happens when the other Mac sends its images again after a cut, or a redo gives the same bits.

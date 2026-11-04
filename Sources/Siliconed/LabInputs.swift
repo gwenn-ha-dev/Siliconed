@@ -1,107 +1,138 @@
 import Foundation
 
-// **The Prompt Lab's inputs, and what it carries to the rack** — the rules, without a window.
+// **The render's inputs: one text, one set of images with their roles, and what the model receives** — the rules,
+// without a window.
 //
-//     Images zone                        Text                          the model aimed at
-//     ┌ 1 start ┐ ┌ 2 reference ┐ ┌ @alice ┐ ┌ describe only ┐    "@alice on a quay, at night"     capacity 3 (Qwen-Image-2.1)
-//     └─────────┘ └─────────────┘ └────────┘ └───────────────┘           │                           capacity 0 (the others)
-//          │ the gesture decides, never the words      │ cited, in the order of the text
-//          ▼                                           ▼
+//     the images (AppState.inputs)        the text (AppState.prompt)        the model chosen
+//     ┌ 1 edited ┐ ┌ 2 reference ┐ ┌ neutral ┐   "@alice on a quay, at night"     capacity 3 (Qwen-Image-2.1)
+//     └──────────┘ └─────────────┘ └─────────┘          │                         capacity 0 (the others)
+//          │ the gesture decides, never the words        │ cited, in the order of the text
+//          ▼                                             ▼
 //     LabInputs.carry ─▶ prompt  "the person in <image3> on a quay, at night\n\nTake only their identity from <image3>: …"
-//                        images  1 start · 2 reference · 3 @alice          ◀ what the rack's Prompt and Images boxes receive
+//                        images  1 edited · 2 reference · 3 @alice        ◀ what the render reads, made when it is queued
 //
-// What the lab carries is **exactly what the rack's former Subjects mode made at the click**
-// (`NamedSubjects.rewrite`, then the subjects' pictures after the edit's own): the rack no longer knows the
-// subjects, it receives their translation. Only the rules are here — the window (`Lab.swift`) holds the pictures.
+// What the render receives is **exactly what the rack's former Subjects mode made at the click**
+// (`NamedSubjects.rewrite`, then the subjects' pictures after the edit's own). The translation is made when the render is
+// queued (`AppState.namedJob`), never written back into the text: the text keeps its `@names`. Only the rules are here —
+// the rack (`AppState+Inputs.swift`) holds the images.
 //
-// - **The starting image is chosen by a gesture, never by the order of the words.** It is image 1 — the one the
+// - **A role is chosen by a gesture, never by the order of the words.** The edited image is image 1 — the one the
 //   model edits, whose proportions give the format —, the references come next, and the subjects the text cites
 //   take the following places in the order they are first named (`first:` of `NamedSubjects.rewrite`).
-// - **Three images at most** (`NamedSubjects.maxImages`), the starting image and the references counted with the
+// - **Two roles that look alike and are not** (4/11): the image Qwen-Image-2.1 *edits* and the image an img2img
+//   (Z-Image, Anima, Krea 2, MOSS) *starts from* are two intentions. A change of model never turns one into the other:
+//   it would start an img2img nobody asked for. **A change of model never gives a role either**: an image keeps its
+//   role, which has no effect where the new model lacks it (`isEffective`) — the window says so, and counts it with the
+//   images that do not go (`unused`); back on a model that has it, it works again (`conforming`).
+// - **Where an image lands**: under a model that reads images, a newcomer takes the next place (edited, then references)
+//   while there is room; elsewhere it is neutral — dropping a picture to describe it must not turn the next render into
+//   an img2img (`defaultRole`).
+// - **Three images at most** (`NamedSubjects.maxImages`), the edited image and the references counted with the
 //   subjects: the worst case measured is 1024×1536 with three references.
 // - **A model that reads no images** (capacity 0) keeps the text as typed — `@` is then its own character (Anima's
-//   artists) — and every image is « describe only »: it stays in the lab and goes nowhere — **unless the model starts from
-//   an image** (img2img: Z-Image, Anima, Krea 2; `startsFromImage`): then one image may be the start, the image the render
-//   re-noises and denoises, chosen by a gesture as for Qwen-Image-2.1. A newcomer is never a start there: dropping a picture
-//   to describe it must not turn the next render into an img2img nobody asked for.
+//   artists) — and receives, at most, its starting image; only the `@names` of the library's subjects are left out.
+// - **What is greyed does not go** (`inert`, `sent`): a subject's `@name` under a model that reads no image, a reference to
+//   an image the render does not carry (`<image3>`, `image 3`, `Picture 3` with two images). The field greys them, the
+//   model's prompt leaves them out with the space before them; the typed text keeps them, for when they are read again.
 // - **A `@` inside a `{a|b}` group is refused**: the rack expands the group, and each expansion would need its own
 //   translation. A group without `@` goes through as it is.
 package enum LabInputs {
     // MARK: Roles
 
-    /// What the render makes of an image of the lab.
+    /// What the render makes of an image.
     package enum Role: String, CaseIterable, Sendable {
-        /// The image the model edits (Qwen-Image-2.1), or the one it starts from (img2img): image 1, one only, and it gives
-        /// the format.
-        case start
-        /// Context the model sees: images 2 and 3.
+        /// The image the model edits (Qwen-Image-2.1): image 1, one only, and it gives the format.
+        case edited
+        /// Context the model sees: the images after the edited one.
         case reference
-        /// Nothing: the image stays in the lab, to be described.
-        case describeOnly
+        /// The image an img2img re-noises and denoises (Z-Image, Anima, Krea 2, MOSS): one only, its proportions choose the
+        /// format among the model's.
+        case start
+        /// Nothing: the image waits — to be described, or given a role.
+        case neutral
 
         /// Whether the render receives it.
-        package var isSent: Bool { self != .describeOnly }
+        package var isSent: Bool { self != .neutral }
     }
 
-    /// An image of the zone, by whatever names it in the window.
+    /// **Whether a role does something under a model**: offered by it, and not neutral.
+    package static func isEffective(_ role: Role, capacity: Int, startsFromImage: Bool = false) -> Bool {
+        role.isSent && roles(capacity: capacity, startsFromImage: startsFromImage).contains(role)
+    }
+
+    /// **The images that do not go to the render**: neutral, or with a role the model lacks.
+    package static func unused<ID>(_ slots: [Slot<ID>], capacity: Int, startsFromImage: Bool = false) -> Int {
+        slots.filter { !isEffective($0.role, capacity: capacity, startsFromImage: startsFromImage) }.count
+    }
+
+    /// An image, by whatever names it in the window.
     package struct Slot<ID: Hashable & Sendable>: Sendable {
         package var id: ID
         package var role: Role
         package init(id: ID, role: Role) { self.id = id; self.role = role }
     }
 
-    /// **The roles a model offers**: all three when it reads images (`capacity` > 0); the start and « describe only » when it
-    /// reads none but starts from an image (`startsFromImage`, img2img); « describe only » otherwise.
+    /// **The roles a model offers**: edited, reference, neutral when it reads images (`capacity` > 0); the start and
+    /// neutral when it reads none but starts from an image (`startsFromImage`, img2img); neutral otherwise.
     package static func roles(capacity: Int, startsFromImage: Bool = false) -> [Role] {
-        if capacity > 0 { return [.start, .reference, .describeOnly] }
-        return startsFromImage ? [.start, .describeOnly] : [.describeOnly]
+        if capacity > 0 { return [.edited, .reference, .neutral] }
+        return startsFromImage ? [.start, .neutral] : [.neutral]
     }
 
-    /// **The role of an image just dropped**: the first one sent is the start, the next ones references — as long as
-    /// the render has room (`capacity`, three at most); beyond, or with a model that reads no image, « describe only » —
-    /// an img2img model's included: its start is a gesture, never a default.
+    /// **The role of an image just dropped**: under a model that reads images, the edited place if it is free, a
+    /// reference otherwise — as long as the render has room (`capacity`, three at most); beyond, or with a model that
+    /// reads no image, neutral — an img2img model's included: its start is a gesture, never a default.
     package static func defaultRole<ID>(adding slots: [Slot<ID>], capacity: Int) -> Role {
         let limit = min(capacity, NamedSubjects.maxImages)
-        let sent = slots.filter { $0.role.isSent }
-        guard limit > 0, sent.count < limit else { return .describeOnly }
-        return sent.isEmpty ? .start : .reference
+        guard limit > 0, slots.filter({ $0.role == .edited || $0.role == .reference }).count < limit else { return .neutral }
+        return slots.contains { $0.role == .edited } ? .reference : .edited
     }
 
-    /// **Gives `id` a role.** The start is unique: choosing it for one image makes the previous start a reference — or
-    /// « describe only » for a model that reads no references (img2img: `startsFromImage`, `capacity` 0).
-    package static func assigning<ID>(_ role: Role, to id: ID, in slots: [Slot<ID>], capacity: Int = 3) -> [Slot<ID>] {
+    /// **Gives `id` a role.** The edited image and the start are unique: choosing one for an image makes the previous
+    /// edited image a reference, the previous start neutral.
+    package static func assigning<ID>(_ role: Role, to id: ID, in slots: [Slot<ID>]) -> [Slot<ID>] {
         var out = slots
         guard let i = out.firstIndex(where: { $0.id == id }) else { return out }
-        if role == .start {
-            for j in out.indices where out[j].role == .start { out[j].role = capacity > 0 ? .reference : .describeOnly }
-        }
+        if role == .edited { for j in out.indices where out[j].role == .edited { out[j].role = .reference } }
+        if role == .start { for j in out.indices where out[j].role == .start { out[j].role = .neutral } }
         out[i].role = role
         return out
     }
 
-    /// **After a change of the model aimed at**: an image whose role it no longer offers becomes « describe only »;
-    /// a second start (never made by the window) becomes a reference — or « describe only » where there are no references.
+    /// **After a change of model**: each image keeps its role — never another one, even where the new model lacks it
+    /// (it then has no effect: `isEffective`); a second edited image (never made by the window) becomes a reference, a
+    /// second start neutral; and the effective images beyond what the model reads become neutral, from the last.
     package static func conforming<ID>(_ slots: [Slot<ID>], capacity: Int, startsFromImage: Bool = false) -> [Slot<ID>] {
-        let offered = roles(capacity: capacity, startsFromImage: startsFromImage)
         var out = slots
-        var started = false
+        var edited = false, started = false
         for i in out.indices {
-            if !offered.contains(out[i].role) { out[i].role = .describeOnly }
+            if out[i].role == .edited {
+                if edited { out[i].role = .reference }
+                edited = true
+            }
             if out[i].role == .start {
-                if started { out[i].role = offered.contains(.reference) ? .reference : .describeOnly }
+                if started { out[i].role = .neutral }
                 started = true
             }
+        }
+        // The edited image is the last to go: it gives the format, and the limit is never 0 where it is offered.
+        let limit = capacity > 0 ? min(capacity, NamedSubjects.maxImages) : (startsFromImage ? 1 : 0)
+        let effective = { (role: Role) in isEffective(role, capacity: capacity, startsFromImage: startsFromImage) }
+        var excess = out.filter { effective($0.role) }.count - limit
+        for i in out.indices.reversed() where excess > 0 && effective(out[i].role) && out[i].role != .edited {
+            out[i].role = .neutral
+            excess -= 1
         }
         return out
     }
 
-    // MARK: What the lab carries
+    // MARK: What the render receives
 
-    /// What stops the lab from carrying its inputs, each said in one sentence by the window.
+    /// What stops a render from being queued, each said in one sentence by the rack.
     package enum Refusal: Error, Equatable, Sendable {
         /// A `@name` the library does not know, no picture, or too many images with the subjects.
         case subject(NamedSubjects.Failure)
-        /// The starting image and the references alone exceed what a render takes.
+        /// The edited image and the references alone exceed what a render takes.
         case tooManyImages(count: Int, max: Int)
         /// `@name` inside a `{a|b}` group.
         case mentionInGroup(name: String)
@@ -113,9 +144,10 @@ package enum LabInputs {
         case subject(NamedSubjects.Placed)
     }
 
-    /// **What the rack's Prompt and Images boxes receive.**
+    /// **What the render receives**: made when it is queued, never shown as text in the rack.
     package struct Carry<ID: Hashable & Sendable>: Equatable, Sendable {
-        /// The prompt the model reads: the text, its `@names` translated (`image 2`, a legend after).
+        /// The prompt the model reads: the text, its `@names` translated (`image 2`, a legend after) — before the greyed
+        /// words leave it, when the render is queued (`sent`).
         package let prompt: String
         /// The images in the order of their numbers, the first one giving the format.
         package let images: [Image<ID>]
@@ -124,7 +156,7 @@ package enum LabInputs {
     }
 
     /// **Translates the text and numbers the images.** `capacity` is how many images the model aimed at reads
-    /// (0: none), `subjects` the library. The starting image goes first, then the references in the zone's order,
+    /// (0: none), `subjects` the library. The edited image goes first, then the references in their order,
     /// then the subjects the text cites. A model that reads none but starts from an image (`startsFromImage`) receives the
     /// text as typed and its start alone.
     package static func carry<ID>(text: String, slots: [Slot<ID>], subjects: [NamedSubjects.Subject],
@@ -133,9 +165,9 @@ package enum LabInputs {
             let start = startsFromImage ? slots.first { $0.role == .start }.map { [Image<ID>.plain($0.id, .start)] } ?? [] : []
             return .success(Carry(prompt: text, images: start, cited: []))
         }
-        let start = slots.filter { $0.role == .start }
+        let edited = slots.filter { $0.role == .edited }
         let references = slots.filter { $0.role == .reference }
-        let plain = (start + references).map { Image<ID>.plain($0.id, $0.role) }
+        let plain = (edited + references).map { Image<ID>.plain($0.id, $0.role) }
         let limit = min(capacity, NamedSubjects.maxImages)
         if plain.count > limit { return .failure(.tooManyImages(count: plain.count, max: limit)) }
 
@@ -151,51 +183,6 @@ package enum LabInputs {
         }
         return .success(Carry(prompt: rewritten.prompt, images: plain + rewritten.placed.map { .subject($0) },
                               cited: rewritten.cited))
-    }
-
-    // MARK: « The rack will receive »
-
-    /// **The line under the lab**: what « Carry to the Rack » will hand over and replace — or why it can not. The window
-    /// says it in words; the facts are here.
-    package struct Receipt<ID: Hashable & Sendable>: Equatable, Sendable {
-        package enum Outcome: Equatable, Sendable {
-            /// Nothing to carry: no text, no image sent.
-            case nothing
-            case refused(Refusal)
-            case carries(Carry<ID>)
-        }
-        package let outcome: Outcome
-        /// The rack's Prompt is replaced (⌘Z brings it back): the lab has a text, and it differs from the rack's.
-        package let replacesPrompt: Bool
-        /// The rack's images that are replaced, none of which can be brought back: 0 when the lab sends no image.
-        package let replacedImages: Int
-        /// The rack takes the lab's model: it was on another family.
-        package let changesModel: Bool
-
-        /// Image 1, which gives the format, when the lab sends images.
-        package var first: Image<ID>? {
-            if case .carries(let c) = outcome { c.images.first } else { nil }
-        }
-        /// Whether the button is on.
-        package var canCarry: Bool { if case .carries = outcome { true } else { false } }
-    }
-
-    /// **What carrying would do now.** `rackPrompt` and `rackImages` are the rack's own (for an img2img model, its starting
-    /// image: 0 or 1), `changesModel` whether the rack must change family to receive it.
-    package static func receipt<ID>(text: String, slots: [Slot<ID>], subjects: [NamedSubjects.Subject], capacity: Int,
-                                    startsFromImage: Bool = false,
-                                    rackPrompt: String, rackImages: Int, changesModel: Bool) -> Receipt<ID> {
-        let blank = text.allSatisfy(\.isWhitespace)
-        switch carry(text: text, slots: slots, subjects: subjects, capacity: capacity, startsFromImage: startsFromImage) {
-        case .failure(let refusal):
-            return Receipt(outcome: .refused(refusal), replacesPrompt: false, replacedImages: 0, changesModel: changesModel)
-        case .success(let c):
-            guard !blank || !c.images.isEmpty else {
-                return Receipt(outcome: .nothing, replacesPrompt: false, replacedImages: 0, changesModel: changesModel)
-            }
-            return Receipt(outcome: .carries(c), replacesPrompt: !blank && c.prompt != rackPrompt,
-                           replacedImages: c.images.isEmpty ? 0 : rackImages, changesModel: changesModel)
-        }
     }
 
     /// Whether the mention sits between an unescaped `{` and its `}` (`PromptAlternatives`' syntax: `\{`, `\}`
@@ -220,6 +207,62 @@ package enum LabInputs {
             i = text.index(after: i)
         }
         return open
+    }
+
+    // MARK: What is greyed does not go
+
+    /// **A word of the text the render does not send**, and why.
+    package struct Inert: Equatable, Sendable {
+        package enum Why: Equatable, Sendable {
+            /// A subject of the library, under a model that reads no image.
+            case subject
+            /// A reference to image N, past those the render carries.
+            case image(Int)
+        }
+        package let range: Range<String.Index>
+        package let why: Why
+    }
+
+    /// `<image3>`, `image 3`, `Picture 3` — the three forms `NamedSubjects.Phrasing.Reference` knows, in any case.
+    nonisolated(unsafe) private static let imageReference = try! NSRegularExpression(
+        pattern: "<image\\s*([0-9]+)>|\\b(?:image|picture)\\s+([0-9]+)\\b", options: [.caseInsensitive])
+
+    /// **The words the model does not read**, in the order of the text: under a model that reads no image (`capacity` 0),
+    /// every `@name` the library knows (`known`: the subjects' keys, `NamedSubjects.key`); under any model, a reference to an
+    /// image past the `carried` ones (the edit's images and the subjects' pictures). Another `@` is the model's own text.
+    package static func inert(in text: String, known: Set<String>, capacity: Int, carried: Int) -> [Inert] {
+        var found: [Inert] = []
+        if capacity == 0 {
+            for m in NamedSubjects.mentions(in: text) where known.contains(NamedSubjects.key(m.name)) {
+                found.append(Inert(range: m.range, why: .subject))
+            }
+        }
+        let all = NSRange(text.startIndex..., in: text)
+        for match in imageReference.matches(in: text, range: all) {
+            let group = match.range(at: 1).location != NSNotFound ? match.range(at: 1) : match.range(at: 2)
+            guard let digits = Range(group, in: text), let n = Int(text[digits]), n >= 1, n > carried,
+                  let range = Range(match.range, in: text), !found.contains(where: { $0.range.overlaps(range) }) else { continue }
+            found.append(Inert(range: range, why: .image(n)))
+        }
+        return found.sorted { $0.range.lowerBound < $1.range.lowerBound }
+    }
+
+    /// **The text the model reads**: `text` without its inert words, each taking the space before it (or after it, at the
+    /// start of a line). Nothing inert: `text` itself, to the byte.
+    package static func sent(_ text: String, leaving inert: [Inert]) -> String {
+        guard !inert.isEmpty else { return text }
+        // In UTF-16 offsets, from the end: the indices of `text` are not read in a string being cut.
+        let out = NSMutableString(string: text)
+        for word in inert.sorted(by: { $0.range.lowerBound > $1.range.lowerBound }) {
+            var r = NSRange(word.range, in: text)
+            if r.location > 0, out.character(at: r.location - 1) == 0x20 {
+                r.location -= 1; r.length += 1
+            } else if r.location + r.length < out.length, out.character(at: r.location + r.length) == 0x20 {
+                r.length += 1
+            }
+            out.deleteCharacters(in: r)
+        }
+        return out as String
     }
 
     // MARK: The mentions, kept through a rewrite

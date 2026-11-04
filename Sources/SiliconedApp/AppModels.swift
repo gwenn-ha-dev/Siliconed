@@ -13,6 +13,8 @@ struct LoRASlot: Identifiable, Equatable {
     let id = UUID()
     var path = ""
     var strength = 0.8
+    /// Off: kept in the stack with its strength, out of the render — to see the image without it, and back.
+    var on = true
 }
 
 /// An edit's reference: a chosen or dragged file, or an image from the history. We keep the source,
@@ -27,13 +29,21 @@ struct ReferenceImage: Identifiable, @unchecked Sendable {
     /// Mac (`MirrorServer`), decoded as the file was there. `remote`: an image that stays on the other
     /// Mac, named only (a mirrored history image's edit images) — nothing to show or decode here.
     enum Source { case file(URL), image(CGImage), subject(CGImage?, name: String), bytes(Data), remote(RemoteReference.Origin) }
-    let id = UUID()
+    /// Given only to a subject the prompt cites (`AppState.references`): the same id at every reading, for the rack's rows.
+    var id = UUID()
     let source: Source
     let vignette: NSImage
     let name: String
     let width: Int, height: Int
     /// Taken from the history: its `i` ordinal — what a mirror sends instead of the bytes.
     var ordinal: Int? = nil
+
+    /// The same picture as `other`: the same file, or the same image of the history.
+    func same(_ other: ReferenceImage) -> Bool {
+        if let a = ordinal, let b = other.ordinal { return a == b }
+        if case .file(let a) = source, case .file(let b) = other.source { return a.standardizedFileURL == b.standardizedFileURL }
+        return false
+    }
 
     /// Decoded for display, upright, at `width × height` — the original under an edit's curtain.
     func displayed(width: Int, height: Int) -> CGImage? {
@@ -179,8 +189,6 @@ struct Entry: Identifiable {
     /// **A grid's sheet** (`Grid.swift`): its `settings` are what the cells share — the prompt as
     /// typed, braces included —, its `timings` the cells' sum, its `footprints` their peaks.
     var grid: GridInfo? = nil
-    /// **A sketch** (an exploration's cell): the evaluations it stopped after. Never in the history.
-    var sketch: Int? = nil
     /// **An enlargement** (`Enlarge.swift`): its factor. Its settings stay the render's — what « Reuse
     /// These Settings » and « Redo » bring back is the image it was made from.
     var enlarged: Int? = nil
@@ -306,11 +314,8 @@ struct Job: Identifiable {
     let defaultSteps: Int?
     /// The denoiser's plan for one image (evaluations, including those reduced by the spectral), LoRA
     /// included — `nil` if the model is not installed. What, with the learned speed, estimates
-    /// its duration before it runs. A sketch's plan is already cut to its evaluations.
+    /// its duration before it runs.
     let plan: DenoisingPlan?
-    /// **A sketch** (`Request.sketch`): the evaluations it stops after; its image is the estimate,
-    /// kept by its exploration and never put in the history. `nil`: a finished image.
-    var sketch: Int? = nil
     /// **The accelerators as the remote control asked them** (`add --accelerators`, `--no-accelerators`), frozen in the job;
     /// `nil`, the model's choice when the job starts (`AppState.accelerators(for:)`), like a click.
     var accelerators: Bool? = nil

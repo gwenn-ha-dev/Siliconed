@@ -154,7 +154,7 @@ extension AppState {
     /// Why « Enlarge » cannot take this image now, in a sentence — `nil` when it can.
     func enlargeRefusal(_ entry: Entry) -> String? {
         if !(mirrorCatalog.map(\.enlarges) ?? SuperResolution.available) { return String(localized: "This Mac does not offer macOS’s super-resolution") }
-        if entry.grid != nil || entry.sketch != nil { return String(localized: "A grid is not enlarged") }
+        if entry.grid != nil { return String(localized: "A grid is not enlarged") }
         if entry.enlarged != nil { return String(localized: "This image is already enlarged") }
         // A render past 1920 px (the sizes B now allows) is no enlargement: it is beyond macOS's input.
         if max(entry.width, entry.height) > SuperResolution.maximumSide {

@@ -29,7 +29,7 @@ final class EngineErrorTests: XCTestCase {
                        ["file_size_limit", "read_only", "not_a_library", "already_a_library", "same_library", "copy_damaged"])
         XCTAssertEqual(EngineError.GridRefusal.allCases.map(\.rawValue),
                        ["empty_axis", "same_axis_twice", "no_such_group", "no_such_lora", "group_not_on_axis",
-                        "invalid_value", "unreadable_axis", "lora_across_models"])
+                        "invalid_value", "unreadable_axis", "lora_across_models", "no_start_image"])
     }
 
     /// A refusal of the prompt's own text is an input error with its own case — never an

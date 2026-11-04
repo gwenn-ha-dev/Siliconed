@@ -150,6 +150,7 @@ struct Problem: Equatable, Sendable {
             case .invalidValue: return String(localized: "An axis of the grid has a value no render takes.")
             case .unreadableAxis: return String(localized: "An axis of the grid can’t be read.")
             case .loraAcrossModels: return String(localized: "A grid that varies the model can’t take a LoRA: each LoRA is made for one model.")
+            case .noStartImage: return String(localized: "A grid that varies the starting image’s strength needs a starting image.")
             }
         case let .tooManyGridCells(count, max):                      // too_many_grid_cells
             return String(localized: "This grid makes \(String(count)) cells: \(String(max)) at most.")
@@ -273,6 +274,7 @@ struct Problem: Equatable, Sendable {
             case .unreadableAxis, .emptyAxis, .noSuchGroup, .noSuchLoRA:
                 return String(localized: "Give each axis its values: a group of the prompt, seeds, steps, a LoRA of the stack, models or the edit’s images.")
             case .loraAcrossModels: return String(localized: "Remove the LoRAs, or vary something other than the model.")
+            case .noStartImage: return String(localized: "Start from an image, or vary something else.")
             }
         case .tooManyGridCells:
             return String(localized: "Remove values from an axis.")

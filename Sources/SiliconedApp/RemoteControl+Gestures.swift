@@ -1,6 +1,6 @@
-// **The window's other gestures, from the terminal** — the history's (`remove`, `undo`, `again`, `reuse`, `crop`), the exploration's
-// (`finish`, `sheet`) and the models' (`import`, `uninstall`, `install stop`). Each calls the function the button or the menu item calls
-// (`AppState.delete`, the window's `UndoManager`, `redo`, `restoreSettings`, `finishCell`, `addSheet`, `perform`, `uninstall`, `remove`,
+// **The window's other gestures, from the terminal** — the history's (`remove`, `undo`, `again`, `reuse`, `crop`), the series'
+// (`sheet`) and the models' (`import`, `uninstall`, `install stop`). Each calls the function the button or the menu item calls
+// (`AppState.delete`, the window's `UndoManager`, `redo`, `restoreSettings`, `addSheet`, `perform`, `uninstall`, `remove`,
 // `cancelForge`), with the guard the window puts on it: a gesture that is greyed out in the window is a refusal here, with the same
 // sentence. The arguments are read in the library (`GestureOrder`), where the tests read them. Compute On and the library are in
 // `RemoteControl+Place.swift`.
@@ -41,7 +41,6 @@ extension RemoteControl {
         case .again(let word): try again(word, cwd: cwd, c)
         case .reuse(let word): finish(c, try reuse(word, cwd: cwd))
         case .crop(let image, let spec): try crop(image, spec, c)
-        case .finish(let cell): try finishCell(cell, c)
         case .sheet(let grid): try addSheet(grid: grid, c)
         case .importFiles(let paths): try importFiles(paths, cwd: cwd, c)
         case .uninstall(let what, let confirmed): finish(c, try uninstall(what, confirmed: confirmed))
@@ -49,6 +48,7 @@ extension RemoteControl {
         case .compute(let target): try compute(target, c)
         case .library(let action, let confirmed): try library(action, confirmed: confirmed, cwd: cwd, c)
         case .startImage(let action): finish(c, try startImage(action, cwd: cwd))
+        case .lab(let action): finish(c, try lab(action, cwd: cwd))
         }
     }
 
@@ -127,8 +127,17 @@ extension RemoteControl {
         ["model": app.identifier, "prompt": app.prompt, "steps": app.steps,
          "width": app.format.width, "height": app.format.height,
          "seed": app.fixedSeed ? NSNumber(value: app.seed) : NSNull(),
-         "loras": app.loras.filter { !$0.path.isEmpty }.map { ["lora": Self.shortName($0.path), "strength": Response.number($0.strength)] },
-         "start_image": startJSON() ?? NSNull()]
+         "loras": app.loras.filter { !$0.path.isEmpty }.map { ["lora": Self.shortName($0.path), "strength": Response.number($0.strength), "on": $0.on] },
+         "start_image": startJSON() ?? NSNull(), "series": seriesJSON()]
+    }
+
+    /// **The rack's series** — what « Generate » varies: each axis as `grid` reads it, and what is beyond two.
+    private func seriesJSON() -> [String: Any] {
+        let layout = app.seriesLayout
+        let names = app.activeLoRAs.map { Self.shortName($0.path) }
+        func axis(_ k: SeriesKey) -> String? { app.gridAxis(k).map { GridWords.command($0, loras: names) } }
+        return ["x": layout.columns.flatMap(axis) ?? NSNull(), "y": layout.rows.flatMap(axis) ?? NSNull(),
+                "excess": layout.excess.compactMap(axis), "renders": app.seriesRenders]
     }
 
     /// **`again <i7|file.png>`**: « Render Again (Same Seed) » (⌘R) — `redo` for an image of the history, which fills the rack with its
@@ -146,9 +155,9 @@ extension RemoteControl {
             gesture = { self.app.render() }
         }
         if sheet, app.mirror != nil {
-            // The other Mac makes the cells of a sheet's exploration: its answer is not a job's.
+            // The other Mac makes the cells of a sheet's series: its answer is not a job's.
             gesture()
-            finish(c, ["ok": true, "message": String(localized: "the exploration is asked of the other Mac"), "computing_on": app.mirror?.macName ?? NSNull()])
+            finish(c, ["ok": true, "message": String(localized: "the series is asked of the other Mac"), "computing_on": app.mirror?.macName ?? NSNull()])
             return
         }
         queueing(c, gesture)
@@ -182,7 +191,7 @@ extension RemoteControl {
 
     /// **`crop <i7> --box X,Y,W,H | --ratio P:Q`**: « Crop… », Return: the frame's pixels become a new image at the head of the history, the
     /// original stays (`undo` removes the crop). The frame obeys the editor's rules (`Crop.Frame`): never under `Format.minimumSide` a side,
-    /// never the whole image, and not a grid's sheet or a sketch.
+    /// never the whole image, and not a grid's sheet.
     func crop(_ image: String, _ spec: CropSpec, _ c: Connection) throws {
         guard let e = self.image(image) else {
             throw Refusal("unknown_image", String(localized: "no image \"\(image)\" in the history"), help: "silicontrol history")
@@ -225,49 +234,13 @@ extension RemoteControl {
         }
     }
 
-    // MARK: - The exploration
+    // MARK: - The series
 
-    /// The exploration shown, and the cell a name points at in it — or why not.
-    private func cell(_ name: CellName) throws -> (run: GridRun, index: Int) {
-        guard let run = app.explored else {
-            throw Refusal("unknown_job", String(localized: "no exploration is shown"), help: "silicontrol grid --sketch")
-        }
-        switch name {
-        case .cell(let grid, let index):
-            guard grid == run.ordinal else {
-                let shown = run.name, g = String(grid)
-                throw Refusal("unknown_job", String(localized: "g\(g) is not the exploration shown (\(shown)): a new one replaces the last"), help: "silicontrol status")
-            }
-            guard run.jobs.indices.contains(index) else {
-                let n = String(run.jobs.count), last = String(run.jobs.count - 1), name = run.name
-                throw Refusal("unknown_job", String(localized: "\(name) has \(n) cells: c0 to c\(last)"))
-            }
-            return (run, index)
-        case .job(let n):
-            guard let index = run.jobs.firstIndex(of: n) else {
-                let shown = run.name, job = "t\(n)"
-                throw Refusal("unknown_job", String(localized: "\(job) is not a cell of the exploration shown (\(shown))"), help: "silicontrol status")
-            }
-            return (run, index)
-        }
-    }
-
-    /// **`finish g2c3|t5`**: « Finish This Image » — the rack takes the cell (model, prompt, size, steps, LoRAs, edit images, seed) and renders it
-    /// to its end: the image its sketch announced, at the same seed and size, in the history. Only a cell whose picture is there, as in the window.
-    func finishCell(_ name: CellName, _ c: Connection) throws {
-        let (run, index) = try cell(name)
-        guard run.entries[index] != nil else {
-            let label = CellName.name(grid: run.ordinal, cell: index)
-            throw Refusal("cell", String(localized: "\(label) has no picture yet: wait for it, or it did not render"), help: "silicontrol follow")
-        }
-        queueing(c) { self.app.finishCell(index) }
-    }
-
-    /// **`sheet g2`**: « Add Sheet to History » — the sketches side by side, labelled, an image of the history. Answered once it is there.
+    /// **`sheet g2`**: « Add Sheet to History » — the series' images side by side, labelled, an image of the history. Answered once it is there.
     func addSheet(grid: Int, _ c: Connection) throws {
         guard let run = app.explored, run.ordinal == grid else {
             let shown = app.explored?.name, wanted = "g\(grid)"
-            throw Refusal("unknown_job", shown.map { String(localized: "\(wanted) is not the exploration shown (\($0))") } ?? String(localized: "no exploration is shown"),
+            throw Refusal("unknown_job", shown.map { String(localized: "\(wanted) is not the series shown (\($0))") } ?? String(localized: "no series is shown"),
                           help: "silicontrol status")
         }
         // The window greys the button while cells are on their way or none rendered.

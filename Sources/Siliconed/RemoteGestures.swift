@@ -1,34 +1,17 @@
-// What `silicontrol` asks of the app for the window's other gestures — the history's (remove, undo, again, reuse, crop), the exploration's
-// (finish a cell, add the sheet), the models' (import, uninstall), Compute On and the library — kept here, pure, so that the tests read
-// the arguments, the way a cell is named, a crop's frame and the `--yes` guard without an app.
+// What `silicontrol` asks of the app for the window's other gestures — the history's (remove, undo, again, reuse, crop), the series'
+// (add its sheet), the models' (import, uninstall), Compute On and the library — kept here, pure, so that the tests read the
+// arguments, the way a cell is named, a crop's frame and the `--yes` guard without an app.
 //
 // The gestures themselves are the app's (`AppState`, `MainWindow`): a command calls the function the button calls.
 
 // MARK: - Naming a cell
 
-/// **A cell of an exploration**, as `finish` names it: `g2c3` — the grid and the cell's rank in the sheet's reading order, from 0
-/// (row by row: `row · columns + column`, the same numbers the job's `column` and `row` give) — or `t5`, the job that renders it:
-/// every cell is an ordinary job, so the name `wait` and `cancel` already know is one more way to say it.
+/// **A cell of a grid**, as the answers name it: `g2c3` — the grid and the cell's rank in the sheet's reading order, from 0 (row by
+/// row: `row · columns + column`, the same numbers the job's `column` and `row` give). Every cell is also an ordinary job, `t5`.
 ///
 /// One letter and a number for each kind of thing (`t3` a job, `i7` an image, `g2` a grid), and a cell is a part of a grid: `g2`, then
 /// `c` and its rank. A pair of coordinates (`g2:1,0`) would need quotes in some shells and a sheet's width to be read right.
-package enum CellName: Equatable, Sendable {
-    case cell(grid: Int, index: Int)
-    case job(Int)
-
-    package init?(_ word: String) {
-        if let rest = word.first == "g" ? word.dropFirst() : nil, let c = rest.firstIndex(of: "c"),
-           let grid = Int(rest[..<c]), let index = Int(rest[rest.index(after: c)...]), grid >= 0, index >= 0,
-           rest.allSatisfy({ $0.isNumber || $0 == "c" }) {
-            self = .cell(grid: grid, index: index)
-        } else if word.first == "t", let n = Int(word.dropFirst()), n >= 0 {
-            self = .job(n)
-        } else {
-            return nil
-        }
-    }
-
-    /// How the answers say it.
+package enum CellName {
     package static func name(grid: Int, cell: Int) -> String { "g\(grid)c\(cell)" }
 }
 
@@ -83,8 +66,6 @@ package enum GestureOrder: Equatable, Sendable {
     case reuse(String)
     /// `crop i7 --box X,Y,W,H | --ratio P:Q`.
     case crop(image: String, CropSpec)
-    /// `finish g2c3|t5`: Finish This Image.
-    case finish(CellName)
     /// `sheet g2`: Add Sheet to History.
     case sheet(grid: Int)
     /// `import FILE …`: Import a Model or LoRA.
@@ -97,8 +78,10 @@ package enum GestureOrder: Equatable, Sendable {
     case compute(ComputeTarget)
     /// `library …`.
     case library(LibraryAction, confirmed: Bool)
-    /// `start-image …`: the rack's starting image (img2img), as the Prompt Lab carries it and the Images box retouches it.
+    /// `start-image …`: the rack's starting image (img2img) — an image of the Prompt Lab given the start's role, and its strength.
     case startImage(StartImageAction)
+    /// `lab …`: the Prompt Lab, the bar under the image — what it holds, folded or unfolded, an image in, a role, an image out.
+    case lab(LabAction)
 
     package enum Removal: Equatable, Sendable {
         /// A model's id: a publisher's family is uninstalled, an imported model removed.
@@ -129,6 +112,29 @@ package enum GestureOrder: Equatable, Sendable {
         case remove
     }
 
+    /// What `lab` does. The images are numbered as the bar shows them, from 1.
+    package enum LabAction: Equatable, Sendable {
+        case status
+        case unfold, fold
+        /// Files, or `i7` of the history: each takes the role a newcomer takes.
+        case add([String])
+        case role(image: Int, LabInputs.Role)
+        case remove(image: Int)
+
+        /// A role as the command names it: `edited`, `reference`, `start`, `none`.
+        package static func role(named word: String) -> LabInputs.Role? {
+            switch word.lowercased() {
+            case "edited": .edited
+            case "reference": .reference
+            case "start": .start
+            case "none": .neutral
+            default: nil
+            }
+        }
+
+        package static func name(_ role: LabInputs.Role) -> String { role == .neutral ? "none" : role.rawValue }
+    }
+
     package enum Failure: Error, Equatable, Sendable {
         /// Not the syntax; the associated value is the usage line.
         case usage(String)
@@ -138,8 +144,8 @@ package enum GestureOrder: Equatable, Sendable {
         case badValue(String, String)
     }
 
-    package static let verbs: Set<String> = ["remove", "undo", "again", "reuse", "crop", "finish", "sheet", "import", "uninstall",
-                                             "macs", "compute", "library", "start-image"]
+    package static let verbs: Set<String> = ["remove", "undo", "again", "reuse", "crop", "sheet", "import", "uninstall",
+                                             "macs", "compute", "library", "start-image", "lab"]
 
     package static func usage(_ command: String) -> String {
         switch command {
@@ -148,13 +154,13 @@ package enum GestureOrder: Equatable, Sendable {
         case "again": "again <i7|file.png>"
         case "reuse": "reuse <i7|file.png>"
         case "crop": "crop <i7> --box X,Y,W,H | --ratio P:Q"
-        case "finish": "finish <g2c3|t5>"
         case "sheet": "sheet <g2>"
         case "import": "import <file.safetensors|file.gguf> …"
         case "uninstall": "uninstall <model-id> [--yes] · uninstall lora <name> [--yes] · uninstall downloads [--yes]"
         case "macs": "macs [connect|disconnect NAME]"
         case "compute": "compute <NAME|this>"
         case "start-image": "start-image [<image|i7>] [--strength 0.65] · start-image --remove"
+        case "lab": "lab [open|close] · lab add <image|i7> … · lab role <n> edited|reference|start|none · lab remove <n>"
         default: "library [move DIR|home|open DIR|local] [--yes]"
         }
     }
@@ -212,9 +218,6 @@ package enum GestureOrder: Equatable, Sendable {
             let sides = v.split(separator: ":", omittingEmptySubsequences: false).map { Int($0) }
             guard sides.count == 2, let w = sides[0], let h = sides[1], w > 0, h > 0 else { return .failure(.badValue("--ratio", v)) }
             return .success(.crop(image: image, .ratio(Crop.Ratio(w, h))))
-        case "finish":
-            guard let word = one() else { return .failure(.usage(line)) }
-            return CellName(word).map { .success(.finish($0)) } ?? .failure(.badValue("cell", word))
         case "sheet":
             guard let word = one() else { return .failure(.usage(line)) }
             guard word.first == "g", let n = Int(word.dropFirst()), n >= 0 else { return .failure(.badValue("grid", word)) }
@@ -246,6 +249,24 @@ package enum GestureOrder: Equatable, Sendable {
             case (0, nil): return .success(.startImage(.status))
             case (0, let s?): return .success(.startImage(.strength(s)))
             case (1, let s): return .success(.startImage(.carry(words[0], strength: s)))
+            default: return .failure(.usage(line))
+            }
+        case "lab":
+            let rest = Array(words.dropFirst())
+            func number(_ word: String) -> Int? { Int(word).flatMap { $0 >= 1 ? $0 : nil } }
+            switch words.first {
+            case nil: return .success(.lab(.status))
+            case "open"?: return rest.isEmpty ? .success(.lab(.unfold)) : .failure(.usage(line))
+            case "close"?: return rest.isEmpty ? .success(.lab(.fold)) : .failure(.usage(line))
+            case "add"?: return rest.isEmpty ? .failure(.usage(line)) : .success(.lab(.add(rest)))
+            case "role"?:
+                guard rest.count == 2 else { return .failure(.usage(line)) }
+                guard let n = number(rest[0]) else { return .failure(.badValue("image", rest[0])) }
+                guard let role = LabAction.role(named: rest[1]) else { return .failure(.badValue("role", rest[1])) }
+                return .success(.lab(.role(image: n, role)))
+            case "remove"?:
+                guard rest.count == 1 else { return .failure(.usage(line)) }
+                return number(rest[0]).map { .success(.lab(.remove(image: $0))) } ?? .failure(.badValue("image", rest[0]))
             default: return .failure(.usage(line))
             }
         default:

@@ -1,8 +1,8 @@
 import XCTest
 @testable import Siliconed
 
-/// **The Prompt Lab's inputs** (`LabInputs`): roles, numbering, refusals, the mentions kept through a rewrite — and the
-/// proof that what the lab carries to the rack is what the rack's former Subjects mode made at the click.
+/// **The render's inputs** (`LabInputs`): roles, numbering, refusals, the mentions kept through a rewrite — and the
+/// proof that what the render receives is what the rack's former Subjects mode made at the click.
 final class LabInputsTests: XCTestCase {
     private typealias L = LabInputs
     private typealias N = NamedSubjects
@@ -27,7 +27,7 @@ final class LabInputsTests: XCTestCase {
 
     // ── the roles ──
 
-    func testADroppedImageIsTheStartThenReferencesThenDescribeOnly() {
+    func testADroppedImageTakesTheNextPlaceUnderAModelThatReadsImages() {
         var zone: [L.Slot<Int>] = []
         var roles: [L.Role] = []
         for id in 0..<5 {
@@ -35,83 +35,112 @@ final class LabInputsTests: XCTestCase {
             zone.append(L.Slot(id: id, role: role))
             roles.append(role)
         }
-        XCTAssertEqual(roles, [.start, .reference, .reference, .describeOnly, .describeOnly])
-        // A model that reads no image: every image stays in the lab.
-        XCTAssertEqual(L.defaultRole(adding: [] as [L.Slot<Int>], capacity: 0), .describeOnly)
-        XCTAssertEqual(L.roles(capacity: 0), [.describeOnly])
-        XCTAssertEqual(L.roles(capacity: 3), [.start, .reference, .describeOnly])
+        XCTAssertEqual(roles, [.edited, .reference, .reference, .neutral, .neutral])
+        // The edited place is filled first when it is free.
+        XCTAssertEqual(L.defaultRole(adding: slots(.reference, .neutral), capacity: 3), .edited)
+        // A model that reads no image, img2img included: a newcomer is neutral, its start is a gesture.
+        XCTAssertEqual(L.defaultRole(adding: [] as [L.Slot<Int>], capacity: 0), .neutral)
+        XCTAssertEqual(L.roles(capacity: 0), [.neutral])
+        XCTAssertEqual(L.roles(capacity: 0, startsFromImage: true), [.start, .neutral])
+        XCTAssertEqual(L.roles(capacity: 3), [.edited, .reference, .neutral])
+        XCTAssertEqual(L.roles(capacity: 3, startsFromImage: true), [.edited, .reference, .neutral], "an edit model offers no start")
     }
 
-    func testChoosingTheStartMakesThePreviousOneAReference() {
-        let zone = L.assigning(.start, to: 2, in: slots(.start, .reference, .reference))
-        XCTAssertEqual(zone.map(\.role), [.reference, .reference, .start])
-        XCTAssertEqual(zone.filter { $0.role == .start }.count, 1)
+    func testTheEditedImageAndTheStartAreUnique() {
+        let zone = L.assigning(.edited, to: 2, in: slots(.edited, .reference, .reference))
+        XCTAssertEqual(zone.map(\.role), [.reference, .reference, .edited])
+        // A new start sends the previous one back to neutral, never to another role.
+        XCTAssertEqual(L.assigning(.start, to: 1, in: slots(.start, .neutral)).map(\.role), [.neutral, .start])
         // Another role leaves the others alone.
-        XCTAssertEqual(L.assigning(.describeOnly, to: 1, in: slots(.start, .reference)).map(\.role), [.start, .describeOnly])
+        XCTAssertEqual(L.assigning(.neutral, to: 1, in: slots(.edited, .reference)).map(\.role), [.edited, .neutral])
         // An unknown id changes nothing.
-        XCTAssertEqual(L.assigning(.start, to: 9, in: slots(.start)).map(\.role), [.start])
+        XCTAssertEqual(L.assigning(.edited, to: 9, in: slots(.edited)).map(\.role), [.edited])
     }
 
-    func testChangingTheModelAimedAtDropsTheRolesItDoesNotOffer() {
-        XCTAssertEqual(L.conforming(slots(.start, .reference, .describeOnly), capacity: 0).map(\.role),
-                       [.describeOnly, .describeOnly, .describeOnly])
-        XCTAssertEqual(L.conforming(slots(.start, .reference), capacity: 3).map(\.role), [.start, .reference])
-        XCTAssertEqual(L.conforming(slots(.start, .start), capacity: 3).map(\.role), [.start, .reference])
+    func testAChangeOfModelNeverGivesNorConvertsARole() {
+        // Qwen-Image-2.1 → Z-Image: the edited image does not become the start of an img2img nobody asked for — it keeps
+        // its role, without effect, and nothing goes.
+        let z = L.conforming(slots(.edited, .reference, .neutral), capacity: 0, startsFromImage: true)
+        XCTAssertEqual(z.map(\.role), [.edited, .reference, .neutral])
+        XCTAssertEqual(try L.carry(text: "a quay", slots: z, subjects: [], capacity: 0, startsFromImage: true).get().images, [])
+        XCTAssertEqual(L.unused(z, capacity: 0, startsFromImage: true), 3)
+        // Back to Qwen-Image-2.1: they work again.
+        XCTAssertEqual(L.conforming(z, capacity: 3).map(\.role), [.edited, .reference, .neutral])
+        XCTAssertEqual(L.unused(z, capacity: 3), 1)
+        // Z-Image → Qwen-Image-2.1: the start does not become the edited image, and a neutral image stays neutral.
+        let qwen = L.conforming(slots(.start, .neutral), capacity: 3)
+        XCTAssertEqual(qwen.map(\.role), [.start, .neutral])
+        XCTAssertEqual(try L.carry(text: "a quay", slots: qwen, subjects: [], capacity: 3).get().images, [])
+        XCTAssertFalse(L.isEffective(.start, capacity: 3))
+        // A newcomer under Qwen takes image 1: the start without effect holds no place.
+        XCTAssertEqual(L.defaultRole(adding: qwen, capacity: 3), .edited)
+        // Between two models that start from an image, the start stays.
+        XCTAssertEqual(L.conforming(slots(.neutral, .start), capacity: 0, startsFromImage: true).map(\.role), [.neutral, .start])
+        // A model that reads nothing and starts from nothing: nothing goes.
+        XCTAssertEqual(L.unused(slots(.start, .edited), capacity: 0), 2)
+        // Between two edit models, the roles stay; a second edited image becomes a reference.
+        XCTAssertEqual(L.conforming(slots(.edited, .reference), capacity: 3).map(\.role), [.edited, .reference])
+        XCTAssertEqual(L.conforming(slots(.edited, .edited), capacity: 3).map(\.role), [.edited, .reference])
+    }
+
+    func testAModelThatReadsFewerImagesLeavesTheLastOnesNeutralTheEditedOneLast() {
+        XCTAssertEqual(L.conforming(slots(.edited, .reference, .reference), capacity: 2).map(\.role), [.edited, .reference, .neutral])
+        XCTAssertEqual(L.conforming(slots(.reference, .reference, .edited), capacity: 1).map(\.role), [.neutral, .neutral, .edited])
     }
 
     // ── the numbering ──
 
-    func testTheStartIsImageOneWhateverTheOrderOfTheZoneAndOfTheWords() throws {
-        // The reference sits first in the zone, the start after it: the start still takes place 1.
-        let r = try carried("@alice beside the dog", slots(.reference, .start))
-        XCTAssertEqual(r.images, [.plain(1, .start), .plain(0, .reference), .subject(N.Placed(subject: library[0], picture: library[0].pictures[0], number: 3))])
+    func testTheEditedImageIsImageOneWhateverTheOrderOfTheImagesAndOfTheWords() throws {
+        // The reference sits first, the edited image after it: the edited image still takes place 1.
+        let r = try carried("@alice beside the dog", slots(.reference, .edited))
+        XCTAssertEqual(r.images, [.plain(1, .edited), .plain(0, .reference), .subject(N.Placed(subject: library[0], picture: library[0].pictures[0], number: 3))])
         XCTAssertTrue(r.prompt.hasPrefix("the person in \(N.Phrasing.reference(3)) beside the dog"), r.prompt)
     }
 
     func testTheCitedSubjectsTakeThePlacesThatFollowInTheOrderOfTheText() throws {
-        let r = try carried("@red-coat on @alice", slots(.start))
+        let r = try carried("@red-coat on @alice", slots(.edited))
         let placed = r.images.compactMap { image -> N.Placed? in if case .subject(let p) = image { p } else { nil } }
         XCTAssertEqual(placed.map(\.number), [2, 3])
         XCTAssertEqual(placed.map(\.subject.name), ["red-coat", "alice"])
-        XCTAssertEqual(r.images.first, .plain(0, .start))
+        XCTAssertEqual(r.images.first, .plain(0, .edited))
         XCTAssertEqual(r.cited.map(\.name), ["red-coat", "alice"])
-        // The same rule, called as the lab calls it.
+        // The same rule, called as the queue calls it (`AppState.namedJob`).
         let direct = try N.rewrite("@red-coat on @alice", subjects: library, capacity: 3, first: 2)
         XCTAssertEqual(r.prompt, direct.prompt)
     }
 
-    func testWithoutAStartTheSubjectsTakeOneTwoThree() throws {
+    func testWithoutAnEditedImageTheSubjectsTakeOneTwoThree() throws {
         let r = try carried("@alice in @red-coat on @the-beach")
         XCTAssertEqual(r.images.count, 3)
         XCTAssertEqual(r.images.compactMap { if case .subject(let p) = $0 { p.number } else { nil } }, [1, 2, 3])
-        // Images that are only described are not sent.
-        let described = try carried("@alice", slots(.describeOnly, .describeOnly))
+        // Neutral images are not sent.
+        let described = try carried("@alice", slots(.neutral, .neutral))
         XCTAssertEqual(described.images.count, 1)
     }
 
     func testASubjectWithTwoPicturesTakesTwoPlaces() throws {
-        let r = try carried("@Bob with a dog", slots(.start))
+        let r = try carried("@Bob with a dog", slots(.edited))
         XCTAssertEqual(r.images.count, 3)
         XCTAssertEqual(r.images.compactMap { if case .subject(let p) = $0 { p.number } else { nil } }, [2, 3])
     }
 
-    func testAPromptThatCitesNobodySendsTheZoneAlone() throws {
-        let r = try carried("a dog in a library", slots(.start, .reference, .describeOnly))
+    func testAPromptThatCitesNobodySendsTheImagesAlone() throws {
+        let r = try carried("a dog in a library", slots(.edited, .reference, .neutral))
         XCTAssertEqual(r.prompt, "a dog in a library")
-        XCTAssertEqual(r.images, [.plain(0, .start), .plain(1, .reference)])
-        XCTAssertTrue(try carried("a dog", slots(.describeOnly)).images.isEmpty)
+        XCTAssertEqual(r.images, [.plain(0, .edited), .plain(1, .reference)])
+        XCTAssertTrue(try carried("a dog", slots(.neutral)).images.isEmpty)
     }
 
     // ── the refusals ──
 
     func testThreeImagesAtMost() {
-        XCTAssertEqual(refusal("a dog", slots(.start, .reference, .reference, .reference)), .tooManyImages(count: 4, max: 3))
-        XCTAssertEqual(refusal("@alice", slots(.start, .reference, .reference)), .subject(.tooManyImages(count: 4, max: 3)))
+        XCTAssertEqual(refusal("a dog", slots(.edited, .reference, .reference, .reference)), .tooManyImages(count: 4, max: 3))
+        XCTAssertEqual(refusal("@alice", slots(.edited, .reference, .reference)), .subject(.tooManyImages(count: 4, max: 3)))
         // A subject with two pictures counts twice.
-        XCTAssertEqual(refusal("@Bob @lamp", slots(.start)), .subject(.tooManyImages(count: 4, max: 3)))
-        XCTAssertNil(refusal("@alice @lamp", slots(.start)))
+        XCTAssertEqual(refusal("@Bob @lamp", slots(.edited)), .subject(.tooManyImages(count: 4, max: 3)))
+        XCTAssertNil(refusal("@alice @lamp", slots(.edited)))
         // A model that reads two images only.
-        XCTAssertEqual(refusal("a dog", slots(.start, .reference, .reference), capacity: 2), .tooManyImages(count: 3, max: 2))
+        XCTAssertEqual(refusal("a dog", slots(.edited, .reference, .reference), capacity: 2), .tooManyImages(count: 3, max: 2))
     }
 
     func testAnUnknownSubjectIsRefusedNeverPassedAsText() {
@@ -132,12 +161,51 @@ final class LabInputsTests: XCTestCase {
         XCTAssertNil(refusal("a {red @alice"))
     }
 
+    // ── what is greyed does not go ──
+
+    private func sent(_ text: String, capacity: Int, carried: Int) -> String {
+        L.sent(text, leaving: L.inert(in: text, known: Set(library.map(\.id)), capacity: capacity, carried: carried))
+    }
+
+    func testUnderAModelThatReadsNoImageASubjectIsGreyedAndLeftOutAnotherAtStays() {
+        let text = "@alice posing in a library, @incase style"
+        let inert = L.inert(in: text, known: Set(library.map(\.id)), capacity: 0, carried: 0)
+        XCTAssertEqual(inert.map(\.why), [.subject])
+        XCTAssertEqual(String(text[inert[0].range]), "@alice")
+        // Anima's artist is the model's own word; the subject takes the space after it, at the start.
+        XCTAssertEqual(sent(text, capacity: 0, carried: 0), "posing in a library, @incase style")
+        XCTAssertEqual(sent("a girl with @Alice", capacity: 0, carried: 0), "a girl with")
+        // Under a model that reads images, a subject goes (translated by the rewrite).
+        XCTAssertEqual(sent(text, capacity: 3, carried: 1), text)
+    }
+
+    func testAReferenceToAnImageTheRenderDoesNotCarryIsLeftOut() {
+        XCTAssertEqual(sent("put the dog of <image3> next to the woman in <image1>", capacity: 3, carried: 2),
+                       "put the dog of next to the woman in <image1>")
+        XCTAssertEqual(sent("Picture 2 and image 1, then IMAGE 4", capacity: 3, carried: 1), "and image 1, then")
+        XCTAssertEqual(L.inert(in: "<image 3>", known: [], capacity: 3, carried: 2).map(\.why), [.image(3)])
+        // Under a model that reads none, no image is carried: every reference is left out.
+        XCTAssertEqual(sent("image 1 of a cat", capacity: 0, carried: 0), "of a cat")
+        // Not a reference: a number glued to the word, or zero.
+        XCTAssertEqual(sent("image2 and image 0", capacity: 3, carried: 0), "image2 and image 0")
+    }
+
+    func testNothingGreyedLeavesTheTextToTheByte() {
+        let text = "a  quay,   at night\n\n<image1> stays"
+        XCTAssertTrue(L.inert(in: text, known: Set(library.map(\.id)), capacity: 3, carried: 1).isEmpty)
+        XCTAssertEqual(sent(text, capacity: 3, carried: 1), text)
+    }
+
     func testAModelThatReadsNoImageKeepsTheTextAndTheAtSign() throws {
         // Anima's artists: `@incase` is the model's own word, whatever the library holds.
-        let r = try carried("a girl, @incase, @alice", slots(.describeOnly), capacity: 0)
+        let r = try carried("a girl, @incase, @alice", slots(.neutral), capacity: 0)
         XCTAssertEqual(r.prompt, "a girl, @incase, @alice")
         XCTAssertTrue(r.images.isEmpty)
         XCTAssertNil(refusal("a {@incase|b}", capacity: 0))
+        // An img2img receives its start alone, wherever it sits.
+        let start = try L.carry(text: "a dog", slots: slots(.neutral, .start), subjects: library, capacity: 0, startsFromImage: true).get()
+        XCTAssertEqual(start.images, [.plain(1, .start)])
+        XCTAssertEqual(start.prompt, "a dog")
     }
 
     // ── what the rack received before, and receives now ──
@@ -153,7 +221,7 @@ final class LabInputsTests: XCTestCase {
         return request
     }
 
-    /// The lab: carry, then what the rack's Prompt and Images boxes hold and the render reads.
+    /// Now: carry, then what the render reads.
     private func lab(_ typed: String, capacity: Int) throws -> Request {
         let carry = try L.carry(text: typed, slots: [L.Slot<Int>](), subjects: library, capacity: capacity).get()
         var request = Request(carry.prompt, width: 512, height: 512, seed: 42)
@@ -194,48 +262,6 @@ final class LabInputsTests: XCTestCase {
         for (carried, former) in zip(expansions, try PromptAlternatives(typed).prompts) {
             XCTAssertEqual(carried, try N.rewrite(former, subjects: library, capacity: 3).prompt)
         }
-    }
-
-    // ── « The rack will receive » ──
-
-    private func receipt(_ text: String, _ zone: [L.Slot<Int>] = [], capacity: Int = 3, rackPrompt: String = "",
-                         rackImages: Int = 0, changesModel: Bool = false) -> L.Receipt<Int> {
-        L.receipt(text: text, slots: zone, subjects: library, capacity: capacity, rackPrompt: rackPrompt,
-                  rackImages: rackImages, changesModel: changesModel)
-    }
-
-    func testTheLineSaysWhatTheRackWillReceiveAndWhatItReplaces() throws {
-        let r = receipt("@alice on a quay", slots(.start), rackPrompt: "old", rackImages: 2)
-        guard case .carries(let c) = r.outcome else { return XCTFail("\(r.outcome)") }
-        XCTAssertEqual(c.images.count, 2)
-        XCTAssertEqual(r.first, .plain(0, .start), "the format is image 1's")
-        XCTAssertTrue(r.replacesPrompt)
-        XCTAssertEqual(r.replacedImages, 2)
-        XCTAssertTrue(r.canCarry)
-        // No image to send: the rack's own stay.
-        let text = receipt("a dog in a library", rackPrompt: "old", rackImages: 2)
-        XCTAssertEqual(text.replacedImages, 0)
-        XCTAssertNil(text.first)
-        // The same prompt as the rack's replaces nothing.
-        XCTAssertFalse(receipt("a dog", rackPrompt: "a dog").replacesPrompt)
-        // Images alone leave the rack's Prompt in place.
-        let images = receipt("  ", slots(.start), rackPrompt: "old", rackImages: 1)
-        XCTAssertFalse(images.replacesPrompt)
-        XCTAssertEqual(images.replacedImages, 1)
-        XCTAssertTrue(images.canCarry)
-        XCTAssertTrue(receipt("x", changesModel: true).changesModel)
-    }
-
-    func testTheLineSaysWhyItCannotInOneSentenceOfData() {
-        XCTAssertEqual(receipt("   ").outcome, .nothing)
-        XCTAssertEqual(receipt("   ", slots(.describeOnly)).outcome, .nothing)
-        XCTAssertFalse(receipt("").canCarry)
-        XCTAssertEqual(receipt("@nobody").outcome, .refused(.subject(.unknownSubject(name: "nobody"))))
-        XCTAssertEqual(receipt("a {@alice|b}").outcome, .refused(.mentionInGroup(name: "alice")))
-        XCTAssertEqual(receipt("x", slots(.start, .reference, .reference, .reference)).outcome,
-                       .refused(.tooManyImages(count: 4, max: 3)))
-        XCTAssertFalse(receipt("@nobody", rackPrompt: "old", rackImages: 3).replacesPrompt, "a refused carry replaces nothing")
-        XCTAssertEqual(receipt("@nobody", rackImages: 3).replacedImages, 0)
     }
 
     // ── the mentions, kept through a rewrite ──

@@ -158,6 +158,42 @@ final class RenderGridTests: XCTestCase {
         XCTAssertEqual(refusal(base, x: .solvers([.euler]), y: .solvers([.unipc])), .gridRefused(reason: .sameAxisTwice))
     }
 
+    /// A start strength axis: each cell its strength of the starting image, the rest the base's;
+    /// refused without a starting image, out of 0…1, or empty.
+    func testAStartStrengthAxisGivesEachCellItsStrength() throws {
+        let base = RenderGrid.Base(prompt: "woman posing in a library", seed: 42, steps: 8, start: true)
+        let g = try RenderGrid(base, x: .startStrength([0.45, 0.6, 0.75]), y: .consecutiveSeeds(count: 2))
+        XCTAssertEqual(g.cells.map(\.startStrength), [0.45, 0.6, 0.75, 0.45, 0.6, 0.75])
+        XCTAssertEqual(g.cells.map(\.seed), [42, 42, 42, 43, 43, 43])
+        XCTAssertEqual(Set(g.cells.map(\.detail)), [nil])
+        XCTAssertEqual(g.values(of: g.x), [.startStrength(0.45), .startStrength(0.6), .startStrength(0.75)])
+        XCTAssertEqual(Set(try RenderGrid(base, x: .consecutiveSeeds(count: 2)).cells.map(\.startStrength)), [nil])
+        var noStart = base; noStart.start = false
+        XCTAssertEqual(refusal(noStart, x: .startStrength([0.5])), .gridRefused(reason: .noStartImage))
+        XCTAssertEqual(refusal(base, x: .startStrength([])), .gridRefused(reason: .emptyAxis))
+        XCTAssertEqual(refusal(base, x: .startStrength([0.5, 1.2])), .gridRefused(reason: .invalidValue))
+        XCTAssertEqual(refusal(base, x: .startStrength([0.5]), y: .startStrength([0.6])), .gridRefused(reason: .sameAxisTwice))
+    }
+
+    /// A Detail axis: each cell its level, the solver and the steps the base's; a level twice refused.
+    func testADetailAxisGivesEachCellItsDetail() throws {
+        let base = RenderGrid.Base(prompt: "woman posing in a {library|greenhouse}", seed: 42, steps: 8)
+        let g = try RenderGrid(base, x: .prompt(group: 0), y: .detail([.normal, .more, .most]))
+        XCTAssertEqual(g.cells.map(\.detail), [.normal, .normal, .more, .more, .most, .most])
+        XCTAssertEqual(g.cells.map(\.prompt).prefix(2), ["woman posing in a library", "woman posing in a greenhouse"])
+        XCTAssertEqual(Set(g.cells.map(\.solver)), [nil])
+        XCTAssertEqual(g.values(of: g.y!), [.detail(.normal), .detail(.more), .detail(.most)])
+        XCTAssertEqual(refusal(base, x: .prompt(group: 0), y: .detail([])), .gridRefused(reason: .emptyAxis))
+        XCTAssertEqual(refusal(base, x: .prompt(group: 0), y: .detail([.more, .more])), .gridRefused(reason: .invalidValue))
+        XCTAssertEqual(try RenderGrid.axis("detail=normal, MORE"), .detail([.normal, .more]))
+        XCTAssertEqual(try RenderGrid.axis("start=0.45,0.6"), .startStrength([0.45, 0.6]))
+        for bad in ["detail=", "detail=sharp", "detail:1=more", "start=", "start=a", "start:2=0.5"] {
+            XCTAssertThrowsError(try RenderGrid.axis(bad), bad) {
+                XCTAssertEqual($0 as? EngineError, .gridRefused(reason: .unreadableAxis), bad)
+            }
+        }
+    }
+
     /// A LoRA axis: each cell adds one LoRA (or none) to the stack, at the axis's strength; the stack's
     /// strength axis is another setting; refused across models.
     func testALoRAAxisAddsOneLoRAPerCell() throws {

@@ -182,7 +182,6 @@ final class RemoteControl {
             o["rows"] = g.grid.rows
             o["empty_cells"] = g.empty
         }
-        if let n = e.sketch { o["sketch"] = n }
         if let n = e.enlarged { o["enlarged"] = n }
         if let path { o["path"] = path }
         return o

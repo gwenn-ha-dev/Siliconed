@@ -14,7 +14,7 @@ import Foundation
 ///                  preview     the denoising's latent preview as a small PNG blob, once per step
 ///                  quoted      the answer to a `quote`; `answer` the one to a `render`
 ///                  ended       one of the Neo's jobs ended, after its images (what `silicontrol wait` reads)
-///                  explored    the exploration under way, without its images; `cellImage` + PNG one cell's
+///                  explored    the series under way, without its images: its cells are history images
 ///                  synced      at each join: the images and jobs the mini still knows of the Neo's, so that
 ///                              what was removed during a cut is removed here too
 ///                  statistics  what the Statistics window reads, for the Neo's renders only (`Statistics.swift`)
@@ -24,9 +24,9 @@ import Foundation
 ///                              go first as blobs, or by their history ordinal
 ///                  quote       what an edit's format and a need with images are: the denoiser's rule
 ///                              and the memory need come from maps only the mini holds
-///                  grid        an exploration (or a grid) from the Neo's form: its cells made on the mini,
-///                              which alone knows where a model's sketch stops; `addSheet` draws its sheet;
-///                              asked with a request number (`silicontrol grid`), it is answered by `gridQueued`
+///                  grid        a series (or a grid) from the Neo's form: its cells made on the mini, each
+///                              judged there as a render is; `addSheet` draws its sheet; asked with a request
+///                              number (`silicontrol grid`), it is answered by `gridQueued`
 ///                  enlarge, crop  an image of the mini's history, made there; `enlargeNeedsDownload`
 ///                              asks the Neo's consent to Apple's model
 ///                  cancel, removeJob, stopAll, clearQueue, deleteImages
@@ -273,19 +273,18 @@ package struct RemoteGridSpec: Codable, Equatable, Sendable {
     package func grid() throws(EngineError) -> RenderGrid { try RenderGrid(base, x: x, y: y) }
 }
 
-/// An exploration asked from the Neo's form. `job`: what the cells share — the prompt as typed, the
-/// format, the stack, the edit's images —; its seeds are none, the grid's are.
+/// A series asked from the Neo's form, or a grid from its `silicontrol grid`. `job`: what the cells share — the prompt
+/// as typed, the format, the stack, the edit's images —; its seeds are none, the grid's are.
 package struct RemoteGridRequest: Codable, Equatable, Sendable {
     package var spec: RemoteGridSpec
     package var job: RemoteJob
-    package var sketch: Bool
-    /// The evaluations a sketch stops after; 0: where the model's sketch stops by itself.
-    package var stopAfter: Int
+    /// The sheet is drawn when the last cell ends (`silicontrol grid`); a series' only when asked (`addSheet`).
+    package var sheet: Bool
     /// The Neo's request number when it waits for the mini's word (`silicontrol grid`): answered by
-    /// `RemoteAnswer.gridQueued`. `nil`: the window, which reads the exploration published.
+    /// `RemoteAnswer.gridQueued`. `nil`: the window, which reads the series published.
     package var request: Int?
-    package init(spec: RemoteGridSpec, job: RemoteJob, sketch: Bool, stopAfter: Int, request: Int? = nil) {
-        self.spec = spec; self.job = job; self.sketch = sketch; self.stopAfter = stopAfter; self.request = request
+    package init(spec: RemoteGridSpec, job: RemoteJob, sheet: Bool, request: Int? = nil) {
+        self.spec = spec; self.job = job; self.sheet = sheet; self.request = request
     }
 }
 
@@ -295,8 +294,8 @@ package enum RemoteIssue: Codable, Equatable, Sendable {
     case failed(RemoteRefusal)
 }
 
-/// **The exploration on the mini**, published whole at each change — but its images, which go once
-/// each (`cellImage`).
+/// **The series on the mini**, published whole at each change — but its images, which are history images, sent as
+/// any other (`entry`): the Neo lays them in their cells by their job.
 package struct RemoteExploration: Codable, Equatable, Sendable {
     package var ordinal: Int
     package var spec: RemoteGridSpec
@@ -304,9 +303,8 @@ package struct RemoteExploration: Codable, Equatable, Sendable {
     /// Each cell's job, in the grid's order: its ordinal, and its settings whole.
     package var cells: [RemoteJob]
     package var issues: [Int: RemoteIssue]
-    package var sketch: Bool
-    package init(ordinal: Int, spec: RemoteGridSpec, job: RemoteJob, cells: [RemoteJob], issues: [Int: RemoteIssue], sketch: Bool) {
-        self.ordinal = ordinal; self.spec = spec; self.job = job; self.cells = cells; self.issues = issues; self.sketch = sketch
+    package init(ordinal: Int, spec: RemoteGridSpec, job: RemoteJob, cells: [RemoteJob], issues: [Int: RemoteIssue]) {
+        self.ordinal = ordinal; self.spec = spec; self.job = job; self.cells = cells; self.issues = issues
     }
 }
 

@@ -10,26 +10,35 @@ import UniformTypeIdentifiers
 extension AppState {
     // MARK: Render
 
-    /// **Puts a render in the queue**, and launches it if nothing is running. `imposedSeed`: "Redo"
-    /// (the seed of a history image). `imposedFormat`: an exploration cell's, finished at its sketch's
-    /// size — with edit images, `outputFormat` would derive another one from image 1.
+    /// **Puts a render in the queue**, and launches it if nothing is running. `imposedSeed`: "Redo" (the seed of a history
+    /// image). `imposedFormat`: "Redo" (its size) — with edit images, `outputFormat` would derive another one from image 1.
+    /// **Something varies** (`Series.swift`): the series' grid, one finished image per cell.
     func render(imposedSeed: UInt64? = nil, imposedFormat: RecommendedFormat? = nil) {
         guard canRender else { return }
-        followsRender = true
         // Everything that reads the state is taken here: the job no longer depends on the form.
         let firstNumber = imposedSeed ?? (fixedSeed ? seed : UInt64.random(in: 0...UInt64(UInt32.max)))
         let format = imposedFormat ?? outputFormat
-        guard let prompts = try? alternatives.get().prompts else { return }
-        // **One job per alternative, all at the same seeds**: a series compares the prompts, so
-        // nothing else may differ. Each keeps the batch. Its history images carry the expanded prompt.
+        guard let prompts = try? alternatives.get().prompts, (try? carried.get()) != nil else { return }
+        if case .success(let g?) = seriesGrid(seed: firstNumber) {
+            renderSeries(g, format: format)
+            return
+        }
+        followsRender = true
+        // The edit's images as the render reads them, decoded once for the whole series.
+        let edit = renderReferences
+        // One job (a prompt without groups: a series is a grid), its lot of seeds.
         enqueue(prompts.map { expanded in
             var settings = RenderSettings(identifier: identifier, modelName: card?.name ?? identifier, prompt: expanded,
-                                          format: format, steps: steps, loras: loras.filter { !$0.path.isEmpty },
-                                          references: references.count, variations: variations, detail: effectiveDetail,
+                                          format: format, steps: steps, loras: activeLoRAs,
+                                          references: edit.count, variations: variations, detail: effectiveDetail,
                                           solver: effectiveSolver)
-            let used = references, start = usedStart
+            // **The subjects the text cites, translated here** (`namedJob`): their pictures after the edit's, the model
+            // reading the rewrite, the text kept as typed.
+            let used = namedJob(expanded, settings: &settings, references: edit, model: model(identifier),
+                                capacity: mirror != nil ? imageCapacity : nil)
+            let start = usedStart
             if start != nil { settings.strength = startStrength }
-            let plan = expectedPlan(steps: steps, format: format, withLoRA: loras.contains { !$0.path.isEmpty } || !plainSampling,
+            let plan = expectedPlan(steps: steps, format: format, withLoRA: !activeLoRAs.isEmpty || !plainSampling,
                                     references: used.count, strength: settings.strength)
             var job = Job(ordinal: nextJobNumber(), settings: settings,
                           seeds: (0..<max(1, batch)).map { firstNumber &+ UInt64($0) },
@@ -40,16 +49,36 @@ extension AppState {
         })
     }
 
+    /// **The series « Generate » renders**: its grid, each cell a finished image into the history, the canvas showing
+    /// the grid as the cells come (the history does not take the canvas from it: `followsRender` off). No sheet unless
+    /// asked (« Add Sheet to History »). In a mirror, the other Mac makes the cells, as it makes a render.
+    private func renderSeries(_ g: RenderGrid, format: RecommendedFormat) {
+        var settings = RenderSettings(identifier: identifier, modelName: card?.name ?? identifier, prompt: prompt,
+                                      format: format, steps: steps, loras: activeLoRAs, references: renderReferences.count,
+                                      variations: variations, detail: effectiveDetail, solver: effectiveSolver)
+        if usedStart != nil { settings.strength = startStrength }
+        followsRender = false
+        if let mirror {
+            do { try mirror.explore(g, settings: resolvingFaster(settings), references: renderReferences, accelerators: nil) }
+            catch { problem = Problem(error); flash(Problem(error).text); return }
+        } else {
+            enqueueGrid(g, settings: settings, references: renderReferences, previews: previews, sheet: false, named: true,
+                        start: usedStart)
+        }
+        showsExploration = true
+    }
+
     /// **A grid enters the queue**: one ordinary job per cell, in the grid's order, and the run that
-    /// will lay their images out — the path of the exploration and of `silicontrol grid`. `settings`:
-    /// what the cells share, the prompt as typed. `sketch`: each cell stops as a sketch (`Sketch`), its
-    /// image kept by the run, not the history, and no sheet is drawn unless asked (`addSheet`).
+    /// will lay their images out — the path of a series and of `silicontrol grid`. `settings`:
+    /// what the cells share, the prompt as typed. `sheet`: the sheet is drawn when the last cell ends
+    /// (`silicontrol grid`); otherwise only when asked (`addSheet`). `named`: each cell's `@name`s
+    /// translated as a render's are (`namedJob`).
     @discardableResult
-    /// `owner`: another Mac's (`MirrorServer`), whose exploration is not shown here (`shows`).
+    /// `owner`: another Mac's (`MirrorServer`), whose series is not shown here (`shows`).
     /// `start`: the starting image every cell renders from (img2img, at `settings.strength`) — dropped by a cell whose model
     /// does not start from one (a models axis).
     func enqueueGrid(_ grid: RenderGrid, settings: RenderSettings, references: [ReferenceImage], previews: Bool,
-                     sketch: Bool = false, stopAfter: Int = 0, accelerators: Bool? = nil, owner: Data? = nil,
+                     sheet: Bool = true, named: Bool = false, accelerators: Bool? = nil, owner: Data? = nil,
                      shows: Bool = true, start: ReferenceImage? = nil) -> (run: GridRun, jobs: [Job]) {
         lastGrid += 1
         let jobs = grid.cells.map { cell in
@@ -61,9 +90,15 @@ extension AppState {
             for (i, f) in cell.loraStrengths.enumerated() where s.loras.indices.contains(i) { s.loras[i].strength = f }
             if let l = cell.addedLoRA { s.loras.append(LoRASlot(path: l, strength: cell.addedStrength)) }
             if let solver = cell.solver { s.solver = solver }
-            let used = cell.image.map { references.indices.contains($0) ? [references[$0]] : [] } ?? references
+            if let detail = cell.detail { s.detail = detail }
+            if let strength = cell.startStrength { s.strength = strength }
+            var used = cell.image.map { references.indices.contains($0) ? [references[$0]] : [] } ?? references
             s.references = used.count
             let model = try? Model.named(s.identifier, in: library)
+            if named {
+                used = namedJob(cell.prompt, settings: &s, references: used, model: model,
+                                capacity: mirror != nil ? imageCapacity : nil)
+            }
             // A models axis: a cell whose sampler walks Euler only renders Euler (its caption says none).
             if let model, !model.chain.denoising.solvers.contains(s.solver) { s.solver = .euler }
             // …and a cell whose model offers no Detail renders Normal.
@@ -71,7 +106,7 @@ extension AppState {
             // …and a cell whose model does not start from an image renders from noise.
             let cellStart = start != nil && model?.chain.entries.contains(where: { $0.kind == .image }) == true ? start : nil
             if cellStart == nil { s.strength = nil }
-            var plan = model.map { m in
+            let plan = model.map { m in
                 let f = m.chain.denoising.space.factor
                 let first = s.strength.map { min(s.steps, Strength.startStep(steps: s.steps, strength: $0)) } ?? 0
                 let plan = m.chain.denoising.plan(height: s.format.height / f, width: s.format.width / f, steps: s.steps,
@@ -79,25 +114,20 @@ extension AppState {
                                                   faster: s.fasterRendering ?? fasterRendering(for: s.identifier))
                 return s.references > 0 ? plan.unreduced : plan
             }
-            // A stop at or past the plan's count is a finished image — kept by the exploration all the same.
-            let stop = !sketch ? nil : stopAfter > 0 ? min(stopAfter, plan?.evaluations ?? stopAfter)
-                : model?.sketchEvaluations(steps: s.steps, width: s.format.width, height: s.format.height)
-            if let stop { plan = plan?.sketched(stop) }
             var job = Job(ordinal: nextJobNumber(), settings: s, seeds: [cell.seed], references: used,
                           previews: previews, defaultSteps: card?.defaultSteps, plan: plan)
             job.start = cellStart
-            job.sketch = stop
             job.accelerators = accelerators
             job.owner = owner
             return job
         }
         var run = GridRun(ordinal: lastGrid, grid: grid, settings: settings, jobs: jobs.map(\.ordinal),
-                          references: references.count, sketch: sketch)
+                          references: references.count, sheet: sheet)
         run.cellJobs = jobs
         run.owner = owner
         gridRuns[run.ordinal] = run
         for (i, job) in jobs.enumerated() { gridCells[job.ordinal] = (run.ordinal, i) }
-        if sketch, shows { explored = run }
+        if shows { explored = run }
         enqueue(jobs)
         return (run, jobs)
     }
@@ -110,8 +140,8 @@ extension AppState {
     func finishGrid(_ ordinal: Int) {
         guard let run = gridRuns.removeValue(forKey: ordinal) else { return }
         if explored?.ordinal == ordinal { explored = run }
-        // An exploration's sheet is drawn only when asked (`addSheet`): the window is its sheet.
-        guard !run.sketch else {
+        // A series' sheet is drawn only when asked (`addSheet`): the canvas is its sheet.
+        guard run.sheet else {
             endedGrids[ordinal] = (run.jobs, nil)
             signal(.sheet(run, nil))
             return
@@ -360,7 +390,6 @@ extension AppState {
                                   loras: loraEntries, image: start, strength: settings.strength ?? Strength.defaultValue,
                                   previews: job.previews)
             request.references = references
-            request.sketch = job.sketch
             request.detail = settings.detail
             request.solver = settings.solver
             request.variations = settings.variations
@@ -421,17 +450,7 @@ extension AppState {
                                         evaluations: renderResult.evaluations,
                                         settings: { var s = settings; s.offer = renderResult.offer; s.fasterRendering = renderResult.fasterRendering; return s }(),
                                         metadata: named ?? renderResult.metadata, references: job.references,
-                                        start: start == nil ? nil : job.start, sketch: renderResult.sketch, owner: job.owner)
-                    // A sketch belongs to its exploration, not to the history.
-                    if job.sketch != nil, let at = gridCells[job.ordinal] {
-                        gridRuns[at.grid]?.entries[at.cell] = entry
-                        if explored?.ordinal == at.grid { explored = gridRuns[at.grid] }
-                        preview = nil
-                        sessionSeconds += renderResult.timings.total
-                        jobImages.append(entry.ordinal)
-                        signal(.image(job, entry))
-                        continue
-                    }
+                                        start: start == nil ? nil : job.start, owner: job.owner)
                     history.insert(entry, at: 0)
                     saveIfAsked(entry)
                     if followsRender {
@@ -443,7 +462,10 @@ extension AppState {
                     sessionImages += 1
                     sessionSeconds += renderResult.timings.total
                     jobImages.append(entry.ordinal)
-                    if let at = gridCells[job.ordinal] { gridRuns[at.grid]?.entries[at.cell] = entry }
+                    if let at = gridCells[job.ordinal] {
+                        gridRuns[at.grid]?.entries[at.cell] = entry
+                        if explored?.ordinal == at.grid { explored = gridRuns[at.grid] }
+                    }
                     signal(.image(job, entry))
                 case .warning(let message):
                     journal.append(message)
@@ -564,7 +586,7 @@ extension AppState {
     /// Whether « Variations » can take this image: an ordinary history image of an installed model,
     /// no installation running.
     func canVary(_ entry: Entry) -> Bool {
-        installBlocker == nil && entry.grid == nil && entry.sketch == nil && entry.enlarged == nil
+        installBlocker == nil && entry.grid == nil && entry.enlarged == nil
             && entry.cropped == nil
             && readySet.contains(entry.settings.identifier)
     }
@@ -606,16 +628,18 @@ extension AppState {
         return jobs
     }
 
-    /// Redo the chosen image: same settings, same seed.
+    /// Redo the chosen image: same settings, same seed — and its size: an edit's would otherwise be derived again from image 1
+    /// (`outputFormat`), and one typed on the command line (`add … 1024 --ref …`) came back at image 1's proportions.
     func redo(_ entry: Entry) {
         restoreSettings(entry)
-        // A sheet: its exploration again, at its seed.
-        if entry.grid != nil { explore(seed: entry.seed); return }
-        render(imposedSeed: entry.seed)
+        render(imposedSeed: entry.seed, imposedFormat: entry.settings.format)
     }
 
     func restoreSettings(_ entry: Entry) {
         restoreSettings(entry.settings)
+        // An image's settings are one render's: no knob bracketed (a sheet sets its own, below).
+        brackets = []
+        seriesPlaced = [nil, nil]
         // Fixed, or the next render draws a new seed and the settings reused are not the image's.
         seed = entry.seed
         fixedSeed = true
@@ -623,15 +647,16 @@ extension AppState {
         variations = entry.settings.variations
         // The image it started from, with its strength — or none: « Redo » renders the same image, not an img2img of another.
         if let s = entry.settings.strength, let start = entry.start, startsFromImage {
-            startImage = start
+            setStart(start)
             startStrength = s
         } else {
-            startImage = nil
+            setStart(nil)
         }
         if let g = entry.grid?.grid {
             // A sheet's prompt is the one typed, its groups the grid's axes: not escaped.
-            setGridForm(g, prompt: entry.settings.prompt)
-            MainWindow.shared.showExploration()
+            prompt = entry.settings.prompt
+            let left = setSeries(from: g)
+            if !left.isEmpty { flash(String(localized: "The grid’s models, steps or edit images are silicontrol’s: left out")) }
         }
     }
 
@@ -657,9 +682,16 @@ extension AppState {
     /// Incognito: the file is only read — no panel, no recent item, no copy.
     func restoreSettings(fromPNG url: URL) -> Bool {
         guard url.isFileURL, url.pathExtension.lowercased() == "png",
-              let data = try? Data(contentsOf: url, options: .mappedIfSafe),
-              let recipe = Engine.Render.Recipe(metadata: PNG.text(data)) else { return false }
-        let file = url.lastPathComponent
+              let data = try? Data(contentsOf: url, options: .mappedIfSafe) else { return false }
+        return restoreSettings(fromPNG: data, file: url.lastPathComponent)
+    }
+
+    /// Whether these bytes are a PNG Siliconed wrote: what offers « Reuse These Settings » on an image of the Prompt Lab.
+    static func isRecipe(_ data: Data) -> Bool { Engine.Render.Recipe(metadata: PNG.text(data)) != nil }
+
+    /// The same, from the bytes — an image of the Prompt Lab; `file` names it in the notes.
+    func restoreSettings(fromPNG data: Data, file: String) -> Bool {
+        guard let recipe = Engine.Render.Recipe(metadata: PNG.text(data)) else { return false }
         var notes: [String] = []
 
         // The PNG names a family, not a card (a fine-tune writes its family's name): the form's

@@ -118,6 +118,80 @@ package struct PromptAlternatives: Equatable, Sendable {
         return s
     }
 
+    // ── the groups in the text as typed ──
+
+    /// **Where a group is in the text as typed**: from its `{` to its `}` included, and each alternative's characters.
+    package struct Span: Equatable, Sendable {
+        package let range: Range<String.Index>
+        package let alternatives: [Range<String.Index>]
+    }
+
+    /// **The groups of `prompt` where they are typed**, in reading order — what a field draws as a chip and a gesture
+    /// rewrites. `[]` when the text does not parse: a chip is never drawn over a syntax error.
+    package static func spans(_ prompt: String) -> [Span] {
+        guard (try? PromptAlternatives(prompt, limit: .max)) != nil else { return [] }
+        var spans: [Span] = []
+        var open: String.Index?
+        var start = prompt.startIndex
+        var alternatives: [Range<String.Index>] = []
+        var i = prompt.startIndex
+        while i < prompt.endIndex {
+            let c = prompt[i]
+            let next = prompt.index(after: i)
+            switch c {
+            case "\\":
+                // As the parser: the character after a backslash is consumed with it, whatever it is.
+                i = next < prompt.endIndex ? prompt.index(after: next) : next
+                continue
+            case "{":
+                open = i; start = next; alternatives = []
+            case "|" where open != nil:
+                alternatives.append(start..<i); start = next
+            case "}":
+                if let o = open {
+                    alternatives.append(start..<i)
+                    spans.append(Span(range: o..<next, alternatives: alternatives))
+                    open = nil
+                }
+            default:
+                break
+            }
+            i = next
+        }
+        return spans
+    }
+
+    /// **An alternative written to read back as itself inside a group**: its `{`, `}` and `|` escaped.
+    package static func escapingAlternative(_ text: String) -> String {
+        var s = ""
+        for c in text {
+            if c == "{" || c == "}" || c == "|" { s.append("\\") }
+            s.append(c)
+        }
+        return s
+    }
+
+    /// **A group as typed**: `{red|blue|green}`, each alternative escaped — what « Vary This Word… » writes.
+    package static func group(_ alternatives: [String]) -> String {
+        "{" + alternatives.map(escapingAlternative).joined(separator: "|") + "}"
+    }
+
+    /// **The `g`-th group of `prompt` replaced by `text`**, written as it should be typed (another group, or a word
+    /// `escaping` made safe). The prompt unchanged when it has no such group.
+    package static func replacing(group g: Int, in prompt: String, with text: String) -> String {
+        let spans = spans(prompt)
+        guard spans.indices.contains(g) else { return prompt }
+        var s = prompt
+        s.replaceSubrange(spans[g].range, with: text)
+        return s
+    }
+
+    /// **The `g`-th group brought back to its first alternative** — the text a series no longer varies there.
+    package static func collapsing(group g: Int, in prompt: String) -> String {
+        guard let p = try? PromptAlternatives(prompt, limit: .max), p.groups.indices.contains(g) else { return prompt }
+        return replacing(group: g, in: prompt, with: escaping(p.groups[g].first ?? ""))
+    }
+
     // ── the parser ──
 
     private static func parse(_ prompt: String) throws(EngineError) -> [Piece] {

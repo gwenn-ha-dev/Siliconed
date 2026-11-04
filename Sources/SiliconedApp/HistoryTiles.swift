@@ -1,4 +1,4 @@
-// The history strip: banner, thumbnails, live and exploration tiles and their buttons.
+// The history column: thumbnails, live and series tiles and their buttons.
 // Split from `MainView.swift`.
 
 import AppKit
@@ -8,16 +8,18 @@ import UniformTypeIdentifiers
 
 // MARK: - The history
 
+/// **The history, in a column on the right of the image** (the height is what a window lacks, not the width): the newest on top,
+/// the series' tile and the render under way first; at its foot, how many images and the thumbnails' size.
 struct Banner: View {
     @Bindable var app: AppState
 
     var body: some View {
-        HStack(spacing: 0) {
+        VStack(spacing: 0) {
             ScrollViewReader { reader in
-            ScrollView(.horizontal) {
-                LazyHStack(spacing: 8) {
+            ScrollView(.vertical) {
+                LazyVStack(spacing: 8) {
                     if let run = app.explored { ExplorationTile(app: app, run: run) }
-                    // An exploration's cell shows its own preview in the grid: no second tile for it.
+                    // A series' cell shows its own preview in the grid: no second tile for it.
                     if let job = app.currentJob, app.explored?.jobs.contains(job.ordinal) != true {
                         LiveTile(app: app, job: job)
                     }
@@ -28,7 +30,7 @@ struct Banner: View {
                             .id(entry.id)
                     }
                 }
-                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
             }
             .scrollIndicators(.never)
             .onChange(of: app.selection) { _, id in
@@ -38,27 +40,22 @@ struct Banner: View {
             Divider()
             sizeControl
         }
-        // The strip is as tall as its thumbnails, never more: the canvas keeps the rest.
-        .frame(height: app.thumbnailSide + 20)
+        // The column is as wide as its thumbnails, never more: the canvas keeps the rest.
+        .frame(width: app.thumbnailSide + 28)
         .background(.black.opacity(0.12))
-        .overlay(alignment: .top) { Divider() }
     }
 
-    /// At the strip's end: how many images, and the thumbnails' size.
+    /// At the column's foot: how many images, and the thumbnails' size.
     private var sizeControl: some View {
-        VStack(alignment: .trailing, spacing: 6) {
+        VStack(spacing: 6) {
             Text(app.history.count == 1 ? String(localized: "1 image") : String(localized: "\(app.history.count) images"))
                 .font(.caption).monospacedDigit().foregroundStyle(.secondary)
-            HStack(spacing: 4) {
-                Image(systemName: "photo").imageScale(.small)
-                Slider(value: $app.thumbnailSide, in: 48...140).frame(width: 80).controlSize(.mini)
-                Image(systemName: "photo").imageScale(.large)
-            }
-            .foregroundStyle(.secondary)
-            .help("Thumbnail size")
+            Slider(value: $app.thumbnailSide, in: 48...160).controlSize(.mini)
+                .foregroundStyle(.secondary)
+                .help("Thumbnail size")
+                .accessibilityLabel(Text("Thumbnail size"))
         }
-        .padding(.horizontal, 14)
-        .fixedSize(horizontal: true, vertical: false)
+        .padding(.horizontal, 8).padding(.vertical, 8)
     }
 }
 
@@ -152,7 +149,7 @@ private struct LiveTile: View {
     }
 }
 
-/// **The exploration, at the head of the strip**: its grid in small, how far it is; a click brings the
+/// **The series, at the head of the strip**: its grid in small, how far it is; a click brings the
 /// grid back to the canvas.
 private struct ExplorationTile: View {
     let app: AppState
@@ -175,9 +172,9 @@ private struct ExplorationTile: View {
         .frame(height: side + 4)
         .contentShape(Rectangle())
         .onTapGesture { app.showsExploration = true }
-        .help("The exploration’s grid")
+        .help("The series’ grid")
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text("The exploration’s grid"))
+        .accessibilityLabel(Text("The series’ grid"))
         .accessibilityValue(Text(verbatim: "\(run.entries.count)/\(run.jobs.count)"))
         .accessibilityAddTraits(.isButton)
     }
@@ -224,7 +221,8 @@ private struct EditButtons: View {
 
     var body: some View {
         if app.editingPossible {
-            Button("Edit This Image") { app.placeReference(entry) }
+            // The shortcut of « Send to the Prompt Lab » under a model that edits: the image goes straight to image 1.
+            Button("Edit with \(app.card?.name ?? "")") { app.placeReference(entry) }
         } else if app.editors.count == 1, let model = app.editors.first {
             Button("Edit with \(model.name)") { app.edit(entry, with: model.id) }
         } else if !app.editors.isEmpty {
@@ -258,21 +256,21 @@ struct MenuEntry: View {
             Button("Full Screen") { app.show(entry.id); app.fullScreen = true }
             Divider()
             Button(app.busy ? "Render Again (Same Seed), Queued" : "Render Again (Same Seed)") { app.redo(entry) }
-            if entry.grid == nil, entry.sketch == nil {
+            if entry.grid == nil {
                 Menu("Variations") { VariationButtons(app: app, entry: entry) }
                     .disabled(!app.canVary(entry))
             }
-            if entry.grid == nil, entry.sketch == nil {
+            if entry.grid == nil {
                 Button("Enlarge ×4") { app.enlarge(entry) }
                     .disabled(app.enlargeRefusal(entry) != nil)
             }
-            if entry.grid == nil, entry.sketch == nil {
+            if entry.grid == nil {
                 Button("Crop…") { app.beginCrop(entry) }
                     .disabled(app.cropRefusal(entry) != nil)
             }
             Button(entry.grid == nil ? "Reuse These Settings" : "Reuse This Grid") { app.restoreSettings(entry) }
             if entry.grid == nil { EditButtons(app: app, entry: entry) }
-            if entry.grid == nil { Button("Open in the Prompt Lab") { LabModel.shared.load(image: entry.png); LabWindow.shared.show() } }
+            if entry.grid == nil { Button("Send to the Prompt Lab") { LabModel.shared.send(entry) } }
             Divider()
             Button("Remove from History", role: .destructive) { app.delete(entry) }
         }

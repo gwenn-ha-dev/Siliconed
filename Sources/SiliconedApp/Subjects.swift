@@ -332,12 +332,28 @@ extension AppState {
     }
 
     /// **The job's prompt and references for one expanded prompt**: rewritten when it cites subjects,
-    /// the subjects' framed pictures after the edit's images.
+    /// the subjects' framed pictures after the edit's images — and without what the field greys (`LabInputs.inert`): a
+    /// subject under a model that reads no image, a reference to an image the render does not carry. The text kept as
+    /// typed, the model's prompt goes beside it (`modelPrompt`) whenever it differs.
     /// In a mirror the job goes with the rewrite and the pictures (`RemoteJob.modelPrompt`): the subjects stay here.
     func namedJob(_ expanded: String, settings: inout RenderSettings, references edit: [ReferenceImage],
                   model: Model? = nil, capacity: Int? = nil) -> [ReferenceImage] {
-        guard case .success(let r)? = rewrite(expanded, model: model, capacity: capacity, editImages: edit.count),
-              !r.placed.isEmpty else { return edit }
+        var text = expanded
+        if let reads = capacity ?? model.map({ $0.chain.text.output.readsImages ? $0.chain.denoising.maxReferences : 0 }) {
+            // The subjects' pictures counted first: a reference past them does not go.
+            var pictures = 0
+            if case .success(let r)? = rewrite(expanded, model: model, capacity: capacity, editImages: edit.count) {
+                pictures = subjects.references(r.placed).count
+            }
+            let inert = LabInputs.inert(in: expanded, known: Set(subjects.all.map(\.id)), capacity: reads,
+                                        carried: edit.count + pictures)
+            text = LabInputs.sent(expanded, leaving: inert)
+        }
+        guard case .success(let r)? = rewrite(text, model: model, capacity: capacity, editImages: edit.count),
+              !r.placed.isEmpty else {
+            if text != expanded { settings.modelPrompt = text }
+            return edit
+        }
         let placed = subjects.references(r.placed)
         settings.modelPrompt = r.prompt
         settings.subjectImages = placed.count

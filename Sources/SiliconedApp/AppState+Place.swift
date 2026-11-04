@@ -43,7 +43,7 @@ extension AppState {
         guard workingCopy != nil, libraryReachable, forgeInProgress == nil else { return }
         let models = models ?? (readySet.contains(identifier) ? [identifier] : [])
         guard !models.isEmpty else { return }
-        let loras = loras ?? self.loras.map(\.path).filter { !$0.isEmpty }
+        let loras = loras ?? activeLoRAs.map(\.path)
         warmCancellation?.cancel()
         let cancellation = Cancellation()
         warmCancellation = cancellation

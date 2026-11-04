@@ -139,12 +139,12 @@ extension RemoteControl {
         /// `nil`: like the app's « Preview at every step » switch.
         var previews: Bool?
         var wait = false
+        /// `grid --no-sheet`: a series as « Generate » renders it — the cells, the sheet only on `sheet g2`.
+        var sheet = true
         var folder: String?
         /// `grid`: the axes as typed (`RenderGrid.axis`), and whether `--batch` was given (refused).
         var x: String?, y: String?
         var batchGiven = false
-        /// `grid --sketch`: the exploration's cells (`Sketch`), shown in its window, not in the history.
-        var sketch = false
     }
 
     /// **`subjects`** (`Subjects.swift`): list, name, delete — the Prompt Lab's library, in the app's memory.

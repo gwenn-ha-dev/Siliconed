@@ -90,8 +90,6 @@ package enum SessionMessage: Codable, Equatable, Sendable {
     /// Enlarging this image needs Apple's model, not yet on the mini: the Neo asks the user.
     case enlargeNeedsDownload(Int)
     case explored(RemoteExploration?)
-    /// One cell's image of the exploration `grid`; its PNG is the blob `entry.png`, which follows.
-    case cellImage(grid: Int, cell: Int, RemoteEntry)
     /// What the Statistics window reads for this client (`Statistics.swift`).
     case statistics(RemoteStatistics)
     /// The license this client's waiting job needs, to be accepted on its screen; `nil`: none waits.

@@ -85,7 +85,7 @@ extension AppState {
     /// the scale the rack had and among the sizes this Mac renders. The size stays free afterwards: the engine crops the centre.
     func carryStart(_ image: ReferenceImage, strength: Double? = nil) {
         guard startsFromImage else { return }
-        startImage = image
+        setStart(image)
         if let strength { startStrength = StartImage.snapped(strength) }
         if let f = recommendedFormat(width: image.width, height: image.height), f != format { useFormat(f) }
     }
@@ -97,7 +97,7 @@ extension AppState {
                                             current: format)
     }
 
-    func removeStart() { startImage = nil }
+    func removeStart() { setStart(nil) }
 
     /// The strength, as the slider and the remote control set it: in hundredths.
     func setStartStrength(_ s: Double) { startStrength = StartImage.snapped(s) }
@@ -135,21 +135,6 @@ extension AppState {
                           name: name)
     }
 
-    /// A file dropped on the rack's Images box, or chosen by its « Replace… »: it takes the place of the starting image, its strength
-    /// kept.
-    func replaceStart(with url: URL) {
-        guard let image = startImage(file: url) else { return }
-        carryStart(image)
-    }
-
-    func chooseStartReplacement() {
-        let panel = NSOpenPanel()
-        panel.allowedContentTypes = [.image]
-        panel.prompt = String(localized: "Choose")
-        panel.message = String(localized: "The image the render starts from: it keeps its composition, the strength says how far it moves away.")
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        replaceStart(with: url)
-    }
 }
 
 /// **The starting image in words**: its strength as a percentage, and what it means.

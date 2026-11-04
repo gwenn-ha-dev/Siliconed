@@ -32,7 +32,7 @@ extension AppState {
     var managementPossible: Bool { mirror == nil && forgeInProgress == nil && !busy && !diagnosticRunning && libraryReachable }
 
     /// **No render while an installation or an import runs**: one big job at a time on 16 GB — the
-    /// forge reads and writes GBs, a render maps as many. Why « Generate », « Explore » and the
+    /// forge reads and writes GBs, a render maps as many. Why « Generate » and the
     /// variations are greyed out, and what `silicontrol add` answers (`busy`); the queue waits too.
     var installBlocker: String? {
         forgeInProgress == nil ? nil : String(localized: "An installation is running: renders can start once it is done.")

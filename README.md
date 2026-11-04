@@ -25,7 +25,7 @@ The app ships as a `.dmg` on the [Releases](https://github.com/gwenn-ha-dev/Sili
 ## What it does
 
 - **Draws from text, and edits by instruction.** Qwen-Image-2.1 Turbo takes 1 to 3 images and a sentence (“replace the cloudy sky with a blue sky”) and changes only what you named. Which model for what, with licenses and sizes: [Models](docs/APP.md#models).
-- **Explores before it commits.** A grid of quick sketches across seeds, steps, LoRA strengths or models; the cell you pick becomes the finished image, the very one its sketch promised.
+- **Brackets, like a camera.** Vary a word, the seed, a LoRA's strength, LoRAs, Detail or the starting image: one finished image per cell, side by side on the canvas, each the very image a single render gives.
 - **Writes your prompts, if you ask** (beta). The Prompt Lab rewrites a short prompt in the style each model likes, or describes an image you drop on it. It uses a model you already have installed, and never while an image is rendering.
 - **Takes your own models.** Import LoRAs and fine-tunes from Civitai or Hugging Face.
 - **Local and private.** Rendering happens on your Mac, with no content filter added by the app and no history sent anywhere. It follows the system language (English, French, German, Spanish, Italian, Japanese or Simplified Chinese).
@@ -38,14 +38,14 @@ The tour of the app: [docs/APP.md](docs/APP.md).
 
 - **Fast, without cutting corners.** On the M1 Pro with 16 GB that did all the testing, at 1024², with all 8 evaluations (passes of the model) their recipes call for at full size: Qwen-Image-2.1 Turbo in 85.8 s, Z-Image Turbo in 101.9 s, Krea 2 Turbo in 140.9 s, in the Compact the app recommends (the model in 8-bit weights, half the disk; [the three versions](docs/APP.md#model-management)). Each computation goes to the GPU, the CPU's matrix unit or the Neural Engine as this Mac measured them. In full precision, the publisher's bf16 weights computed in fp32: 135.6 s, 113.1 s and 213.3 s. [All the numbers](docs/ENGINE.md#numbers).
 - **Big models, small Mac.** 34 GB of model on a 16 GB Mac sounds like a bad idea. Weights are read from disk as they are needed, and Siliconed never takes more than ¾ of the Mac's memory minus 2 GB, a budget it does not exceed, ever. Each render works out what it needs before it starts; one beyond the budget is politely refused up front. [How it is measured](docs/ENGINE.md#memory-and-the-budget).
-- **Even on an 8 GB MacBook Neo.** The one with an iPhone chip (A18 Pro): Anima Turbo in 91.5 s and Z-Image Turbo in 246.5 s at 1024², Compact, all 8 evaluations at full size, the app at 2.0 GiB at most and not a page of swap. [On a MacBook Neo](docs/ENGINE.md#on-a-macbook-neo).
+- **Even on an 8 GB MacBook Neo.** The one with an iPhone chip (A18 Pro): with 0.19, Anima Turbo makes a 1024² square in under a minute on it, in the Compact. We no longer have a Neo to time it properly: if you have one, or a Mac we have never seen, [send us your numbers](docs/ENGINE.md#on-a-macbook-neo).
 - **Checked against the original models, a bit obsessively.** Every stage is compared, channel by channel, with the reference implementation (diffusers / transformers in fp32 on CPU), and what cannot be checked does not ship. Run the checks yourself: [VERIFY.md](docs/VERIFY.md). The CI runs the kernels' CPU stages each time the engine changes; its GPU is virtual, so the GPU stages run on your Mac.
 - **Knows your Mac.** Before the first render, in about a minute (five at most) and without any model, it measures what each engine of your Mac — the GPU, the CPU's matrix unit, the Neural Engine — computes, alone and together, and checks every result against the exact one; it then works out, for every product and every attention of a render, how to share the rows among the engines that computed right. [How](docs/ENGINE.md#an-engine-measured-on-your-mac).
 - **Measured next to Draw Things' engine**, on the same Mac. The method and every figure are in [Next to Draw Things](docs/ENGINE.md#next-to-draw-things).
 
 ## Documentation
 
-- [docs/APP.md](docs/APP.md): the app in detail: creating, editing, writing prompts, exploring, managing models, settings, privacy.
+- [docs/APP.md](docs/APP.md): the app in detail: creating, editing, writing prompts, series, managing models, settings, privacy.
 - [docs/ENGINE.md](docs/ENGINE.md): the engine: measuring the Mac, the Neural Engine, numbers, Faster Rendering, Draw Things, memory, the community diagnostic, verification, building from source.
 - [docs/VERIFY.md](docs/VERIFY.md): checking the results against the reference on your Mac.
 - [docs/REMOTE-CONTROL.md](docs/REMOTE-CONTROL.md): `silicontrol`, protocol and internals.

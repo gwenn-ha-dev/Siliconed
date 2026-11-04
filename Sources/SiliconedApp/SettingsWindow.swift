@@ -164,7 +164,7 @@ struct SettingsView: View {
             }
             Section {
                 Toggle(isOn: $app.developerMode) {
-                    SettingLabel("More Solvers", "Adds the solvers Euler a, DPM++ 2M and UniPC to the DiT’s box and to the exploration’s axes. The default, Euler, is the one the models were distilled for.")
+                    SettingLabel("More Solvers", "Adds the solvers Euler a, DPM++ 2M and UniPC to the DiT’s box and to the series. The default, Euler, is the one the models were distilled for.")
                 }
                 Toggle(isOn: $app.fasterRenderingBeta) {
                     SettingLabel("Faster Rendering", "Adds a Faster Rendering switch to the DiT’s box: from 1024² up, the first steps at half size, faster, a slightly different image. Not with a LoRA, Detail or an edit. Off, no render is a faster one.")
