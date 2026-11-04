@@ -1,15 +1,16 @@
 // **« Generate », at the end of the text** — in the Prompt Lab's bar under the image, where the hand is when the idea is
 // written (`LabView.swift`), not at the foot of the rack:
 //
-//     folded     ▣ ▣  woman posing in a library…          ✦   ≈ 31 s  [ Generate ]  ˄
+//     folded     ▣ ▣  woman posing in a library…          ✦   [ Generate ]  ˄
 //     unfolded   …the text, the images…
-//                1024 × 1024 · 9.2 GB · ≈ 31 s                               [ Generate ]
+//                ↔ red, blue, green  ✕                                   [ Generate 3 Images ]
 //
 // - **No « Explore » beside it** (4/11): a series is the knobs' and the words' bracketing, which « Generate » renders
 //   whole, in finished images; what varies is said above it, one line per axis (`SeriesSummary`).
-// - **The cost before the click** (rule 7): folded, the time alone (and how many renders a series makes); unfolded, the
-//   size, the memory the engine will compare to this Mac's, how many renders, the time — learned on this Mac.
-// - **What stops it is said beside it**, in place of the cost: the reason (the whole sentence unfolded, cut to the line
+// - **No cost here** (the user, 4/11/2026: « c'est de la technique pure »): the size, the memory, the time and how many renders
+//   are the chain's, said under it in the rack (`RenderEstimate`); here, the idea, what varies, and the button that says
+//   how many images it makes.
+// - **What stops it is said beside it**: the reason (the whole sentence unfolded, cut to the line
 //   folded, whole on hover), and for a size this Mac cannot hold, the largest it can. An empty text says nothing folded: the
 //   field's own « Type the idea… » says it. A Mac not measured yet: « Measure This Mac… », folded or not — the render never
 //   starts the measure, its sheet asks for a Mac at rest first (4/11).
@@ -37,8 +38,6 @@ struct GenerateControls: View {
                 if let blocker {
                     if app.mapBlocker != nil { measure }
                     else if !app.prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { folded(blocker) }
-                } else {
-                    time
                 }
                 generate(disabled: blocker != nil)
             }
@@ -57,8 +56,6 @@ struct GenerateControls: View {
                                     .buttonStyle(.link).font(.caption)
                                     .help("The largest of this model’s sizes this Mac renders")
                             }
-                        } else {
-                            cost
                         }
                     }
                     Spacer(minLength: 8)
@@ -113,21 +110,6 @@ struct GenerateControls: View {
         .help(reason)
     }
 
-    @ViewBuilder private var time: some View {
-        if app.missing == nil, app.card != nil {
-            HStack(spacing: 6) {
-                if app.seriesRenders > 1 {
-                    Text("\(app.seriesRenders) renders").help(app.seriesHelp)
-                }
-                if let t = app.plannedCost {
-                    Text(verbatim: "≈ " + Figures.duration(t))
-                        .help("Learned on this Mac: the first render at this size, with this model, sets the estimate")
-                }
-            }
-            .font(.caption).monospacedDigit().foregroundStyle(.secondary)
-        }
-    }
-
     /// Folded, the images the render will not read are a mark: its sentence on hover, a click unfolds the bar where they are.
     @ViewBuilder private var unusedMark: some View {
         let unused = app.unusedInputs
@@ -156,49 +138,5 @@ struct GenerateControls: View {
     static func unusedSentence(_ unused: Int) -> String {
         unused == 1 ? String(localized: "1 image of the Prompt Lab not used")
                     : String(localized: "\(unused) images of the Prompt Lab not used")
-    }
-
-    /// **Rule 7: the cost before the click** — the size, the memory the engine will compare to the machine's, how many renders,
-    /// and the time, learned on this Mac in this session (never a constant from another machine).
-    @ViewBuilder private var cost: some View {
-        if app.missing == nil, let card = app.card {
-            let f = app.outputFormat
-            HStack(spacing: 14) {
-                Label {
-                    Text(verbatim: "\(f.width) × \(f.height)").monospacedDigit()
-                } icon: { Image(systemName: "aspectratio") }
-                if let need = app.memoryNeed {
-                    Label {
-                        Text(Figures.memory(need)).monospacedDigit()
-                    } icon: { Image(systemName: "memorychip") }
-                    .help(String(localized: "The memory \(card.name) needs at this size (computed)"))
-                }
-                if app.seriesRenders > 1 {
-                    // A series: how many renders, before the click.
-                    Label {
-                        Text("\(app.seriesRenders) renders").monospacedDigit()
-                    } icon: { Image(systemName: "square.grid.3x3") }
-                    .help(app.seriesHelp)
-                }
-                Label {
-                    if let t = app.plannedCost {
-                        Text(verbatim: "≈ " + Figures.duration(t)).monospacedDigit()
-                    } else {
-                        Text("after one render")
-                    }
-                } icon: { Image(systemName: "clock") }
-                .help("Learned on this Mac: the first render at this size, with this model, sets the estimate")
-            }
-            .font(.caption)
-            .foregroundStyle(.secondary)
-            .labelStyle(CompactLabel())
-        }
-    }
-}
-
-/// An icon and its text, close together.
-private struct CompactLabel: LabelStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        HStack(spacing: 4) { configuration.icon; configuration.title }
     }
 }

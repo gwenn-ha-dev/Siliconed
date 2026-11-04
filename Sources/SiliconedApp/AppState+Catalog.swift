@@ -236,7 +236,8 @@ extension AppState {
     /// The series, one axis per line — the tooltip of the render count.
     var seriesHelp: String {
         let layout = seriesLayout
-        return zip(["X", "Y"], layout.axes).map { "\($0): \(axisWords($1))" }.joined(separator: "\n")
+        return zip([String(localized: "Columns"), String(localized: "Rows")], layout.axes)
+            .map { "\($0): \(axisWords($1))" }.joined(separator: "\n")
     }
 
     /// **What the render will cost as it is set**, if it has already been measured in the session at

@@ -20,10 +20,12 @@
 // thumbnails first, under the caret (`SubjectCompletion`); ↑ ↓ choose, Return or Tab take, Esc closes.
 // The window's key monitor leaves Esc to it while it is open (`SubjectCompletion.isOpen`).
 //
-// **A series' group is a chip too** (`{red|blue}`, `PromptAlternatives`): drawn in the accent, its braces and bars not
-// drawn — a dot between its words. A click on it opens its bubble (`BracketBubble`), whose words rewrite the group where it is
-// typed; braces typed by hand make one as well. « Vary This Word… » (right-click on a word or a selection) turns words into a
-// group. The text stays the characters typed, as for a subject.
+// **A series' group is a chip too** (`{red|blue}`, `PromptAlternatives`): drawn in the series' yellow (`Palette.bracket`), its
+// braces and bars not drawn — a dot between its words. A click on it opens its bubble (`BracketBubble`), whose words rewrite the
+// group where it is typed; braces typed by hand make one as well. Words become a group by the card's ± (`PromptBracketMark`: the
+// selection, or the word at the caret) or by « Vary This Word… » at the head of the right-click menu — added by the delegate
+// (`textView(_:menu:for:at:)`): with an override of `menu(for:)`, the user saw only the system's menu (4/11/2026). The
+// text stays the characters typed, as for a subject.
 //
 // TextKit 1 on purpose: `drawBackground` / `drawGlyphs` of an `NSLayoutManager` subclass are the one
 // stable place to draw behind and above given glyphs, and a prompt is a few hundred characters.
@@ -167,6 +169,12 @@ struct PromptField: NSViewRepresentable {
         func openBracket(_ target: BracketTarget, at rect: NSRect) {
             guard let series, let view else { return }
             BracketPopover.show(series, target: target, relativeTo: rect, of: view)
+        }
+
+        /// **« Vary This Word… » at the head of the right-click menu**: the selection, or the word under the click.
+        func textView(_ textView: NSTextView, menu: NSMenu, for event: NSEvent, at charIndex: Int) -> NSMenu? {
+            (textView as? PromptTextView)?.addVary(to: menu, at: charIndex)
+            return menu
         }
 
         // ── the text changes ──
@@ -361,31 +369,68 @@ final class PromptTextView: NSTextView {
         openBracket(.key(.group(g)), rect(of: r))
     }
 
-    /// **« Vary This Word… »**: the selection, or the word under the click — never across a group.
-    override func menu(for event: NSEvent) -> NSMenu? {
-        let menu = super.menu(for: event)
-        guard openBracket != nil, isEditable, let menu, let storage = textStorage, storage.length > 0 else { return menu }
-        let at = characterIndexForInsertion(at: convert(event.locationInWindow, from: nil))
+    /// **The words a series would vary**: the selection when `index` falls in it (or no index is given: the card's ±), else the
+    /// word at `index` or just before the caret — never blank. Inside a group: that group, to change its words.
+    func varyTarget(at index: Int?) -> BracketTarget? {
+        guard openBracket != nil, isEditable, let storage = textStorage, storage.length > 0 else { return nil }
+        let length = storage.length
         let chosen = selectedRange()
-        let words = chosen.length > 0 && NSLocationInRange(at, chosen) ? chosen
-            : selectionRange(forProposedRange: NSRange(location: min(at, storage.length - 1), length: 0), granularity: .selectByWord)
-        let text = (string as NSString).substring(with: words)
+        let at = min(max(index ?? chosen.location, 0), length)
+        var r = NSRange()
+        for probe in [min(at, length - 1), max(at - 1, 0)] {
+            if let g = storage.attribute(.seriesGroup, at: probe, effectiveRange: &r) as? Int, chosen.length == 0 || index != nil {
+                return .key(.group(g))
+            }
+        }
+        let text = string as NSString
+        func blank(_ r: NSRange) -> Bool { text.substring(with: r).trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+        var words: NSRange
+        if chosen.length > 0, index == nil || NSLocationInRange(at, chosen) {
+            words = chosen
+        } else {
+            words = selectionRange(forProposedRange: NSRange(location: min(at, length - 1), length: 0), granularity: .selectByWord)
+            if blank(words), at > 0 {
+                words = selectionRange(forProposedRange: NSRange(location: at - 1, length: 0), granularity: .selectByWord)
+            }
+        }
+        guard !blank(words) else { return nil }
         var inGroup = false
         storage.enumerateAttribute(.seriesGroup, in: words) { v, _, stop in if v != nil { inGroup = true; stop.pointee = true } }
-        guard !inGroup, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return menu }
-        let item = NSMenuItem(title: String(localized: "Vary This Word…"), action: #selector(varyWords(_:)), keyEquivalent: "")
-        item.target = self
-        item.representedObject = NSValue(range: words)
-        menu.insertItem(item, at: 0)
-        menu.insertItem(.separator(), at: 1)
-        return menu
+        return inGroup ? nil : .words(words, prompt: string)
     }
 
-    @objc private func varyWords(_ sender: NSMenuItem) {
-        guard let words = (sender.representedObject as? NSValue)?.rangeValue,
-              NSMaxRange(words) <= (string as NSString).length else { return }
-        setSelectedRange(words)
-        openBracket?(.words(words, prompt: string), rect(of: words))
+    /// Adds « Vary This Word… » at the head of `menu` when there are words to vary at `index`.
+    func addVary(to menu: NSMenu, at index: Int) {
+        guard let target = varyTarget(at: index) else { return }
+        var title = String(localized: "Vary This Word…")
+        if case .key = target { title = String(localized: "Change These Words…") }
+        let item = NSMenuItem(title: title, action: #selector(varyFromMenu(_:)), keyEquivalent: "")
+        item.target = self
+        item.representedObject = index
+        menu.insertItem(item, at: 0)
+        menu.insertItem(.separator(), at: 1)
+    }
+
+    @objc private func varyFromMenu(_ sender: NSMenuItem) { vary(at: sender.representedObject as? Int) }
+
+    /// **The bubble for the words at `index`** (nil: the selection or the caret): `false` when there is nothing to vary there.
+    @discardableResult
+    func vary(at index: Int? = nil) -> Bool {
+        guard let target = varyTarget(at: index) else { return false }
+        switch target {
+        case let .words(words, _):
+            setSelectedRange(words)
+            openBracket?(target, rect(of: words))
+        case .key(.group(let g)):
+            var r = NSRange(location: 0, length: 0)
+            textStorage?.enumerateAttribute(.seriesGroup, in: NSRange(location: 0, length: textStorage?.length ?? 0)) { v, range, stop in
+                if v as? Int == g { r = range; stop.pointee = true }
+            }
+            openBracket?(target, rect(of: r))
+        default:
+            return false
+        }
+        return true
     }
 
     /// The first line's rectangle of these characters, in the view.
@@ -442,9 +487,9 @@ final class SubjectLayoutManager: NSLayoutManager {
             color.withAlphaComponent(0.14).setFill()
             NSBezierPath(roundedRect: rect, xRadius: rect.height / 2, yRadius: rect.height / 2).fill()
         }
-        let accent = NSColor.controlAccentColor
+        let accent = Palette.bracketInk
         groups(in: glyphsToShow, at: origin) { rect in
-            accent.withAlphaComponent(0.12).setFill()
+            accent.withAlphaComponent(0.14).setFill()
             NSBezierPath(roundedRect: rect, xRadius: 5, yRadius: 5).fill()
         }
         super.drawBackground(forGlyphRange: glyphsToShow, at: origin)
@@ -452,7 +497,7 @@ final class SubjectLayoutManager: NSLayoutManager {
 
     override func drawGlyphs(forGlyphRange glyphsToShow: NSRange, at origin: NSPoint) {
         super.drawGlyphs(forGlyphRange: glyphsToShow, at: origin)
-        let accent = NSColor.controlAccentColor
+        let accent = Palette.bracketInk
         groups(in: glyphsToShow, at: origin) { rect in
             let edge = NSBezierPath(roundedRect: rect.insetBy(dx: 0.5, dy: 0.5), xRadius: 4.5, yRadius: 4.5)
             edge.lineWidth = 1

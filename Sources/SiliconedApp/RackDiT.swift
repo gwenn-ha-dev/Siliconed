@@ -14,7 +14,7 @@ struct DiTBox: View {
     @State private var customSize = false
 
     var body: some View {
-        StageBox(title: "DiT", symbol: "sparkles", state: app.state(of: .denoising),
+        StageBox(title: "DiT", symbol: "engine.combustion", state: app.state(of: .denoising),
                  explanation: "The model that draws (a diffusion transformer): from noise, step by step, it makes the image the prompt describes") {
             Picker("Model", selection: $app.identifier) {
                 ForEach(app.visibleCards) { card in
@@ -234,13 +234,12 @@ struct DiTBox: View {
             }
             .help("The next render is a variation of the seed’s image, like the image it came from")
         }
-        Field(title: "Batch") {
+        // The lot is the series' seed axis (4/11): bracketing the seed is choosing how many, and where they go.
+        Field(title: "Batch", app: app, bracket: .seeds) {
             Stepper(value: $app.batch, in: 1...8) { Text(verbatim: "\(app.batch)").monospacedDigit() }
                 .fixedSize()
         }
         .help("Consecutive seeds; the prompt is encoded only once")
-        // The lot is the series' seed axis (4/11): bracketing the seed is choosing how many, and where they go.
-        .bracketable(app, .seeds)
         // **The steps, only off the recipe**: the five models are distilled for 8, and fewer is softer, more is longer and no
         // better — a choice that only costs. The line comes when something else set them (a PNG's settings reused,
         // `silicontrol`), as the variation's does, with its way back.
@@ -257,35 +256,38 @@ struct DiTBox: View {
         }
         // Not on a model that offers none (Anima): a choice that changes nothing is not shown.
         if app.offersDetail {
-            Field(title: "Detail") {
+            Field(title: "Detail", app: app, bracket: .detail) {
                 Picker("Detail", selection: $app.detail) {
                     ForEach(Detail.allCases, id: \.self) { Text(verbatim: $0.choice).tag($0) }
                 }
                 .pickerStyle(.segmented).labelsHidden().fixedSize()
             }
             .help("Adds fine texture and small details; Most can over-sharpen")
-            .bracketable(app, .detail)
         }
         // More Solvers, the models in front: how a step moves to the next. Euler is the distillation's own.
         if app.offeredSolvers.count > 1 {
-            Field(title: "Solver") {
+            Field(title: "Solver", app: app, bracket: .solver) {
                 Picker("Solver", selection: $app.solver) {
                     ForEach(app.offeredSolvers, id: \.self) { Text(verbatim: $0.choice).tag($0) }
                 }
                 .labelsHidden().fixedSize()
             }
             .help("How each step moves to the next, with the same steps: Euler is the one this model was distilled for")
-            .bracketable(app, .solver)
         }
         Toggle("Preview every step", isOn: $app.previews)
             .font(.callout)
             .help("Shows the image taking shape on the canvas after each step. It does not change the image.")
-        switches
+            .padding(.leading, BracketMark.gutter)
+        switches.padding(.leading, BracketMark.gutter)
     }
 
     /// **The two switches that change how the DiT computes**, each in the box of what it changes. A switch that cannot apply is
     /// greyed and says why, in a sentence, instead of disappearing or turning into a label. The decisions are `DiTSwitches`'s.
-    @ViewBuilder private var switches: some View {
+    private var switches: some View {
+        VStack(alignment: .leading, spacing: 9) { switchRows }
+    }
+
+    @ViewBuilder private var switchRows: some View {
         let id = app.identifier
         let reason = DiTSwitches.acceleratorsUnavailable(measured: app.settingsRead, offered: app.acceleratorsOffered)
         VStack(alignment: .leading, spacing: 2) {
@@ -330,7 +332,7 @@ struct DiTBox: View {
     /// the prompt. Nothing hides behind a popover or a hover.
     @ViewBuilder private var loras: some View {
         VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 8) {
+            let header = HStack(spacing: 8) {
                 Text("LoRA").foregroundStyle(.secondary)
                 if !app.loras.isEmpty {
                     Text(verbatim: "\(app.loras.count)/\(AppState.maxLoRA)").monospacedDigit().foregroundStyle(.secondary)
@@ -339,10 +341,19 @@ struct DiTBox: View {
                 LoRAAddMenu(app: app)
             }
             .font(.callout)
-            if app.compatibleLoras.isEmpty, app.loras.isEmpty {
-                Text("No LoRA for this model").font(.caption).foregroundStyle(.secondary)
+            // The title's ±: « Compare LoRAs », one of them per image beside the image without — where this model has some.
+            if app.applies(.comparedLoRAs) {
+                header.bracketable(app, .comparedLoRAs, menu: false)
+            } else {
+                header.padding(.leading, BracketMark.gutter)
             }
-            ForEach($app.loras) { $slot in LoRARow(app: app, slot: $slot) }
+            Group {
+                if app.compatibleLoras.isEmpty, app.loras.isEmpty {
+                    Text("No LoRA for this model").font(.caption).foregroundStyle(.secondary)
+                }
+                ForEach($app.loras) { $slot in LoRARow(app: app, slot: $slot) }
+            }
+            .padding(.leading, BracketMark.gutter)
         }
     }
 
@@ -435,7 +446,6 @@ struct LoRAAddMenu: View {
         }
         .menuStyle(.button).buttonStyle(.bordered).controlSize(.small).fixedSize()
         .help("A LoRA of this model (3 at most), or one to import: a .safetensors as published on Civitai")
-        .bracketable(app, .comparedLoRAs, menu: false)
     }
 }
 
@@ -475,8 +485,8 @@ struct LoRARow: View {
                     .multilineTextAlignment(.trailing).frame(width: 48)
                     .help("Strength: 0.8 attenuates, 1 as trained, more emphasizes")
             }
-            .bracketable(app, .loraStrength(slot.path), menu: false)
-            .padding(.leading, 22)
+            // Its ± under the switch, at the left of the strength it varies.
+            .bracketable(app, .loraStrength(slot.path), menu: false, gutter: 22)
             .opacity(slot.on ? 1 : 0.45)
             if let card, !card.triggers.isEmpty {
                 VStack(alignment: .leading, spacing: 3) {

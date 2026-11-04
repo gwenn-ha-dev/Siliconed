@@ -181,9 +181,15 @@ struct LabView: View {
                 }
             }
         }
+        // The series' column, as in the rack: its ± at the text's left (`PromptBracketMark`).
+        .padding(.leading, 18)
         .padding(6)
         .frame(height: 96)
         .background(card)
+        .overlay(alignment: .topLeading) {
+            PromptBracketMark(app: model.rack, disabled: model.isWriting || model.changes != nil)
+                .padding(.leading, 7).padding(.top, 8)
+        }
         .overlay(alignment: .topTrailing) {
             // A search field's clear button, where the eye looks for it; ⌘Z in the text brings the text back.
             if !model.text.isEmpty, !model.isWriting, model.changes == nil {

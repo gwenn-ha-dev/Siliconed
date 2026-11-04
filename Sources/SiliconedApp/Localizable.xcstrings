@@ -8613,6 +8613,46 @@
         }
       }
     },
+    "Bracket: Generate renders this setting at several values" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reihe: „Generieren“ rendert diese Einstellung mit mehreren Werten"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Horquillar: «Generar» renderiza este ajuste con varios valores"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bracketer : « Générer » rend ce réglage à plusieurs valeurs"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bracketing: «Genera» rende questa impostazione con più valori"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ブラケット：「生成」でこの設定を複数の値で描画します"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "包围：“生成”会以多个值渲染此设置"
+          }
+        }
+      }
+    },
     "Bracketed: Generate renders each value" : {
       "localizations" : {
         "de" : {
@@ -8649,6 +8689,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "包围中：“生成”会逐一渲染每个值"
+          }
+        }
+      }
+    },
+    "Bracketed: Generate renders each value. Click to change them." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "In Reihe: „Generieren“ rendert jeden Wert. Klicken, um sie zu ändern."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Horquillado: «Generar» renderiza cada valor. Haz clic para cambiarlos."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bracketé : « Générer » rend chaque valeur. Cliquez pour les changer."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Con bracketing: «Genera» rende ogni valore. Fai clic per cambiarli."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ブラケット中：「生成」で各値を描画します。クリックで値を変更。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "包围中：“生成”会逐一渲染每个值。点按以更改。"
           }
         }
       }
@@ -9049,6 +9129,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "更改文件夹…"
+          }
+        }
+      }
+    },
+    "Change These Words…" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diese Wörter ändern…"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cambiar estas palabras…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Changer ces mots…"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cambia queste parole…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "これらの語を変更…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更改这些词…"
           }
         }
       }
@@ -9729,6 +9849,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "请选择为此模型制作的 LoRA。"
+          }
+        }
+      }
+    },
+    "Choose a LoRA to compare with the image without." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wählen Sie eine LoRA, die mit dem Bild ohne verglichen wird."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Elige una LoRA para comparar con la imagen sin ella."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choisissez une LoRA à comparer à l’image sans."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scegli una LoRA da confrontare con l’immagine senza."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "LoRAなしの画像と比べるLoRAを選んでください。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请选择一个 LoRA，与不使用 LoRA 的图像比较。"
           }
         }
       }
@@ -10889,46 +11049,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "列"
-          }
-        }
-      }
-    },
-    "Columns (X)" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Spalten (X)"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Columnas (X)"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Colonnes (X)"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Colonne (X)"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "列（X）"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "列（X）"
           }
         }
       }
@@ -28867,46 +28987,6 @@
         }
       }
     },
-    "Rows (Y)" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Zeilen (Y)"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Filas (Y)"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Lignes (Y)"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Righe (Y)"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "行（Y）"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "行（Y）"
-          }
-        }
-      }
-    },
     "Save" : {
       "localizations" : {
         "de" : {
@@ -40720,6 +40800,46 @@
         }
       }
     },
+    "Two values at least: one alone is the setting itself." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mindestens zwei Werte: einer allein ist die Einstellung selbst."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dos valores como mínimo: uno solo es el propio ajuste."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deux valeurs au moins : une seule, c’est le réglage lui-même."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Almeno due valori: uno solo è l’impostazione stessa."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "値は2つ以上必要です：1つだけなら設定そのものです。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "至少需要两个值：只有一个值就是设置本身。"
+          }
+        }
+      }
+    },
     "Type a size (width × height)" : {
       "localizations" : {
         "de" : {
@@ -41602,6 +41722,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "变换此词…"
+          }
+        }
+      }
+    },
+    "Vary a word: select it, or put the caret in it, then click — Generate renders each word you give" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ein Wort variieren: markieren oder die Einfügemarke hineinsetzen, dann klicken – „Generieren“ rendert jedes angegebene Wort"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Variar una palabra: selecciónala o pon el cursor en ella y haz clic — «Generar» renderiza cada palabra que indiques"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Faire varier un mot : sélectionnez-le, ou placez-y le curseur, puis cliquez — « Générer » rend chaque mot donné"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Varia una parola: selezionala o mettici il cursore, poi fai clic — «Genera» rende ogni parola indicata"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "語を変化させる：語を選択するかカーソルを置いてクリック。「生成」が指定した各語で描画します"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "变换一个词：选中它或将光标放在其中，然后点按——“生成”会逐一渲染你给出的每个词"
           }
         }
       }

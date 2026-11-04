@@ -1,17 +1,22 @@
 // **The series: what « Generate » renders when something varies — and how the hand says it varies.**
 //
-//     the text     a woman in a (red · blue · green) dress     a group of words: « Vary This Word… », or braces typed
-//     the rack     Seed ± · Flat ± · Solver ± · Detail ±       a knob bracketed: right-click › « Bracket… », or ± on hover;
-//     the lab      the starting image's strength ±             « Compare LoRAs… » from the stack's « Add »
+//     the text     ± a woman in a (red · blue · green) dress   a group of words: the card's ± on the selection or the word at
+//                                                              the caret, right-click › « Vary This Word… », or braces typed
+//     the rack     ± Batch · ± Detail · ± Solver · ± LoRA      a knob bracketed: its ± at its left, right-click › « Bracket… »;
+//     the lab      ± the starting image's strength             ± LoRA (the stack's title): « Compare LoRAs… »
 //        │ what varies, placed on two axes at most (`SeriesLayout`)
 //        ▼
-//     beside Generate   X  red, blue, green   ✕               one line per axis; its ✕ brings that setting back to one
-//                       Y  3 seeds            ✕   ⇄            value; ⇄ exchanges columns and rows
+//     beside Generate   ↔  red, blue, green   ✕               one line per axis; its ✕ brings that setting back to one
+//                       ↕  3 seeds            ✕   ⇄            value; ⇄ exchanges columns and rows
 //                       [ Generate 9 Images ]
 //        │ a grid (`RenderGrid`): one job per cell (`AppState.enqueueGrid`), each a finished image into the history
 //        ▼
 //     the canvas   the grid fills in as the cells come (`SeriesCanvas`), until an image is chosen;
 //                  « Add Sheet to History » makes the sheet an image
+//
+// **Seen, never guessed** (the user, 4/11/2026: « le bracketing ne se voit pas, on ne peut pas le deviner »): the same ±, always
+// shown, in one yellow (`Palette.bracket`), at the left of everything that can vary — outlined it offers, filled it varies —;
+// what varies says its values under it, with the arrow of its axis (↔ the columns, ↕ the rows), in the same yellow.
 //
 // What an analogy with the former exploration, or with a camera's bracketing, would miss:
 //
@@ -24,6 +29,8 @@
 //   models is `silicontrol grid`'s; so is each image of an edit alone.
 // - **A bracket that no longer applies does not vary** (its LoRA switched off or removed, Detail on Anima, no starting
 //   image): its values wait, unseen, and come back with their knob.
+// - **A series is two values or more**: one is the knob itself. A bracket left with fewer does not vary (`Bracket.values`), and
+//   the bubble does not offer to make one — « Compare LoRAs » needs a LoRA beside the image without.
 // - **Three things varying never render**: « Generate » says it, and a ✕ takes one away. Placing an axis where another
 //   is replaces that one, and the bubble says which before the click (`SeriesLayout.place`).
 
@@ -41,6 +48,17 @@ struct Bracket: Equatable {
     var strength = 0.8
     var solvers: [Solver] = []
     var details: [Detail] = []
+
+    /// **How many images it makes along its axis** — a series is two or more: one value is the knob itself.
+    var values: Int {
+        switch key {
+        case .loraStrength, .startStrength: Set(numbers).count
+        case .comparedLoRAs: loras.contains { !$0.isEmpty } ? loras.count : 0
+        case .solver: solvers.count
+        case .detail: details.count
+        case .group, .seeds: 2
+        }
+    }
 }
 
 /// **What a bubble brackets**: an axis that is (or is about to be) — or words of the text, about to become a group.
@@ -65,8 +83,14 @@ extension AppState {
         }
     }
 
-    /// The brackets whose knob applies, in the order bracketed.
-    var activeBrackets: [Bracket] { brackets.filter { applies($0.key) } }
+    /// The brackets whose knob applies and that make a series (two values or more), in the order bracketed.
+    var activeBrackets: [Bracket] { brackets.filter { applies($0.key) && $0.values > 1 } }
+
+    /// Whether the ± may open: « Compare LoRAs » needs a LoRA not already in the stack, and room for one.
+    func canBracket(_ key: SeriesKey) -> Bool {
+        guard case .comparedLoRAs = key, !varies(key) else { return true }
+        return canAddLoRA && compatibleLoras.contains { l in !loras.contains { $0.path == l.path } }
+    }
 
     func bracket(_ key: SeriesKey) -> Bracket? { activeBrackets.first { $0.key == key } }
 
@@ -295,7 +319,7 @@ extension AppState {
 
 // MARK: - Beside « Generate »
 
-/// **What the series varies, in one place**: a line per axis, X the columns and Y the rows, each with its ✕; ⇄ when there
+/// **What the series varies, in one place**: a line per axis, ↔ the columns and ↕ the rows, each with its ✕; ⇄ when there
 /// are two; beyond two, the excess in orange, which keeps « Generate » off.
 struct SeriesSummary: View {
     @Bindable var app: AppState
@@ -305,24 +329,21 @@ struct SeriesSummary: View {
         if !layout.axes.isEmpty {
             VStack(alignment: .leading, spacing: 3) {
                 ForEach(Array(layout.axes.enumerated()), id: \.offset) { i, key in
-                    line(i == 0 ? "X" : "Y", key, help: i == 0 ? String(localized: "Columns") : String(localized: "Rows"),
-                         swap: i == 0 && layout.rows != nil)
+                    line(i, key, swap: i == 0 && layout.rows != nil)
                 }
                 ForEach(layout.excess, id: \.self) { key in
-                    line("+", key, help: String(localized: "Two axes at most: this one does not render"), excess: true)
+                    line(nil, key)
                 }
             }
             .font(.caption)
         }
     }
 
-    private func line(_ axis: String, _ key: SeriesKey, help: String, swap: Bool = false, excess: Bool = false) -> some View {
+    private func line(_ slot: Int?, _ key: SeriesKey, swap: Bool = false) -> some View {
         HStack(spacing: 6) {
-            Text(verbatim: axis).fontWeight(.semibold).monospaced().frame(width: 12)
-                .foregroundStyle(excess ? Color(nsColor: .systemOrange) : .secondary)
-                .help(help)
+            AxisMark(slot: slot).frame(width: 14)
             Text(verbatim: app.axisWords(key)).lineLimit(1).truncationMode(.middle)
-                .foregroundStyle(excess ? Color(nsColor: .systemOrange) : .primary)
+                .foregroundStyle(slot == nil ? Color(nsColor: .systemOrange) : .primary)
             Button { app.removeAxis(key) } label: { Image(systemName: "xmark.circle.fill") }
                 .buttonStyle(.borderless).foregroundStyle(.secondary)
                 .help(removeHelp(key))
@@ -347,11 +368,45 @@ struct SeriesSummary: View {
 
 // MARK: - A knob bracketable
 
+/// **An axis, as an arrow**: ↔ the columns, ↕ the rows, in the series' yellow; beyond two axes, the orange warning.
+struct AxisMark: View {
+    let slot: Int?
+
+    var body: some View {
+        Image(systemName: slot == 0 ? "arrow.left.and.right" : slot == 1 ? "arrow.up.and.down" : "exclamationmark.triangle.fill")
+            .foregroundStyle(slot == nil ? Color(nsColor: .systemOrange) : Palette.bracket)
+            .help(slot == 0 ? String(localized: "Columns") : slot == 1 ? String(localized: "Rows")
+                  : String(localized: "Two axes at most: this one does not render"))
+    }
+}
+
+/// **The series' mark, at the left of what can vary**: always shown, in the series' yellow — outlined it offers, filled the knob
+/// varies. A click opens the bubble.
+struct BracketMark: View {
+    @Bindable var app: AppState
+    let key: SeriesKey
+    /// The column the marks stand in, at the left of a box's settings: every title after it, marked or not.
+    static let gutter: CGFloat = 20
+
+    var body: some View {
+        let varies = app.varies(key)
+        Button { app.bracketing = key } label: {
+            Image(systemName: varies ? "plusminus.circle.fill" : "plusminus.circle")
+                .foregroundStyle(Palette.bracket)
+        }
+        .buttonStyle(.borderless)
+        .disabled(!app.canBracket(key))
+        .help(varies ? String(localized: "Bracketed: Generate renders each value. Click to change them.")
+                     : String(localized: "Bracket: Generate renders this setting at several values"))
+        .accessibilityLabel(Text("Bracket…"))
+    }
+}
+
 extension View {
-    /// **A knob that can be bracketed**: right-click › « Bracket… », or the ± that shows on hover; bracketed, its values
-    /// under it with the axis they make, a click on them reopens the bubble.
-    func bracketable(_ app: AppState, _ key: SeriesKey, menu: Bool = true) -> some View {
-        modifier(Bracketable(app: app, key: key, menu: menu))
+    /// **A knob that can be bracketed**: its ± at its left, in `gutter` (and right-click › « Bracket… » with `menu`); bracketed,
+    /// its values under it with the arrow of their axis, a click on them reopens the bubble.
+    func bracketable(_ app: AppState, _ key: SeriesKey, menu: Bool = true, gutter: CGFloat = BracketMark.gutter) -> some View {
+        modifier(Bracketable(app: app, key: key, menu: menu, gutter: gutter))
     }
 }
 
@@ -359,44 +414,39 @@ private struct Bracketable: ViewModifier {
     @Bindable var app: AppState
     let key: SeriesKey
     let menu: Bool
-    @State private var hover = false
+    let gutter: CGFloat
 
     func body(content: Content) -> some View {
-        let layout = app.seriesLayout
-        let slot = layout.slot(of: key)
-        let varies = app.varies(key)
-        VStack(alignment: .leading, spacing: 2) {
-            HStack(spacing: 4) {
+        let slot = app.seriesLayout.slot(of: key)
+        withMenu(VStack(alignment: .leading, spacing: 2) {
+            HStack(alignment: .firstTextBaseline, spacing: 0) {
+                BracketMark(app: app, key: key).frame(width: gutter, alignment: .leading)
                 content
-                Button { app.bracketing = key } label: { Image(systemName: "plusminus.circle") }
-                    .buttonStyle(.borderless)
-                    .foregroundStyle(varies ? Palette.live : .secondary)
-                    .opacity(hover || varies || app.bracketing == key ? 1 : 0)
-                    .help("Bracket…")
-                    .accessibilityLabel(Text("Bracket…"))
             }
-            if varies {
+            if app.varies(key) {
                 Button { app.bracketing = key } label: {
                     HStack(spacing: 4) {
-                        Text(verbatim: slot == 0 ? "X" : slot == 1 ? "Y" : "+").fontWeight(.semibold).monospaced()
+                        AxisMark(slot: slot)
                         Text(verbatim: app.axisWords(key)).lineLimit(1).truncationMode(.middle)
+                            .foregroundStyle(slot == nil ? Color(nsColor: .systemOrange) : Palette.bracket)
                     }
                     .font(.caption)
-                    .foregroundStyle(slot == nil ? Color(nsColor: .systemOrange) : Palette.live)
                 }
                 .buttonStyle(.plain)
+                .padding(.leading, gutter)
                 .help("Bracketed: Generate renders each value")
             }
-        }
-        .onHover { hover = $0 }
-        .contextMenu {
-            if menu { Button("Bracket…") { app.bracketing = key } }
-        }
+        })
         .popover(isPresented: Binding(get: { app.bracketing == key },
                                       set: { if !$0, app.bracketing == key { app.bracketing = nil } }),
                  arrowEdge: .trailing) {
             BracketBubble(app: app, target: .key(key)) { app.bracketing = nil }
         }
+    }
+
+    /// Right-click › « Bracket… » where the knob has no menu of its own (a LoRA's card has one, which says it).
+    @ViewBuilder private func withMenu<V: View>(_ v: V) -> some View {
+        if menu { v.contextMenu { Button("Bracket…") { app.bracketing = key } } } else { v }
     }
 }
 
@@ -445,6 +495,9 @@ struct BracketBubble: View {
         VStack(alignment: .leading, spacing: 12) {
             Text(verbatim: String(localized: "Bracket · \(app.knobName(key))")).font(.headline)
             values
+            if !valid {
+                Text(hint).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            }
             axis
             HStack {
                 if exists {
@@ -518,7 +571,7 @@ struct BracketBubble: View {
                         in: 0.05...0.5, step: 0.05) {
                     Text(verbatim: String(localized: "Step \(isPercent ? StartWords.percent(step) : Figures.strength(step))")).monospacedDigit()
                 }
-                Stepper(value: Binding(get: { draft.numbers.count }, set: { regenerate(count: $0) }), in: 1...9) {
+                Stepper(value: Binding(get: { draft.numbers.count }, set: { regenerate(count: $0) }), in: 2...9) {
                     Text(verbatim: String(localized: "Count \(String(draft.numbers.count))")).monospacedDigit()
                 }
             }
@@ -581,8 +634,8 @@ struct BracketBubble: View {
                 } label: {
                     Text(verbatim: label(value)).lineLimit(1)
                         .padding(.horizontal, 8).padding(.vertical, 3)
-                        .background(Capsule().fill(on ? Palette.live.opacity(0.25) : Palette.well))
-                        .overlay(Capsule().strokeBorder(on ? Palette.live : Palette.hairline))
+                        .background(Capsule().fill(on ? Palette.bracket.opacity(0.25) : Palette.well))
+                        .overlay(Capsule().strokeBorder(on ? Palette.bracket : Palette.hairline))
                 }
                 .buttonStyle(.plain)
             }
@@ -605,8 +658,8 @@ struct BracketBubble: View {
     private var axis: some View {
         VStack(alignment: .leading, spacing: 4) {
             Picker("Axis", selection: $slot) {
-                Text("Columns (X)").tag(0)
-                Text("Rows (Y)").tag(1)
+                Label("Columns", systemImage: "arrow.left.and.right").tag(0)
+                Label("Rows", systemImage: "arrow.up.and.down").tag(1)
             }
             .pickerStyle(.segmented)
             if let r = replaced {
@@ -625,16 +678,20 @@ struct BracketBubble: View {
 
     // ── done ──
 
+    /// Why « Bracket » waits.
+    private var hint: String {
+        if case .comparedLoRAs = key { return String(localized: "Choose a LoRA to compare with the image without.") }
+        return String(localized: "Two values at least: one alone is the setting itself.")
+    }
+
     private var cleanWords: [String] { words.filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty } }
 
+    /// Two values or more: one is the knob itself (`Bracket.values`).
     private var valid: Bool {
         switch key {
         case .group: cleanWords.count > 1
         case .seeds: seeds > 1
-        case .loraStrength, .startStrength: !draft.numbers.isEmpty
-        case .solver: !draft.solvers.isEmpty
-        case .detail: !draft.details.isEmpty
-        case .comparedLoRAs: !draft.loras.isEmpty
+        default: draft.values > 1
         }
     }
 
@@ -689,6 +746,27 @@ private struct FlowRow: Layout {
 }
 
 // MARK: - From the text
+
+/// **The text's ±, at the card's left**: the selection, or the word at the caret, becomes a group — or the group the caret is
+/// in opens; filled once the text has a group. The same mark as the rack's, so that the text reads as something that varies too.
+struct PromptBracketMark: View {
+    @Bindable var app: AppState
+    var disabled = false
+
+    var body: some View {
+        let varies = !app.promptGroups.isEmpty
+        Button {
+            if PromptTextView.current?.vary() != true { NSSound.beep() }
+        } label: {
+            Image(systemName: varies ? "plusminus.circle.fill" : "plusminus.circle")
+                .foregroundStyle(Palette.bracket)
+        }
+        .buttonStyle(.borderless)
+        .disabled(disabled || app.prompt.isEmpty)
+        .help("Vary a word: select it, or put the caret in it, then click — Generate renders each word you give")
+        .accessibilityLabel(Text("Vary This Word…"))
+    }
+}
 
 /// **The bubble over the text**: for words selected (« Vary This Word… ») or a group's chip clicked — an AppKit popover,
 /// the field being AppKit's.

@@ -121,12 +121,24 @@ extension PortBox where Trailing == EmptyView {
 }
 
 /// **A setting in a box**: its name on the left, its controls on the right — or under it, when the
-/// box is too narrow for both on one line.
+/// box is too narrow for both on one line. **At its left, the series' column** (`BracketMark.gutter`): the ± of a knob that can
+/// vary (`bracket`), empty for the others, so that every title starts on one line and every control ends on one — a ± after
+/// the controls, shown on hover, pushed some of them in (the user, 4/11/2026: « Random » out of line with what is above it).
 struct Field<Controls: View>: View {
     let title: LocalizedStringKey
+    var app: AppState? = nil
+    var bracket: SeriesKey? = nil
     @ViewBuilder var controls: Controls
 
     var body: some View {
+        if let app, let bracket {
+            line.bracketable(app, bracket)
+        } else {
+            line.padding(.leading, BracketMark.gutter)
+        }
+    }
+
+    private var line: some View {
         ViewThatFits(in: .horizontal) {
             HStack(spacing: 8) {
                 Text(title).foregroundStyle(.secondary)

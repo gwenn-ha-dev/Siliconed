@@ -67,6 +67,10 @@ enum Palette {
     static let amber = dynamic(dark: 0xE5B46E, light: 0xA36E09)
     static let lavender = dynamic(dark: 0xC8AEF8, light: 0x8668B6)
     static let seaGreen = dynamic(dark: 0x67D4C0, light: 0x00917D)
+    /// **A series** (bracketing): the mark at the left of what can vary, the text's groups, the axes beside « Generate » — one
+    /// yellow everywhere, a hue of its own: the accent is what runs, amber the text's wire (the user, 4/11/2026).
+    static let bracketInk = dynamicInk(dark: 0xFFD60A, light: 0xB89400)
+    static let bracket = Color(nsColor: bracketInk)
     /// What runs: the system's accent, as a selection or a progress bar elsewhere in macOS.
     static let live = Color.accentColor
     static let failure = Color(nsColor: .systemRed)
@@ -82,13 +86,16 @@ enum Palette {
         a.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? NSColor(white: 1, alpha: 0.16) : NSColor(white: 0, alpha: 0.14)
     })
 
-    private static func dynamic(dark: Int, light: Int) -> Color {
+    private static func dynamic(dark: Int, light: Int) -> Color { Color(nsColor: dynamicInk(dark: dark, light: light)) }
+
+    /// The same, for AppKit's drawing (the text's groups).
+    private static func dynamicInk(dark: Int, light: Int) -> NSColor {
         func color(_ v: Int) -> NSColor {
             NSColor(srgbRed: CGFloat(v >> 16 & 0xFF) / 255, green: CGFloat(v >> 8 & 0xFF) / 255, blue: CGFloat(v & 0xFF) / 255, alpha: 1)
         }
-        return Color(nsColor: NSColor(name: nil) { a in
+        return NSColor(name: nil) { a in
             a.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? color(dark) : color(light)
-        })
+        }
     }
 }
 
@@ -203,6 +210,7 @@ struct RackView: View {
             .onGeometryChange(for: Bool.self) { $0.frame(in: .scrollView).minY < 0 } action: { chainAway?.wrappedValue = $0 }
             DiTBox(app: app).node(.dit)
             vae.node(.vae)
+            RenderEstimate(app: app)
             legend
         }
         .padding(.horizontal, 14)
@@ -338,6 +346,61 @@ struct RackView: View {
             WeightsTag(format: app.weightFormats?.vae)
             Cost(app.stageCost(.decoding))
         }
+    }
+}
+
+// MARK: - What the next render costs
+
+/// **The next render, before the click** (rule 7), under the chain that makes it: the size, the memory the engine will compare
+/// to this Mac's (computed), how many renders a series makes, and the time — learned on this Mac in this session, never a
+/// constant from another machine. Here, not under the text (the user, 4/11/2026: « c'est de la technique pure »).
+struct RenderEstimate: View {
+    @Bindable var app: AppState
+
+    var body: some View {
+        if app.missing == nil, let card = app.card {
+            let f = app.outputFormat
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 12) { figures(card, f) }
+                VStack(alignment: .leading, spacing: 4) { figures(card, f) }
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .labelStyle(CompactLabel())
+        }
+    }
+
+    @ViewBuilder private func figures(_ card: ModelCard, _ f: RecommendedFormat) -> some View {
+        Label {
+            Text(verbatim: "\(f.width) × \(f.height)").monospacedDigit()
+        } icon: { Image(systemName: "aspectratio") }
+        if let need = app.memoryNeed {
+            Label {
+                Text(Figures.memory(need)).monospacedDigit()
+            } icon: { Image(systemName: "memorychip") }
+            .help(String(localized: "The memory \(card.name) needs at this size (computed)"))
+        }
+        if app.seriesRenders > 1 {
+            Label {
+                Text("\(app.seriesRenders) renders").monospacedDigit()
+            } icon: { Image(systemName: "square.grid.3x3") }
+            .help(app.seriesHelp)
+        }
+        Label {
+            if let t = app.plannedCost {
+                Text(verbatim: "≈ " + Figures.duration(t)).monospacedDigit()
+            } else {
+                Text("after one render")
+            }
+        } icon: { Image(systemName: "clock") }
+        .help("Learned on this Mac: the first render at this size, with this model, sets the estimate")
+    }
+}
+
+/// An icon and its text, close together.
+private struct CompactLabel: LabelStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        HStack(spacing: 4) { configuration.icon; configuration.title }
     }
 }
 
