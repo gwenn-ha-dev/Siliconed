@@ -33060,46 +33060,6 @@
         }
       }
     },
-    "Sweep seeds, a LoRA’s strength, words of the prompt, models or the images to edit — small sketches, fast (⌥⌘G)" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Seeds, die Stärke einer LoRA, Wörter des Prompts, Modelle oder die zu bearbeitenden Bilder durchspielen – kleine Skizzen, schnell (⌥⌘G)"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Recorre semillas, la intensidad de un LoRA, palabras del prompt, modelos o las imágenes que editar — pequeños bocetos, rápidos (⌥⌘G)"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Balayez des graines, la force d’une LoRA, des mots du prompt, des modèles ou les images à éditer — de petites esquisses, vite (⌥⌘G)"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Esplora semi, l’intensità di una LoRA, parole del prompt, modelli o le immagini da modificare — piccoli schizzi, veloci (⌥⌘G)"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "シード、LoRAの強さ、プロンプトの単語、モデル、編集する画像を順に変えて、小さなスケッチを素早く生成（⌥⌘G）"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "扫过种子、LoRA 的强度、提示词中的词、模型或要编辑的图像——小草稿，快速完成（⌥⌘G）"
-          }
-        }
-      }
-    },
     "Switch" : {
       "localizations" : {
         "de" : {

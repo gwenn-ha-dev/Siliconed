@@ -3,8 +3,10 @@
 //
 //     folded     ▣ ▣  woman posing in a library…          ✦   ≈ 31 s  [ Generate ]  ˄
 //     unfolded   …the text, the images…
-//                1024 × 1024 · 9.2 GB · ≈ 31 s                    [Explore]  [ Generate ]
+//                1024 × 1024 · 9.2 GB · ≈ 31 s                               [ Generate ]
 //
+// - **No « Explore » beside it** (4/11): a series is the knobs' and the words' bracketing, which « Generate » renders whole;
+//   until it comes, the exploration's panel opens from the Render menu (⌥⌘G).
 // - **The cost before the click** (rule 7): folded, the time alone (and how many renders a text with alternatives makes);
 //   unfolded, the size, the memory the engine will compare to this Mac's, how many renders, the time — learned on this Mac.
 // - **What stops it is said beside it**, in place of the cost: the reason (the whole sentence unfolded, cut to the line
@@ -56,13 +58,6 @@ struct GenerateControls: View {
                         }
                     }
                     Spacer(minLength: 8)
-                    Button { MainWindow.shared.showExploration() } label: {
-                        Label("Explore", systemImage: "square.grid.3x3")
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.large)
-                    .fixedSize()
-                    .help("Sweep seeds, a LoRA’s strength, words of the prompt, models or the images to edit — small sketches, fast (⌥⌘G)")
                     generate(disabled: blocker != nil)
                 }
             }
