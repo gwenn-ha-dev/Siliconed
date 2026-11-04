@@ -2,7 +2,7 @@
 //
 //     typed      woman posing with @alice in @red-coat and @bob
 //     drawn      woman posing with (▣ alice) in (▣ red-coat) and @bob
-//                                  └ lavender   └ lavender       └ unknown: dotted underline
+//                                  └ rose       └ rose           └ unknown: dotted underline
 //
 // **Greyed where the model does not read it** (`reading`, the rule is `LabInputs.inert`): under a model that takes no image,
 // a subject's chip is drawn grey, its thumbnail faded; a reference to an image the render does not carry (`<image3>` with two)
@@ -682,7 +682,7 @@ private struct CompletionList: View {
                 }
                 .padding(.horizontal, 6).frame(height: 28)
                 .background(RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .fill(i == model.selected ? Color.accentColor.opacity(0.22) : .clear))
+                    .fill(i == model.selected ? Palette.live.opacity(0.22) : .clear))
                 .contentShape(Rectangle())
                 .onTapGesture { model.take?(item.subject) }
                 .onHover { if $0 { model.selected = i } }

@@ -224,7 +224,7 @@ private struct Bars: View {
                     let reducedAverage = i < reduced
                     let value = mergeDone ? durations[i] : (reducedAverage ? ceiling * 0.35 : (mean ?? ceiling * 0.5))
                     RoundedRectangle(cornerRadius: 2)
-                        .fill(mergeDone ? Color.accentColor.opacity(reducedAverage ? 0.5 : 1) : Color.secondary.opacity(0.25))
+                        .fill(mergeDone ? Palette.live.opacity(reducedAverage ? 0.5 : 1) : Color.secondary.opacity(0.25))
                         .frame(width: width, height: max(2, g.size.height * CGFloat(value / ceiling)))
                         .help(mergeDone ? (reducedAverage ? String(localized: "step \(i + 1), half-size: \(Figures.seconds(value))")
                                                : String(localized: "step \(i + 1): \(Figures.seconds(value))"))

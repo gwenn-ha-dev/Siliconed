@@ -268,7 +268,7 @@ extension NamedSubjects.Kind {
         }
     }
 
-    /// **One color for every kind: the image wire's lavender** (`Palette.lavender`) — a subject is an
+    /// **One color for every kind: the image wire's rose** (`Palette.rose`) — a subject is an
     /// image to the model. A hue per kind put rose and olive in the prompt, which read as an error and
     /// a warning; the kind is said by its words (`label`, `taken`) and its symbol.
     var nsColor: NSColor { Self.dynamic(dark: 0xC8AEF8, light: 0x8668B6) }

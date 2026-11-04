@@ -79,7 +79,7 @@ private struct Thumbnail: View {
             .frame(width: side * min(1, l / h), height: side * min(1, h / l))
             .clipShape(RoundedRectangle(cornerRadius: 5))
             .overlay(RoundedRectangle(cornerRadius: 5)
-                .strokeBorder(marked ? Color.accentColor : hover ? Color.secondary : Palette.hairline,
+                .strokeBorder(marked ? Palette.live : hover ? Color.secondary : Palette.hairline,
                               lineWidth: marked ? (shown ? 3.5 : 2.5) : 1))
             .opacity(marked || hover ? 1 : 0.88)
             .frame(height: side + 4)

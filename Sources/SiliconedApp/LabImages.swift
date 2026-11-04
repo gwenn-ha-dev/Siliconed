@@ -4,7 +4,7 @@
 //     │▣ │ Describe  Beta        │▣ │ Describe          │▣ │ Person · cited  ┊▣ ┊ 3 / 3: full     ┊+ ┊
 //     └──┘                       └──┘                   └──┘                 └┄┄┘ Describe         └┄┄┘
 //
-// - **The edge says the role**: the image wire's lavender, full for the image the model edits or starts from, lighter for
+// - **The edge says the role**: the image wire's rose, full for the image the model edits or starts from, lighter for
 //   a reference or a cited subject; dashed for an image that does not go — neutral, or with a role the model lacks, which
 //   the tile says (« “Reference”: no effect with Anima »). A change of model never gives nor converts a role (`LabInputs`).
 // - **Under Qwen-Image-2.1** an image takes the next place as it comes in; its menu changes it (Image to Edit, Reference,

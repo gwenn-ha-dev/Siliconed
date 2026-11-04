@@ -243,12 +243,12 @@ struct ModelManagement: View {
                 Spacer()
                 Button("Cancel") { app.installOffer = nil }
                 Button("Accept and Install") { app.acceptAndInstall(p.family, variant: offer.variant, baseDiT: offer.baseDiT) }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(.prominent)
                     .disabled(!app.libraryManageable || tooBig)
             }
         }
         .padding(12)
-        .background(RoundedRectangle(cornerRadius: 8).fill(Color.accentColor.opacity(0.07)))
+        .background(RoundedRectangle(cornerRadius: 8).fill(Palette.live.opacity(0.07)))
     }
 
     private func familyRow(_ p: Library.Occupancy.FamilyPart) -> some View {

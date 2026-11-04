@@ -14,7 +14,7 @@ struct DiTBox: View {
     @State private var customSize = false
 
     var body: some View {
-        StageBox(title: "DiT", symbol: "engine.combustion", state: app.state(of: .denoising),
+        StageBox(title: "DiT", symbol: "engine.combustion", kind: .latent, state: app.state(of: .denoising),
                  explanation: "The model that draws (a diffusion transformer): from noise, step by step, it makes the image the prompt describes") {
             Picker("Model", selection: $app.identifier) {
                 ForEach(app.visibleCards) { card in

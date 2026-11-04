@@ -40,7 +40,7 @@ struct Sidebar: View {
                             MiniChain(app: app)
                                 .padding(.vertical, 8)
                                 .frame(maxWidth: .infinity)
-                                .background(.bar)
+                                .background(Palette.column)
                                 .overlay(alignment: .bottom) { Rectangle().fill(Palette.hairline).frame(height: 1) }
                                 .contentShape(Rectangle())
                         }
@@ -53,6 +53,7 @@ struct Sidebar: View {
             }
             Footer(app: app)
         }
+        .background(Palette.column)
         // A `.safetensors` or a `.gguf` dropped on the column is imported (model or LoRA).
         .dropDestination(for: URL.self) { urls, _ in
             let s = urls.filter(AppState.importable)
@@ -174,7 +175,7 @@ private struct Footer: View {
                 }
             }
             .padding(14)
-            .background(.bar)
+            .background(Palette.column)
             .overlay(alignment: .top) { Divider() }
         }
     }
@@ -188,7 +189,7 @@ private struct Footer: View {
             if !app.file.isEmpty { waiting }
         }
         .padding(9)
-        .background(RoundedRectangle(cornerRadius: 8).fill(Color(nsColor: .controlBackgroundColor)))
+        .background(RoundedRectangle(cornerRadius: 8).fill(Palette.surface))
     }
 
     /// The running render: where its batch is, the time left, and a stop that leaves the queue going.

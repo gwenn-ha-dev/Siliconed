@@ -102,12 +102,9 @@ extension View {
     }
 }
 
-/// The canvas background: a near-black gray in dark, a light gray in light — neutral, so that
-/// the image alone carries the color.
-private let canvasBackground = Color(nsColor: NSColor(name: nil) { appearance in
-    appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
-        ? NSColor(white: 0.075, alpha: 1) : NSColor(white: 0.9, alpha: 1)
-})
+/// The canvas background: the chart's night or its pearl (`Palette.canvas`), barely tinted, so that the image alone
+/// carries the color.
+private let canvasBackground = Palette.canvas
 
 // MARK: - The canvas
 

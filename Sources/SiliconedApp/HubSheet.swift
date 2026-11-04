@@ -101,7 +101,7 @@ struct HubSheet: View {
         } label: {
             HStack(spacing: 8) {
                 Image(systemName: chosen ? "largecircle.fill.circle" : "circle")
-                    .foregroundStyle(chosen ? Color.accentColor : .secondary)
+                    .foregroundStyle(chosen ? Palette.live : .secondary)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(verbatim: f.path).lineLimit(1).truncationMode(.middle)
                     verdict(v).font(.caption).foregroundStyle(.secondary)

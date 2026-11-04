@@ -158,7 +158,7 @@ struct SeriesCanvas: View {
         }
         .clipShape(RoundedRectangle(cornerRadius: 4))
         .overlay(RoundedRectangle(cornerRadius: 4)
-            .strokeBorder(chosen == i ? Color.accentColor : running == i ? Palette.live : .clear, lineWidth: 3))
+            .strokeBorder(chosen == i ? Palette.live : running == i ? Palette.live : .clear, lineWidth: 3))
         .contentShape(Rectangle())
         .onTapGesture(count: 2) { showImage(i) }
         .onTapGesture { chosen = run.entries[i] == nil ? nil : i }
@@ -197,7 +197,7 @@ struct SeriesCanvas: View {
                 Button("Reuse These Settings") { app.restoreSettings(e) }
                     .help("The rack takes this image’s settings — model, prompt, size, LoRAs, seed — without rendering")
                 Button("Show This Image") { showImage(i) }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(.prominent)
                     .help("The image, as the history shows it (double-click a cell)")
             }
         }

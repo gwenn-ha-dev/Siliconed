@@ -225,7 +225,7 @@ struct SceneView: View {
                 if app.canCompareOriginal(e) {
                     Button { app.comparesOriginal.toggle() } label: {
                         Image(systemName: "square.lefthalf.filled")
-                            .foregroundStyle(app.comparesOriginal ? Color.accentColor : .primary)
+                            .foregroundStyle(app.comparesOriginal ? Palette.live : .primary)
                     }
                     .accessibilityLabel(Text("Compare with Original"))
                     .accessibilityAddTraits(app.comparesOriginal ? .isSelected : [])
@@ -338,7 +338,7 @@ private struct Comparison: View {
                 .scaledToFit()
                 .clipShape(RoundedRectangle(cornerRadius: 6))
                 .overlay(RoundedRectangle(cornerRadius: 6)
-                    .strokeBorder(Color.accentColor, lineWidth: e.id == app.selectedEntry?.id ? 2 : 0))
+                    .strokeBorder(Palette.live, lineWidth: e.id == app.selectedEntry?.id ? 2 : 0))
                 .shadow(color: .black.opacity(0.3), radius: 12, y: 4)
                 .frame(maxWidth: CGFloat(e.width), maxHeight: CGFloat(e.height))
             Text(verbatim: e.legend).font(.caption).monospacedDigit().foregroundStyle(.secondary).lineLimit(1)

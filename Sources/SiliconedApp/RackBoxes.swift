@@ -7,12 +7,14 @@ import SwiftUI
 
 // MARK: - A box
 
-/// **A stage's box**: its symbol and name, its state on the right, then what fills it. Idle: a quiet
-/// card. Working: the accent's edge and a faint wash of it. Done: a discreet check. Refused: red. It
-/// takes the width it is given.
+/// **A stage's box**: its icon and name, its state on the right, then what fills it. Idle: a quiet
+/// card, its icon in the color of the wire it gives. Working: the edge, the icon and a faint wash of what runs.
+/// Done: a discreet check. Refused: red. It takes the width it is given.
 struct StageBox<Content: View>: View {
     let title: LocalizedStringKey
     let symbol: String
+    /// The wire the stage gives: its icon's color at rest.
+    let kind: WireKind
     let state: StageState
     /// What the stage does, in plain words: shown when the pointer rests on its name.
     let explanation: LocalizedStringKey
@@ -20,7 +22,8 @@ struct StageBox<Content: View>: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 9) {
-            BoxTitle(title: title, symbol: symbol, tint: state == .active ? Palette.live : .secondary,
+            BoxTitle(title: title, symbol: symbol,
+                     tint: state == .active ? Palette.live : state == .failed ? Palette.failure : kind.color,
                      explanation: explanation) {
                 // No spinner while working: the edge and the wash say it, and the one under the image
                 // says the render runs — three turning at once was noise.
@@ -46,7 +49,7 @@ struct StageBox<Content: View>: View {
     }
 }
 
-/// A box's first line: its symbol in the wire's color, its name, and what it says on the right.
+/// A box's first line: its icon (`IconTile`), its name, and what it says on the right.
 private struct BoxTitle<Trailing: View>: View {
     let title: LocalizedStringKey
     let symbol: String
@@ -59,11 +62,7 @@ private struct BoxTitle<Trailing: View>: View {
     var body: some View {
         HStack(spacing: 7) {
             HStack(spacing: 7) {
-                // The bare glyph in the wire's color: no chip around it, so that what is framed in a box's title is a button.
-                Image(systemName: symbol)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(tint)
-                    .frame(width: 20, height: 20)
+                IconTile(symbol: symbol, color: tint)
                 Text(title).font(.callout.weight(quiet ? .medium : .semibold))
                     .foregroundStyle(quiet ? .secondary : .primary)
                     .lineLimit(2).fixedSize(horizontal: false, vertical: true)
@@ -83,14 +82,13 @@ extension View {
         padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(boxShape.fill(Palette.surface))
-            .background(boxShape.fill(Color(nsColor: .windowBackgroundColor)))
             .overlay { if let wash { boxShape.fill(wash.opacity(0.06)).allowsHitTesting(false) } }
             .overlay(boxShape.strokeBorder(edge, lineWidth: width))
             .shadow(color: .black.opacity(0.08), radius: 2, y: 1)
     }
 }
 
-/// **A box the signal starts in** — the text, an edit's images: its symbol in the color of the wire it sends. **An outline,
+/// **A box the signal starts in** — the text, an edit's images: its icon in the color of the wire it sends. **An outline,
 /// not a card**: nothing is typed in it, and a white card at the rack's top left, the first thing the eye meets, was taken
 /// for the place to write (4/11) — the stages below stay cards, the ports are only drawn around.
 struct PortBox<Trailing: View, Content: View>: View {
@@ -370,9 +368,9 @@ private struct PortThumbnail: View {
                 if let number {
                     Text(verbatim: "\(number)")
                         .font(.system(size: 9, weight: .bold)).monospacedDigit()
-                        .foregroundStyle(.white)
+                        .foregroundStyle(number == 1 ? AnyShapeStyle(Palette.onLive) : AnyShapeStyle(.white))
                         .frame(width: 13, height: 13)
-                        .background(Circle().fill(number == 1 ? Color.accentColor : Color.black.opacity(0.6)))
+                        .background(Circle().fill(number == 1 ? AnyShapeStyle(Palette.live) : AnyShapeStyle(.black.opacity(0.6))))
                         .padding(2)
                 }
             }

@@ -258,9 +258,9 @@ struct CurtainView: View {
                 .shadow(color: .black.opacity(0.5), radius: 2)
             Image(systemName: "arrow.left.and.right")
                 .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(dragging ? Color.white : Color.primary)
+                .foregroundStyle(dragging ? Palette.onLive : Color.primary)
                 .frame(width: 30, height: 30)
-                .background(Circle().fill(dragging ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.regularMaterial)))
+                .background(Circle().fill(dragging ? AnyShapeStyle(Palette.live) : AnyShapeStyle(.regularMaterial)))
                 .overlay(Circle().strokeBorder(.white.opacity(0.9), lineWidth: 1.5))
                 .shadow(color: .black.opacity(0.35), radius: 4, y: 1)
         }
@@ -381,7 +381,7 @@ struct CurtainSwitch: View {
             Image(systemName: symbol)
                 .imageScale(.medium)
                 .frame(width: 30, height: 22)
-                .foregroundStyle(!possible ? AnyShapeStyle(.tertiary) : active ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.secondary))
+                .foregroundStyle(!possible ? AnyShapeStyle(.tertiary) : active ? AnyShapeStyle(Palette.live) : AnyShapeStyle(.secondary))
                 .background(RoundedRectangle(cornerRadius: 5).fill(active && possible ? Palette.surface : .clear))
                 .contentShape(Rectangle())
         }

@@ -19,10 +19,11 @@
 // not a box: it is what the DiT makes, its previews are drawn in the DiT. Nor is the image: it is the
 // result, shown on the canvas. « Generate » is not in the rack either: it is at the end of the text, in the
 // lab, where the hand is when the idea is written. The wires between the boxes are of their true type (text
-// amber, image lavender, latent sea green — `Palette`), and run top to bottom, in the direction of the
+// peach, image rose, latent sky — `Palette.swift`), and run top to bottom, in the direction of the
 // signal, each port above the encoder it feeds. **Color is spent only where
-// something happens**: at rest the boxes are quiet cards and the wires muted; during a render the box
-// of the stage at work wears the accent and the wire it reads brightens and widens; what is done keeps
+// something happens**: at rest the boxes are quiet cards, only their icons in their wire's color, and the wires
+// muted; during a render the box of the stage at work wears what runs (mint at night, indigo by day) and the
+// wire it reads brightens and widens; what is done keeps
 // a discreet check; where the engine refused, the box turns red. Under each box, what it costs: the
 // time it just took, set as soon as the stage ends — before, the one learned on this Mac. The memory a render needs is the whole chain's: it is said once, in the
 // summary under the rack (`Sidebar`), not under the DiT. Each stage's name stays the technical one —
@@ -59,57 +60,17 @@ extension View {
     }
 }
 
-/// **The rack's colors.** Three hues for the three wires — amber, lavender, sea green — at the same
-/// lightness and the same chroma (OKLCH 0.80 / 0.105 on a dark ground, 0.58 / 0.12 on a light one), so
-/// that none shouts over the others and each reads on both grounds. Everything else is the system's:
-/// the accent for what runs, red for what failed, the separator and the control colors for the rest.
-enum Palette {
-    static let amber = dynamic(dark: 0xE5B46E, light: 0xA36E09)
-    static let lavender = dynamic(dark: 0xC8AEF8, light: 0x8668B6)
-    static let seaGreen = dynamic(dark: 0x67D4C0, light: 0x00917D)
-    /// **A series** (bracketing): the mark at the left of what can vary, the text's groups, the axes beside « Generate » — one
-    /// yellow everywhere, a hue of its own: the accent is what runs, amber the text's wire (the user, 4/11/2026).
-    static let bracketInk = dynamicInk(dark: 0xFFD60A, light: 0xB89400)
-    static let bracket = Color(nsColor: bracketInk)
-    /// What runs: the system's accent, as a selection or a progress bar elsewhere in macOS.
-    static let live = Color.accentColor
-    static let failure = Color(nsColor: .systemRed)
-    /// A box: a card a step above the column — lifted in dark, white in light, as System Settings does.
-    static let surface = Color(nsColor: NSColor(name: nil) { a in
-        a.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? NSColor(white: 1, alpha: 0.07) : NSColor(white: 1, alpha: 0.85)
-    })
-    /// A field inside a box: a recess.
-    static let well = Color.primary.opacity(0.08)
-    /// A card's edge, a separator: a notch firmer than the system's `separatorColor` (10 %), which
-    /// let a box melt into the column on both grounds.
-    static let hairline = Color(nsColor: NSColor(name: nil) { a in
-        a.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? NSColor(white: 1, alpha: 0.16) : NSColor(white: 0, alpha: 0.14)
-    })
-
-    private static func dynamic(dark: Int, light: Int) -> Color { Color(nsColor: dynamicInk(dark: dark, light: light)) }
-
-    /// The same, for AppKit's drawing (the text's groups).
-    private static func dynamicInk(dark: Int, light: Int) -> NSColor {
-        func color(_ v: Int) -> NSColor {
-            NSColor(srgbRed: CGFloat(v >> 16 & 0xFF) / 255, green: CGFloat(v >> 8 & 0xFF) / 255, blue: CGFloat(v & 0xFF) / 255, alpha: 1)
-        }
-        return NSColor(name: nil) { a in
-            a.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? color(dark) : color(light)
-        }
-    }
-}
-
 /// The boxes' shape: a continuous rounded rectangle, the system's own.
-let boxShape = RoundedRectangle(cornerRadius: 10, style: .continuous)
+let boxShape = RoundedRectangle(cornerRadius: 12, style: .continuous)
 
 /// What a wire carries: three types, three hues, the same everywhere in the app.
 enum WireKind {
     case text, image, latent
     var color: Color {
         switch self {
-        case .text: Palette.amber
-        case .image: Palette.lavender
-        case .latent: Palette.seaGreen
+        case .text: Palette.peach
+        case .image: Palette.rose
+        case .latent: Palette.sky
         }
     }
 }
@@ -317,7 +278,7 @@ struct RackView: View {
     // ── the fixed stages ──
 
     private var textEncoder: some View {
-        StageBox(title: "Text encoder", symbol: "character.textbox", state: app.state(of: .text),
+        StageBox(title: "Text encoder", symbol: "character.textbox", kind: .text, state: app.state(of: .text),
                  explanation: "A language model reads the prompt and turns it into what the DiT understands") {
             ModuleSlot(name: app.moduleNames.text)
             WeightsTag(format: app.weightFormats?.text)
@@ -330,7 +291,7 @@ struct RackView: View {
     }
 
     private var imageEncoder: some View {
-        StageBox(title: "Image encoder", symbol: "photo", state: app.state(of: .image),
+        StageBox(title: "Image encoder", symbol: "photo", kind: .latent, state: app.state(of: .image),
                  explanation: showsStart ? "Turns the starting image into the latent the DiT starts from, noised to the strength"
                                          : "Turns the images to edit into the compact form the DiT works in, the latent") {
             ModuleSlot(name: app.moduleNames.encoding)
@@ -340,7 +301,7 @@ struct RackView: View {
     }
 
     private var vae: some View {
-        StageBox(title: "VAE decoder", symbol: "square.grid.3x3.square", state: app.state(of: .decoding),
+        StageBox(title: "VAE decoder", symbol: "square.grid.3x3.square", kind: .image, state: app.state(of: .decoding),
                  explanation: "Turns the DiT’s result, the latent, into pixels: the final image") {
             ModuleSlot(name: app.moduleNames.decoding)
             WeightsTag(format: app.weightFormats?.vae)

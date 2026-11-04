@@ -122,7 +122,8 @@ private struct AppCommands: Commands {
         CommandMenu("Render") {
             // ⌘↩ is also a sheet's or a panel's own button: while another window is key the menu item steps
             // aside, so that the key reaches that window's button.
-            Button("Generate") { app.render() }
+            // Something stops the render: ⌘↩ unfolds the Prompt Lab, where the reason is said, instead of doing nothing.
+            Button("Generate") { if app.canRender { app.render() } else { LabModel.shared.unfold() } }
                 .keyboardShortcut(.return)
                 .disabled(!window.carrier.mainIsKey)
             Button("Render Again (Same Seed)") { app.selectedEntry.map(app.redo) }

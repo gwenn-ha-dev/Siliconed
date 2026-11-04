@@ -51,7 +51,7 @@ struct Welcome: View {
         return VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Image(systemName: Self.symbol(family))
-                    .font(.title2).foregroundStyle(Color.accentColor)
+                    .font(.title2).foregroundStyle(Palette.live)
                 Spacer()
                 Text(verbatim: model.licenseName).font(.caption).foregroundStyle(.secondary)
                     .lineLimit(1).truncationMode(.tail)
@@ -78,7 +78,7 @@ struct Welcome: View {
                 }
                 Spacer()
                 Button("Install…") { app.offerInstall(family, variant: variant) }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(.prominent)
                     .disabled(!app.managementPossible)
             }
         }

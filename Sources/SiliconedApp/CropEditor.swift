@@ -342,7 +342,7 @@ struct CropEditor: View {
         }
         c.stroke(Path(f), with: .color(.white.opacity(0.9)), lineWidth: 1)
         // The grips: an L at each corner, a short bar in the middle of each side.
-        let arm = min(18, f.width / 3, f.height / 3), lit = Color.accentColor
+        let arm = min(18, f.width / 3, f.height / 3), lit = Palette.live
         func grip(_ p: Path, _ on: Bool) {
             c.stroke(p, with: .color(.black.opacity(0.35)), style: StrokeStyle(lineWidth: 5, lineCap: .round, lineJoin: .round))
             c.stroke(p, with: .color(on ? lit : .white), style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
@@ -392,7 +392,7 @@ struct CropEditor: View {
             Button("Cancel") { app.cancelCrop() }
                 .help("Leave without cropping (Esc)")
             Button("Crop") { app.commitCrop() }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.prominent)
                 .disabled(session.isWhole)
                 .help(session.isWhole ? Text("Move a side of the frame first") : Text("Crop the image (↩)"))
         }
