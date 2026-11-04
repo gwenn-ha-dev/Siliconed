@@ -674,6 +674,12 @@ final class AppState {
             settingsWarnings = EngineSettings.effective.warnings.map(Library.withoutHome)
             mapInUse = map
             planGeneration = EngineSettings.generation
+        } catch .settingsAlreadyLoaded {
+            // **Something read the defaults before the measure ended**: the writer's Describe or Rewrite, which plans its own
+            // products, used before this Mac was measured (4/11/2026: a map measured, then refused, and the render after it
+            // without the Neural Engine). A finished measure always applies: it replaces them as a second measure would.
+            EngineSettings.adopt(map: map)
+            syncPlan()
         } catch {
             settingsWarnings = [Library.withoutHome(error.localizedDescription)]
         }
