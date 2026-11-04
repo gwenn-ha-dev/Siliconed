@@ -19,6 +19,7 @@ import SwiftUI
 
 struct Sidebar: View {
     @Bindable var app: AppState
+    @State private var chainAway = false
 
     var body: some View {
         // The footer under the scroll view, not a `safeAreaInset` of it: as an inset, the clip view
@@ -26,10 +27,32 @@ struct Sidebar: View {
         // band of rack just above the footer was drawn but took no click (the LoRA row, « Import… »)
         // until scrolled up — hit testing measured on macOS 27, 13/10/2026.
         VStack(spacing: 0) {
-            ScrollView(.vertical) {
-                RackView(app: app)
+            ScrollViewReader { proxy in
+                ScrollView(.vertical) {
+                    RackView(app: app, chainAway: $chainAway)
+                }
+                .scrollIndicators(.automatic)
+                // Once the chain's boxes have scrolled away (setting the DiT, its LoRAs), the chain stays in sight in small,
+                // lit as they are; a click scrolls back to them (`RackMiniChain.swift`).
+                .overlay(alignment: .top) {
+                    if chainAway {
+                        Button { withAnimation(Motion.pick(.easeOut(duration: 0.3))) { proxy.scrollTo(RackView.top, anchor: .top) } } label: {
+                            // A band the column's width, flush with its top, as a section header: a floating plate let
+                            // the rack show above it.
+                            MiniChain(app: app)
+                                .padding(.vertical, 8)
+                                .frame(maxWidth: .infinity)
+                                .background(.bar)
+                                .overlay(alignment: .bottom) { Rectangle().fill(Palette.hairline).frame(height: 1) }
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .help("The chain, while the rack scrolls: a click brings its boxes back")
+                        .transition(.opacity)
+                    }
+                }
+                .animation(Motion.pick(.easeOut(duration: 0.2)), value: chainAway)
             }
-            .scrollIndicators(.automatic)
             Footer(app: app)
         }
         // A `.safetensors` or a `.gguf` dropped on the column is imported (model or LoRA).

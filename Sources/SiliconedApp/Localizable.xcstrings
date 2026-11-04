@@ -23010,6 +23010,46 @@
         }
       }
     },
+    "No image %@ goes with this render: these words are left out." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kein Bild %@ geht mit diesem Bild mit: Diese Wörter werden weggelassen."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ninguna imagen %@ va con esta imagen: estas palabras se dejan fuera."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucune image %@ ne part avec ce rendu : ces mots sont laissés de côté."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nessuna immagine %@ va con questa immagine: queste parole vengono lasciate fuori."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この生成には画像%@が含まれません。これらの語は除かれます。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此次生成不包含图像 %@：这些词会被略去。"
+          }
+        }
+      }
+    },
     "No license declared on its page: the file is its author’s." : {
       "localizations" : {
         "de" : {
@@ -33942,6 +33982,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "处理链在这台 Mac 上计算"
+          }
+        }
+      }
+    },
+    "The chain, while the rack scrolls: a click brings its boxes back" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Kette, während das Rack scrollt: Ein Klick holt ihre Kästen zurück"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La cadena, mientras el rack se desplaza: un clic devuelve sus cajas"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La chaîne, pendant que le rack défile : un clic ramène ses boîtes"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La catena, mentre il rack scorre: un clic riporta i suoi riquadri"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ラックのスクロール中のチェーン：クリックで各ボックスに戻ります"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "滚动机架时的处理链：点击即可回到各个模块框"
           }
         }
       }

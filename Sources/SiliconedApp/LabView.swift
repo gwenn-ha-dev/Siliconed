@@ -43,6 +43,15 @@ struct LabView: View {
         .onAppear { model.watchRender(); model.refresh() }
     }
 
+    /// What the model reads of the text — the field greys the rest. Refused (too many images): no reference greyed.
+    private var reading: PromptReading {
+        let rack = model.rack
+        let carried = (try? rack.carried.get()).map { carry in
+            carry.images.filter { if case .plain(_, .start) = $0 { false } else { true } }.count
+        } ?? Int.max
+        return PromptReading(capacity: rack.imageCapacity, carried: carried, model: rack.card?.name ?? rack.identifier)
+    }
+
     /// The model the text is written for: the rack's card, else its family.
     private var modelName: String? { model.rack.card?.name ?? model.target?.name }
 
@@ -152,8 +161,7 @@ struct LabView: View {
     private var textZone: some View {
         ZStack(alignment: .topLeading) {
             PromptField(text: $model.text, subjects: model.subjects, focused: $typing, editable: !model.isWriting,
-                        inert: model.rack.imageCapacity == 0
-                            ? String(localized: "\(model.rack.card?.name ?? "") does not read subjects") : nil)
+                        reading: reading)
                 .opacity(model.changes == nil ? 1 : 0)
             if model.text.isEmpty {
                 Text("Type or paste a prompt. Write @ to cite a subject.")

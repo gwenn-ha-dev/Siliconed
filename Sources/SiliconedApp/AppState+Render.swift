@@ -10,9 +10,9 @@ import UniformTypeIdentifiers
 extension AppState {
     // MARK: Render
 
-    /// **Puts a render in the queue**, and launches it if nothing is running. `imposedSeed`: "Redo"
-    /// (the seed of a history image). `imposedFormat`: an exploration cell's, finished at its sketch's
-    /// size — with edit images, `outputFormat` would derive another one from image 1.
+    /// **Puts a render in the queue**, and launches it if nothing is running. `imposedSeed`: "Redo" (the seed of a history
+    /// image). `imposedFormat`: "Redo" (its size), or an exploration cell's, finished at its sketch's size — with edit images,
+    /// `outputFormat` would derive another one from image 1.
     func render(imposedSeed: UInt64? = nil, imposedFormat: RecommendedFormat? = nil) {
         guard canRender else { return }
         followsRender = true
@@ -612,12 +612,13 @@ extension AppState {
         return jobs
     }
 
-    /// Redo the chosen image: same settings, same seed.
+    /// Redo the chosen image: same settings, same seed — and its size: an edit's would otherwise be derived again from image 1
+    /// (`outputFormat`), and one typed on the command line (`add … 1024 --ref …`) came back at image 1's proportions.
     func redo(_ entry: Entry) {
         restoreSettings(entry)
         // A sheet: its exploration again, at its seed.
         if entry.grid != nil { explore(seed: entry.seed); return }
-        render(imposedSeed: entry.seed)
+        render(imposedSeed: entry.seed, imposedFormat: entry.settings.format)
     }
 
     func restoreSettings(_ entry: Entry) {

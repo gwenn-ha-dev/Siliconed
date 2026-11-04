@@ -193,11 +193,16 @@ private struct Wires: View {
 
 struct RackView: View {
     @Bindable var app: AppState
+    /// Set while the encoders' boxes have their top above the column's: the sidebar then pins the chain in small (`MiniChain`).
+    var chainAway: Binding<Bool>? = nil
     @State private var hoversTitle = false
+
+    /// The head of the rack, where the mini chain's click scrolls back.
+    static let top = "rack.top"
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
-            header
+            header.id(Self.top)
             if app.editingPossible { ImagesNode(app: app).node(.images) }
             else if showsStart { StartImageNode(app: app).node(.images) }
             PromptNode(app: app).node(.prompt)
@@ -205,6 +210,8 @@ struct RackView: View {
                 textEncoder.node(.textEncoder)
                 if encodesImages { imageEncoder.node(.imageEncoder) }
             }
+            // Away once their titles and lights are: on a tall window the rack's bottom still shows their feet.
+            .onGeometryChange(for: Bool.self) { $0.frame(in: .scrollView).minY < 0 } action: { chainAway?.wrappedValue = $0 }
             DiTBox(app: app).node(.dit)
             vae.node(.vae)
             legend

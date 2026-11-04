@@ -4,8 +4,10 @@
 //     drawn      woman posing with (▣ alice) in (▣ red-coat) and @bob
 //                                  └ lavender   └ lavender       └ unknown: dotted underline
 //
-// **Greyed where the model does not read it** (`inert`): under a model that takes no image, a chip is drawn grey, its
-// thumbnail faded, and its hover says why — the render leaves it out, the text keeps it for when the model reads it again.
+// **Greyed where the model does not read it** (`reading`, the rule is `LabInputs.inert`): under a model that takes no image,
+// a subject's chip is drawn grey, its thumbnail faded; a reference to an image the render does not carry (`<image3>` with two)
+// is grey too. The hover says why. The render leaves them out (`AppState.namedJob`); the text keeps them, for when they are
+// read again.
 //
 // **The text stays text.** A chip is the characters `@alice`, styled — not an attachment: copying gives
 // `@alice`, pasting `@alice` makes a chip, the caret and the selection go through it as through a word,
@@ -39,8 +41,8 @@ struct PromptField: NSViewRepresentable {
     @Binding var focused: Bool
     /// Off while the writer writes: the text it will replace does not move under it.
     var editable = true
-    /// Why the chips do not go (« Z-Image Turbo does not read subjects »), or `nil`: they are drawn grey, saying it.
-    var inert: String? = nil
+    /// What the model aimed at reads of the text, or `nil`: nothing greyed.
+    var reading: PromptReading? = nil
 
     func makeCoordinator() -> Coordinator { Coordinator(text: $text, subjects: subjects, focused: $focused) }
 
@@ -95,8 +97,8 @@ struct PromptField: NSViewRepresentable {
         // rewrite), a subject created, renamed or deleted.
         let text = self.text, version = subjects.version
         if view.isEditable != editable { view.isEditable = editable }
-        if c.inert != inert, !view.hasMarkedText() {
-            c.inert = inert
+        if c.reading != reading, !view.hasMarkedText() {
+            c.reading = reading
             c.restyle()
         }
         if view.string != text, !view.hasMarkedText() {
@@ -133,7 +135,7 @@ struct PromptField: NSViewRepresentable {
         var focused: Binding<Bool>
         weak var view: PromptTextView?
         var styledVersion = -1
-        var inert: String?
+        var reading: PromptReading?
         let completion = SubjectCompletion()
 
         init(text: Binding<String>, subjects: SubjectLibrary, focused: Binding<Bool>) {
@@ -178,13 +180,18 @@ struct PromptField: NSViewRepresentable {
             storage.beginEditing()
             storage.setAttributes(PromptStyle.base, range: all)
             var names: [String] = []
+            let inert = reading.map {
+                LabInputs.inert(in: text, known: Set(subjects.all.map(\.id)), capacity: $0.capacity, carried: $0.carried)
+            } ?? []
+            let greyedSubjects = Set(inert.filter { $0.why == .subject }.map(\.range.lowerBound))
             for m in NamedSubjects.mentions(in: text) {
+                let greyed = greyedSubjects.contains(m.range.lowerBound)
                 let r = NSRange(m.range, in: text)
                 if let s = subjects.subject(named: m.name) {
                     names.append(contentsOf: s.name.split(whereSeparator: { $0 == "-" || $0 == "_" }).map(String.init))
-                    storage.addAttributes([.subjectChip: "\(s.kind.rawValue):\(s.id)",
-                                           .toolTip: "@\(s.name) — \(inert ?? s.kind.label)"], range: r)
-                    if inert != nil {
+                    let why = greyed ? String(localized: "\(reading?.model ?? "") does not read subjects") : s.kind.label
+                    storage.addAttributes([.subjectChip: "\(s.kind.rawValue):\(s.id)", .toolTip: "@\(s.name) — \(why)"], range: r)
+                    if greyed {
                         storage.addAttributes([.subjectChipInert: true, .foregroundColor: NSColor.tertiaryLabelColor], range: r)
                     }
                     // The `@`, not drawn: its advance makes the thumbnail's room.
@@ -197,6 +204,12 @@ struct PromptField: NSViewRepresentable {
                                            .foregroundColor: NSColor.secondaryLabelColor,
                                            .toolTip: String(localized: "No subject is called @\(m.name).")], range: r)
                 }
+            }
+            for word in inert {
+                guard case .image(let n) = word.why else { continue }
+                storage.addAttributes([.foregroundColor: NSColor.tertiaryLabelColor,
+                                       .toolTip: String(localized: "No image \(String(n)) goes with this render: these words are left out.")],
+                                      range: NSRange(word.range, in: text))
             }
             storage.endEditing()
             view.typingAttributes = PromptStyle.base
@@ -259,6 +272,14 @@ struct PromptField: NSViewRepresentable {
             return true
         }
     }
+}
+
+/// **What the model aimed at reads of the text**: how many images it takes (0: none), how many the render carries (the
+/// edit's images and the subjects' pictures, not an img2img's start), its name for the hover.
+struct PromptReading: Equatable {
+    var capacity: Int
+    var carried: Int
+    var model: String
 }
 
 /// The field's type: its metrics, and how much room the `@` makes for the thumbnail.

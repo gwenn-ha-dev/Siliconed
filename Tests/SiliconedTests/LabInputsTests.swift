@@ -161,6 +161,41 @@ final class LabInputsTests: XCTestCase {
         XCTAssertNil(refusal("a {red @alice"))
     }
 
+    // ── what is greyed does not go ──
+
+    private func sent(_ text: String, capacity: Int, carried: Int) -> String {
+        L.sent(text, leaving: L.inert(in: text, known: Set(library.map(\.id)), capacity: capacity, carried: carried))
+    }
+
+    func testUnderAModelThatReadsNoImageASubjectIsGreyedAndLeftOutAnotherAtStays() {
+        let text = "@alice posing in a library, @incase style"
+        let inert = L.inert(in: text, known: Set(library.map(\.id)), capacity: 0, carried: 0)
+        XCTAssertEqual(inert.map(\.why), [.subject])
+        XCTAssertEqual(String(text[inert[0].range]), "@alice")
+        // Anima's artist is the model's own word; the subject takes the space after it, at the start.
+        XCTAssertEqual(sent(text, capacity: 0, carried: 0), "posing in a library, @incase style")
+        XCTAssertEqual(sent("a girl with @Alice", capacity: 0, carried: 0), "a girl with")
+        // Under a model that reads images, a subject goes (translated by the rewrite).
+        XCTAssertEqual(sent(text, capacity: 3, carried: 1), text)
+    }
+
+    func testAReferenceToAnImageTheRenderDoesNotCarryIsLeftOut() {
+        XCTAssertEqual(sent("put the dog of <image3> next to the woman in <image1>", capacity: 3, carried: 2),
+                       "put the dog of next to the woman in <image1>")
+        XCTAssertEqual(sent("Picture 2 and image 1, then IMAGE 4", capacity: 3, carried: 1), "and image 1, then")
+        XCTAssertEqual(L.inert(in: "<image 3>", known: [], capacity: 3, carried: 2).map(\.why), [.image(3)])
+        // Under a model that reads none, no image is carried: every reference is left out.
+        XCTAssertEqual(sent("image 1 of a cat", capacity: 0, carried: 0), "of a cat")
+        // Not a reference: a number glued to the word, or zero.
+        XCTAssertEqual(sent("image2 and image 0", capacity: 3, carried: 0), "image2 and image 0")
+    }
+
+    func testNothingGreyedLeavesTheTextToTheByte() {
+        let text = "a  quay,   at night\n\n<image1> stays"
+        XCTAssertTrue(L.inert(in: text, known: Set(library.map(\.id)), capacity: 3, carried: 1).isEmpty)
+        XCTAssertEqual(sent(text, capacity: 3, carried: 1), text)
+    }
+
     func testAModelThatReadsNoImageKeepsTheTextAndTheAtSign() throws {
         // Anima's artists: `@incase` is the model's own word, whatever the library holds.
         let r = try carried("a girl, @incase, @alice", slots(.neutral), capacity: 0)

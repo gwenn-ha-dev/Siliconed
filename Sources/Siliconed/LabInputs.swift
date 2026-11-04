@@ -30,7 +30,10 @@ import Foundation
 // - **Three images at most** (`NamedSubjects.maxImages`), the edited image and the references counted with the
 //   subjects: the worst case measured is 1024×1536 with three references.
 // - **A model that reads no images** (capacity 0) keeps the text as typed — `@` is then its own character (Anima's
-//   artists) — and receives, at most, its starting image.
+//   artists) — and receives, at most, its starting image; only the `@names` of the library's subjects are left out.
+// - **What is greyed does not go** (`inert`, `sent`): a subject's `@name` under a model that reads no image, a reference to
+//   an image the render does not carry (`<image3>`, `image 3`, `Picture 3` with two images). The field greys them, the
+//   model's prompt leaves them out with the space before them; the typed text keeps them, for when they are read again.
 // - **A `@` inside a `{a|b}` group is refused**: the rack expands the group, and each expansion would need its own
 //   translation. A group without `@` goes through as it is.
 package enum LabInputs {
@@ -143,7 +146,8 @@ package enum LabInputs {
 
     /// **What the render receives**: made when it is queued, never shown as text in the rack.
     package struct Carry<ID: Hashable & Sendable>: Equatable, Sendable {
-        /// The prompt the model reads: the text, its `@names` translated (`image 2`, a legend after).
+        /// The prompt the model reads: the text, its `@names` translated (`image 2`, a legend after) — before the greyed
+        /// words leave it, when the render is queued (`sent`).
         package let prompt: String
         /// The images in the order of their numbers, the first one giving the format.
         package let images: [Image<ID>]
@@ -203,6 +207,62 @@ package enum LabInputs {
             i = text.index(after: i)
         }
         return open
+    }
+
+    // MARK: What is greyed does not go
+
+    /// **A word of the text the render does not send**, and why.
+    package struct Inert: Equatable, Sendable {
+        package enum Why: Equatable, Sendable {
+            /// A subject of the library, under a model that reads no image.
+            case subject
+            /// A reference to image N, past those the render carries.
+            case image(Int)
+        }
+        package let range: Range<String.Index>
+        package let why: Why
+    }
+
+    /// `<image3>`, `image 3`, `Picture 3` — the three forms `NamedSubjects.Phrasing.Reference` knows, in any case.
+    nonisolated(unsafe) private static let imageReference = try! NSRegularExpression(
+        pattern: "<image\\s*([0-9]+)>|\\b(?:image|picture)\\s+([0-9]+)\\b", options: [.caseInsensitive])
+
+    /// **The words the model does not read**, in the order of the text: under a model that reads no image (`capacity` 0),
+    /// every `@name` the library knows (`known`: the subjects' keys, `NamedSubjects.key`); under any model, a reference to an
+    /// image past the `carried` ones (the edit's images and the subjects' pictures). Another `@` is the model's own text.
+    package static func inert(in text: String, known: Set<String>, capacity: Int, carried: Int) -> [Inert] {
+        var found: [Inert] = []
+        if capacity == 0 {
+            for m in NamedSubjects.mentions(in: text) where known.contains(NamedSubjects.key(m.name)) {
+                found.append(Inert(range: m.range, why: .subject))
+            }
+        }
+        let all = NSRange(text.startIndex..., in: text)
+        for match in imageReference.matches(in: text, range: all) {
+            let group = match.range(at: 1).location != NSNotFound ? match.range(at: 1) : match.range(at: 2)
+            guard let digits = Range(group, in: text), let n = Int(text[digits]), n >= 1, n > carried,
+                  let range = Range(match.range, in: text), !found.contains(where: { $0.range.overlaps(range) }) else { continue }
+            found.append(Inert(range: range, why: .image(n)))
+        }
+        return found.sorted { $0.range.lowerBound < $1.range.lowerBound }
+    }
+
+    /// **The text the model reads**: `text` without its inert words, each taking the space before it (or after it, at the
+    /// start of a line). Nothing inert: `text` itself, to the byte.
+    package static func sent(_ text: String, leaving inert: [Inert]) -> String {
+        guard !inert.isEmpty else { return text }
+        // In UTF-16 offsets, from the end: the indices of `text` are not read in a string being cut.
+        let out = NSMutableString(string: text)
+        for word in inert.sorted(by: { $0.range.lowerBound > $1.range.lowerBound }) {
+            var r = NSRange(word.range, in: text)
+            if r.location > 0, out.character(at: r.location - 1) == 0x20 {
+                r.location -= 1; r.length += 1
+            } else if r.location + r.length < out.length, out.character(at: r.location + r.length) == 0x20 {
+                r.length += 1
+            }
+            out.deleteCharacters(in: r)
+        }
+        return out as String
     }
 
     // MARK: The mentions, kept through a rewrite
