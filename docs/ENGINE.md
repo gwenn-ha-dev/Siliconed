@@ -61,16 +61,9 @@ Each line is a `silicontrol measure` series in a freshly opened app, the series 
 
 ### On a MacBook Neo
 
-An 8 GB Mac: a MacBook Neo (A18 Pro), on AC power. App 0.18 as published, 1/11/2026, the series above run on the Neo itself, on the capacity map the app had just measured (45.2 s), with the version installed there, the Compact, Neural Engine on.
+An 8 GB Mac: a MacBook Neo (A18 Pro). With 0.19, Anima Turbo makes a 1024² square in under a minute on it, in the Compact. That is a render seen in the app, not a `silicontrol measure` series: we no longer have a Neo to run one. The budget of an 8 GB Mac is 4 GB (¾ of 8 GB minus 2 GB, [Memory and the budget](#memory-and-the-budget)).
 
-| 1024², Compact | Z-Image Turbo | Anima Turbo |
-|---|---|---|
-| every evaluation at full size | **246.5 s** | **91.5 s** |
-| with Faster Rendering | 188.7 s | 67.7 s |
-| peak memory of the app | 2.0 GiB | 1.4 GiB |
-| read from disk per image | 44 GB | 0 GB |
-
-The budget of an 8 GB Mac is 4 GB (¾ of 8 GB minus 2 GB, [Memory and the budget](#memory-and-the-budget)): each peak stays at half of it at most, and no series swapped out a page. Z-Image's Compact weights do not stay in the Neo's memory and are read again from disk at each step, 44 GB per image. That is 2.1 to 2.4 times the reference machine's time on the same lines. Each series gave a single image, identical to the bit from render to render. Z-Image at full size is the mean of its series' first two renders, 247.0 and 246.1 s: the third, the closing witness, took 312.2 s, 26 % more than the first, beyond the 13 % within which `silicontrol measure` holds a series comparable; the other three series kept their renders within 7 % of each other.
+If you have a Neo, or a Mac we have never held, your numbers are welcome. Render, then open **Measure This Mac…** (Help menu): **Share… ▸ Open a GitHub Issue** prepares the report, the map and your last render's predicted and measured times, and nothing leaves until you submit it ([Community diagnostic](#community-diagnostic)). A `silicontrol measure` series ([REMOTE-CONTROL.md](REMOTE-CONTROL.md)) is better still.
 
 ### Faster Rendering
 
