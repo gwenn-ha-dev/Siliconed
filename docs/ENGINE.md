@@ -61,7 +61,7 @@ Each line is a `silicontrol measure` series in a freshly opened app, the series 
 
 ### On a MacBook Neo
 
-An 8 GB Mac: a MacBook Neo (A18 Pro). With 0.19, Anima Turbo makes a 1024² square in under a minute on it, in the Compact. That is a render seen in the app, not a `silicontrol measure` series: we no longer have a Neo to run one. The budget of an 8 GB Mac is 4 GB (¾ of 8 GB minus 2 GB, [Memory and the budget](#memory-and-the-budget)).
+An 8 GB Mac: a MacBook Neo (A18 Pro). With 0.19, Anima Turbo makes a 1024² square in under a minute on it, in the Compact, every evaluation at full size (Faster Rendering off). That is a render seen in the app, not a `silicontrol measure` series: we no longer have a Neo to run one. The budget of an 8 GB Mac is 4 GB (¾ of 8 GB minus 2 GB, [Memory and the budget](#memory-and-the-budget)).
 
 If you have a Neo, or a Mac we have never held, your numbers are welcome. Render, then open **Measure This Mac…** (Help menu): **Share… ▸ Open a GitHub Issue** prepares the report, the map and your last render's predicted and measured times, and nothing leaves until you submit it ([Community diagnostic](#community-diagnostic)). A `silicontrol measure` series ([REMOTE-CONTROL.md](REMOTE-CONTROL.md)) is better still.
 

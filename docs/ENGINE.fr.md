@@ -61,7 +61,7 @@ Chaque ligne est une série `silicontrol measure` dans une app tout juste ouvert
 
 ### Sur un MacBook Neo
 
-Un Mac de 8 Go : un MacBook Neo (A18 Pro). Avec la 0.19, Anima Turbo y fait un carré de 1024² en moins d'une minute, en Compact. C'est un rendu vu dans l'app, pas une série `silicontrol measure` : nous n'avons plus de Neo pour en lancer une. Le budget d'un Mac de 8 Go est de 4 Go (les ¾ de 8 Go moins 2 Go, [La mémoire et le budget](#la-mémoire-et-le-budget)).
+Un Mac de 8 Go : un MacBook Neo (A18 Pro). Avec la 0.19, Anima Turbo y fait un carré de 1024² en moins d'une minute, en Compact, toutes les évaluations en pleine taille (rendu plus rapide éteint). C'est un rendu vu dans l'app, pas une série `silicontrol measure` : nous n'avons plus de Neo pour en lancer une. Le budget d'un Mac de 8 Go est de 4 Go (les ¾ de 8 Go moins 2 Go, [La mémoire et le budget](#la-mémoire-et-le-budget)).
 
 Si vous avez un Neo, ou un Mac que nous n'avons jamais tenu, vos chiffres sont les bienvenus. Faites un rendu, puis ouvrez **Mesurer ce Mac…** (menu Aide) : **Partager… ▸ Ouvrir un signalement GitHub** prépare le rapport, la carte et les temps prévus et mesurés de votre dernier rendu, et rien ne part tant que vous ne le soumettez pas ([Le diagnostic communautaire](#le-diagnostic-communautaire)). Une série `silicontrol measure` ([REMOTE-CONTROL.fr.md](REMOTE-CONTROL.fr.md)) vaut mieux encore.
 
