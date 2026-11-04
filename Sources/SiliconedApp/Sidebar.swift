@@ -121,9 +121,9 @@ private struct Footer: View {
                 // nothing left to click — measured with the footer as a `safeAreaInset`, the same in a `VStack`. Wrapping on its
                 // own, the text fits.
                 if case let .running(done, total, line) = app.diagnostic {
-                    // Before the first render, the measure it waits for: why nothing starts yet, and how far.
+                    // Why nothing starts yet, and how far; the first one, with what it asks.
                     Text(app.settingsRead ? "The diagnostic is running: renders wait for it."
-                                          : "Siliconed measures this Mac before its first render — about a minute.")
+                                          : "Siliconed is measuring this Mac — about a minute. Leave it at rest meanwhile.")
                         .font(.callout)
                     Text(verbatim: "\(line) · \(done + 1)/\(total)").font(.caption).foregroundStyle(.secondary)
                 }

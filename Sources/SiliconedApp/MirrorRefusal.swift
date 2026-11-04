@@ -20,6 +20,8 @@ extension AppRefusal {
             String(localized: "A render takes 1 to 8 images.")
         case .queueFull:
             String(localized: "The queue is full.")
+        case .notMeasured:
+            String(localized: "That Mac has not been measured yet: Measure This Mac… measures it.")
         case .enlargeModelDownload:
             String(localized: "The enlargement model could not be downloaded")
         case .enlargeFailed:

@@ -405,7 +405,7 @@ enum AcceleratorWords {
     /// Why the switch has nothing to choose.
     static func unavailable(_ reason: DiTSwitchUnavailable) -> String {
         switch reason {
-        case .notMeasured: String(localized: "This Mac is not measured yet: its first render measures it, then the accelerators can be chosen.")
+        case .notMeasured: String(localized: "This Mac is not measured yet: once it is (Measure This Mac…), the accelerators can be chosen.")
         default: String(localized: "This Mac’s measure gives the accelerators nothing to do: the DiT is computed in fp32.")
         }
     }

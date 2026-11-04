@@ -245,7 +245,7 @@ struct RackView: View {
     private var header: some View {
         HStack(alignment: .firstTextBaseline, spacing: 10) {
             // The engine's plan comes from this Mac's measure (`Diagnostic.Report`): the title and the Mac's own
-            // icon open it — greyed until a measure is kept (the first render waits for it), in its colours after.
+            // icon open it — greyed until a measure is kept (no render before it, and none starts it), in its colours after.
             let measured = app.mapMeasured
             Button { app.openDiagnostic() } label: {
                 HStack(spacing: 6) {

@@ -11,7 +11,8 @@
 //   size, the memory the engine will compare to this Mac's, how many renders, the time — learned on this Mac.
 // - **What stops it is said beside it**, in place of the cost: the reason (the whole sentence unfolded, cut to the line
 //   folded, whole on hover), and for a size this Mac cannot hold, the largest it can. An empty text says nothing folded: the
-//   field's own « Type the idea… » says it.
+//   field's own « Type the idea… » says it. A Mac not measured yet: « Measure This Mac… », folded or not — the render never
+//   starts the measure, its sheet asks for a Mac at rest first (4/11).
 // - **What the lab holds and the render will not read** is counted here too, never in silence.
 // - ⌘↩ from anywhere in the window (the Render menu). The queue, the measure of this Mac and what went wrong stay under the
 //   rack (`Sidebar`): they are the chain's, not the idea's.
@@ -34,7 +35,8 @@ struct GenerateControls: View {
             HStack(spacing: 8) {
                 unusedMark
                 if let blocker {
-                    if !app.prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { folded(blocker) }
+                    if app.mapBlocker != nil { measure }
+                    else if !app.prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { folded(blocker) }
                 } else {
                     time
                 }
@@ -48,6 +50,7 @@ struct GenerateControls: View {
                     VStack(alignment: .leading, spacing: 3) {
                         if let blocker {
                             Text(blocker).font(.callout).fixedSize(horizontal: false, vertical: true)
+                            if app.mapBlocker != nil, !app.diagnosticRunning { measure }
                             // A memory refusal is never a dead end: a size this Mac renders.
                             if let f = refusal?.smaller {
                                 Button(String(localized: "Use \(String(f.width)) × \(String(f.height))")) { app.useFormat(f) }
@@ -83,6 +86,17 @@ struct GenerateControls: View {
         if !app.references.isEmpty { return n > 1 ? String(localized: "Edit Image \(n) Ways") : String(localized: "Edit Image") }
         let images = app.seriesImages
         return images > 1 ? String(localized: "Generate \(images) Images") : String(localized: "Generate")
+    }
+
+    /// **The way to the measure** (`mapBlocker`): its sheet, which says what it asks — a Mac at rest — before its « Start ».
+    @ViewBuilder private var measure: some View {
+        if app.diagnosticRunning {
+            Text("Siliconed is measuring this Mac.").font(.caption).foregroundStyle(.secondary)
+        } else {
+            Button("Measure This Mac…") { app.openDiagnostic() }
+                .buttonStyle(.link).font(.caption)
+                .help("About a minute, the Mac at rest: Siliconed plans its renders from this measure")
+        }
     }
 
     // MARK: Folded

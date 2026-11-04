@@ -580,8 +580,7 @@ final class AppState {
         readEditors()
         // The engine's settings, read with the capacity map — once per process, and only
         // with a current map: the app builds only one `AppState` (see `App.swift`). Without one (none yet,
-        // or one of another Mac, macOS or build: an update), the settings stay unread until the measure
-        // the first render starts (`next`). **A map of this Mac and this build is read as it stands**: what the measure could not
+        // or one of another Mac, macOS or build: an update), the settings stay unread until the user measures (`mapBlocker`). **A map of this Mac and this build is read as it stands**: what the measure could not
         // give is said in its findings and the plan does without it, how far its identical calls agreed is written beside each
         // engine, and nothing asks to measure again. A render's gap to the prediction never asks for a new one either: the plan
         // stays what the model made it, and the bits of an image with it.
@@ -600,9 +599,10 @@ final class AppState {
 
     /// **The capacity model, in the app's preferences** (`Diagnostic.Report`, its JSON): what the engine plans with (`Report.plan`).
     /// **No render without one** (the user, 18/10/2026): the defaults are the M1 Pro's, and only a measure says what another
-    /// Mac's engines are worth. So the first render measures first — when none is kept, or the one kept is of another schema or
-    /// another `fingerprint` (another Mac, macOS build or app build) —, said in the sidebar, never in the background; the user can
-    /// also measure again (« Measure This Mac »), which then applies to the next render.
+    /// Mac's engines are worth. So no render before a measure — when none is kept, or the one kept is of another schema or
+    /// another `fingerprint` (another Mac, macOS build or app build) — and **only the user starts it** (the user, 4/11/2026):
+    /// « Generate » greys out on « Measure This Mac… », whose sheet asks for a Mac at rest beside its « Start » (`mapBlocker`).
+    /// Never in the background, never from a render. The user can also measure again, which then applies to the next render.
     private static let capacityMapKey = "capacityMap"
 
     /// The stored report; an older schema is not a map (`Report.read`).

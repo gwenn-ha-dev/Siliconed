@@ -257,8 +257,8 @@ extension AppState {
             do { for j in jobs { try mirror.render(j) } } catch { problem = Problem(error); flash(Problem(error).text) }
             return
         }
-        // A measure that failed before the first render is retried by the next click, not by itself.
-        if !settingsRead, case .failed = diagnostic { diagnostic = .ready }
+        // Never a measure started by a render (`mapBlocker`): its sheet, which says it wants a Mac at rest, before its « Start ».
+        guard settingsRead else { openDiagnostic(); return }
         file.append(contentsOf: jobs)
         if inProgress { flash(String(localized: "Added to the queue (\(file.count) waiting)")) }
         // An exploration across models: all of them copied to this Mac before its first cell, if needed.
@@ -273,7 +273,7 @@ extension AppState {
     /// succeeded, stopped or failed: the queue empties by itself.
     /// The diagnostic occupies the GPU and the CPU like a render: the queue waits for it (and it for the
     /// queue) — and for an installation, which reads and writes GBs (`installBlocker`). **No render
-    /// without this Mac's measure** (`settingsRead`): the first job starts it, and its end calls `next`.
+    /// without this Mac's measure** (`settingsRead`), which the user starts (`mapBlocker`), and its end calls `next`.
     /// An « Enlarge ×4 » under way and a grid's sheet being drawn are waited for too — memory a render
     /// would add to, never counted in its plan —; each calls `next` when it ends (`enlarged`, `addSheet`).
     func next() {
@@ -287,10 +287,7 @@ extension AppState {
         }
         guard enlarging == nil, drawingSheets.isEmpty else { return }
         applyPendingMap()
-        guard settingsRead else {
-            if case .ready = diagnostic { measure() }
-            return
-        }
+        guard settingsRead else { return }
         if activity == nil {
             activity = ProcessInfo.processInfo.beginActivity(options: [.userInitiated, .latencyCritical],
                                                              reason: "Image render")
