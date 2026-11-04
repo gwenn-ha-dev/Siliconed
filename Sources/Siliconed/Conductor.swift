@@ -7,9 +7,10 @@ import MetalPerformanceShaders
 
 /// **A GEMM cut by rows: the GPU and the AMX on it at the same time.**
 ///
-/// The sum of the two engines' throughputs, measured on one GEMM with a shared reserve: 5.360 TFLOP/s against 3.478 for the GPU
-/// alone (the AMX keeping 91 % of its solo throughput, the GPU losing 3.2 %); the thermal control framed it (−0.3 %). Reading a
-/// single weight instead of two brings in more than the rendezvous costs.
+/// What the pair is worth depends on the shape and the Mac, and this file does not say it: engines share, they do not add
+/// (`CapacityModel`, `keep`), and how many rows each one takes is the plan's, from this Mac's measure (below). The throughput
+/// this header used to quote came from a bench that filled its buffers with constants and never compared the product: it
+/// measured nothing of this operation.
 ///
 /// ## What the plan decides, and what this file does
 ///
@@ -25,9 +26,7 @@ import MetalPerformanceShaders
 ///    the question of a Metal offset's alignment never arises; it is the AMX, which works
 ///    on bare pointers, that takes the tail.
 /// 2. **The reserve is shared** — both engines read the *same* fp32 weight and write into the
-///    *same* output, each on its slice of rows. The first measurement read two distinct buffers, hence
-///    314 MB of traffic where there is only 157: its measurement was **pessimistic** about
-///    bandwidth, not optimistic.
+///    *same* output, each on its slice of rows: the traffic of one weight, not two.
 ///
 /// **`@unchecked Sendable`**: the AMX thread reads `self` while the calling thread works
 /// on the GPU, and that is intended. Their baton pass is made of two semaphores (`ready`, `done`):
