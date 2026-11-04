@@ -791,6 +791,46 @@
         }
       }
     },
+    "%@ free" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ frei"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ libres"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ libres"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ liberi"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "空き容量%@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "可用 %@"
+          }
+        }
+      }
+    },
     "%@ free on disk" : {
       "localizations" : {
         "de" : {
@@ -1509,6 +1549,52 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@ / %@"
+          }
+        }
+      }
+    },
+    "%@ of models · %@ free" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ Modelle · %@ frei"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ of models · %2$@ free"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ de modelos · %@ libres"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ de modèles · %@ libres"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ di modelli · %@ liberi"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "モデル%@・空き容量%@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "模型 %@ · 可用 %@"
           }
         }
       }
@@ -5923,6 +6009,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "负的 LoRA 强度会变回 0：请打开“测试版”→“负 LoRA 强度”。"
+          }
+        }
+      }
+    },
+    "A proportion, then 1K or 2K." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ein Seitenverhältnis, dann 1K oder 2K."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Una proporción y luego 1K o 2K."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Une proportion, puis 1K ou 2K."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prima le proporzioni, poi 1K o 2K."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "縦横比を選び、次に1Kまたは2K。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "先选比例，再选 1K 或 2K。"
           }
         }
       }
@@ -14271,6 +14397,46 @@
         }
       }
     },
+    "Each new image, as a PNG with its prompt, seed and model." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Jedes neue Bild als PNG, mit Prompt, Seed und Modell."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cada imagen nueva, en PNG con su prompt, su semilla y su modelo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chaque nouvelle image, en PNG avec son prompt, sa graine et son modèle."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ogni nuova immagine, in PNG con il suo prompt, il seme e il modello."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新しい画像をすべて、プロンプト、シード、モデルとともにPNGで保存します。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "每张新图像都以 PNG 存储，附带提示词、种子和模型。"
+          }
+        }
+      }
+    },
     "Each route alone, in trillions of operations a second (TFLOP/s). The bar is the share of the GPU’s peak, which its cores and clock announce; only the GPU has one, and only its matrix products are compared to it. ✓: the result is within its threshold of the exact one." : {
       "localizations" : {
         "de" : {
@@ -15153,6 +15319,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在放大…"
+          }
+        }
+      }
+    },
+    "Euler a, DPM++ 2M and UniPC, beside Euler." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Euler a, DPM++ 2M und UniPC neben Euler."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Euler a, DPM++ 2M y UniPC, junto a Euler."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Euler a, DPM++ 2M et UniPC, à côté d’Euler."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Euler a, DPM++ 2M e UniPC, accanto a Euler."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Euler に加えて Euler a、DPM++ 2M、UniPC。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在 Euler 之外，还有 Euler a、DPM++ 2M 和 UniPC。"
           }
         }
       }
@@ -16077,6 +16283,46 @@
         }
       }
     },
+    "From 1024², the first steps at half size." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ab 1024² die ersten Schritte in halber Größe."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Desde 1024², los primeros pasos a mitad de tamaño."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dès 1024², les premiers pas à demi-taille."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Da 1024², i primi passi a metà dimensione."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1024²以上では、最初のステップを半分のサイズで。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "从 1024² 起，前几步以一半尺寸进行。"
+          }
+        }
+      }
+    },
     "From Hugging Face" : {
       "localizations" : {
         "de" : {
@@ -16113,6 +16359,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "来自 Hugging Face"
+          }
+        }
+      }
+    },
+    "From −1.5 to 1.5, for slider LoRAs." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Von −1,5 bis 1,5, für „Slider“-LoRAs."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "De −1,5 a 1,5, para LoRA «slider»."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "De −1,5 à 1,5, pour les LoRA « slider »."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Da −1,5 a 1,5, per i LoRA «slider»."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "−1.5〜1.5、「スライダー」LoRA 用。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "从 −1.5 到 1.5，适用于“slider”类 LoRA。"
           }
         }
       }
@@ -20297,6 +20583,46 @@
         }
       }
     },
+    "Macs" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Macs"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mac"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mac"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mac"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mac"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mac"
+          }
+        }
+      }
+    },
     "Made with the %@ solver, offered when More Solvers is on: Euler will be used." : {
       "localizations" : {
         "de" : {
@@ -20857,6 +21183,46 @@
         }
       }
     },
+    "Measure" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Messung"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Medición"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mesure"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Misura"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "測定"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "测量"
+          }
+        }
+      }
+    },
     "Measure Again" : {
       "localizations" : {
         "de" : {
@@ -21093,6 +21459,86 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已测量"
+          }
+        }
+      }
+    },
+    "Measured on %@" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gemessen am %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Medido el %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mesuré le %@"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Misurato il %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@に測定"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "测量于 %@"
+          }
+        }
+      }
+    },
+    "Measured on %@; applies to the next render" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gemessen am %@; gilt ab dem nächsten Rendern"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Medido el %@; se aplica al siguiente render"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mesuré le %@ ; s’applique au rendu suivant"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Misurato il %@; si applica al render successivo"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@に測定。次の生成から適用されます"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "测量于 %@；下一次生成起生效"
           }
         }
       }
@@ -24114,6 +24560,86 @@
         }
       }
     },
+    "On Another Disk" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Auf einer anderen Festplatte"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En otro disco"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sur un autre disque"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Su un altro disco"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "別のディスク上"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "位于另一块磁盘"
+          }
+        }
+      }
+    },
+    "On This Mac" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Auf diesem Mac"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En este Mac"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sur ce Mac"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Su questo Mac"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このMac上"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "位于这台 Mac"
+          }
+        }
+      }
+    },
     "On another disk: what a render reads is copied to this Mac first, once per session, and removed when Siliconed quits. The disk must be connected to render." : {
       "localizations" : {
         "de" : {
@@ -24154,82 +24680,82 @@
         }
       }
     },
-    "On that Mac: Settings → Other Macs → Lend This Mac, then Pair a Mac…" : {
+    "On that Mac: Settings → Macs → Lend This Mac, then Pair a Mac…" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Auf jenem Mac: Einstellungen → Andere Macs → Diesen Mac ausleihen, dann Mac koppeln…"
+            "value" : "Auf jenem Mac: Einstellungen → Macs → Diesen Mac ausleihen, dann Mac koppeln…"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "En ese Mac: Ajustes → Otros Mac → Prestar este Mac, y luego Vincular un Mac…"
+            "value" : "En ese Mac: Ajustes → Mac → Prestar este Mac, y luego Vincular un Mac…"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Sur ce Mac : Réglages → Autres Mac → Prêter ce Mac, puis Appairer un Mac…"
+            "value" : "Sur ce Mac : Réglages → Mac → Prêter ce Mac, puis Appairer un Mac…"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Su quel Mac: Impostazioni → Altri Mac → Presta questo Mac, poi Abbina un Mac…"
+            "value" : "Su quel Mac: Impostazioni → Mac → Presta questo Mac, poi Abbina un Mac…"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "そのMacで：「設定」→「ほかのMac」→「このMacを貸し出す」、続いて「Macをペアリング…」。"
+            "value" : "そのMacで：「設定」→「Mac」→「このMacを貸し出す」、続いて「Macをペアリング…」。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "在那台 Mac 上：设置 → 其他 Mac → 出借这台 Mac，然后选择“配对 Mac…”。"
+            "value" : "在那台 Mac 上：设置 → Mac → 出借这台 Mac，然后选择“配对 Mac…”。"
           }
         }
       }
     },
-    "On the other Mac: Settings → Other Macs → Pair With a Mac…, then choose “%@”." : {
+    "On the other Mac: Settings → Macs → Pair With a Mac…, then choose “%@”." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Auf dem anderen Mac: Einstellungen → Andere Macs → Mit einem Mac koppeln…, dann „%@“ wählen."
+            "value" : "Auf dem anderen Mac: Einstellungen → Macs → Mit einem Mac koppeln…, dann „%@“ wählen."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "En el otro Mac: Ajustes → Otros Mac → Vincular con un Mac…, y luego elige «%@»."
+            "value" : "En el otro Mac: Ajustes → Mac → Vincular con un Mac…, y luego elige «%@»."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Sur l’autre Mac : Réglages → Autres Mac → Appairer avec un Mac…, puis choisissez « %@ »."
+            "value" : "Sur l’autre Mac : Réglages → Mac → Appairer avec un Mac…, puis choisissez « %@ »."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Sull’altro Mac: Impostazioni → Altri Mac → Abbina a un Mac…, poi scegli «%@»."
+            "value" : "Sull’altro Mac: Impostazioni → Mac → Abbina a un Mac…, poi scegli «%@»."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "もう一方のMacで：「設定」→「ほかのMac」→「Macとペアリング…」、続いて「%@」を選びます。"
+            "value" : "もう一方のMacで：「設定」→「Mac」→「Macとペアリング…」、続いて「%@」を選びます。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "在另一台 Mac 上：设置 → 其他 Mac → 与 Mac 配对…，然后选择“%@”。"
+            "value" : "在另一台 Mac 上：设置 → Mac → 与 Mac 配对…，然后选择“%@”。"
           }
         }
       }
@@ -25350,6 +25876,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "使用两台设备上显示的代码配对一次。"
+          }
+        }
+      }
+    },
+    "Paired Macs render on this one, with its models." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gekoppelte Macs rendern auf diesem, mit seinen Modellen."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Los Mac emparejados renderizan en este, con sus modelos."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les Mac appairés calculent sur celui-ci, avec ses modèles."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I Mac abbinati generano su questo, con i suoi modelli."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ペアリングしたMacはこのMacとそのモデルで生成します。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "配对的 Mac 会在这台 Mac 上使用它的模型进行生成。"
           }
         }
       }
@@ -29549,46 +30115,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "由模型所属系列决定"
-          }
-        }
-      }
-    },
-    "Settings" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Einstellungen"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ajustes"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Réglages"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Impostazioni"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "設定"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "设置"
           }
         }
       }
@@ -40354,6 +40880,46 @@
         }
       }
     },
+    "To measure again: macOS or Siliconed changed" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Neu messen: macOS oder Siliconed hat sich geändert"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Volver a medir: macOS o Siliconed ha cambiado"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "À mesurer à nouveau : macOS ou Siliconed a changé"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Da rimisurare: macOS o Siliconed è cambiato"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "再測定が必要：macOSまたはSiliconedが変わりました"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "需要重新测量：macOS 或 Siliconed 已更改"
+          }
+        }
+      }
+    },
     "Too small: %@ px on a side, %@ px at least." : {
       "localizations" : {
         "de" : {
@@ -47748,42 +48314,42 @@
         }
       }
     },
-    "pair a Mac in Settings › Other Macs, in the window" : {
+    "pair a Mac in Settings › Macs, in the window" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "einen Mac in den Einstellungen › Andere Macs koppeln, im Fenster"
+            "value" : "einen Mac in den Einstellungen › Macs koppeln, im Fenster"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "empareja un Mac en Ajustes › Otros Mac, en la ventana"
+            "value" : "empareja un Mac en Ajustes › Mac, en la ventana"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "appairer un Mac dans Réglages › Autres Mac, dans la fenêtre"
+            "value" : "appairer un Mac dans Réglages › Mac, dans la fenêtre"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "associa un Mac in Impostazioni › Altri Mac, nella finestra"
+            "value" : "associa un Mac in Impostazioni › Mac, nella finestra"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ウインドウの「設定」›「ほかのMac」でMacをペアリングしてください"
+            "value" : "ウインドウの「設定」›「Mac」でMacをペアリングしてください"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "请在窗口的“设置”›“其他 Mac”中配对 Mac"
+            "value" : "请在窗口的“设置”›“Mac”中配对 Mac"
           }
         }
       }

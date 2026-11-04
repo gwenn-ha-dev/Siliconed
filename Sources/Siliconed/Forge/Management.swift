@@ -346,7 +346,7 @@ extension Library {
     static func exists(_ path: String) -> Bool { FileManager.default.fileExists(atPath: path) }
 
     /// The size of a file, or of a whole folder; 0 if it does not exist.
-    static func size(_ path: String) -> Int {
+    package static func size(_ path: String) -> Int {
         let fm = FileManager.default
         var folder: ObjCBool = false
         guard fm.fileExists(atPath: path, isDirectory: &folder) else { return 0 }

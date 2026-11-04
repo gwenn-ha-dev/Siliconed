@@ -391,7 +391,7 @@ private struct ComputeOnMenu: View {
                     if let machine = w.otherMacs.machines[b.id] { Text(verbatim: machine.summary) }
                 }
                 Divider()
-                Button("Other Macs…") { SettingsWindow.shared.show(w.local) }
+                Button("Other Macs…") { SettingsWindow.shared.show(w.local, pane: .macs) }
             } label: {
                 // A long name gives way, never « Chain » or « Models… » beside it.
                 Text("On: \(shown?.name ?? String(localized: "This Mac"))").font(.callout)

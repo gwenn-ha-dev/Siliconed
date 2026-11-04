@@ -1,14 +1,20 @@
-// **Other Macs, in the Settings**: lend this Mac, pair a Mac, the Macs paired each way — and the two
-// pairing sheets, one per side, where the same six digits are compared.
+// **Other Macs, in the Settings' Macs pane**: lend this Mac, pair a Mac, the Macs paired each way — and the
+// two pairing sheets, one per side, where the same six digits are compared.
 //
-//     ┌ Other Macs ────────────────────────────────────────────────┐
-//     │ Lend This Mac                                        [on]  │
-//     │   Neo de Gwenn · connected                       Forget    │
-//     │   [Pair a Mac…]                                            │
-//     │ Compute on Another Mac                [Pair With a Mac…]   │
-//     │   Mac mini de Gwenn · connected      Disconnect  Forget    │
+//     OTHER MACS
+//     ┌────────────────────────────────────────────────────────────┐
+//     │ [■] Lend This Mac                                    (●○)  │
+//     │     Paired Macs render on this one, with its models.       │
+//     │     [Pair a Mac…]                                          │
+//     │ [▣] Neo de Gwenn   ● connected                   [Forget]  │
+//     ├────────────────────────────────────────────────────────────┤
+//     │ [■] Compute on Another Mac              [Pair With a Mac…] │
+//     │ [▣] Mac mini de Gwenn  ● connected   [Disconnect] [Forget] │
+//     │     Apple M4 Pro · 64 GB · Budget 46 GB · Measured · …     │
 //     └────────────────────────────────────────────────────────────┘
+//     One Mac renders for another on the same network.
 //
+// A paired Mac wears its own icon (`MacIcon`, from the model it said it is); one never seen, a plain tile.
 // The acceptance is on the lending side only (`Pairing.swift`: the code proves nothing typed on the
 // other one); the borrowing sheet shows the code and says where to accept.
 
@@ -21,37 +27,49 @@ struct OtherMacsSection: View {
     @State private var clientSheet = false
 
     var body: some View {
-        Section {
-            Toggle(isOn: $macs.lending) {
-                SettingLabel("Lend This Mac", "Paired Macs render on this one, with its models. Nothing connects before you accept a pairing.")
+        SettingsGroup("Other Macs", footer: "One Mac renders for another on the same network.") {
+            SettingRow(Text("Lend This Mac"), Text("Paired Macs render on this one, with its models."),
+                       detail: "Paired Macs render on this one, with its models. Nothing connects before you accept a pairing.") {
+                IconTile(symbol: "antenna.radiowaves.left.and.right", color: Palette.peach, side: 26)
+            } trailing: {
+                SettingSwitch("Lend This Mac", isOn: $macs.lending)
+            } below: {
+                if macs.lending {
+                    Button("Pair a Mac…") {
+                        macs.openPairing()
+                        hostSheet = true
+                    }
+                }
+                if let p = macs.lendingProblem {
+                    Text(verbatim: p).font(.caption).foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true)
+                }
             }
             if macs.lending {
                 ForEach(macs.pairings?.lent ?? [], id: \.identity) { m in
-                    LabeledContent {
+                    let hello = macs.connected[m.identity]
+                    SettingRow(Text(verbatim: m.name)) {
+                        Self.icon(hello?.machine.hardwareModel)
+                    } trailing: {
                         Button("Forget") { macs.forget(lent: m) }
-                    } label: {
-                        Text(verbatim: m.name)
-                        Text(macs.connected[m.identity] != nil ? "connected" : "not connected").font(.caption)
+                    } below: {
+                        LinkState(text: hello != nil ? String(localized: "connected") : String(localized: "not connected"),
+                                  color: hello != nil ? Palette.live : .secondary)
+                            .font(.caption).foregroundStyle(.secondary)
                     }
                 }
-                Button("Pair a Mac…") {
-                    macs.openPairing()
-                    hostSheet = true
-                }
             }
-            if let p = macs.lendingProblem {
-                Text(verbatim: p).font(.caption).foregroundStyle(.orange)
-            }
-            LabeledContent {
+            SettingRow(Text("Compute on Another Mac"), Text("Pair once, with a code shown on both screens.")) {
+                IconTile(symbol: "network", color: Palette.sky, side: 26)
+            } trailing: {
                 Button("Pair With a Mac…") {
                     macs.lookForPairable()
                     clientSheet = true
                 }
-            } label: {
-                SettingLabel("Compute on Another Mac", "Pair once, with a code shown on both screens.")
             }
             ForEach(macs.pairings?.borrowed ?? [], id: \.id) { m in
-                LabeledContent {
+                SettingRow(Text(verbatim: m.name)) {
+                    Self.icon(macs.machines[m.id]?.hardwareModel)
+                } trailing: {
                     HStack {
                         if macs.links[m.id] == nil {
                             Button("Connect") { macs.connect(m) }
@@ -60,14 +78,16 @@ struct OtherMacsSection: View {
                         }
                         Button("Forget") { macs.forget(borrowed: m) }
                     }
-                } label: {
-                    Text(verbatim: m.name)
-                    Text(Self.state(macs.links[m.id], found: macs.found[m.id] != nil)).font(.caption)
-                    if let machine = macs.machines[m.id] { Text(verbatim: machine.summary).font(.caption) }
+                } below: {
+                    VStack(alignment: .leading, spacing: 2) {
+                        LinkState(text: Self.state(macs.links[m.id], found: macs.found[m.id] != nil), color: Self.dot(macs.links[m.id]))
+                        if let machine = macs.machines[m.id] {
+                            Text(verbatim: machine.summary).foregroundStyle(.tertiary)
+                        }
+                    }
+                    .font(.caption).foregroundStyle(.secondary)
                 }
             }
-        } header: {
-            SettingLabel("Other Macs", "One Mac renders for another on the same network.")
         }
         .onAppear { macs.load() }
         .sheet(isPresented: $hostSheet, onDismiss: macs.closePairing) {
@@ -75,6 +95,25 @@ struct OtherMacsSection: View {
         }
         .sheet(isPresented: $clientSheet, onDismiss: macs.stopLookingForPairable) {
             ClientPairingSheet(macs: macs) { clientSheet = false }
+        }
+    }
+
+    /// A paired Mac's icon, from the model it said it is; a plain tile while it has said nothing.
+    @ViewBuilder private static func icon(_ hardwareModel: String?) -> some View {
+        if let hardwareModel {
+            MacIcon(hardwareModel: hardwareModel).frame(width: 30, height: 30)
+        } else {
+            IconTile(symbol: "laptopcomputer", color: .secondary, side: 26)
+        }
+    }
+
+    /// The dot of a link: what runs when connected, orange on the way, red when refused.
+    static func dot(_ s: RemoteLink.State?) -> Color {
+        switch s {
+        case .connected?: Palette.live
+        case .connecting?, .waiting?: .orange
+        case .refused?: Palette.failure
+        case nil, .off?: .secondary
         }
     }
 
@@ -116,7 +155,7 @@ private struct HostPairingSheet: View {
             case nil, .waiting?:
                 ProgressView()
                 Text("Waiting for a Mac…").font(.headline)
-                Text("On the other Mac: Settings → Other Macs → Pair With a Mac…, then choose “\(macs.name)”.")
+                Text("On the other Mac: Settings → Macs → Pair With a Mac…, then choose “\(macs.name)”.")
                     .multilineTextAlignment(.center)
                 Button("Cancel", action: done).keyboardShortcut(.cancelAction)
             case .compare(let client, let code)?:
@@ -180,7 +219,7 @@ private struct ClientPairingSheet: View {
                 Text("Choose the Mac to compute on").font(.headline)
                 if macs.pairable.isEmpty {
                     ProgressView()
-                    Text("On that Mac: Settings → Other Macs → Lend This Mac, then Pair a Mac…")
+                    Text("On that Mac: Settings → Macs → Lend This Mac, then Pair a Mac…")
                         .multilineTextAlignment(.center).font(.caption).foregroundStyle(.secondary)
                 } else {
                     ForEach(macs.pairable) { m in

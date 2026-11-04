@@ -37,7 +37,7 @@ extension RemoteControl {
         guard let found = MacName.match(word, among: borrowed.map { ($0.id, $0.name) }), let b = borrowed.first(where: { $0.id == found.id }) else {
             let names = borrowed.map(\.name).joined(separator: ", ")
             throw Refusal("unknown_mac", String(localized: "no paired Mac called \"\(word)\""),
-                          help: names.isEmpty ? String(localized: "pair a Mac in Settings › Other Macs, in the window") : String(localized: "paired: \(names)"))
+                          help: names.isEmpty ? String(localized: "pair a Mac in Settings › Macs, in the window") : String(localized: "paired: \(names)"))
         }
         return b
     }

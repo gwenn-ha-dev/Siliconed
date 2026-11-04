@@ -57,8 +57,9 @@ enum Palette {
     static let failure = dynamic(dark: 0xFC5852, light: 0xD02C2A)
     /// Behind the image: the color is the image's, the ground stays dark at night, pale by day.
     static let canvas = dynamic(dark: 0x131424, light: 0xF9F6F2)
-    /// The rack's column.
-    static let column = dynamic(dark: 0x1B1C2F, light: 0xF0ECE7)
+    /// The rack's column; the ground of the Settings.
+    static let column = Color(nsColor: columnInk)
+    static let columnInk = dynamicInk(dark: 0x1B1C2F, light: 0xF0ECE7)
     /// A box: a card a step above the column.
     static let surface = dynamic(dark: 0x2A283D, light: 0xFEFDFB)
     /// A field inside a box: a recess.
@@ -86,13 +87,15 @@ enum Palette {
 struct IconTile: View {
     let symbol: String
     let color: Color
+    /// 20 in a box's title; 26 before a setting.
+    var side: CGFloat = 20
 
     var body: some View {
         Image(systemName: symbol)
-            .font(.system(size: 11, weight: .semibold))
+            .font(.system(size: side * 0.55, weight: .semibold))
             .foregroundStyle(Palette.surface)
-            .frame(width: 20, height: 20)
-            .background(RoundedRectangle(cornerRadius: 5, style: .continuous).fill(color))
+            .frame(width: side, height: side)
+            .background(RoundedRectangle(cornerRadius: side / 4, style: .continuous).fill(color))
     }
 }
 

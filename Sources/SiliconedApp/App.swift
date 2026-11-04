@@ -144,7 +144,7 @@ private struct AppCommands: Commands {
                     }
                 }
                 if window.otherMacs.pairings == nil {
-                    Button("Other Macs…") { SettingsWindow.shared.show(window.local) }
+                    Button("Other Macs…") { SettingsWindow.shared.show(window.local, pane: .macs) }
                 }
             }
         }
