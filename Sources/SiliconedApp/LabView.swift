@@ -6,7 +6,8 @@
 //   unfolds it.
 // - **Unfolded**: a plate of glass, its edges fading (`vapour`), that rises over the image (`MainView`), never pushing it: pushed, the window took
 //   the image's height plus the bar's and grew past the screen. Its title names the model it writes for — the menu of the
-//   model is the rack's, one place —, its foot holds the cost, « Explore » and « Generate ». A click on the image folds it.
+//   model is the rack's, one place —, its foot holds the cost and « Generate ». A click on the image folds it. **The window
+//   opens with it unfolded** (`LabModel.opening`): the place to write is the first thing seen.
 // - **Rewrite and Describe wait for a render** (the render first), and the folded line says so.
 
 import AppKit

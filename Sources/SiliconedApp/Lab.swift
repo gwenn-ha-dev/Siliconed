@@ -441,6 +441,15 @@ final class LabModel {
     /// ⌥⌘L, and the bar's chevron.
     func toggle() { if unfolded { fold() } else { unfold() } }
 
+    /// **Unfolded when the window opens** (4/11): where the idea is written is the first thing seen — folded, the eye went to
+    /// the rack's text port and looked for a field there. Once per launch: a fold after it is the hand's, and stays.
+    func opening() {
+        guard !opened else { return }
+        opened = true
+        unfold()
+    }
+    @ObservationIgnored private var opened = false
+
     /// **« Send to the Prompt Lab »**: a history image comes in with the role a newcomer takes, and the bar unfolds on it.
     func send(_ entry: Entry) {
         guard let image = rack.fromHistory(entry) else { return }

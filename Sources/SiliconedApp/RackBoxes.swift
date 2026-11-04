@@ -52,6 +52,8 @@ private struct BoxTitle<Trailing: View>: View {
     let symbol: String
     let tint: Color
     var explanation: LocalizedStringKey? = nil
+    /// A port's name: read, not a stage's.
+    var quiet = false
     @ViewBuilder var trailing: Trailing
 
     var body: some View {
@@ -62,7 +64,8 @@ private struct BoxTitle<Trailing: View>: View {
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(tint)
                     .frame(width: 20, height: 20)
-                Text(title).font(.callout.weight(.semibold))
+                Text(title).font(.callout.weight(quiet ? .medium : .semibold))
+                    .foregroundStyle(quiet ? .secondary : .primary)
                     .lineLimit(2).fixedSize(horizontal: false, vertical: true)
             }
             .contentShape(Rectangle())
@@ -87,31 +90,33 @@ extension View {
     }
 }
 
-/// **A box the signal starts in** — the prompt, an edit's images: its chip in the color of the wire
-/// it sends; its edge takes the accent while it is being typed in (`focused`).
+/// **A box the signal starts in** — the text, an edit's images: its symbol in the color of the wire it sends. **An outline,
+/// not a card**: nothing is typed in it, and a white card at the rack's top left, the first thing the eye meets, was taken
+/// for the place to write (4/11) — the stages below stay cards, the ports are only drawn around.
 struct PortBox<Trailing: View, Content: View>: View {
     let title: LocalizedStringKey
     let symbol: String
     let kind: WireKind
-    var focused = false
     @ViewBuilder var trailing: Trailing
     @ViewBuilder var content: Content
 
     var body: some View {
         VStack(alignment: .leading, spacing: 9) {
-            BoxTitle(title: title, symbol: symbol, tint: kind.color) {
+            BoxTitle(title: title, symbol: symbol, tint: kind.color, quiet: true) {
                 trailing.font(.caption).monospacedDigit().foregroundStyle(.secondary)
             }
             content
         }
-        .boxed(edge: focused ? Palette.live : Palette.hairline, width: focused ? 1.5 : 1)
-        .animation(Motion.pick(.easeInOut(duration: 0.15)), value: focused)
+        // No fill, its name in the secondary color: a recess filled with `well` was the cards' 7 % in dark, the same white.
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .overlay(boxShape.strokeBorder(Palette.hairline, lineWidth: 1))
     }
 }
 
 extension PortBox where Trailing == EmptyView {
-    init(title: LocalizedStringKey, symbol: String, kind: WireKind, focused: Bool = false, @ViewBuilder content: () -> Content) {
-        self.init(title: title, symbol: symbol, kind: kind, focused: focused, trailing: { EmptyView() }, content: content)
+    init(title: LocalizedStringKey, symbol: String, kind: WireKind, @ViewBuilder content: () -> Content) {
+        self.init(title: title, symbol: symbol, kind: kind, trailing: { EmptyView() }, content: content)
     }
 }
 
@@ -243,7 +248,7 @@ struct Cost: View {
 // **The rack's inputs, read only**: what the next render sends, written and chosen in the Prompt Lab under the image
 // (`LabView.swift`) — the rack says what goes, it never takes it twice, the strength of a starting image included. Two small
 // ports side by side, each above the encoder it feeds, so that each wire drops straight down: the text over the text
-// encoder, the images over the image encoder. A click on either unfolds the lab (⌥⌘L).
+// encoder, the images over the image encoder. In outline, not cards (`PortBox`). A click on either unfolds the lab (⌥⌘L).
 
 extension View {
     /// A port: read here, set in the Prompt Lab — a click unfolds it.
@@ -256,12 +261,13 @@ extension View {
     }
 }
 
-/// **The prompt, as a port**: where the text comes from, not the text — it is read in the bar under the image.
+/// **The text, as a port**: where it comes from, not the text — it is read in the bar under the image. Named « Text », what
+/// the text encoder under it reads: « Prompt » sent the eye looking for a field here.
 struct PromptPort: View {
     @Bindable var app: AppState
 
     var body: some View {
-        PortBox(title: "Prompt", symbol: "text.quote", kind: .text) {
+        PortBox(title: "Text", symbol: "text.quote", kind: .text) {
             Text(app.prompt.isEmpty ? "to write in the Prompt Lab" : "from the Prompt Lab")
                 .font(.caption).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)

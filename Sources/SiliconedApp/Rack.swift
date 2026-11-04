@@ -1,7 +1,7 @@
 // **The rack: the chain of the render, drawn from `model.chain`, as the window's left column**.
 //
-//   ┌ Prompt ────────┐ ┌ Images ──── 1/3 ┐   the inputs, read only: written and chosen in the Prompt Lab under
-//   │ from the Lab   │ │ ▣ ▣             │   the image (`LabView.swift`). The images port only on a model that
+//   ┌ Text ──────────┐ ┌ Images ──── 1/3 ┐   the inputs, read only, in outline: written and chosen in the Prompt Lab
+//   │ from the Lab   │ │ ▣ ▣             │   under the image (`LabView.swift`). The images port only on a model that
 //   └───────┬────────┘ └──┬──────┬───────┘   edits (its images, numbered) or starts from an image (img2img: the
 //           │text  ╭──────╯image │image      starting image and its strength, set on its tile in the lab)
 //   ┌Text encoder────┐ ┌Image encoder────┐   Qwen-Image-2.1's text encoder sees the images too: one short wire
