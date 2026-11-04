@@ -242,8 +242,8 @@ struct DiTBox: View {
         // The lot is the series' seed axis (4/11): bracketing the seed is choosing how many, and where they go.
         .bracketable(app, .seeds)
         // **The steps, only off the recipe**: the five models are distilled for 8, and fewer is softer, more is longer and no
-        // better — a choice that only costs. The line comes when something else set them (a PNG's settings reused, a cell of
-        // an exploration finished, `silicontrol`), as the variation's does, with its way back.
+        // better — a choice that only costs. The line comes when something else set them (a PNG's settings reused,
+        // `silicontrol`), as the variation's does, with its way back.
         let recipe = app.card?.defaultSteps ?? 8
         if app.steps != recipe {
             Field(title: "Steps") {

@@ -25,7 +25,7 @@ L'app est distribuée en `.dmg` sur la page [Releases](https://github.com/gwenn-
 ## Ce que fait l'app
 
 - **Dessine à partir de texte, et retouche sur instruction.** Qwen-Image-2.1 Turbo prend 1 à 3 images et une phrase (« remplace le ciel nuageux par un ciel bleu ») et ne change que ce que vous avez nommé. Quel modèle pour quoi, avec licences et tailles : [Les modèles](docs/APP.fr.md#les-modèles).
-- **Explore avant de s'engager.** Une grille d'esquisses rapides à travers graines, pas, forces de LoRA ou modèles ; la case choisie devient l'image finie, celle-là même que son esquisse promettait.
+- **Bracketing, comme un appareil photo.** Faites varier un mot, la graine, la force d'une LoRA, des LoRA, le Détail ou l'image de départ : une image finie par case, côte à côte sur le canevas, chacune celle-là même que donne un rendu seul.
 - **Écrit vos prompts, si vous le demandez** (bêta). L'Atelier de prompts réécrit un prompt court dans le style que chaque modèle aime, ou décrit une image que vous y déposez. Il se sert d'un modèle déjà installé, et jamais pendant un rendu.
 - **Prend vos propres modèles.** Importez des LoRA et des fine-tunes depuis Civitai ou Hugging Face.
 - **Local et privé.** Le rendu se fait sur votre Mac, sans filtre de contenu ajouté par l'app et sans rien envoyer de votre historique. Elle suit la langue du système (anglais, français, allemand, espagnol, italien, japonais ou chinois simplifié).
@@ -45,7 +45,7 @@ Le tour de l'app : [docs/APP.fr.md](docs/APP.fr.md).
 
 ## Documentation
 
-- [docs/APP.fr.md](docs/APP.fr.md) : l'app en détail : créer, éditer, écrire des prompts, explorer, gérer les modèles, réglages, vie privée.
+- [docs/APP.fr.md](docs/APP.fr.md) : l'app en détail : créer, éditer, écrire des prompts, séries, gérer les modèles, réglages, vie privée.
 - [docs/ENGINE.fr.md](docs/ENGINE.fr.md) : le moteur : la mesure du Mac, le Neural Engine, les chiffres, le rendu plus rapide, Draw Things, la mémoire, le diagnostic communautaire, la vérification, la construction depuis les sources.
 - [docs/VERIFY.fr.md](docs/VERIFY.fr.md) : vérifier les résultats contre la référence sur votre Mac.
 - [docs/REMOTE-CONTROL.fr.md](docs/REMOTE-CONTROL.fr.md) : `silicontrol`, protocole et fonctionnement interne.

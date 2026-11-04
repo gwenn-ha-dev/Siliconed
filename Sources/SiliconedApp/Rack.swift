@@ -266,7 +266,6 @@ struct RackView: View {
             .help(DiagnosticSheet.mapStatus(app))
             ComputeOnMenu(app: app)
             Spacer()
-            // « Explore » is beside « Generate » (`Sidebar`): a gesture that makes images, not a setting.
             Button("Models…") { app.managementOpen = true }
                 .buttonStyle(.link)
                 .font(.callout)

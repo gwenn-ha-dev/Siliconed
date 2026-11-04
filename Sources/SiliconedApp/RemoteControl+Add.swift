@@ -63,6 +63,7 @@ extension RemoteControl {
             case "--preview": d.previews = true
             case "--no-preview": d.previews = false
             case "--wait": d.wait = true
+            case "--no-sheet": d.sheet = false
             case "--image": d.image = try value(a)
             case "--strength":
                 let v = try value(a)
@@ -122,8 +123,8 @@ extension RemoteControl {
         // One big job at a time on 16 GB: no render while an installation or an import runs.
         if let reason = app.libraryBlocker { throw Refusal("library_absent", reason, help: String(localized: "connect the disk, then retry")) }
         if let reason = app.installBlocker { throw Refusal("busy", reason, help: String(localized: "retry once the installation is done (silicontrol models)")) }
-        if !grid, d.x != nil || d.y != nil {
-            throw Refusal("usage", String(localized: "--x and --y belong to “silicontrol grid”"), help: "silicontrol help grid")
+        if !grid, d.x != nil || d.y != nil || !d.sheet {
+            throw Refusal("usage", String(localized: "--x, --y and --no-sheet belong to “silicontrol grid”"), help: "silicontrol help grid")
         }
         if grid, d.x == nil {
             throw Refusal("usage", String(localized: "a grid needs --x (and optionally --y)"), help: "silicontrol help grid")
@@ -439,7 +440,7 @@ extension RemoteControl {
                                       solver: d.solver)
         settings.strength = strength
         let (run, jobs) = app.enqueueGrid(g, settings: settings, references: references, previews: d.previews ?? app.previews,
-                                          accelerators: d.accelerators, start: start)
+                                          sheet: d.sheet, accelerators: d.accelerators, start: start)
         // The rack's tag of each model the cells render, as after a click.
         if let on = d.accelerators { for id in Set(jobs.map(\.settings.identifier)) { app.setAccelerators(on, for: id) } }
         // The form takes the grid, as after a click: settings, prompt as typed, edit images, and the axes the window brackets

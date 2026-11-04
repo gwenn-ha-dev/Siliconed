@@ -82,8 +82,8 @@ extension RemoteControl {
                           help: String(localized: "Render › Compute On › This Mac, then retry"))
         }
         // The same usage rules as here (`add`).
-        if !grid, d.x != nil || d.y != nil {
-            throw Refusal("usage", String(localized: "--x and --y belong to “silicontrol grid”"), help: "silicontrol help grid")
+        if !grid, d.x != nil || d.y != nil || !d.sheet {
+            throw Refusal("usage", String(localized: "--x, --y and --no-sheet belong to “silicontrol grid”"), help: "silicontrol help grid")
         }
         if grid, d.x == nil {
             throw Refusal("usage", String(localized: "a grid needs --x (and optionally --y)"), help: "silicontrol help grid")
@@ -305,7 +305,7 @@ extension RemoteControl {
         let on = mirror.macName
         do {
             try mirror.explore(g, settings: app.resolvingFaster(settings), references: references, accelerators: d.accelerators,
-                               previews: d.previews ?? app.previews) { [self] answer in
+                               sheet: d.sheet, previews: d.previews ?? app.previews) { [self] answer in
                 switch answer {
                 case .refused(let text):
                     finish(c, Response.failure("refused", Problem(text).text))
@@ -335,7 +335,7 @@ extension RemoteControl {
     /// **`wait g2` and `grid --wait` on a mirror**: each cell's image as it comes (written into `folder`
     /// if given), the sheet, then the verdict. The sheet is the image of the history that cites the grid.
     func followMirroredGrid(_ mirror: MirrorLink, _ g: Int, folder: String?, _ c: Connection) {
-        guard let jobs = mirror.grids[g] else {
+        guard let (jobs, drawn) = mirror.grids[g] else {
             finish(c, Response.failure("unknown_job", String(localized: "no grid \("g\(g)") in this session"), help: "silicontrol status"))
             return
         }
@@ -347,8 +347,8 @@ extension RemoteControl {
         func conclude() {
             guard !concluded, tallies.count == jobs.count else { return }
             let done = jobs.filter { tallies[$0]?["outcome"] as? String == "done" }
-            // The verdict comes after the images: the sheet after the last cell.
-            if !done.isEmpty, sheet == nil { return }
+            // The verdict comes after the images: the sheet, if the grid draws one, after the last cell.
+            if drawn, !done.isEmpty, sheet == nil { return }
             concluded = true
             if let token { app.unsubscribe(token) }
             let allFinished = done.count == jobs.count

@@ -139,6 +139,8 @@ extension RemoteControl {
         /// `nil`: like the app's « Preview at every step » switch.
         var previews: Bool?
         var wait = false
+        /// `grid --no-sheet`: a series as « Generate » renders it — the cells, the sheet only on `sheet g2`.
+        var sheet = true
         var folder: String?
         /// `grid`: the axes as typed (`RenderGrid.axis`), and whether `--batch` was given (refused).
         var x: String?, y: String?

@@ -101,7 +101,7 @@ private struct AppCommands: Commands {
             Button("Copy as Terminal Command") { app.copyCommand() }
         }
         CommandGroup(after: .toolbar) {
-            // On the exploration's grid, the cells' size; otherwise the image's zoom.
+            // On a series' grid, the cells' size; otherwise the image's zoom.
             Button("Zoom In") {
                 if app.showsExploration { app.exploreCellSide = AppState.clampedCellSide(app.exploreCellSide * 1.25) }
                 else { app.zoom = min(app.zoom * 1.5, 8) }

@@ -1,4 +1,4 @@
-// The history column: thumbnails, live and exploration tiles and their buttons.
+// The history column: thumbnails, live and series tiles and their buttons.
 // Split from `MainView.swift`.
 
 import AppKit
@@ -9,7 +9,7 @@ import UniformTypeIdentifiers
 // MARK: - The history
 
 /// **The history, in a column on the right of the image** (the height is what a window lacks, not the width): the newest on top,
-/// the exploration's tile and the render under way first; at its foot, how many images and the thumbnails' size.
+/// the series' tile and the render under way first; at its foot, how many images and the thumbnails' size.
 struct Banner: View {
     @Bindable var app: AppState
 
@@ -19,7 +19,7 @@ struct Banner: View {
             ScrollView(.vertical) {
                 LazyVStack(spacing: 8) {
                     if let run = app.explored { ExplorationTile(app: app, run: run) }
-                    // An exploration's cell shows its own preview in the grid: no second tile for it.
+                    // A series' cell shows its own preview in the grid: no second tile for it.
                     if let job = app.currentJob, app.explored?.jobs.contains(job.ordinal) != true {
                         LiveTile(app: app, job: job)
                     }
@@ -149,7 +149,7 @@ private struct LiveTile: View {
     }
 }
 
-/// **The exploration, at the head of the strip**: its grid in small, how far it is; a click brings the
+/// **The series, at the head of the strip**: its grid in small, how far it is; a click brings the
 /// grid back to the canvas.
 private struct ExplorationTile: View {
     let app: AppState
@@ -172,9 +172,9 @@ private struct ExplorationTile: View {
         .frame(height: side + 4)
         .contentShape(Rectangle())
         .onTapGesture { app.showsExploration = true }
-        .help("The exploration’s grid")
+        .help("The series’ grid")
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text("The exploration’s grid"))
+        .accessibilityLabel(Text("The series’ grid"))
         .accessibilityValue(Text(verbatim: "\(run.entries.count)/\(run.jobs.count)"))
         .accessibilityAddTraits(.isButton)
     }

@@ -871,52 +871,6 @@
         }
       }
     },
-    "%@ has %@ cells: c0 to c%@" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ hat %@ Zellen: c0 bis c%@"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "%1$@ has %2$@ cells: c0 to c%3$@"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ tiene %@ celdas: de c0 a c%@"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ a %@ cases : c0 à c%@"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ ha %@ celle: da c0 a c%@"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ には %@ 個のセルがあります：c0 から c%@ まで"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ 有 %@ 个单元格：c0 到 c%@"
-          }
-        }
-      }
-    },
     "%@ has no %@ version" : {
       "localizations" : {
         "de" : {
@@ -963,46 +917,6 @@
         }
       }
     },
-    "%@ has no picture yet: wait for it, or it did not render" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ hat noch kein Bild: abwarten, oder die Zelle wurde nicht gerendert"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ aún no tiene imagen: espera, o no se renderizó"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ n’a pas encore d’image{N}: l’attendre, ou elle n’a pas été rendue"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ non ha ancora un’immagine: aspetta, oppure non è stata renderizzata"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ にはまだ画像がありません：待つか、生成されなかったセルです"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ 还没有图像：请等待，或它没有生成"
-          }
-        }
-      }
-    },
     "%@ has no role “%@”" : {
       "localizations" : {
         "de" : {
@@ -1045,52 +959,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@ 没有“%@”角色"
-          }
-        }
-      }
-    },
-    "%@ has no schedule for %@ steps." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$@ hat keinen Zeitplan für %2$@ Schritte."
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "%1$@ has no schedule for %2$@ steps."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$@ no tiene planificación para %2$@ pasos."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$@ n’a pas de calendrier pour %2$@ pas."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$@ non ha una pianificazione per %2$@ passi."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$@には%2$@ステップ用のスケジュールがありません。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ 没有适用于 %@ 步的调度。"
           }
         }
       }
@@ -1255,94 +1123,48 @@
         }
       }
     },
-    "%@ is not a cell of the exploration shown (%@)" : {
+    "%@ is not the series shown (%@)" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@ ist keine Zelle der gezeigten Erkundung (%@)"
+            "value" : "%@ ist nicht die angezeigte Serie (%@)"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "new",
-            "value" : "%1$@ is not a cell of the exploration shown (%2$@)"
+            "value" : "%1$@ is not the series shown (%2$@)"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@ no es una celda de la exploración mostrada (%@)"
+            "value" : "%@ no es la serie mostrada (%@)"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@ n’est pas une case de l’exploration montrée (%@)"
+            "value" : "%@ n’est pas la série montrée (%@)"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@ non è una cella dell’esplorazione mostrata (%@)"
+            "value" : "%@ non è la serie mostrata (%@)"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@ は表示中の探索のセルではありません（%@）"
+            "value" : "%@ は表示中のシリーズではありません（%@）"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@ 不是当前所示探索的单元格（%@）"
-          }
-        }
-      }
-    },
-    "%@ is not the exploration shown (%@)" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ ist nicht die gezeigte Erkundung (%@)"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "%1$@ is not the exploration shown (%2$@)"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ no es la exploración mostrada (%@)"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ n’est pas l’exploration montrée (%@)"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ non è l’esplorazione mostrata (%@)"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ は表示中の探索ではありません（%@）"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ 不是当前所示的探索（%@）"
+            "value" : "%@ 不是当前显示的系列（%@）"
           }
         }
       }
@@ -1931,6 +1753,86 @@
         }
       }
     },
+    "%@ seeds" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ Seeds"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ semillas"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ graines"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ semi"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "シード%@個"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 个种子"
+          }
+        }
+      }
+    },
+    "%@ seeds from the rack’s" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ Seeds ab dem des Racks"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ semillas a partir de la del rack"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ graines à partir de celle du rack"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ semi a partire da quello del rack"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ラックのシードから%@個"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "从机架的种子起 %@ 个"
+          }
+        }
+      }
+    },
     "%@ steps" : {
       "localizations" : {
         "de" : {
@@ -1967,6 +1869,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@ 步"
+          }
+        }
+      }
+    },
+    "%@ things vary: two at most. Take one away with its ✕." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ Dinge variieren: höchstens zwei. Entferne eines mit seinem ✕."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ cosas varían: dos como máximo. Quita una con su ✕."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ choses varient : deux au plus. Retirez-en une avec son ✕."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ cose variano: due al massimo. Togline una con la sua ✕."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@個の項目が変化しています：最大2つまでです。✕で1つ外してください。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "有 %@ 项在变化：最多两项。用它的 ✕ 移除一项。"
           }
         }
       }
@@ -2917,46 +2859,6 @@
         }
       }
     },
-    "%lld LoRAs stacked on every cell" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld LoRAs gestapelt auf jeder Zelle"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld LoRA apilados en cada celda"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld LoRA empilées sur chaque case"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld LoRA impilate su ogni cella"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "各セルにLoRAを%lld個重ねています"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "每个单元格叠加 %lld 个 LoRA"
-          }
-        }
-      }
-    },
     "%lld LoRAs: the app stacks %lld at most" : {
       "localizations" : {
         "de" : {
@@ -2993,130 +2895,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%lld 个 LoRA：App 最多叠加 %lld 个"
-          }
-        }
-      }
-    },
-    "%lld from the seed" : {
-      "localizations" : {
-        "de" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld ab dem Seed"
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld ab dem Seed"
-                }
-              }
-            }
-          }
-        },
-        "en" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld from the seed"
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld from the seed"
-                }
-              }
-            }
-          }
-        },
-        "es" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld desde la semilla"
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld desde la semilla"
-                }
-              }
-            }
-          }
-        },
-        "fr" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld depuis la graine"
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld depuis la graine"
-                }
-              }
-            }
-          }
-        },
-        "it" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld dal seme"
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld dal seme"
-                }
-              }
-            }
-          }
-        },
-        "ja" : {
-          "variations" : {
-            "plural" : {
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "シードから%lld個"
-                }
-              }
-            }
-          }
-        },
-        "zh-Hans" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "从该种子起 %lld 个"
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "从该种子起 %lld 个"
-                }
-              }
-            }
           }
         }
       }
@@ -3834,130 +3612,6 @@
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "%lld 次生成"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "%lld sketches" : {
-      "localizations" : {
-        "de" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld Skizze"
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld Skizzen"
-                }
-              }
-            }
-          }
-        },
-        "en" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld sketch"
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld sketches"
-                }
-              }
-            }
-          }
-        },
-        "es" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld boceto"
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld bocetos"
-                }
-              }
-            }
-          }
-        },
-        "fr" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld esquisse"
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld esquisses"
-                }
-              }
-            }
-          }
-        },
-        "it" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld schizzo"
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld schizzi"
-                }
-              }
-            }
-          }
-        },
-        "ja" : {
-          "variations" : {
-            "plural" : {
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "スケッチ%lld件"
-                }
-              }
-            }
-          }
-        },
-        "zh-Hans" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld 张草稿"
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld 张草稿"
                 }
               }
             }
@@ -4787,46 +4441,6 @@
         }
       }
     },
-    "--sketch belongs to “silicontrol grid”" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "--sketch gehört zu „silicontrol grid“"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "--sketch es de «silicontrol grid»"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "--sketch appartient à « silicontrol grid »"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "--sketch appartiene a «silicontrol grid»"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "--sketch は「silicontrol grid」のオプションです"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "--sketch 属于“silicontrol grid”"
-          }
-        }
-      }
-    },
     "--solver %@ is offered only when More Solvers is on" : {
       "localizations" : {
         "de" : {
@@ -5033,46 +4647,6 @@
         }
       }
     },
-    "--x and --y belong to “silicontrol grid”" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "--x und --y gehören zu „silicontrol grid“"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "--x y --y son de «silicontrol grid»"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "--x et --y sont à « silicontrol grid »"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "--x e --y appartengono a «silicontrol grid»"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "--x と --y は「silicontrol grid」のオプションです"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "--x 和 --y 属于“silicontrol grid”"
-          }
-        }
-      }
-    },
     "--x seeds=N gives N seeds — silicontrol help grid" : {
       "localizations" : {
         "de" : {
@@ -5109,6 +4683,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "--x seeds=N 给出 N 个种子——见 silicontrol help grid"
+          }
+        }
+      }
+    },
+    "--x, --y and --no-sheet belong to “silicontrol grid”" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "--x, --y und --no-sheet gehören zu „silicontrol grid“"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "--x, --y y --no-sheet son de «silicontrol grid»"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "--x, --y et --no-sheet appartiennent à « silicontrol grid »"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "--x, --y e --no-sheet appartengono a «silicontrol grid»"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "--x、--y、--no-sheet は「silicontrol grid」のオプションです"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "--x、--y 和 --no-sheet 属于“silicontrol grid”"
           }
         }
       }
@@ -5309,126 +4923,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "1K 或 2K，例如 3:4@2K"
-          }
-        }
-      }
-    },
-    "512 × 512" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "512 × 512"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "512 × 512"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "512 × 512"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "512 × 512"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "512 × 512"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "512 × 512"
-          }
-        }
-      }
-    },
-    "512 × 768" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "512 × 768"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "512 × 768"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "512 × 768"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "512 × 768"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "512 × 768"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "512 × 768"
-          }
-        }
-      }
-    },
-    "768 × 512" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "768 × 512"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "768 × 512"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "768 × 512"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "768 × 512"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "768 × 512"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "768 × 512"
           }
         }
       }
@@ -6073,6 +5567,46 @@
         }
       }
     },
+    "A grid that varies the starting image’s strength needs a starting image." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ein Raster, das die Stärke des Startbilds variiert, braucht ein Startbild."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Una cuadrícula que varía la fuerza de la imagen de partida necesita una imagen de partida."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Une grille qui fait varier la force de l’image de départ a besoin d’une image de départ."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Una griglia che varia la forza dell’immagine di partenza ha bisogno di un’immagine di partenza."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "開始画像の強さを変えるグリッドには開始画像が必要です。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "改变起始图像强度的网格需要一张起始图像。"
+          }
+        }
+      }
+    },
     "A language model reads the prompt and turns it into what the DiT understands" : {
       "localizations" : {
         "de" : {
@@ -6553,82 +6087,42 @@
         }
       }
     },
-    "A sketch is not cropped" : {
+    "A series: Generate renders each of these words. Click to change them." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Eine Skizze wird nicht zugeschnitten"
+            "value" : "Eine Serie: „Generieren“ rendert jedes dieser Wörter. Klicke, um sie zu ändern."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Un boceto no se recorta"
+            "value" : "Una serie: «Generar» renderiza cada una de estas palabras. Haz clic para cambiarlas."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Une esquisse ne se recadre pas"
+            "value" : "Une série : « Générer » rend chacun de ces mots. Cliquez pour les changer."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Uno schizzo non si ritaglia"
+            "value" : "Una serie: «Genera» rende ciascuna di queste parole. Fai clic per cambiarle."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "スケッチはトリミングできません"
+            "value" : "シリーズ：「生成」でこれらの語をそれぞれ描画します。クリックして変更できます。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "草稿不能裁剪"
-          }
-        }
-      }
-    },
-    "A sketch stops early: the later it stops, the closer to the finished image (a LoRA’s style can settle late), the longer it takes. The step count is the rack’s" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Eine Skizze stoppt früh: Je später sie stoppt, desto näher ist sie am fertigen Bild (der Stil einer LoRA kann sich spät zeigen) und desto länger dauert sie. Die Schrittzahl ist die des Racks"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Un boceto se detiene pronto: cuanto más tarde se detiene, más se parece a la imagen terminada (el estilo de un LoRA puede aparecer tarde) y más tarda. El número de pasos es el del rack"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Une esquisse s’arrête tôt : plus elle s’arrête tard, plus elle ressemble à l’image finie (le style d’une LoRA peut venir tard), plus elle prend de temps. Le nombre de pas est celui du rack"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Uno schizzo si ferma presto: più tardi si ferma, più si avvicina all’immagine finita (lo stile di una LoRA può arrivare tardi), più tempo richiede. Il numero di passi è quello del rack"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "スケッチは途中で止まります：止めるのが遅いほど完成画像に近づき（LoRAのスタイルは後から現れることがあります）、時間もかかります。ステップ数はラックのものです"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "草稿会提前停止：停得越晚，越接近成图（LoRA 的风格可能较晚才定型），耗时也越长。步数与机架一致"
+            "value" : "一个系列：“生成”会逐一渲染这些词。点击即可修改。"
           }
         }
       }
@@ -7439,42 +6933,42 @@
         }
       }
     },
-    "Adds the solvers Euler a, DPM++ 2M and UniPC to the DiT’s box and to the exploration’s axes. The default, Euler, is the one the models were distilled for." : {
+    "Adds the solvers Euler a, DPM++ 2M and UniPC to the DiT’s box and to the series. The default, Euler, is the one the models were distilled for." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Fügt die Solver Euler a, DPM++ 2M und UniPC zur Box des DiT und zu den Achsen der Erkundung hinzu. Standard ist Euler, der Solver, für den die Modelle destilliert wurden."
+            "value" : "Fügt die Solver Euler a, DPM++ 2M und UniPC zur Box des DiT und zu den Serien hinzu. Standard ist Euler, der Solver, für den die Modelle destilliert wurden."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Añade los solvers Euler a, DPM++ 2M y UniPC a la caja del DiT y a los ejes de la exploración. El predeterminado, Euler, es aquel para el que se destilaron los modelos."
+            "value" : "Añade los solvers Euler a, DPM++ 2M y UniPC a la caja del DiT y a las series. El predeterminado, Euler, es aquel para el que se destilaron los modelos."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ajoute les solveurs Euler a, DPM++ 2M et UniPC à la boîte du DiT et aux axes de l’exploration. Euler, par défaut, est celui pour lequel les modèles ont été distillés."
+            "value" : "Ajoute les solveurs Euler a, DPM++ 2M et UniPC à la boîte du DiT et aux séries. Euler, par défaut, est celui pour lequel les modèles ont été distillés."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Aggiunge i solver Euler a, DPM++ 2M e UniPC al riquadro del DiT e agli assi dell’esplorazione. Quello predefinito, Euler, è quello per cui i modelli sono stati distillati."
+            "value" : "Aggiunge i solver Euler a, DPM++ 2M e UniPC al riquadro del DiT e alle serie. Quello predefinito, Euler, è quello per cui i modelli sono stati distillati."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ソルバー Euler a、DPM++ 2M、UniPC を DiT のボックスと探索の軸に追加します。既定の Euler は、モデルが蒸留されたときのソルバーです。"
+            "value" : "ソルバー Euler a、DPM++ 2M、UniPC を DiT のボックスとシリーズに追加します。既定の Euler は、モデルが蒸留されたときのソルバーです。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "在 DiT 的方框和探索的轴中添加求解器 Euler a、DPM++ 2M 和 UniPC。默认的 Euler 是这些模型蒸馏时所用的求解器。"
+            "value" : "在 DiT 的方框和系列中添加求解器 Euler a、DPM++ 2M 和 UniPC。默认的 Euler 是这些模型蒸馏时所用的求解器。"
           }
         }
       }
@@ -8599,82 +8093,42 @@
         }
       }
     },
-    "Automatic" : {
+    "Axis" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Automatisch"
+            "value" : "Achse"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Automático"
+            "value" : "Eje"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Automatique"
+            "value" : "Axe"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Automatico"
+            "value" : "Asse"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "自動"
+            "value" : "軸"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "自动"
-          }
-        }
-      }
-    },
-    "Axis %@" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Achse %@"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Eje %@"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Axe %@"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Asse %@"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "軸%@"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "轴 %@"
+            "value" : "轴"
           }
         }
       }
@@ -8719,6 +8173,86 @@
         }
       }
     },
+    "Back to one image" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zurück zu einem Bild"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Volver a una imagen"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Revenir à une image"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Torna a un’immagine"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1枚に戻す"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "恢复为一张图像"
+          }
+        }
+      }
+    },
+    "Back to the first word" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zurück zum ersten Wort"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Volver a la primera palabra"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Revenir au premier mot"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Torna alla prima parola"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最初の語に戻す"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "恢复为第一个词"
+          }
+        }
+      }
+    },
     "Back to the images — the grid stays at the head of the strip" : {
       "localizations" : {
         "de" : {
@@ -8755,46 +8289,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "返回图像——网格保留在序列最前"
-          }
-        }
-      }
-    },
-    "Base" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Basis"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Base"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Base"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Base"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ベース"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "基础"
           }
         }
       }
@@ -8995,6 +8489,166 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "测试版：8 步配方是社区的蒸馏版本，而非发布方的。待发布方推出自己的快速版本后，将结束测试。"
+          }
+        }
+      }
+    },
+    "Bracket" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reihe erstellen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Horquillar"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bracketer"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Applica"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ブラケット"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "包围"
+          }
+        }
+      }
+    },
+    "Bracket · %@" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reihe · %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Horquillado · %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bracketer · %@"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bracketing · %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ブラケット · %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "包围 · %@"
+          }
+        }
+      }
+    },
+    "Bracketed: Generate renders each value" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "In Reihe: „Generieren“ rendert jeden Wert"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Horquillado: «Generar» renderiza cada valor"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bracketé : « Générer » rend chaque valeur"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Con bracketing: «Genera» rende ogni valore"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ブラケット中：「生成」で各値を描画します"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "包围中：“生成”会逐一渲染每个值"
+          }
+        }
+      }
+    },
+    "Bracket…" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reihe…"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Horquillar…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bracketer…"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bracketing…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ブラケット…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "包围…"
           }
         }
       }
@@ -11159,6 +10813,86 @@
         }
       }
     },
+    "Columns" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Spalten"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Columnas"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Colonnes"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Colonne"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "列"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "列"
+          }
+        }
+      }
+    },
+    "Columns (X)" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Spalten (X)"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Columnas (X)"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Colonnes (X)"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Colonne (X)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "列（X）"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "列（X）"
+          }
+        }
+      }
+    },
     "Command Line" : {
       "localizations" : {
         "de" : {
@@ -11355,6 +11089,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "紧凑"
+          }
+        }
+      }
+    },
+    "Compare LoRAs…" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "LoRAs vergleichen…"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Comparar LoRA…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Comparer des LoRA…"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Confronta LoRA…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "LoRAを比較…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "比较 LoRA…"
           }
         }
       }
@@ -11835,46 +11609,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在连接“%@”…"
-          }
-        }
-      }
-    },
-    "Consecutive" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Fortlaufend"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Consecutivas"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Consécutives"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Consecutivi"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "連続"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "连续"
           }
         }
       }
@@ -12555,6 +12289,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "核心"
+          }
+        }
+      }
+    },
+    "Count %@" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Anzahl %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cantidad %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nombre %@"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Numero %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "数 %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "数量 %@"
           }
         }
       }
@@ -13399,6 +13173,46 @@
         }
       }
     },
+    "Detail %@" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Detail %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Detalle %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Détail %@"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dettaglio %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ディテール %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "细节 %@"
+          }
+        }
+      }
+    },
     "Detail: %@" : {
       "localizations" : {
         "de" : {
@@ -14217,46 +14031,6 @@
         }
       }
     },
-    "Each cell adds one of these LoRAs to the stack, at one strength" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Jede Zelle fügt eine dieser LoRAs dem Stapel hinzu, mit derselben Stärke"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cada celda añade uno de estos LoRA a la pila, con una misma intensidad"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Chaque case ajoute une de ces LoRA à la pile, à une même force"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ogni cella aggiunge una di queste LoRA alla pila, con la stessa intensità"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "各セルはこれらのLoRAのうち1つを、同じ強さでスタックに追加します"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "每个单元格以同一强度向堆叠中添加其中一个 LoRA"
-          }
-        }
-      }
-    },
     "Each keeps of its speed alone" : {
       "localizations" : {
         "de" : {
@@ -14297,46 +14071,6 @@
         }
       }
     },
-    "Each model at its own number of steps; the LoRAs are left out, each is made for one model" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Jedes Modell mit seiner eigenen Schrittzahl; die LoRAs werden ausgelassen, jede ist für ein einziges Modell gemacht"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cada modelo con su propio número de pasos; los LoRA se dejan fuera, cada uno está hecho para un solo modelo"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Chaque modèle à son propre nombre de pas ; les LoRA sont laissées de côté, chacune est faite pour un seul modèle"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ogni modello con il proprio numero di passi; le LoRA vengono tralasciate, ognuna è fatta per un solo modello"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "各モデルをそれぞれのステップ数で実行します。LoRAは除外されます（LoRAはそれぞれ1つのモデル専用です）"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "每个模型使用各自的步数；LoRA 会略去，因为每个 LoRA 只适用于一个模型"
-          }
-        }
-      }
-    },
     "Each new image will be saved here as a PNG, with its prompt, seed and model." : {
       "localizations" : {
         "de" : {
@@ -14373,46 +14107,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "每张新图像都会以 PNG 格式存储在这里，并附带其提示词、种子和模型。"
-          }
-        }
-      }
-    },
-    "Each of the %lld images alone, with the same instruction" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Jedes der %lld Bilder einzeln, mit derselben Anweisung"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cada una de las %lld imágenes por separado, con la misma instrucción"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Chacune des %lld images seule, avec la même instruction"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ognuna delle %lld immagini da sola, con la stessa istruzione"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld枚の画像をそれぞれ単独で、同じ指示で処理します"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "这 %lld 张图像各自单独处理，使用相同的指令"
           }
         }
       }
@@ -15423,82 +15117,42 @@
         }
       }
     },
-    "Exploration" : {
+    "Exchange the columns and the rows" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Erkundung"
+            "value" : "Spalten und Zeilen tauschen"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Exploración"
+            "value" : "Intercambiar columnas y filas"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Exploration"
+            "value" : "Échanger les colonnes et les lignes"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Esplorazione"
+            "value" : "Scambia colonne e righe"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "探索"
+            "value" : "列と行を入れ替える"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "探索"
-          }
-        }
-      }
-    },
-    "Explore" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Erkunden"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Explorar"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Explorer"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Esplora"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "探索"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "探索"
+            "value" : "交换列与行"
           }
         }
       }
@@ -15943,170 +15597,6 @@
         }
       }
     },
-    "Finish This Image" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Dieses Bild fertigstellen"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Terminar esta imagen"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Finir cette image"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Completa questa immagine"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "この画像を仕上げる"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "完成此图像"
-          }
-        }
-      }
-    },
-    "Finished images, %lld steps" : {
-      "localizations" : {
-        "de" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "Fertige Bilder, %lld Schritt"
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "Fertige Bilder, %lld Schritte"
-                }
-              }
-            }
-          }
-        },
-        "en" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "Finished images, %lld step"
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "Finished images, %lld steps"
-                }
-              }
-            }
-          }
-        },
-        "es" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "Imágenes terminadas, %lld paso"
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "Imágenes terminadas, %lld pasos"
-                }
-              }
-            }
-          }
-        },
-        "fr" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "Images finies, %lld pas"
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "Images finies, %lld pas"
-                }
-              }
-            }
-          }
-        },
-        "it" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "Immagini finite, %lld passo"
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "Immagini finite, %lld passi"
-                }
-              }
-            }
-          }
-        },
-        "ja" : {
-          "variations" : {
-            "plural" : {
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "完成画像、%lldステップ"
-                }
-              }
-            }
-          }
-        },
-        "zh-Hans" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "已完成的图像，%lld 步"
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "已完成的图像，%lld 步"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "Fixed" : {
       "localizations" : {
         "de" : {
@@ -16263,46 +15753,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "忘记"
-          }
-        }
-      }
-    },
-    "Format" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Format"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Formato"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Format"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Formato"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "フォーマット"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "格式"
           }
         }
       }
@@ -19807,46 +19257,6 @@
         }
       }
     },
-    "Learned on this Mac, model by model at this size" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Auf diesem Mac gelernt, Modell für Modell in diesem Format"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Aprendido en este Mac, modelo a modelo a este tamaño"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Appris sur ce Mac, modèle par modèle à cette taille"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Appreso su questo Mac, modello per modello a questa dimensione"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "このMacで学習：このサイズで、モデルごとに"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已在这台 Mac 上学习，按此尺寸逐个模型记录"
-          }
-        }
-      }
-    },
     "Learned on this Mac: the first render at this size, with this model, sets the estimate" : {
       "localizations" : {
         "de" : {
@@ -20207,46 +19617,6 @@
         }
       }
     },
-    "List" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Liste"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Lista"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Liste"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Elenco"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "リスト"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "列表"
-          }
-        }
-      }
-    },
     "LoRA" : {
       "localizations" : {
         "de" : {
@@ -20363,46 +19733,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "未找到 %2$@ 的 LoRA“%1$@”"
-          }
-        }
-      }
-    },
-    "LoRA %@" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "LoRA %@"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "LoRA %@"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "LoRA %@"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "LoRA %@"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "LoRA %@"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "LoRA %@"
           }
         }
       }
@@ -20647,30 +19977,30 @@
         }
       }
     },
-    "LoRA to Compare" : {
+    "LoRAs Compared" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Zu vergleichende LoRA"
+            "value" : "Verglichene LoRAs"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "LoRA que comparar"
+            "value" : "LoRA comparadas"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "LoRA à comparer"
+            "value" : "LoRA comparées"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "LoRA da confrontare"
+            "value" : "LoRA a confronto"
           }
         },
         "ja" : {
@@ -20682,47 +20012,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "用于对比的 LoRA"
-          }
-        }
-      }
-    },
-    "LoRAs on Every Cell" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "LoRAs auf allen Zellen"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "LoRA en todas las celdas"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "LoRA sur toutes les cases"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "LoRA su ogni cella"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "すべてのセルにLoRA"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "每个单元格的 LoRA"
+            "value" : "比较的 LoRA"
           }
         }
       }
@@ -23130,6 +22420,46 @@
         }
       }
     },
+    "No longer bracketed" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keine Reihe mehr"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sin horquillado"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Plus de bracketing"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Senza bracketing"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ブラケットを解除"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "取消包围"
+          }
+        }
+      }
+    },
     "No reference" : {
       "localizations" : {
         "de" : {
@@ -23486,46 +22816,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "非商用：该模型仅限个人使用和研究。其生成的图像可用于任何目的，包括商业用途。"
-          }
-        }
-      }
-    },
-    "None" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Keine"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ninguno"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Aucun"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Nessuno"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "なし"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "无"
           }
         }
       }
@@ -24860,6 +24150,86 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "有一张图像从未存储。"
+          }
+        }
+      }
+    },
+    "One more value, a step after the last" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ein Wert mehr, einen Schritt nach dem letzten"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un valor más, un paso después del último"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Une valeur de plus, un pas après la dernière"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un valore in più, un passo dopo l’ultimo"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最後の値から1ステップ先に値を1つ追加"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "再加一个值，比最后一个多一步"
+          }
+        }
+      }
+    },
+    "One more word" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ein Wort mehr"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Una palabra más"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un mot de plus"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Una parola in più"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "語を1つ追加"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "再加一个词"
           }
         }
       }
@@ -28737,6 +28107,46 @@
         }
       }
     },
+    "Replaces: %@" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ersetzt: %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sustituye: %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remplace : %@"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sostituisce: %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "置き換え：%@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "替换：%@"
+          }
+        }
+      }
+    },
     "Replace…" : {
       "localizations" : {
         "de" : {
@@ -29257,6 +28667,86 @@
         }
       }
     },
+    "Rows" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zeilen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Filas"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lignes"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Righe"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "行"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "行"
+          }
+        }
+      }
+    },
+    "Rows (Y)" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zeilen (Y)"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Filas (Y)"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lignes (Y)"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Righe (Y)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "行（Y）"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "行（Y）"
+          }
+        }
+      }
+    },
     "Save" : {
       "localizations" : {
         "de" : {
@@ -29573,46 +29063,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "种子 %@"
-          }
-        }
-      }
-    },
-    "Seeds" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Seeds"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Semillas"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Graines"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Semi"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "シード"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "种子"
           }
         }
       }
@@ -29943,46 +29393,6 @@
         }
       }
     },
-    "Settings of the cell taken by the rack" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Einstellungen der Zelle vom Rack übernommen"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ajustes de la celda tomados por el rack"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Réglages de la case repris par le rack"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Impostazioni della cella riprese dal rack"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ラックに取り込まれたセルの設定"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "机架采用的单元格设置"
-          }
-        }
-      }
-    },
     "Settings…" : {
       "localizations" : {
         "de" : {
@@ -30263,6 +29673,46 @@
         }
       }
     },
+    "Show This Image" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dieses Bild zeigen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostrar esta imagen"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Montrer cette image"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostra questa immagine"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この画像を表示"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示此图像"
+          }
+        }
+      }
+    },
     "Show in Finder" : {
       "localizations" : {
         "de" : {
@@ -30299,46 +29749,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "在访达中显示"
-          }
-        }
-      }
-    },
-    "Show the Grid" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Raster zeigen"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mostrar la cuadrícula"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Montrer la grille"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mostra la griglia"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "グリッドを表示"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "显示网格"
           }
         }
       }
@@ -31223,114 +30633,6 @@
         }
       }
     },
-    "Sketch at %lld steps of %lld" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Skizze bei %1$lld von %2$lld Schritten"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sketch at %#@n@ of %2$lld"
-          },
-          "substitutions" : {
-            "n" : {
-              "argNum" : 1,
-              "formatSpecifier" : "lld",
-              "variations" : {
-                "plural" : {
-                  "one" : {
-                    "stringUnit" : {
-                      "state" : "translated",
-                      "value" : "%arg step"
-                    }
-                  },
-                  "other" : {
-                    "stringUnit" : {
-                      "state" : "translated",
-                      "value" : "%arg steps"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Boceto a %1$lld pasos de %2$lld"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Esquisse à %1$lld pas sur %2$lld"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Schizzo a %1$lld passi su %2$lld"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%2$lldステップ中%1$lldステップのスケッチ"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "第 %lld 步（共 %lld 步）的草稿"
-          }
-        }
-      }
-    },
-    "Small and fast: 512 on the short side — the models are out of their domain below" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Klein und schnell: 512 auf der kurzen Seite – darunter sind die Modelle außerhalb ihres Bereichs"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Pequeño y rápido: 512 en el lado corto — por debajo, los modelos salen de su dominio"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Petit et rapide : 512 sur le petit côté — les modèles sont hors de leur domaine en dessous"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Piccolo e veloce: 512 sul lato corto — sotto, i modelli sono fuori dal loro dominio"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "小さく高速：短辺512 — これより小さいとモデルは得意な範囲を外れます"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "小而快：短边 512——低于此尺寸，模型就超出了其适用范围"
-          }
-        }
-      }
-    },
     "Smaller on disk: the image model in 8 bits, the publisher’s text encoder; images slightly different." : {
       "localizations" : {
         "de" : {
@@ -31611,46 +30913,6 @@
         }
       }
     },
-    "Stacked together, the rack’s own. To compare LoRAs, choose “LoRA to Compare” on an axis." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Zusammen gestapelt, die des Racks. Um LoRAs zu vergleichen, wählen Sie „Zu vergleichende LoRA“ auf einer Achse."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Apilados juntos, los del rack. Para comparar LoRA, elige «LoRA que comparar» en un eje."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Empilées ensemble, celles du rack. Pour comparer des LoRA, choisissez « LoRA à comparer » sur un axe."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Impilate insieme, quelle del rack. Per confrontare delle LoRA, scegli «LoRA da confrontare» su un asse."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "まとめてスタックされる、ラックのものです。LoRAを比較するには、軸で「比較するLoRA」を選んでください。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "一同叠加，使用机架自己的 LoRA。若要对比 LoRA，请在某个轴上选择“用于对比的 LoRA”。"
-          }
-        }
-      }
-    },
     "Stage" : {
       "localizations" : {
         "de" : {
@@ -31892,6 +31154,46 @@
         }
       }
     },
+    "Start from an image, or vary something else." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Starte von einem Bild aus oder variiere etwas anderes."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Parte de una imagen o haz variar otra cosa."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Partez d’une image, ou faites varier autre chose."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Parti da un’immagine o fai variare qualcos’altro."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "画像から始めるか、別のものを変えてください。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请从一张图像开始，或改变其他设置。"
+          }
+        }
+      }
+    },
     "Starting Image" : {
       "localizations" : {
         "de" : {
@@ -31928,6 +31230,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "起始图像"
+          }
+        }
+      }
+    },
+    "Starting Image Strength" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stärke des Startbilds"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fuerza de la imagen de partida"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Force de l’image de départ"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Forza dell’immagine di partenza"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "開始画像の強さ"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "起始图像强度"
           }
         }
       }
@@ -32093,42 +31435,42 @@
         }
       }
     },
-    "Step counts, separated by commas" : {
+    "Step %@" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Schrittzahlen, durch Kommas getrennt"
+            "value" : "Schritt %@"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Números de pasos, separados por comas"
+            "value" : "Paso %@"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nombres de pas, séparés par des virgules"
+            "value" : "Pas %@"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Numeri di passi, separati da virgole"
+            "value" : "Passo %@"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ステップ数をカンマ区切りで入力"
+            "value" : "間隔 %@"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "步数，以逗号分隔"
+            "value" : "步长 %@"
           }
         }
       }
@@ -32699,6 +32041,46 @@
         }
       }
     },
+    "Strength of %@" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stärke von %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fuerza de %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Force de %@"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Forza di %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ の強さ"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 的强度"
+          }
+        }
+      }
+    },
     "Strength: 0.8 attenuates, 1 as trained, more emphasizes" : {
       "localizations" : {
         "de" : {
@@ -32735,86 +32117,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "强度：0.8 减弱，1 为训练原样，更大则加强"
-          }
-        }
-      }
-    },
-    "Strengths" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Stärken"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Intensidades"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Forces"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Intensità"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "強さ"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "强度"
-          }
-        }
-      }
-    },
-    "Strengths for this LoRA; the other LoRAs keep theirs" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Stärken für diese LoRA; die anderen LoRAs behalten ihre"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Intensidades de este LoRA; los demás LoRA conservan la suya"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Les forces de cette LoRA ; les autres LoRA gardent la leur"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Le intensità di questa LoRA; le altre LoRA mantengono la loro"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "このLoRAの強さ。ほかのLoRAは自分の強さを保ちます"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "此 LoRA 的强度；其他 LoRA 保持各自的强度"
           }
         }
       }
@@ -34592,86 +33894,6 @@
         }
       }
     },
-    "The exploration’s grid" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Das Raster der Erkundung"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "La cuadrícula de la exploración"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "La grille de l’exploration"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "La griglia dell’esplorazione"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "探索のグリッド"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "探索的网格"
-          }
-        }
-      }
-    },
-    "The exploration’s panel (⌥⌘G)" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Das Feld der Erkundung (⌥⌘G)"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "El panel de la exploración (⌥⌘G)"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Le panneau de l’exploration (⌥⌘G)"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Il pannello dell’esplorazione (⌥⌘G)"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "探索パネル（⌥⌘G）"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "探索面板（⌥⌘G）"
-          }
-        }
-      }
-    },
     "The file arrived damaged on “%@”: nothing was kept. Send it again." : {
       "localizations" : {
         "de" : {
@@ -34828,6 +34050,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "仅服饰——不含穿着者。"
+          }
+        }
+      }
+    },
+    "The grid’s models, steps or edit images are silicontrol’s: left out" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modelle, Schritte oder Bearbeitungsbilder des Rasters gehören zu silicontrol: weggelassen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Los modelos, pasos o imágenes de edición de la cuadrícula son de silicontrol: se omiten"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les modèles, les pas ou les images à éditer de la grille sont à silicontrol : laissés de côté"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modelli, passi o immagini da modificare della griglia sono di silicontrol: tralasciati"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "グリッドのモデル、ステップ数、編集画像はsilicontrol専用のため省きました"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "网格的模型、步数或编辑图像属于 silicontrol：已略过"
           }
         }
       }
@@ -35428,6 +34690,86 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "渲染开始时的图像：保留其构图；尺寸随它而定。"
+          }
+        }
+      }
+    },
+    "The image, as the history shows it (double-click a cell)" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das Bild, wie der Verlauf es zeigt (Doppelklick auf eine Zelle)"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La imagen, tal como la muestra el historial (doble clic en una celda)"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’image, comme l’historique la montre (double-cliquez sur une case)"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’immagine, come la mostra la cronologia (doppio clic su una cella)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "履歴と同じように画像を表示（セルをダブルクリック）"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "像历史记录那样显示图像（双击单元格）"
+          }
+        }
+      }
+    },
+    "The images side by side, labelled — an image of the history, in memory like the others" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Bilder nebeneinander, beschriftet – ein Bild des Verlaufs, im Speicher wie die anderen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Las imágenes una al lado de otra, etiquetadas — una imagen del historial, en memoria como las demás"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les images côte à côte, étiquetées — une image de l’historique, en mémoire comme les autres"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le immagini affiancate, etichettate — un’immagine della cronologia, in memoria come le altre"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "画像を並べてラベルを付けたもの — 他と同じくメモリ上の履歴の画像です"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "图像并排排列并加标注——历史记录中的一张图像，和其他图像一样保存在内存中"
           }
         }
       }
@@ -36918,162 +36260,42 @@
         }
       }
     },
-    "The rack takes this cell whole — model, prompt, size, steps, LoRAs, seed — without rendering" : {
+    "The rack takes this image’s settings — model, prompt, size, LoRAs, seed — without rendering" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Das Rack übernimmt diese Zelle vollständig – Modell, Prompt, Format, Schritte, LoRAs, Seed –, ohne zu rendern"
+            "value" : "Das Rack übernimmt die Einstellungen dieses Bilds – Modell, Prompt, Größe, LoRAs, Seed – ohne zu rendern"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "El rack toma la celda entera — modelo, prompt, tamaño, pasos, LoRA, semilla — sin renderizar"
+            "value" : "El rack toma los ajustes de esta imagen — modelo, prompt, tamaño, LoRA, semilla — sin renderizar"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Le rack reprend toute la case — modèle, prompt, taille, pas, LoRA, graine — sans rendre"
+            "value" : "Le rack prend les réglages de cette image — modèle, prompt, taille, LoRA, graine — sans rendre"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Il rack riprende l’intera cella — modello, prompt, dimensione, passi, LoRA, seme — senza eseguire il rendering"
+            "value" : "Il rack prende le impostazioni di questa immagine — modello, prompt, dimensione, LoRA, seme — senza renderizzare"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ラックはこのセルをそのまま取り込みます — モデル、プロンプト、サイズ、ステップ、LoRA、シード — 生成はしません"
+            "value" : "ラックがこの画像の設定（モデル、プロンプト、サイズ、LoRA、シード）を描画せずに取り込みます"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "机架会完整采用此单元格——模型、提示词、尺寸、步数、LoRA、种子——但不进行生成"
-          }
-        }
-      }
-    },
-    "The rack takes this cell, then renders it to its end: the image this sketch announced (double-click a cell)" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Das Rack übernimmt diese Zelle und rendert sie zu Ende: das Bild, das diese Skizze ankündigte (Doppelklick auf eine Zelle)"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "El rack toma la celda y la renderiza hasta el final: la imagen que anunciaba el boceto (doble clic en una celda)"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Le rack reprend la case, puis la rend jusqu’au bout : l’image que l’esquisse annonçait (double-clic sur une case)"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Il rack riprende la cella, poi ne esegue il rendering fino in fondo: l’immagine che lo schizzo annunciava (doppio clic su una cella)"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ラックはこのセルを取り込み、最後まで生成します：このスケッチが予告した画像です（セルをダブルクリック）"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "机架采用此单元格，然后将其生成到底：即此草稿所预告的图像（双击单元格）"
-          }
-        }
-      }
-    },
-    "The rack’s LoRAs, seed and images to edit: the exploration varies them" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Die LoRAs, der Seed und die zu bearbeitenden Bilder des Racks: Die Erkundung variiert sie"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Los LoRA, la semilla y las imágenes que editar del rack: la exploración los varía"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Les LoRA, la graine et les images à éditer du rack : l’exploration les fait varier"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Le LoRA, il seme e le immagini da modificare del rack: l’esplorazione le fa variare"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ラックのLoRA、シード、編集する画像：探索はこれらを変化させます"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "机架的 LoRA、种子和要编辑的图像：探索会改变它们"
-          }
-        }
-      }
-    },
-    "The rack’s model: changing it here changes it there" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Das Modell des Racks: Eine Änderung hier ändert es auch dort"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "El modelo del rack: cambiarlo aquí lo cambia allí"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Le modèle du rack : le changer ici le change là-bas"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Il modello del rack: cambiarlo qui lo cambia anche lì"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ラックのモデル：ここで変えると、あちらでも変わります"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "机架的模型：在这里更改，那里也随之更改"
+            "value" : "机架会采用此图像的设置——模型、提示词、尺寸、LoRA、种子——但不渲染"
           }
         }
       }
@@ -37398,82 +36620,82 @@
         }
       }
     },
-    "The same seed and steps under each solver: Euler is the one this model was distilled for" : {
+    "The seeds that follow the rack’s seed: drawn at the click, or the fixed one" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Derselbe Seed und dieselben Schritte unter jedem Solver: Euler ist der, auf den dieses Modell destilliert wurde"
+            "value" : "Die Seeds, die auf den Seed des Racks folgen: beim Klick gewürfelt oder der feste"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "La misma semilla y los mismos pasos con cada solver: Euler es aquel para el que se destiló este modelo"
+            "value" : "Las semillas que siguen a la del rack: sorteada al hacer clic, o la fija"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "La même graine et les mêmes pas sous chaque solveur : Euler est celui pour lequel ce modèle a été distillé"
+            "value" : "Les graines qui suivent celle du rack : tirée au clic, ou la fixe"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Lo stesso seme e gli stessi passi con ogni solver: Euler è quello per cui questo modello è stato distillato"
+            "value" : "I semi che seguono quello del rack: estratto al clic, o quello fisso"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "各ソルバーで同じシードと同じステップ：このモデルが蒸留されたのはEulerです"
+            "value" : "ラックのシードに続くシード：クリック時に引いたもの、または固定のもの"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "每个求解器使用相同的种子和步数：Euler 是此模型蒸馏时所用的求解器"
+            "value" : "紧接机架种子之后的种子：点击时抽取的，或固定的那个"
           }
         }
       }
     },
-    "The seeds that follow the rack’s seed, or the seeds you list" : {
+    "The series’ grid" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Die Seeds, die auf den Seed des Racks folgen, oder die Seeds, die Sie angeben"
+            "value" : "Das Raster der Serie"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Las semillas que siguen a la del rack, o las que indiques"
+            "value" : "La cuadrícula de la serie"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Les graines qui suivent celle du rack, ou celles que vous listez"
+            "value" : "La grille de la série"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "I semi che seguono quello del rack, o i semi che elenchi"
+            "value" : "La griglia della serie"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ラックのシードに続くシード、またはリストにしたシード"
+            "value" : "シリーズのグリッド"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "机架种子之后的各个种子，或你列出的种子"
+            "value" : "系列的网格"
           }
         }
       }
@@ -37678,46 +36900,6 @@
         }
       }
     },
-    "The sketches side by side, labelled — an image of the history, in memory like the others" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Die Skizzen nebeneinander, beschriftet – ein Bild des Verlaufs, im Arbeitsspeicher wie die anderen"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Los bocetos lado a lado, con leyenda — una imagen del historial, en memoria como las demás"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Les esquisses côte à côte, légendées — une image de l’historique, en mémoire comme les autres"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Gli schizzi affiancati, con didascalie — un’immagine della cronologia, in memoria come le altre"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ラベル付きで並べたスケッチ — 履歴の画像で、ほかの画像と同じくメモリ上にあります"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "并排显示草稿并加上标签——这是历史记录中的一张图像，与其他图像一样存于内存中"
-          }
-        }
-      }
-    },
     "The smallest on disk, made for Macs with 8 GB; another set of weights, so an image may come out composed differently." : {
       "localizations" : {
         "de" : {
@@ -37878,46 +37060,6 @@
         }
       }
     },
-    "The strength of each LoRA compared" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Die Stärke jeder verglichenen LoRA"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "La intensidad de cada LoRA comparado"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "La force de chaque LoRA comparée"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "L’intensità di ogni LoRA confrontata"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "比較する各LoRAの強さ"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "所对比的各个 LoRA 的强度"
-          }
-        }
-      }
-    },
     "The subject @%@ has no picture." : {
       "localizations" : {
         "de" : {
@@ -38034,6 +37176,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "两张图像尺寸不同：只能并排显示"
+          }
+        }
+      }
+    },
+    "The values again, around the knob’s" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Werte neu, um den des Reglers herum"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Los valores de nuevo, en torno al del control"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les valeurs à nouveau, autour de celle du réglage"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I valori di nuovo, attorno a quello del controllo"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "調整値を中心に値を作り直す"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "围绕当前值重新生成这些值"
           }
         }
       }
@@ -38800,52 +37982,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "这些备选项会产生 %@ 个提示词：最多 %@ 个。"
-          }
-        }
-      }
-    },
-    "These alternatives make %@ renders: the queue has room for %@." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Diese Alternativen ergeben %@ Renderings: In der Warteschlange ist Platz für %@."
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "These alternatives make %1$@ renders: the queue has room for %2$@."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Estas alternativas dan %@ renderizados: la cola tiene sitio para %@."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ces alternatives font %@ rendus : la file a de la place pour %@."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Queste alternative danno %@ rendering: la coda ha posto per %@."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "この選択肢からは%@回の生成になります：キューの空きは%@です。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "这些备选项会产生 %@ 次生成：队列还能容纳 %@ 次。"
           }
         }
       }
@@ -39662,52 +38798,6 @@
         }
       }
     },
-    "This grid makes %@ renders: the queue has room for %@." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Dieses Raster ergibt %1$@ Renderings: In der Warteschlange ist Platz für %2$@."
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "This grid makes %1$@ renders: the queue has room for %2$@."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Esta cuadrícula da %1$@ renderizados: la cola tiene sitio para %2$@."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cette grille fait %1$@ rendus : la file a de la place pour %2$@."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Questa griglia dà %1$@ rendering: la coda ha posto per %2$@."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "このグリッドは%1$@回の生成になります：キューの空きは%2$@です。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "此网格有 %@ 次生成：队列还能容纳 %@ 次。"
-          }
-        }
-      }
-    },
     "This image can’t be read" : {
       "localizations" : {
         "de" : {
@@ -40234,46 +39324,6 @@
         }
       }
     },
-    "This model does not sketch: its cells are finished images. The step count is the rack’s (a steps axis overrides it)" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Dieses Modell skizziert nicht: Seine Zellen sind fertige Bilder. Die Schrittzahl ist die des Racks (eine Schritte-Achse ersetzt sie)"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Este modelo no hace bocetos: sus celdas son imágenes terminadas. El número de pasos es el del rack (un eje de pasos lo sustituye)"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ce modèle n’esquisse pas : ses cases sont des images finies. Le nombre de pas est celui du rack (un axe de pas le remplace)"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Questo modello non fa schizzi: le sue celle sono immagini finite. Il numero di passi è quello del rack (un asse di passi lo sostituisce)"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "このモデルはスケッチしません：セルは完成画像です。ステップ数はラックのものです（ステップの軸があればそちらが優先されます）"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "此模型不生成草稿：其单元格都是完成的图像。步数与机架一致（步数轴会覆盖它）"
-          }
-        }
-      }
-    },
     "This model doesn’t edit images." : {
       "localizations" : {
         "de" : {
@@ -40642,6 +39692,52 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "此次生成出错，其图像无法使用：未予保留。"
+          }
+        }
+      }
+    },
+    "This series makes %@ renders: the queue has room for %@." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diese Serie ergibt %@ Renderings: In der Warteschlange ist Platz für %@."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "This series makes %1$@ renders: the queue has room for %2$@."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esta serie hace %@ renders: la cola tiene sitio para %@."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette série fait %@ rendus : la file a de la place pour %@."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Questa serie produce %@ render: la coda ha posto per %@."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このシリーズは%@回描画します：キューの空きは%@件です。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此系列需渲染 %@ 次：队列还能容纳 %@ 个。"
           }
         }
       }
@@ -41300,6 +40396,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "将起始图像转为 DiT 开始时的潜变量，并按强度加噪"
+          }
+        }
+      }
+    },
+    "Two axes at most: this one does not render" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Höchstens zwei Achsen: diese wird nicht gerendert"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dos ejes como máximo: este no se renderiza"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deux axes au plus : celui-ci n’est pas rendu"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Due assi al massimo: questo non viene renderizzato"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "軸は2つまで：この軸は描画されません"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最多两个轴：这个不会渲染"
           }
         }
       }
@@ -42190,6 +41326,46 @@
         }
       }
     },
+    "Vary This Word…" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dieses Wort variieren…"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Variar esta palabra…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Varier ce mot…"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Varia questa parola…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この語を変化させる…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "变换此词…"
+          }
+        }
+      }
+    },
     "Version" : {
       "localizations" : {
         "de" : {
@@ -42676,46 +41852,6 @@
         }
       }
     },
-    "What varies from one column (X) or row (Y) to the next" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Was sich von einer Spalte (X) oder Zeile (Y) zur nächsten ändert"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Lo que cambia de una columna (X) o de una fila (Y) a la siguiente"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ce qui change d’une colonne (X) ou d’une rangée (Y) à l’autre"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cosa cambia da una colonna (X) o da una riga (Y) all’altra"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "列（X）または行（Y）ごとに変わるもの"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "从一列（X）或一行（Y）到下一列或下一行有何变化"
-          }
-        }
-      }
-    },
     "When engines share a product, each keeps only part of the speed it has alone: they compete for memory and for power. Then the set reaches less than the sum of its engines alone, and more than its best one." : {
       "localizations" : {
         "de" : {
@@ -42962,6 +42098,46 @@
         }
       }
     },
+    "Words" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wörter"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Palabras"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mots"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Parole"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "語"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "词语"
+          }
+        }
+      }
+    },
     "Working on the library of “%@”" : {
       "localizations" : {
         "de" : {
@@ -43198,46 +42374,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "为 %@ 撰写"
-          }
-        }
-      }
-    },
-    "Write {brunette|blonde|red-haired} to make a group an axis." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Schreiben Sie {brünett|blond|rothaarig}, um eine Gruppe zur Achse zu machen."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Escribe {morena|rubia|pelirroja} para convertir un grupo en un eje."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Écrivez {brune|blonde|rousse} pour faire d’un groupe un axe."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Scrivi {mora|bionda|rossa} per fare di un gruppo un asse."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "グループを軸にするには、{brunette|blonde|red-haired} のように書きます。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "写成 {brunette|blonde|red-haired}，即可让一个组成为一个轴。"
           }
         }
       }
@@ -43838,46 +42974,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "窗口在“%@”上计算时不提供起始图像"
-          }
-        }
-      }
-    },
-    "after one exploration" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "nach einer Erkundung"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "tras una exploración"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "après une exploration"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "dopo un’esplorazione"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "1回の探索の後"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "一次探索之后"
           }
         }
       }
@@ -45646,52 +44742,6 @@
         }
       }
     },
-    "g%@ is not the exploration shown (%@): a new one replaces the last" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "g%@ ist nicht die gezeigte Erkundung (%@): eine neue ersetzt die letzte"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "g%1$@ is not the exploration shown (%2$@): a new one replaces the last"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "g%@ no es la exploración mostrada (%@): una nueva sustituye a la última"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "g%@ n’est pas l’exploration montrée (%@) : une nouvelle remplace la dernière"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "g%@ non è l’esplorazione mostrata (%@): una nuova sostituisce l’ultima"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "g%@ は表示中の探索ではありません（%@）：新しい探索が前のものに置き換わります"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "g%@ 不是当前所示的探索（%@）：新的探索会取代上一个"
-          }
-        }
-      }
-    },
     "give an existing folder" : {
       "localizations" : {
         "de" : {
@@ -46778,46 +45828,6 @@
         }
       }
     },
-    "model on an axis" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Modell auf einer Achse"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "modelo en un eje"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "modèle sur un axe"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "modello su un asse"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "軸にモデルを指定"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "轴上的模型"
-          }
-        }
-      }
-    },
     "models that do have \"edit\": true in \"silicontrol models\"" : {
       "localizations" : {
         "de" : {
@@ -47178,46 +46188,6 @@
         }
       }
     },
-    "no exploration is shown" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "es wird keine Erkundung gezeigt"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "no se muestra ninguna exploración"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "aucune exploration n’est montrée"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "nessuna esplorazione è mostrata"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "探索は表示されていません"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "当前没有显示探索"
-          }
-        }
-      }
-    },
     "no grid %@ in this session" : {
       "localizations" : {
         "de" : {
@@ -47494,6 +46464,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "没有名为“%@”的已配对 Mac"
+          }
+        }
+      }
+    },
+    "no series is shown" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "keine Serie angezeigt"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "no se muestra ninguna serie"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "aucune série n’est montrée"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "nessuna serie è mostrata"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "表示中のシリーズはありません"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当前没有显示系列"
           }
         }
       }
@@ -48618,46 +47628,6 @@
         }
       }
     },
-    "random seed" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "zufälliger Seed"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "semilla aleatoria"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "graine aléatoire"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "seme casuale"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ランダムなシード"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "随机种子"
-          }
-        }
-      }
-    },
     "rank %lld" : {
       "localizations" : {
         "de" : {
@@ -49178,46 +48148,6 @@
         }
       }
     },
-    "sketch after %lld evaluations" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Skizze nach %lld Auswertungen"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "boceto tras %lld evaluaciones"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "esquisse après %lld évaluations"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "schizzo dopo %lld valutazioni"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld回の評価後のスケッチ"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "经过 %lld 次评估后的草稿"
-          }
-        }
-      }
-    },
     "socket path too long (%lld bytes, %lld at most): %@" : {
       "localizations" : {
         "de" : {
@@ -49294,6 +48224,86 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "求解器"
+          }
+        }
+      }
+    },
+    "start %@" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Start %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "partida %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "départ %@"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "partenza %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "開始 %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "起始 %@"
+          }
+        }
+      }
+    },
+    "starting image" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Startbild"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "imagen de partida"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "image de départ"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "immagine di partenza"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "開始画像"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "起始图像"
           }
         }
       }
@@ -49990,46 +49000,6 @@
         }
       }
     },
-    "the exploration is asked of the other Mac" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "die Erkundung wird beim anderen Mac angefragt"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "la exploración se pide al otro Mac"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "l’exploration est demandée à l’autre Mac"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "l’esplorazione è richiesta all’altro Mac"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "探索はもう一方のMacに依頼しました"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已向另一台 Mac 请求探索"
-          }
-        }
-      }
-    },
     "the frame leaves the image (%@ × %@)" : {
       "localizations" : {
         "de" : {
@@ -50352,6 +49322,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "机架中没有起始图像"
+          }
+        }
+      }
+    },
+    "the series is asked of the other Mac" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "die Serie wird beim anderen Mac angefragt"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "la serie se pide al otro Mac"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "la série est demandée à l’autre Mac"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "la serie è chiesta all’altro Mac"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "シリーズを別のMacに依頼しました"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已向另一台 Mac 请求该系列"
           }
         }
       }
@@ -51552,6 +50562,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "宽 x 高，例如 832x1216"
+          }
+        }
+      }
+    },
+    "word" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wort"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "palabra"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "mot"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "parola"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "語"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "词"
           }
         }
       }

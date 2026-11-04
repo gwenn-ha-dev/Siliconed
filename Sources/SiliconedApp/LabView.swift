@@ -162,7 +162,7 @@ struct LabView: View {
     private var textZone: some View {
         ZStack(alignment: .topLeading) {
             PromptField(text: $model.text, subjects: model.subjects, focused: $typing, editable: !model.isWriting,
-                        reading: reading)
+                        reading: reading, series: model.rack)
                 .opacity(model.changes == nil ? 1 : 0)
             if model.text.isEmpty {
                 Text("Type or paste a prompt. Write @ to cite a subject.")

@@ -544,7 +544,7 @@ final class MirrorServer {
         host.send(blob: e.png, id: id, to: identity)
     }
 
-    /// An exploration's cell image: `at` is [grid, cell].
+    /// A history image, as the other Mac reads it: its job, its edit's images named by this image, a sheet's grid.
     private func remote(_ e: Entry, png id: UInt32) -> RemoteEntry {
         var job = MirrorProjection.remote(e.settings, ordinal: e.job, seeds: [e.seed], previews: false, defaultSteps: nil,
                                           accelerators: nil)

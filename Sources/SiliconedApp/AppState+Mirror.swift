@@ -30,8 +30,8 @@
 // - **Named subjects stay here** (incognito): a render that cites them sends the model's prompt and the
 //   subjects' framed pictures after the edit's images (`RemoteJob.modelPrompt`, `subjectImages`), and
 //   nothing else of them.
-// - **The exploration** is asked whole (`grid`) and made there; the panel shows the one it publishes,
-//   its cells' images arriving one by one (`cellImage`). « Finish This Image » is an ordinary render.
+// - **A series** is asked whole (`grid`) and made there; the canvas shows the one it publishes, its cells'
+//   images arriving as any history image, laid in their cells by their job.
 // - **The statistics and the license sheet** are the other Mac's, for this Mac's renders (`MirrorStats.swift`).
 // - **⌘Z after a removal**: the other Mac keeps the images removed in a trash of its session, per Mac;
 //   « Undo » asks them back by ordinal (`restoreImages`) and « Redo » removes them again.
@@ -92,8 +92,9 @@ final class MirrorLink {
     /// consent alert, the flash).
     var enlargeWaiters: [(Enlarged) -> Void] = []
     enum Enlarged { case done(Entry), downloadRequired, refused(String) }
-    /// The grids the other Mac made for `silicontrol grid`: their cell jobs in order.
-    var grids: [Int: [Int]] = [:]
+    /// The grids the other Mac made for `silicontrol grid`: their cell jobs in order, and whether a sheet ends them.
+    var grids: [Int: (jobs: [Int], sheet: Bool)] = [:]
+    private var sheets: [Int: Bool] = [:]
 
     /// The files this Mac offers to import there (`MirrorUpload.swift`).
     let uploads: UploadBorrower
@@ -126,10 +127,10 @@ final class MirrorLink {
     }
 
     /// A series, or a grid: the cells are made there (`enqueueGrid`), each judged as a render is. `answered`
-    /// (`silicontrol grid`): the other Mac's word on the grid, its cell jobs numbered, its sheet drawn at the end;
-    /// without, the window's series, which the other Mac publishes back (`explored`).
+    /// (`silicontrol grid`): the other Mac's word on the grid, its cell jobs numbered, its sheet drawn at the end if
+    /// `sheet`; without, the window's series, which the other Mac publishes back (`explored`), its sheet only when asked.
     func explore(_ grid: RenderGrid, settings: RenderSettings, references: [ReferenceImage],
-                 accelerators: Bool?, previews: Bool = true,
+                 accelerators: Bool?, sheet: Bool = false, previews: Bool = true,
                  answered: ((RemoteAnswer) -> Void)? = nil) throws(EngineError) {
         if let down { answered?(.refused(.text(down))); return }
         var job = MirrorProjection.remote(settings, ordinal: 0, seeds: [], previews: previews, defaultSteps: nil,
@@ -140,15 +141,16 @@ final class MirrorLink {
             request = nextRequest
             nextRequest += 1
             waiters[request!] = answered
+            sheets[request!] = sheet
         } else {
             exploreReferences = references
         }
-        sender(.grid(RemoteGridRequest(spec: RemoteGridSpec(grid), job: job, sheet: answered != nil, request: request)))
+        sender(.grid(RemoteGridRequest(spec: RemoteGridSpec(grid), job: job, sheet: answered != nil && sheet, request: request)))
     }
 
     /// A grid answered: its cells are known, to follow.
     func made(_ grid: Int, cells: [Int], request: Int) {
-        grids[grid] = cells
+        grids[grid] = (cells, sheets.removeValue(forKey: request) ?? true)
     }
 
     /// The word of the other Mac on every request numbered from `first` (those a gesture of the window,

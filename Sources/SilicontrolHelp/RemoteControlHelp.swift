@@ -471,7 +471,7 @@ package enum RemoteControlHelp {
         """,
 
         "grid": """
-        silicontrol grid --x AXIS [--y AXIS] [options] "<prompt>" [512|1024|WxH|P:Q@1K|2K] [seed]
+        silicontrol grid --x AXIS [--y AXIS] [--no-sheet] [options] "<prompt>" [512|1024|WxH|P:Q@1K|2K] [seed]
 
         An XY grid: one or two settings swept, ONE JOB PER CELL in the queue — each an ordinary
         job, its image in the history like any other —, then, when the last cell ends, a SHEET:
@@ -479,8 +479,10 @@ package enum RemoteControlHelp {
         title, added to the history (i…). Nothing is written to disk without --out or save.
         Options and arguments are those of « add » (help add), except --batch: a cell is one image.
         The window's series (« Bracket… » on a knob, a {…} group in the prompt, the lot) are grids too, drawn on its canvas: the
-        same cells, the same images, the sheet only on « Add Sheet to History » (« sheet g2 »). The window takes the grid's
-        axes as its series; a models, steps, listed seeds or images axis stays silicontrol's.
+        same cells, the same images, the sheet only on « Add Sheet to History » (« sheet g2 »): --no-sheet renders a grid so,
+        its verdict with "sheet": null. The window takes the grid's axes as its series; a models, steps, listed seeds or images
+        axis stays silicontrol's. « reuse » answers the rack's series ("series": its x and y as --x and --y read them, "excess"
+        beyond two, "renders" the jobs « Generate » would queue).
 
         AXES — kind[:which][=values]; values separated by commas, decimals with a point
           prompt              the prompt's {…} group      prompt:2      its second group
@@ -932,7 +934,8 @@ package enum RemoteControlHelp {
 
         Answer (again): {"ok": true, "jobs": [{"job": "t6", "model": "z-image", "seeds": [42], …}]}
         Answer (reuse): {"ok": true, "rack": {"model": "z-image", "prompt": "…", "steps": 8, "width": 1024, "height": 1024,
-                                              "seed": 42, "loras": []}, "notes": "…" (only when something did not come back)}
+                                              "seed": 42, "loras": [], "series": {"x": null, "y": null, "excess": [], "renders": 1}},
+                         "notes": "…" (only when something did not come back). A sheet's series comes back with it (help grid).
         FAILURES: usage, unknown_image, ref (a file that is unreadable, or not a PNG Siliconed wrote), and for again the reasons « Generate » is
           greyed out: model (not installed), library_absent, busy (an installation is running), queue_full, link (the session with the
           other Mac is down), refused (anything else it says: "message" is the window's sentence — a memory refusal, a step count the
@@ -1670,7 +1673,7 @@ package enum RemoteControlHelp {
         """,
 
         "grid": """
-        silicontrol grid --x AXE [--y AXE] [options] "<prompt>" [512|1024|WxH|P:Q@1K|2K] [seed]
+        silicontrol grid --x AXE [--y AXE] [--no-sheet] [options] "<prompt>" [512|1024|WxH|P:Q@1K|2K] [seed]
 
         Une grille XY : un ou deux réglages balayés, UN TRAVAIL PAR CASE dans la file — chacun un
         travail ordinaire, son image dans l'historique comme les autres —, puis, quand la dernière
@@ -1680,8 +1683,10 @@ package enum RemoteControlHelp {
         Options et arguments sont ceux de « add » (help add), sauf --batch : une case est une image.
         Les séries de la fenêtre (« Bracketer… » sur une molette, un groupe {…} dans le prompt, le lot) sont aussi des grilles,
         dessinées sur son canevas : les mêmes cases, les mêmes images, la planche seulement sur « Ajouter la planche à
-        l'historique » (« sheet g2 »). La fenêtre prend les axes de la grille pour sa série ; un axe de modèles, de pas, de
-        graines listées ou d'images reste à silicontrol.
+        l'historique » (« sheet g2 ») : --no-sheet rend ainsi une grille, son verdict avec "sheet": null. La fenêtre prend les
+        axes de la grille pour sa série ; un axe de modèles, de pas, de graines listées ou d'images reste à silicontrol.
+        « reuse » répond la série du rack ("series" : son x et son y comme --x et --y les lisent, "excess" au-delà de deux,
+        "renders" les travaux que « Générer » mettrait en file).
 
         AXES — sorte[:lequel][=valeurs] ; valeurs séparées par des virgules, décimales avec un point
           prompt              le groupe {…} du prompt     prompt:2      son deuxième groupe
@@ -2146,7 +2151,8 @@ package enum RemoteControlHelp {
 
         Réponse (again) : {"ok": true, "jobs": [{"job": "t6", "model": "z-image", "seeds": [42], …}]}
         Réponse (reuse) : {"ok": true, "rack": {"model": "z-image", "prompt": "…", "steps": 8, "width": 1024, "height": 1024,
-                                                "seed": 42, "loras": []}, "notes": "…" (seulement si quelque chose n'est pas revenu)}
+                                                "seed": 42, "loras": [], "series": {"x": null, "y": null, "excess": [], "renders": 1}},
+                          "notes": "…" (seulement si quelque chose n'est pas revenu). La série d'une planche revient avec elle (help grid).
         ÉCHECS : usage, unknown_image, ref (un fichier illisible, ou qui n'est pas un PNG écrit par Siliconed), et pour again les raisons pour
           lesquelles « Générer » est grisé : model (non installé), library_absent, busy (une installation tourne), queue_full, link (la
           session avec l'autre Mac est coupée), refused (tout le reste : "message" est la phrase de la fenêtre — un refus mémoire, un

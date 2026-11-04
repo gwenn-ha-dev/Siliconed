@@ -128,7 +128,16 @@ extension RemoteControl {
          "width": app.format.width, "height": app.format.height,
          "seed": app.fixedSeed ? NSNumber(value: app.seed) : NSNull(),
          "loras": app.loras.filter { !$0.path.isEmpty }.map { ["lora": Self.shortName($0.path), "strength": Response.number($0.strength), "on": $0.on] },
-         "start_image": startJSON() ?? NSNull()]
+         "start_image": startJSON() ?? NSNull(), "series": seriesJSON()]
+    }
+
+    /// **The rack's series** — what « Generate » varies: each axis as `grid` reads it, and what is beyond two.
+    private func seriesJSON() -> [String: Any] {
+        let layout = app.seriesLayout
+        let names = app.activeLoRAs.map { Self.shortName($0.path) }
+        func axis(_ k: SeriesKey) -> String? { app.gridAxis(k).map { GridWords.command($0, loras: names) } }
+        return ["x": layout.columns.flatMap(axis) ?? NSNull(), "y": layout.rows.flatMap(axis) ?? NSNull(),
+                "excess": layout.excess.compactMap(axis), "renders": app.seriesRenders]
     }
 
     /// **`again <i7|file.png>`**: « Render Again (Same Seed) » (⌘R) — `redo` for an image of the history, which fills the rack with its
@@ -146,9 +155,9 @@ extension RemoteControl {
             gesture = { self.app.render() }
         }
         if sheet, app.mirror != nil {
-            // The other Mac makes the cells of a sheet's exploration: its answer is not a job's.
+            // The other Mac makes the cells of a sheet's series: its answer is not a job's.
             gesture()
-            finish(c, ["ok": true, "message": String(localized: "the exploration is asked of the other Mac"), "computing_on": app.mirror?.macName ?? NSNull()])
+            finish(c, ["ok": true, "message": String(localized: "the series is asked of the other Mac"), "computing_on": app.mirror?.macName ?? NSNull()])
             return
         }
         queueing(c, gesture)

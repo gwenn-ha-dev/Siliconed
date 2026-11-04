@@ -530,11 +530,11 @@ struct BracketBubble: View {
     /// A value as the knob says it: a percentage for the start's strength, two decimals for a LoRA's.
     @ViewBuilder private func numberField(_ i: Int) -> some View {
         if isPercent {
-            TextField("", value: number(i), format: FloatingPointFormatStyle<Double>.Percent().precision(.fractionLength(0)))
-                .textFieldStyle(.plain).monospacedDigit().frame(width: 40)
+            TextField(value: number(i), format: FloatingPointFormatStyle<Double>.Percent().precision(.fractionLength(0))) { EmptyView() }
+                .labelsHidden().textFieldStyle(.plain).monospacedDigit().frame(width: 40)
         } else {
-            TextField("", value: number(i), format: FloatingPointFormatStyle<Double>().precision(.fractionLength(2)))
-                .textFieldStyle(.plain).monospacedDigit().frame(width: 36)
+            TextField(value: number(i), format: FloatingPointFormatStyle<Double>().precision(.fractionLength(2))) { EmptyView() }
+                .labelsHidden().textFieldStyle(.plain).monospacedDigit().frame(width: 36)
         }
     }
 

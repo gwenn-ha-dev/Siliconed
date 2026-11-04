@@ -25,7 +25,7 @@ The app ships as a `.dmg` on the [Releases](https://github.com/gwenn-ha-dev/Sili
 ## What it does
 
 - **Draws from text, and edits by instruction.** Qwen-Image-2.1 Turbo takes 1 to 3 images and a sentence (“replace the cloudy sky with a blue sky”) and changes only what you named. Which model for what, with licenses and sizes: [Models](docs/APP.md#models).
-- **Explores before it commits.** A grid of quick sketches across seeds, steps, LoRA strengths or models; the cell you pick becomes the finished image, the very one its sketch promised.
+- **Brackets, like a camera.** Vary a word, the seed, a LoRA's strength, LoRAs, Detail or the starting image: one finished image per cell, side by side on the canvas, each the very image a single render gives.
 - **Writes your prompts, if you ask** (beta). The Prompt Lab rewrites a short prompt in the style each model likes, or describes an image you drop on it. It uses a model you already have installed, and never while an image is rendering.
 - **Takes your own models.** Import LoRAs and fine-tunes from Civitai or Hugging Face.
 - **Local and private.** Rendering happens on your Mac, with no content filter added by the app and no history sent anywhere. It follows the system language (English, French, German, Spanish, Italian, Japanese or Simplified Chinese).
@@ -45,7 +45,7 @@ The tour of the app: [docs/APP.md](docs/APP.md).
 
 ## Documentation
 
-- [docs/APP.md](docs/APP.md): the app in detail: creating, editing, writing prompts, exploring, managing models, settings, privacy.
+- [docs/APP.md](docs/APP.md): the app in detail: creating, editing, writing prompts, series, managing models, settings, privacy.
 - [docs/ENGINE.md](docs/ENGINE.md): the engine: measuring the Mac, the Neural Engine, numbers, Faster Rendering, Draw Things, memory, the community diagnostic, verification, building from source.
 - [docs/VERIFY.md](docs/VERIFY.md): checking the results against the reference on your Mac.
 - [docs/REMOTE-CONTROL.md](docs/REMOTE-CONTROL.md): `silicontrol`, protocol and internals.
