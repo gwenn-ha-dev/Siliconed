@@ -43,7 +43,7 @@ struct GenerateControls: View {
                         // A memory refusal is never a dead end: a size this Mac renders.
                         if let f = refusal?.smaller {
                             Button(String(localized: "Use \(String(f.width)) × \(String(f.height))")) { app.useFormat(f) }
-                                .buttonStyle(.link).font(.caption)
+                                .buttonStyle(.chartLink).font(.caption)
                                 .help("The largest of this model’s sizes this Mac renders")
                         }
                     }
@@ -80,7 +80,7 @@ struct GenerateControls: View {
             Text("Siliconed is measuring this Mac.").font(.caption).foregroundStyle(.secondary)
         } else {
             Button("Measure This Mac…") { app.openDiagnostic() }
-                .buttonStyle(.link).font(.caption)
+                .buttonStyle(.chartLink).font(.caption)
                 .help("About a minute, the Mac at rest: Siliconed plans its renders from this measure")
         }
     }

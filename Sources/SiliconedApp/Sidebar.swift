@@ -152,7 +152,7 @@ private struct Footer: View {
                             Text(title).font(.callout).lineLimit(2)
                             Spacer()
                             Button("Stop") { app.cancelForge() }
-                                .buttonStyle(.link).font(.caption)
+                                .buttonStyle(.chartLink).font(.caption)
                                 .help("Stops the installation: the files already downloaded are kept, the one in progress will start over")
                         }
                         if let line = app.forgeLine {
@@ -227,7 +227,7 @@ private struct Footer: View {
                     .font(.caption.weight(.semibold)).foregroundStyle(.secondary)
                 Spacer()
                 Button("Stop All", role: .destructive) { app.stopAll() }
-                    .buttonStyle(.link).font(.caption)
+                    .buttonStyle(.chartLink).font(.caption)
                     .help("Clear the queue and stop the current render")
             }
             // **The queue scrolls past a few rows**: grown with each job, it pushed the footer above the

@@ -144,7 +144,7 @@ struct SubjectSheet: View {
                     Picker("Picture", selection: $shown) {
                         ForEach(draft.pictures.indices, id: \.self) { i in Text(verbatim: "\(i + 1)").tag(i) }
                     }
-                    .pickerStyle(.segmented).labelsHidden().fixedSize()
+                    .pickerStyle(.segmented).labelsHidden().fixedSize().tint(Palette.control)
                     .help("The subject’s two pictures: each has its own frame")
                 }
                 Button("Whole Image") { draft.pictures[shown].frame = .whole }

@@ -233,7 +233,7 @@ struct LabView: View {
             HStack(spacing: 8) {
                 if let fraction = Self.percent(MainWindow.shared.local.forgeJournal.last) { ProgressView(value: fraction) } else { ProgressView().controlSize(.small) }
                 Text("Installing the writer…").font(.caption).foregroundStyle(.secondary)
-                Button("Stop") { MainWindow.shared.local.cancelForge() }.buttonStyle(.link).font(.caption)
+                Button("Stop") { MainWindow.shared.local.cancelForge() }.buttonStyle(.chartLink).font(.caption)
             }
         } else if case .unavailable(.needsHead) = model.availability, !model.following, !model.rendering {
             Button("Install the Writer") { model.installHead(MainWindow.shared.local) }

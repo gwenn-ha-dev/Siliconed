@@ -38,7 +38,7 @@ struct Welcome: View {
                     Text(title).font(.callout).foregroundStyle(.secondary)
                 }
             } else {
-                Button("All Models…") { app.managementOpen = true }.buttonStyle(.link)
+                Button("All Models…") { app.managementOpen = true }.buttonStyle(.chartLink)
             }
         }
         .multilineTextAlignment(.center)

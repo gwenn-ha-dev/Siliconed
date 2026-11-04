@@ -664,7 +664,7 @@ struct BracketBubble: View {
                 Label("Columns", systemImage: "arrow.left.and.right").tag(0)
                 Label("Rows", systemImage: "arrow.up.and.down").tag(1)
             }
-            .pickerStyle(.segmented)
+            .pickerStyle(.segmented).tint(Palette.control)
             if let r = replaced {
                 Text(verbatim: String(localized: "Replaces: \(app.axisWords(r))"))
                     .font(.caption).foregroundStyle(Color(nsColor: .systemOrange))

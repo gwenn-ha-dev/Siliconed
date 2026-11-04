@@ -18,8 +18,14 @@
 //   deuteranope (0.069 against 0.082 at night).
 // - **What runs is no longer the system's accent**: mint at night, indigo by day, whatever accent System Settings holds.
 //   Mint cannot take macOS's white label (1.3:1): the buttons that start something are drawn here (`ProminentButtonStyle`),
-//   mint with a dark label and a halo at night. The system's own controls (checkboxes, switches, links) keep the system's
-//   accent: they are not what runs.
+//   mint with a dark label and a halo at night.
+// - **The system's own controls** take the icon's indigo, never the system's blue, which was the one color on screen from
+//   outside the chart (the user, 4/11). A segment or a checkbox, by `.tint(Palette.control)` on the control itself: the
+//   chart's indigo by day, a lighter one at night (#6660CB, OKLCH 0.55 / 0.16) so that their white label holds (5.1:1) —
+//   not mint, on which a white label reads at 1.3:1. **Not a tint over the window**: macOS 26 paints the label of every
+//   menu and bordered button in it (« Euler », « Add » in violet, 3:1 at night). A link, by `.chartLink`: the system's
+//   `.link` keeps its blue whatever the tint; at night a lighter indigo (#999BEE, 6.6:1 on the column). In the prompt
+//   (`PromptField`), the caret in the text wire's peach and a selection in a faint indigo, not the system's blue.
 // - **An icon wears its wire** (`IconTile`): a full tile of the color of the wire its stage gives, the glyph hollowed in the
 //   card's color; the stage at work wears what runs, a refused one red. It replaces the former rule — a bare glyph, no chip,
 //   so that nothing in a box's title would read as a button —: the chart's choice, to be judged on screen.
@@ -29,7 +35,9 @@ import AppKit
 import SwiftUI
 
 enum Palette {
-    static let peach = dynamic(dark: 0xF2B279, light: 0xB36D2A)
+    static let peach = Color(nsColor: peachInk)
+    /// The same, for AppKit: the prompt's caret.
+    static let peachInk = dynamicInk(dark: 0xF2B279, light: 0xB36D2A)
     static let rose = dynamic(dark: 0xEFA6D6, light: 0xB06194)
     static let sky = dynamic(dark: 0x7FCAFE, light: 0x3786C3)
     /// **A series** (bracketing): the mark at the left of what can vary, the text's groups, the axes beside « Generate » — one
@@ -38,6 +46,12 @@ enum Palette {
     static let bracket = Color(nsColor: bracketInk)
     /// What runs: the stage at work, the steps done, the image followed, the button that starts something.
     static let live = dynamic(dark: 0x6EF1DD, light: 0x3F3A8A)
+    /// A selected segment, a checked box: `.tint(Palette.control)` on the control.
+    static let control = dynamic(dark: 0x6660CB, light: 0x3F3A8A)
+    /// A selection in the prompt (AppKit): `control`, faint, under the words.
+    static let selectionInk = dynamicInk(dark: 0x6660CB, light: 0x3F3A8A, alpha: 0.38)
+    /// A link's words (`ChartLinkStyle`).
+    static let link = dynamic(dark: 0x999BEE, light: 0x3F3A8A)
     /// A label or a glyph on `live`.
     static let onLive = dynamic(dark: 0x0F1021, light: 0xFCFCFC)
     static let failure = dynamic(dark: 0xFC5852, light: 0xD02C2A)
@@ -58,9 +72,9 @@ enum Palette {
     private static func dynamic(dark: Int, light: Int) -> Color { Color(nsColor: dynamicInk(dark: dark, light: light)) }
 
     /// The same, for AppKit's drawing (the text's groups).
-    private static func dynamicInk(dark: Int, light: Int) -> NSColor {
+    private static func dynamicInk(dark: Int, light: Int, alpha: CGFloat = 1) -> NSColor {
         func color(_ v: Int) -> NSColor {
-            NSColor(srgbRed: CGFloat(v >> 16 & 0xFF) / 255, green: CGFloat(v >> 8 & 0xFF) / 255, blue: CGFloat(v & 0xFF) / 255, alpha: 1)
+            NSColor(srgbRed: CGFloat(v >> 16 & 0xFF) / 255, green: CGFloat(v >> 8 & 0xFF) / 255, blue: CGFloat(v & 0xFF) / 255, alpha: alpha)
         }
         return NSColor(name: nil) { a in
             a.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? color(dark) : color(light)
@@ -113,4 +127,25 @@ struct ProminentButtonStyle: ButtonStyle {
 
 extension ButtonStyle where Self == ProminentButtonStyle {
     static var prominent: ProminentButtonStyle { ProminentButtonStyle() }
+}
+
+/// **A link in the chart's indigo** (`.chartLink`): the system's `.link`, its words in `Palette.link`.
+struct ChartLinkStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View { Face(configuration: configuration) }
+
+    private struct Face: View {
+        let configuration: Configuration
+        @Environment(\.isEnabled) private var enabled
+
+        var body: some View {
+            configuration.label
+                .foregroundStyle(enabled ? AnyShapeStyle(Palette.link) : AnyShapeStyle(.tertiary))
+                .opacity(configuration.isPressed ? 0.7 : 1)
+                .contentShape(Rectangle())
+        }
+    }
+}
+
+extension ButtonStyle where Self == ChartLinkStyle {
+    static var chartLink: ChartLinkStyle { ChartLinkStyle() }
 }

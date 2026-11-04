@@ -171,7 +171,7 @@ struct DiTBox: View {
                         Image(systemName: o.symbol).help(o.label).accessibilityLabel(Text(verbatim: o.label)).tag(o)
                     }
                 }
-                .pickerStyle(.segmented).labelsHidden().fixedSize()
+                .pickerStyle(.segmented).labelsHidden().fixedSize().tint(Palette.control)
                 // What this Mac cannot render is greyed out ahead, with the Mac it needs (B, `macNeeded`).
                 // **Its width is a plain size's, never its longest entry's**: a menu picker sizes to its
                 // widest item, and the squares list « 2048 × 2048 — needs a Mac with 32 GB » — each switch
@@ -260,7 +260,7 @@ struct DiTBox: View {
                 Picker("Detail", selection: $app.detail) {
                     ForEach(Detail.allCases, id: \.self) { Text(verbatim: $0.choice).tag($0) }
                 }
-                .pickerStyle(.segmented).labelsHidden().fixedSize()
+                .pickerStyle(.segmented).labelsHidden().fixedSize().tint(Palette.control)
             }
             .help("Adds fine texture and small details; Most can over-sharpen")
         }
@@ -275,7 +275,7 @@ struct DiTBox: View {
             .help("How each step moves to the next, with the same steps: Euler is the one this model was distilled for")
         }
         Toggle("Preview every step", isOn: $app.previews)
-            .font(.callout)
+            .font(.callout).tint(Palette.control)
             .help("Shows the image taking shape on the canvas after each step. It does not change the image.")
         switches
     }
@@ -292,7 +292,7 @@ struct DiTBox: View {
         VStack(alignment: .leading, spacing: 2) {
             Toggle("Accelerators", isOn: Binding(get: { reason == nil && app.accelerators(for: id) },
                                                  set: { app.setAccelerators($0, for: id) }))
-                .font(.callout)
+                .font(.callout).tint(Palette.control)
                 .disabled(reason != nil)
                 .help(AcceleratorWords.switchHelp(app.acceleratorOffer ?? .none))
             if let reason {
@@ -306,7 +306,7 @@ struct DiTBox: View {
             VStack(alignment: .leading, spacing: 2) {
                 Toggle("Faster Rendering", isOn: Binding(get: { app.fasterRenderingShown(for: id) },
                                                          set: { app.setFasterRendering($0, for: id) }))
-                    .font(.callout)
+                    .font(.callout).tint(Palette.control)
                     .disabled(reason != nil)
                     .help("From 1024² up, the first steps at half size: faster, a slightly different image.")
                 if let reason {
@@ -460,7 +460,7 @@ struct LoRARow: View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 6) {
                 Toggle(isOn: $slot.on) { EmptyView() }
-                    .toggleStyle(.checkbox).labelsHidden()
+                    .toggleStyle(.checkbox).labelsHidden().tint(Palette.control)
                     .help("On, it goes into the render. Off, it stays here with its strength, out of the render.")
                     .accessibilityLabel(Text("Use this LoRA"))
                 Text(card?.name ?? String(localized: "Choose…"))

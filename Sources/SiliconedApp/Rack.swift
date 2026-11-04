@@ -236,7 +236,7 @@ struct RackView: View {
             ComputeOnMenu(app: app)
             Spacer()
             Button("Models…") { app.managementOpen = true }
-                .buttonStyle(.link)
+                .buttonStyle(.chartLink)
                 .font(.callout)
                 .help("Install, import, remove — and what each takes on disk (⇧⌘M)")
                 .fixedSize()
