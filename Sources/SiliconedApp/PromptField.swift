@@ -22,7 +22,7 @@
 //
 // **A series' group is a chip too** (`{red|blue}`, `PromptAlternatives`): drawn in the series' yellow (`Palette.bracket`), its
 // braces and bars not drawn — a dot between its words. A click on it opens its bubble (`BracketBubble`), whose words rewrite the
-// group where it is typed; braces typed by hand make one as well. Words become a group by the card's ± (`PromptBracketMark`: the
+// group where it is typed; braces typed by hand make one as well. Words become a group by the ± at the card's right (`PromptBracketMark`: the
 // selection, or the word at the caret) or by « Vary This Word… » at the head of the right-click menu — added by the delegate
 // (`textView(_:menu:for:at:)`): with an override of `menu(for:)`, the user saw only the system's menu (4/11/2026). The
 // text stays the characters typed, as for a subject.

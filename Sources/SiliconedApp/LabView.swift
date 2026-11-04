@@ -181,23 +181,25 @@ struct LabView: View {
                 }
             }
         }
-        // The series' column, as in the rack: its ± at the text's left (`PromptBracketMark`).
-        .padding(.leading, 18)
+        // The series' column, as in the rack: at the text's right, the ✕ that clears it and, under it, its ± (`PromptBracketMark`).
+        .padding(.trailing, 18)
         .padding(6)
         .frame(height: 96)
         .background(card)
-        .overlay(alignment: .topLeading) {
-            PromptBracketMark(app: model.rack, disabled: model.isWriting || model.changes != nil)
-                .padding(.leading, 7).padding(.top, 8)
-        }
         .overlay(alignment: .topTrailing) {
-            // A search field's clear button, where the eye looks for it; ⌘Z in the text brings the text back.
-            if !model.text.isEmpty, !model.isWriting, model.changes == nil {
-                Button { model.text = "" } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(.tertiary) }
-                    .buttonStyle(.plain).padding(6)
-                    .help("Clear the prompt (⌘Z brings it back)")
-                    .accessibilityLabel(Text("Clear Prompt"))
+            VStack(spacing: 6) {
+                // A search field's clear button, where the eye looks for it; ⌘Z in the text brings the text back.
+                if !model.text.isEmpty, !model.isWriting, model.changes == nil {
+                    Button { model.text = "" } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(.tertiary) }
+                        .buttonStyle(.plain)
+                        .help("Clear the prompt (⌘Z brings it back)")
+                        .accessibilityLabel(Text("Clear Prompt"))
+                } else {
+                    Color.clear.frame(width: 14, height: 14)
+                }
+                PromptBracketMark(app: model.rack, disabled: model.isWriting || model.changes != nil)
             }
+            .padding(.top, 7).padding(.trailing, 7)
         }
     }
 

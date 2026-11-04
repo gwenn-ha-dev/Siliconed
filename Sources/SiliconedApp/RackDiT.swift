@@ -206,7 +206,8 @@ struct DiTBox: View {
             }
             .help("An edit keeps the framing of image 1: about 1 megapixel at its proportions, each side at least 512, 1024² at most")
         }
-        Field(title: "Seed") {
+        // The lot is the series' seed axis (4/11): its ± on the Seed's line, choosing how many seeds and where they go.
+        Field(title: "Seed", app: app, bracket: .seeds) {
             if app.fixedSeed {
                 TextField("Seed", value: $app.seed, format: .number.grouping(.never))
                     .labelsHidden()
@@ -234,8 +235,7 @@ struct DiTBox: View {
             }
             .help("The next render is a variation of the seed’s image, like the image it came from")
         }
-        // The lot is the series' seed axis (4/11): bracketing the seed is choosing how many, and where they go.
-        Field(title: "Batch", app: app, bracket: .seeds) {
+        Field(title: "Batch") {
             Stepper(value: $app.batch, in: 1...8) { Text(verbatim: "\(app.batch)").monospacedDigit() }
                 .fixedSize()
         }
@@ -277,8 +277,7 @@ struct DiTBox: View {
         Toggle("Preview every step", isOn: $app.previews)
             .font(.callout)
             .help("Shows the image taking shape on the canvas after each step. It does not change the image.")
-            .padding(.leading, BracketMark.gutter)
-        switches.padding(.leading, BracketMark.gutter)
+        switches
     }
 
     /// **The two switches that change how the DiT computes**, each in the box of what it changes. A switch that cannot apply is
@@ -345,15 +344,12 @@ struct DiTBox: View {
             if app.applies(.comparedLoRAs) {
                 header.bracketable(app, .comparedLoRAs, menu: false)
             } else {
-                header.padding(.leading, BracketMark.gutter)
+                header.padding(.trailing, BracketMark.gutter)
             }
-            Group {
-                if app.compatibleLoras.isEmpty, app.loras.isEmpty {
-                    Text("No LoRA for this model").font(.caption).foregroundStyle(.secondary)
-                }
-                ForEach($app.loras) { $slot in LoRARow(app: app, slot: $slot) }
+            if app.compatibleLoras.isEmpty, app.loras.isEmpty {
+                Text("No LoRA for this model").font(.caption).foregroundStyle(.secondary)
             }
-            .padding(.leading, BracketMark.gutter)
+            ForEach($app.loras) { $slot in LoRARow(app: app, slot: $slot) }
         }
     }
 
@@ -437,10 +433,12 @@ struct LoRAAddMenu: View {
             if !app.compatibleLoras.isEmpty { Divider() }
             Button("Import…") { app.chooseToImport() }
                 .disabled(!app.importPossible)
-            Divider()
             // A series: one of them added per image, and the image without (`SeriesKey.comparedLoRAs`).
-            Button("Compare LoRAs…") { app.bracketing = .comparedLoRAs }
-                .disabled(!app.canAddLoRA || app.compatibleLoras.allSatisfy { used.contains($0.path) })
+            if app.compatibleLoras.count > 1 {
+                Divider()
+                Button("Compare LoRAs…") { app.bracketing = .comparedLoRAs }
+                    .disabled(!app.canBracket(.comparedLoRAs))
+            }
         } label: {
             Label("Add", systemImage: "plus")
         }
@@ -485,8 +483,9 @@ struct LoRARow: View {
                     .multilineTextAlignment(.trailing).frame(width: 48)
                     .help("Strength: 0.8 attenuates, 1 as trained, more emphasizes")
             }
-            // Its ± under the switch, at the left of the strength it varies.
+            // Its ± at the right of the strength it varies, under the card's ✕.
             .bracketable(app, .loraStrength(slot.path), menu: false, gutter: 22)
+            .padding(.leading, 22)
             .opacity(slot.on ? 1 : 0.45)
             if let card, !card.triggers.isEmpty {
                 VStack(alignment: .leading, spacing: 3) {
