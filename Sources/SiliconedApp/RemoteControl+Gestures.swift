@@ -49,6 +49,7 @@ extension RemoteControl {
         case .compute(let target): try compute(target, c)
         case .library(let action, let confirmed): try library(action, confirmed: confirmed, cwd: cwd, c)
         case .startImage(let action): finish(c, try startImage(action, cwd: cwd))
+        case .lab(let action): finish(c, try lab(action, cwd: cwd))
         }
     }
 
@@ -127,7 +128,7 @@ extension RemoteControl {
         ["model": app.identifier, "prompt": app.prompt, "steps": app.steps,
          "width": app.format.width, "height": app.format.height,
          "seed": app.fixedSeed ? NSNumber(value: app.seed) : NSNull(),
-         "loras": app.loras.filter { !$0.path.isEmpty }.map { ["lora": Self.shortName($0.path), "strength": Response.number($0.strength)] },
+         "loras": app.loras.filter { !$0.path.isEmpty }.map { ["lora": Self.shortName($0.path), "strength": Response.number($0.strength), "on": $0.on] },
          "start_image": startJSON() ?? NSNull()]
     }
 

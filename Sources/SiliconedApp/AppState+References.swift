@@ -1,5 +1,5 @@
-// **`AppState`: an edit's reference images** — chosen, dragged, taken from the history, read off the
-// main thread. The state itself is in `AppState.swift`.
+// **`AppState`: how an image becomes one of the render's** — a file, a history image, ⌘V, « Edit with … ». They all land
+// in the Prompt Lab (`AppState.inputs`, `AppState+Inputs.swift`), read off the main thread when the render runs.
 
 import AppKit
 import ImageIO
@@ -13,7 +13,8 @@ extension AppState {
     // **Editing by reference** (Qwen-Image-2.1) lives here. The re-noised starting image (img2img, SDEdit) of
     // Z-Image, Anima and Krea 2 is another input, chosen in the Prompt Lab: `AppState+Start.swift`.
 
-    private func read(_ url: URL) -> ReferenceImage? {
+    /// A file as the render reads it — the file itself (`ImageRGB(contentsOf:)`, upright), its vignette and size.
+    func read(_ url: URL) -> ReferenceImage? {
         guard let vignette = NSImage(contentsOf: url), vignette.isValid, let size = ReferenceImage.size(of: url) else {
             problem = Problem(EngineError.imageUnreadable(file: url.path))
             return nil
@@ -29,69 +30,15 @@ extension AppState {
                              width: entry.width, height: entry.height, ordinal: entry.ordinal)
     }
 
-    /// The open panel: as many images as there are free slots, added after those already set.
-    func chooseReferences() {
-        guard canAddReference, nextReferenceRefusal() == nil else { return }
-        let panel = NSOpenPanel()
-        panel.allowedContentTypes = [.image]
-        panel.allowsMultipleSelection = maxReferences - references.count > 1
-        panel.prompt = String(localized: "Choose")
-        panel.message = references.isEmpty
-            ? String(localized: "The image to edit: the prompt says what changes (“change her jacket to red”).")
-            : String(localized: "Another image the prompt can draw from (“the dog of image 2”).")
-        guard panel.runModal() == .OK else { return }
-        addReferences(panel.urls)
-    }
-
-    /// Files chosen or dropped, appended in their order; beyond the model's maximum, the rest is
-    /// left out and the toast says so.
-    func addReferences(_ urls: [URL]) {
-        // Files only: a dragged thumbnail (text) must not come back as a URL to read.
-        let urls = urls.filter(\.isFileURL)
-        guard editingPossible, !urls.isEmpty else { return }
-        let slots = max(0, maxReferences - references.count)
-        // As many as this Mac's memory takes, too (`nextReferenceRefusal`, one image at a time).
-        var free = 0, refusal: String?
-        while free < min(slots, urls.count) {
-            refusal = nextReferenceRefusal(adding: free)
-            guard refusal == nil else { break }
-            free += 1
-        }
-        references += urls.prefix(free).compactMap(read)
-        if let refusal {
-            flash(refusal)
-        } else if urls.count > free {
-            flash(String(localized: "This model reads \(maxReferences) images at most"))
-        }
-    }
-
-    /// A file chosen to take the place of the reference `id`, at its number.
+    /// A file chosen to take the place of the image `id` of the Prompt Lab, with its role.
     func replaceReference(_ id: ReferenceImage.ID) {
-        guard references.contains(where: { $0.id == id }) else { return }
+        guard inputIndex(shown: id) != nil else { return }
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [.image]
         panel.prompt = String(localized: "Choose")
         guard panel.runModal() == .OK, let url = panel.url, let image = read(url),
-              let i = references.firstIndex(where: { $0.id == id }) else { return }
-        references[i] = image
-    }
-
-    func removeReference(_ id: ReferenceImage.ID) {
-        references.removeAll { $0.id == id }
-    }
-
-    /// Moves a reference to the place `index` (0: image 1), the others shifting. Image 1 is the one
-    /// edited: putting another image first changes what is edited, and the output's format.
-    func moveReference(_ id: ReferenceImage.ID, to index: Int) {
-        guard let i = references.firstIndex(where: { $0.id == id }), i != index,
-              references.indices.contains(index) else { return }
-        references.insert(references.remove(at: i), at: index)
-    }
-
-    /// One place left (−1, towards image 1) or right (+1).
-    func moveReference(_ id: ReferenceImage.ID, by offset: Int) {
-        guard let i = references.firstIndex(where: { $0.id == id }) else { return }
-        moveReference(id, to: i + offset)
+              let i = inputIndex(shown: id) else { return }
+        replaceInput(inputs[i].id, with: image)
     }
 
     /// "Edit this image": a history image becomes **image 1** — the one edited, whose format the
@@ -99,7 +46,11 @@ extension AppState {
     /// gesture); the other references stay.
     func placeReference(_ entry: Entry) {
         guard editingPossible, let image = fromHistory(entry) else { return }
-        if references.isEmpty { references = [image] } else { references[0] = image }
+        if let edited = inputs.firstIndex(where: { $0.role == .edited }) {
+            replaceInput(inputs[edited].id, with: image, bytes: entry.png)
+        } else {
+            addInput(image, bytes: entry.png, role: .edited)
+        }
         flash(String(localized: "Image 1 set: say what changes"))
     }
 
@@ -109,9 +60,9 @@ extension AppState {
         placeReference(entry)
     }
 
-    /// **⌘V outside a text field**: an image copied in Procreate, Photoshop, Preview or the Finder
-    /// goes where a drop on the Images box would. `false` when the pasteboard holds
-    /// no image, so the key goes on to the menu.
+    /// **⌘V outside a text field**: an image copied in Procreate, Photoshop, Preview or the Finder goes to the Prompt Lab,
+    /// as a drop on the canvas would, and the bar unfolds on it. `false` when the pasteboard holds no image, so the key goes
+    /// on to the menu.
     func pasteImage() -> Bool {
         let pasteboard = NSPasteboard.general
         let files = (pasteboard.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL] ?? [])
@@ -121,44 +72,14 @@ extension AppState {
             .flatMap { $0.cgImage(forProposedRect: nil, context: nil, hints: nil) }
             .flatMap { try? PNG.data($0) } : nil
         guard !files.isEmpty || pixels != nil else { return false }
-        guard editingPossible else {
-            // img2img: a pasted image replaces the starting image the rack holds; the first one is chosen in the Prompt Lab.
-            if startsFromImage, startImage != nil {
-                if let pixels, let image = Self.startImage(png: pixels, name: String(localized: "pasted image")) {
-                    carryStart(image)
-                } else if let file = files.first {
-                    replaceStart(with: file)
-                }
-            } else if startsFromImage {
-                flash(String(localized: "To start from an image, choose it in the Prompt Lab"))
-            } else {
-                flash(String(localized: "To start from an image, choose a model that edits"))
-            }
-            return true
-        }
+        let lab = LabModel.shared
         if let pixels {
-            addReference(png: pixels, name: String(localized: "pasted image"))
+            lab.load(image: pixels, name: String(localized: "pasted image"))
         } else {
-            addReferences(files)
+            for url in files { lab.load(.file(url)) }
         }
+        lab.unfold()
         return true
     }
 
-    /// PNG bytes dropped on the Images box: a strip image is recognized by its bytes (its name, its
-    /// curtain); any other PNG is taken as it is.
-    func addReference(png data: Data, name: String = String(localized: "dropped image")) {
-        guard editingPossible else { return }
-        guard canAddReference else { flash(String(localized: "This model reads \(maxReferences) images at most")); return }
-        if let refusal = nextReferenceRefusal() { flash(refusal); return }
-        if let entry = history.first(where: { $0.png == data }), let image = fromHistory(entry) {
-            references.append(image)
-        } else if let source = CGImageSourceCreateWithData(data as CFData, nil),
-                  let cg = CGImageSourceCreateImageAtIndex(source, 0, nil) {
-            let vignette = FinishedImage.reduce(cg, side: 240) ?? cg
-            references.append(ReferenceImage(source: .image(cg), vignette: NSImage(cgImage: vignette, size: .zero),
-                                             name: name, width: cg.width, height: cg.height))
-        } else {
-            flash(String(localized: "This image can’t be read"))
-        }
-    }
 }

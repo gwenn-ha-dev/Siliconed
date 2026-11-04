@@ -89,20 +89,16 @@ struct ReferenceThumbnail: View {
     let reference: ReferenceImage
     let number: Int
     let last: Bool
-    @State private var hover = false
-    @State private var target = false
 
-    /// What a thumbnail carries when dragged: its id, tagged so that no other text matches.
-    private static let prefix = "siliconed-reference:"
+    /// A subject the prompt cites: it comes and goes with its `@name`.
+    private var cited: Bool { if case .subject = reference.source { true } else { false } }
 
     var body: some View {
         VStack(spacing: 3) {
             Image(nsImage: reference.vignette).resizable().scaledToFill()
                 .frame(width: Self.side, height: Self.side)
                 .clipShape(RoundedRectangle(cornerRadius: 6))
-                .overlay(RoundedRectangle(cornerRadius: 6)
-                    .strokeBorder(target ? Color.accentColor : Palette.hairline,
-                                  lineWidth: target ? 2 : 1))
+                .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Palette.hairline, lineWidth: 1))
                 .overlay(alignment: .topLeading) {
                     Text(verbatim: "\(number)")
                         .font(.caption2.weight(.bold)).monospacedDigit()
@@ -111,63 +107,13 @@ struct ReferenceThumbnail: View {
                         .background(Circle().fill(number == 1 ? Color.accentColor : Color.black.opacity(0.6)))
                         .padding(4)
                 }
-                .overlay(alignment: .bottomTrailing) {
-                    if hover, app.cropRefusal(width: reference.width, height: reference.height) == nil {
-                        Button { app.beginCrop(reference) } label: {
-                            Image(systemName: "crop").font(.caption2.weight(.semibold))
-                                .foregroundStyle(.white)
-                                .frame(width: 18, height: 18)
-                                .background(Circle().fill(Color.black.opacity(0.6)))
-                        }
-                        .buttonStyle(.plain)
-                        .padding(4)
-                        .help("Crop this image (the frame keeps at least \(String(Format.minimumSide)) px a side)")
-                        .accessibilityLabel(Text("Crop…"))
-                    }
-                }
-                .overlay(alignment: .topTrailing) {
-                    if hover {
-                        Button { app.removeReference(reference.id) } label: {
-                            Image(systemName: "xmark.circle.fill").symbolRenderingMode(.palette)
-                                .foregroundStyle(.white, .black.opacity(0.6))
-                                .frame(width: 24, height: 24).contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-                        .padding(4)
-                        .help("Remove")
-                        .accessibilityLabel(Text("Remove"))
-                    }
-                }
             Text(number == 1 ? String(localized: "edited") : String(localized: "image \(number)"))
                 .font(.caption2).foregroundStyle(number == 1 ? .primary : .secondary)
         }
-        .onHover { hover = $0 }
-        .help(Text(verbatim: "\(reference.name) · \(reference.width) × \(reference.height)"))
-        .accessibilityElement(children: .contain)
+        .help(cited ? Text("\(reference.name), cited by the prompt: delete the name there to take it out")
+                    : Text(verbatim: "\(reference.name) · \(reference.width) × \(reference.height)"))
+        .accessibilityElement(children: .combine)
         .accessibilityLabel(Text(verbatim: "\(number). \(reference.name)"))
-        .accessibilityAction(named: Text("Remove")) { app.removeReference(reference.id) }
-        .draggable(Self.prefix + reference.id.uuidString) {
-            Image(nsImage: reference.vignette).resizable().scaledToFit().frame(width: 48, height: 48)
-        }
-        .dropDestination(for: String.self) { items, _ in
-            guard let item = items.first, item.hasPrefix(Self.prefix),
-                  let id = UUID(uuidString: String(item.dropFirst(Self.prefix.count))),
-                  app.references.contains(where: { $0.id == id }) else { return false }
-            app.moveReference(id, to: number - 1)
-            return true
-        } isTargeted: { target = $0 }
-        .contextMenu {
-            if number > 1 {
-                Button("Make It Image 1") { app.moveReference(reference.id, to: 0) }
-                Button("Move Left") { app.moveReference(reference.id, by: -1) }
-            }
-            if !last { Button("Move Right") { app.moveReference(reference.id, by: 1) } }
-            Divider()
-            Button("Crop…") { app.beginCrop(reference) }
-                .disabled(app.cropRefusal(width: reference.width, height: reference.height) != nil)
-            Button("Replace…") { app.replaceReference(reference.id) }
-            Button("Remove", role: .destructive) { app.removeReference(reference.id) }
-        }
     }
 }
 
@@ -209,6 +155,17 @@ private struct Footer: View {
             // A render's gap to the measure's prediction is not said here: the model runs a long render's regime off the probes' short
             // passes, the same way on every Mac, and an invitation to measure again could not close that gap. The gap goes with the
             // report (the diagnostic sheet's last render).
+            // What the Prompt Lab holds and the render will not read: said before the click, never in silence.
+            let unused = app.unusedInputs
+            if unused > 0 {
+                Button { LabModel.shared.unfold() } label: {
+                    Label(unused == 1 ? String(localized: "1 image of the Prompt Lab not used")
+                                      : String(localized: "\(unused) images of the Prompt Lab not used"),
+                          systemImage: "info.circle")
+                }
+                .buttonStyle(.plain).font(.caption).foregroundStyle(.secondary)
+                .help("Without a role, or with one this model lacks: give it a role in the Prompt Lab")
+            }
             HStack(spacing: 8) {
                 Button { app.render() } label: {
                     Text(label).fontWeight(.semibold).frame(maxWidth: .infinity)

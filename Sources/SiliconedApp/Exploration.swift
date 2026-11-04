@@ -85,7 +85,9 @@ extension AppState {
         if let reason = libraryBlocker { return reason }
         if let reason = installBlocker { return reason }
         if !exploresModels, missing != nil { return String(localized: "This model isn’t installed.") }
-        if explorePrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return String(localized: "Write a prompt.") }
+        if prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return String(localized: "Write a prompt.") }
+        // The cells would each need the subjects' translation: refused, as `silicontrol grid` refuses them.
+        if case .success(let c) = carried, !c.cited.isEmpty { return String(localized: "a grid does not cite named subjects yet") }
         let g: RenderGrid
         switch grid {
         case .failure(let e): return Problem(e).text
@@ -142,17 +144,17 @@ extension AppState {
         stopExploring()
         let base = imposed ?? (fixedSeed ? seed : UInt64.random(in: 0...UInt64(UInt32.max)))
         guard let g = try? grid(seed: base).get() else { return }
-        var settings = RenderSettings(identifier: identifier, modelName: card?.name ?? identifier, prompt: explorePrompt,
+        var settings = RenderSettings(identifier: identifier, modelName: card?.name ?? identifier, prompt: prompt,
                                       format: exploreFormat, steps: steps, loras: exploresModels ? [] : activeLoRAs,
                                       references: references.count, detail: effectiveDetail, solver: effectiveSolver)
         // The starting image the rack holds: every cell starts from it, as a click on Generate would.
         if usedStart != nil { settings.strength = startStrength }
         followsRender = false
         if let mirror {
-            do { try mirror.explore(g, settings: resolvingFaster(settings), references: references, stopAfter: exploreStop, accelerators: nil) }
+            do { try mirror.explore(g, settings: resolvingFaster(settings), references: renderReferences, stopAfter: exploreStop, accelerators: nil) }
             catch { problem = Problem(error); flash(Problem(error).text); return }
         } else {
-            enqueueGrid(g, settings: settings, references: references, previews: true, sketch: true, stopAfter: exploreStop,
+            enqueueGrid(g, settings: settings, references: renderReferences, previews: true, sketch: true, stopAfter: exploreStop,
                         start: usedStart)
         }
         showsExploration = true
@@ -171,7 +173,7 @@ extension AppState {
         guard let r = explored, r.cellJobs.indices.contains(i) else { return }
         let job = r.cellJobs[i]
         restoreSettings(job.settings)
-        references = job.references
+        setEditImages(job.references)
         seed = job.seeds[0]
         fixedSeed = true
         // A cell is never a variation (`explore` passes none): a « Reuse » made before must not turn
@@ -220,7 +222,6 @@ extension MainWindow {
     /// the main window's canvas. Kept once opened; it retains nothing (incognito).
     func showExploration() {
         if explorationPanel == nil {
-            if app.explorePrompt.isEmpty { app.explorePrompt = app.prompt }
             app.gridDefaults()
             // Not `.nonactivatingPanel`: its prompt is typed in.
             let p = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 360, height: 720),
@@ -254,7 +255,7 @@ struct ExplorationPanel: View {
             VStack(alignment: .leading, spacing: 14) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Prompt").font(.callout.weight(.semibold))
-                    TextEditor(text: $app.explorePrompt)
+                    TextEditor(text: $app.prompt)
                         .font(.body)
                         .frame(minHeight: 70, maxHeight: 140)
                         .overlay(RoundedRectangle(cornerRadius: 6, style: .continuous).strokeBorder(Palette.hairline))

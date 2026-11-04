@@ -144,7 +144,7 @@ final class AppState {
     /// Why Faster Rendering would do nothing for the render being set up in the form (nil: it applies).
     var fasterRenderingUnavailable: DiTSwitchUnavailable? {
         DiTSwitches.fasterRenderingUnavailable(width: format.width, height: format.height,
-                                               withLoRA: !loras.isEmpty || detail != .normal, edit: !references.isEmpty,
+                                               withLoRA: !activeLoRAs.isEmpty || detail != .normal, edit: !references.isEmpty,
                                                atRecipeSteps: steps == (card?.defaultSteps ?? 8))
     }
     func setFasterRendering(_ on: Bool, for id: String) {
@@ -250,16 +250,12 @@ final class AppState {
     var orientation = RecommendedFormat.Orientation.square { didSet { orientationChanged() } }
     var format = ModelCard.recommendedFormats[0]
     var loras: [LoRASlot] = []
-    /// The edit's references, numbered from 1 in this order: **image 1 is the one edited** (it sets
-    /// the output's format), the others are what the prompt borrows from (« the dog of image 2 »).
-    /// At most the denoiser's `maxReferences`. Added by the box, a drop, « Edit This Image », or carried by
-    /// the Prompt Lab (the starting image, the references, the subjects the text cites: `Lab.swift`).
-    var references: [ReferenceImage] = []
-    /// **The image the render starts from** (img2img: Z-Image, Anima, Krea 2 — `startsFromImage`), carried by the Prompt Lab
-    /// (`Lab.swift`) or `silicontrol start-image`, shown with its strength in the rack's Images box. `nil`: from noise. Dropped
-    /// when the rack takes a model that does not start from an image, as the references a model does not read are.
-    var startImage: ReferenceImage?
-    /// **Its strength** (diffusers' `strength`, `StartImage`): how far the render moves from the image — retouched in the rack
+    /// **The render's images, each with its role** (`AppState+Inputs.swift`): the image edited and the references
+    /// (Qwen-Image-2.1), the image an img2img starts from (Z-Image, Anima, Krea 2), the neutral ones waiting to be described
+    /// or given a role. Brought by the Prompt Lab, a drop, « Edit This Image », ⌘V or the remote control; `references` and
+    /// `startImage` read them.
+    var inputs: [InputImage] = []
+    /// **The start's strength** (diffusers' `strength`, `StartImage`): how far the render moves from the image — retouched in the rack
     /// between two renders. In hundredths. The family's default (`StartImage.defaultStrength`) until one is chosen; forgotten
     /// when the rack changes family.
     var startStrength: Double {
@@ -299,8 +295,7 @@ final class AppState {
     var previews = true
     /// **The named subjects** (`Subjects.swift`): the Prompt Lab's library, in memory. The rack does not read them.
     let subjects: SubjectLibrary
-    /// **The exploration's form** (`Exploration.swift`): its own prompt, a small format, the two axes.
-    var explorePrompt = ""
+    /// **The exploration's form** (`Exploration.swift`): a small format, the two axes — the prompt is the rack's.
     var exploreShape = ExploreShape.square
     var gridX = GridAxisForm(kind: .seed)
     var gridY = GridAxisForm(kind: .none)
@@ -390,8 +385,8 @@ final class AppState {
     func canCompareOriginal(_ e: Entry) -> Bool {
         e.grid == nil && (e.references.contains { if case .remote = $0.source { false } else { true } } || e.enlargedFrom != nil)
     }
-    /// The thumbnails' height in the strip (the slider at its end); in memory, like the rest.
-    var thumbnailSide: Double = 64
+    /// The thumbnails' side in the history column (the slider at its foot); in memory, like the rest.
+    var thumbnailSide: Double = 96
     /// Where a ⇧-run starts: the last image clicked without ⇧.
     var anchor: Entry.ID?
     /// **The images that left the app** — saved, exported, written by `silicontrol save`. The others

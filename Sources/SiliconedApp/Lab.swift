@@ -1,42 +1,31 @@
-// **The Prompt Lab: where the inputs of a render are prepared, and an installed language model helps write them.**
+// **The Prompt Lab: where the inputs of a render are prepared, and an installed language model helps write them** — a bar
+// under the image, in the window (`LabView.swift`), folded to a line or unfolded.
 //
-//     Window ▸ Prompt Lab (⌥⌘L)
-//     ┌ Prompt Lab ───────────────────────────── Write for [Qwen-Image-2.1 ▾] ┐
-//     │ Images                                                                │   a library, as long as one wants
-//     │ ┌────────────┐ ┌────────────┐ ┌────────────┐ ┌────┐                   │   each image its role:
-//     │ │ 1 · Start ▾│ │ 2 · @alice │ │ Describe   │ │ +  │  drop, open,      │   start · reference · @name · describe only
-//     │ └────────────┘ └────────────┘ │ only      ▾│ └────┘  or from history   │
-//     │ Text                           └────────────┘      Use the Rack’s Prompt│
-//     │ ┌───────────────────────────────────────────────────────────────────┐ │   one text, always editable by hand
-//     │ │ (▣ alice) on a station platform at night, neon, fine rain…        │ │   `@name` drawn as a chip
-//     │ └───────────────────────────────────────────────────────────────────┘ │
-//     │ [ Rewrite  Beta ]                                                     │
-//     │ The rack will receive: « …the person in <image2>… »  1 ▣  2 ▣  1024×1536│
-//     │ Replaces the rack’s prompt (⌘Z brings it back) and its images.        │
-//     │                                              [ Carry to the Rack ]    │
-//     └───────────────────────────────────────────────────────────────────────┘
+//     folded    ┌ (▣ start 75 %)  put @alice on the platform of image 1, fine rain…           [✦] [⌃] ┐
+//     unfolded  ┌ Prompt Lab · Write for Qwen-Image-2.1                         [✦ Rewrite]      [⌄] ┐   ⌥⌘L folds, unfolds
+//               │ put (▣ alice) on the platform of image 1, fine rain, neon reflections…            │   the rack's prompt
+//               │ ▣ 1 · Image to Edit   ▣ 2 · Reference   ▣ 3 · @alice   ▣ Describe    +           │   the rack's images
+//               └────────────────────────────────────────────────────────────────────────────────────┘
 //
-// - **The lab prepares, the rack shows what the render reads.** « Carry to the Rack » fills the boxes the rack has
-//   always had: its Prompt (the text translated, the `@names` turned into « image N »; ⌘Z in the field brings the old
-//   prompt back) and its Images box (1 to 3 numbered images, which have no undo — the line says so). The rack does not
-//   know the subjects. The rules are `LabInputs` (`Sources/Siliconed`), pure and tested.
+// - **One text, one set of images, nothing to carry.** The Lab edits the rack's own prompt (`AppState.prompt`) and images
+//   (`AppState.inputs`): the rack shows what will go, the render translates the `@names` when it is queued
+//   (`AppState.namedJob`). The rules are `LabInputs` (`Sources/Siliconed`), pure and tested.
 // - **The starting image of an img2img** (Z-Image, Anima, Krea 2: a model that reads no image but starts from one) is a role
 //   too, chosen by a gesture — « Start From This Image », or the role menu — never by default: a picture dropped to be described
-//   must not turn the next render into an img2img. Its tile then carries the strength (0 to 100 %, `StartImage`), and « Carry »
-//   puts both in the rack's Images box (`AppState.carryStart`), the size set to the format nearest the image's proportions.
+//   must not turn the next render into an img2img. Its tile then carries the rack's strength (0 to 100 %, `StartImage`).
 // - **No tabs, gestures that mix, written in the field as they come.** Describe writes into the text: it fills it when empty,
 //   otherwise it inserts at the caret or replaces the selection. Rewrite works on all of it. Both draw their marks token by
 //   token over the field (additions in the accent, removals struck; « Edit » puts them away), and the text lands in the field
 //   once whole. **⌘Z undoes any gesture of the language model**: the text is written through the text system (`PromptTextView.replace`).
 // - **Availability is judged gesture by gesture.** While an image renders, or without an installed writer, only Rewrite
-//   and Describe wait, under one sentence; naming, framing, choosing a role and carrying need no model. **The render always
+//   and Describe wait, under one sentence; naming, framing and choosing a role need no model. **The render always
 //   has priority** (`AppState.busy`): a write under way is cancelled — said once, quietly — and the writer gives its memory back.
 // - **Mentions are protected in a rewrite** (`LabInputs.MentionGuard`): each `@name` is put aside as a neutral token and put
 //   back; one the writer lost or deformed is told, never dropped in silence.
-// - **Incognito**: the text, the images, the subjects live in memory; no file, no default, no history. Closing the window cancels
-//   and releases; the texts stay for the session.
-// - **Following another Mac** (`Carrier.mirror`): Rewrite and Describe are off and say so (the writer is this Mac's); images, roles,
-//   subjects and « Carry » fill the rack that is shown, which sends its references to the Mac that renders.
+// - **Incognito**: the text, the images, the subjects live in memory; no file, no default, no history. Folding the bar cancels
+//   a gesture under way and releases the writer.
+// - **Following another Mac** (`Carrier.mirror`): Rewrite and Describe are off and say so (the writer is this Mac's); the
+//   text, images, roles and subjects are the rack's that is shown, which sends its references to the Mac that renders.
 // - The engine is behind `LabWriter` (`LabWriter.swift`).
 
 import AppKit
@@ -52,22 +41,6 @@ final class LabModel {
     enum Gesture: Equatable { case rewrite, describe }
     enum Phase: Equatable { case idle, loading(Double?), writing }
 
-    /// An image of the zone: its bytes as given, never re-encoded, and what the render makes of it.
-    struct Picture: Identifiable {
-        let id = UUID()
-        let data: Data
-        let thumbnail: NSImage
-        /// Upright, in pixels: image 1's give the format.
-        let width: Int, height: Int
-        var role: LabInputs.Role
-    }
-
-    /// **The strength the starting image is carried with** (img2img), set on its tile — the rack's own is retouched there afterwards.
-    /// The aimed family's default (`StartImage.defaultStrength`) until one is chosen.
-    var startStrength: Double { chosenStartStrength ?? defaultStartStrength }
-    var defaultStartStrength: Double { StartImage.defaultStrength(for: target) }
-    private var chosenStartStrength: Double?
-
     /// What a rewrite changed, to draw its marks while the text is still the one it wrote.
     struct Changes: Equatable { var before: String; var after: String }
 
@@ -75,30 +48,35 @@ final class LabModel {
     var writer: any LabWriter = EngineLabWriter(library: MainWindow.shared.local.library) { didSet { refresh() } }
     private(set) var availability: LabAvailability = .unavailable(.preparing)
 
-    var text = "" {
-        // The marks belong to the text the writer wrote: any other text puts them away.
-        didSet { if let c = changes, text != c.after { changes = nil } }
+    /// **The text is the rack's prompt**: one text, typed here or in the rack.
+    var text: String {
+        get { rack.prompt }
+        set {
+            rack.prompt = newValue
+            // The marks belong to the text the writer wrote: any other text puts them away.
+            if let c = changes, newValue != c.after { changes = nil }
+        }
     }
-    var pictures: [Picture] = []
-    /// The family chosen by hand; `nil` follows the rack's.
-    var chosenTarget: Family?
+    /// **The images are the rack's** (`AppState.inputs`), each with its role.
+    var pictures: [InputImage] { rack.inputs }
     private(set) var changes: Changes?
+    /// **The bar unfolded**: it pushes the image up. Folded, one line.
+    private(set) var unfolded = false
 
     private(set) var phase = Phase.idle
     /// The gesture under way, and the image it describes.
     private(set) var running: Gesture?
-    private(set) var describing: Picture.ID?
+    private(set) var describing: InputImage.ID?
     private(set) var stopped = false
     private(set) var failure: String?
     /// What a rewrite did not keep of the mentions, in one sentence.
     private(set) var notice: String?
-    private(set) var carried = false
     /// Whether a render is running or queued on this Mac: the writer waits.
     private(set) var rendering = false
 
     /// The sheet that names or edits a subject, while it is open — and the image it names.
     var draft: SubjectDraft?
-    @ObservationIgnored private var naming: (picture: Picture.ID, known: Int)?
+    @ObservationIgnored private var naming: (picture: InputImage.ID, known: Int)?
 
     @ObservationIgnored private var task: Task<Void, Never>?
     @ObservationIgnored private var generation = 0
@@ -132,7 +110,14 @@ final class LabModel {
         return Family.allCases.filter(ready.contains)
     }
 
-    var target: Family? { WriterTarget.pick(chosen: chosenTarget, rack: rack.card?.family, installed: families) }
+    /// The model the Lab writes for: the rack's — one setting, chosen here or in the rack (`choose`).
+    var target: Family? { WriterTarget.pick(chosen: nil, rack: rack.card?.family, installed: families) }
+
+    /// The Lab's « Write for » menu: the rack takes that family's model.
+    func choose(_ family: Family) {
+        guard !following, let card = card(for: family), rack.identifier != card.id else { return }
+        rack.identifier = card.id
+    }
 
     /// The installed card the rack takes to render for `family`: its own when it is of that family.
     func card(for family: Family) -> ModelCard? {
@@ -140,9 +125,9 @@ final class LabModel {
         return rack.cards.first { $0.family == family && rack.readySet.contains($0.id) }
     }
 
-    /// **How many images the model aimed at reads** (0: none) — from its denoiser here, from the traits the other Mac
+    /// **How many images the rack's model reads** (0: none) — from its denoiser here, from the traits the other Mac
     /// published in a mirror.
-    var capacity: Int { capacity(for: target) }
+    var capacity: Int { rack.imageCapacity }
 
     /// The same, for the model a gesture writes for (`silicontrol rewrite --for`).
     func capacity(for family: Family?) -> Int {
@@ -152,22 +137,14 @@ final class LabModel {
         return model.chain.text.output.readsImages ? model.chain.denoising.maxReferences : 0
     }
 
-    /// **Whether the model aimed at starts from an image** (img2img): its chain offers the image entry. Never in a mirror — the
-    /// other Mac's traits do not say it, and its jobs carry no starting image.
-    var startsFromImage: Bool { startsFromImage(for: target) }
+    /// **Whether the rack's model starts from an image** (img2img). Never in a mirror — the other Mac's traits do not say it,
+    /// and its jobs carry no starting image.
+    var startsFromImage: Bool { rack.startsFromImage }
 
-    func startsFromImage(for family: Family?) -> Bool {
-        guard !following, let family, let card = card(for: family), let model = rack.model(card.id) else { return false }
-        return model.chain.entries.contains { $0.kind == .image }
-    }
-
-    /// The model's start is an img2img's — not Qwen-Image-2.1's image 1, which the model reads as a reference.
+    /// The model's start is an img2img's.
     var startIsImg2Img: Bool { capacity == 0 && startsFromImage }
 
     var offeredRoles: [LabInputs.Role] { LabInputs.roles(capacity: capacity, startsFromImage: startsFromImage) }
-
-    /// What the roles depend on: a change of either conforms them.
-    var rolesKey: String { "\(capacity)·\(startsFromImage)" }
 
     // MARK: The render's priority
 
@@ -311,8 +288,23 @@ final class LabModel {
         return (back.text, back.lost, back.intact ? nil : mentionNotice(lost: back.lost))
     }
 
-    /// **Describe**: an image of the zone, or a subject's first picture.
-    func describe(_ picture: Picture) { describe(data: picture.data, id: picture.id) }
+    /// **Describe**: an image of the rack, or a subject's first picture.
+    func describe(_ picture: InputImage) {
+        guard let data = Self.bytes(of: picture) else { failure = String(localized: "This image could not be read."); return }
+        describe(data: data, id: picture.id)
+    }
+
+    /// An image's bytes as it came — or, for pixels without bytes (a crop, a history image taken whole), a PNG of them.
+    static func bytes(of picture: InputImage) -> Data? {
+        if let bytes = picture.bytes { return bytes }
+        switch picture.shown.source {
+        case .file(let url): return try? Data(contentsOf: url)
+        case .bytes(let data): return data
+        case .image(let cg): return try? PNG.data(cg)
+        case .subject(let cg, _): return cg.flatMap { try? PNG.data($0) }
+        case .remote: return nil
+        }
+    }
 
     func describe(_ subject: NamedSubjects.Subject) {
         guard let first = subject.pictures.first, let data = subjects.data(subject, first) else { return }
@@ -321,7 +313,7 @@ final class LabModel {
 
     /// Written in the field as it comes, where the caret was (or over the selection) when the gesture began — the field takes no
     /// key while the writer writes —, marked as an addition.
-    private func describe(data: Data, id: Picture.ID?) {
+    private func describe(data: Data, id: InputImage.ID?) {
         guard canDescribe, let target else { return }
         let before = text
         // The field off screen: after the text, as a caret at its end would.
@@ -335,11 +327,11 @@ final class LabModel {
         }
     }
 
-    private func begin(_ input: LabInput, for target: Family, gesture: Gesture, picture: Picture.ID?,
+    private func begin(_ input: LabInput, for target: Family, gesture: Gesture, picture: InputImage.ID?,
                        progress: @escaping @MainActor (String) -> Void, finished: @escaping @MainActor (String) -> Void) {
         generation += 1
         let mine = generation
-        phase = .loading(nil); stopped = false; failure = nil; notice = nil; carried = false; changes = nil
+        phase = .loading(nil); stopped = false; failure = nil; notice = nil; changes = nil
         running = gesture; describing = picture
         task = Task { [writer] in
             do {
@@ -429,61 +421,79 @@ final class LabModel {
     func dismissChanges() { changes = nil }
 
     /// The window closes: nothing keeps writing, nothing keeps the memory.
-    func windowClosed() {
+    // MARK: Folding
+
+    func unfold() {
+        watchRender()
+        refresh()
+        unfolded = true
+    }
+
+    /// **Folded**: a gesture under way is stopped and the writer gives its memory back — a command's gesture excepted.
+    func fold() {
+        unfolded = false
         if phase != .idle { stop() }
-        // A command's gesture is not the window's: closing the window does not take its writer away.
+        // A command's gesture is not the bar's: folding it does not take its writer away.
         guard remote == nil else { return }
         Task { await writer.release() }
     }
 
+    /// ⌥⌘L, and the bar's chevron.
+    func toggle() { if unfolded { fold() } else { unfold() } }
+
+    /// **« Send to the Prompt Lab »**: a history image comes in with the role a newcomer takes, and the bar unfolds on it.
+    func send(_ entry: Entry) {
+        guard let image = rack.fromHistory(entry) else { return }
+        rack.addInput(image, bytes: entry.png)
+        unfold()
+    }
+
     // MARK: The images
 
-    /// A role for each image of the zone, as the rules see them.
-    private var slots: [LabInputs.Slot<Picture.ID>] { pictures.map { LabInputs.Slot(id: $0.id, role: $0.role) } }
+    /// « Start From This Image »: the gesture that makes an img2img's start — the previous start, if any, goes back to neutral.
+    func startFrom(_ picture: InputImage) { setRole(.start, of: picture) }
 
-    /// After a change of the model aimed at: an image whose role it no longer offers is « describe only ».
-    func conformRoles() {
-        let kept = LabInputs.conforming(slots, capacity: capacity, startsFromImage: startsFromImage)
-        for (i, slot) in kept.enumerated() where pictures[i].role != slot.role { pictures[i].role = slot.role }
-    }
+    func setRole(_ role: LabInputs.Role, of picture: InputImage) { rack.setRole(role, of: picture.id) }
 
-    /// « Start From This Image »: the gesture that makes an img2img's start — the previous start, if any, goes back to « describe only ».
-    func startFrom(_ picture: Picture) { setRole(.start, of: picture) }
-
-    func setStartStrength(_ s: Double) { chosenStartStrength = StartImage.snapped(s) }
-
-    func setRole(_ role: LabInputs.Role, of picture: Picture) {
-        for slot in LabInputs.assigning(role, to: picture.id, in: slots, capacity: capacity) {
-            if let i = pictures.firstIndex(where: { $0.id == slot.id }), pictures[i].role != slot.role { pictures[i].role = slot.role }
-        }
-    }
-
-    func remove(_ picture: Picture) {
+    func remove(_ picture: InputImage) {
         if describing == picture.id { stop() }
-        pictures.removeAll { $0.id == picture.id }
+        rack.removeInput(picture.id)
     }
 
-    /// An image from bytes: its thumbnail and size are read upright; it takes the role the zone gives a newcomer.
-    func load(image data: Data) {
-        guard let upright = SubjectPictures.upright(data), upright.width > 0 else {
+    /// An image from bytes: its thumbnail and size are read upright; it takes the role a newcomer takes in the rack. The render
+    /// reads it as « Carry to the Rack » handed a picture of the lab over: decoded upright as an edit's image, its bytes as a start.
+    /// **An image comes in as bytes** (a drop of pixels, ⌘V): a history image (dragged from the column) as « Send to the Prompt
+    /// Lab » brings it — its pixels, its ordinal for a mirror —, any other as the rack's Images box took it in 0.19: its
+    /// pixels for an edit, its bytes for a start. It takes the role a newcomer takes.
+    func load(image data: Data, name: String = String(localized: "dropped image")) {
+        if let entry = rack.history.first(where: { $0.png.count == data.count && $0.png == data }), let image = rack.fromHistory(entry) {
+            rack.addInput(image, bytes: entry.png)
+            failure = nil
+            return
+        }
+        guard let source = CGImageSourceCreateWithData(data as CFData, nil),
+              let cg = CGImageSourceCreateImageAtIndex(source, 0, nil) else {
             failure = String(localized: "This image could not be read.")
             return
         }
-        let thumbnail = FinishedImage.reduce(upright, side: 360).map { NSImage(cgImage: $0, size: .zero) } ?? NSImage(cgImage: upright, size: .zero)
-        pictures.append(Picture(data: data, thumbnail: thumbnail, width: upright.width, height: upright.height,
-                                role: LabInputs.defaultRole(adding: slots, capacity: capacity)))
+        let vignette = FinishedImage.reduce(cg, side: 240) ?? cg
+        rack.addInput(ReferenceImage(source: .image(cg), vignette: NSImage(cgImage: vignette, size: .zero), name: name,
+                                     width: cg.width, height: cg.height), bytes: data)
         failure = nil
     }
 
+    /// The image of a gesture: bytes as above, a file as the render reads a file (`AppState.read`) — the same pixels for an
+    /// edit and for a start (`ImageRGB(data:)` reads bytes as the file).
     func load(_ dropped: DroppedImage) {
         switch dropped {
         case .png(let data): load(image: data)
         case .file(let url):
-            guard let data = try? Data(contentsOf: url) else {
+            guard let image = rack.read(url) else {
                 failure = String(localized: "This image could not be read.")
                 return
             }
-            load(image: data)
+            rack.addInput(image)
+            failure = nil
         }
     }
 
@@ -497,14 +507,11 @@ final class LabModel {
         for url in panel.urls { load(.file(url)) }
     }
 
-    /// “Use the Rack’s Prompt”.
-    func useRackPrompt() { text = rack.prompt }
-
     // MARK: The subjects
 
-    /// The sheet opens on an image of the zone: once the subject is created, the image becomes it.
-    func name(_ picture: Picture) {
-        guard let draft = SubjectDraft(new: .png(picture.data), taken: subjects.all.map(\.name)) else {
+    /// The sheet opens on an image of the rack: once the subject is created, the image becomes it.
+    func name(_ picture: InputImage) {
+        guard let data = Self.bytes(of: picture), let draft = SubjectDraft(new: .png(data), taken: subjects.all.map(\.name)) else {
             failure = String(localized: "This image could not be read.")
             return
         }
@@ -536,7 +543,7 @@ final class LabModel {
     func sheetClosed() {
         defer { naming = nil }
         guard let naming, subjects.all.count > naming.known else { return }
-        pictures.removeAll { $0.id == naming.picture }
+        rack.removeInput(naming.picture)
     }
 
     /// Asked first: texts that cite it are refused afterwards.
@@ -571,132 +578,4 @@ final class LabModel {
         }
         if renamed != text { text = renamed }
     }
-
-    // MARK: What the rack will receive
-
-    /// **The line under the lab** (`LabInputs.receipt`): the translated text, the images numbered, and what carrying replaces.
-    var receipt: LabInputs.Receipt<Picture.ID> {
-        let family = target
-        let changesModel = !following && family != nil && rack.card?.family != family
-        let img2img = startIsImg2Img
-        return LabInputs.receipt(text: text, slots: slots, subjects: subjects.all, capacity: capacity, startsFromImage: img2img,
-                                 rackPrompt: rack.prompt,
-                                 rackImages: img2img ? (rack.startImage == nil ? 0 : 1) : rack.references.count,
-                                 changesModel: changesModel)
-    }
-
-    /// The picture behind an image of the carried list.
-    func picture(_ id: Picture.ID) -> Picture? { pictures.first { $0.id == id } }
-
-    /// The size of an image of the carried list: image 1's gives the format.
-    func size(of image: LabInputs.Image<Picture.ID>) -> (width: Int, height: Int)? {
-        switch image {
-        case .plain(let id, _): picture(id).map { ($0.width, $0.height) }
-        case .subject(let p): subjects.framedSize(p.subject, p.picture)
-        }
-    }
-
-    /// **The format that will come out**: the one the model derives from image 1 (`DenoisingModule.editFormat`), as the
-    /// rack shows it. `nil` in a mirror (the other Mac computes it) or without an image.
-    var outputFormat: RecommendedFormat? {
-        guard !following, let first = receipt.first, let size = size(of: first), let family = target,
-              let card = card(for: family), let denoising = rack.model(card.id)?.chain.denoising else { return nil }
-        // An img2img's size follows its starting image too, but among the model's sizes: the nearest proportions, at the rack's scale.
-        if startIsImg2Img {
-            return rack.identifier == card.id
-                ? rack.recommendedFormat(width: size.width, height: size.height)
-                : StartImage.recommendedFormat(width: size.width, height: size.height, among: card.formats, current: rack.format)
-        }
-        let f = denoising.editFormat(referenceWidth: size.width, referenceHeight: size.height)
-        return AppState.cappedForEditing(RecommendedFormat(f.width, f.height))
-    }
-
-    /// **« Carry to the Rack »**: the rack takes the lab's model if it was on another family, its Images box takes the
-    /// numbered images (when the lab sends any), its Prompt the translated text — the old one kept by the window's undo
-    /// manager, so that ⌘Z in the field brings it back (`MainWindow.setPrompt`).
-    func carry() {
-        let receipt = receipt
-        guard case .carries(let carry) = receipt.outcome, let family = target else { return }
-        let app = rack
-        let img2img = startIsImg2Img
-        if !following, receipt.changesModel, let wanted = card(for: family) { app.identifier = wanted.id }
-        if img2img, case .plain(let id, _)? = carry.images.first, let picture = picture(id) {
-            app.carryStart(AppState.startImage(bytes: picture.data, thumbnail: picture.thumbnail, width: picture.width,
-                                               height: picture.height, name: String(localized: "image from the lab")),
-                           strength: startStrength)
-        } else if !carry.images.isEmpty {
-            app.references = references(of: carry)
-        }
-        if receipt.replacesPrompt { MainWindow.shared.setPrompt(carry.prompt, of: app) }
-        self.carried = true
-        MainWindow.shared.show()
-        Task {
-            try? await Task.sleep(for: .seconds(2))
-            self.carried = false
-        }
-    }
-
-    /// The rack's references: the images of the zone as they are (upright, whole), the subjects' pictures cropped to their frame.
-    private func references(of carry: LabInputs.Carry<Picture.ID>) -> [ReferenceImage] {
-        carry.images.map { image in
-            switch image {
-            case .subject(let placed):
-                return subjects.references([placed])[0]
-            case .plain(let id, _):
-                let picture = self.picture(id)
-                let data = picture?.data ?? Data()
-                guard let cg = SubjectPictures.upright(data) else {
-                    return ReferenceImage(source: .bytes(data), vignette: picture?.thumbnail ?? NSImage(),
-                                          name: String(localized: "image from the lab"), width: picture?.width ?? 1, height: picture?.height ?? 1)
-                }
-                let vignette = FinishedImage.reduce(cg, side: 240) ?? cg
-                return ReferenceImage(source: .image(cg), vignette: NSImage(cgImage: vignette, size: .zero),
-                                      name: String(localized: "image from the lab"), width: cg.width, height: cg.height)
-            }
-        }
-    }
-}
-
-// MARK: - The window
-
-@MainActor
-final class LabWindow: NSObject, NSWindowDelegate {
-    static let shared = LabWindow()
-    private var window: NSWindow?
-
-    func show() {
-        let model = LabModel.shared
-        model.watchRender()
-        model.refresh()
-        if let window {
-            NSApp.activate()
-            window.makeKeyAndOrderFront(nil)
-            return
-        }
-        let host = NSHostingController(rootView: LabView(model: model))
-        host.sizingOptions = []
-        let w = NSWindow(contentViewController: host)
-        w.title = String(localized: "Prompt Lab")
-        w.styleMask = [.titled, .closable, .miniaturizable, .resizable]
-        w.isReleasedWhenClosed = false
-        // Incognito: no frame kept, nothing restored.
-        w.isRestorable = false
-        w.delegate = self
-        w.setContentSize(NSSize(width: 640, height: 780))
-        w.center()
-        window = w
-        NSApp.activate()
-        w.makeKeyAndOrderFront(nil)
-    }
-
-    /// **The smallest the Lab gets** (`MinimumContent`, issue #7): its pieces with the text at about twice its own minimum (110 pt),
-    /// and room for the status lines a rewrite adds.
-    static let minimumContent = NSSize(width: 560, height: 640)
-
-    func windowWillResize(_ sender: NSWindow, to frameSize: NSSize) -> NSSize {
-        MinimumContent.clamp(frameSize, of: sender, to: Self.minimumContent)
-    }
-
-    func windowWillClose(_ notification: Notification) { LabModel.shared.windowClosed() }
-    func windowDidBecomeKey(_ notification: Notification) { LabModel.shared.refresh() }
 }

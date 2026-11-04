@@ -97,8 +97,10 @@ package enum GestureOrder: Equatable, Sendable {
     case compute(ComputeTarget)
     /// `library …`.
     case library(LibraryAction, confirmed: Bool)
-    /// `start-image …`: the rack's starting image (img2img), as the Prompt Lab carries it and the Images box retouches it.
+    /// `start-image …`: the rack's starting image (img2img) — an image of the Prompt Lab given the start's role, and its strength.
     case startImage(StartImageAction)
+    /// `lab …`: the Prompt Lab, the bar under the image — what it holds, folded or unfolded, an image in, a role, an image out.
+    case lab(LabAction)
 
     package enum Removal: Equatable, Sendable {
         /// A model's id: a publisher's family is uninstalled, an imported model removed.
@@ -129,6 +131,29 @@ package enum GestureOrder: Equatable, Sendable {
         case remove
     }
 
+    /// What `lab` does. The images are numbered as the bar shows them, from 1.
+    package enum LabAction: Equatable, Sendable {
+        case status
+        case unfold, fold
+        /// Files, or `i7` of the history: each takes the role a newcomer takes.
+        case add([String])
+        case role(image: Int, LabInputs.Role)
+        case remove(image: Int)
+
+        /// A role as the command names it: `edited`, `reference`, `start`, `none`.
+        package static func role(named word: String) -> LabInputs.Role? {
+            switch word.lowercased() {
+            case "edited": .edited
+            case "reference": .reference
+            case "start": .start
+            case "none": .neutral
+            default: nil
+            }
+        }
+
+        package static func name(_ role: LabInputs.Role) -> String { role == .neutral ? "none" : role.rawValue }
+    }
+
     package enum Failure: Error, Equatable, Sendable {
         /// Not the syntax; the associated value is the usage line.
         case usage(String)
@@ -139,7 +164,7 @@ package enum GestureOrder: Equatable, Sendable {
     }
 
     package static let verbs: Set<String> = ["remove", "undo", "again", "reuse", "crop", "finish", "sheet", "import", "uninstall",
-                                             "macs", "compute", "library", "start-image"]
+                                             "macs", "compute", "library", "start-image", "lab"]
 
     package static func usage(_ command: String) -> String {
         switch command {
@@ -155,6 +180,7 @@ package enum GestureOrder: Equatable, Sendable {
         case "macs": "macs [connect|disconnect NAME]"
         case "compute": "compute <NAME|this>"
         case "start-image": "start-image [<image|i7>] [--strength 0.65] · start-image --remove"
+        case "lab": "lab [open|close] · lab add <image|i7> … · lab role <n> edited|reference|start|none · lab remove <n>"
         default: "library [move DIR|home|open DIR|local] [--yes]"
         }
     }
@@ -246,6 +272,24 @@ package enum GestureOrder: Equatable, Sendable {
             case (0, nil): return .success(.startImage(.status))
             case (0, let s?): return .success(.startImage(.strength(s)))
             case (1, let s): return .success(.startImage(.carry(words[0], strength: s)))
+            default: return .failure(.usage(line))
+            }
+        case "lab":
+            let rest = Array(words.dropFirst())
+            func number(_ word: String) -> Int? { Int(word).flatMap { $0 >= 1 ? $0 : nil } }
+            switch words.first {
+            case nil: return .success(.lab(.status))
+            case "open"?: return rest.isEmpty ? .success(.lab(.unfold)) : .failure(.usage(line))
+            case "close"?: return rest.isEmpty ? .success(.lab(.fold)) : .failure(.usage(line))
+            case "add"?: return rest.isEmpty ? .failure(.usage(line)) : .success(.lab(.add(rest)))
+            case "role"?:
+                guard rest.count == 2 else { return .failure(.usage(line)) }
+                guard let n = number(rest[0]) else { return .failure(.badValue("image", rest[0])) }
+                guard let role = LabAction.role(named: rest[1]) else { return .failure(.badValue("role", rest[1])) }
+                return .success(.lab(.role(image: n, role)))
+            case "remove"?:
+                guard rest.count == 1 else { return .failure(.usage(line)) }
+                return number(rest[0]).map { .success(.lab(.remove(image: $0))) } ?? .failure(.badValue("image", rest[0]))
             default: return .failure(.usage(line))
             }
         default:

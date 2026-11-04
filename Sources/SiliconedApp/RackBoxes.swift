@@ -240,90 +240,29 @@ struct Cost: View {
 
 // MARK: - The inputs
 
-/// **The prompt is typed in its box**: what to make — or, when editing, what changes. A real text view
-/// (`TextEditor`, an `NSTextView`): ⌘A, ⌘C, ⌘Z, the spelling, a long prompt that scrolls. The grip
-/// under it gives it the height one wants; Esc leaves it (the arrows then walk the strip). The wand facing
-/// its title opens the Prompt Lab; the cross in its corner empties it, and ⌘Z brings it back.
+/// **The prompt, as a port**: the text the next render reads comes from the Prompt Lab, the bar under the image
+/// (`LabView.swift`) — the rack says where it comes from, it does not show it twice. A click unfolds the bar (⌥⌘L).
 struct PromptNode: View {
     @Bindable var app: AppState
-    @FocusState private var typing: Bool
-    @State private var height: CGFloat = 72
-    @GestureState private var stretch: CGFloat = 0
-    private static let heights: ClosedRange<CGFloat> = 44...480
 
     var body: some View {
-        PortBox(title: "Prompt", symbol: "text.quote", kind: .text, focused: typing) {
-            // The Prompt Lab, one click from the prompt it prepares (Window ▸ Prompt Lab, ⌥⌘L).
-            // A bezelled button in the prompt's color: the title row's only frame, so it reads as something to click.
-            Button { LabWindow.shared.show() } label: {
-                Image(systemName: "wand.and.sparkles")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(WireKind.text.color)
-                    .padding(.horizontal, 2)
-            }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
-            .help("Open the Prompt Lab (⌥⌘L)")
-            .accessibilityLabel(Text("Prompt Lab"))
+        PortBox(title: "Prompt", symbol: "text.quote", kind: .text) {
+            Text(app.prompt.isEmpty ? "to write in the Prompt Lab" : "from the Prompt Lab")
         } content: {
-            VStack(spacing: 0) {
-                ZStack(alignment: .topLeading) {
-                    TextEditor(text: $app.prompt)
-                        .accessibilityLabel(Text("Prompt"))
-                        .font(.body)
-                        .scrollContentBackground(.hidden)
-                        .scrollIndicators(.automatic)
-                        // Room for the clear button: a line never runs under it.
-                        .contentMargins(.trailing, app.prompt.isEmpty ? 0 : 18, for: .scrollContent)
-                        .focused($typing)
-                    if app.prompt.isEmpty {
-                        Text(app.references.isEmpty ? "Describe the image…" : "Say what changes…")
-                            .font(.body).foregroundStyle(.tertiary)
-                            .padding(.leading, 5)
-                            .allowsHitTesting(false)
-                    }
-                }
-                .overlay(alignment: .topTrailing) {
-                    // A search field's clear button, where the eye looks for it; ⌘Z (Edit ▸ Undo) brings the prompt back.
-                    if !app.prompt.isEmpty {
-                        Button { MainWindow.shared.setPrompt("", of: app, action: String(localized: "Clear Prompt")) } label: {
-                            Image(systemName: "xmark.circle.fill").foregroundStyle(.tertiary)
-                        }
-                        .buttonStyle(.plain)
-                        .padding(.trailing, 2)
-                        .help("Clear the prompt (⌘Z brings it back)")
-                        .accessibilityLabel(Text("Clear Prompt"))
-                    }
-                }
-                .frame(height: min(max(height + stretch, Self.heights.lowerBound), Self.heights.upperBound))
-                grip
-            }
+            EmptyView()
         }
-    }
-
-    /// The handle: dragged, the field grows or shrinks; its cursor says so.
-    private var grip: some View {
-        Capsule().fill(Color.secondary.opacity(0.5)).frame(width: 34, height: 4)
-            .frame(maxWidth: .infinity).frame(height: 12)
-            .contentShape(Rectangle())
-            .onHover { inside in if inside { NSCursor.resizeUpDown.push() } else { NSCursor.pop() } }
-            .gesture(DragGesture(minimumDistance: 1)
-                .updating($stretch) { v, s, _ in s = v.translation.height }
-                .onEnded { v in
-                    height = min(max(height + v.translation.height, Self.heights.lowerBound), Self.heights.upperBound)
-                })
-            .help("Drag to resize the prompt")
-            .padding(.bottom, -6)
+        .contentShape(Rectangle())
+        .onTapGesture { LabModel.shared.unfold() }
+        .help("Written in the Prompt Lab, under the image (⌥⌘L)")
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isButton)
     }
 }
 
-/// **The images the prompt works on, numbered as it names them**: image 1 is the one edited — the
-/// output takes its format —, the others are what the prompt borrows from. Added by the button, by a
-/// drop here or on the canvas (there, a PNG Siliconed wrote restores its settings instead), or by
-/// « Edit This Image » in the history; reordered by dragging a
-/// thumbnail onto another, or from its menu. Only for a model that edits (rule 2: the inputs follow
-/// the model). The Prompt Lab fills it too, with the starting image, the references and the subjects its text
-/// cites (« Carry to the Rack »). The title counts what the next render sends.
+/// **The images the prompt works on, numbered as it names them**: image 1 is the one edited — the output takes its format
+/// —, the others are what the prompt borrows from, then the subjects the text cites. Only for a model that edits (rule 2:
+/// the inputs follow the model). **Read here, chosen in the Prompt Lab** (a drop on the canvas, « Send to the Prompt Lab »
+/// or « Edit with … » in the history, ⌘V): a click unfolds it. The title counts what the next render sends.
 struct ImagesNode: View {
     @Bindable var app: AppState
     private var used: Int { app.references.count }
@@ -334,42 +273,17 @@ struct ImagesNode: View {
         } content: {
             images
         }
-        .dropDestination(for: DroppedImage.self) { items, _ in
-            var files: [URL] = []
-            for item in items {
-                switch item {
-                case .file(let url) where !AppState.importable(url): files.append(url)
-                case .file: break
-                case .png(let data): app.addReference(png: data)
-                }
-            }
-            app.addReferences(files)
-            return items.contains { if case .file(let u) = $0 { !AppState.importable(u) } else { true } }
-        }
+        .contentShape(Rectangle())
+        .onTapGesture { LabModel.shared.unfold() }
     }
 
     @ViewBuilder private var images: some View {
-        // One more image beyond this Mac's memory (B): the « + » greyed out, the sentence below.
+        // One more image beyond this Mac's memory (B): the sentence below, read before adding one in the lab.
         let refusal = app.canAddReference ? app.nextReferenceRefusal() : nil
         HStack(alignment: .top, spacing: 6) {
             ForEach(Array(app.references.enumerated()), id: \.element.id) { n, reference in
                 ReferenceThumbnail(app: app, reference: reference, number: n + 1,
-                                   last: n == app.references.count - 1)
-            }
-            if app.canAddReference {
-                Button { app.chooseReferences() } label: {
-                    RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .strokeBorder(style: StrokeStyle(lineWidth: 1.25, dash: [4, 3]))
-                        .foregroundStyle(WireKind.image.color.opacity(0.7))
-                        .overlay(Image(systemName: "plus").foregroundStyle(WireKind.image.color))
-                        .frame(width: ReferenceThumbnail.side, height: ReferenceThumbnail.side)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .disabled(refusal != nil).opacity(refusal == nil ? 1 : 0.35)
-                .help(app.references.isEmpty ? "The image to edit — or drop or paste it here (⌘V)"
-                                             : "Add an image the prompt can draw from — or drop or paste it here (⌘V)")
-                .accessibilityLabel(Text("Add an Image"))
+                                   last: n == app.editInputs.count - 1)
             }
             Spacer(minLength: 0)
         }
@@ -377,7 +291,7 @@ struct ImagesNode: View {
             if let refusal {
                 Text(refusal)
             } else if app.references.isEmpty {
-                Text("Optional. Add an image and the prompt becomes an instruction: “change her jacket to red”.")
+                Text("Optional. Drop an image in the Prompt Lab and the prompt becomes an instruction: “change her jacket to red”.")
             } else if app.promptNamesImages && app.maxReferences > 1 {
                 Text("Image 1 is the one edited. The prompt can name them: “put the dog of image 2 next to the woman in image 1”.")
                     .help("The model reads them as <image1>, <image2>… in front of the prompt")
@@ -390,13 +304,12 @@ struct ImagesNode: View {
     }
 }
 
-/// **The image the render starts from** (img2img), on a model that starts from one: shown only once the Prompt Lab (or
-/// `silicontrol start-image`) has carried one — the rack has no empty slot for it, the Lab is where it is chosen. Its thumbnail,
-/// and its strength on a slider from 0 to 100 %, like a LoRA's: retouched between two renders. Low keeps the image's composition
-/// and colours, 100 % ignores it; the tooltip says how many of the steps the strength leaves. A file dropped here replaces it.
+/// **The image the render starts from** (img2img), on a model that starts from one: shown once an image of the Prompt Lab
+/// (or `silicontrol start-image`) is the start — chosen there, read here (a click unfolds the lab). Its thumbnail, and its
+/// strength on a slider from 0 to 100 %, like a LoRA's: a setting, retouched between two renders. Low keeps the image's
+/// composition and colours, 100 % ignores it; the tooltip says how many of the steps the strength leaves.
 struct StartImageNode: View {
     @Bindable var app: AppState
-    @State private var hover = false
 
     var body: some View {
         PortBox(title: "Starting Image", symbol: "photo", kind: .image) {
@@ -432,14 +345,6 @@ struct StartImageNode: View {
         }
         .contextMenu {
             Button("Reset to \(StartWords.percent(app.defaultStartStrength))") { app.setStartStrength(app.defaultStartStrength) }
-            Button("Replace…") { app.chooseStartReplacement() }
-            Divider()
-            Button("Remove", role: .destructive) { app.removeStart() }
-        }
-        .dropDestination(for: URL.self) { urls, _ in
-            guard let url = urls.first(where: { $0.isFileURL && !AppState.importable($0) }) else { return false }
-            app.replaceStart(with: url)
-            return true
         }
     }
 
@@ -448,19 +353,7 @@ struct StartImageNode: View {
             .frame(width: ReferenceThumbnail.side, height: ReferenceThumbnail.side)
             .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: 6, style: .continuous).strokeBorder(WireKind.image.color, lineWidth: 1.5))
-            .overlay(alignment: .topTrailing) {
-                if hover {
-                    Button { app.removeStart() } label: {
-                        Image(systemName: "xmark.circle.fill").symbolRenderingMode(.palette)
-                            .foregroundStyle(.white, .black.opacity(0.6))
-                            .frame(width: 24, height: 24).contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .help("Remove: the next render starts from noise")
-                    .accessibilityLabel(Text("Remove"))
-                }
-            }
-            .onHover { hover = $0 }
+            .onTapGesture { LabModel.shared.unfold() }
             .help(Text(verbatim: "\(start.name) · \(start.width) × \(start.height)"))
             .accessibilityLabel(Text(verbatim: start.name))
     }

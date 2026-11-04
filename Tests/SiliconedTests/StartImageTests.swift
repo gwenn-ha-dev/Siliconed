@@ -27,61 +27,43 @@ final class StartImageTests: XCTestCase {
     }
 
     func testAnImg2ImgModelOffersTheStartAndNoReference() {
-        XCTAssertEqual(L.roles(capacity: 0, startsFromImage: true), [.start, .describeOnly])
-        XCTAssertEqual(L.roles(capacity: 0, startsFromImage: false), [.describeOnly])
-        // Qwen-Image-2.1 reads its images: its roles do not change.
-        XCTAssertEqual(L.roles(capacity: 3, startsFromImage: false), [.start, .reference, .describeOnly])
+        XCTAssertEqual(L.roles(capacity: 0, startsFromImage: true), [.start, .neutral])
+        XCTAssertEqual(L.roles(capacity: 0, startsFromImage: false), [.neutral])
+        // Qwen-Image-2.1 reads its images: the edited image and the references, never a start.
+        XCTAssertEqual(L.roles(capacity: 3, startsFromImage: false), [.edited, .reference, .neutral])
     }
 
     /// A picture dropped to be described never makes the next render an img2img: its start is a gesture.
     func testANewcomerIsNeverAnImg2ImgStart() {
-        XCTAssertEqual(L.defaultRole(adding: [] as [L.Slot<Int>], capacity: 0), .describeOnly)
-        XCTAssertEqual(L.defaultRole(adding: slots(.describeOnly, .describeOnly), capacity: 0), .describeOnly)
+        XCTAssertEqual(L.defaultRole(adding: [] as [L.Slot<Int>], capacity: 0), .neutral)
+        XCTAssertEqual(L.defaultRole(adding: slots(.neutral, .neutral), capacity: 0), .neutral)
     }
 
-    /// One start: choosing another sends the previous one back to « describe only » — there are no references to send it to.
-    func testChoosingAnotherStartSendsTheFirstBackToDescribeOnly() {
-        let zone = L.assigning(.start, to: 1, in: slots(.start, .describeOnly), capacity: 0)
-        XCTAssertEqual(zone.map(\.role), [.describeOnly, .start])
-        // Qwen-Image-2.1's rule stays: the previous start becomes a reference.
-        XCTAssertEqual(L.assigning(.start, to: 1, in: slots(.start, .describeOnly)).map(\.role), [.reference, .start])
+    /// One start: choosing another sends the previous one back to neutral — never to a reference.
+    func testChoosingAnotherStartSendsTheFirstBackToNeutral() {
+        XCTAssertEqual(L.assigning(.start, to: 1, in: slots(.start, .neutral)).map(\.role), [.neutral, .start])
     }
 
     func testChangingTheModelKeepsTheStartWhereItIsOffered() {
-        // Qwen → Z-Image: the references go to « describe only », the start stays.
-        XCTAssertEqual(L.conforming(slots(.start, .reference, .reference), capacity: 0, startsFromImage: true).map(\.role),
-                       [.start, .describeOnly, .describeOnly])
+        // Z-Image → Anima: the start stays.
+        XCTAssertEqual(L.conforming(slots(.start, .neutral), capacity: 0, startsFromImage: true).map(\.role), [.start, .neutral])
         // A second start (never made by the window) has nowhere else to go.
-        XCTAssertEqual(L.conforming(slots(.start, .start), capacity: 0, startsFromImage: true).map(\.role), [.start, .describeOnly])
-        // A model that neither reads nor starts from an image keeps none.
-        XCTAssertEqual(L.conforming(slots(.start, .describeOnly), capacity: 0, startsFromImage: false).map(\.role),
-                       [.describeOnly, .describeOnly])
+        XCTAssertEqual(L.conforming(slots(.start, .start), capacity: 0, startsFromImage: true).map(\.role), [.start, .neutral])
+        // A model that neither reads nor starts from an image: the start keeps its role, without effect.
+        XCTAssertEqual(L.conforming(slots(.start, .neutral), capacity: 0, startsFromImage: false).map(\.role), [.start, .neutral])
+        XCTAssertFalse(L.isEffective(.start, capacity: 0, startsFromImage: false))
     }
 
     /// The start alone goes, the text as typed — `@` is the model's own there (Anima's artists).
     func testAnImg2ImgCarriesItsStartAndTheTextAsTyped() throws {
         let text = "@greg_rutkowski, a lighthouse at dusk"
-        let c = try L.carry(text: text, slots: slots(.describeOnly, .start), subjects: [], capacity: 0, startsFromImage: true).get()
+        let c = try L.carry(text: text, slots: slots(.neutral, .start), subjects: [], capacity: 0, startsFromImage: true).get()
         XCTAssertEqual(c.prompt, text)
         XCTAssertEqual(c.images, [.plain(1, .start)])
         XCTAssertTrue(c.cited.isEmpty)
         // Without a start, the text alone; without img2img, no image at all.
-        XCTAssertEqual(try L.carry(text: text, slots: slots(.describeOnly), subjects: [], capacity: 0, startsFromImage: true).get().images, [])
+        XCTAssertEqual(try L.carry(text: text, slots: slots(.neutral), subjects: [], capacity: 0, startsFromImage: true).get().images, [])
         XCTAssertEqual(try L.carry(text: text, slots: slots(.start), subjects: [], capacity: 0).get().images, [])
-    }
-
-    func testTheReceiptSaysWhatTheStartReplaces() {
-        let r = L.receipt(text: "a lighthouse", slots: slots(.start), subjects: [], capacity: 0, startsFromImage: true,
-                          rackPrompt: "a lighthouse", rackImages: 1, changesModel: false)
-        XCTAssertTrue(r.canCarry)
-        XCTAssertFalse(r.replacesPrompt)
-        XCTAssertEqual(r.replacedImages, 1)
-        XCTAssertEqual(r.first, .plain(0, .start))
-        // An image alone, no text: carried all the same (the rack keeps its prompt).
-        let image = L.receipt(text: "", slots: slots(.start), subjects: [], capacity: 0, startsFromImage: true,
-                              rackPrompt: "x", rackImages: 0, changesModel: true)
-        XCTAssertTrue(image.canCarry)
-        XCTAssertEqual(image.replacedImages, 0)
     }
 
     // ── the strength ──

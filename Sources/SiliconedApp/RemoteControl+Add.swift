@@ -345,9 +345,9 @@ extension RemoteControl {
         // the prompt as typed, so that « Generate » would queue the same series.
         app.restoreSettings(jobs[0].settings)
         app.prompt = prompt
-        app.references = references
+        app.setEditImages(references)
         // The starting image too, or none: « Generate » would queue the same request.
-        app.startImage = start
+        app.setStart(start)
         if let strength { app.startStrength = strength }
         // A seed drawn here is a Random render, as after a click: the rack must not keep showing an old Fixed one.
         if let seed = d.seed { app.fixedSeed = true; app.seed = seed } else { app.fixedSeed = false }
@@ -450,8 +450,8 @@ extension RemoteControl {
         // The form takes the grid, as after a click: settings, prompt as typed, edit images, axes.
         app.restoreSettings(settings)
         app.prompt = prompt
-        app.references = references
-        app.startImage = start
+        app.setEditImages(references)
+        app.setStart(start)
         if let strength { app.startStrength = strength }
         if let s = d.seed { app.fixedSeed = true; app.seed = s } else { app.fixedSeed = false }
         app.setGridForm(g, prompt: prompt)

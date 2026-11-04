@@ -81,6 +81,52 @@
         }
       }
     },
+    "%@ / %@: full" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ / %@: voll"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ / %2$@: full"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ / %@: completo"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ / %@ : complet"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ / %@: completo"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ / %@：満杯"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ / %@：已满"
+          }
+        }
+      }
+    },
     "%@ acts on this Mac, and the window computes on “%@”" : {
       "localizations" : {
         "de" : {
@@ -283,6 +329,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@ 不支持参考图编辑（--ref）"
+          }
+        }
+      }
+    },
+    "%@ does not read subjects" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ liest keine Motive"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ no lee sujetos"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ ne lit pas les sujets"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ non legge i soggetti"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@はサブジェクトを読み取りません"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 不读取主体"
           }
         }
       }
@@ -913,6 +999,52 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@ 还没有图像：请等待，或它没有生成"
+          }
+        }
+      }
+    },
+    "%@ has no role “%@”" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ hat keine Rolle „%@“"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ has no role “%2$@”"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ no tiene la función «%@»"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ n’a pas le rôle « %@ »"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ non ha il ruolo «%@»"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@には「%@」の役割がありません"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 没有“%@”角色"
           }
         }
       }
@@ -2705,6 +2837,46 @@
         }
       }
     },
+    "%@, cited by the prompt: delete the name there to take it out" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@, im Prompt genannt: dort den Namen löschen, um es zu entfernen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@, citado por el prompt: borre allí el nombre para quitarlo"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@, cité par le prompt : effacez-y le nom pour l’ôter"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@, citato dal prompt: cancellane lì il nome per toglierlo"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ はプロンプトで指定されています。外すにはプロンプトから名前を消してください"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 由提示词引用：在提示词中删除该名称即可移除"
+          }
+        }
+      }
+    },
     "%@: accept its license to render" : {
       "localizations" : {
         "de" : {
@@ -3071,6 +3243,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已将 %lld 张图像导出到 %@"
+          }
+        }
+      }
+    },
+    "%lld images of the Prompt Lab not used" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld Bilder des Prompt-Labors nicht verwendet"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld imágenes del laboratorio de prompts sin usar"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld images de l’atelier non utilisées"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld immagini del laboratorio dei prompt non usate"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "プロンプトラボの画像%lld枚が使われていません"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "提示词实验室中有 %lld 张图像未使用"
           }
         }
       }
@@ -4941,6 +5153,46 @@
         }
       }
     },
+    "1 image of the Prompt Lab not used" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 Bild des Prompt-Labors nicht verwendet"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 imagen del laboratorio de prompts sin usar"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 image de l’atelier non utilisée"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 immagine del laboratorio dei prompt non usata"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "プロンプトラボの画像1枚が使われていません"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "提示词实验室中有 1 张图像未使用"
+          }
+        }
+      }
+    },
     "1 reference" : {
       "localizations" : {
         "de" : {
@@ -5417,6 +5669,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "@%@ 不能在 {…|…} 分组中引用：请把它移到花括号之外。"
+          }
+        }
+      }
+    },
+    "A LoRA of this model (3 at most), or one to import: a .safetensors as published on Civitai" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eine LoRA dieses Modells (höchstens 3) oder eine zum Importieren: eine .safetensors-Datei, wie auf Civitai veröffentlicht"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un LoRA de este modelo (3 como máximo), o uno para importar: un .safetensors tal como se publica en Civitai"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Une LoRA de ce modèle (3 au plus), ou une à importer : un .safetensors tel que publié sur Civitai"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Una LoRA di questo modello (al massimo 3), o una da importare: un .safetensors così come pubblicato su Civitai"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このモデルのLoRA（最大3つ）、または読み込むLoRA。Civitaiで公開されている.safetensors"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此模型的 LoRA（最多 3 个），或要导入的 LoRA：Civitai 上发布的 .safetensors"
           }
         }
       }
@@ -6907,46 +7199,6 @@
         }
       }
     },
-    "Add a LoRA to the stack (3 at most)" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "LoRA zum Stapel hinzufügen (höchstens 3)"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Añadir un LoRA a la pila (3 como máximo)"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ajouter une LoRA à la pile (3 au plus)"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Aggiungi una LoRA alla pila (massimo 3)"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "LoRAをスタックに追加（最大3つ）"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "向堆叠中添加 LoRA（最多 3 个）"
-          }
-        }
-      }
-    },
     "Add a Second Picture…" : {
       "localizations" : {
         "de" : {
@@ -7023,46 +7275,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "添加图像"
-          }
-        }
-      }
-    },
-    "Add an image the prompt can draw from — or drop or paste it here (⌘V)" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ein Bild hinzufügen, aus dem der Prompt schöpfen kann — oder hier ablegen oder einfügen (⌘V)"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Añadir una imagen de la que el prompt pueda tomar — o soltarla o pegarla aquí (⌘V)"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ajouter une image où le prompt peut puiser — ou la déposer ou la coller ici (⌘V)"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Aggiungi un’immagine da cui il prompt possa attingere — o trascinala o incollala qui (⌘V)"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "プロンプトが参照できる画像を追加 — ここにドロップまたはペースト（⌘V）することもできます"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "添加提示词可引用的图像——或将其拖放、粘贴到此处（⌘V）"
           }
         }
       }
@@ -7947,46 +8159,6 @@
         }
       }
     },
-    "Another image the prompt can draw from (“the dog of image 2”)." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ein weiteres Bild, aus dem der Prompt schöpfen kann („der Hund aus Bild 2“)."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Otra imagen de la que puede partir el prompt («el perro de la imagen 2»)."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Une autre image où le prompt peut puiser (« le chien de l’image 2 »)."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Un’altra immagine a cui il prompt può attingere («il cane dell’immagine 2»)."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "プロンプトが参照できる別の画像（「画像2の犬」）。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "提示词可引用的另一张图像（“图像 2 里的那条狗”）。"
-          }
-        }
-      }
-    },
     "Another picture of the same subject." : {
       "localizations" : {
         "de" : {
@@ -8707,46 +8879,6 @@
         }
       }
     },
-    "Beta: Rewrite and Describe use a language model still being settled, and may change." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Beta: Umschreiben und Beschreiben nutzen ein Sprachmodell, das noch abgestimmt wird, und können sich ändern."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Beta: Reescribir y Describir usan un modelo de lenguaje que aún se está ajustando y pueden cambiar."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Bêta : Réécrire et Décrire s’appuient sur un modèle de langage encore en réglage, et peuvent changer."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Beta: Riscrivi e Descrivi usano un modello linguistico ancora in messa a punto e possono cambiare."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ベータ：「書き直す」と「説明する」は調整中の言語モデルを使っており、変更される場合があります。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "测试版：“改写”和“描述”使用仍在调校的语言模型，可能会有变化。"
-          }
-        }
-      }
-    },
     "Beta: still being settled, and may change." : {
       "localizations" : {
         "de" : {
@@ -9023,46 +9155,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "取消"
-          }
-        }
-      }
-    },
-    "Carried" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Übertragen"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Llevado"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Porté"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Portato"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "移しました"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已移入"
           }
         }
       }
@@ -10547,46 +10639,6 @@
         }
       }
     },
-    "Clear" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Löschen"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Borrar"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Effacer"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cancella"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "消去"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "清除"
-          }
-        }
-      }
-    },
     "Clear History" : {
       "localizations" : {
         "de" : {
@@ -10804,7 +10856,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Effacer le prompt (⌘Z le rétablit)"
+            "value" : "Effacer le prompt (⌘Z le rend)"
           }
         },
         "it" : {
@@ -10816,13 +10868,13 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "プロンプトを消去（⌘Zで元に戻ります）"
+            "value" : "プロンプトを消去（⌘Zで戻せます）"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "清除提示词（按 ⌘Z 可恢复）"
+            "value" : "清除提示词（⌘Z 可恢复）"
           }
         }
       }
@@ -12627,46 +12679,6 @@
         }
       }
     },
-    "Crop this image (the frame keeps at least %@ px a side)" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Dieses Bild zuschneiden (der Rahmen behält mindestens %@ px pro Seite)"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Recortar esta imagen (el marco conserva al menos %@ px por lado)"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Recadrer cette image (le cadre garde au moins %@ px par côté)"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ritaglia questa immagine (la cornice mantiene almeno %@ px per lato)"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "この画像をトリミング（フレームは各辺%@ px以上を保ちます）"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "裁剪此图像（裁剪框每边至少保留 %@ 像素）"
-          }
-        }
-      }
-    },
     "Crop: a new image, the original stays (C)" : {
       "localizations" : {
         "de" : {
@@ -13303,87 +13315,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "描述一张图像，然后按 ⌘↩"
-          }
-        }
-      }
-    },
-    "Describe only" : {
-      "comment" : "The role of an image that goes nowhere",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Nur beschreiben"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Solo describir"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Décrire seulement"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Solo descrizione"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "説明のみ"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "仅描述"
-          }
-        }
-      }
-    },
-    "Describe the image…" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Beschreiben Sie das Bild …"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Describe la imagen…"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Décrivez l’image…"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Descrivi l’immagine…"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "画像を説明してください…"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "描述图像…"
           }
         }
       }
@@ -14046,46 +13977,6 @@
         }
       }
     },
-    "Drag to resize the prompt" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ziehen, um die Größe des Prompts zu ändern"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Arrastra para cambiar el tamaño del prompt"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Glisser pour redimensionner le prompt"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Trascina per ridimensionare il prompt"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ドラッグしてプロンプト欄のサイズを変更"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "拖移以调整提示词的大小"
-          }
-        }
-      }
-    },
     "Draw a seed" : {
       "localizations" : {
         "de" : {
@@ -14526,46 +14417,6 @@
         }
       }
     },
-    "Edit" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Bearbeiten"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Editar"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Modifier"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Modifica"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "編集"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "编辑"
-          }
-        }
-      }
-    },
     "Edit @%@" : {
       "localizations" : {
         "de" : {
@@ -14882,46 +14733,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "编辑…"
-          }
-        }
-      }
-    },
-    "Empties the text. ⌘Z in the text brings it back." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Leert den Text. ⌘Z im Text holt ihn zurück."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Vacía el texto. ⌘Z en el texto lo recupera."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Vide le texte. ⌘Z dans le texte le rétablit."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Svuota il testo. ⌘Z nel testo lo ripristina."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "テキストを空にします。テキスト内で⌘Zを押すと元に戻ります。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "清空文本。在文本中按 ⌘Z 可恢复。"
           }
         }
       }
@@ -16092,46 +15903,6 @@
         }
       }
     },
-    "Fills the rack’s images." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Füllt die Bilder des Racks."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Rellena las imágenes del rack."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Remplit les images du rack."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Riempie le immagini del rack."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ラックの画像欄に入れます。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "填入机架的图像。"
-          }
-        }
-      }
-    },
     "Finish Installing…" : {
       "localizations" : {
         "de" : {
@@ -16372,6 +16143,86 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "固定"
+          }
+        }
+      }
+    },
+    "Fold the Prompt Lab" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prompt-Labor einklappen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Plegar el laboratorio de prompts"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Replier l’atelier"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chiudi il laboratorio dei prompt"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "プロンプトラボを畳む"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "收起提示词实验室"
+          }
+        }
+      }
+    },
+    "Fold the Prompt Lab (⌥⌘L)" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prompt-Labor einklappen (⌥⌘L)"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Plegar el laboratorio de prompts (⌥⌘L)"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Replier l’atelier (⌥⌘L)"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chiudi il laboratorio dei prompt (⌥⌘L)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "プロンプトラボを畳む（⌥⌘L）"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "收起提示词实验室（⌥⌘L）"
           }
         }
       }
@@ -17137,86 +16988,6 @@
         }
       }
     },
-    "Gives it a name, a kind and a frame, to cite it as @name in the text" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Gibt ihm einen Namen, eine Art und einen Rahmen, um es im Text als @name zu nennen"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Le da un nombre, un tipo y un encuadre, para citarla como @nombre en el texto"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Lui donne un nom, un genre et un cadre, pour la citer par @nom dans le texte"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Le dà un nome, un tipo e una cornice, per citarla come @nome nel testo"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "名前、種類、フレームを付けて、テキスト内で@nameとして引用できるようにします"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "为它指定名称、类型和取景框，以便在文本中以 @名称 引用"
-          }
-        }
-      }
-    },
-    "Gives the rack a starting image." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Gibt dem Rack ein Startbild."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Da al rack una imagen de partida."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Donne au rack une image de départ."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Dà al rack un’immagine di partenza."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ラックに開始画像を渡します。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "为机架提供一张起始图像。"
-          }
-        }
-      }
-    },
     "Grid" : {
       "localizations" : {
         "de" : {
@@ -17755,46 +17526,6 @@
         }
       }
     },
-    "Image 1 gives the format." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Bild 1 gibt das Format vor."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "La imagen 1 da el formato."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "L’image 1 donne le format."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "L’immagine 1 dà il formato."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "画像1がサイズを決めます。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "图像 1 决定尺寸。"
-          }
-        }
-      }
-    },
     "Image 1 is the one edited and gives the format. The rack takes 3 images at most." : {
       "localizations" : {
         "de" : {
@@ -18156,6 +17887,7 @@
       }
     },
     "Image to Edit" : {
+      "comment" : "The role of the image the model edits",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -18871,6 +18603,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "在终端中：silicontrol help"
+          }
+        }
+      }
+    },
+    "In the prompt" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Im Prompt"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En el prompt"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dans le prompt"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nel prompt"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "プロンプト内"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已在提示词中"
           }
         }
       }
@@ -19631,6 +19403,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "其转换后的模型文件会从磁盘删除。如需恢复，请重新导入其文件。"
+          }
+        }
+      }
+    },
+    "Its trigger words, as its file gives them: a click puts them at the head of the prompt." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ihre Trigger-Wörter, wie ihre Datei sie angibt: Ein Klick setzt sie an den Anfang des Prompts."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sus palabras de activación, tal como las da su archivo: un clic las pone al principio del prompt."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ses mots déclencheurs, tels que son fichier les donne : un clic les met en tête du prompt."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le sue parole di attivazione, come le dà il suo file: un clic le mette all’inizio del prompt."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ファイルに記されたトリガーワード。クリックでプロンプトの先頭に入ります。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "文件中给出的触发词：点击即可放到提示词开头。"
           }
         }
       }
@@ -20995,46 +20807,6 @@
         }
       }
     },
-    "Make It Image 1" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Zu Bild 1 machen"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Convertirla en imagen 1"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "En faire l’image 1"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Rendila immagine 1"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "画像1にする"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "设为图像 1"
-          }
-        }
-      }
-    },
     "Make each group an axis, or write its braces as \\{ and \\}." : {
       "localizations" : {
         "de" : {
@@ -22277,46 +22049,6 @@
         }
       }
     },
-    "Move Left" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Nach links bewegen"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mover a la izquierda"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Déplacer à gauche"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sposta a sinistra"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "左へ移動"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "向左移"
-          }
-        }
-      }
-    },
     "Move Library…" : {
       "localizations" : {
         "de" : {
@@ -22353,46 +22085,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "移动资源库…"
-          }
-        }
-      }
-    },
-    "Move Right" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Nach rechts bewegen"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mover a la derecha"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Déplacer à droite"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sposta a destra"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "右へ移動"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "向右移"
           }
         }
       }
@@ -23197,42 +22889,43 @@
         }
       }
     },
-    "No Siliconed settings in this image" : {
+    "No Role" : {
+      "comment" : "An image of the lab that does not go to the render",
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Keine Siliconed-Einstellungen in diesem Bild"
+            "value" : "Ohne Rolle"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ningún ajuste de Siliconed en esta imagen"
+            "value" : "Sin función"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Aucun réglage Siliconed dans cette image"
+            "value" : "Sans rôle"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nessuna impostazione di Siliconed in questa immagine"
+            "value" : "Nessun ruolo"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "この画像にSiliconedの設定はありません"
+            "value" : "役割なし"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "此图像中没有 Siliconed 设置"
+            "value" : "无角色"
           }
         }
       }
@@ -24610,46 +24303,6 @@
         }
       }
     },
-    "Nothing to carry yet: write a text, or choose an image to send." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Noch nichts zu übertragen: Schreibe einen Text oder wähle ein Bild zum Senden."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Nada que llevar todavía: escribe un texto o elige una imagen para enviar."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Rien à porter pour l’instant : écrivez un texte, ou choisissez une image à envoyer."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Niente da portare per ora: scrivi un testo o scegli un’immagine da inviare."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "移すものがまだありません：テキストを書くか、送る画像を選んでください。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "暂无可移入的内容：请写一段文本，或选择要发送的图像。"
-          }
-        }
-      }
-    },
     "OK" : {
       "localizations" : {
         "de" : {
@@ -24967,6 +24620,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "位于这台 Mac 上。若要释放其磁盘，请将资源库移到另一处——外置磁盘或网络共享：这样 Siliconed 在每次会话中只会把要生成的那个模型拷贝到这台 Mac。"
+          }
+        }
+      }
+    },
+    "On, it goes into the render. Off, it stays here with its strength, out of the render." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "An: Sie geht in das Bild ein. Aus: Sie bleibt hier mit ihrer Stärke, außerhalb des Bildes."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Activado, entra en la imagen. Desactivado, se queda aquí con su fuerza, fuera de la imagen."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cochée, elle entre dans le rendu. Décochée, elle reste ici avec sa force, hors du rendu."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Attiva, entra nell’immagine. Disattiva, resta qui con la sua forza, fuori dall’immagine."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "オンで生成に使われます。オフでは強さを保ったままここに残り、生成には使われません。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "开启时参与生成。关闭时保留在此处及其强度，不参与生成。"
           }
         }
       }
@@ -25331,82 +25024,42 @@
         }
       }
     },
-    "Open images — or drop them here, or send one from the history (Open in the Prompt Lab)" : {
+    "Open images — or drop them here, or send one from the history (Send to the Prompt Lab)" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Bilder öffnen – oder hier ablegen, oder eines aus dem Verlauf senden („Im Prompt-Labor öffnen“)"
+            "value" : "Bilder öffnen – oder hier ablegen, oder eines aus dem Verlauf senden (An das Prompt-Labor senden)"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Abrir imágenes, soltarlas aquí o enviar una desde el historial (Abrir en el laboratorio de prompts)"
+            "value" : "Abrir imágenes — o soltarlas aquí, o enviar una desde el historial (Enviar al laboratorio de prompts)"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ouvrir des images — ou les déposer ici, ou en envoyer une depuis l’historique (Ouvrir dans l’atelier de prompts)"
+            "value" : "Ouvrir des images — ou les déposer ici, ou en envoyer une depuis l’historique (Envoyer à l’atelier)"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Apri immagini, trascinale qui o inviane una dalla cronologia (Apri nel laboratorio dei prompt)"
+            "value" : "Apri immagini — o trascinale qui, o inviane una dalla cronologia (Invia al laboratorio dei prompt)"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "画像を開く、ここにドロップする、または履歴から送る（「プロンプトラボで開く」）"
+            "value" : "画像を開く（ここにドロップ、または履歴から送ることもできます：「プロンプトラボに送る」）"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "打开图像，或拖放到此处，或从历史记录发送一张（“在提示词实验室中打开”）"
-          }
-        }
-      }
-    },
-    "Open in the Prompt Lab" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Im Prompt-Labor öffnen"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Abrir en el laboratorio de prompts"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ouvrir dans l’atelier de prompts"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Apri nel laboratorio dei prompt"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "プロンプトラボで開く"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "在提示词实验室中打开"
+            "value" : "打开图像——也可拖放到这里，或从历史记录发送（发送到提示词实验室）"
           }
         }
       }
@@ -25491,82 +25144,42 @@
         }
       }
     },
-    "Open the Prompt Lab (⌥⌘L)" : {
+    "Optional. Drop an image in the Prompt Lab and the prompt becomes an instruction: “change her jacket to red”." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Prompt-Labor öffnen (⌥⌘L)"
+            "value" : "Optional. Legen Sie ein Bild im Prompt-Labor ab, und der Prompt wird zur Anweisung: „mach ihre Jacke rot“."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Abrir el laboratorio de prompts (⌥⌘L)"
+            "value" : "Opcional. Suelta una imagen en el laboratorio de prompts y el prompt se convierte en una instrucción: «ponle una chaqueta roja»."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ouvrir l’atelier de prompts (⌥⌘L)"
+            "value" : "Facultatif. Déposez une image dans l’atelier et le prompt devient une instruction : « mets-lui une veste rouge »."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Apri il laboratorio dei prompt (⌥⌘L)"
+            "value" : "Facoltativo. Trascina un’immagine nel laboratorio dei prompt e il prompt diventa un’istruzione: «rendi rossa la sua giacca»."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "プロンプトラボを開く（⌥⌘L）"
+            "value" : "任意。プロンプトラボに画像をドロップすると、プロンプトが指示になります：「彼女のジャケットを赤にして」。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "打开提示词实验室（⌥⌘L）"
-          }
-        }
-      }
-    },
-    "Optional. Add an image and the prompt becomes an instruction: “change her jacket to red”." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Optional. Fügen Sie ein Bild hinzu, und der Prompt wird zur Anweisung: „mach ihre Jacke rot“."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Opcional. Añade una imagen y el prompt se convierte en una instrucción: «ponle una chaqueta roja»."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Facultatif. Ajoutez une image et le prompt devient une instruction : « mets-lui une veste rouge »."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Facoltativo. Aggiungi un’immagine e il prompt diventa un’istruzione: «rendi rossa la sua giacca»."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "任意。画像を追加すると、プロンプトが指示になります：「彼女のジャケットを赤にして」。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "可选。添加一张图像，提示词就会变成指令：“把她的夹克改成红色”。"
+            "value" : "可选。将一张图像拖入提示词实验室，提示词就会变成指令：“把她的夹克改成红色”。"
           }
         }
       }
@@ -26809,46 +26422,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "发布方的模型"
-          }
-        }
-      }
-    },
-    "Puts the marks of the rewrite away. ⌘Z in the text brings the previous text back." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Blendet die Markierungen der Umschreibung aus. ⌘Z im Text holt den vorherigen Text zurück."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Quita las marcas de la reescritura. ⌘Z en el texto recupera el texto anterior."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Retire les marques de la réécriture. ⌘Z dans le texte rétablit le texte précédent."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Toglie i segni della riscrittura. ⌘Z nel testo ripristina il testo precedente."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "書き直しの印を消します。テキストで⌘Zを押すと元のテキストに戻ります。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "移除改写的标记。在文本中按 ⌘Z 可恢复之前的文本。"
           }
         }
       }
@@ -28460,46 +28033,6 @@
         }
       }
     },
-    "Remove: the next render starts from noise" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Entfernen: Das nächste Rendern geht vom Rauschen aus"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Quitar: el próximo renderizado parte del ruido"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Retirer : le prochain rendu part du bruit"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Rimuovi: il prossimo rendering parte dal rumore"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "削除：次のレンダリングはノイズから始まります"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "移除：下次渲染将从噪声开始"
-          }
-        }
-      }
-    },
     "Removed" : {
       "localizations" : {
         "de" : {
@@ -28998,6 +28531,46 @@
         }
       }
     },
+    "Replace With" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ersetzen durch"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reemplazar por"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remplacer par"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sostituisci con"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "置き換え"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "替换为"
+          }
+        }
+      }
+    },
     "Replaces the %@ version now installed, once the new one is ready: %@ freed then." : {
       "localizations" : {
         "de" : {
@@ -29040,286 +28613,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "新版本就绪后，将替换当前已安装的 %@ 版本：届时释放 %@。"
-          }
-        }
-      }
-    },
-    "Replaces the rack’s images. They can’t be brought back." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ersetzt die Bilder des Racks. Sie lassen sich nicht zurückholen."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sustituye las imágenes del rack. No se pueden recuperar."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Remplace les images du rack. Elles ne peuvent pas être rétablies."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sostituisce le immagini del rack. Non si possono ripristinare."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ラックの画像を置き換えます。元に戻すことはできません。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "替换机架中的图像。无法恢复。"
-          }
-        }
-      }
-    },
-    "Replaces the rack’s prompt (⌘Z brings it back) and fills its images." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ersetzt den Prompt des Racks (⌘Z holt ihn zurück) und füllt seine Bilder."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sustituye el prompt del rack (⌘Z lo recupera) y rellena sus imágenes."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Remplace le prompt du rack (⌘Z le rétablit) et remplit ses images."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sostituisce il prompt del rack (⌘Z lo ripristina) e riempie le sue immagini."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ラックのプロンプトを置き換え（⌘Zで元に戻せます）、画像欄に入れます。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "替换机架中的提示词（按 ⌘Z 可恢复），并填入其图像。"
-          }
-        }
-      }
-    },
-    "Replaces the rack’s prompt (⌘Z brings it back) and gives it a starting image." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ersetzt den Prompt des Racks (⌘Z holt ihn zurück) und gibt ihm ein Startbild."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sustituye el prompt del rack (⌘Z lo recupera) y le da una imagen de partida."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Remplace le prompt du rack (⌘Z le rétablit) et lui donne une image de départ."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sostituisce il prompt del rack (⌘Z lo ripristina) e gli dà un’immagine di partenza."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ラックのプロンプトを置き換え（⌘Zで元に戻せます）、開始画像を渡します。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "替换机架中的提示词（按 ⌘Z 可恢复），并为其提供起始图像。"
-          }
-        }
-      }
-    },
-    "Replaces the rack’s prompt (⌘Z brings it back) and its images (they can’t be brought back)." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ersetzt den Prompt des Racks (⌘Z holt ihn zurück) und seine Bilder (sie lassen sich nicht zurückholen)."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sustituye el prompt del rack (⌘Z lo recupera) y sus imágenes (no se pueden recuperar)."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Remplace le prompt du rack (⌘Z le rétablit) et ses images (elles ne peuvent pas être rétablies)."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sostituisce il prompt del rack (⌘Z lo ripristina) e le sue immagini (non si possono ripristinare)."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ラックのプロンプトと画像を置き換えます（プロンプトは⌘Zで元に戻せますが、画像は戻せません）。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "替换机架中的提示词和图像（提示词可按 ⌘Z 恢复，图像无法恢复）。"
-          }
-        }
-      }
-    },
-    "Replaces the rack’s prompt (⌘Z brings it back) and its starting image (it can’t be brought back)." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ersetzt den Prompt des Racks (⌘Z holt ihn zurück) und sein Startbild (es lässt sich nicht zurückholen)."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sustituye el prompt del rack (⌘Z lo recupera) y su imagen de partida (no se puede recuperar)."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Remplace le prompt du rack (⌘Z le rétablit) et son image de départ (elle ne peut pas être rétablie)."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sostituisce il prompt del rack (⌘Z lo ripristina) e la sua immagine di partenza (non si può ripristinare)."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ラックのプロンプトと開始画像を置き換えます（プロンプトは⌘Zで元に戻せますが、開始画像は戻せません）。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "替换机架中的提示词和起始图像（提示词可按 ⌘Z 恢复，起始图像无法恢复）。"
-          }
-        }
-      }
-    },
-    "Replaces the rack’s prompt. ⌘Z in its field brings it back." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ersetzt den Prompt des Racks. ⌘Z in seinem Feld holt ihn zurück."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sustituye el prompt del rack. ⌘Z en su campo lo recupera."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Remplace le prompt du rack. ⌘Z dans son champ le rétablit."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sostituisce il prompt del rack. ⌘Z nel suo campo lo ripristina."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ラックのプロンプトを置き換えます。その欄で⌘Zを押すと元に戻ります。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "替换机架中的提示词。在其栏中按 ⌘Z 可恢复。"
-          }
-        }
-      }
-    },
-    "Replaces the rack’s starting image. It can’t be brought back." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ersetzt das Startbild des Racks. Es lässt sich nicht zurückholen."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sustituye la imagen de partida del rack. No se puede recuperar."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Remplace l’image de départ du rack. Elle ne peut pas être rétablie."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sostituisce l’immagine di partenza del rack. Non si può ripristinare."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ラックの開始画像を置き換えます。元に戻すことはできません。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "替换机架中的起始图像。无法恢复。"
           }
         }
       }
@@ -30084,46 +29377,6 @@
         }
       }
     },
-    "Say what changes…" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sagen Sie, was sich ändert …"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Di qué cambia…"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Dites ce qui change…"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Di’ cosa cambia…"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "何を変えるか書いてください…"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "说明要改什么…"
-          }
-        }
-      }
-    },
     "Seed" : {
       "localizations" : {
         "de" : {
@@ -30280,6 +29533,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "全选图像"
+          }
+        }
+      }
+    },
+    "Send to the Prompt Lab" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "An das Prompt-Labor senden"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enviar al laboratorio de prompts"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Envoyer à l’atelier"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Invia al laboratorio dei prompt"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "プロンプトラボに送る"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "发送到提示词实验室"
           }
         }
       }
@@ -32520,7 +31813,7 @@
       }
     },
     "Starting image" : {
-      "comment" : "The role of the image the model edits",
+      "comment" : "The role of the image an img2img starts from",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -33286,46 +32579,6 @@
         }
       }
     },
-    "Strength %@" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Stärke %@"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Fuerza %@"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Force %@"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Forza %@"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "強さ %@"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "强度 %@"
-          }
-        }
-      }
-    },
     "Strength — double-click for %@" : {
       "localizations" : {
         "de" : {
@@ -33366,42 +32619,42 @@
         }
       }
     },
-    "Strength — double-click for 0.8" : {
+    "Strength: 0.8 attenuates, 1 as trained, more emphasizes" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Stärke — Doppelklick für 0,8"
+            "value" : "Stärke: 0,8 schwächt ab, 1 wie trainiert, mehr verstärkt"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Fuerza — doble clic para 0,8"
+            "value" : "Fuerza: 0,8 atenúa, 1 tal como se entrenó, más acentúa"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Force — double-clic pour 0,8"
+            "value" : "Force : 0,8 atténue, 1 tel qu’entraînée, au-delà accentue"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Forza — doppio clic per 0,8"
+            "value" : "Forza: 0,8 attenua, 1 come addestrata, di più accentua"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "強さ — ダブルクリックで0.8"
+            "value" : "強さ：0.8で弱め、1で学習どおり、それ以上で強調"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "强度——双击恢复为 0.8"
+            "value" : "强度：0.8 减弱，1 为训练原样，更大则加强"
           }
         }
       }
@@ -36059,46 +35312,6 @@
         }
       }
     },
-    "The image the render starts from: it keeps its composition, the strength says how far it moves away." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Das Bild, von dem das Rendern ausgeht: Es behält seine Komposition, die Stärke sagt, wie weit es sich davon entfernt."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "La imagen de la que parte el renderizado: conserva su composición, la fuerza dice cuánto se aleja de ella."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "L’image dont part le rendu : il garde sa composition, la force dit jusqu’où il s’en éloigne."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "L’immagine da cui parte il rendering: ne conserva la composizione, la forza dice quanto se ne allontana."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "レンダリングの開始画像です。構図は保たれ、強さはそこからどれだけ離れるかを決めます。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "渲染开始时的图像：保留其构图，强度决定离它有多远。"
-          }
-        }
-      }
-    },
     "The image the render starts from: it keeps its composition; the size follows it." : {
       "localizations" : {
         "de" : {
@@ -36139,128 +35352,48 @@
         }
       }
     },
-    "The image to edit — or drop or paste it here (⌘V)" : {
+    "The lab sends %@ images: a render takes %@ at most. Set some to No Role." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Das zu bearbeitende Bild — oder hier ablegen oder einfügen (⌘V)"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "La imagen que editar — o suéltala o pégala aquí (⌘V)"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "L’image à éditer — ou la déposer ou la coller ici (⌘V)"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "L’immagine da modificare — o trascinala o incollala qui (⌘V)"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "編集する画像 — またはここにドロップまたはペースト（⌘V）"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "要编辑的图像——或将其拖放、粘贴到此处（⌘V）"
-          }
-        }
-      }
-    },
-    "The image to edit: the prompt says what changes (“change her jacket to red”)." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Das zu bearbeitende Bild: Der Prompt sagt, was sich ändert („mach ihre Jacke rot“)."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "La imagen que editar: el prompt dice qué cambia («ponle una chaqueta roja»)."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "L’image à éditer : le prompt dit ce qui change (« mets-lui une veste rouge »)."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "L’immagine da modificare: il prompt dice cosa cambia («rendi rossa la sua giacca»)."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "編集する画像：プロンプトに何を変えるかを書きます（「彼女のジャケットを赤にして」）。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "要编辑的图像：提示词说明要改什么（“把她的夹克改成红色”）。"
-          }
-        }
-      }
-    },
-    "The lab sends %@ images: a render takes %@ at most. Set some to Describe only." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Das Labor sendet %@ Bilder: Ein Rendern nimmt höchstens %@. Setze einige auf „Nur beschreiben“."
+            "value" : "Das Labor sendet %@ Bilder: Ein Rendern nimmt höchstens %@. Setze einige auf „Ohne Rolle“."
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "new",
-            "value" : "The lab sends %1$@ images: a render takes %2$@ at most. Set some to Describe only."
+            "value" : "The lab sends %1$@ images: a render takes %2$@ at most. Set some to No Role."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "El laboratorio envía %@ imágenes: una generación admite %@ como máximo. Pon algunas en Solo describir."
+            "value" : "El laboratorio envía %@ imágenes: una generación admite %@ como máximo. Pon algunas en Sin función."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "L’atelier envoie %@ images : un rendu en prend %@ au plus. Mettez-en certaines sur « Décrire seulement »."
+            "value" : "L’atelier envoie %@ images : un rendu en prend %@ au plus. Mettez-en certaines sur « Sans rôle »."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Il laboratorio invia %@ immagini: una generazione ne accetta al massimo %@. Imposta alcune su Solo descrizione."
+            "value" : "Il laboratorio invia %@ immagini: una generazione ne accetta al massimo %@. Imposta alcune su Nessun ruolo."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ラボが送る画像は%@枚です：1回の生成で読めるのは最大%@枚です。いくつかを「説明のみ」にしてください。"
+            "value" : "ラボが送る画像は%@枚です：1回の生成で読めるのは最大%@枚です。いくつかを「役割なし」にしてください。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "实验室发送了 %@ 张图像：一次生成最多接收 %@ 张。请将部分设为“仅描述”。"
+            "value" : "实验室发送了 %@ 张图像：一次生成最多接收 %@ 张。请将部分设为“无角色”。"
           }
         }
       }
@@ -36985,42 +36118,42 @@
         }
       }
     },
-    "The model sees it as context, after the starting image." : {
+    "The model sees it as context, after the image to edit." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Das Modell sieht es als Kontext, nach dem Startbild."
+            "value" : "Das Modell sieht es als Kontext, nach dem zu bearbeitenden Bild."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "El modelo la ve como contexto, después de la imagen de partida."
+            "value" : "El modelo la ve como contexto, después de la imagen que editar."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Le modèle la voit comme contexte, après l’image de départ."
+            "value" : "Le modèle la voit comme contexte, après l’image à éditer."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Il modello la vede come contesto, dopo l’immagine di partenza."
+            "value" : "Il modello la vede come contesto, dopo l’immagine da modificare."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "モデルは開始画像のあとに、文脈として読み取ります。"
+            "value" : "モデルは編集する画像のあとに、文脈として読み取ります。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "模型把它当作上下文，位于起始图像之后。"
+            "value" : "模型把它当作上下文，位于要编辑的图像之后。"
           }
         }
       }
@@ -37745,46 +36878,6 @@
         }
       }
     },
-    "The rack already holds this." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Das Rack enthält das bereits."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "El rack ya contiene esto."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Le rack contient déjà cela."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Il rack contiene già questo."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ラックにはすでにこの内容が入っています。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "机架中已经是这些内容。"
-          }
-        }
-      }
-    },
     "The rack takes this cell whole — model, prompt, size, steps, LoRAs, seed — without rendering" : {
       "localizations" : {
         "de" : {
@@ -37865,86 +36958,6 @@
         }
       }
     },
-    "The rack will receive" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Das Rack erhält"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "El rack recibirá"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Le rack recevra"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Il rack riceverà"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ラックが受け取るもの"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "机架将收到"
-          }
-        }
-      }
-    },
-    "The rack will switch to %@." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Das Rack wechselt zu %@."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "El rack cambiará a %@."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Le rack passera sur %@."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Il rack passerà a %@."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ラックは%@に切り替わります。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "机架将切换到 %@。"
-          }
-        }
-      }
-    },
     "The rack’s LoRAs, seed and images to edit: the exploration varies them" : {
       "localizations" : {
         "de" : {
@@ -38021,6 +37034,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "机架的模型：在这里更改，那里也随之更改"
+          }
+        }
+      }
+    },
+    "The render can start from one image: it keeps its composition, the strength says how far it moves away." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das Rendern kann von einem Bild ausgehen: Es behält seine Komposition, die Stärke sagt, wie weit es sich davon entfernt."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El renderizado puede partir de una imagen: conserva su composición, la fuerza dice cuánto se aleja de ella."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le rendu peut partir d’une image : il garde sa composition, la force dit jusqu’où il s’en éloigne."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il rendering può partire da un’immagine: ne conserva la composizione, la forza dice quanto se ne allontana."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "レンダリングは1枚の画像から始められます。構図は保たれ、強さはそこからどれだけ離れるかを決めます。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "渲染可以从一张图像开始：保留其构图，强度决定离它有多远。"
           }
         }
       }
@@ -38581,46 +37634,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "silicontrol 命令未安装。"
-          }
-        }
-      }
-    },
-    "The size follows the starting image’s proportions; it stays free in the rack, which keeps the centre." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Das Format folgt den Proportionen des Startbilds; im Rack bleibt es frei, die Mitte bleibt erhalten."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "El formato sigue las proporciones de la imagen de partida; queda libre en el rack, que conserva el centro."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Le format suit les proportions de l’image de départ ; il reste libre dans le rack, qui garde le centre."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Il formato segue le proporzioni dell’immagine di partenza; resta libero nel rack, che conserva il centro."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "サイズは開始画像の縦横比に合わせます。ラックでは自由に変えられ、中央が残ります。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "尺寸随起始图像的比例而定；在机架中仍可自由更改，并保留中心部分。"
           }
         }
       }
@@ -41507,46 +40520,6 @@
         }
       }
     },
-    "This model reads %lld images at most" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Dieses Modell liest höchstens %lld Bilder"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Este modelo lee %lld imágenes como máximo"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ce modèle lit %lld images au plus"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Questo modello legge al massimo %lld immagini"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "このモデルが読み込める画像は最大%lld枚です"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "此模型最多读取 %lld 张图像"
-          }
-        }
-      }
-    },
     "This prompt takes %@ images: a render takes %@ at most." : {
       "localizations" : {
         "de" : {
@@ -41921,86 +40894,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "如需自行安装，请将以下内容粘贴到终端："
-          }
-        }
-      }
-    },
-    "To start from an image, choose a model that edits" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Um von einem Bild auszugehen, wählen Sie ein Modell, das bearbeitet"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Para partir de una imagen, elige un modelo que edite"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Pour partir d’une image, choisissez un modèle qui édite"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Per partire da un’immagine, scegli un modello che modifica"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "画像から始めるには、編集できるモデルを選んでください"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "要从图像开始，请选择可编辑的模型"
-          }
-        }
-      }
-    },
-    "To start from an image, choose it in the Prompt Lab" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Um von einem Bild auszugehen, wählen Sie es im Prompt-Labor"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Para partir de una imagen, elígela en el laboratorio de prompts"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Pour partir d’une image, choisissez-la dans l’atelier de prompts"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Per partire da un’immagine, sceglila nel laboratorio dei prompt"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "画像から始めるには、プロンプトラボで選んでください"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "要从图像开始，请在提示词实验室中选择它"
           }
         }
       }
@@ -42491,6 +41384,126 @@
         }
       }
     },
+    "Type the idea… (⌥⌘L)" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Idee eingeben … (⌥⌘L)"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escribe la idea… (⌥⌘L)"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Écrire l’idée… (⌥⌘L)"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scrivi l’idea… (⌥⌘L)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アイデアを入力…（⌥⌘L）"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "输入想法…（⌥⌘L）"
+          }
+        }
+      }
+    },
+    "Unfold the Prompt Lab" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prompt-Labor ausklappen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Desplegar el laboratorio de prompts"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Déplier l’atelier"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apri il laboratorio dei prompt"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "プロンプトラボを開く"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "展开提示词实验室"
+          }
+        }
+      }
+    },
+    "Unfold the Prompt Lab (⌥⌘L)" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prompt-Labor ausklappen (⌥⌘L)"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Desplegar el laboratorio de prompts (⌥⌘L)"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Déplier l’atelier (⌥⌘L)"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apri il laboratorio dei prompt (⌥⌘L)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "プロンプトラボを開く（⌥⌘L）"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "展开提示词实验室（⌥⌘L）"
+          }
+        }
+      }
+    },
     "Uninstall" : {
       "localizations" : {
         "de" : {
@@ -42777,42 +41790,42 @@
         }
       }
     },
-    "Use the Rack’s Prompt" : {
+    "Use this LoRA" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Prompt aus dem Rack verwenden"
+            "value" : "Diese LoRA verwenden"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Usar el prompt del rack"
+            "value" : "Usar este LoRA"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Utiliser le prompt du rack"
+            "value" : "Utiliser cette LoRA"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Usa il prompt del rack"
+            "value" : "Usa questa LoRA"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ラックのプロンプトを使う"
+            "value" : "このLoRAを使う"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "使用机架中的提示词"
+            "value" : "使用此 LoRA"
           }
         }
       }
@@ -43869,6 +42882,46 @@
         }
       }
     },
+    "Without a role, or with one this model lacks: give it a role in the Prompt Lab" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ohne Rolle oder mit einer, die dieses Modell nicht hat: Gib ihm im Prompt-Labor eine Rolle"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sin función, o con una que este modelo no tiene: dale una función en el laboratorio de prompts"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sans rôle, ou avec un rôle que ce modèle n’a pas : donnez-lui un rôle dans l’atelier"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Senza ruolo, o con uno che questo modello non ha: dagli un ruolo nel laboratorio dei prompt"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "役割がないか、このモデルにない役割です：プロンプトラボで役割を与えてください"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有角色，或角色是此模型没有的：在提示词实验室中为它指定角色"
+          }
+        }
+      }
+    },
     "Working on the library of “%@”" : {
       "localizations" : {
         "de" : {
@@ -44069,46 +43122,6 @@
         }
       }
     },
-    "Write for" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Schreiben für"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Escribir para"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Écrire pour"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Scrivi per"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "対象モデル"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "撰写对象"
-          }
-        }
-      }
-    },
     "Write for %@" : {
       "localizations" : {
         "de" : {
@@ -44189,46 +43202,6 @@
         }
       }
     },
-    "Writer: %@" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Textmodell: %@"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Redactor: %@"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Rédacteur : %@"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Redattore: %@"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ライター：%@"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "写作模型：%@"
-          }
-        }
-      }
-    },
     "Writes what the image shows into the text, at the caret." : {
       "localizations" : {
         "de" : {
@@ -44305,6 +43278,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在书写…"
+          }
+        }
+      }
+    },
+    "Written in the Prompt Lab, under the image (⌥⌘L)" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wird im Prompt-Labor unter dem Bild geschrieben (⌥⌘L)"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Se escribe en el laboratorio de prompts, bajo la imagen (⌥⌘L)"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "S’écrit dans l’atelier, sous l’image (⌥⌘L)"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Si scrive nel laboratorio dei prompt, sotto l’immagine (⌥⌘L)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "画像の下のプロンプトラボで書きます（⌥⌘L）"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在图像下方的提示词实验室中输入（⌥⌘L）"
           }
         }
       }
@@ -46593,6 +45606,46 @@
         }
       }
     },
+    "from the Prompt Lab" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "aus dem Prompt-Labor"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "del laboratorio de prompts"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "de l’atelier"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "dal laboratorio dei prompt"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "プロンプトラボから"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "来自提示词实验室"
+          }
+        }
+      }
+    },
     "g%@ is not the exploration shown (%@): a new one replaces the last" : {
       "localizations" : {
         "de" : {
@@ -46955,46 +46008,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "来自历史记录的图像（种子 %@）"
-          }
-        }
-      }
-    },
-    "image from the lab" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Bild aus dem Labor"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "imagen del laboratorio"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "image de l’atelier"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "immagine del laboratorio"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ラボの画像"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "来自实验室的图像"
           }
         }
       }
@@ -48281,6 +47294,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "历史记录中没有图像“%@”"
+          }
+        }
+      }
+    },
+    "no image %@ in the Prompt Lab" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "kein Bild %@ im Prompt-Labor"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "no hay imagen %@ en el laboratorio de prompts"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "pas d’image %@ dans l’atelier"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "nessuna immagine %@ nel laboratorio dei prompt"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "プロンプトラボに画像%@はありません"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "提示词实验室中没有图像 %@"
           }
         }
       }
@@ -51743,6 +50796,46 @@
         }
       }
     },
+    "to write in the Prompt Lab" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "im Prompt-Labor zu schreiben"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "por escribir en el laboratorio de prompts"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "à écrire dans l’atelier"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "da scrivere nel laboratorio dei prompt"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "プロンプトラボで書きます"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在提示词实验室中输入"
+          }
+        }
+      }
+    },
     "tokenizer %@ · encoder %@" : {
       "localizations" : {
         "de" : {
@@ -53219,6 +52312,52 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "“%@”想要卸载 %@。"
+          }
+        }
+      }
+    },
+    "“%@”: no effect with %@" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "„%@“: ohne Wirkung mit %@"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "“%1$@”: no effect with %2$@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "«%@»: sin efecto con %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "« %@ » : sans effet avec %@"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "«%@»: senza effetto con %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「%@」：%@では効果なし"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@”：对 %@ 无效"
           }
         }
       }

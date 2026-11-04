@@ -28,7 +28,7 @@ package enum RemoteControlHelp {
     /// The topics in reading order (`help all` follows it).
     static let order = ["contract", "open", "models", "install", "add", "grid", "edit", "wait", "status", "follow",
                         "cancel", "clear", "set", "history", "save", "vary", "enlarge", "crop", "again", "remove", "undo", "finish", "rewrite", "describe",
-                        "start-image", "subjects", "import", "uninstall", "macs", "library", "diagnose", "measure", "errors", "recipes"]
+                        "start-image", "lab", "subjects", "import", "uninstall", "macs", "library", "diagnose", "measure", "errors", "recipes"]
     static let aliases = ["examples": "recipes", "reuse": "again", "sheet": "finish", "compute": "macs"]
 
     /// French when the user puts it before English. Not `Bundle.main.preferredLocalizations`: the app's
@@ -124,7 +124,8 @@ package enum RemoteControlHelp {
       rewrite "<text>" [--for ID]              the Prompt Lab's Rewrite: a prompt rewritten for a model → its text
       describe <image|i7> [--for ID]           the Prompt Lab's Describe: an image told as a prompt → its text
       start-image [<image|i7>] [--strength S] · start-image --remove
-                                               the rack's starting image (img2img), as the Prompt Lab carries it
+                                               the starting image (img2img): an image of the Prompt Lab, and its strength
+      lab [open|close] · lab add|role|remove … the Prompt Lab: its images, a role each; folded or not
       remove i7 [i8 …]                         Remove from History · undo [--redo]: ⌘Z, ⇧⌘Z
       again <i7|file.png> · reuse <i7|file.png> Render Again (Same Seed) · Reuse These Settings (an image, or a PNG of another day)
       crop i7 --box X,Y,W,H | --ratio P:Q      Crop… → a new image (i8)
@@ -800,18 +801,52 @@ package enum RemoteControlHelp {
         not in the history).
         """,
 
+        "lab": """
+        silicontrol lab [open|close]
+        silicontrol lab add <image|i7> …
+        silicontrol lab role <n> edited|reference|start|none
+        silicontrol lab remove <n>
+
+        THE PROMPT LAB — the bar under the image, where the next render's text and images are prepared:
+        what a drop on the canvas, ⌘V, « Send to the Prompt Lab » and the role menus of its images do. Its
+        text is the rack's prompt (add and reuse write it); its images are numbered as the bar shows
+        them, from 1.
+
+          lab                          what it holds: folded or not, the text, the images and their roles
+          lab open · lab close         unfolds or folds the bar (⌥⌘L); folding stops a Rewrite or a Describe
+                                       under way and gives the writer's memory back
+          lab add IMAGE|i7 …           files, or images of the history: each takes the role a newcomer
+                                       takes — the next place under Qwen-Image-2.1 (edited, then references,
+                                       three at most with the subjects the text cites), none elsewhere
+          lab role N ROLE              edited · reference (Qwen-Image-2.1) · start (Z-Image, Anima, Krea 2,
+                                       MOSS-Image: the render starts from it, the size takes the model's
+                                       format nearest its proportions) · none. One image to edit and one
+                                       start: choosing another sends the previous image to edit to the
+                                       references, the previous start to none.
+          lab remove N                 takes image N out
+
+        A CHANGE OF MODEL never gives a role, nor turns one into another: a reference keeps its role under
+        Z-Image, without effect ("used": false), and works again back on Qwen-Image-2.1. "unused" counts
+        what the next render will not read, as the line under Generate does.
+
+        ANSWER
+          {"ok": true, "lab": {"unfolded": false, "model": "qwen-image-2.1", "text": "@alice on the quay",
+            "images": [{"n": 1, "name": "quay.jpg", "width": 1536, "height": 1024, "role": "edited",
+                        "used": true}], "unused": 0}}
+        """,
+
         "start-image": """
         silicontrol start-image [<image|i7>] [--strength S]
         silicontrol start-image --remove
 
-        THE RACK'S STARTING IMAGE (img2img) — what the Prompt Lab's « Carry to the Rack » puts in the rack's
-        Images box when a picture is the starting image, and what that box retouches. Only for a model that
-        starts from an image ("start_image": true in « models »: Z-Image, Anima, Krea 2). Qwen-Image-2.1
-        edits by reference instead (--ref, help edit).
+        THE STARTING IMAGE (img2img) — an image of the Prompt Lab given the start's role (« Start From This
+        Image », or « lab role N start »), and its strength, a setting of the rack. Only for a model that
+        starts from an image ("start_image": true in « models »: Z-Image, Anima, Krea 2, MOSS-Image).
+        Qwen-Image-2.1 edits by reference instead (--ref, help edit).
 
           start-image                  what the rack holds
-          start-image IMAGE|i7         carries an image (a file, or an image of the history): the next
-                                       renders start from it. The size is set to the model's format
+          start-image IMAGE|i7         brings an image into the lab as the start (a file, or an image of the
+                                       history): the next renders start from it. The size is set to the model's format
                                        nearest its proportions, at the rack's scale — and stays free.
           … --strength S               with it, its strength; alone, retouches the one carried
           start-image --remove         takes it out: the next renders start from noise
@@ -1292,7 +1327,8 @@ package enum RemoteControlHelp {
       rewrite "<texte>" [--for ID]             « Réécrire » de l'Atelier : un prompt réécrit pour un modèle → son texte
       describe <image|i7> [--for ID]           « Décrire » de l'Atelier : une image racontée en prompt → son texte
       start-image [<image|i7>] [--strength S] · start-image --remove
-                                               l'image de départ du rack (img2img), comme l'Atelier la porte
+                                               l'image de départ (img2img) : une image de l'Atelier, et sa force
+      lab [open|close] · lab add|role|remove … l'Atelier : ses images, un rôle chacune ; replié ou non
       remove i7 [i8 …]                         Retirer de l'historique · undo [--redo] : ⌘Z, ⇧⌘Z
       again <i7|fichier.png> · reuse <i7|fichier.png> Rendre à nouveau (même graine) · Reprendre ces réglages (une image, ou un PNG d'un autre jour)
       crop i7 --box X,Y,W,H | --ratio P:Q      Recadrer… → une nouvelle image (i8)
@@ -1981,18 +2017,53 @@ package enum RemoteControlHelp {
         n'est pas dans l'historique).
         """,
 
+        "lab": """
+        silicontrol lab [open|close]
+        silicontrol lab add <image|i7> …
+        silicontrol lab role <n> edited|reference|start|none
+        silicontrol lab remove <n>
+
+        L'ATELIER — la barre sous l'image, où se préparent le texte et les images du prochain rendu : ce que
+        font un dépôt sur le canevas, ⌘V, « Envoyer à l'atelier » et les menus de rôle de ses images. Son
+        texte est le prompt du rack (add et reuse l'écrivent) ; ses images sont numérotées comme la
+        barre les montre, à partir de 1.
+
+          lab                          ce qu'il tient : replié ou non, le texte, les images et leurs rôles
+          lab open · lab close         déplie ou replie la barre (⌥⌘L) ; replier arrête un Réécrire ou un
+                                       Décrire en cours et rend la mémoire du rédacteur
+          lab add IMAGE|i7 …           des fichiers, ou des images de l'historique : chacune prend le rôle
+                                       d'une arrivante — la place suivante sous Qwen-Image-2.1 (éditée, puis
+                                       références, trois au plus avec les sujets que cite le texte), aucun
+                                       ailleurs
+          lab role N RÔLE              edited (à éditer) · reference (Qwen-Image-2.1) · start (Z-Image,
+                                       Anima, Krea 2, MOSS-Image : le rendu part d'elle, la taille prend le
+                                       format du modèle le plus proche de ses proportions) · none (aucun).
+                                       Une image à éditer et un départ : en choisir une autre envoie la
+                                       précédente image à éditer aux références, le départ précédent à aucun.
+          lab remove N                 retire l'image N
+
+        UN CHANGEMENT DE MODÈLE ne donne jamais de rôle et n'en change aucun en un autre : une référence
+        garde son rôle sous Z-Image, sans effet ("used": false), et resert de retour sous Qwen-Image-2.1.
+        "unused" compte ce que le prochain rendu ne lira pas, comme la ligne sous Générer.
+
+        RÉPONSE
+          {"ok": true, "lab": {"unfolded": false, "model": "qwen-image-2.1", "text": "@alice on the quay",
+            "images": [{"n": 1, "name": "quai.jpg", "width": 1536, "height": 1024, "role": "edited",
+                        "used": true}], "unused": 0}}
+        """,
+
         "start-image": """
         silicontrol start-image [<image|i7>] [--strength S]
         silicontrol start-image --remove
 
-        L'IMAGE DE DÉPART DU RACK (img2img) — ce que « Porter dans le rack » de l'Atelier met dans la boîte
-        Images du rack quand une image a le rôle de départ, et ce que cette boîte retouche. Seulement pour
-        un modèle qui part d'une image ("start_image": true dans « models » : Z-Image, Anima, Krea 2).
+        L'IMAGE DE DÉPART (img2img) — une image de l'Atelier à qui on donne le rôle de départ (« Partir de
+        cette image », ou « lab role N start »), et sa force, un réglage du rack. Seulement pour un modèle
+        qui part d'une image ("start_image": true dans « models » : Z-Image, Anima, Krea 2, MOSS-Image).
         Qwen-Image-2.1 édite par référence à la place (--ref, help edit).
 
           start-image                  ce que le rack tient
-          start-image IMAGE|i7         porte une image (un fichier, ou une image de l'historique) : les
-                                       rendus suivants partent d'elle. La taille prend le format du
+          start-image IMAGE|i7         met une image dans l'Atelier comme départ (un fichier, ou une image de
+                                       l'historique) : les rendus suivants partent d'elle. La taille prend le format du
                                        modèle le plus proche de ses proportions, à l'échelle du rack —
                                        et reste libre.
           … --strength S               avec elle, sa force ; seul, retouche celle de l'image portée
@@ -2021,7 +2092,7 @@ package enum RemoteControlHelp {
         "subjects": """
         SUJETS NOMMÉS — silicontrol subjects [add … | remove NOM]
 
-        La même bibliothèque que celle du Labo (Fenêtre → Atelier de prompts). Un sujet est une image (ou deux du même sujet) avec un nom, un genre et
+        La même bibliothèque que celle de l'atelier (Fenêtre → Atelier de prompts). Un sujet est une image (ou deux du même sujet) avec un nom, un genre et
         un cadre ; le prompt le cite par @nom, et ses images vont au modèle comme références, après
         celles des --ref. Un modèle qui lit les images seulement (Qwen-Image-2.1) ; 3 images au plus
         par rendu. En mémoire dans l'app, comme l'historique : les sujets partent quand l'app quitte

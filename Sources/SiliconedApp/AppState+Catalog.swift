@@ -81,6 +81,8 @@ extension AppState {
         case .failure(let e): return Problem(e).text
         case .success(let a): n = a.count
         }
+        // An unknown `@name`, too many images, a mention inside a group: said before the click (`LabInputs.carry`).
+        if case .failure(let refusal) = carried { return refusal.sentence }
         if file.count >= Self.maxQueueLength { return String(localized: "The queue is full.") }
         if file.count + n > Self.maxQueueLength {
             let room = Self.maxQueueLength - file.count
@@ -215,10 +217,11 @@ extension AppState {
     func modelName(_ identifier: String) -> String { cards.first { $0.id == identifier }?.name ?? identifier }
 
     /// The LoRAs the render will take, in the stack's order — what a LoRA axis indexes.
-    var activeLoRAs: [LoRASlot] { loras.filter { !$0.path.isEmpty } }
+    /// The LoRAs a render takes: chosen, and switched on.
+    var activeLoRAs: [LoRASlot] { loras.filter { !$0.path.isEmpty && $0.on } }
 
-    /// The exploration prompt's `{…}` groups — what the grid's axes offer (none when it does not parse).
-    var promptGroups: [[String]] { (try? PromptAlternatives(explorePrompt, limit: .max).groups) ?? [] }
+    /// The prompt's `{…}` groups — what the grid's axes offer (none when it does not parse).
+    var promptGroups: [[String]] { (try? PromptAlternatives(prompt, limit: .max).groups) ?? [] }
 
     /// A LoRA as the user knows it: its card's name, or its short name.
     func loraName(_ path: String) -> String { loraCard(path)?.name ?? RemoteControl.shortName(path) }
@@ -231,7 +234,7 @@ extension AppState {
         let stack = models ? [] : activeLoRAs
         return Result { () throws(EngineError) in
             guard let x = try gridX.axis(stack: stack) else { throw .gridRefused(reason: .emptyAxis) }
-            let g = try RenderGrid(.init(prompt: explorePrompt, seed: seed, steps: steps,
+            let g = try RenderGrid(.init(prompt: prompt, seed: seed, steps: steps,
                                          loraStrengths: stack.map(\.strength), images: references.count),
                                    x: x, y: try gridY.axis(stack: stack))
             guard !refusesNegativeStrength(g) else { throw .gridRefused(reason: .invalidValue) }
@@ -252,10 +255,10 @@ extension AppState {
     }
 
     /// **The exploration's form takes a grid** — a sheet's settings reused, or a grid the remote
-    /// control queued: its prompt as typed, its axes.
+    /// control queued: its prompt as typed, its groups unescaped (they are the grid's axes), its axes.
     func setGridForm(_ g: RenderGrid, prompt typed: String) {
         let stack = activeLoRAs
-        explorePrompt = typed
+        prompt = typed
         gridX = GridAxisForm(g.x, stack: stack)
         gridY = GridAxisForm(g.y, stack: stack)
     }
@@ -270,7 +273,7 @@ extension AppState {
     /// **What the render will cost as it is set**, if it has already been measured in the session at
     /// this format: never a constant, never another machine.
     var plannedCost: Double? {
-        let withLoRA = loras.contains { !$0.path.isEmpty }
+        let withLoRA = !activeLoRAs.isEmpty
         let format = outputFormat
         let images = sentImages
         guard let v = speeds[Speed.key(identifier, format, references: images, lora: withLoRA)] else { return nil }
@@ -283,7 +286,7 @@ extension AppState {
     /// **One stage's share of that cost**, per image — what the rack writes under each box. Learned
     /// like the whole (`speeds`): `nil` until this model has rendered at this size in the session.
     func stageEstimate(_ stage: Engine.Stage) -> Double? {
-        let withLoRA = loras.contains { !$0.path.isEmpty }
+        let withLoRA = !activeLoRAs.isEmpty
         let format = outputFormat
         let images = sentImages
         guard let v = speeds[Speed.key(identifier, format, references: images, lora: withLoRA)] else { return nil }
@@ -318,8 +321,8 @@ extension AppState {
         let valid = Set(compatibleLoras.map(\.path))
         loras.removeAll { !$0.path.isEmpty && !valid.contains($0.path) }
         steps = card?.defaultSteps ?? 8
-        if references.count > maxReferences { references = Array(references.prefix(maxReferences)) }
-        if !startsFromImage { startImage = nil }
+        // A role the new model does not offer becomes neutral, never another: the image stays, waiting (`LabInputs.conforming`).
+        conformInputs()
         // A size typed by hand stays while the new model takes it (`Format.check(…, family:)`: Qwen-Image-2.1
         // wants multiples of 32, Anima 2048 px a side at most) — and this Mac's memory, or the footer
         // says so and offers the largest that fits.

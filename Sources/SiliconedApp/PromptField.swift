@@ -4,6 +4,9 @@
 //     drawn      woman posing with (▣ alice) in (▣ red-coat) and @bob
 //                                  └ lavender   └ lavender       └ unknown: dotted underline
 //
+// **Greyed where the model does not read it** (`inert`): under a model that takes no image, a chip is drawn grey, its
+// thumbnail faded, and its hover says why — the render leaves it out, the text keeps it for when the model reads it again.
+//
 // **The text stays text.** A chip is the characters `@alice`, styled — not an attachment: copying gives
 // `@alice`, pasting `@alice` makes a chip, the caret and the selection go through it as through a word,
 // undo is the text's, and VoiceOver reads what is written. The `@` is not drawn: its advance is widened
@@ -25,6 +28,8 @@ import SwiftUI
 extension NSAttributedString.Key {
     /// A known subject's chip: `<kind>:<key>` (`NamedSubjects.key`), read by the layout manager.
     static let subjectChip = NSAttributedString.Key("SiliconedSubjectChip")
+    /// A chip the model does not read: drawn grey (`PromptField.inert`).
+    static let subjectChipInert = NSAttributedString.Key("SiliconedSubjectChipInert")
 }
 
 /// **The field, for SwiftUI**: the same font as a `TextEditor`.
@@ -34,6 +39,8 @@ struct PromptField: NSViewRepresentable {
     @Binding var focused: Bool
     /// Off while the writer writes: the text it will replace does not move under it.
     var editable = true
+    /// Why the chips do not go (« Z-Image Turbo does not read subjects »), or `nil`: they are drawn grey, saying it.
+    var inert: String? = nil
 
     func makeCoordinator() -> Coordinator { Coordinator(text: $text, subjects: subjects, focused: $focused) }
 
@@ -88,6 +95,10 @@ struct PromptField: NSViewRepresentable {
         // rewrite), a subject created, renamed or deleted.
         let text = self.text, version = subjects.version
         if view.isEditable != editable { view.isEditable = editable }
+        if c.inert != inert, !view.hasMarkedText() {
+            c.inert = inert
+            c.restyle()
+        }
         if view.string != text, !view.hasMarkedText() {
             // Through the text system, as a paste would be: one undo step. `string =` would leave the
             // undo stack holding ranges of the old text — ⌘Z would then undo into the wrong place.
@@ -122,6 +133,7 @@ struct PromptField: NSViewRepresentable {
         var focused: Binding<Bool>
         weak var view: PromptTextView?
         var styledVersion = -1
+        var inert: String?
         let completion = SubjectCompletion()
 
         init(text: Binding<String>, subjects: SubjectLibrary, focused: Binding<Bool>) {
@@ -171,7 +183,10 @@ struct PromptField: NSViewRepresentable {
                 if let s = subjects.subject(named: m.name) {
                     names.append(contentsOf: s.name.split(whereSeparator: { $0 == "-" || $0 == "_" }).map(String.init))
                     storage.addAttributes([.subjectChip: "\(s.kind.rawValue):\(s.id)",
-                                           .toolTip: "@\(s.name) — \(s.kind.label)"], range: r)
+                                           .toolTip: "@\(s.name) — \(inert ?? s.kind.label)"], range: r)
+                    if inert != nil {
+                        storage.addAttributes([.subjectChipInert: true, .foregroundColor: NSColor.tertiaryLabelColor], range: r)
+                    }
                     // The `@`, not drawn: its advance makes the thumbnail's room.
                     storage.addAttributes([.foregroundColor: NSColor.clear, .kern: PromptStyle.atKern],
                                           range: NSRange(location: r.location, length: 1))
@@ -313,7 +328,7 @@ final class SubjectLayoutManager: NSLayoutManager {
     var thumbnail: ((String) -> NSImage?)?
 
     override func drawBackground(forGlyphRange glyphsToShow: NSRange, at origin: NSPoint) {
-        chips(in: glyphsToShow, at: origin) { rect, _, color, _ in
+        chips(in: glyphsToShow, at: origin) { rect, _, color, _, _ in
             color.withAlphaComponent(0.14).setFill()
             NSBezierPath(roundedRect: rect, xRadius: rect.height / 2, yRadius: rect.height / 2).fill()
         }
@@ -322,7 +337,7 @@ final class SubjectLayoutManager: NSLayoutManager {
 
     override func drawGlyphs(forGlyphRange glyphsToShow: NSRange, at origin: NSPoint) {
         super.drawGlyphs(forGlyphRange: glyphsToShow, at: origin)
-        chips(in: glyphsToShow, at: origin) { rect, key, color, first in
+        chips(in: glyphsToShow, at: origin) { rect, key, color, first, inert in
             let edge = NSBezierPath(roundedRect: rect.insetBy(dx: 0.5, dy: 0.5), xRadius: rect.height / 2 - 0.5, yRadius: rect.height / 2 - 0.5)
             edge.lineWidth = 1
             color.setStroke()
@@ -337,7 +352,7 @@ final class SubjectLayoutManager: NSLayoutManager {
                 let s = max(side / image.size.width, side / image.size.height)
                 let w = image.size.width * s, h = image.size.height * s
                 image.draw(in: NSRect(x: box.midX - w / 2, y: box.midY - h / 2, width: w, height: h),
-                           from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil)
+                           from: .zero, operation: .sourceOver, fraction: inert ? 0.35 : 1, respectFlipped: true, hints: nil)
             } else {
                 color.withAlphaComponent(0.5).setFill()
                 box.fill()
@@ -348,15 +363,16 @@ final class SubjectLayoutManager: NSLayoutManager {
 
     /// Each chip's rectangles in the glyphs shown (a chip that wraps has one per line), centered on
     /// the text's line whatever the line spacing.
-    private func chips(in glyphs: NSRange, at origin: NSPoint, _ draw: (NSRect, String, NSColor, Bool) -> Void) {
+    private func chips(in glyphs: NSRange, at origin: NSPoint, _ draw: (NSRect, String, NSColor, Bool, Bool) -> Void) {
         guard let storage = textStorage, let container = textContainers.first else { return }
         let characters = characterRange(forGlyphRange: glyphs, actualGlyphRange: nil)
         let font = PromptStyle.font
-        var found: [(NSRect, String, NSColor, Bool)] = []
+        var found: [(NSRect, String, NSColor, Bool, Bool)] = []
         storage.enumerateAttribute(.subjectChip, in: characters) { value, range, _ in
             guard let tag = value as? String, let colon = tag.firstIndex(of: ":") else { return }
             let key = String(tag[tag.index(after: colon)...])
-            let color = (NamedSubjects.Kind(rawValue: String(tag[..<colon])) ?? .person).nsColor
+            let inert = storage.attribute(.subjectChipInert, at: range.location, effectiveRange: nil) != nil
+            let color = inert ? NSColor.secondaryLabelColor : (NamedSubjects.Kind(rawValue: String(tag[..<colon])) ?? .person).nsColor
             let glyphRange = glyphRange(forCharacterRange: range, actualCharacterRange: nil)
             var first = true
             enumerateLineFragments(forGlyphRange: glyphRange) { lineRect, _, _, lineGlyphs, _ in
@@ -367,11 +383,11 @@ final class SubjectLayoutManager: NSLayoutManager {
                 let top = baseline - font.ascender - 2, bottom = baseline - font.descender + 2
                 let rect = NSRect(x: bounds.minX + origin.x, y: top + origin.y,
                                   width: bounds.width, height: bottom - top)
-                found.append((rect, key, color, first))
+                found.append((rect, key, color, first, inert))
                 first = false
             }
         }
-        for (rect, key, color, first) in found { draw(rect, key, color, first) }
+        for (rect, key, color, first, inert) in found { draw(rect, key, color, first, inert) }
     }
 }
 

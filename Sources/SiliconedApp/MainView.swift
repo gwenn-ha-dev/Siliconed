@@ -94,22 +94,42 @@ private let canvasBackground = Color(nsColor: NSColor(name: nil) { appearance in
 
 // MARK: - The canvas
 
+/// **The canvas**: the image, the Prompt Lab's bar under it (unfolded, a glass plate over the image), the history in a column on the right.
 private struct GraphCanvas: View {
     @Bindable var app: AppState
 
     var body: some View {
-        VStack(spacing: 0) {
-            if app.showsExploration, let run = app.explored {
-                ExplorationCanvas(app: app, run: run)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                SceneView(app: app)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            }
+        HStack(spacing: 0) {
+            stage
             if !app.history.isEmpty || app.explored != nil {
+                Divider()
                 Banner(app: app)
             }
         }
+    }
+
+    private var stage: some View {
+        let lab = LabModel.shared
+        return VStack(spacing: 0) {
+            Group {
+                if app.showsExploration, let run = app.explored {
+                    ExplorationCanvas(app: app, run: run)
+                } else {
+                    SceneView(app: app)
+                }
+            }
+            .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+            .clipped()
+            // A click on the image folds the bar — not while the writer writes, which folding would stop.
+            .simultaneousGesture(TapGesture().onEnded { if lab.unfolded, !lab.isWriting { lab.fold() } })
+            // The folded line's room: it never covers the image. Unfolded, the bar rises over the image from there — in the
+            // layout, it summed its height to the image's, and the window grew past the screen, the rack cut at both ends.
+            Color.clear.frame(height: LabView.foldedRoom)
+        }
+        .overlay(alignment: .bottom) {
+            LabView(model: lab).padding(.horizontal, 16).padding(.bottom, 12)
+        }
+        .animation(Motion.pick(.spring(duration: 0.3)), value: lab.unfolded)
         .background(canvasBackground)
         .overlay(alignment: .top) {
             if let toast = app.toast {
@@ -122,19 +142,13 @@ private struct GraphCanvas: View {
             }
         }
         .animation(Motion.pick(.spring(duration: 0.3)), value: app.toast)
-        // A PNG Siliconed wrote brings back its settings — the canvas is where an image is opened.
-        // Any other image keeps the canvas's meaning: an edit's reference when the model edits
-        // (to edit a Siliconed image, drop it on the rack's « Images » box, or « Edit This Image »).
-        .dropDestination(for: URL.self) { urls, _ in
-            let images = urls.filter { !AppState.importable($0) }
-            if images.count == 1, app.restoreSettings(fromPNG: images[0]) { return true }
-            guard app.editingPossible, !images.isEmpty else {
-                if images.count == 1, images[0].pathExtension.lowercased() == "png" {
-                    app.flash(String(localized: "No Siliconed settings in this image"))
-                }
-                return false
-            }
-            app.addReferences(images)
+        // An image dropped on the canvas goes to the Prompt Lab, as any image: the role a newcomer takes there. A PNG
+        // Siliconed wrote no longer brings its settings back by itself — « Reuse These Settings » is on its tile's menu.
+        .dropDestination(for: DroppedImage.self) { items, _ in
+            let images = items.filter { if case .file(let url) = $0 { !AppState.importable(url) } else { true } }
+            guard !images.isEmpty else { return false }
+            for image in images { lab.load(image) }
+            lab.unfold()
             return true
         }
     }

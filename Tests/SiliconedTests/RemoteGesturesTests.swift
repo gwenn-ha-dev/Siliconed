@@ -9,6 +9,31 @@ final class RemoteGesturesTests: XCTestCase {
         return nil
     }
 
+    // ── The Prompt Lab ─────────────────────────────────────────────────────────────────────
+
+    /// `lab`: what it holds, fold or unfold it, images in, a role by its word, an image out — numbered from 1.
+    func testTheLabReadsItsGesturesAndItsRoles() {
+        XCTAssertEqual(parse("lab", []), .lab(.status))
+        XCTAssertEqual(parse("lab", ["open"]), .lab(.unfold))
+        XCTAssertEqual(parse("lab", ["close"]), .lab(.fold))
+        XCTAssertEqual(parse("lab", ["add", "a.jpg", "i7"]), .lab(.add(["a.jpg", "i7"])))
+        XCTAssertEqual(parse("lab", ["role", "2", "reference"]), .lab(.role(image: 2, .reference)))
+        XCTAssertEqual(parse("lab", ["role", "1", "none"]), .lab(.role(image: 1, .neutral)))
+        XCTAssertEqual(parse("lab", ["role", "1", "Start"]), .lab(.role(image: 1, .start)))
+        XCTAssertEqual(parse("lab", ["remove", "3"]), .lab(.remove(image: 3)))
+        // Each role's word reads back as itself.
+        for role in LabInputs.Role.allCases {
+            XCTAssertEqual(GestureOrder.LabAction.role(named: GestureOrder.LabAction.name(role)), role)
+        }
+        XCTAssertEqual(GestureOrder.parse("lab", ["role", "0", "edited"]), .failure(.badValue("image", "0")))
+        XCTAssertEqual(GestureOrder.parse("lab", ["role", "1", "neutral"]), .failure(.badValue("role", "neutral")))
+        XCTAssertEqual(GestureOrder.parse("lab", ["remove", "x"]), .failure(.badValue("image", "x")))
+        for arguments in [["add"], ["open", "now"], ["role", "1"], ["remove"], ["fold"]] {
+            XCTAssertEqual(GestureOrder.parse("lab", arguments), .failure(.usage(GestureOrder.usage("lab"))), "\(arguments)")
+        }
+        XCTAssertEqual(GestureOrder.parse("lab", ["--yes"]), .failure(.unknownFlag("--yes")))
+    }
+
     // ── Naming a cell ──────────────────────────────────────────────────────────────────────
 
     func testACellIsAGridAndARankOrItsJob() {

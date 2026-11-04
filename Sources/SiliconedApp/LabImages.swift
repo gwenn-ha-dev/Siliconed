@@ -1,20 +1,18 @@
-// **The Prompt Lab's Images zone**: a library of images, as long as one wants, each with its role.
+// **The Prompt Lab's images**, in a row under the text: the rack's (`AppState.inputs`), each with its role, then the subjects.
 //
-//     Images
-//     ┌──────────────┐ ┌──────────────┐ ┌──────────────┐ ┌────────┐
-//     │ ▣ 1        × │ │ ▣ 2        × │ │ ▣ 3  ×2    × │ │        │   a number: the place the rack will give it
-//     │ 1 · Start  ▾ │ │ 2 · Reference▾│ │ (▣ @alice)   │ │   +    │   a role menu — the model aimed at offers only
-//     │ Describe Beta│ │ Describe Beta│ │ Describe Beta│ │        │   the roles it can use
-//     │ Name…        │ │ Name…        │ │ Edit…        │ └────────┘
-//     └──────────────┘ └──────────────┘ └──────────────┘
+//     ┌──┐ 1 · Image to Edit ▾   ┌──┐ 2 · Reference ▾   ┌──┐ 3 · @alice      ┌┄┄┐ No Role ▾        ┌┄┄┐
+//     │▣ │ Describe  Beta        │▣ │ Describe          │▣ │ Person · cited  ┊▣ ┊ 3 / 3: full     ┊+ ┊
+//     └──┘                       └──┘                   └──┘                 └┄┄┘ Describe         └┄┄┘
 //
-// A **plain image** is dropped, opened, or sent from the history; its menu says what the render makes of it
-// (`LabInputs.Role`): the starting image (image 1, which gives the format), a reference, or nothing (« describe only »).
-// For a model that starts from an image (img2img), the tile of an image to describe offers « Start From This Image », and the
-// starting image's tile carries its strength, 0 to 100 % — the rack's Images box receives both.
-// A **subject** is an image that has a name, a kind and a frame (`SubjectSheet.swift`): it goes to the render only when the
-// text cites it by `@name`, and takes the places after the images the roles send. Describe is the language model's, Name… opens
-// the sheet, × removes. Nothing is written to disk.
+// - **The edge says the role**: the image wire's lavender, full for the image the model edits or starts from, lighter for
+//   a reference or a cited subject; dashed for an image that does not go — neutral, or with a role the model lacks, which
+//   the tile says (« “Reference”: no effect with Anima »). A change of model never gives nor converts a role (`LabInputs`).
+// - **Under Qwen-Image-2.1** an image takes the next place as it comes in; its menu changes it (Image to Edit, Reference,
+//   No Role) or names it. Full (three images with the cited subjects), a newcomer comes in without a role and says so.
+// - **Under Z-Image, Anima, Krea 2, MOSS** an image comes in without a role: « Start From This Image » makes it the start
+//   (its tile then carries the rack's strength), Describe writes what it shows into the text.
+// - **Right-click**: Crop…, Replace…, Name…, Reuse These Settings (a PNG Siliconed wrote), Remove.
+// - A **subject** (`SubjectSheet.swift`) goes only when the text cites it by `@name`, after the images the roles send.
 
 import AppKit
 import Siliconed
@@ -22,11 +20,13 @@ import SwiftUI
 
 struct LabImages: View {
     @Bindable var model: LabModel
+    /// The row's own height: a horizontal scroll view takes all the height it is offered, so it is held to its tiles'.
+    @State private var rowHeight = LabTile.picture.height + 4
 
-    /// Where the rack will place each image, by the carried list's order (from 1).
-    private var numbers: (plain: [LabModel.Picture.ID: Int], subjects: [String: [Int]]) {
-        guard case .carries(let carry) = model.receipt.outcome else { return ([:], [:]) }
-        var plain: [LabModel.Picture.ID: Int] = [:]
+    /// Where the render will place each image, by the carried list's order (from 1).
+    private var numbers: (plain: [InputImage.ID: Int], subjects: [String: [Int]]) {
+        guard case .success(let carry) = model.rack.carried else { return ([:], [:]) }
+        var plain: [InputImage.ID: Int] = [:]
         var subjects: [String: [Int]] = [:]
         for (i, image) in carry.images.enumerated() {
             switch image {
@@ -39,10 +39,9 @@ struct LabImages: View {
 
     var body: some View {
         let numbers = numbers
-        VStack(alignment: .leading, spacing: 6) {
-            Text("Images").font(.callout.weight(.semibold))
+        VStack(alignment: .leading, spacing: 4) {
             ScrollView(.horizontal) {
-                HStack(alignment: .top, spacing: 8) {
+                HStack(alignment: .top, spacing: 14) {
                     ForEach(model.pictures) { picture in
                         PictureTile(model: model, picture: picture, number: numbers.plain[picture.id])
                     }
@@ -52,7 +51,9 @@ struct LabImages: View {
                     addTile
                 }
                 .padding(.vertical, 2)
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { rowHeight = $0 }
             }
+            .frame(height: rowHeight)
             .scrollIndicators(.automatic)
             Text(hint).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
         }
@@ -60,9 +61,11 @@ struct LabImages: View {
 
     private var hint: LocalizedStringKey {
         if model.startIsImg2Img {
-            return model.pictures.isEmpty
-                ? "Drop an image here to describe it, or to start the render from it."
-                : "The render can start from one image: it keeps its composition, the strength says how far it moves away. The others stay here, to be described."
+            switch model.pictures.count {
+            case 0: return "Drop an image here to describe it, or to start the render from it."
+            case 1: return "The render can start from one image: it keeps its composition, the strength says how far it moves away."
+            default: return "The render can start from one image: it keeps its composition, the strength says how far it moves away. The others stay here, to be described."
+            }
         }
         if model.capacity == 0 {
             return "This model does not read images: they stay here, to be described."
@@ -82,45 +85,41 @@ struct LabImages: View {
                 .strokeBorder(style: StrokeStyle(lineWidth: 1.25, dash: [4, 3]))
                 .foregroundStyle(WireKind.image.color.opacity(0.7))
                 .overlay(Image(systemName: "plus").foregroundStyle(WireKind.image.color))
-                .frame(width: LabTile.width, height: LabTile.picture)
+                .frame(width: LabTile.picture.width, height: LabTile.picture.height)
                 .contentShape(Rectangle())
         }
         .menuStyle(.button).buttonStyle(.plain).menuIndicator(.hidden)
-        .help("Open images — or drop them here, or send one from the history (Open in the Prompt Lab)")
+        .help("Open images — or drop them here, or send one from the history (Send to the Prompt Lab)")
         .accessibilityLabel(Text("Add an Image"))
     }
 }
 
 enum LabTile {
-    static let width: CGFloat = 132
-    static let picture: CGFloat = 92
-}
+    static let picture = CGSize(width: 48, height: 64)
+    static let meta: CGFloat = 150
 
-/// The place the rack gives an image, drawn on its corner.
-private struct NumberBadge: View {
-    let text: String
-    var body: some View {
-        Text(verbatim: text).font(.caption.weight(.semibold)).monospacedDigit()
-            .padding(.horizontal, 6).padding(.vertical, 1)
-            .background(Capsule().fill(.regularMaterial))
-            .overlay(Capsule().strokeBorder(Palette.lavender, lineWidth: 1))
-            .padding(4)
+    /// The edge of a tile's picture: the image wire's colour, full for the image the render edits or starts from, lighter
+    /// for a reference or a subject; dashed for what does not go.
+    @ViewBuilder static func edge(goes: Bool, main: Bool) -> some View {
+        let shape = RoundedRectangle(cornerRadius: 6, style: .continuous)
+        if goes {
+            shape.strokeBorder(WireKind.image.color.opacity(main ? 1 : 0.6), lineWidth: 2)
+        } else {
+            shape.strokeBorder(Color.secondary.opacity(0.6), style: StrokeStyle(lineWidth: 1.5, dash: [4, 3]))
+        }
     }
 }
 
-/// « Describe », with the beta label the language model's gestures carry.
+/// « Describe »: what the image shows, written into the text.
 private struct DescribeButton: View {
     let model: LabModel
     let action: () -> Void
 
     var body: some View {
-        HStack(spacing: 4) {
-            Button("Describe", action: action)
-                .disabled(!model.canDescribe)
-                .help(model.writerPause.map { Text(verbatim: $0.sentence) } ?? Text("Writes what the image shows into the text, at the caret."))
-            BetaBadge(help: "Beta: Rewrite and Describe use a language model still being settled, and may change.")
-        }
-        .controlSize(.small)
+        Button("Describe", action: action)
+            .disabled(!model.canDescribe)
+            .help(model.writerPause.map { Text(verbatim: $0.sentence) } ?? Text("Writes what the image shows into the text, at the caret."))
+            .controlSize(.small)
     }
 }
 
@@ -128,47 +127,67 @@ private struct DescribeButton: View {
 
 private struct PictureTile: View {
     let model: LabModel
-    let picture: LabModel.Picture
+    let picture: InputImage
     let number: Int?
+    @State private var hover = false
+
+    private var rack: AppState { model.rack }
+    private var goes: Bool { rack.isEffective(picture) }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Image(nsImage: picture.thumbnail).resizable().scaledToFill()
-                .frame(width: LabTile.width, height: LabTile.picture).clipped()
+        HStack(alignment: .top, spacing: 8) {
+            Image(nsImage: picture.shown.vignette).resizable().scaledToFill()
+                .frame(width: LabTile.picture.width, height: LabTile.picture.height).clipped()
                 .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                .overlay {
-                    // The starting image of an img2img, framed in the image wire's colour: the one the render starts from.
-                    if model.startIsImg2Img, picture.role == .start {
-                        RoundedRectangle(cornerRadius: 6, style: .continuous).strokeBorder(WireKind.image.color, lineWidth: 2)
-                    }
-                }
-                .overlay(alignment: .topLeading) { if let number { NumberBadge(text: String(number)) } }
+                .overlay { LabTile.edge(goes: goes, main: picture.role == .edited || picture.role == .start) }
                 .overlay(alignment: .topTrailing) {
-                    Button { model.remove(picture) } label: {
-                        Image(systemName: "xmark.circle.fill").symbolRenderingMode(.palette)
-                            .foregroundStyle(.white, .black.opacity(0.55))
+                    if hover {
+                        Button { model.remove(picture) } label: {
+                            Image(systemName: "xmark.circle.fill").symbolRenderingMode(.palette)
+                                .foregroundStyle(.white, .black.opacity(0.55))
+                        }
+                        .buttonStyle(.plain).padding(2)
+                        .help("Remove")
+                        .accessibilityLabel(Text("Remove"))
                     }
-                    .buttonStyle(.plain).padding(4)
-                    .help("Remove")
-                    .accessibilityLabel(Text("Remove"))
                 }
                 .overlay { if model.describing == picture.id { ProgressView().controlSize(.small) } }
                 .accessibilityLabel(Text("An image of the lab"))
-            roleMenu
-            if model.startIsImg2Img {
-                if picture.role == .start { StartStrength(model: model) }
-                else {
-                    Button("Start From This Image") { model.startFrom(picture) }
-                        .controlSize(.small)
-                        .help("The render starts from this image and keeps its composition")
+            VStack(alignment: .leading, spacing: 3) {
+                if model.capacity > 0 { roleMenu } else if goes { roleLabel }
+                if let caption { Text(caption).font(.caption2).foregroundStyle(.secondary).lineLimit(2) }
+                if model.startIsImg2Img {
+                    if picture.role == .start { StartStrength(model: model) }
+                    else {
+                        Button("Start From This Image") { model.startFrom(picture) }
+                            .controlSize(.small)
+                            .help("The render starts from this image and keeps its composition")
+                    }
                 }
+                DescribeButton(model: model) { model.describe(picture) }
             }
-            DescribeButton(model: model) { model.describe(picture) }
-            Button("Name…") { model.name(picture) }
-                .buttonStyle(.link).controlSize(.small)
-                .help("Gives it a name, a kind and a frame, to cite it as @name in the text")
+            .frame(width: LabTile.meta, alignment: .leading)
         }
-        .frame(width: LabTile.width)
+        .onHover { hover = $0 }
+        .contextMenu { menu }
+    }
+
+    /// Why it does not go, when it has a role: the model lacks it. Or, without a role under Qwen, that the render is full.
+    private var caption: String? {
+        if picture.role != .neutral, !goes, let name = rack.card?.name {
+            return String(localized: "“\(picture.role.label)”: no effect with \(name)")
+        }
+        let limit = min(model.capacity, NamedSubjects.maxImages)
+        if picture.role == .neutral, limit > 0, rack.references.count >= limit {
+            return String(localized: "\(String(rack.references.count)) / \(String(limit)): full")
+        }
+        return nil
+    }
+
+    private var roleLabel: some View {
+        Text(verbatim: (number.map { "\($0) · " } ?? "") + picture.role.label)
+            .font(.caption.weight(.semibold)).foregroundStyle(goes ? WireKind.image.color : .secondary).lineLimit(1)
+            .help(picture.role.explanation(img2img: model.startIsImg2Img))
     }
 
     private var roleMenu: some View {
@@ -178,31 +197,46 @@ private struct PictureTile: View {
                     if role == picture.role { Label(role.label, systemImage: "checkmark") } else { Text(role.label) }
                 }
             }
+            Divider()
+            Button("Name…") { model.name(picture) }
         } label: {
-            Text(verbatim: (number.map { "\($0) · " } ?? "") + picture.role.label).lineLimit(1)
+            roleLabel
         }
-        .menuStyle(.button).controlSize(.small)
+        .menuStyle(.button).buttonStyle(.plain).fixedSize()
         .help(picture.role.explanation(img2img: model.startIsImg2Img))
+    }
+
+    @ViewBuilder private var menu: some View {
+        Button("Crop…") { rack.beginCrop(picture.shown) }
+            .disabled(rack.cropRefusal(width: picture.shown.width, height: picture.shown.height) != nil)
+        Button("Replace…") { rack.replaceReference(picture.shown.id) }
+        Button("Name…") { model.name(picture) }
+        if let bytes = picture.bytes, AppState.isRecipe(bytes) {
+            Button("Reuse These Settings") { _ = rack.restoreSettings(fromPNG: bytes, file: picture.shown.name) }
+        }
+        Divider()
+        Button("Remove", role: .destructive) { model.remove(picture) }
     }
 }
 
-/// **The starting image's strength, on its tile**: what it will be carried with — the rack's slider retouches it afterwards.
+/// **The starting image's strength, on its tile**: the rack's — one strength, set here or in the rack.
 private struct StartStrength: View {
-    @Bindable var model: LabModel
+    let model: LabModel
 
     var body: some View {
+        let rack = model.rack
         VStack(alignment: .leading, spacing: 1) {
             HStack {
                 Text("Strength").foregroundStyle(.secondary)
                 Spacer(minLength: 2)
-                Text(verbatim: StartWords.percent(model.startStrength)).monospacedDigit()
-                    .onTapGesture(count: 2) { model.setStartStrength(model.defaultStartStrength) }
+                Text(verbatim: StartWords.percent(rack.startStrength)).monospacedDigit()
+                    .onTapGesture(count: 2) { rack.setStartStrength(rack.defaultStartStrength) }
             }
             .font(.caption)
-            Slider(value: Binding(get: { model.startStrength }, set: { model.setStartStrength($0) }), in: 0...1)
+            Slider(value: Binding(get: { rack.startStrength }, set: { rack.setStartStrength($0) }), in: 0...1)
                 .controlSize(.mini)
                 .accessibilityLabel(Text("Strength"))
-                .accessibilityValue(Text(verbatim: StartWords.percent(model.startStrength)))
+                .accessibilityValue(Text(verbatim: StartWords.percent(rack.startStrength)))
         }
         .help(StartWords.explanation(nil))
     }
@@ -211,9 +245,10 @@ private struct StartStrength: View {
 extension LabInputs.Role {
     var label: String {
         switch self {
-        case .start: String(localized: "Starting image", comment: "The role of the image the model edits")
+        case .edited: String(localized: "Image to Edit", comment: "The role of the image the model edits")
         case .reference: String(localized: "Reference", comment: "The role of an image the model sees as context")
-        case .describeOnly: String(localized: "Describe only", comment: "The role of an image that goes nowhere")
+        case .start: String(localized: "Starting image", comment: "The role of the image an img2img starts from")
+        case .neutral: String(localized: "No Role", comment: "An image of the lab that does not go to the render")
         }
     }
 
@@ -225,9 +260,10 @@ extension LabInputs.Role {
 
     var explanation: String {
         switch self {
-        case .start: String(localized: "The image the model edits: image 1, which gives the format.")
-        case .reference: String(localized: "The model sees it as context, after the starting image.")
-        case .describeOnly: String(localized: "Stays in the lab: it is not sent to the render.")
+        case .edited: String(localized: "The image the model edits: image 1, which gives the format.")
+        case .reference: String(localized: "The model sees it as context, after the image to edit.")
+        case .start: String(localized: "The image the render starts from: it keeps its composition; the size follows it.")
+        case .neutral: String(localized: "Stays in the lab: it is not sent to the render.")
         }
     }
 }
@@ -239,8 +275,11 @@ private struct SubjectTile: View {
     let subject: NamedSubjects.Subject
     let numbers: [Int]
 
+    /// Cited by the text, under a model that reads no image: it does not go.
+    private var inert: Bool { model.capacity == 0 && NamedSubjects.mentions(in: model.text).contains { NamedSubjects.key($0.name) == subject.id } }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        HStack(alignment: .top, spacing: 8) {
             ZStack {
                 if let thumbnail = model.subjects.thumbnail(subject) {
                     Image(nsImage: thumbnail).resizable().scaledToFill()
@@ -248,32 +287,26 @@ private struct SubjectTile: View {
                     subject.kind.color.opacity(0.15).overlay(Image(systemName: subject.kind.symbol).foregroundStyle(subject.kind.color))
                 }
             }
-            .frame(width: LabTile.width, height: LabTile.picture).clipped()
+            .frame(width: LabTile.picture.width, height: LabTile.picture.height).clipped()
             .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 6, style: .continuous).strokeBorder(subject.kind.color, lineWidth: 1.5))
-            .overlay(alignment: .topLeading) {
-                if !numbers.isEmpty { NumberBadge(text: numbers.map(String.init).joined(separator: "+")) }
-            }
-            .overlay(alignment: .topTrailing) {
-                Button { model.confirmDeletion(subject) } label: {
-                    Image(systemName: "xmark.circle.fill").symbolRenderingMode(.palette)
-                        .foregroundStyle(.white, .black.opacity(0.55))
+            .overlay { LabTile.edge(goes: !numbers.isEmpty, main: false) }
+            .opacity(inert ? 0.5 : 1)
+            VStack(alignment: .leading, spacing: 3) {
+                Button { model.cite(subject) } label: {
+                    Text(verbatim: (numbers.isEmpty ? "" : numbers.map(String.init).joined(separator: "+") + " · ") + "@" + subject.name)
+                        .font(.caption.weight(.semibold)).lineLimit(1)
+                        .foregroundStyle(numbers.isEmpty ? Color.secondary : WireKind.image.color)
+                        .strikethrough(inert)
                 }
-                .buttonStyle(.plain).padding(4)
-                .help("Delete…")
-                .accessibilityLabel(Text("Delete…"))
+                .buttonStyle(.plain)
+                .help("Cite in the Text")
+                .draggable("@\(subject.name) ")
+                Text(inert ? String(localized: "\(model.rack.card?.name ?? "") does not read subjects") : subject.kind.label)
+                    .font(.caption2).foregroundStyle(.secondary).lineLimit(2)
+                DescribeButton(model: model) { model.describe(subject) }
             }
-            Button { model.cite(subject) } label: {
-                SubjectChip(name: subject.name, kind: subject.kind, thumbnail: nil, pictures: subject.pictures.count)
-            }
-            .buttonStyle(.plain)
-            .help(Text(verbatim: "\(subject.kind.label) — \(subject.kind.taken)"))
-            .draggable("@\(subject.name) ")
-            DescribeButton(model: model) { model.describe(subject) }
-            Button("Edit…") { model.edit(subject) }
-                .buttonStyle(.link).controlSize(.small)
+            .frame(width: LabTile.meta, alignment: .leading)
         }
-        .frame(width: LabTile.width)
         .contextMenu {
             Button("Cite in the Text") { model.cite(subject) }
             Button("Edit…") { model.edit(subject) }

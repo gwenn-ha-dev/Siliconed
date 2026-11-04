@@ -19,17 +19,23 @@ extension AppState {
         // Everything that reads the state is taken here: the job no longer depends on the form.
         let firstNumber = imposedSeed ?? (fixedSeed ? seed : UInt64.random(in: 0...UInt64(UInt32.max)))
         let format = imposedFormat ?? outputFormat
-        guard let prompts = try? alternatives.get().prompts else { return }
+        guard let prompts = try? alternatives.get().prompts, (try? carried.get()) != nil else { return }
+        // The edit's images as the render reads them, decoded once for the whole series.
+        let edit = renderReferences
         // **One job per alternative, all at the same seeds**: a series compares the prompts, so
         // nothing else may differ. Each keeps the batch. Its history images carry the expanded prompt.
         enqueue(prompts.map { expanded in
             var settings = RenderSettings(identifier: identifier, modelName: card?.name ?? identifier, prompt: expanded,
-                                          format: format, steps: steps, loras: loras.filter { !$0.path.isEmpty },
-                                          references: references.count, variations: variations, detail: effectiveDetail,
+                                          format: format, steps: steps, loras: activeLoRAs,
+                                          references: edit.count, variations: variations, detail: effectiveDetail,
                                           solver: effectiveSolver)
-            let used = references, start = usedStart
+            // **The subjects the text cites, translated here** (`namedJob`): their pictures after the edit's, the model
+            // reading the rewrite, the text kept as typed.
+            let used = namedJob(expanded, settings: &settings, references: edit, model: model(identifier),
+                                capacity: mirror != nil ? imageCapacity : nil)
+            let start = usedStart
             if start != nil { settings.strength = startStrength }
-            let plan = expectedPlan(steps: steps, format: format, withLoRA: loras.contains { !$0.path.isEmpty } || !plainSampling,
+            let plan = expectedPlan(steps: steps, format: format, withLoRA: !activeLoRAs.isEmpty || !plainSampling,
                                     references: used.count, strength: settings.strength)
             var job = Job(ordinal: nextJobNumber(), settings: settings,
                           seeds: (0..<max(1, batch)).map { firstNumber &+ UInt64($0) },
@@ -623,10 +629,10 @@ extension AppState {
         variations = entry.settings.variations
         // The image it started from, with its strength — or none: « Redo » renders the same image, not an img2img of another.
         if let s = entry.settings.strength, let start = entry.start, startsFromImage {
-            startImage = start
+            setStart(start)
             startStrength = s
         } else {
-            startImage = nil
+            setStart(nil)
         }
         if let g = entry.grid?.grid {
             // A sheet's prompt is the one typed, its groups the grid's axes: not escaped.
@@ -657,9 +663,16 @@ extension AppState {
     /// Incognito: the file is only read — no panel, no recent item, no copy.
     func restoreSettings(fromPNG url: URL) -> Bool {
         guard url.isFileURL, url.pathExtension.lowercased() == "png",
-              let data = try? Data(contentsOf: url, options: .mappedIfSafe),
-              let recipe = Engine.Render.Recipe(metadata: PNG.text(data)) else { return false }
-        let file = url.lastPathComponent
+              let data = try? Data(contentsOf: url, options: .mappedIfSafe) else { return false }
+        return restoreSettings(fromPNG: data, file: url.lastPathComponent)
+    }
+
+    /// Whether these bytes are a PNG Siliconed wrote: what offers « Reuse These Settings » on an image of the Prompt Lab.
+    static func isRecipe(_ data: Data) -> Bool { Engine.Render.Recipe(metadata: PNG.text(data)) != nil }
+
+    /// The same, from the bytes — an image of the Prompt Lab; `file` names it in the notes.
+    func restoreSettings(fromPNG data: Data, file: String) -> Bool {
+        guard let recipe = Engine.Render.Recipe(metadata: PNG.text(data)) else { return false }
         var notes: [String] = []
 
         // The PNG names a family, not a card (a fine-tune writes its family's name): the form's
