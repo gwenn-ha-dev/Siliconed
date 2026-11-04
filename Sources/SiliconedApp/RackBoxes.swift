@@ -1,5 +1,5 @@
-// The rack's box furniture (title, ports, fields, tags, cost) and the two input nodes,
-// prompt and images. Split from `Rack.swift`, whose header says how the boxes behave.
+// The rack's box furniture (title, ports, fields, tags, cost) and its input ports, read only: the prompt, the images or
+// the starting image. Split from `Rack.swift`, whose header says how the boxes behave.
 
 import AppKit
 import Siliconed
@@ -240,121 +240,126 @@ struct Cost: View {
 
 // MARK: - The inputs
 
-/// **The prompt, as a port**: the text the next render reads comes from the Prompt Lab, the bar under the image
-/// (`LabView.swift`) — the rack says where it comes from, it does not show it twice. A click unfolds the bar (⌥⌘L).
-struct PromptNode: View {
+// **The rack's inputs, read only**: what the next render sends, written and chosen in the Prompt Lab under the image
+// (`LabView.swift`) — the rack says what goes, it never takes it twice, the strength of a starting image included. Two small
+// ports side by side, each above the encoder it feeds, so that each wire drops straight down: the text over the text
+// encoder, the images over the image encoder. A click on either unfolds the lab (⌥⌘L).
+
+extension View {
+    /// A port: read here, set in the Prompt Lab — a click unfolds it.
+    fileprivate func opensLab(help: Text) -> some View {
+        contentShape(Rectangle())
+            .onTapGesture { LabModel.shared.unfold() }
+            .help(help)
+            .accessibilityElement(children: .combine)
+            .accessibilityAddTraits(.isButton)
+    }
+}
+
+/// **The prompt, as a port**: where the text comes from, not the text — it is read in the bar under the image.
+struct PromptPort: View {
     @Bindable var app: AppState
 
     var body: some View {
         PortBox(title: "Prompt", symbol: "text.quote", kind: .text) {
             Text(app.prompt.isEmpty ? "to write in the Prompt Lab" : "from the Prompt Lab")
-        } content: {
-            EmptyView()
+                .font(.caption).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
-        .contentShape(Rectangle())
-        .onTapGesture { LabModel.shared.unfold() }
-        .help("Written in the Prompt Lab, under the image (⌥⌘L)")
-        .accessibilityElement(children: .combine)
-        .accessibilityAddTraits(.isButton)
+        .opensLab(help: Text("Written in the Prompt Lab, under the image (⌥⌘L)"))
     }
 }
 
-/// **The images the prompt works on, numbered as it names them**: image 1 is the one edited — the output takes its format
-/// —, the others are what the prompt borrows from, then the subjects the text cites. Only for a model that edits (rule 2:
-/// the inputs follow the model). **Read here, chosen in the Prompt Lab** (a drop on the canvas, « Send to the Prompt Lab »
-/// or « Edit with … » in the history, ⌘V): a click unfolds it. The title counts what the next render sends.
-struct ImagesNode: View {
+/// **The images the prompt works on, numbered as it names them**, on a model that edits: image 1 is the one edited — the
+/// output takes its format —, the others are what the prompt borrows from, then the subjects the text cites. Their roles are
+/// chosen in the Prompt Lab (a drop on the canvas, « Send to the Prompt Lab » or « Edit with … » in the history, ⌘V).
+struct ImagesPort: View {
     @Bindable var app: AppState
     private var used: Int { app.references.count }
+
     var body: some View {
         PortBox(title: "Images", symbol: "photo.on.rectangle", kind: .image) {
-            Text(used == 0 ? String(localized: "up to \(app.maxReferences) images") : "\(used)/\(app.maxReferences)")
+            Text(verbatim: "\(used)/\(app.maxReferences)")
                 .foregroundStyle(used > app.maxReferences ? Palette.failure : .secondary)
         } content: {
-            images
+            if used == 0 {
+                Text("Optional").font(.caption).foregroundStyle(.secondary)
+            } else {
+                HStack(spacing: 4) {
+                    ForEach(Array(app.references.enumerated()), id: \.element.id) { n, reference in
+                        PortThumbnail(image: reference, number: n + 1)
+                    }
+                }
+            }
+            // One more image beyond this Mac's memory (B): said here, read before adding one in the lab.
+            if app.canAddReference, let refusal = app.nextReferenceRefusal() {
+                Text(refusal).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            }
         }
-        .contentShape(Rectangle())
-        .onTapGesture { LabModel.shared.unfold() }
+        .opensLab(help: hint)
     }
 
-    @ViewBuilder private var images: some View {
-        // One more image beyond this Mac's memory (B): the sentence below, read before adding one in the lab.
-        let refusal = app.canAddReference ? app.nextReferenceRefusal() : nil
-        HStack(alignment: .top, spacing: 6) {
-            ForEach(Array(app.references.enumerated()), id: \.element.id) { n, reference in
-                ReferenceThumbnail(app: app, reference: reference, number: n + 1,
-                                   last: n == app.editInputs.count - 1)
-            }
-            Spacer(minLength: 0)
+    private var hint: Text {
+        if app.references.isEmpty {
+            return Text("Optional. Drop an image in the Prompt Lab and the prompt becomes an instruction: “change her jacket to red”.")
         }
-        Group {
-            if let refusal {
-                Text(refusal)
-            } else if app.references.isEmpty {
-                Text("Optional. Drop an image in the Prompt Lab and the prompt becomes an instruction: “change her jacket to red”.")
-            } else if app.promptNamesImages && app.maxReferences > 1 {
-                Text("Image 1 is the one edited. The prompt can name them: “put the dog of image 2 next to the woman in image 1”.")
-                    .help("The model reads them as <image1>, <image2>… in front of the prompt")
-            } else {
-                Text("Image 1 is the one edited: the prompt says what changes.")
-            }
+        if app.promptNamesImages && app.maxReferences > 1 {
+            return Text("Image 1 is the one edited. The prompt can name them: “put the dog of image 2 next to the woman in image 1”.")
         }
-        .font(.caption).foregroundStyle(.secondary)
-        .fixedSize(horizontal: false, vertical: true)
+        return Text("Image 1 is the one edited: the prompt says what changes.")
     }
 }
 
-/// **The image the render starts from** (img2img), on a model that starts from one: shown once an image of the Prompt Lab
-/// (or `silicontrol start-image`) is the start — chosen there, read here (a click unfolds the lab). Its thumbnail, and its
-/// strength on a slider from 0 to 100 %, like a LoRA's: a setting, retouched between two renders. Low keeps the image's
-/// composition and colours, 100 % ignores it; the tooltip says how many of the steps the strength leaves.
-struct StartImageNode: View {
+/// **The image the render starts from** (img2img), on a model that starts from one: its thumbnail and its strength, read
+/// here — the strength is set on its tile in the Prompt Lab, one place. Orange when it is so high that the image is ignored.
+struct StartPort: View {
     @Bindable var app: AppState
 
     var body: some View {
         PortBox(title: "Starting Image", symbol: "photo", kind: .image) {
-            Text(verbatim: StartWords.percent(app.startStrength))
-                .onTapGesture(count: 2) { app.setStartStrength(app.defaultStartStrength) }
-                .help("Strength — double-click for \(StartWords.percent(app.defaultStartStrength))")
-        } content: {
             if let start = app.usedStart {
-                HStack(alignment: .center, spacing: 10) {
-                    thumbnail(start)
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text("Strength").font(.callout).foregroundStyle(.secondary)
-                        Slider(value: Binding(get: { app.startStrength }, set: { app.setStartStrength($0) }), in: 0...1)
-                            .controlSize(.small)
-                            .accessibilityLabel(Text("Strength"))
-                            .accessibilityValue(Text(verbatim: StartWords.percent(app.startStrength)))
-                        HStack {
-                            Text("Faithful")
-                            Spacer(minLength: 4)
-                            Text("Free")
-                        }
-                        .font(.caption2).foregroundStyle(.tertiary)
+                HStack(alignment: .center, spacing: 8) {
+                    PortThumbnail(image: start, number: nil)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("Strength").foregroundStyle(.secondary)
+                        Text(verbatim: StartWords.percent(app.startStrength)).monospacedDigit()
+                            .foregroundStyle(app.startIgnored ? Color(nsColor: .systemOrange) : .primary)
                     }
-                    .help(StartWords.explanation(app.startRedraws))
-                }
-                let caption = app.startCaption
-                Text(caption.text)
                     .font(.caption)
-                    .foregroundStyle(caption.tone == .failure ? Palette.failure
-                                     : caption.tone == .warning ? Color(nsColor: .systemOrange) : Color.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                }
             }
         }
-        .contextMenu {
-            Button("Reset to \(StartWords.percent(app.defaultStartStrength))") { app.setStartStrength(app.defaultStartStrength) }
-        }
+        .opensLab(help: Text(verbatim: app.startCaption.text + "\n" + StartWords.explanation(app.startRedraws)))
     }
+}
 
-    private func thumbnail(_ start: ReferenceImage) -> some View {
-        Image(nsImage: start.vignette).resizable().scaledToFill()
-            .frame(width: ReferenceThumbnail.side, height: ReferenceThumbnail.side)
-            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 6, style: .continuous).strokeBorder(WireKind.image.color, lineWidth: 1.5))
-            .onTapGesture { LabModel.shared.unfold() }
-            .help(Text(verbatim: "\(start.name) · \(start.width) × \(start.height)"))
-            .accessibilityLabel(Text(verbatim: start.name))
+/// A port's image, small: its number when the prompt can name it (1 in the accent: the one edited), the image wire's edge.
+private struct PortThumbnail: View {
+    static let side: CGFloat = 34
+    let image: ReferenceImage
+    let number: Int?
+
+    /// A subject the prompt cites: it comes and goes with its `@name`.
+    private var cited: Bool { if case .subject = image.source { true } else { false } }
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: 5, style: .continuous)
+        Image(nsImage: image.vignette).resizable().scaledToFill()
+            .frame(width: Self.side, height: Self.side)
+            .clipShape(shape)
+            .overlay(shape.strokeBorder(WireKind.image.color.opacity(number ?? 1 == 1 ? 1 : 0.6), lineWidth: 1.5))
+            .overlay(alignment: .topLeading) {
+                if let number {
+                    Text(verbatim: "\(number)")
+                        .font(.system(size: 9, weight: .bold)).monospacedDigit()
+                        .foregroundStyle(.white)
+                        .frame(width: 13, height: 13)
+                        .background(Circle().fill(number == 1 ? Color.accentColor : Color.black.opacity(0.6)))
+                        .padding(2)
+                }
+            }
+            .help(cited ? Text("\(image.name), cited by the prompt: delete the name there to take it out")
+                        : Text(verbatim: "\(image.name) · \(image.width) × \(image.height)"))
+            .accessibilityLabel(Text(verbatim: number.map { "\($0). \(image.name)" } ?? image.name))
     }
 }

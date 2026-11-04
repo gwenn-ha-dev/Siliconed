@@ -2,10 +2,11 @@
 // one text, one set of images, nothing to carry.
 //
 // - **Folded**: one line under the image, in a room of its own (`foldedRoom`) — the images that go, as small thumbnails, the
-//   text cut to the line, Rewrite (✦) and the chevron. A click on the text unfolds it.
-// - **Unfolded**: a glass plate that rises over the image (`MainView`), never pushing it: pushed, the window took the image's
-//   height plus the bar's and grew past the screen. Its title names the model it writes for — the menu of the model is the
-//   rack's, one place. A click on the image folds it.
+//   text cut to the line, Rewrite (✦), the time and « Generate » (`LabGenerate.swift`), the chevron. A click on the text
+//   unfolds it.
+// - **Unfolded**: a plate of glass, its edges fading (`vapour`), that rises over the image (`MainView`), never pushing it: pushed, the window took
+//   the image's height plus the bar's and grew past the screen. Its title names the model it writes for — the menu of the
+//   model is the rack's, one place —, its foot holds the cost, « Explore » and « Generate ». A click on the image folds it.
 // - **Rewrite and Describe wait for a render** (the render first), and the folded line says so.
 
 import AppKit
@@ -30,9 +31,9 @@ struct LabView: View {
                 foldedBar.padding(.horizontal, 12).frame(height: Self.foldedHeight)
             }
         }
-        .glass(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .vapour(cornerRadius: 16)
         .overlay {
-            if targeted { RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Color.accentColor, lineWidth: 2) }
+            if targeted { RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Color.accentColor, lineWidth: 2) }
         }
         .dropDestination(for: DroppedImage.self) { items, _ in
             guard !items.isEmpty else { return false }
@@ -84,6 +85,7 @@ struct LabView: View {
             .disabled(!model.canRewrite)
             .help("Rewrite")
             .accessibilityLabel(Text("Rewrite"))
+            GenerateControls(app: model.rack, compact: true)
             chevron
         }
     }
@@ -124,10 +126,8 @@ struct LabView: View {
             textZone
             LabImages(model: model)
             status
-            if case .failure(let refusal) = model.rack.carried {
-                Label(refusal.sentence, systemImage: "exclamationmark.circle").font(.caption).foregroundStyle(Palette.failure)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
+            Divider().opacity(0.6)
+            GenerateControls(app: model.rack)
         }
     }
 
@@ -170,26 +170,14 @@ struct LabView: View {
             }
             if let changes = model.changes {
                 // The marks lie over the text, which stays under them: ⌘Z still undoes the gesture. While the writer writes,
-                // they are the text it has written so far, against the one it started from. Written, a click puts them away
-                // and the caret goes into the text: it is always yours to edit.
-                ScrollView {
-                    Text(Self.shown(PromptDiff.pieces(from: changes.before, to: changes.after)))
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                // The text starts at the top and grows down, as typed text does; once it fills the field, the last words
-                // stay in sight while it comes. A single anchor at the bottom drew a short text at the foot of the field,
-                // and threw it back to the top when the writer ended.
-                .defaultScrollAnchor(.top, for: .alignment)
-                .defaultScrollAnchor(.top, for: .initialOffset)
-                .defaultScrollAnchor(model.isWriting ? .bottom : nil, for: .sizeChanges)
-                .background(Palette.well)
-                .contentShape(Rectangle())
-                .onTapGesture {
+                // they are the text it has written so far, against the one it started from, and the last words stay in sight;
+                // they scroll by hand all along. Written, a click puts them away and the caret goes into the text: it is
+                // always yours to edit.
+                MarkedText(pieces: PromptDiff.pieces(from: changes.before, to: changes.after), writing: model.isWriting) {
                     guard !model.isWriting else { return }
                     model.dismissChanges()
                     if let field = PromptTextView.current { field.window?.makeFirstResponder(field) }
                 }
-                .allowsHitTesting(!model.isWriting)
             }
         }
         .padding(6)
@@ -263,28 +251,128 @@ struct LabView: View {
         return Double(n) / 100
     }
 
-    // MARK: The diff, drawn
+}
 
-    /// Additions in the accent on a faint wash (a colour alone would not do for everyone), removals
-    /// struck through and quiet. A removed piece's leading space stays outside the strike.
-    static func shown(_ pieces: [PromptDiff.Piece]) -> AttributedString {
-        var out = AttributedString()
+// MARK: - The writer's marks
+
+/// **The writer's marks, over the text**: the text it is writing (or wrote), additions in the accent on a faint wash (a colour
+/// alone would not do for everyone), removals struck through and quiet — in a text view of its own, read only, with the field's
+/// font and line spacing, so that it scrolls as any text does, by the wheel or two fingers, while the writer writes too. A
+/// SwiftUI `ScrollView` took no scroll while it wrote (it took no hit, so that a click could not cut the gesture short) and
+/// did not follow the words: a long description went past the field's foot, out of sight until the text was edited.
+///
+/// **While it writes, the end of what it has added stays in sight** — not the text's end: Describe writes at the caret,
+/// which may be in the middle. A hand that scrolls away holds the view where it put it, until it comes back to that end.
+private struct MarkedText: NSViewRepresentable {
+    let pieces: [PromptDiff.Piece]
+    let writing: Bool
+    let click: () -> Void
+
+    @MainActor final class Coordinator {
+        var shown: [PromptDiff.Piece] = []
+        /// The hand scrolled away from the words coming: the view stays where it put it.
+        var held = false
+        /// The view scrolls itself: not the hand.
+        var following = false
+        var observer: NSObjectProtocol?
+    }
+
+    /// A click goes to the gesture, not to a selection: the view is the field's picture, not a field.
+    final class View: NSTextView {
+        var clicked: (() -> Void)?
+        override func mouseDown(with event: NSEvent) { clicked?() }
+        override var acceptsFirstResponder: Bool { false }
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
+    func makeNSView(context: NSViewRepresentableContext<Self>) -> NSScrollView {
+        let storage = NSTextStorage()
+        let layout = NSLayoutManager()
+        storage.addLayoutManager(layout)
+        let container = NSTextContainer(size: NSSize(width: 0, height: CGFloat.greatestFiniteMagnitude))
+        container.widthTracksTextView = true
+        layout.addTextContainer(container)
+        let view = View(frame: .zero, textContainer: container)
+        view.isEditable = false
+        view.isSelectable = false
+        view.drawsBackground = false
+        view.isVerticallyResizable = true
+        view.isHorizontallyResizable = false
+        view.autoresizingMask = [.width]
+        view.minSize = .zero
+        view.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
+        // The field's own inset (`PromptField`): the words do not move when the marks give way to the text.
+        view.textContainerInset = NSSize(width: 0, height: 3)
+        let scroll = NSScrollView()
+        scroll.documentView = view
+        scroll.hasVerticalScroller = true
+        scroll.autohidesScrollers = true
+        scroll.drawsBackground = false
+        scroll.borderType = .noBorder
+        // Any scroll the view did not do itself is the hand's — the wheel's too, which sends no live-scroll notification.
+        let clip = scroll.contentView
+        clip.postsBoundsChangedNotifications = true
+        let c = context.coordinator
+        c.observer = NotificationCenter.default.addObserver(forName: NSView.boundsDidChangeNotification, object: clip,
+                                                            queue: .main) { [weak clip, weak view] _ in
+            MainActor.assumeIsolated {
+                guard !c.following, let clip, let view else { return }
+                c.held = clip.bounds.maxY < view.frame.height - 4
+            }
+        }
+        return scroll
+    }
+
+    func updateNSView(_ scroll: NSScrollView, context: NSViewRepresentableContext<Self>) {
+        guard let view = scroll.documentView as? View else { return }
+        view.clicked = click
+        let c = context.coordinator
+        guard c.shown != pieces else { return }
+        c.shown = pieces
+        view.textStorage?.setAttributedString(Self.drawn(pieces))
+        guard writing, !c.held else { return }
+        c.following = true
+        view.layoutManager?.ensureLayout(for: view.textContainer!)
+        view.scrollRangeToVisible(NSRange(location: Self.endOfAdded(pieces), length: 0))
+        c.following = false
+    }
+
+    static func dismantleNSView(_ scroll: NSScrollView, coordinator: Coordinator) {
+        coordinator.observer.map(NotificationCenter.default.removeObserver)
+        coordinator.observer = nil
+    }
+
+    /// Where the last addition ends, in the drawn text (struck removals included): the place the writer is writing.
+    static func endOfAdded(_ pieces: [PromptDiff.Piece]) -> Int {
+        var at = 0, end = 0
+        for piece in pieces {
+            at += (piece.text as NSString).length
+            if piece.kind == .added { end = at }
+        }
+        return end == 0 ? at : end
+    }
+
+    /// A removed piece's leading space stays outside the strike.
+    static func drawn(_ pieces: [PromptDiff.Piece]) -> NSAttributedString {
+        let out = NSMutableAttributedString()
+        let base = PromptStyle.base
         for piece in pieces {
             switch piece.kind {
             case .same:
-                out += AttributedString(piece.text)
+                out.append(NSAttributedString(string: piece.text, attributes: base))
             case .added:
-                var a = AttributedString(piece.text)
-                a.foregroundColor = Palette.live
-                a.backgroundColor = Palette.live.opacity(0.12)
-                out += a
+                var a = base
+                a[.foregroundColor] = NSColor.controlAccentColor
+                a[.backgroundColor] = NSColor.controlAccentColor.withAlphaComponent(0.12)
+                out.append(NSAttributedString(string: piece.text, attributes: a))
             case .removed:
-                let lead = piece.text.prefix { $0.isWhitespace }
-                out += AttributedString(String(lead))
-                var a = AttributedString(String(piece.text.dropFirst(lead.count)))
-                a.strikethroughStyle = .single
-                a.foregroundColor = Color.secondary
-                out += a
+                let lead = String(piece.text.prefix { $0.isWhitespace })
+                out.append(NSAttributedString(string: lead, attributes: base))
+                var a = base
+                a[.strikethroughStyle] = NSUnderlineStyle.single.rawValue
+                a[.foregroundColor] = NSColor.secondaryLabelColor
+                out.append(NSAttributedString(string: String(piece.text.dropFirst(lead.count)), attributes: a))
             }
         }
         return out

@@ -827,7 +827,7 @@ package enum RemoteControlHelp {
 
         A CHANGE OF MODEL never gives a role, nor turns one into another: a reference keeps its role under
         Z-Image, without effect ("used": false), and works again back on Qwen-Image-2.1. "unused" counts
-        what the next render will not read, as the line under Generate does.
+        what the next render will not read, as the line beside Generate does.
 
         ANSWER
           {"ok": true, "lab": {"unfolded": false, "model": "qwen-image-2.1", "text": "@alice on the quay",
@@ -2044,7 +2044,7 @@ package enum RemoteControlHelp {
 
         UN CHANGEMENT DE MODÈLE ne donne jamais de rôle et n'en change aucun en un autre : une référence
         garde son rôle sous Z-Image, sans effet ("used": false), et resert de retour sous Qwen-Image-2.1.
-        "unused" compte ce que le prochain rendu ne lira pas, comme la ligne sous Générer.
+        "unused" compte ce que le prochain rendu ne lira pas, comme la ligne à côté de Générer.
 
         RÉPONSE
           {"ok": true, "lab": {"unfolded": false, "model": "qwen-image-2.1", "text": "@alice on the quay",

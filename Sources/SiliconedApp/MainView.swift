@@ -83,6 +83,23 @@ extension View {
     func glass<S: Shape>(_ shape: S) -> some View {
         glassEffect(.regular, in: shape)
     }
+
+    /// **Glass with soft edges** — the Prompt Lab's plate over the image: the system's glass, its rim fading over a band
+    /// instead of stopping at a line, a vapour more than a pane. The glass is the one that shows the image through: a
+    /// material (thin to thick) let nothing of the window's content pass, a grey plate (seen side by side, 4/11).
+    func vapour(cornerRadius: CGFloat, feather: CGFloat = 14) -> some View {
+        background {
+            Color.clear
+                .glassEffect(.regular, in: RoundedRectangle(cornerRadius: cornerRadius + feather, style: .continuous))
+                .mask {
+                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                        .padding(feather)
+                        .blur(radius: feather / 2)
+                }
+                .padding(-feather)
+                .allowsHitTesting(false)
+        }
+    }
 }
 
 /// The canvas background: a near-black gray in dark, a light gray in light — neutral, so that

@@ -8,7 +8,7 @@ import SwiftUI
 // MARK: - The DiT: the stage with choices
 
 /// **The DiT and everything it is told**: the model, its license, the size, the seed, how many
-/// images, the steps, the LoRA stack — then what it costs, or its steps while it runs.
+/// images (the steps only off the model's recipe), the LoRA stack — then what it costs, or its steps while it runs.
 struct DiTBox: View {
     @Bindable var app: AppState
     @State private var customSize = false
@@ -239,11 +239,20 @@ struct DiTBox: View {
                 .fixedSize()
         }
         .help("Consecutive seeds; the prompt is encoded only once")
-        Field(title: "Steps") {
-            Stepper(value: $app.steps, in: 1...50) { Text(verbatim: "\(app.steps)").monospacedDigit() }
-                .fixedSize()
+        // **The steps, only off the recipe**: the five models are distilled for 8, and fewer is softer, more is longer and no
+        // better — a choice that only costs. The line comes when something else set them (a PNG's settings reused, a cell of
+        // an exploration finished, `silicontrol`), as the variation's does, with its way back.
+        let recipe = app.card?.defaultSteps ?? 8
+        if app.steps != recipe {
+            Field(title: "Steps") {
+                Text(verbatim: "\(app.steps)").monospacedDigit()
+                Button { app.steps = recipe } label: { Image(systemName: "xmark.circle.fill").frame(width: 24, height: 24).contentShape(Rectangle()) }
+                    .buttonStyle(.borderless).foregroundStyle(.secondary)
+                    .help(String(localized: "Back to \(recipe) steps, the count this model is distilled for"))
+                    .accessibilityLabel(Text("Back to \(recipe) steps, the count this model is distilled for"))
+            }
+            .help(String(localized: "\(recipe) steps: the count this Turbo model is distilled for"))
         }
-        .help(String(localized: "\(app.card?.defaultSteps ?? 8) steps: the count this Turbo model is distilled for"))
         // Not on a model that offers none (Anima): a choice that changes nothing is not shown.
         if app.offersDetail {
             Field(title: "Detail") {

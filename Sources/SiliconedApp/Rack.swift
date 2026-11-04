@@ -1,30 +1,26 @@
 // **The rack: the chain of the render, drawn from `model.chain`, as the window's left column**.
 //
-//     ┌ Images ─────────────────┐   only if the model edits: the images the prompt works on, 1 to 3,
-//   ┌─┤ ▣ ▣ +                   ├─┐ numbered (the Prompt Lab can carry them here, with the prompt
-//   │ │                         │ │ that names them: `Lab.swift`) — or, on a model that starts from an
-//   │ └─────────────────────────┘ │ image (img2img), only once the Lab has carried one: its thumbnail and
-//   │                             │ its strength (`StartImageNode`), wired to the image encoder alone
-//   │ ┌ Prompt ─────────────────┐ │ the text field itself, under what it names
-//   │ └──────────┬──────────────┘ │
-//   │ ┌Text encoder┐ ┌Image encoder┐
-//   └▶│ (sees them)│ │             │◀┘
-//     └─────┬──────┘ └──────┬──────┘
-//           │text           │latent
-//     ┌──────── DiT ────────────┐   model ▾, license · fp32 · latent, size, seed, images, steps, detail,
-//     └────────────┬────────────┘   step previews, LoRA stack — and, running, its steps and preview
+//   ┌ Prompt ────────┐ ┌ Images ──── 1/3 ┐   the inputs, read only: written and chosen in the Prompt Lab under
+//   │ from the Lab   │ │ ▣ ▣             │   the image (`LabView.swift`). The images port only on a model that
+//   └───────┬────────┘ └──┬──────┬───────┘   edits (its images, numbered) or starts from an image (img2img: the
+//           │text  ╭──────╯image │image      starting image and its strength, set on its tile in the lab)
+//   ┌Text encoder────┐ ┌Image encoder────┐   Qwen-Image-2.1's text encoder sees the images too: one short wire
+//   └───────┬────────┘ └───────┬─────────┘   across, from the images into the text encoder's right shoulder
+//           │text              │latent
+//     ┌──────── DiT ────────────┐   model ▾, license · fp32 · latent, size, seed, images, detail, step previews,
+//     └────────────┬────────────┘   LoRA stack — and, running, its steps and preview
 //                  │latent
 //     ┌ VAE decoder ────────────┐
 //     └─────────────────────────┘   → the image, on the canvas: a result, not a stage
 //
 // **A module and its settings are one box**: what the next render reads sits in the box of the stage
-// that reads it — the images in the images, the prompt in the prompt, the size, the seed and the
-// steps in the DiT. There is no other form. The latent is not a box: it is what the DiT makes, its
-// previews are drawn in the DiT. Nor is the image: it is the result, shown on the canvas. The wires
-// between the boxes are of their true type (text amber, image lavender, latent sea green — `Palette`),
-// and run top to bottom, in the direction of the signal; the images come first, as the gesture does —
-// lay the picture down, then say what to make of it —, so their wires skip the prompt: down the left
-// rail into the text encoder, down the right one into the image encoder. **Color is spent only where
+// that reads it — the size and the seed in the DiT. The inputs are the exception, read only: the text and
+// the images are the Prompt Lab's, and the rack shows what goes without taking it twice. The latent is
+// not a box: it is what the DiT makes, its previews are drawn in the DiT. Nor is the image: it is the
+// result, shown on the canvas. « Generate » is not in the rack either: it is at the end of the text, in the
+// lab, where the hand is when the idea is written. The wires between the boxes are of their true type (text
+// amber, image lavender, latent sea green — `Palette`), and run top to bottom, in the direction of the
+// signal, each port above the encoder it feeds. **Color is spent only where
 // something happens**: at rest the boxes are quiet cards and the wires muted; during a render the box
 // of the stage at work wears the accent and the wire it reads brightens and widens; what is done keeps
 // a discreet check; where the engine refused, the box turns red. Under each box, what it costs: the
@@ -118,15 +114,10 @@ private struct Edge: Identifiable {
     let stage: Engine.Stage
     /// False: an optional input left empty (no edit image) — drawn thin and faint.
     var live = true
-    /// Set: it skips the box between its ends, and runs down that side's rail instead of through it.
-    var rail: Rail? = nil
+    /// Set: it crosses from the images port to the text encoder beside it, into the encoder's right shoulder.
+    var across = false
     var id: String { "\(from)-\(to)" }
 }
-
-private enum Rail { case left, right }
-
-/// The rails' distance to the boxes: the column's paddings leave them room.
-private let railInset: CGFloat = 9
 
 /// **The wires**: from the bottom of a box to the top of the next, straight down where the two
 /// overlap — a box under another reads where it sits. In its color, muted at rest; the wire the
@@ -142,7 +133,7 @@ private struct Wires: View {
             Canvas { c, _ in
                 for e in edges {
                     guard let a = frames[e.from].map({ g[$0] }), let b = frames[e.to].map({ g[$0] }) else { continue }
-                    let (p, end) = e.rail.map { Self.rail(a, b, $0) } ?? Self.drop(a, b)
+                    let (p, end) = e.across ? Self.across(a, b) : Self.drop(a, b)
                     let s = e.live ? state(e.stage) : .idle
                     let color: Color = !e.live ? Palette.hairline
                         : s == .idle ? e.kind.color.opacity(0.85) : e.kind.color
@@ -171,20 +162,15 @@ private struct Wires: View {
         return (p, end)
     }
 
-    /// Out of `a`'s side, down the rail, into `b`'s same side: past the boxes in between.
-    private static func rail(_ a: CGRect, _ b: CGRect, _ side: Rail) -> (Path, CGPoint) {
-        let left = side == .left, r: CGFloat = left ? 6 : -6
-        let x = left ? min(a.minX, b.minX) - railInset : max(a.maxX, b.maxX) + railInset
-        let start = CGPoint(x: left ? a.minX : a.maxX, y: a.maxY - 16)
-        let end = CGPoint(x: left ? b.minX : b.maxX, y: b.minY + 18)
-        let turn = abs(r)
+    /// From the images port's left part into the text encoder's right shoulder: a short curve across, clear of the prompt's
+    /// wire, which drops into the encoder's middle.
+    private static func across(_ a: CGRect, _ b: CGRect) -> (Path, CGPoint) {
+        let start = CGPoint(x: a.minX + a.width * 0.22, y: a.maxY)
+        let end = CGPoint(x: b.minX + b.width * 0.8, y: b.minY)
+        let dy = max(8, (end.y - start.y) * 0.7)
         var p = Path()
         p.move(to: start)
-        p.addLine(to: CGPoint(x: x + r, y: start.y))
-        p.addQuadCurve(to: CGPoint(x: x, y: start.y + turn), control: CGPoint(x: x, y: start.y))
-        p.addLine(to: CGPoint(x: x, y: end.y - turn))
-        p.addQuadCurve(to: CGPoint(x: x + r, y: end.y), control: CGPoint(x: x, y: end.y))
-        p.addLine(to: end)
+        p.addCurve(to: end, control1: CGPoint(x: start.x, y: start.y + dy), control2: CGPoint(x: end.x, y: end.y - dy))
         return (p, end)
     }
 }
@@ -203,9 +189,12 @@ struct RackView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             header.id(Self.top)
-            if app.editingPossible { ImagesNode(app: app).node(.images) }
-            else if showsStart { StartImageNode(app: app).node(.images) }
-            PromptNode(app: app).node(.prompt)
+            // The inputs, each above the encoder it feeds: the columns of the two rows are the same halves.
+            HStack(alignment: .top, spacing: 10) {
+                PromptPort(app: app).node(.prompt)
+                if app.editingPossible { ImagesPort(app: app).node(.images) }
+                else if showsStart { StartPort(app: app).node(.images) }
+            }
             HStack(alignment: .top, spacing: 10) {
                 textEncoder.node(.textEncoder)
                 if encodesImages { imageEncoder.node(.imageEncoder) }
@@ -216,8 +205,7 @@ struct RackView: View {
             vae.node(.vae)
             legend
         }
-        .padding(.leading, 12 + railInset)
-        .padding(.trailing, 12 + railInset)
+        .padding(.horizontal, 14)
         .padding(.vertical, 14)
         .backgroundPreferenceValue(NodeFrames.self) { frames in
             Wires(edges: edges, frames: frames, state: app.state(of:))
@@ -228,7 +216,7 @@ struct RackView: View {
     /// The chosen model edits by reference and has an image encoder — or starts from the image the rack holds: its box is drawn.
     private var encodesImages: Bool { (app.editingPossible && app.chain?.encoding != nil) || showsStart }
 
-    /// A starting image is carried, and the model starts from it (img2img): the Images box shows it, wired to the encoder alone.
+    /// A starting image is carried, and the model starts from it (img2img): its port shows it, wired to the image encoder alone.
     private var showsStart: Bool { !app.editingPossible && app.usedStart != nil }
 
     private var edges: [Edge] {
@@ -236,14 +224,14 @@ struct RackView: View {
         var e = [Edge(from: .prompt, to: .textEncoder, kind: .text, stage: .text)]
         if showsStart {
             // The text encoder does not see a starting image: only the image encoder reads it, and the DiT starts from its latent.
-            e.append(Edge(from: .images, to: .imageEncoder, kind: .image, stage: .image, rail: .right))
+            e.append(Edge(from: .images, to: .imageEncoder, kind: .image, stage: .image))
             e.append(Edge(from: .imageEncoder, to: .dit, kind: .latent, stage: .denoising))
         }
         if app.editingPossible {
             // Qwen-Image-2.1's encoder sees the images (`TextFormat.readsImages`): one more wire.
-            if app.promptNamesImages { e.append(Edge(from: .images, to: .textEncoder, kind: .image, stage: .text, live: live, rail: .left)) }
+            if app.promptNamesImages { e.append(Edge(from: .images, to: .textEncoder, kind: .image, stage: .text, live: live, across: true)) }
             if encodesImages {
-                e.append(Edge(from: .images, to: .imageEncoder, kind: .image, stage: .image, live: live, rail: .right))
+                e.append(Edge(from: .images, to: .imageEncoder, kind: .image, stage: .image, live: live))
                 e.append(Edge(from: .imageEncoder, to: .dit, kind: .latent, stage: .denoising, live: live))
             }
         }

@@ -119,7 +119,7 @@ extension AppState {
            let f = recommendedFormat(width: s.width, height: s.height), f != format { useFormat(f) }
     }
 
-    /// **What the Prompt Lab holds that the next render does not read** — said under « Generate »: its images without a role
+    /// **What the Prompt Lab holds that the next render does not read** — said beside « Generate », in the lab: its images without a role
     /// or with one the model lacks, and the subjects the text cites to a model that reads no image.
     var unusedInputs: Int {
         let images = LabInputs.unused(inputSlots, capacity: imageCapacity, startsFromImage: startsFromImage)

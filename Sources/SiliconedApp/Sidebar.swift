@@ -1,16 +1,14 @@
-// **The window's left column: the rack, and under it what the click costs**.
+// **The window's left column: the rack, and under it what the chain is doing**.
 //
 //     the rack     the chain top to bottom, each module with its settings (`Rack.swift`)
 //     ─────────
-//     the cost before the click (memory and time), « Generate », the queue, what went wrong
+//     the measure of this Mac under way, the queue, a copy or an installation, what went wrong
 //
 // No form beside the rack: a setting lives in the box of the stage that reads it. No mask, no setting
 // between two steps: what is set is taken whole at the click (`Job`), and changing it afterwards
-// prepares the next render.
-//
-// **« Explore » stands beside « Generate »** (`Exploration.swift`): the same intention — make images
-// from this chain —, many small ones instead of one; not a setting, so not in the rack's header with
-// « Models… ». The cost line above counts only what « Generate » makes.
+// prepares the next render. **« Generate » is not here**: it is at the end of the text, in the Prompt
+// Lab under the image (`LabGenerate.swift`), with its cost and what stops it — the hand is there when
+// the idea is written. The footer is drawn only when it has something to say.
 // The queue scrolls past a few rows, so that the footer never pushes the rack out of the column.
 
 import AppKit
@@ -103,202 +101,82 @@ struct CustomSize: View {
     }
 }
 
-/// **A reference's thumbnail**: its number (the one the prompt says), the image, and on hover a
-/// button to remove it. Dragged onto another thumbnail, it takes that one's place; its menu moves,
-/// replaces or removes it.
-struct ReferenceThumbnail: View {
-    static let side: CGFloat = 60
-    let app: AppState
-    let reference: ReferenceImage
-    let number: Int
-    let last: Bool
-
-    /// A subject the prompt cites: it comes and goes with its `@name`.
-    private var cited: Bool { if case .subject = reference.source { true } else { false } }
-
-    var body: some View {
-        VStack(spacing: 3) {
-            Image(nsImage: reference.vignette).resizable().scaledToFill()
-                .frame(width: Self.side, height: Self.side)
-                .clipShape(RoundedRectangle(cornerRadius: 6))
-                .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Palette.hairline, lineWidth: 1))
-                .overlay(alignment: .topLeading) {
-                    Text(verbatim: "\(number)")
-                        .font(.caption2.weight(.bold)).monospacedDigit()
-                        .foregroundStyle(.white)
-                        .frame(width: 18, height: 18)
-                        .background(Circle().fill(number == 1 ? Color.accentColor : Color.black.opacity(0.6)))
-                        .padding(4)
-                }
-            Text(number == 1 ? String(localized: "edited") : String(localized: "image \(number)"))
-                .font(.caption2).foregroundStyle(number == 1 ? .primary : .secondary)
-        }
-        .help(cited ? Text("\(reference.name), cited by the prompt: delete the name there to take it out")
-                    : Text(verbatim: "\(reference.name) · \(reference.width) × \(reference.height)"))
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(Text(verbatim: "\(number). \(reference.name)"))
-    }
-}
-
-// MARK: - Under the form: the cost, generate, the queue, what went wrong
+// MARK: - Under the rack: the queue, what went wrong
 
 private struct Footer: View {
     @Bindable var app: AppState
 
+    /// Something to say: an empty bar under the rack would be a band of nothing.
+    private var speaks: Bool {
+        if case .running = app.diagnostic { return true }
+        return app.busy || app.othersQueued > 0 || app.copying != nil || app.forgeInProgress != nil || app.problem != nil
+            || app.journalLine != nil || !app.settingsLines.isEmpty
+    }
+
     var body: some View {
-        // Read once per drawing: the memory half computes the need against B (`MemoryBudget`).
-        let form = app.formBlocker
-        let refusal = form == nil ? app.memoryRefusal : nil
-        let memory = refusal?.text
-        let blocker = form ?? memory
-        VStack(alignment: .leading, spacing: 10) {
-            cost
-            // **No `fixedSize(vertical:)` on a text of this footer** (nor in `ProblemView`): a refusal of
-            // two lines held at its ideal height made the footer taller than the column: it left the
-            // window and the rack scrolled to its end, nothing left to click (a `{` left open, a grid's
-            // LoRA axis without strengths) — measured with the footer as a `safeAreaInset`, the same
-            // in a `VStack`. Wrapping on its own, the text fits.
-            // What stops « Generate » is said above it, in the body's size: it is what to do next, read
-            // before the figures — the cost line above is caption-sized.
-            if let reason = blocker {
-                Text(reason).font(.callout)
-                // A memory refusal is never a dead end: a size this Mac renders.
-                if let f = refusal?.smaller {
-                    Button(String(localized: "Use \(String(f.width)) × \(String(f.height))")) { app.useFormat(f) }
-                        .buttonStyle(.link).font(.caption)
-                        .help("The largest of this model’s sizes this Mac renders")
+        if speaks {
+            VStack(alignment: .leading, spacing: 10) {
+                // **No `fixedSize(vertical:)` on a text of this footer** (nor in `ProblemView`): a text of two lines held at its
+                // ideal height made the footer taller than the column: it left the window and the rack scrolled to its end,
+                // nothing left to click — measured with the footer as a `safeAreaInset`, the same in a `VStack`. Wrapping on its
+                // own, the text fits.
+                if case let .running(done, total, line) = app.diagnostic {
+                    // Before the first render, the measure it waits for: why nothing starts yet, and how far.
+                    Text(app.settingsRead ? "The diagnostic is running: renders wait for it."
+                                          : "Siliconed measures this Mac before its first render — about a minute.")
+                        .font(.callout)
+                    Text(verbatim: "\(line) · \(done + 1)/\(total)").font(.caption).foregroundStyle(.secondary)
                 }
-            } else if case let .running(done, total, line) = app.diagnostic {
-                // Before the first render, the measure it waits for: why nothing starts yet, and how far.
-                Text(app.settingsRead ? "The diagnostic is running: renders wait for it."
-                                      : "Siliconed measures this Mac before its first render — about a minute.")
-                    .font(.callout)
-                Text(verbatim: "\(line) · \(done + 1)/\(total)").font(.caption).foregroundStyle(.secondary)
-            }
-            // A render's gap to the measure's prediction is not said here: the model runs a long render's regime off the probes' short
-            // passes, the same way on every Mac, and an invitation to measure again could not close that gap. The gap goes with the
-            // report (the diagnostic sheet's last render).
-            // What the Prompt Lab holds and the render will not read: said before the click, never in silence.
-            let unused = app.unusedInputs
-            if unused > 0 {
-                Button { LabModel.shared.unfold() } label: {
-                    Label(unused == 1 ? String(localized: "1 image of the Prompt Lab not used")
-                                      : String(localized: "\(unused) images of the Prompt Lab not used"),
-                          systemImage: "info.circle")
+                if app.busy { queue }
+                // In a mirror: the other Mac busy with renders that are not this Mac's — why this one waits.
+                if app.othersQueued > 0, let mirror = app.mirror {
+                    Label(app.othersSeconds.map { s in
+                        String(localized: "Renders for others on “\(mirror.macName)”: \(app.othersQueued), about \(Duration.seconds(s).formatted(.units(allowed: [.minutes, .seconds], width: .abbreviated)))")
+                    } ?? String(localized: "Renders for others on “\(mirror.macName)”: \(app.othersQueued)"),
+                          systemImage: "person.2")
+                        .font(.caption).foregroundStyle(.secondary)
                 }
-                .buttonStyle(.plain).font(.caption).foregroundStyle(.secondary)
-                .help("Without a role, or with one this model lacks: give it a role in the Prompt Lab")
-            }
-            HStack(spacing: 8) {
-                Button { app.render() } label: {
-                    Text(label).fontWeight(.semibold).frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(blocker != nil)
-                .help(Text(verbatim: "⌘↩"))
-                Button { MainWindow.shared.showExploration() } label: {
-                    Label("Explore", systemImage: "square.grid.3x3")
-                }
-                .buttonStyle(.bordered)
-                .fixedSize()
-                .help("Sweep seeds, a LoRA’s strength, words of the prompt, models or the images to edit — small sketches, fast (⌥⌘G)")
-            }
-            .controlSize(.extraLarge)
-            if app.busy { queue }
-            // In a mirror: the other Mac busy with renders that are not this Mac's — why this one waits.
-            if app.othersQueued > 0, let mirror = app.mirror {
-                Label(app.othersSeconds.map { s in
-                    String(localized: "Renders for others on “\(mirror.macName)”: \(app.othersQueued), about \(Duration.seconds(s).formatted(.units(allowed: [.minutes, .seconds], width: .abbreviated)))")
-                } ?? String(localized: "Renders for others on “\(mirror.macName)”: \(app.othersQueued)"),
-                      systemImage: "person.2")
-                    .font(.caption).foregroundStyle(.secondary)
-            }
-            // The models being copied from the library's disk to this Mac (`AppState+Place.swift`).
-            if let c = app.copying {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(c.title).font(.callout).lineLimit(2)
-                    ProgressView(value: c.fraction).controlSize(.small)
-                }
-                .help("The library is on another disk: what a render reads is copied to this Mac first, once, and removed when Siliconed quits")
-            }
-            if let title = app.forgeInProgress {
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack {
-                        ProgressView().controlSize(.small)
-                        Text(title).font(.callout).lineLimit(2)
-                        Spacer()
-                        Button("Stop") { app.cancelForge() }
-                            .buttonStyle(.link).font(.caption)
-                            .help("Stops the installation: the files already downloaded are kept, the one in progress will start over")
+                // The models being copied from the library's disk to this Mac (`AppState+Place.swift`).
+                if let c = app.copying {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(c.title).font(.callout).lineLimit(2)
+                        ProgressView(value: c.fraction).controlSize(.small)
                     }
-                    if let line = app.forgeLine {
-                        Text(line).font(.caption).monospacedDigit().foregroundStyle(.secondary).lineLimit(2)
-                    }
+                    .help("The library is on another disk: what a render reads is copied to this Mac first, once, and removed when Siliconed quits")
                 }
-                .help(app.forgeHelp)
+                if let title = app.forgeInProgress {
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack {
+                            ProgressView().controlSize(.small)
+                            Text(title).font(.callout).lineLimit(2)
+                            Spacer()
+                            Button("Stop") { app.cancelForge() }
+                                .buttonStyle(.link).font(.caption)
+                                .help("Stops the installation: the files already downloaded are kept, the one in progress will start over")
+                        }
+                        if let line = app.forgeLine {
+                            Text(line).font(.caption).monospacedDigit().foregroundStyle(.secondary).lineLimit(2)
+                        }
+                    }
+                    .help(app.forgeHelp)
+                }
+                if let problem = app.problem {
+                    ProblemView(problem: problem) { app.problem = nil }
+                }
+                if let line = app.journalLine {
+                    Label(line, systemImage: "info.circle")
+                        .font(.caption).foregroundStyle(.secondary).lineLimit(2)
+                        .help(app.journal.joined(separator: "\n"))
+                }
+                ForEach(Array(zip(app.settingsLines, app.settingsWarnings)), id: \.1) { line, raw in
+                    Label(line, systemImage: "info.circle").font(.caption).foregroundStyle(.secondary)
+                        .help(raw)
+                }
             }
-            if let problem = app.problem {
-                ProblemView(problem: problem) { app.problem = nil }
-            }
-            if let line = app.journalLine {
-                Label(line, systemImage: "info.circle")
-                    .font(.caption).foregroundStyle(.secondary).lineLimit(2)
-                    .help(app.journal.joined(separator: "\n"))
-            }
-            ForEach(Array(zip(app.settingsLines, app.settingsWarnings)), id: \.1) { line, raw in
-                Label(line, systemImage: "info.circle").font(.caption).foregroundStyle(.secondary)
-                    .help(raw)
-            }
+            .padding(14)
+            .background(.bar)
+            .overlay(alignment: .top) { Divider() }
         }
-        .padding(14)
-        .background(.bar)
-        .overlay(alignment: .top) { Divider() }
-    }
-
-    /// **Rule 7: the cost before the click** — the memory the engine will compare to the machine's, and
-    /// the time, learned on this Mac in this session (never a constant from another machine).
-    @ViewBuilder private var cost: some View {
-        if app.missing == nil, let card = app.card {
-            let f = app.outputFormat
-            HStack(spacing: 14) {
-                Label {
-                    Text(verbatim: "\(f.width) × \(f.height)").monospacedDigit()
-                } icon: { Image(systemName: "aspectratio") }
-                if let need = app.memoryNeed {
-                    Label {
-                        Text(Figures.memory(need)).monospacedDigit()
-                    } icon: { Image(systemName: "memorychip") }
-                    .help(String(localized: "The memory \(card.name) needs at this size (computed)"))
-                }
-                if app.variantCount > 1 {
-                    // A prompt with alternatives is a series: how many renders, before the click.
-                    Label {
-                        Text("\(app.variantCount) renders").monospacedDigit()
-                    } icon: { Image(systemName: "square.stack") }
-                    .help(app.alternativesHelp)
-                }
-                Label {
-                    if let t = app.plannedCost {
-                        Text(verbatim: "≈ " + Figures.duration(t)).monospacedDigit()
-                    } else {
-                        Text("after one render")
-                    }
-                } icon: { Image(systemName: "clock") }
-                .help("Learned on this Mac: the first render at this size, with this model, sets the estimate")
-                Spacer(minLength: 0)
-            }
-            .font(.caption)
-            .foregroundStyle(.secondary)
-            .labelStyle(CompactLabel())
-        }
-    }
-
-    private var label: String {
-        let n = app.variantCount
-        if app.busy { return n > 1 ? String(localized: "Add \(n) Renders to Queue") : String(localized: "Add to Queue") }
-        if !app.references.isEmpty { return n > 1 ? String(localized: "Edit Image \(n) Ways") : String(localized: "Edit Image") }
-        let images = n * max(1, app.batch)
-        return images > 1 ? String(localized: "Generate \(images) Images") : String(localized: "Generate")
     }
 
     /// **What remains to be done**: the running render first — a batch is one job, its images rendered
@@ -388,13 +266,6 @@ private struct Footer: View {
                 .frame(height: Self.rowHeight)
             }
         }
-    }
-}
-
-/// An icon and its text, close together.
-private struct CompactLabel: LabelStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        HStack(spacing: 4) { configuration.icon; configuration.title }
     }
 }
 

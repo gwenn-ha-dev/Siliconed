@@ -211,6 +211,9 @@ private struct PictureTile: View {
             .disabled(rack.cropRefusal(width: picture.shown.width, height: picture.shown.height) != nil)
         Button("Replace…") { rack.replaceReference(picture.shown.id) }
         Button("Name…") { model.name(picture) }
+        if picture.role == .start, model.startIsImg2Img {
+            Button("Reset to \(StartWords.percent(rack.defaultStartStrength))") { rack.setStartStrength(rack.defaultStartStrength) }
+        }
         if let bytes = picture.bytes, AppState.isRecipe(bytes) {
             Button("Reuse These Settings") { _ = rack.restoreSettings(fromPNG: bytes, file: picture.shown.name) }
         }
@@ -219,7 +222,8 @@ private struct PictureTile: View {
     }
 }
 
-/// **The starting image's strength, on its tile**: the rack's — one strength, set here or in the rack.
+/// **The starting image's strength, on its tile** — its one place: the rack reads it in its port, it does not set it.
+/// Orange, and said, when it is so high that the image is ignored.
 private struct StartStrength: View {
     let model: LabModel
 
@@ -237,8 +241,13 @@ private struct StartStrength: View {
                 .controlSize(.mini)
                 .accessibilityLabel(Text("Strength"))
                 .accessibilityValue(Text(verbatim: StartWords.percent(rack.startStrength)))
+            if rack.startIgnored {
+                Text("Image ignored: lower the strength").font(.caption2).foregroundStyle(Color(nsColor: .systemOrange))
+                    .lineLimit(2).fixedSize(horizontal: false, vertical: true)
+                    .help(rack.startCaption.text)
+            }
         }
-        .help(StartWords.explanation(nil))
+        .help(StartWords.explanation(rack.startRedraws))
     }
 }
 
