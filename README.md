@@ -14,7 +14,7 @@ One developer, one MacBook Pro with 16 GB, and a stubborn rule: if a result cann
 [![unit tests](https://img.shields.io/github/actions/workflow/status/gwenn-ha-dev/Siliconed/test.yml?branch=main&label=unit%20tests)](https://github.com/gwenn-ha-dev/Siliconed/actions/workflows/test.yml)
 [![kernels checked, CPU stages](https://img.shields.io/github/actions/workflow/status/gwenn-ha-dev/Siliconed/kernels.yml?branch=main&label=kernels%20checked%2C%20CPU%20stages)](https://github.com/gwenn-ha-dev/Siliconed/actions/workflows/kernels.yml)
 
-![A sunny Krea 2 Turbo photo — a laughing red-haired Irish woman in a shorty wetsuit running out of the surf, her surfboard under her arm, backlit by a low sun — and its cel-shaded western comic-book edit by Qwen-Image-2.1, under a sliding curtain](docs/images/curtain.gif)
+![A sunny Krea 2 Turbo photo — a laughing red-haired Irish woman in a shorty wetsuit wading out of the shore break, her surfboard under her arm, backlit by a low sun — and its cel-shaded western comic-book edit by Qwen-Image-2.1, under a sliding curtain](docs/images/curtain.gif)
 
 *A photo from Krea 2 Turbo, edited by Qwen-Image-2.1 with one sentence (“Convert this photo to a western comic book style with cel shading”, seed 42), compared under the curtain.*
 
@@ -31,6 +31,8 @@ The app ships as a `.dmg` on the [Releases](https://github.com/gwenn-ha-dev/Sili
 - **Local and private.** Rendering happens on your Mac, with no content filter added by the app and no history sent anywhere. It follows the system language (English, French, German, Spanish, Italian, Japanese or Simplified Chinese).
 - **Renders on another Mac.** A MacBook computes on the Mac mini of the next room, paired once with a code, encrypted ([how](docs/APP.md#render-on-another-mac)).
 - **Scriptable.** `silicontrol` drives the running app from a terminal, for scripts and coding agents ([details](docs/REMOTE-CONTROL.md)).
+
+![The Siliconed window: the rack on the left (text, text encoder, DiT, VAE decoder, each with its settings and time), the Krea 2 Turbo surf photo in the middle, the Prompt Lab folded to one line beneath it, the history on the right](docs/images/window.jpg)
 
 The tour of the app: [docs/APP.md](docs/APP.md).
 

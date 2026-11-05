@@ -32,6 +32,8 @@ L'app est distribuée en `.dmg` sur la page [Releases](https://github.com/gwenn-
 - **Calcule sur un autre Mac.** Un MacBook calcule sur le Mac mini de la pièce d'à côté, appairé une fois par un code, chiffré ([comment](docs/APP.fr.md#calculer-sur-un-autre-mac)).
 - **Scriptable.** `silicontrol` pilote l'app ouverte depuis un terminal, pour les scripts et les agents de code ([détails](docs/REMOTE-CONTROL.fr.md)).
 
+![La fenêtre de Siliconed : le rack à gauche (texte, encodeur de texte, DiT, décodeur VAE, chacun avec ses réglages et son temps), la photo de surf de Krea 2 Turbo au centre, l'Atelier de prompt replié en une ligne dessous, l'historique à droite](docs/images/window.jpg)
+
 Le tour de l'app : [docs/APP.fr.md](docs/APP.fr.md).
 
 ## Pourquoi s'embêter

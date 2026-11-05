@@ -4,9 +4,9 @@ English · [Français](APP.fr.md)
 
 `Siliconed.app` turns a prompt into an image, edits images when you tell it what to change, and keeps a queue and a history of it all. No account, no cloud, no spinner that waits for a server somewhere. Just your Mac, working hard and telling you what it is doing. It follows the system language (English, French, German, Spanish, Italian, Japanese or Simplified Chinese).
 
-![The window: the rack on the left (prompt, text encoder, denoiser, decoder, each with its settings and time), a Krea 2 Turbo image at 1248×832 on the right — a laughing red-haired Irish woman running out of the surf, her surfboard under her arm, under a sunny sky —, the history below](images/window.jpg)
+![The window: the rack on the left (text, text encoder, DiT with Krea 2 Turbo, VAE decoder, each with its settings and time), a Krea 2 Turbo photo at 1248×832 in the middle — a laughing red-haired Irish woman wading out of the shore break, her surfboard under her arm, backlit by a low sun —, the Prompt Lab folded to one line beneath it, the history on the right](images/window.jpg)
 
-*The window, with the Krea 2 Turbo photo from the [Models](#models) section: the rack shows the chain, each stage's settings and time; the history runs below the canvas.*
+*The window, with the Krea 2 Turbo photo from the [Models](#models) section: the rack shows the chain, each stage's settings and time; the Prompt Lab, folded, under the image; the history on the right.*
 
 The engine behind it, with the measurements: [The Siliconed engine](ENGINE.md).
 
@@ -20,6 +20,14 @@ The engine behind it, with the measurements: [The Siliconed engine](ENGINE.md).
 - **Enlarge ×4** with macOS's own super-resolution (macOS 26): no prompt, nothing added, edges and texture sharpened; 1024² becomes 4096² in a second or two once macOS's model is warm. It takes images up to 1920 px a side, and an enlarged image is not enlarged again. The original stays in the history.
 - **LoRAs** on all five models, in the denoiser's box: Add lists the model's LoRAs, then Import… for a file from Civitai. Each one is a card: a box to switch it off without losing it, its strength (a slider, or the figure typed), and its trigger words, when its file states them, as a button that puts them at the head of the prompt. Right-click: Replace With, Reset to 0.8, Remove. Three at most.
 - **Reproducible to the bit.** Same prompt, seed, settings and version on the same Mac, same image, byte for byte. Two things can change the pixels: a new version of the app (0.12 did, by a few units in the last place, once its arithmetic rounded as the reference does), and a new measure of this Mac, which may split the work in other rows ([Measure This Mac](#measure-this-mac)).
+
+![A Krea 2 Turbo render under way: the DiT's box lit in mint at step 5 of 8 with 19 seconds left, the image still blurred as it forms, the Prompt Lab unfolded with its text, Add to Queue at its foot, the job in the queue under the rack](images/live.jpg)
+
+*A render under way, Preview Every Step on: the active stage is lit, its steps and the time left under it; the image forms in place.*
+
+![The rack scrolled down to the LoRA: the chain pinned at its top in small (text encoder, DiT lit, VAE decoder), Anima Turbo with the inCase LoRA at 0.80 and its bracketed values, the DiT at step 2 of 8](images/chain.jpg)
+
+*Scrolled down to the denoiser's settings, the chain stays at the top in small, lit the same way.*
 
 Each side must be at least 512 and a multiple of 16; there is no fixed ceiling on the area: the memory budget decides. What a format costs is computed from the model's shapes before the first computation and judged against the Mac's memory budget ([how](ENGINE.md#memory-and-the-budget)): a Mac that cannot hold it is refused, and told which one can. The size picker lists 1536² and 2048² beside 1024², and greys what this Mac's budget refuses; any other size is typed. Formats past 1024×1536 are priced by the same formulas; Anima Turbo at 2048² was rendered on the 16 GB reference Mac, peaking at 5.4 GB. Below 512² the models are outside their domain. Qwen-Image-2.1 needs multiples of 32 (its VAE divides by 16), and Anima at most 2048 px on a side (the positions its reference computes); both are refused before any computation, and so is any side past 8192 px.
 
@@ -44,13 +52,21 @@ The landscapes are the same sizes turned (3:2 is 1248 × 832 at 1K). The ≈: at
 - **Named subjects**: name a person, an object or a style from a photo, then cite it as `@name` in the Prompt Lab's text (see Prepare, below); the render receives the prompt translated and the images numbered.
 - **A history like Photos**, in a column on the right (the slider at its foot sets the thumbnails' size): arrows, ⌫ and ⌘Z, multiple selection, export, drag and drop, Share. From a terminal: `silicontrol remove`, `undo`, `crop`, `again`, `reuse`, `save` (PNG, JPEG, HEIC).
 
-![An edit by Qwen-Image-2.1 in the window: the Krea 2 photo of the surfer as image 1 in the Images box, the instruction “Convert this photo to a western comic book style with cel shading”, the cel-shaded result in the canvas](images/edit.jpg)
+![An edit by Qwen-Image-2.1 in the window: the Krea 2 photo of the surfer as image 1, “Image to Edit”, in the Prompt Lab, the instruction “Convert this photo to a western comic book style with cel shading”, the cel-shaded result in the canvas, the image ports of the rack numbered](images/edit.jpg)
 
 *Qwen-Image-2.1 Turbo, Standard: “Convert this photo to a western comic book style with cel shading”, the Krea 2 photo as image 1, 1248×832, seed 42.*
 
-![An edit by Qwen-Image-2.1, under the sliding curtain: the Krea 2 surfer running out of the surf in her wetsuit, then in a white linen blouse, her face, hair, surfboard and the sea unchanged](images/outfit.gif)
+![An edit by Qwen-Image-2.1, under the sliding curtain: the Krea 2 surfer wading out of the surf in her wetsuit, then in a white linen blouse, her face, hair, surfboard and the sea unchanged](images/outfit.gif)
 
-*An edit that changes only what it is told: “Replace her wetsuit with a white linen blouse. Keep her face, hair, surfboard, pose and the beach unchanged.”, the Krea 2 photo as image 1.*
+*An edit that changes only what it is told: “Replace her wetsuit with a white linen blouse. Keep her face, hair, surfboard, pose and the beach unchanged.”, the Krea 2 photo as image 1, seed 42.*
+
+![Subjects cited by name: the surfer as image 1, three subjects named from another photo (a coat, a dog, a woman), the text “she wears @coat over her wetsuit, and @dog runs beside her through the shallow water” with its two names as chips, the result in the canvas: the surfer in the camel coat, a border collie running beside her in the water](images/mentions.jpg)
+
+*Subjects: a camel coat, a border collie and a woman, named from one photo (a Z-Image Turbo render on a quay in Brittany), then cited by name. Qwen-Image-2.1 Turbo, Standard, the surfer as image 1, seed 42.*
+
+![A new composition from two subjects alone, no image edited: “@maelle walks @dog along a wild beach at sunset”, a woman with short dark curly hair in a long camel coat walking a border collie on a leash along a beach at sunset](images/e3-new.jpg)
+
+*The same subjects without an image to edit: a new picture, 832×1248, seed 42.*
 
 ## Prepare (and let a model do the typing)
 
@@ -60,7 +76,7 @@ The **Prompt Lab** is the bar under the image, where the next render's text and 
 - **A change of model never gives a role, nor turns one into another**: a reference keeps its role under Z-Image, without effect (its tile says so), and works again back on Qwen-Image-2.1; the image Qwen edits never becomes the start of an img2img. Beside Generate, “1 image of the Prompt Lab not used” counts what the next render will not read. Right-click an image: Crop…, Replace…, Name…, Reuse These Settings (for a PNG Siliconed wrote: dropping one no longer changes the rack by itself), Remove.
 - **Subjects**: Name… gives an image a name, a kind and a frame, and the text cites it as `@name` (completed as you type). A subject goes to the render only when the text cites it, after the images the roles send, in the order the text names them. The text keeps its `@names`: they are translated into “image N” when the render is queued, and the PNG keeps both. Subjects live in memory only (nothing is written to disk, as in the history). `silicontrol subjects` acts on the same ones.
 - **What is greyed does not go.** Under a model that reads no image, a subject's `@name` is greyed and left out of what the model reads (any other `@` stays text: Anima's artists); so is a reference to an image the render does not carry (`<image3>`, `image 3` or `Picture 3` with two images). The hover says why; the text keeps them for a model that reads them.
-- **Text**: one text, always yours to edit; the ✕ in its corner clears it (⌘Z brings it back). **Rewrite** turns it into a text written for the rack's model, named in the bar's title, and keeps your `@names` (one it loses is said, never dropped in silence); the additions and removals are marked, and a click in the text puts the marks away. **Describe**, on an image, writes what it shows into the text: it fills an empty text, otherwise it goes where the caret is or replaces the selection (at the end when the text is not on screen). Both write into the text as the writer goes. ⌘Z undoes any gesture of the model. A `@name` cannot sit inside a `{a|b}` group. `silicontrol rewrite` and `silicontrol describe` are the same two gestures for a terminal (same writer, same instructions, same protection of the `@names`, same waits); the text comes back on the socket, never into the field. `silicontrol lab` reads and changes the bar: its images, their roles, folded or not.
+- **Text**: one text, always yours to edit; the ✕ in its corner clears it (⌘Z brings it back). **Rewrite** turns it into a text written for the rack's model, named in the bar's title, and keeps your `@names` (one it loses is said, never dropped in silence); the additions and removals are marked, and a click in the text puts the marks away. **Describe**, on an image, writes what it shows into the text: it fills an empty text, otherwise it goes where the caret is or replaces the selection (at the end when the text is not on screen). Both write into the text as the writer goes. ⌘Z undoes any gesture of the model. A `@name` cannot sit inside a `{a|b}` group. `silicontrol rewrite` and `silicontrol describe` are the same two gestures for a terminal (same writer, same instructions, same protection of the `@names`, same waits); the text comes back on the socket; `silicontrol lab rewrite` and `lab describe N` write it into the bar's text, marks included, as the buttons do. `silicontrol lab` reads and changes the bar: its images, their roles, folded or not.
 - **Following another Mac** (see below): Rewrite and Describe are off and say so; the images, the roles and the subjects fill the rack you see, which sends its references to the Mac that renders.
 - **Rewrite and Describe are the only gestures that need the writer** (below): during a render, or without the writer, only they wait, and the rest of the bar works.
 - **The writer is a model you already have**: Qwen-Image-2.1's text encoder, Qwen3-VL-8B, made to write. Only its output layer is missing from the installed model, and “Install the Writer” (or `silicontrol install writer`) downloads it from the same repository (1.25 GB, by byte range; no license of its own, it is Qwen-Image-2.1's). It needs Qwen-Image-2.1 installed, and reads its layers in a plan chosen within the memory budget before the first word: on a 16 GB Mac the Compact's all from memory; on an 8 GB Mac, or with the Standard on 16 GB, part of them from the disk at each token, more slowly. The window tells you what is missing.
@@ -68,17 +84,33 @@ The **Prompt Lab** is the bar under the image, where the next render's text and 
 - **Never during a render**: an image that starts stops the writer, and Rewrite and Describe wait. On an M1 Pro with the Compact, the first word comes after about 10 s for Rewrite and 25 s for Describe, which reads the image first, then about 12 tokens a second, on the GPU. Its greedy output matches transformers' token for token ([VERIFY](VERIFY.md)).
 - **Incognito**: texts, images and subjects stay in memory, with no file and no history; the writer gives its weights back after every gesture, so the Mac's memory is free between two.
 
+![The Prompt Lab unfolded as a glass plate over a Z-Image Turbo photo, in the light appearance: a young red-haired Irish woman in a cream Aran sweater riding a green bicycle down a lane between dry-stone walls and red fuchsia hedges, the prompt in the bar, Generate at its foot](images/window-light.jpg)
+
+*The Prompt Lab unfolded over the image, in the light appearance: Z-Image Turbo, Standard, 832×1248, seed 7001.*
+
+![Rewrite for Z-Image Turbo: a short idea turned into a long description of the cyclist photo, the additions marked in peach, the title “Write for Z-Image Turbo”](images/rewrite.jpg)
+
+*Rewrite: a one-line idea written out for Z-Image Turbo, what was added marked in the text.*
+
+![Describe at work: a photo of a woman hugging a border collie on a quay as the only image of the Prompt Lab, with Start From This Image and Describe, the writer filling the empty text as it goes, “Writing…” under it](images/describe.jpg)
+
+*Describe: the writer reads the image and writes what it shows into the text as it goes.*
+
 ## Series (bracket, then choose)
 
 Anything that varies makes a series, and everything that can vary carries the same yellow ± at its right: outlined it offers, filled it varies, its values written under it with the arrow of their axis (↔ columns, ↕ rows). A `{red|blue}` group in the prompt is one, drawn as a yellow chip with a dot between its words: a click on it opens its bubble, and the ± at the right of the text, under its ✕ — or Vary This Word… at the head of the right-click menu — turns the selected word, or the word at the caret, into one. The Batch is another: consecutive seeds from the rack's, its ± on the Seed line. The knobs are the rest, by their ± or right-click › Bracket…: a LoRA's strength, LoRAs compared (the ± of the LoRA title, or Add › Compare LoRAs…, where the model has two LoRAs or more: one added per image, and the image without), the starting image's strength, Detail and, with More Solvers on, the solver. The bubble offers three values around the knob's (a LoRA ±0.2, the starting image ±15 points), a step and a count to make them again, and the axis they take, columns or rows; placed where another axis is, it replaces it, and says which before you click. A series is two values or more. Two axes at most, the Batch one of them: beside Generate, a line per axis with its ✕, and ⇄ to swap them; a third thing that varies keeps Generate off and says why. Generate then queues one finished image per cell, the very image it would render alone, into the history one by one; the canvas lays them out as a grid while they render and until you choose one, and Add Sheet to History draws the sheet when you want it. Models, steps and each image of an edit vary from a terminal: `silicontrol grid` (its axes become the window's series where the window has them) and `silicontrol sheet g2`.
 
-![A series with Anima Turbo and the inCase LoRA, filling in the canvas: a laughing red-haired Irish woman on a sunny cliff-top beach, the wetsuit's colour across (teal, coral red, mustard yellow, navy) and the LoRA's strength down (0, 0.5, 1), the axes as labels, the last row still rendering](images/grid.jpg)
+![A series filling in the canvas: Anima Turbo with the inCase LoRA, a laughing red-haired Irish woman before sea cliffs, the wetsuit's colour across (teal, coral red, mustard yellow) and inCase's strength down (0, 0.5, 1), one cell after another, until the nine are there](images/series.gif)
 
-*A series with Anima Turbo and the inCase LoRA: the wetsuit's colour written in braces in the prompt (`{teal|coral red|mustard yellow|navy}`) across, inCase bracketed at 0, 0.5 and 1 down; 512×768.*
+*A series with Anima Turbo and the inCase LoRA: the wetsuit's colour written as a group in the prompt (`{teal|coral red|mustard yellow}`) across, inCase bracketed at 0, 0.5 and 1 down; 832×1248, seed 4001, nine finished images.*
 
-![The chosen cell in the window: an Anima Turbo illustration with the inCase LoRA, a laughing young red-haired Irish woman in a navy wetsuit in close-up, cliffs and breaking waves behind her](images/anima.jpg)
+![The series done, the Prompt Lab unfolded: the yellow chip “teal · coral red · mustard yellow” in the text, the inCase LoRA's ± filled with its values written under it, a line per axis beside “Generate 9 Images”, the nine images on the canvas behind](images/series-set.jpg)
 
-*The chosen cell, full size: Anima Turbo with the inCase LoRA at 1, “A close-up portrait of a young Irish woman with long wavy auburn red hair, pale freckled skin and green eyes, laughing, wearing a navy shorty wetsuit, on a sunny cliff-top beach in the west of Ireland. Big Atlantic waves breaking into white spray below green sea cliffs, deep blue sky, bright sunlight, wind in her hair.”, 512×768, seed 4001.*
+*What varies, where it varies: the group in the text, inCase's ± in the rack, one line per axis beside Generate.*
+
+![The bracket bubble open on inCase's strength: the values 0.00, 0.50 and 1.00 with a ✕ each and a +, a step of 0.20 and a count of 3, the axis set to Rows, Remove, Cancel and Bracket](images/bracket.jpg)
+
+*The bubble of a knob: its values, a step and a count to make them again, and the axis they take.*
 
 ## Model management
 
@@ -97,7 +129,7 @@ A measure you ask for applies to the **next** render, never to one under way, so
 
 Models live in `~/Library/Application Support/Siliconed` (override with `SILICONED_ROOT`). To free the internal disk, Settings › Move Library… moves them to another one — an external disk, a network share: every file is copied, checked, then removed from the Mac. Siliconed then copies to the Mac only the models you render, for the session, and removes them when it quits; the licenses you accepted and this Mac's measurements stay on the Mac. Unplugged, the disk is flagged: nothing renders until it is back. From a terminal: `silicontrol library move DIR` (without `--yes`, it says what would be copied and the room there is).
 
-![The Models window: the five publishers' models installed in Compact, each with its license and its size on disk (Z-Image Turbo 11.74 GB, Qwen-Image-2.1 Turbo 17.3 GB, Anima Turbo 4.1 GB, Krea 2 Turbo 19.5 GB, MOSS-Image 17.88 GB, marked beta), the LoRAs below, the disk used and free at the bottom](images/models.jpg)
+![The Models window: the five publishers' models installed in Standard, each with its license and its size on disk (Z-Image Turbo 20.36 GB, Qwen-Image-2.1 Turbo 32.46 GB, Anima Turbo 5.65 GB, Krea 2 Turbo 55.97 GB, MOSS-Image 27.5 GB, marked beta), MOSS-Image's versions open with the Compact chosen and the room it would free, the disk used and free at the bottom](images/models.jpg)
 
 ## Models
 
@@ -115,9 +147,9 @@ Only recent models whose text encoder is a language model — no Stable Diffusio
 
 [Krea 2 Turbo](https://huggingface.co/krea/Krea-2-Turbo), by Krea, is the fourth model, added in 0.12: a 12.9-billion-parameter DiT, the largest of the five, for aesthetic images from photography to painting. It reads the prompt with Qwen3-VL-4B and runs its whole 8-evaluation recipe in fp32 on the publisher's bf16 weights, with [Faster Rendering](ENGINE.md#faster-rendering) as a Beta option (times and deviations: [Numbers](ENGINE.md#numbers)), its weights streamed from disk within the memory budget. It installs as Standard, Compact or Light (sizes: [Model management](#model-management)), from open copies proven to be identical to Krea's files (see below), under the Krea 2 Community license (table above).
 
-![A Krea 2 Turbo photo at 1248×832, low angle: a young Irish woman with long wavy auburn hair and freckles, in a short-sleeved shorty wetsuit, running out of the surf laughing with her surfboard under her arm, backlit by a low golden sun with lens flare, glowing spray, turquoise water and a deep blue sky](images/krea2.jpg)
+![A Krea 2 Turbo photo at 1248×832, from the water at wave height: a young Irish woman with long wavy auburn hair and freckles, in a short-sleeved shorty wetsuit, wading out of the shore break laughing with her surfboard under her arm, the low sun behind her, rim light in her wet hair, backlit spray, the horizon slightly tilted](images/krea2.jpg)
 
-*Krea 2 Turbo, Standard, 1248×832, 8 steps, seed 3001: “Editorial surf photograph, low angle, of a young Irish woman with long wavy auburn red hair, pale freckled skin and green eyes, in a short-sleeved shorty wetsuit, running out of the surf laughing, surfboard under her arm, on a rare sunny day in the west of Ireland. Golden late-afternoon backlight, sun flare, spray glowing in the light, turquoise water, deep blue sky, high contrast, vivid colors, sharp focus, shot on a 50 mm lens.”*
+*Krea 2 Turbo, Standard, 1248×832, 8 steps, seed 3303: “Surf photograph shot from the water at wave height: a young Irish woman with long wavy auburn red hair, pale freckled skin and green eyes, in a short-sleeved shorty wetsuit, wading out of the shore break and laughing, her surfboard under her arm, on a rare sunny evening in the west of Ireland. Hard low sun behind her, rim light in her wet hair, the spray backlit like sparks, deep shadows, horizon slightly tilted, one drop of water on the lens in a corner, Kodak Portra 400 grain, 35 mm.”*
 
 Krea 2 Turbo downloads nothing from [krea/Krea-2-Turbo](https://huggingface.co/krea/Krea-2-Turbo): that repository asks for a Hugging Face account, and the app has no sign-in. Each of its files comes from an open copy proven identical to Krea's: the DiT and the Qwen3-VL-4B text encoder in bf16 from [Comfy-Org/Krea-2](https://huggingface.co/Comfy-Org/Krea-2) (the DiT the very same file, the encoder equal tensor for tensor), the VAE from [Qwen/Qwen-Image](https://huggingface.co/Qwen/Qwen-Image) (Krea's fp32 VAE is this bf16 one widened, value for value), the tokenizer from [Qwen/Qwen-Image-2.1-Turbo](https://huggingface.co/Qwen/Qwen-Image-2.1-Turbo) (the same file); Krea's own configuration files are embedded as published. Its Compact takes the DiT and the text encoder in int8 convrot from [Comfy-Org/Krea-2](https://huggingface.co/Comfy-Org/Krea-2); its Light, the GGUF Q4_K_M of [vantagewithai/Krea-2-Turbo-GGUF](https://huggingface.co/vantagewithai/Krea-2-Turbo-GGUF) with the Compact's text encoder.
 
@@ -125,9 +157,9 @@ Krea 2 Turbo downloads nothing from [krea/Krea-2-Turbo](https://huggingface.co/k
 
 [MOSS-Image](https://huggingface.co/OpenMOSS-Team/MOSS-Image-SFT), by the OpenMOSS team, is the fifth model, added in 0.16: a single-stream DiT of 5.1 billion parameters that reads the prompt with Qwen3.5-9B — a hybrid language model, three layers in four of linear attention (Gated DeltaNet) — and decodes with FLUX.2's VAE. Its publisher released no fast version; the community did: Siliconed runs MOSS-Image-SFT under [lodestones' DMD LoRA](https://huggingface.co/lodestones/MOSS-Image-SFT-8-steps-dmd) at strength 1, 8 evaluations, no CFG, the LoRA kept beside the weights in fp32 (merged into the bf16 weights, its small deltas would be lost to rounding). Both are checked against the reference, the LoRA included ([VERIFY.md](VERIFY.md)). Text to image, and your LoRAs on top of the 8-step one — ComfyUI's and ai-toolkit's fused `qkv` is split exactly, and LoRAs trained on MOSS-Image Base apply too, as the community uses them; no Detail, no edit. [Faster Rendering](ENGINE.md#faster-rendering) takes a single half-size evaluation: from the second, MOSS-Image loses fine detail (skin, book spines) where the other models keep it. It is marked **beta** in the app, because its 8-step recipe is the community's, not the publisher's; it leaves beta when OpenMOSS releases its own fast version. It installs as Standard or Compact (sizes: [Model management](#model-management)), under Apache 2.0, the LoRA included.
 
-![The window with MOSS-Image in the rack: a 1248×832 close-up portrait of a young Irish woman with long wavy auburn hair and freckles, in a shorty wetsuit, laughing, wet strands of hair blown across her face, raindrops on her skin, the Atlantic breaking behind her under a cloudy sky](images/moss.jpg)
+![MOSS-Image starting from the Krea 2 photo: the rack's Starting Image port reads it at 80 %, the Prompt Lab holds it as “Starting Image” with its strength, and the canvas shows the same shot with a laughing grey-haired Irish grandmother in her seventies in the shorty wetsuit, her surfboard under her arm](images/start.jpg)
 
-*MOSS-Image, Compact, 1248×832, 8 steps, seed 6001: “Close-up portrait of a young Irish woman with long wavy auburn red hair, pale freckled skin and green eyes, in a short-sleeved shorty wetsuit, the wind whipping wet strands of hair across her face, squinting and laughing. Hard low sunlight from the side just after a rain shower, dark storm clouds over the Atlantic behind her, raindrops on her skin, shot on Portra 400, shallow depth of field.”*
+*MOSS-Image, Standard, starting from the Krea 2 photo (Start From This Image, strength 80 %), 1248×832, 8 steps, seed 9001: the same prompt, the young woman replaced by “a grey-haired Irish grandmother in her seventies”. The composition holds; the person changes.*
 
 The Standard takes the DiT, the Qwen3.5-9B text encoder (its language model alone, the vision tower left out), the VAE and the tokenizer from [OpenMOSS-Team/MOSS-Image-SFT](https://huggingface.co/OpenMOSS-Team/MOSS-Image-SFT), and the LoRA from [lodestones/MOSS-Image-SFT-8-steps-dmd](https://huggingface.co/lodestones/MOSS-Image-SFT-8-steps-dmd). Its Compact takes the DiT and the text encoder in int8 convrot from [Comfy-Org/MOSS-Image](https://huggingface.co/Comfy-Org/MOSS-Image), with the same LoRA, VAE and tokenizer. No Light yet: a 4-bit DiT is published but not yet checked; on a Mac with 8 GB the Compact is preselected, and its peak stays within that Mac's budget.
 
@@ -152,6 +184,12 @@ Siliconed › Settings… (⌘,), four tabs chosen by their icons; each setting 
 - **Advanced**, in this order: Command Line (installs `silicontrol`, below); and **Beta**, off by default and liable to change: More Solvers (adds the solvers Euler a, DPM++ 2M and UniPC to the denoiser's box and to the series; Euler, the default, is the one the models were distilled for), Faster Rendering (adds its switch to the denoiser's box), Size in Two Scales (the rack's Size becomes a proportion and a resolution, below), Negative LoRA Strengths (strengths from −1.5 to 1.5, for “slider” LoRAs; an ordinary LoRA is damaged by a negative strength). `silicontrol set beta` flips them like the switches.
 
 While you compute on another Mac, the measure is that Mac's, and the window says so.
+
+![Settings, General: the models On This Mac with what they weigh and the disk's free space, Show in Finder, Move Library… and Open Library…, then Save Every Image To…, off](images/settings.jpg)
+
+![Settings, Prompt Lab: Krea 2's Rewrite instruction replaced by one of yours, “Yours: sent instead of Siliconed's.”, and Restore](images/settings-lab.jpg)
+
+*Settings › Prompt Lab: an instruction of your own for Krea 2's Rewrite (a photographer's brief), sent in place of Siliconed's; Restore brings ours back.*
 
 ## Keyboard
 

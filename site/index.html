@@ -215,7 +215,7 @@
   </div>
   <p class="req">Apache 2.0 · macOS 26 or later · M1 and later · signed and notarized</p>
   <figure class="stage h-fade d3">
-    <div class="glow"><img src="images/curtain.gif" width="800" height="533" alt="Under a sliding curtain: on one side, a sunny Krea 2 Turbo photo of a laughing red-haired Irish woman in a shorty wetsuit running out of the surf, her surfboard under her arm, backlit by a low sun; on the other, the same picture turned into a cel-shaded western comic book by Qwen-Image-2.1"></div>
+    <div class="glow"><img src="images/curtain.gif" width="800" height="533" alt="Under a sliding curtain: on one side, a sunny Krea 2 Turbo photo of a laughing red-haired Irish woman in a shorty wetsuit wading out of the shore break, her surfboard under her arm, backlit by a low sun; on the other, the same picture turned into a cel-shaded western comic book by Qwen-Image-2.1"></div>
     <figcaption>A photo by Krea 2 Turbo. Then Qwen-Image-2.1 after one sentence: “Convert this photo to a western comic book style with cel shading.” Seed 42.</figcaption>
   </figure>
   <div class="strip" aria-label="Models and principles">
@@ -240,15 +240,25 @@
       </ul>
     </div>
     <figure class="shot reveal">
-      <img src="images/krea2.jpg" width="1248" height="832" alt="A Krea 2 Turbo photo, low angle: a young Irish woman with long wavy auburn hair and freckles, in a short-sleeved shorty wetsuit, running out of the surf laughing with her surfboard under her arm, backlit by a low golden sun, glowing spray, turquoise water, deep blue sky" loading="lazy">
-      <figcaption>Krea 2 Turbo, Standard, 1248×832, 8 steps, seed 3001: &ldquo;Editorial surf photograph, low angle, of a young Irish woman with long wavy auburn red hair, pale freckled skin and green eyes, in a short-sleeved shorty wetsuit, running out of the surf laughing, surfboard under her arm, on a rare sunny day in the west of Ireland. Golden late-afternoon backlight, sun flare, spray glowing in the light, turquoise water, deep blue sky, high contrast, vivid colors, sharp focus, shot on a 50 mm lens.&rdquo;</figcaption>
+      <img src="images/krea2.jpg" width="1248" height="832" alt="A Krea 2 Turbo photo from the water at wave height: a young Irish woman with long wavy auburn hair and freckles, in a short-sleeved shorty wetsuit, wading out of the shore break laughing with her surfboard under her arm, the low sun behind her, rim light in her wet hair, backlit spray, the horizon slightly tilted" loading="lazy">
+      <figcaption>Krea 2 Turbo, Standard, 1248×832, 8 steps, seed 3303: &ldquo;Surf photograph shot from the water at wave height: a young Irish woman with long wavy auburn red hair, pale freckled skin and green eyes, in a short-sleeved shorty wetsuit, wading out of the shore break and laughing, her surfboard under her arm, on a rare sunny evening in the west of Ireland. Hard low sun behind her, rim light in her wet hair, the spray backlit like sparks, deep shadows, horizon slightly tilted, one drop of water on the lens in a corner, Kodak Portra 400 grain, 35 mm.&rdquo;</figcaption>
     </figure>
   </div>
 
   <figure class="shot reveal" style="margin-top:clamp(56px, 8vw, 96px)">
-    <img src="images/window.jpg" width="1600" height="1064" alt="The Siliconed window: the rack on the left (prompt, text encoder, DiT, VAE decoder, each with its settings and time), the Krea 2 Turbo surf photo at 1248×832 in the canvas, the history below" loading="lazy">
-    <figcaption>One window, the whole chain in view: prompt, text encoder, DiT, decoder, each stage with its settings and its time.</figcaption>
+    <img src="images/window.jpg" width="1600" height="1032" alt="The Siliconed window: the rack on the left (text, text encoder, DiT, VAE decoder, each with its settings and time), the Krea 2 Turbo surf photo at 1248×832 in the middle, the Prompt Lab folded to one line beneath it, the history on the right" loading="lazy">
+    <figcaption>One window, the whole chain in view: text, encoder, DiT, decoder, each stage with its settings and its time. The image in the middle, the Prompt Lab under it, the history on the right.</figcaption>
   </figure>
+  <div class="pair">
+    <figure class="shot reveal">
+      <img src="images/live.jpg" width="1600" height="1032" alt="A Krea 2 Turbo render under way: the DiT's box lit in mint at step 5 of 8, 19 seconds left, the image still forming, the Prompt Lab unfolded with its text" loading="lazy">
+      <figcaption>A render under way: the active stage lit, its steps and the time left; the image forms in place.</figcaption>
+    </figure>
+    <figure class="shot reveal">
+      <img src="images/window-light.jpg" width="1600" height="1032" alt="The window in the light appearance: a Z-Image Turbo photo of a young red-haired Irish woman riding a green bicycle down a lane between dry-stone walls and red fuchsia hedges, the Prompt Lab unfolded over it as a glass plate, Generate at its foot" loading="lazy">
+      <figcaption>Light or dark, as macOS is. Z-Image Turbo, Standard, 832×1248, seed 7001, the Prompt Lab unfolded over the image.</figcaption>
+    </figure>
+  </div>
 
   <div class="reveal" style="margin-top:clamp(56px, 8vw, 96px)">
     <h2>Five models.<br><span class="grad">Zero cloud.</span></h2>
@@ -260,7 +270,7 @@
       <tr><td><a href="https://huggingface.co/circlestone-labs/Anima">Anima Turbo</a></td><td>text-to-image (illustration, painting, anime), LoRA</td><td>CircleStone Labs Non-Commercial (the images may be used commercially)</td></tr>
       <tr><td><a href="https://huggingface.co/OpenMOSS-Team/MOSS-Image-SFT">MOSS-Image</a></td><td>text-to-image, LoRA; beta, under the community's 8-step LoRA</td><td>Apache 2.0</td></tr>
     </table></div>
-    <p class="times">1024², 8 steps, seed 42, on an M1 Pro with 16 GB, app 0.18, every evaluation at full size. Compact, the default version: Krea 2 Turbo 140.9 s, Z-Image Turbo 101.9 s, Qwen-Image-2.1 Turbo 85.8 s, Anima Turbo 40.1 s, MOSS-Image 85.0 s. Standard, the publisher's bf16 in fp32: 213.3 s, 113.1 s, 135.6 s, 40.9 s, 111.7 s. With Faster Rendering, on by default for the Compact: 97.0 s, 80.8 s, 71.4 s, 32.4 s, 78.9 s.</p>
+    <p class="times">1024², 8 steps, seed 42, on an M1 Pro with 16 GB, app 0.18, every evaluation at full size. Compact, the default version: Krea 2 Turbo 140.9 s, Z-Image Turbo 101.9 s, Qwen-Image-2.1 Turbo 85.8 s, Anima Turbo 40.1 s, MOSS-Image 85.0 s. Standard, the publisher's bf16 in fp32: 213.3 s, 113.1 s, 135.6 s, 40.9 s, 111.7 s. With Faster Rendering (a Beta option, off by default): 97.0 s, 80.8 s, 71.4 s, 32.4 s, 78.9 s.</p>
   </div>
   <div class="split rev" id="moss" style="margin-top:clamp(64px, 9vw, 112px)">
     <div class="text reveal">
@@ -271,6 +281,9 @@
         in fp32 so its small deltas survive. Both checked against the reference, the LoRA included. Your
         LoRAs on top, ComfyUI's and ai-toolkit's too. Beta until OpenMOSS ships its own fast version.
         Apache 2.0.</p>
+      <p>And like the four others, it can start from an image instead of noise: Start From This Image keeps the
+        composition, the strength says how far the render moves away. Here, the Krea 2 photo, the surfer turned
+        into her grandmother.</p>
       <ul class="stats">
         <li><b>85.0 s</b>1024² on an M1 Pro, Compact</li>
         <li><b>111.7 s</b>the same, in full precision</li>
@@ -278,8 +291,8 @@
       </ul>
     </div>
     <figure class="shot reveal">
-      <img src="images/moss.jpg" width="1600" height="1065" alt="The Siliconed window with MOSS-Image in the rack: a 1248×832 close-up portrait of a young Irish woman with long wavy auburn hair and freckles, in a shorty wetsuit, laughing, wet strands of hair blown across her face, raindrops on her skin, the Atlantic breaking behind her under a cloudy sky" loading="lazy">
-      <figcaption>MOSS-Image, Compact, 1248×832, 8 steps, seed 6001: &ldquo;Close-up portrait of a young Irish woman with long wavy auburn red hair, pale freckled skin and green eyes, in a short-sleeved shorty wetsuit, the wind whipping wet strands of hair across her face, squinting and laughing. Hard low sunlight from the side just after a rain shower, dark storm clouds over the Atlantic behind her, raindrops on her skin, shot on Portra 400, shallow depth of field.&rdquo;</figcaption>
+      <img src="images/start.jpg" width="1600" height="1032" alt="MOSS-Image starting from the Krea 2 photo: the rack's Starting Image port reads it at 80 %, and the canvas shows the same shot with a laughing grey-haired Irish grandmother in her seventies in the shorty wetsuit, her surfboard under her arm" loading="lazy">
+      <figcaption>MOSS-Image, Standard, from the Krea 2 photo (Start From This Image, strength 80 %), 1248×832, 8 steps, seed 9001: the same prompt, the young woman replaced by &ldquo;a grey-haired Irish grandmother in her seventies&rdquo;.</figcaption>
     </figure>
   </div>
 </section>
@@ -346,9 +359,9 @@
       <p>Where your Mac's map gives it rows, the Neural Engine takes part of the denoiser's matrix products
         beside the GPU, shape by shape. It computes in fp16: each weight column and each activation row is
         lifted by a power of two into fp16's range, then brought back in fp32, and rows that overflow go back
-        to the GPU. On int8 weights it reads them as published and widens them itself. Your choice, per model: off by default on the Standard, which stays the
-        reference-checked fp32 image; on by default on Compact and Light. The label in the rack reads
-        <code>computes fp32 · ANE</code> when it is on; a switch in the DiT's box turns it on or off.</p>
+        to the GPU. On int8 weights it reads them as published and widens them itself. Your choice, per model: on by default, on every version; the Accelerators switch in the DiT's box
+        turns it off, and the DiT is then in fp32 throughout. The label in the rack reads
+        <code>computes fp32 · ANE</code> when it is on.</p>
     </div>
     <ul class="stats reveal">
       <li><b>−16 to −26 %</b>energy per image, M1 Pro, 1024², Standard (app 0.14)</li>
@@ -369,7 +382,7 @@
         and its original to see exactly what changed, or flip between the two with Switch.</p>
     </div>
     <figure class="shot reveal">
-      <img src="images/edit.jpg" width="1600" height="1064" alt="An edit by Qwen-Image-2.1 in the Siliconed window: the Krea 2 photo of the Irish surfer as image 1, the instruction in the prompt, the cel-shaded western comic book result in the canvas" loading="lazy">
+      <img src="images/edit.jpg" width="1600" height="1032" alt="An edit by Qwen-Image-2.1 in the Siliconed window: the Krea 2 photo of the Irish surfer as image 1, Image to Edit, in the Prompt Lab, the instruction in its text, the cel-shaded western comic book result in the canvas" loading="lazy">
       <figcaption>Qwen-Image-2.1 Turbo, Standard: &ldquo;Convert this photo to a western comic book style with cel shading&rdquo;, the Krea 2 photo as image 1, 1248×832, seed 42.</figcaption>
     </figure>
   </div>
@@ -380,29 +393,76 @@
         sea and sun: the instruction touches what it names and leaves the rest alone.</p>
     </div>
     <figure class="shot reveal">
-      <img src="images/outfit.gif" width="800" height="533" alt="Under a sliding curtain, an edit by Qwen-Image-2.1: the Krea 2 surfer running out of the surf in her wetsuit, then in a white linen blouse, her face, hair, surfboard and the sea unchanged" loading="lazy">
-      <figcaption>Qwen-Image-2.1 Turbo, Standard: &ldquo;Replace her wetsuit with a white linen blouse. Keep her face, hair, surfboard, pose and the beach unchanged.&rdquo;</figcaption>
+      <img src="images/outfit.gif" width="800" height="533" alt="Under a sliding curtain, an edit by Qwen-Image-2.1: the Krea 2 surfer wading out of the surf in her wetsuit, then in a white linen blouse, her face, hair, surfboard and the sea unchanged" loading="lazy">
+      <figcaption>Qwen-Image-2.1 Turbo, Standard: &ldquo;Replace her wetsuit with a white linen blouse. Keep her face, hair, surfboard, pose and the beach unchanged.&rdquo; Seed 42.</figcaption>
+    </figure>
+  </div>
+  <div class="reveal" style="max-width:780px;margin-top:clamp(64px, 9vw, 112px)">
+    <h2>Name it once.<br><span class="grad">Cite it.</span></h2>
+    <p style="color:var(--muted)">Take a coat, a dog and a woman from one photo: Name… frames each one and gives it a
+      name. Then the text cites them, <code>@coat</code>, <code>@dog</code>, and Qwen-Image-2.1 receives the prompt
+      translated and the images numbered. With an image to edit, the subjects come into it; without one, they make
+      a new picture.</p>
+  </div>
+  <div class="pair">
+    <figure class="shot reveal">
+      <img src="images/mentions.jpg" width="1600" height="1032" alt="The surfer as image 1 and three subjects named from another photo (a coat, a dog, a woman), the text &ldquo;she wears @coat over her wetsuit, and @dog runs beside her through the shallow water&rdquo; with its two names as chips, the result: the surfer in a camel coat, a border collie running beside her in the water" loading="lazy">
+      <figcaption>&ldquo;she wears @coat over her wetsuit, and @dog runs beside her through the shallow water&rdquo;: the surfer as image 1, the subjects from a Z-Image photo of a quay in Brittany. Seed 42.</figcaption>
+    </figure>
+    <figure class="shot reveal">
+      <img src="images/e3-new.jpg" width="1600" height="1032" alt="A new composition from two subjects alone: &ldquo;@maelle walks @dog along a wild beach at sunset&rdquo;, a woman with short dark curly hair in a long camel coat walking a border collie on a leash along a beach at sunset" loading="lazy">
+      <figcaption>&ldquo;@maelle walks @dog along a wild beach at sunset&rdquo;: no image to edit, a new picture from the same subjects. 832×1248, seed 42.</figcaption>
     </figure>
   </div>
 </section>
 
 <section class="wrap" id="explore">
-  <div class="reveal" style="max-width:780px">
-    <p class="kicker">Exploration</p>
-    <h2>Sketch a grid.<br><span class="grad">Finish the one you love.</span></h2>
-    <p style="color:var(--muted)">Seeds, steps, LoRA strengths, models or the alternatives written in braces in
-      the prompt, drawn as quick sketches in the canvas with the axes as labels. “Finish This Image” renders
-      the chosen cell to the end, with the same seed: the image its sketch announced. Here, Anima Turbo
-      with the inCase LoRA: the wetsuit's colour across, the LoRA's strength down.</p>
+  <div class="split">
+    <div class="text reveal">
+      <p class="kicker">Series</p>
+      <h2>Bracket, like a camera.<br><span class="grad">Then choose.</span></h2>
+      <p class="punch">Every setting that can vary wears a yellow ±.</p>
+      <p>A word written as a group in the prompt, <code>{teal|coral red|mustard yellow}</code>, the seed, a LoRA's
+        strength, LoRAs compared, Detail, the starting image's strength: open its ±, pick the values and the axis,
+        and Generate queues one finished image per cell, the very image a single render gives. The canvas lays them
+        out as a grid while they render. Here, Anima Turbo with the inCase LoRA: the wetsuit's colour across,
+        the LoRA's strength down.</p>
+    </div>
+    <figure class="shot reveal">
+      <img src="images/series.gif" width="800" height="667" alt="A series filling in the canvas: Anima Turbo with the inCase LoRA, a laughing red-haired Irish woman before sea cliffs, the wetsuit in teal, coral red and mustard yellow across, inCase at 0, 0.5 and 1 down, one cell after another until the nine are there" loading="lazy">
+      <figcaption>{teal|coral red|mustard yellow} × inCase 0 / 0.5 / 1: nine finished images, 832×1248, seed 4001.</figcaption>
+    </figure>
   </div>
   <div class="pair">
     <figure class="shot reveal">
-      <img src="images/grid.jpg" width="1600" height="1086" alt="An exploration with Anima Turbo and the inCase LoRA, filling in: sketches of a laughing red-haired Irish woman on a sunny cliff-top beach, the wetsuit in teal, coral red, mustard yellow and navy across, inCase at 0, 0.5 and 1 down, the last row still rendering" loading="lazy">
-      <figcaption>{teal|coral red|mustard yellow|navy} × inCase 0 / 0.5 / 1: 512×768 sketches.</figcaption>
+      <img src="images/series-set.jpg" width="1600" height="1032" alt="The series done, the Prompt Lab unfolded: the yellow chip &ldquo;teal · coral red · mustard yellow&rdquo; in the text, inCase's ± filled with its values written under it, one line per axis beside Generate 9 Images" loading="lazy">
+      <figcaption>What varies, where it varies: the group in the text, inCase's ± in the rack, one line per axis beside Generate.</figcaption>
     </figure>
     <figure class="shot reveal">
-      <img src="images/anima.jpg" width="1600" height="1064" alt="The finished cell in the window: an Anima Turbo illustration with the inCase LoRA, a laughing young red-haired Irish woman in a navy wetsuit in close-up, sea cliffs and breaking waves behind her" loading="lazy">
-      <figcaption>The chosen cell, finished: navy, inCase at 1, 512×768, seed 4001.</figcaption>
+      <img src="images/bracket.jpg" width="1600" height="1032" alt="The bracket bubble open on inCase's strength: the values 0.00, 0.50 and 1.00, a step of 0.20 and a count of 3, the axis set to Rows" loading="lazy">
+      <figcaption>The bubble of a knob: its values, a step and a count to make them again, and the axis they take.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<section class="wrap" id="writer">
+  <div class="reveal" style="max-width:780px">
+    <p class="kicker">The Prompt Lab · beta</p>
+    <h2>A short idea.<br><span class="grad">Written for the model.</span></h2>
+    <p style="color:var(--muted)">Rewrite turns a line into the text each model likes, and marks what it added; Describe
+      writes what an image shows. The writer is Qwen-Image-2.1's own text encoder, made to write: nothing more to
+      download but its 1.25 GB output layer. It keeps every element of your prompt, never moralizes, and steps aside
+      the moment an image starts rendering. Its greedy output matches transformers, token for token. And its
+      instructions are yours to rewrite, one per model and gesture, in Settings › Prompt Lab.</p>
+  </div>
+  <div class="pair">
+    <figure class="shot reveal">
+      <img src="images/rewrite.jpg" width="1600" height="1032" alt="Rewrite for Z-Image Turbo: a short idea turned into a long description of the cyclist photo, the additions marked in peach in the Prompt Lab's text" loading="lazy">
+      <figcaption>Rewrite, for Z-Image Turbo: what was added is marked in the text.</figcaption>
+    </figure>
+    <figure class="shot reveal">
+      <img src="images/settings-lab.jpg" width="560" height="650" alt="Settings, Prompt Lab: Krea 2's Rewrite instruction replaced by one of yours, a photographer's brief, &ldquo;Yours: sent instead of Siliconed's.&rdquo;, and Restore" loading="lazy">
+      <figcaption>Your own instruction for Krea 2's Rewrite, sent in place of ours; Restore brings ours back.</figcaption>
     </figure>
   </div>
 </section>
@@ -413,13 +473,12 @@
   <div class="grid3">
     <div class="card reveal"><h3>Checked against the original, a bit obsessively</h3><p>Every stage is compared channel by channel with diffusers and transformers in fp32, and rounds where they round. What cannot be checked against the reference does not ship.</p></div>
     <div class="card reveal"><h3>34 GB of model, 16 GB of Mac</h3><p>It sounds like a bad idea; it works. Weights stream from disk as needed. Never more than ¾ of the Mac's memory minus 2 GB (10 GB on a 16 GB Mac): each render computes what it needs before it starts.</p></div>
-    <div class="card reveal"><h3>Eight bits against eight bits</h3><p>Z-Image Turbo Compact (GGUF Q8_0), 1024², 8 steps, Faster Rendering and the Neural Engine both on, as they are for the Compact: 81–83 s on an M1 Pro. Draw Things' engine with its default 8-bit <code>q8p</code>, the same day on the same Mac: 135–144 s (23 October 2026, app 0.14). Wall-clock, not identical arithmetic: the samplers and the images differ.</p></div>
+    <div class="card reveal"><h3>Eight bits against eight bits</h3><p>Z-Image Turbo Compact (GGUF Q8_0), 1024², 8 steps, Faster Rendering and the Neural Engine both on (0.14's defaults for the Compact): 81–83 s on an M1 Pro. Draw Things' engine with its default 8-bit <code>q8p</code>, the same day on the same Mac: 135–144 s (23 October 2026, app 0.14). Wall-clock, not identical arithmetic: the samplers and the images differ.</p></div>
     <div class="card reveal"><h3>Private by construction</h3><p>Nothing leaves your Mac but the model downloads you accepted and what you send to another Mac of yours, encrypted. It works offline once a model is installed, and the render cache is gone when you quit.</p></div>
     <div class="card reveal"><h3>Scriptable, agents included</h3><p><code>silicontrol</code> drives the running app from a terminal, with JSON lines out; <code>silicontrol help</code> is all a script or a coding agent needs.</p></div>
     <div class="card reveal"><h3>Reproducible to the bit</h3><p>Same prompt, seed, settings and version on the same Mac: the same image, byte for byte.</p></div>
-    <div class="card reveal" style="grid-column:1/-1"><h3>A prompt writer, if you want one (beta)</h3><p>The Prompt Lab (Window › Prompt Lab) rewrites a short prompt the way each model likes it, or describes an image you drop on it. The writer is Qwen-Image-2.1's own text encoder, made to write, so there is nothing more to download but its 1.25 GB output layer. It keeps every element of your prompt, never moralizes, and steps aside the moment an image starts rendering. Its greedy output matches transformers, token for token.</p></div>
     <div class="card reveal" style="grid-column:1/-1"><h3>Render on another Mac</h3><p>The MacBook in the living room computes on the Mac mini next door: Render › Compute On moves the whole window there. Paired once with a six-digit code, TLS with a key per Mac.</p></div>
-    <div class="card reveal" style="grid-column:1/-1"><h3>Faster Rendering, the honest trick</h3><p>It is a choice per model, like the Neural Engine: on for the Compact and the Light, off for the Standard, which stays the image checked against the reference. From 1024 px on each side, the first steps run on a half-size grid, the rest at full size: 17 to 31 % off the clock at 1024² (7 % on MOSS-Image), still all 8 evaluations of the recipe. The trick is in the noise: the small grid gets the averaged picture plus the low band of the noise, and the step brought back to full size clears the fine noise exactly as a full step would, so no grain, no cracks; freckles and book spines survive. Another picture than the full-size one, not a blurrier one. Switch it off and you get the full-size recipe, bit for bit, the one checked against diffusers. The choice travels with the image, so Render Again gives the same one.</p></div>
+    <div class="card reveal" style="grid-column:1/-1"><h3>Faster Rendering, the honest trick</h3><p>A Beta option, off by default; turned on, it is a choice per model. From 1024 px on each side, the first steps run on a half-size grid, the rest at full size: 17 to 31 % off the clock at 1024² (7 % on MOSS-Image), still all 8 evaluations of the recipe. The trick is in the noise: the small grid gets the averaged picture plus the low band of the noise, and the step brought back to full size clears the fine noise exactly as a full step would, so no grain, no cracks; freckles and book spines survive. Another picture than the full-size one, not a blurrier one. Switch it off and you get the full-size recipe, bit for bit, the one checked against diffusers. The choice travels with the image, so Render Again gives the same one.</p></div>
   </div>
 </section>
 
@@ -447,7 +506,7 @@
         revision and checked by sha256, and downloads resume where they stopped. The next file downloads
         while the previous one is prepared.</p>
     </div>
-    <figure class="shot reveal"><img src="images/models.jpg" width="1600" height="1065" alt="The Models window: the five publishers' models installed in Compact, MOSS-Image marked beta, each with its license and size on disk, and the LoRAs below" loading="lazy"></figure>
+    <figure class="shot reveal"><img src="images/models.jpg" width="1600" height="1032" alt="The Models window: the five publishers' models installed in Standard, MOSS-Image marked beta, each with its license and size on disk, MOSS-Image's versions open with the Compact chosen and the room it would free" loading="lazy"></figure>
   </div>
 </section>
 
