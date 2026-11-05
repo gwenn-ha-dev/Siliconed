@@ -329,10 +329,13 @@ package final class Block: BoundaryRecording, PhaseTiming {
         for (name, buffer) in [("attention.to_q.weight", qb), ("attention.to_k.weight", kb), ("attention.to_v.weight", vb)] {
             try products.linear(prefix + name, a: a, c: buffer, m: s, k: d, n: d)
         }
+        // The pass joins the attention's class (`ProductLedger.pass`), its GPU seconds on the stream.
+        let passClock = ProductLedger.pass(sequence: s, heads: heads, headDim: headDim, stream: stream)
         timed("qk-norm + rope") {
             pass.run([.init(qb, heads: heads, weight: normQ), .init(kb, heads: heads, weight: normK)],
                      rows: s, headDim: headDim, eps: 1e-5, freqs: table, layout: .interleaved, wait: !stream.isOn)
         }
+        passClock?.finish()
         timed("sdpa wall") { ownTimings["sdpa GPU", default: 0] += tiled.run(q: qb, k: kb, v: vb, into: ob) }
         try products.linear(prefix + "attention.to_out.0.weight", a: ob, c: o, m: s, k: d, n: d)
         timed("residual") { elementwise.normResidual(x0, plus: (o, 0), weight: at(1), gate: at(5), rows: s, columns: d, eps: eps) }

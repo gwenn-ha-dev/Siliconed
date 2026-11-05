@@ -127,6 +127,11 @@ package final class WeightProducts {
         // The render's check (`ProductLedger`): this product's wall seconds, as the class and the route it is.
         let ledger = ProductLedger.current
         let began = ledger == nil ? 0 : DispatchTime.now().uptimeNanoseconds
+        // On a stream that queues, the call only encodes: its seconds are the buffers' and the ANE's (`ProductLedger.Charge`).
+        let stream = gemm.queue.stream
+        let charge = ledger.flatMap { stream.isOn ? ProductLedger.Charge(ledger: $0) : nil }
+        let previousCharge = charge == nil ? nil : stream.charge
+        if let charge { stream.charge = charge }
         // The ANE's rows the plan gave and the process did not hand it (`ProductLedger.Reason.aneNotAccepted`).
         var aneDeclined = false
         let givenBackBefore = planned.ane > 0 && ledger != nil ? GEMM.neuralEngineTally.withLock { $0.givenBack } : 0
@@ -209,8 +214,13 @@ package final class WeightProducts {
         }
         if let ledger {
             let (weight, route) = classification(of: name, path)
-            ledger.add(.product(k: k, n: n, m: m, weight: weight), route: route,
-                       seconds: Double(DispatchTime.now().uptimeNanoseconds - began) * 1e-9)
+            let wall = Double(DispatchTime.now().uptimeNanoseconds - began) * 1e-9
+            if let charge {
+                stream.charge = previousCharge
+                charge.finish(.product(k: k, n: n, m: m, weight: weight), route: route, wall: wall)
+            } else {
+                ledger.add(.product(k: k, n: n, m: m, weight: weight), route: route, seconds: wall)
+            }
             // What ran otherwise than planned, and why: the plan's own fallback first, then the path skipped, then the ANE's rows.
             let key = ProductKey(k: k, n: n, m: m, weight: format(of: name), phase: gemm.phase)
             let reason: ProductLedger.Reason?

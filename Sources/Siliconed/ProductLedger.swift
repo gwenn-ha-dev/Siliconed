@@ -28,6 +28,9 @@ import Synchronization
 ///     probe that builds a `GEMM` outside a render records nothing and pays a lock to learn it.
 ///   - **Free in bits and nearly in time**: the ledger reads the clock twice around a product (a few tens of
 ///     nanoseconds for a product of milliseconds) and changes neither the order of the work nor a route.
+///   - **On the stream, the seconds are the engines', not the wall** (`Charge`): a call that only encodes has a wall of ~0.1 ms, so a
+///     product or an attention queued on a `GPUStream` is charged its buffers' GPU seconds at the drain and its ANE rows' seconds on
+///     the ANE's thread. Off the stream, the wall, as before: same lines, same seconds.
 ///   - **Attentions under 64 rows are no class** (`CapacityClasses`), so they are not recorded.
 ///   - **A route not taken is named, never only absent** (`Fallback`): the plan without an answer (`?? .gpuAlone`), a path the process
 ///     cannot run (`WeightProducts.prepare` skips down to the plain or widened weight), the ANE's rows not accepted or given back. The
@@ -92,10 +95,52 @@ package final class ProductLedger: Sendable {
 
     package init() {}
 
-    package func add(_ work: Work, route: String, seconds: Double) {
+    /// `executions` 0: seconds added to the line of an execution already counted (`Charge`).
+    package func add(_ work: Work, route: String, seconds: Double, executions: Int = 1) {
         lines.withLock {
             let kept = $0[Key(work: work, route: route)] ?? (0, 0)
-            $0[Key(work: work, route: route)] = (kept.executions + 1, kept.seconds + seconds)
+            $0[Key(work: work, route: route)] = (kept.executions + executions, kept.seconds + seconds)
+        }
+    }
+
+    // MARK: - On the stream
+
+    /// **One execution queued on a stream (`GPUStream`), timed by the engines' own seconds instead of the caller's wall** — which, the
+    /// call only encoding, is the encoder's ~0.1 ms. The stream charges it the GPU seconds of the buffers settled while it is open
+    /// (`GPUStream.charge`), added at the drain — each buffer's own span, not `gpuEndTime − gpuStartTime`, which also holds its wait
+    /// behind the buffer ahead and behind the ANE's rows (another class's seconds, counted there) —, and the ANE's seconds of the rows handed to it (`GPUStream.neuralEngine`), timed on
+    /// the ANE's thread; the line gets `max(GPU, ANE, wall)` — the pair's sides run at once and the GPU waits for the ANE's rows before
+    /// the next buffer, so the longer side is the class's span, as the map's pair is measured (`bf16ProductStreamed`, its wall). The
+    /// execution is counted when the call returns (`finish`), its seconds as they arrive: at that return and at each drain after it, by
+    /// difference, so a class split by a drain is still one execution of `max` seconds. Off the stream nothing makes one: the wall as before.
+    package final class Charge: Sendable {
+        private struct State { var gpu = 0.0, ane = 0.0, wall = 0.0, credited = 0.0, line: (work: Work, route: String)? }
+        private let ledger: ProductLedger
+        private let state = Mutex<State>(State())
+
+        package init(ledger: ProductLedger) { self.ledger = ledger }
+
+        /// A settled buffer's GPU seconds (the drain).
+        package func addGPU(_ seconds: Double) { state.withLock { $0.gpu += seconds } }
+        /// The ANE's side of a product, on its thread: the program and, on a refusal, the CPU's rows that stand for it.
+        package func addANE(_ seconds: Double) { state.withLock { $0.ane += seconds } }
+
+        /// The call returned: its class and route (known only now: the ANE taken or not), its wall, one execution.
+        package func finish(_ work: Work, route: String, wall: Double) {
+            state.withLock { $0.line = (work, route); $0.wall = wall }
+            ledger.add(work, route: route, seconds: 0)
+            credit()
+        }
+
+        /// What the execution's span has grown by since the last credit, into its line. Nothing before `finish`.
+        package func credit() {
+            let owed = state.withLock { s -> (work: Work, route: String, seconds: Double)? in
+                guard let line = s.line else { return nil }
+                let span = max(s.gpu, s.ane, s.wall)
+                defer { s.credited = span }
+                return (line.work, line.route, span - s.credited)
+            }
+            if let owed, owed.seconds > 0 { ledger.add(owed.work, route: owed.route, seconds: owed.seconds, executions: 0) }
         }
     }
 
@@ -139,15 +184,22 @@ package final class ProductLedger: Sendable {
 
     // MARK: - Timing a call
 
-    /// A started clock on a ledger; `finish` adds the line. `nil` when nothing is recording.
+    /// A started clock on a ledger; `finish` adds the line. `nil` when nothing is recording. On a stream that queues (`stream` on), the
+    /// execution is charged the stream's seconds (`Charge`), not the wall.
     package struct Stopwatch {
         let ledger: ProductLedger
         let work: Work
         let route: String
         let started: UInt64
+        var stream: GPUStream? = nil
+        var charge: Charge? = nil
+        var previous: Charge? = nil
 
         package func finish() {
-            ledger.add(work, route: route, seconds: Double(DispatchTime.now().uptimeNanoseconds - started) * 1e-9)
+            let wall = Double(DispatchTime.now().uptimeNanoseconds - started) * 1e-9
+            guard let charge, let stream else { ledger.add(work, route: route, seconds: wall); return }
+            stream.charge = previous
+            charge.finish(work, route: route, wall: wall)
         }
     }
 
@@ -157,14 +209,21 @@ package final class ProductLedger: Sendable {
     /// Starts timing the QK-norm and RoPE before the self-attention of `sequence` query rows, on the CPU or the GPU: its seconds join the
     /// attention's class and no execution (`RenderLoop.compare`) — the plan prices the pass there (`CapacityModel.normRope`), and the
     /// attention's own clock starts after a CPU pass or a waited GPU pass (a GPU pass left in the queue runs inside it).
-    package static func pass(sequence: Int, heads: Int, headDim: Int) -> Stopwatch? {
-        attention(sequence: sequence, heads: heads, headDim: headDim, route: passRoute)
+    package static func pass(sequence: Int, heads: Int, headDim: Int, stream: GPUStream? = nil) -> Stopwatch? {
+        attention(sequence: sequence, heads: heads, headDim: headDim, route: passRoute, stream: stream)
     }
 
-    /// Starts timing an attention of `sequence` query rows (none under 64: no class decides it) on `route`.
-    package static func attention(sequence: Int, heads: Int, headDim: Int, route: String) -> Stopwatch? {
+    /// Starts timing an attention of `sequence` query rows (none under 64: no class decides it) on `route`. `stream`: the queue's
+    /// stream the work is settled on — when it queues, the stream's seconds are charged (`Charge`), not the wall.
+    package static func attention(sequence: Int, heads: Int, headDim: Int, route: String, stream: GPUStream? = nil) -> Stopwatch? {
         guard sequence >= 64, let ledger = current else { return nil }
-        return Stopwatch(ledger: ledger, work: .attention(sequence: sequence, heads: heads, headDim: headDim),
-                         route: route, started: DispatchTime.now().uptimeNanoseconds)
+        var watch = Stopwatch(ledger: ledger, work: .attention(sequence: sequence, heads: heads, headDim: headDim),
+                              route: route, started: DispatchTime.now().uptimeNanoseconds)
+        if let stream, stream.isOn {
+            let charge = Charge(ledger: ledger)
+            watch.stream = stream; watch.charge = charge; watch.previous = stream.charge
+            stream.charge = charge
+        }
+        return watch
     }
 }

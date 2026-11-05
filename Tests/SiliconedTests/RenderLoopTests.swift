@@ -69,6 +69,26 @@ import Testing
         #expect(ProductLedger.Work.product(k: 1, n: 1, m: 1, weight: .q4k) != .product(k: 1, n: 1, m: 1, weight: .bf16))
     }
 
+    /// On the stream, an execution is its engines' span, not the encoder's wall: `max(GPU, ANE, wall)`, counted once, whatever the
+    /// order the seconds arrive in (the ANE's thread, a drain before or after the call returns).
+    @Test func aChargeIsTheLongerSideCountedOnce() {
+        let ledger = ProductLedger()
+        let w = ProductLedger.Work.product(k: 3840, n: 3840, m: 4128, weight: .bf16)
+        let pair = ProductLedger.Charge(ledger: ledger)
+        pair.addGPU(0.010); pair.credit()
+        #expect(ledger.tallies.isEmpty, "nothing before the call returns: its route is not known yet")
+        pair.addANE(0.012)
+        pair.finish(w, route: "gpu+ane/bf16act", wall: 0.0001)
+        pair.addGPU(0.004); pair.credit(); pair.credit()          // a second buffer, drained after the return; credited twice
+        let alone = ProductLedger.Charge(ledger: ledger)
+        alone.finish(w, route: "gpu/bf16act", wall: 0.0002)
+        alone.addGPU(0.020); alone.credit()
+        let t = ledger.tallies
+        #expect(t.map(\.executions) == [1, 1])
+        #expect(abs((t.first { $0.route == "gpu+ane/bf16act" }?.seconds ?? 0) - 0.014) < 1e-12, "the GPU's 14 ms over the ANE's 12")
+        #expect(abs((t.first { $0.route == "gpu/bf16act" }?.seconds ?? 0) - 0.020) < 1e-12)
+    }
+
     // MARK: classes
 
     @Test func heightsWithin64RowsAreOneClassAndOthersAreNot() {

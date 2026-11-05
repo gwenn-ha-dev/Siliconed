@@ -168,6 +168,11 @@ package final class QKNormRope: @unchecked Sendable {   // immutable after init;
         }
         encoder.endEncoding()
         guard wait else {
+            // On a stream that queues, settled there: judged at its drain, its GPU seconds counted (and charged to the attention's class).
+            if queue.stream.isOn {
+                commands.commitSettled(label: "qk-norm+rope GPU", what: "QK-norm + RoPE on the GPU")
+                return 0
+            }
             commands.addCompletedHandler { done in _ = Attention.verdict(done, what: "QK-norm + RoPE on the GPU") }
             commands.commit()
             return 0

@@ -17,7 +17,8 @@ import Synchronization
 ///     after a commit a race, not an error. The caller owns that rule (`drain()` before a vDSP pass, a staging, a modulation, a
 ///     boundary recorded, the ANE's half of a product); a call that waits on its own buffer (`settle` off) needs nothing.
 ///   - **Seconds are the GPU's own** (`gpuEndTime − gpuStartTime`), added at the drain, not the caller's wall: on, a call returns 0
-///     and the encode is all its wall measures. `gpuSeconds` gives them back by label.
+///     and the encode is all its wall measures. `gpuSeconds` gives them back by label; the render's ledger gets them by class through
+///     the execution open when each buffer was settled (`charge`, `ProductLedger.Charge`), the ANE's side timed on its own thread.
 ///   - **A refusal is reported at the drain**, not lost: a completed buffer's error is kept and said once, as `Attention.verdict` does.
 package final class GPUStream: @unchecked Sendable {   // its state under `lock`
     /// **Where a denoiser streams** (`SILICONED_STREAM`, a prototype's switch): `off` as before; `on` the stream, the ANE's products
@@ -34,9 +35,24 @@ package final class GPUStream: @unchecked Sendable {   // its state under `lock`
     }()
 
     private let lock = NSLock()
-    private var pending: [(commands: MTLCommandBuffer, label: String, what: @Sendable () -> String)] = []
+    private var pending: [(commands: MTLCommandBuffer, label: String, what: @Sendable () -> String, charge: ProductLedger.Charge?,
+                           waitsFor: UInt64)] = []
     private var seconds: [String: Double] = [:]
     private var on = false
+    private var charged: ProductLedger.Charge?
+    /// The ledger's clock on the GPU: where the last settled buffer ended, the ANE's rows each waited-for value stands for ended (host
+    /// seconds, `gpuEndTime`'s base), and the value a buffer made here waits for (`awaitNeuralEngine`), until it is settled.
+    private var lastEnd: CFTimeInterval = 0
+    private var aneEnds: [UInt64: CFTimeInterval] = [:]
+    private var waits: [ObjectIdentifier: UInt64] = [:]
+
+    /// **The render's execution the buffers settled from here are charged to** (`ProductLedger.Charge`): set by the ledger's caller
+    /// around one product or attention, while the stream queues; at the drain each buffer's GPU seconds go to it, and the ANE's rows
+    /// handed meanwhile (`neuralEngine`) add their seconds on the ANE's thread. `nil`: the buffers are no class's (a norm, a SwiGLU).
+    package var charge: ProductLedger.Charge? {
+        get { lock.lock(); defer { lock.unlock() }; return charged }
+        set { lock.lock(); charged = newValue; lock.unlock() }
+    }
 
     private static let lock = NSLock()
     nonisolated(unsafe) private static var streams: [ObjectIdentifier: GPUStream] = [:]
@@ -70,7 +86,7 @@ package final class GPUStream: @unchecked Sendable {   // its state under `lock`
             commands.waitUntilCompleted()
             return Attention.verdict(commands, what: what())
         }
-        pending.append((commands, label, what))
+        pending.append((commands, label, what, charged, waits.removeValue(forKey: ObjectIdentifier(commands)) ?? 0))
         lock.unlock()
         return 0
     }
@@ -85,22 +101,46 @@ package final class GPUStream: @unchecked Sendable {   // its state under `lock`
         last.commands.waitUntilCompleted()
         Self.tally.withLock { $0.drains += 1; $0.waited += Double(DispatchTime.now().uptimeNanoseconds - began) * 1e-9; $0.buffers += queued.count }
         var added: [String: Double] = [:]
+        var charges: [ProductLedger.Charge] = []
+        lock.lock(); var end = lastEnd; let ends = aneEnds; aneEnds = [:]; waits = [:]; lock.unlock()
+        var behindGPU = 0.0, behindANE = 0.0
         for q in queued {
             q.commands.waitUntilCompleted()   // a queue completes in order: already done, unless it was another queue's
-            added[q.label, default: 0] += Attention.verdict(q.commands, what: q.what())
+            let s = Attention.verdict(q.commands, what: q.what())
+            added[q.label, default: 0] += s
+            // **What the ledger charges is the buffer's own span**: `gpuStartTime` is when the buffer began, which can be before the
+            // buffer ahead of it ended (its kernels then wait on the hazard) or before the ANE's rows it waits for were written (the
+            // event); that wait is the other's time, already counted. From the later of the three to its end.
+            let start = q.commands.gpuStartTime, finish = q.commands.gpuEndTime
+            let afterGPU = max(start, end), afterANE = max(afterGPU, ends[q.waitsFor] ?? 0)
+            let own = max(0, finish - afterANE)
+            behindGPU += max(0, min(afterGPU, finish) - start); behindANE += max(0, min(afterANE, finish) - min(afterGPU, finish))
+            end = max(end, finish)
+            if let c = q.charge {
+                c.addGPU(own)
+                if charges.last !== c { charges.append(c) }
+            }
         }
-        lock.lock(); for (k, v) in added { seconds[k, default: 0] += v }; lock.unlock()
-        Self.tally.withLock { t in for (k, v) in added { t.gpu[k, default: 0] += v } }
+        lock.lock(); lastEnd = end; for (k, v) in added { seconds[k, default: 0] += v }; lock.unlock()
+        Self.tally.withLock { t in
+            for (k, v) in added { t.gpu[k, default: 0] += v }
+            t.behindGPU += behindGPU; t.behindANE += behindANE
+        }
+        for c in charges { c.credit() }       // a charge credited twice adds nothing the second time
     }
 
     /// **The prototype's account** (`SILICONED_STREAM_REPORT`): drains, the CPU's seconds waiting in them, buffers settled, GPU
     /// seconds by label — printed at the process's exit.
-    package struct Tally: Sendable { var drains = 0; var waited = 0.0; var buffers = 0; var gpu: [String: Double] = [:] }
+    package struct Tally: Sendable { var drains = 0; var waited = 0.0; var buffers = 0; var gpu: [String: Double] = [:]; var ane = 0.0
+                                    /// Seconds inside the buffers' spans spent behind the buffer ahead, or behind the ANE's rows waited for.
+                                    var behindGPU = 0.0, behindANE = 0.0 }
     package static let tally = Mutex<Tally>(Tally())
     package static func report() -> String {
         tally.withLock { t in
             let gpu = t.gpu.sorted { $0.key < $1.key }.map { String(format: "%@ %.2f s", $0.key, $0.value) }.joined(separator: " · ")
             return String(format: "stream: %d drains, %.2f s waited, %d buffers · ", t.drains, t.waited, t.buffers) + gpu
+                + (t.ane > 0 ? String(format: " · ANE's side %.2f s", t.ane) : "")
+                + (t.buffers > 0 ? String(format: " · inside the spans: behind the GPU %.2f s, behind the ANE %.2f s", t.behindGPU, t.behindANE) : "")
         }
     }
 
@@ -125,6 +165,7 @@ package final class GPUStream: @unchecked Sendable {   // its state under `lock`
         let event = event!
         counter += 2
         let ready = counter - 1, done = counter
+        let charge = charged
         lock.unlock()
         guard let signal = queue.makeCommandBuffer() else { fatalError("Metal refused a command buffer") }
         lock.lock()
@@ -135,9 +176,16 @@ package final class GPUStream: @unchecked Sendable {   // its state under `lock`
         nonisolated(unsafe) let e = event
         neuralQueue.async {
             _ = e.wait(untilSignaledValue: ready, timeoutMS: 600_000)
+            let began = DispatchTime.now().uptimeNanoseconds
             let computed = work()
             GEMM.neuralEngineTally.withLock { $0.handed += 1; if !computed { $0.givenBack += 1 } }
             if !computed { fallback() }
+            // The ANE's side, from its operand ready to its rows written: what the GPU waits for before the next buffer.
+            let ended = DispatchTime.now().uptimeNanoseconds   // mach_absolute_time's base, `gpuEndTime`'s
+            let side = Double(ended - began) * 1e-9
+            charge?.addANE(side)
+            GPUStream.tally.withLock { $0.ane += side }
+            self.lock.lock(); self.aneEnds[done] = Double(ended) * 1e-9; self.lock.unlock()
             e.signaledValue = done
         }
         return done
@@ -154,6 +202,7 @@ package final class GPUStream: @unchecked Sendable {   // its state under `lock`
         guard awaited > encodedWait, let event else { return }
         commands.encodeWaitForEvent(event, value: awaited)
         encodedWait = awaited
+        waits[ObjectIdentifier(commands)] = awaited
     }
 
     /// The GPU seconds of the stream's buffers by label since the last call, and reset.

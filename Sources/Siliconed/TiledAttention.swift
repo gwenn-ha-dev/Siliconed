@@ -190,7 +190,7 @@ package final class TiledAttention {
     /// **Runs the attention** over `q [S, H·Dh]`, `k` and `v [keys, KVH·Dh]` (fp32, offset 0), writing `out [S, H·Dh]`: one command
     /// buffer. Returns the GPU seconds.
     package func run(q: MTLBuffer, k: MTLBuffer, v: MTLBuffer, into out: MTLBuffer) -> Double {
-        let clock = ProductLedger.attention(sequence: sequence, heads: heads, headDim: headDim, route: route)
+        let clock = ProductLedger.attention(sequence: sequence, heads: heads, headDim: headDim, route: route, stream: queue.stream)
         defer { clock?.finish() }
         let commands = submit(q: q, k: k, v: v, into: out)
         let what = "tiled attention S=\(sequence) H=\(computed)/\(heads) \(precision)"
