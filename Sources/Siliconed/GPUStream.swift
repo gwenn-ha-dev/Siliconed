@@ -21,14 +21,16 @@ import Synchronization
 ///     the execution open when each buffer was settled (`charge`, `ProductLedger.Charge`), the ANE's side timed on its own thread.
 ///   - **A refusal is reported at the drain**, not lost: a completed buffer's error is kept and said once, as `Attention.verdict` does.
 package final class GPUStream: @unchecked Sendable {   // its state under `lock`
-    /// **Where a denoiser streams** (`SILICONED_STREAM`, a prototype's switch): `off` as before; `on` the stream, the ANE's products
-    /// waited for as before; `gpu` the stream with no ANE rows (each product the GPU's whole), the ANE's rendezvous gone.
+    /// **Where a denoiser streams** (`SILICONED_STREAM`, a forcing of measurement): `on`, the default, the stream with the ANE's rows on
+    /// its event; `off` each call waited for as before the stream (the CPU's norms, other bits); `gpu` the stream with no ANE rows
+    /// (each product the GPU's whole). The five families' streamed blocks are judged against the oracle and keep their bits with a
+    /// wait at every operation (`SILICONED_STREAM_WAIT`).
     package enum Policy: String, Sendable { case off, on, gpu }
     package static let policy: Policy = {
         let p: Policy = switch ProcessInfo.processInfo.environment["SILICONED_STREAM"] {
-        case "1", "on": .on
+        case "0", "off": .off
         case "gpu": .gpu
-        default: .off
+        default: .on
         }
         if ProcessInfo.processInfo.environment["SILICONED_STREAM_REPORT"] != nil { atexit { print(GPUStream.report()) } }
         return p

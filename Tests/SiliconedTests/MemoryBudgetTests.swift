@@ -16,6 +16,7 @@ final class MemoryBudgetTests: XCTestCase {
                                                     base: 0)
         r.threads = 6
         r.qwenMaps = MemoryFixtures.qwenMaps()
+        r.mapInPlaceAvailable = false   // the plans without the stream's reading in place; its own tests turn it on
         return r
     }
 
@@ -243,7 +244,7 @@ final class MemoryBudgetTests: XCTestCase {
 
     func testTheMapReadInPlaceIsChargedAndTakenOnlyWhereBHoldsIt() {
         var request = MemoryFixtures.zImageRequest(1024, 1024)
-        XCTAssertFalse(request.mapInPlaceAvailable)   // no `SILICONED_STREAM` in the tests' process
+        request.mapInPlaceAvailable = false   // the plan without the stream's reading in place first, whatever the process's policy
         let without = request
         request.mapInPlaceAvailable = true
         let page = Int(getpagesize())

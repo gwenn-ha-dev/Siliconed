@@ -310,7 +310,8 @@ final class MossImageTests: XCTestCase {
         func pages(_ floats: [Int]) -> Int { floats.reduce(0) { $0 + Arena.capacity(for: $1 * 4) } }
         XCTAssertEqual(MossImageDiT.arenaBytes(config: config, gridHeight: 64, gridWidth: 64, maxText: 25, rank: 0),
                        pages(Array(repeating: n * 3072, count: 7) + [n * 16384, n * 8192, 8 * 3072, 3072 * 16384, 4096 * 128,
-                                                                     4096 * 128, 25 * 4096, n * 128]))
+                                                                     4096 * 128, 25 * 4096, n * 128]
+                             + (GPUStream.policy != .off ? [2 * 3072] : [])))
     }
 
     /// **A LoRA costs three things in the DiT**: `mid [n, r]`, the cache of the 252 modules (the DMD LoRA's
