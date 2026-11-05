@@ -153,8 +153,10 @@ package enum Krea2PermutedMap {
     /// requests (a trajectory's failing steps) share it. `text` (`[T, d]`, `txt_in`'s output) is permuted alike.
     /// `evaluate(request, map, text)` runs the permuted model and returns its boundaries by name, `model_out` included;
     /// every boundary but `model_out` (the latent, outside the residual stream) comes back in the reference's channel
-    /// order. Seed 0 evaluates `source` itself. Returns, per request, its boundaries by seed.
+    /// order. Seed 0 evaluates `source` itself. Returns, per request, its boundaries by seed. `outside`: the names that are
+    /// not in the residual stream and come back as evaluated (`model_out`; a free pass's latents).
     package static func draws(source: String, requests: [[UInt64]], text: UnsafeBufferPointer<Float>, directory: String? = nil,
+                              outside: Set<String> = ["model_out"],
                               evaluate: (Int, Artifact, UnsafeBufferPointer<Float>) throws -> [String: [Float]])
         throws -> [[UInt64: [String: [Float]]]] {
         guard requests.contains(where: { !$0.isEmpty }) else { return requests.map { _ in [:] } }
@@ -188,7 +190,7 @@ package enum Krea2PermutedMap {
             }
             var restored: [String: [Float]] = [:]
             for (name, values) in boundaries {
-                restored[name] = name == "model_out" ? values : ResidualPermutation.restored(values, map.perm)
+                restored[name] = outside.contains(name) ? values : ResidualPermutation.restored(values, map.perm)
             }
             return restored
         })

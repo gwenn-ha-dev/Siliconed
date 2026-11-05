@@ -7,6 +7,8 @@
     krea2.py dit|bf16|witness|witness-step --size 512 --variant compact|light   the same, for the Compact's (Comfy-Org int8 convrot) or the
                                                Light's (GGUF Q4_K_M) published DiT -> goldens-krea2-dit-<variant>-<size>
     krea2.py trajectory --size 512 [1024]      the 8-step Euler loop                         -> goldens-krea2-trajectory-<size>
+    krea2.py trajectory --size 512 --permute 0 N [N...] [--permute-kind group|full]   the free 8-step loop under each
+                                               drawn summation order (0: the identity, same calls) -> draw-krea2-<size>-trajectory-perm<kind>N
     krea2.py vae --size 512 [1024 768x512]     the decoder on the final latent               -> goldens-krea2-vae-<size>
     krea2.py witness --size 512                time, img_in, blocks 0-1 in float64           -> witness-krea2-f64-<size>
     krea2.py witness-step --size 512 --step 1  a WHOLE evaluation in float64, at step i      -> witness-krea2-f64-<size>-step<i>
@@ -782,6 +784,57 @@ def stage_permuted_draws(size: str, step: int, seeds: list[int], kind: str, img2
         print(f"-> {path}")
 
 
+def stage_permuted_trajectory(size: str, seeds: list[int], kind: str):
+    """**The free trajectory under drawn summation orders**: the 8 Euler steps from the seed's noise, each velocity the
+    permuted model's (`stage_permuted_draws`' call for call: valid text rows, no mask), each step `x += (σ[i+1] − σ[i])·v`
+    in fp32 as the scheduler does — the reference's own chaos, which a draw restarted from the golden's latent at each
+    step cannot show. Seed 0 is the identity: the nominal pass along the same calls. Each block is loaded once per step
+    and run under every seed. Writes, per seed, `draw-krea2-<size>-trajectory-perm<kind><seed>` (latent_1 … latent_8)."""
+    resolution = int(size)
+    trajectory = read(f"goldens-krea2-trajectory-{resolution}", f"krea2.py trajectory --size {resolution}")
+    text = read(f"goldens-krea2-dit-{resolution}", f"krea2.py dit --size {resolution}")["txt_in_out"]
+    sigmas = trajectory["sigmas"].float()
+    model = load_transformer(streamed=False)
+    pipe = make_pipeline(transformer=model)
+    d = model.hidden_size
+    perms = {s: residual_permutation(d, kind, s) for s in seeds}
+    top = {k: v for k, v in model.state_dict().items()
+           if k.startswith(("time_embed.", "time_mod_proj.", "img_in.", "final_layer."))}
+    t = text.shape[0]
+    rope = model.rotary_emb(pipe.prepare_position_ids(t, resolution // 16, resolution // 16, torch.device("cpu")))
+    empty = {k: torch.empty(v.shape, dtype=v.dtype, device="meta") for k, v in model.transformer_blocks[0].state_dict().items()}
+    latent = {s: trajectory["latent_init"].clone() for s in seeds}
+    payload = {s: {} for s in seeds}
+    for step in range(len(sigmas) - 1):
+        timestep = ((sigmas[step] * 1000).float() / 1000).reshape(1)
+        x, temb, temb_mod = {}, {}, {}
+        for s in seeds:
+            p = perms[s]
+            model.load_state_dict(permuted_state(top, p), strict=False, assign=True)
+            temb[s] = model.time_embed(timestep, dtype=torch.float32)
+            temb_mod[s] = model.time_mod_proj(torch.nn.functional.gelu(temb[s], approximate="tanh"))
+            packed = pipe._pack_latents(latent[s][None], 1, 16, resolution // 8, resolution // 8)
+            x[s] = torch.cat([text[:, p][None], model.img_in(packed)], dim=1)
+        for i, block in enumerate(model.transformer_blocks):
+            weights = model.published.under(f"transformer_blocks.{i}.", torch.float32)
+            for s in seeds:
+                block.load_state_dict(permuted_state(weights, perms[s], f"transformer_blocks.{i}."), assign=True)
+                x[s] = block(x[s], temb_mod[s], rope, None)
+                block.load_state_dict(empty, assign=True)
+            del weights
+            print(f"  step {step}, block {i}", end="\r", flush=True)
+        for s in seeds:
+            model.load_state_dict(permuted_state(top, perms[s]), strict=False, assign=True)
+            velocity = unpack(pipe, model.final_layer(x[s][:, t:], temb[s]), resolution)
+            latent[s] = latent[s] + (sigmas[step + 1] - sigmas[step]) * velocity
+            payload[s][f"latent_{step + 1}"] = latent[s].clone()
+        print(f"  step {step}: sigma = {float(sigmas[step]):.4f}          ", flush=True)
+    for s in seeds:
+        path = OUT / f"draw-krea2-{resolution}-trajectory-perm{kind}{s}.safetensors"
+        save_file({k: v.contiguous() for k, v in payload[s].items()}, str(path))
+        print(f"-> {path}")
+
+
 def stage_witness(size: str):
     """**The float64 reference of the head**: the engine's inputs (the oracle's latent and ITS `txt_in`
     output: fp32, valid rows, no padding), then time, `img_in` and the first two blocks in double."""
@@ -892,7 +945,7 @@ def main() -> None:
     p.add_argument("--jitter", type=int, nargs="+", default=[0],
                    help="draw only: seed(s) of the one-ulp move of the latent (0 = the unmoved inputs)")
     p.add_argument("--permute", type=int, nargs="+", default=None,
-                   help="draw and img2img-draw: seed(s) of the residual permutation (the summation order drawn), all in one process")
+                   help="trajectory, draw and img2img-draw: seed(s) of the residual permutation (the summation order drawn; 0 the identity), all in one process")
     p.add_argument("--permute-kind", choices=["group", "full"], default="group",
                    help="draw --permute: groups of 256 channels (what the int8 engine can draw too) or any permutation")
     p.add_argument("--witness-steps", type=int, nargs="+", default=list(range(8)),
@@ -918,9 +971,13 @@ def main() -> None:
     sizes = args.size or ["512"]
     if args.stage == "img2img-draw" and args.permute is None:
         p.error("img2img-draw takes --permute")
+    if args.permute is not None and args.stage == "trajectory":
+        for size in sizes:
+            stage_permuted_trajectory(size, args.permute, args.permute_kind)
+        return
     if args.permute is not None:
         if args.stage not in ("draw", "img2img-draw") or len(args.step) > 1 or args.jitter != [0]:
-            p.error("--permute goes with draw or img2img-draw, one --step, no --jitter")
+            p.error("--permute goes with trajectory, draw or img2img-draw (one --step, no --jitter)")
         for size in sizes:
             stage_permuted_draws(size, args.step[0], args.permute, args.permute_kind, img2img=args.stage == "img2img-draw")
         return

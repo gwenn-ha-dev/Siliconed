@@ -213,9 +213,9 @@ enum Krea2Stages {
     static let trajectory = Stage(
         model: model, name: "trajectory",
         proves: "the seed's noise bit for bit, the schedule, then the 8 Euler steps: each step's velocity from the oracle's latent at that step, at the step's fp64 witness where it exists",
-        sizes: ["512", "1024"], options: ["--map"],
-        oracle: "tools/oracle/krea2.py trajectory --size {size}; witness-step --size {size} --step 0 1 2 3 4 5 6 7; draw --size {size} --step i --permute 1 2 3 4 5 6 7 8 --permute-kind group, one run per step i from 0 to 7", weights: ["DiT"],
-        rule: "σ within 1e-6; the rule on each guided velocity, floor 5e-4, at the step's fp64 witness where it exists, clouds of summation orders when the oracle has order draws of the step (the same seeds drawn by the engine), of one-ulp moves when it has only those; the free pass is shown, not judged"
+        sizes: ["512", "1024"], options: ["--map", "--free-orders"],
+        oracle: "tools/oracle/krea2.py trajectory --size {size}; witness-step --size {size} --step 0 1 2 3 4 5 6 7; draw --size {size} --step i --permute 1 2 3 4 5 6 7 8 --permute-kind group, one run per step i from 0 to 7; with --free-orders, trajectory --size {size} --permute 0 and the same seeds", weights: ["DiT"],
+        rule: "σ within 1e-6; the rule on each guided velocity, floor 5e-4, at the step's fp64 witness where it exists, clouds of summation orders when the oracle has order draws of the step (the same seeds drawn by the engine), of one-ulp moves when it has only those; the free pass is shown, not judged; --free-orders 1,2,3: the free pass again under each seed's summation order (residual stream permuted by groups of 256), shown step by step against the nominal pass and the oracle, beside the oracle's own passes under the same orders where it drew them, not judged"
     ) { invocation in
         let report = Report(title: "\(model) trajectory \(invocation.size)")
         let trajectory = try invocation.goldens.open("krea2/goldens-krea2-trajectory-\(invocation.size).safetensors")
@@ -289,14 +289,61 @@ enum Krea2Stages {
             guided.append(try clouds.arbitrate(p.measure, exact: p.exact, columns: columns, as: "model_out"))
         }
         // The free pass: the latents chain, the error amplifies; shown beside each step.
-        var latent = Array(initial)
+        var latent = Array(initial), free: [[Float]] = []
         for i in 0..<steps {
             let v = try velocity(latent, i)
             let dt = sigmas[i + 1] - sigmas[i]
             for j in 0..<latent.count { latent[j] += dt * v[j] }
+            free.append(latent)
             guard i < guided.count else { continue }
             let drift = trajectory.float32("latent_\(i + 1)").map { channelError(latent, $0, columns: columns).worst }
             report.add(drift.map { guided[i].with(note: String(format: "free latent %.2e", $0)) } ?? guided[i])
+        }
+        // `--free-orders`: the same free pass under other summation orders — the chaos of the trajectory itself, which the
+        // guided steps (each restarted from the oracle's latent) cannot show.
+        guard let list = invocation.extras["--free-orders"] else { return report }
+        let seeds = try list.split(separator: ",").map { piece -> UInt64 in
+            guard let s = UInt64(piece), s > 0 else { throw UsageError("--free-orders \(list): seeds of summation orders, 1 or more, comma-separated") }
+            return s
+        }
+        let names = (1...steps).map { "latent_\($0)" }
+        let passes = try Krea2PermutedMap.draws(source: map, requests: [seeds], text: text, outside: Set(names)) {
+            _, permutedMap, movedText in
+            let permuted = try Krea2DiT(artifact: permutedMap, latentHeight: side, latentWidth: side, maxText: t)
+            try permuted.tabulateModulation(sigmas: Array(sigmas.dropLast()))
+            var x = Array(initial), out: [String: [Float]] = [:]
+            for i in 0..<steps {
+                let v = try x.withUnsafeBufferPointer {
+                    try permuted.forward(latent: $0.baseAddress!, text: movedText.baseAddress!, textRows: t, sigma: sigmas[i])
+                }
+                let dt = sigmas[i + 1] - sigmas[i]
+                for j in 0..<x.count { x[j] += dt * v[j] }
+                out[names[i]] = x
+            }
+            return out
+        }[0]
+        // The oracle's side, where it drew the same orders (`krea2.py trajectory --permute 0 N…`; 0 is its identity along the
+        // same block-by-block calls): its own free passes against its trajectory golden — the reference's cloud.
+        let oracleSeeds = ([0] + seeds).filter {
+            invocation.goldens.optional("krea2/draw-krea2-\(invocation.size)-trajectory-permgroup\($0).safetensors") != nil
+        }
+        let oracleDraws = oracleSeeds.compactMap {
+            invocation.goldens.optional("krea2/draw-krea2-\(invocation.size)-trajectory-permgroup\($0).safetensors")
+        }
+        print("\nfree pass under summation orders \(seeds.map(String.init).joined(separator: ", ")) (residual stream permuted by groups of "
+              + "\(ResidualPermutation.group); per latent plane's channel error, worst channel), not judged:")
+        let column = { (title: String) in title.padding(toLength: 21, withPad: " ", startingAt: 0) }
+        print("step        " + seeds.map { column("engine \($0) vs engine") }.joined() + column("engine vs oracle")
+              + seeds.map { column("engine \($0) vs oracle") }.joined() + oracleSeeds.map { column("oracle \($0) vs oracle") }.joined())
+        let cell = { (v: Double) in String(format: "%-21.3e", v) }
+        for i in 0..<steps {
+            var line = seeds.map { s in cell(free[i].withUnsafeBufferPointer { channelError(passes[s]![names[i]]!, $0, columns: columns).worst }) }.joined()
+            if let oracle = trajectory.float32("latent_\(i + 1)") {
+                line += cell(channelError(free[i], oracle, columns: columns).worst)
+                line += seeds.map { s in cell(channelError(passes[s]![names[i]]!, oracle, columns: columns).worst) }.joined()
+                line += oracleDraws.map { d in d.float32(names[i]).map { cell(channelError(Array($0), oracle, columns: columns).worst) } ?? column("—") }.joined()
+            }
+            print(names[i].padding(toLength: 12, withPad: " ", startingAt: 0) + line)
         }
         return report
     }
