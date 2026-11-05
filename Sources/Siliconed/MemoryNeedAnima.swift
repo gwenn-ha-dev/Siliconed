@@ -69,6 +69,8 @@ extension MemoryNeed {
         /// What widening the DiT's largest int8 convrot weight allocates outside every arena
         /// (`Widen.rotationScratchBytes`): the Compact's int8 convrot, or an imported Comfy-style one; 0 otherwise.
         package let ditRotationScratch: Int
+        /// What the DiT's map costs read in place (`MemoryNeed.inPlaceBytes`, `Request.mapInPlace`): its header's extent.
+        package let ditInPlaceBytes: Int
         /// The formats the two maps' products are published in (`Artifact.weightFormat`): the plan's keys.
         package let ditFormat: CapacityClasses.WeightFormat, encoderFormat: CapacityClasses.WeightFormat
 
@@ -81,6 +83,7 @@ extension MemoryNeed {
             guard staging > 0 else { return nil }
             self.dit = AnimaDiT.Config(header: dit); self.encoder = config; encoderLayerStaging = staging
             ditRotationScratch = Widen.rotationScratchBytes(header: dit)
+            ditInPlaceBytes = MemoryNeed.inPlaceBytes(header: dit, fileSize: .max)
             ditFormat = Artifact.weightFormat(header: dit); encoderFormat = Artifact.weightFormat(header: encoder)
         }
 
@@ -169,6 +172,7 @@ extension MemoryNeed {
             // The velocity the DiT returns (`forward`'s `[C, h, w]`); Euler keeps no history.
             Term("sampler", latent + request.solver.historyBytes(count: latent / f)),
             Term("DiT rotation scratch", maps.ditRotationScratch),
+            Term(inPlaceTerm, request.mapInPlace && request.mapInPlaceAvailable ? maps.ditInPlaceBytes : 0),
         ] + attention("self-attention", heads: dit.heads, rows: s, keys: s, headDim: dit.headDim, causal: false,
                       assignment: request.ditPlan.assign(AttentionKey(sequence: s, heads: dit.heads, headDim: dit.headDim), flash: true),
                       threads: request.threads)

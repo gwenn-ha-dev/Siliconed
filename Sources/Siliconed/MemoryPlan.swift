@@ -68,7 +68,7 @@ package enum MemoryPlan {
     /// **Whether this process's denoiser of `family` reads its map in place** (`WeightProducts.prepare`): a family whose blocks run on
     /// the GPU stream (`SILICONED_STREAM`, read once per process; `SILICONED_STREAM_WAIT` turns the stream off). A setting, not the
     /// machine's state.
-    package static let streamedFamilies: Set<Family> = [.zImage, .qwenImage21, .mossImage]
+    package static let streamedFamilies: Set<Family> = [.zImage, .qwenImage21, .mossImage, .krea2, .anima]
     package static func readsMapInPlace(_ family: Family) -> Bool {
         streamedFamilies.contains(family) && GPUStream.policy != .off && ProcessInfo.processInfo.environment["SILICONED_STREAM_WAIT"] == nil
     }
