@@ -29,6 +29,12 @@ import Testing
         }
     }
 
+    /// **Three rounds on the wide product, two on the thin shapes**: the wide rounds are the map's noise, the thin ones only choose; a candidate
+    /// in doubt is measured three more beside the fastest, whatever its class.
+    @Test func theThinShapesTakeTwoRoundsAndTheWideThree() {
+        #expect(MatmulTile.rounds(thin: false) == 3 && MatmulTile.rounds(thin: true) == 2 && MatmulTile.extraRounds == 3)
+    }
+
     @Test func theInt8CandidatesStayWithinTheAMXsCut() {
         // Beside the AMX the GPU writes only its first columns: a wider tile would write into the AMX's.
         for t in MatmulTile.candidates(for: Kernel(.gpu, .int8)) { #expect(t.columns == 64) }

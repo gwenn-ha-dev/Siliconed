@@ -826,7 +826,16 @@ extension Diagnostic {
                 func rate(_ engine: String) -> Double? { witnesses.first { $0.engine == engine }.flatMap { $0.before > 0 ? flop / $0.before : nil } }
                 guard let gpu = rate("gpu") else { return }
                 let cores = Double(machine.performanceCores + machine.efficiencyCores)
-                let rates = Rates(gpu: gpu, amx: rate("amx"), ane: rate("ane"), cpu: cores > 0 ? 0.125e12 * cores : 1.0e12)
+                // A pulse closes every step: what one takes here is counted with them, on its fast side of two (a disturbance only adds
+                // time). Not recorded among the pulses: it closes no step. The pulse's instruments are made here instead of at the first step.
+                let pulse = (0..<2).map { _ -> Double in
+                    let t = CapacityProbes.now()
+                    _ = takePulse(step: "projection", attempt: 0, record: false)
+                    return CapacityProbes.now() - t
+                }.min()!
+                regime.pulseSeconds = Diagnostic.significant(pulse, 3)
+                let rates = Rates(gpu: gpu, amx: rate("amx"), ane: rate("ane"), cpu: cores > 0 ? 0.125e12 * cores : 1.0e12, pulse: pulse,
+                                  tiled: alone.tensor != nil)
                 let left = Diagnostic.ceiling - Sizes.reserve - (CapacityProbes.now() - started)
                 let chosen = Sizes.tier(for: rates, budget: left, startingAt: sizes.tier)
                 if chosen.tier != sizes.tier {
@@ -835,7 +844,8 @@ extension Diagnostic {
                 }
                 // Preparation and the first witnesses have run: they were not projected.
                 projected = sizes.projection(rates).filter { $0.key != "preparation" && $0.key != "witnesses start" }
-                // What the ceiling leaves beyond the run as projected is what the guard may spend: none on a Mac that fills it.
+                // What the ceiling leaves beyond the run as projected is what the guard may spend: none on a Mac that fills it. The
+                // projection counts the trials and the pulses: without them the budget was set against half the run.
                 retryBudget = max(0, min(Sizes.retryCap, left - sizes.projectedSeconds(rates) * Sizes.expectation))
             }
 

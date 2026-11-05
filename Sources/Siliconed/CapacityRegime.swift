@@ -69,6 +69,9 @@ extension Diagnostic {
         /// How many steps were measured again, and the seconds the guard spent on it (the waits included).
         package var repeated = 0
         package var repeatedSeconds = 0.0
+        /// **Seconds one pulse took before the projection** (`Sizes.Rates.pulse`), the fast side of two: what the projection counted per
+        /// step. `nil` in a report that predates it (under schema 23).
+        package var pulseSeconds: Double?
         package init() {}
 
         // MARK: The rules

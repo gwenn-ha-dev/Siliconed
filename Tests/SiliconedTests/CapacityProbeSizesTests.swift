@@ -54,8 +54,9 @@ import Testing
 
     @Test func theProjectionIsTheRightOrderOnTheMacItWasTunedOn() {
         let p = Sizes.full.projection(Self.m1Pro)
+        // The tiles' trials came after these runs too (2/11/2026); the pulses are not counted here (`m1Pro.pulse` is 0).
         let untimed = Sizes.full.roundedEightBitSeconds(Self.m1Pro).merging(Sizes.full.roundedPairSeconds(Self.m1Pro)) { $0 + $1 }
-            .merging(Sizes.full.roundedProductSeconds(Self.m1Pro)) { $0 + $1 }
+            .merging(Sizes.full.roundedProductSeconds(Self.m1Pro)) { $0 + $1 }.merging(Sizes.full.tileTrialSeconds(Self.m1Pro)) { $0 + $1 }
         #expect(Set(p.keys) == Set(Self.measured.keys))
         for (stage, seconds) in Self.measured.sorted(by: { $0.key < $1.key }) {
             // The attention's 4.0 s were measured before the half-precision kernels chose their form (2/11/2026), the 8-bit stages before
@@ -82,17 +83,24 @@ import Testing
         #expect(Sizes.tier(for: Self.m1Pro, startingAt: 1).tier == 1, "a tier is never stepped back up")
     }
 
-    /// **The time chooses no tier on the Macs of the fleet**: the M1 Pro, the Neo, a hot Neo, a Neo at a third of its speed all project
-    /// the first tier, with the heat's margin, under the ceiling — the memory alone sets their tier. Only a Mac far slower steps down,
-    /// and a slower GPU never picks a bigger tier.
+    /// **The time chooses no tier on the Macs of the fleet**: the M1 Pro, the Neo, a hot Neo all project the first tier, with the heat's
+    /// margin, under the ceiling — the memory alone sets their tier. A Neo at a third of its speed steps down: its map would take
+    /// more than the margin leaves, which a projection without the tiles' trials and the pulses hid (it kept the first tier at 0.6 of the
+    /// ceiling, and the five maps of the fleet took 1.7 to 2.1 times their projection). A slower GPU never picks a bigger tier.
     @Test func aSlowMacStepsDownOnlyPastTheCeiling() {
         let budget = Diagnostic.ceiling - Sizes.reserve
+        // A pulse's order on the fleet's Macs (17 to 20 ms: fourteen empty submissions and four loops of 4 ms).
+        func pulsed(_ r: Rates) -> Rates { var r = r; r.pulse = 0.018; return r }
         let hot = Rates(gpu: 1.19e12, amx: 0.83e12, ane: 4.13e12, cpu: 0.4e12)
         let third = Rates(gpu: 0.477e12, amx: 0.5e12, ane: 1.38e12, cpu: 0.17e12)
-        for (name, r) in [("M1 Pro", Self.m1Pro), ("Neo", Self.neo), ("hot Neo", hot), ("a third of a Neo", third)] {
+        for (name, r) in [("M1 Pro", Self.m1Pro), ("Neo", Self.neo), ("hot Neo", hot)].map({ ($0.0, pulsed($0.1)) }) {
             #expect(Sizes.tier(for: r).tier == 0, "\(name)")
             #expect(Sizes.full.projectedSeconds(r) * Sizes.margin <= budget, "\(name): \(Sizes.full.projectedSeconds(r)) s")
         }
+        var old = pulsed(third); old.pulse = 0; old.tiled = false
+        #expect(Sizes.full.projectedSeconds(old) * Sizes.margin <= budget, "the projection without trials nor pulses kept the first tier")
+        #expect(Sizes.full.projectedSeconds(pulsed(third)) * Sizes.margin > budget && Sizes.tier(for: pulsed(third)).tier > 0,
+                "a third of a Neo: \(Sizes.full.projectedSeconds(pulsed(third))) s")
         var last = 0
         for gpu in stride(from: 4.0e12, through: 0.01e12, by: -0.01e12) {
             let r = Rates(gpu: gpu, amx: gpu * 0.6, ane: gpu * 1.4, cpu: gpu / 4)
@@ -110,6 +118,28 @@ import Testing
         #expect(Sizes.tier(for: Self.m1Pro, startingAt: 2).tier == 2)
         let plan = try Diagnostic.Plan.choose(budget: 4 << 30, base: 600 << 20) { Diagnostic.CapacityProbes.need(sizes: Sizes.tiers[$0]) }
         #expect(plan.tier == 1, "a Neo's B holds the second tier: the first needs 4.3 GB for the chains' long k (a weight of 201 MB, its copies and truths)")
+    }
+
+    /// **What a stage does beside its figures, counted as the probes do it**: the steps through the guard are those of an M5 Pro's map at
+    /// the first tier (schema 22: its first measures, tiles' trials and attention's forms, 427 pulses once the thin trials' third round is
+    /// taken off) and of a Neo's at the second (378); the trials are each candidate's rounds on the shapes its kernel takes — the
+    /// 8-bit weights leave out a k under a group, the rounded one a reserve too small for 64 rows —; a pulse is counted once per step.
+    @Test func theTrialsAndThePulsesAreCountedAsTheProbesRunThem() {
+        let r = Rates(gpu: 5.8e12, amx: 1.8e12, ane: 7.1e12, cpu: 1.9e12, pulse: 0.018)
+        #expect(Sizes.full.steps(r) == ["solos fp32": 87, "stairs": 8, "attention": 39, "sharing": 12, "solos 8-bit and rounded": 213,
+                                        "thin products": 59, "sharing int8": 6, "sharing rounded": 3])
+        #expect(Sizes.tiers[1].steps(r).values.reduce(0, +) == 378)
+        let trials = MatmulTile.kernels.map { Sizes.full.tileTrials($0).count }
+        #expect(trials == [4 * (3 + 2 * 7), 4 * (3 + 2 * 7), 4 * (3 + 2 * 6), 4 * (3 + 2 * 5)], "bf16, bf16act, int8, int8act")
+        var silent = r; silent.pulse = 0
+        let with = Sizes.full.projection(r), without = Sizes.full.projection(silent)
+        for (stage, n) in Sizes.full.steps(r) { #expect(abs(with[stage]! - without[stage]! - Double(n) * 0.018) < 1e-9, "\(stage)") }
+        var untiled = silent; untiled.tiled = false
+        #expect(Sizes.full.tileTrialSeconds(untiled).isEmpty && Sizes.full.steps(untiled)["solos fp32"] == 87 - 68)
+        let priced = Sizes.full.tileTrialSeconds(silent)
+        #expect(abs(Sizes.full.projection(silent)["solos fp32"]! - Sizes.full.projection(untiled)["solos fp32"]! - priced["solos fp32"]!) < 1e-9)
+        // A thin trial of a millisecond is seventeen runs (`steadyCalls`: fifteen at most), not four.
+        #expect(Sizes.steadySeconds(0.001) == 0.001 * 17 && Sizes.steadySeconds(0.2) == 0.2 * 3)
     }
 
     /// No ANE: its stages cost nothing, its sets are not run.

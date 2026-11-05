@@ -98,10 +98,10 @@ extension Diagnostic.CapacityProbes.Context {
         return chosen
     }
 
-    /// **The tiles of a `matmul2d` kernel** (`MatmulTile`): every candidate, judged, then timed in three alternated rounds — on the largest solo
-    /// product for the wide tile (a render's height; the middle one, 1.5 ms on an M5 Pro, ran 30 % apart between two maps), over the thin shapes
-    /// (`Sizes.thin`) for the thin one —, each shape on its fast side (the least of the rounds, as the map reads every disturbed figure), the
-    /// shapes summed, and `MatmulTile.choose`. The chosen tiles run the kernel's lines and its products, and go in the report with every
+    /// **The tiles of a `matmul2d` kernel** (`MatmulTile`): every candidate, judged, then timed in alternated rounds — three on the largest solo
+    /// product for the wide tile (a render's height; the middle one, 1.5 ms on an M5 Pro, ran 30 % apart between two maps), two over the thin
+    /// shapes (`Sizes.thin`) for the thin one (`MatmulTile.rounds(thin:)`) —, each shape on its fast side (the least of the rounds, as the map
+    /// reads every disturbed figure), the shapes summed, and `MatmulTile.choose`. The chosen tiles run the kernel's lines and its products, and go in the report with every
     /// candidate's solos.
     func chooseTiles(_ probe: Probe, _ m: inout Fit.Measurements) {
         let kernel = probe.kernel
@@ -138,7 +138,7 @@ extension Diagnostic.CapacityProbes.Context {
         func decide(_ shapes: [Sizes.Shape], thin: Bool) -> MatmulTile {
             let margin = thin ? MatmulTile.thinMargin : MatmulTile.margin
             var every: [MatmulTile: [Int: [Double]]] = [:], refused: Set<MatmulTile> = []
-            run(candidates, shapes, thin: thin, rounds: MatmulTile.rounds, into: &every, refused: &refused)
+            run(candidates, shapes, thin: thin, rounds: MatmulTile.rounds(thin: thin), into: &every, refused: &refused)
             var measured = summed(every, refused: refused, shapes: shapes.count)
             // A candidate whose rounds fall on both sides of the margin is measured again beside the fastest, alternated: the answer is
             // the rounds', not one round's. All the doubtful ones in the same rounds, so that each round of the fastest pairs with each.

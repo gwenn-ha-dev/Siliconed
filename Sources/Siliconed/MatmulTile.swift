@@ -9,7 +9,8 @@ import Synchronization
 /// like every route (`CapacityModel.tiles`).
 ///
 ///     map:    for each kernel, each candidate on the largest solo product, three alternated rounds, the fastest → `choose` → `tiles`
-///             and on the thin products (`CapacityModel.isThin`), the same, each shape's fastest summed → `choose` → `thinTiles`
+///             and on the thin products (`CapacityModel.isThin`), two rounds, each shape's fastest summed → `choose` → `thinTiles`
+///             (either: a candidate in doubt, three more beside the fastest)
 ///     engine: GEMM reads the report's tiles → TensorGEMM compiles each variant once → a product takes its class's tile
 ///
 /// What sets it apart — what a tile chosen by analogy would get wrong:
@@ -83,8 +84,18 @@ package struct MatmulTile: Hashable, Sendable, Codable, CustomStringConvertible 
     /// 10–50 % apart). The standard tile is listed first: within the margin it stays, and with it the bits of every map measured before.
     package static let margin = 0.05
     package static let thinMargin = 0.15
-    /// Alternated rounds per candidate; each shape keeps its fastest.
+    /// Alternated rounds per candidate on the wide product; each shape keeps its fastest. **Three, because these rounds are the map's
+    /// noise** (`CapacityFit.noise`, the median of their slowest over their fastest): two of them read a narrower noise, and the plans it
+    /// settles moved — 62 classes of 602 on a Neo, the wide `bf16act` tile on an iMac M4.
     package static let rounds = 3
+    /// **Alternated rounds per candidate on the thin shapes: two.** Their figures choose the thin tile and nothing else — the noise leaves
+    /// a thin shape out (its first round pays what the next do not), and so do the lines (`thinSolos` measures the products again, in the
+    /// tile chosen). On five maps of three Macs (M5 Pro, Neo, iMac M4), the tiles chosen on the first two rounds are those of the three, and
+    /// the plans are the same, 170 of 170; where two rounds disagree with each other on the margin, `ambiguous` measures the candidate again
+    /// as it does after three. A third round cost 100 trials of 300 on a map.
+    package static let thinRounds = 2
+    /// The rounds of a class: `rounds` on the wide product, `thinRounds` on the thin shapes.
+    package static func rounds(thin: Bool) -> Int { thin ? thinRounds : rounds }
 
     /// Rounds a candidate in doubt and the fastest are measured again, alternated (`ambiguous`): a candidate's figures that straddle the
     /// margin are a question three more paired rounds settle.

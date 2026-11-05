@@ -2,16 +2,16 @@ import Foundation
 import Testing
 @testable import Siliconed
 
-/// **The report of schema 22** (`DiagnosticReport.swift`): the JSON a user shares — sober, stable, read back whole —, the model it
+/// **The report of schema 23** (`DiagnosticReport.swift`): the JSON a user shares — sober, stable, read back whole —, the model it
 /// holds being what its measurements fit to (the fleet's reports can be replayed offline), what an older schema or another build
 /// designates (nothing), and what the plan of a current report excludes. Pure: no GPU, no weights.
 @Suite struct DiagnosticReportTests {
     typealias R = ReportFixtures
 
     @Test func theSchemaIsSixteenAndAnOlderOneIsNotAMap() throws {
-        #expect(Diagnostic.schema == 22)
+        #expect(Diagnostic.schema == 23)
         let report = R.report()
-        #expect(report.schema == 22)
+        #expect(report.schema == 23)
         let data = try report.json()
         #expect(Diagnostic.Report.read(data) == report)
         // Schema 14 and before were tables of routes: whatever else they hold, they are not read.
@@ -37,7 +37,7 @@ import Testing
         #expect(try JSONDecoder().decode(Diagnostic.Report.self, from: a) == report)
         #expect(try JSONDecoder().decode(Diagnostic.Report.self, from: report.json(pretty: false)) == report)
         let text = String(decoding: a, as: UTF8.self)
-        #expect(text.contains("\"schema\" : 22"))
+        #expect(text.contains("\"schema\" : 23"))
         // Sorted keys: `findings` before `judge` before `machine` before `measurements` before `model` before `stages` — and no verdict.
         let order = ["\"findings\"", "\"judge\"", "\"machine\"", "\"measurements\"", "\"model\"", "\"stages\""].map { text.range(of: $0)!.lowerBound }
         #expect(order == order.sorted())
@@ -156,7 +156,7 @@ import Testing
         let a = EngineSettings.designation(of: elsewhere)
         #expect(a.plan == nil)
         let warning = try #require(a.warning)
-        #expect(warning.contains("ignored, the defaults apply") && warning.contains("schema 22"))
+        #expect(warning.contains("ignored, the defaults apply") && warning.contains("schema 23"))
         var older = R.report(machine: Diagnostic.machine())
         older.schema = 14
         let b = EngineSettings.designation(of: older)

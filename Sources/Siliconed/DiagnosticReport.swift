@@ -1,4 +1,4 @@
-// The diagnostic's report: the JSON types (machine, conditions, judge, memory, stages), the report itself of schema 22 and the
+// The diagnostic's report: the JSON types (machine, conditions, judge, memory, stages), the report itself of schema 23 and the
 // issue link. Split from `Diagnostic.swift`, which says what the diagnostic is.
 
 import CryptoKit
@@ -124,6 +124,8 @@ extension Diagnostic {
     /// without it, named in the report a user shares.
     package struct StageTime: Codable, Sendable, Equatable {
         package var seconds: Double
+        /// From schema 23, everything the stage does that a count gives — its figures, the tiles' trials, a pulse per step; under 23, its
+        /// figures alone: an older report's ratio of seconds to projection is not this one's.
         package var projected: Double?
         package var removes: String?
         package init(seconds: Double, projected: Double? = nil, removes: String? = nil) {
@@ -134,7 +136,7 @@ extension Diagnostic {
 
     // ── the report ──────────────────────────────────────────────────────────────────────────
 
-    /// **The report of schema 22**: the machine and what it announces, the model the probes fitted — what the engine plans with —,
+    /// **The report of schema 23**: the machine and what it announces, the model the probes fitted — what the engine plans with —,
     /// the raw measurements it was fitted on (so that anyone can replay the fit: `refit`), what the judge said of each kernel, the heat
     /// and the memory, each stage's seconds beside its projection, and what the measure found (`findings`, `uncertainty`). A finished
     /// report is always a map: it is applied as it stands.
@@ -272,7 +274,7 @@ extension Diagnostic {
         /// Every kernel judged right ran within its threshold: nothing excluded.
         package var passes: Bool { !judge.values.contains { $0.excluded } }
 
-        /// **Reads a stored or received report**, `nil` for anything that is not a report of schema 22 — an older schema is not a map.
+        /// **Reads a stored or received report**, `nil` for anything that is not a report of schema 23 — an older schema is not a map.
         package static func read(_ data: Data) -> Report? {
             struct Schema: Decodable { var schema: Int }
             guard let s = try? JSONDecoder().decode(Schema.self, from: data), s.schema == Diagnostic.schema else { return nil }
