@@ -13,18 +13,19 @@
     anima.py vae-witness --size 512         the decoder in float64                      -> witness-anima-vae-f64-<size>
     anima.py img2img --size 512             img2img at strength 0.6: the picture encoded, the start, the
                                             truncated loop (steps 3-7)                  -> goldens-anima-img2img-<size>
-    anima.py all [--size 512 1024 768x512 1536]  all of the above, in an order that satisfies their dependencies
+    anima.py all [--size 512 1024 768x512] [1536]  all of the above, in an order that satisfies their dependencies
 
 `bf16` is the bar of a half-precision path (the ANE's fp16 products): the `dit` evaluation with the
 reference in bfloat16, on the `dit` golden's inputs. It is not part of `all` (costly, and only that path reads it).
 
 Goldens go in `<goldens>/anima/`; `--goldens DIR`, else `SILICONED_GOLDENS`, else `./goldens`. Each stage
 rereads what an earlier one wrote (`dit` the text, `trajectory` the text, `vae` the trajectory, a rectangle's
-`vae` the 1024 trajectory), so run them in the order above. `all` without `--size` writes everything
-`siliconed check anima` reads: 512, 1024, 768x512 and 1536, where only the DiT's evaluation, trajectory and
-witness exist (the decoder's goldens stop at 1024). With `--size 512` it takes about two minutes on an
-M1 Pro, about ten with `--size 512 1024 768x512`. The witness of the DiT is the first step's (the only one
-the check reads) and exists for the squares: a rectangle has no trajectory to take its starting latent from.
+`vae` the 1024 trajectory), so run them in the order above. `all` without `--size` writes 512, 1024 and
+768x512: about two minutes on an M1 Pro with `--size 512`, about ten without. 1536 is asked for by name
+(`--size 1536`, alone or with the others): only the DiT's evaluation, trajectory and witness exist there (the
+decoder's goldens stop at 1024), and its fp32 trajectory is long; without its goldens, `siliconed check anima`
+skips the 1536 stages. The witness of the DiT is the first step's (the only one the check reads) and exists
+for the squares: a rectangle has no trajectory to take its starting latent from.
 
 The reference is diffusers' `CosmosTransformer3DModel`, `AnimaTextConditioner` and
 `AutoencoderKLQwenImage`, with transformers' Qwen3 and T5 tokenizer, in float32 on the CPU. The Turbo
@@ -603,7 +604,7 @@ def main() -> None:
     OUT = common.goldens_directory(args.goldens) / "anima"
     OUT.mkdir(parents=True, exist_ok=True)
     if args.stage == "all":
-        everything(common.goldens_directory(args.goldens), args.size or ["512", "1024", "768x512", "1536"])
+        everything(common.goldens_directory(args.goldens), args.size or ["512", "1024", "768x512"])
     elif args.stage == "tokenizer":
         stage_tokenizer()
     elif args.stage == "text":
