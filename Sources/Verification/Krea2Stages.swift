@@ -399,6 +399,15 @@ struct Clouds {
         }
         let oracleCloud = [atWitness.reference] + moves + permuted
         let median = engineCloud.sorted()[engineCloud.count / 2], threshold = 1.25 * (oracleCloud.max() ?? 0)
+        // SILICONED_CHECK_CLOUDS=1: every draw of both clouds on stderr, one line each, for whoever wants to plot them.
+        if ProcessInfo.processInfo.environment["SILICONED_CHECK_CLOUDS"] == "1" {
+            let kinds = ["nominal"] + Array(repeating: "ulp", count: moves.count) + Array(repeating: "order", count: permuted.count)
+            var lines = zip(kinds, oracleCloud).map { "cloud\t\(m.boundary)\toracle\t\($0)\t\($1)" }
+            lines += engineCloud.enumerated().map { "cloud\t\(m.boundary)\tengine\t\($0 == 0 ? "nominal" : byOrders ? "order" : "ulp")\t\($1)" }
+            lines.append("cloud\t\(m.boundary)\tjudge\tmedian\t\(median)")
+            lines.append("cloud\t\(m.boundary)\tjudge\tthreshold\t\(threshold)")
+            FileHandle.standardError.write((lines.joined(separator: "\n") + "\n").data(using: .utf8)!)
+        }
         let note = byOrders
             ? String(format: "clouds of summation orders: engine median of %d (nominal + %d orders), oracle worst of %d (nominal + %d ulp + %d orders)",
                      engineCloud.count, engineCloud.count - 1, oracleCloud.count, moves.count, permuted.count)
