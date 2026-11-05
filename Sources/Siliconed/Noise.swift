@@ -59,11 +59,12 @@ package struct Noise {
 ///     `u₁ = 1 − data[j]`, `u₂ = data[j + 8]`, `r = √(−2 ln u₁)` in float, `θ = 2π·u₂` **in double**
 ///     (`2.0f * c10::pi<double> * u2`) rounded to float, `data[j] = r·cos θ`, `data[j + 8] = r·sin θ`;
 ///   - a size that is not a multiple of 16 **redraws** 16 fresh uniforms over the last 16 values
-///     and transforms them again — the tail overwrites values already transformed. That path is
-///     ported but NOT exact: `randn(20)` differs by one ulp in one value. A latent never takes it
-///     (64 channels); the multiple-of-16 path is checked to the bit (tests, `qwen21-trajectory`).
+///     and transforms them again — the tail overwrites values already transformed. Both paths are
+///     checked to the bit (tests: 384 values, and `randn(20)`; `<model> trajectory`); the one ulp the
+///     tail once missed was the cos/sin fusion below, not the tail.
 ///
-/// The float `log`, `cos`, `sin`, `sqrt` are the platform's libm, the one PyTorch calls on this Mac.
+/// The float `log`, `sqrt` and the fused `__sincosf_stret` are the platform's libm, what PyTorch's compiled path calls on
+/// this Mac — the fused call, not `cos` and `sin` one by one, as its source would suggest.
 package struct TorchNoise {
     private var state = [UInt32](repeating: 0, count: 624)
     private var index = 624
@@ -102,8 +103,13 @@ package struct TorchNoise {
             let u1 = 1 - data[j], u2 = data[j + 8]
             let radius = (-2 * Foundation.log(u1)).squareRoot()
             let theta = Float(2.0 * Double.pi * Double(u2))
-            data[j] = radius * Foundation.cos(theta)
-            data[j + 8] = radius * Foundation.sin(theta)
+            // One fused call, as PyTorch's wheel makes it: its source calls `std::cos` then `std::sin`, its compiler fused
+            // them (`nm -u libtorch_cpu.dylib` imports `___sincosf_stret`), and on some angles the fused pair and two
+            // separate calls differ by one or two ulps — 3,022 of Krea 2's 262,144 values at 1024² (macOS 27.2). Written
+            // out, so that the bits do not hang on what the optimizer fuses (a `-Onone` build did not).
+            let pair = __sincosf_stret(theta)
+            data[j] = radius * pair.__cosval
+            data[j + 8] = radius * pair.__sinval
         }
     }
 

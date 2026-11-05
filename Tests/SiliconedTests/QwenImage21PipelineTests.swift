@@ -67,16 +67,22 @@ final class QwenImage21PipelineTests: XCTestCase {
         a.withUnsafeMutableBufferPointer { g.fill($0.baseAddress!, count: 384) }
         XCTAssertEqual(bits(Array(a.prefix(4))), [0xbf901b85, 0xbf93808a, 0xbe804bd6, 0xbede255e])
         XCTAssertEqual(bits(Array(a.suffix(3))), [0x3f0dda9a, 0xbe3a03d5, 0xbe7019cb])
-        // A count that is not a multiple of 16 (never a latent: 64 channels) is NOT claimed to the bit:
-        // `torch.randn(20, seed 42)` differs in one value by one ulp (index 14) — PyTorch's tail path
-        // rounds differently somewhere. 19 of 20 agree.
+        // All 384, by their FNV-1a 64 over the little-endian bits: value 42 is one whose cos and sin differ by an ulp
+        // between the fused `__sincosf_stret` torch calls and two separate calls, which the seven above do not catch.
+        XCTAssertEqual(a[42].bitPattern, 0xbe944f4f)
+        let fnv = bits(a).reduce(UInt64(0xcbf2_9ce4_8422_2325)) { h, w in
+            (0..<4).reduce(h) { ($0 ^ UInt64((w >> (8 * $1)) & 0xff)) &* 0x100_0000_01b3 }
+        }
+        XCTAssertEqual(fnv, 0x5bfe_ebab_057d_1cb2)
+        // A count that is not a multiple of 16 (never a latent) redraws its last 16 values: `torch.randn(20, seed 42)`,
+        // to the bit. Value 14 once missed by an ulp: cos and sin called apart, where torch's compiled path fuses them.
         var b = [Float](repeating: 0, count: 20)
         var h = TorchNoise(seed: 42)
         b.withUnsafeMutableBufferPointer { h.fill($0.baseAddress!, count: 20) }
         let torch: [UInt32] = [0x3ff6a527, 0x3fbe5f54, 0x3f669567, 0xc006c0dd, 0xbf4214e2, 0x3f8a0650, 0x3f4d0143,
                                0x3fd71e93, 0x3eb63341, 0xbf2fc686, 0xbefc9934, 0x3e774894, 0xbe6d2eed, 0x3d2b0c00,
                                0xbe80ce79, 0x3f5c1fb0, 0xbe9e9487, 0xbeca9a91, 0x3f4dac3c, 0xbf1f20e0]
-        XCTAssertEqual(zip(bits(b), torch).filter { $0 != $1 }.count, 1)
+        XCTAssertEqual(bits(b), torch)
         // The product's latent draws it, Qwen-Image-2.1 only.
         XCTAssertEqual(bits(Array(Latent.noise(.qwenImage21, height: 2, width: 3, seed: 0).values)), bits(a))
     }
