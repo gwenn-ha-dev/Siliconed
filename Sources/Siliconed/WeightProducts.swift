@@ -441,12 +441,6 @@ package final class WeightProducts {
         return (gpu, computed, gpuWall, aneWall)
     }
 
-    /// **The rounded bf16 product cut between the GPU and the ANE**, at the same time: the first `m − aneRows` rows on the GPU's
-    /// kernel on the activation rounded to bf16 (`GEMM.linear(a:rounding:bf16:…)`, its rounded rows in the reserve's tail), the last
-    /// `aneRows` on the ANE's fp16 program, which reads the same bf16 copy at the reserve's head (`NeuralEngine.product(a:bf16:…)`) and
-    /// the fp32 activation. Each row is one engine's. The ANE's rows refused or non-finite: the whole product again on the GPU's rounded
-    /// kernel. What the map measures for the pair (`gpu/bf16act+ane/fp16`) is this function. The weight is `[k, n]`. Returns as
-    /// `int8Product(…ane:)`.
     /// **The ANE's rows refused, computed on the CPU** — the stream's fallback (`GPUStream.neuralEngine`): the GPU already queued what
     /// reads them, so they are written before the ANE's signal, never left undefined. The operand rounded to bf16 as the GPU's route
     /// rounds it, the weight widened, sums in fp32 (BLAS): close to the GPU's rows, not their bits — a refusal is rare and counted.
@@ -463,6 +457,12 @@ package final class WeightProducts {
                     0, c + first * n, Int32(n))
     }
 
+    /// **The rounded bf16 product cut between the GPU and the ANE**, at the same time: the first `m − aneRows` rows on the GPU's
+    /// kernel on the activation rounded to bf16 (`GEMM.linear(a:rounding:bf16:…)`, its rounded rows in the reserve's tail), the last
+    /// `aneRows` on the ANE's fp16 program, which reads the same bf16 copy at the reserve's head (`NeuralEngine.product(a:bf16:…)`) and
+    /// the fp32 activation. Each row is one engine's. The ANE's rows refused or non-finite: the whole product again on the GPU's rounded
+    /// kernel. What the map measures for the pair (`gpu/bf16act+ane/fp16`) where the ANE is not streamed. The weight is `[k, n]`. Returns as
+    /// `int8Product(…ane:)`.
     package static func bf16Product(gemm: GEMM, rounding: TensorGEMM.Rounding, reserve w: MTLBuffer, a: MTLBuffer, c: MTLBuffer,
                                     m: Int, k: Int, n: Int, ane: NeuralEngine, aneRows: Int)
         -> (gpu: Double, computed: Bool, gpuWall: Double, aneWall: Double) {
@@ -483,6 +483,46 @@ package final class WeightProducts {
         GEMM.neuralEngineTally.withLock { $0.handed += 1; if !computed { $0.givenBack += 1 } }
         if !computed { gpu += gemm.linear(a: a, rounding: rounding, bf16: w, c: c, m: m, k: k, n: n, weightIsTransposed: true) }
         return (gpu, computed, gpuWall, aneWall)
+    }
+
+    /// **The same pair as the stream runs it** (`GPUStream.neuralEngine`, the render's in-place path): the ANE's rows on its thread,
+    /// started by the GPU's signal, the GPU's rows queued beside them, one wait at the end (the stream's drain) instead of a rendezvous
+    /// on the CPU. A refusal is computed on the CPU (`cpuRows`) before the signal, as in a render. `gpuWall`: when the GPU's rows
+    /// completed (a marker buffer behind them); `aneWall`: when the ANE's thread returned; both from the call's start.
+    package static func bf16ProductStreamed(gemm: GEMM, rounding: TensorGEMM.Rounding, reserve w: MTLBuffer, a: MTLBuffer, c: MTLBuffer,
+                                            m: Int, k: Int, n: Int, ane: NeuralEngine, aneRows: Int)
+        -> (gpu: Double, computed: Bool, gpuWall: Double, aneWall: Double) {
+        let first = m - aneRows
+        nonisolated(unsafe) let (pa, pc) = (a.contents().assumingMemoryBound(to: Float.self), c.contents().assumingMemoryBound(to: Float.self))
+        nonisolated(unsafe) let weight = UnsafePointer(w.contents().assumingMemoryBound(to: UInt16.self))
+        final class Ends: @unchecked Sendable {   // under `lock`
+            let lock = NSLock(); var gpu: UInt64 = 0, ane: UInt64 = 0, computed = false
+            func set(_ body: (Ends) -> Void) { lock.lock(); body(self); lock.unlock() }
+        }
+        let ends = Ends()
+        let stream = gemm.queue.stream
+        let wasOn = stream.isOn
+        stream.isOn = true
+        let began = DispatchTime.now().uptimeNanoseconds
+        let done = stream.neuralEngine(on: gemm.queue, work: {
+            let computed = ane.product(a: pa, bf16: weight, c: pc, first: first, rows: aneRows, k: k, n: n)
+            ends.set { $0.ane = DispatchTime.now().uptimeNanoseconds; $0.computed = computed }
+            return computed
+        }, fallback: {
+            cpuRows(a: pa, bf16: weight, c: pc, first: first, rows: aneRows, k: k, n: n)
+        })
+        if first > 0 { _ = gemm.linear(a: a, rounding: rounding, bf16: w, c: c, m: first, k: k, n: n, weightIsTransposed: true) }
+        if let marker = gemm.queue.makeCommandBuffer() {
+            marker.addCompletedHandler { _ in ends.set { $0.gpu = DispatchTime.now().uptimeNanoseconds } }
+            marker.commit()
+            stream.neuralEngineQueued(done)
+            stream.drain()
+            marker.waitUntilCompleted()
+        } else { stream.neuralEngineQueued(done); stream.drain() }
+        let gpu = stream.gpuSeconds().values.reduce(0, +)
+        if !wasOn { stream.isOn = false }
+        ends.lock.lock(); defer { ends.lock.unlock() }
+        return (gpu, ends.computed, Double(ends.gpu &- began) * 1e-9, Double(ends.ane &- began) * 1e-9)
     }
 
     /// The weight into the reserve, by the path the plan assigned, and the assignment the widened product then runs under. A path

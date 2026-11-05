@@ -137,9 +137,18 @@ extension Diagnostic.CapacityProbes.Context {
             Widen.copyBfloat16(source: operands.bf16.base, destination: operands.b.base, count: k * n)
             dirty = max(dirty, k * n)
             once = {
-                timedPair { WeightProducts.bf16Product(gemm: self.alone, rounding: (self.aloneB.b, rounding.offset, rounding.rows),
-                                                       reserve: self.aloneB.b, a: self.aloneB.a, c: self.aloneB.c,
-                                                       m: m, k: k, n: n, ane: engine, aneRows: aneRows) }
+                // **The pair as the render runs it.** Where a denoiser streams the ANE (`GPUStream.policy` on), its rows run beside the
+                // queued GPU rows, no rendezvous on the CPU: measured so. The synchronous form's chains read the GPU at κ 0.74–0.80 at
+                // k = 3 840 where the stream's read 0.91–0.98, and three times their noise — a pair priced 4–14 % over the GPU alone,
+                // taken or not from one map to the next, that a render ran 12 % under it.
+                if GPUStream.policy == .on {
+                    return timedPair { WeightProducts.bf16ProductStreamed(gemm: self.alone, rounding: (self.aloneB.b, rounding.offset, rounding.rows),
+                                                                          reserve: self.aloneB.b, a: self.aloneB.a, c: self.aloneB.c,
+                                                                          m: m, k: k, n: n, ane: engine, aneRows: aneRows) }
+                }
+                return timedPair { WeightProducts.bf16Product(gemm: self.alone, rounding: (self.aloneB.b, rounding.offset, rounding.rows),
+                                                              reserve: self.aloneB.b, a: self.aloneB.a, c: self.aloneB.c,
+                                                              m: m, k: k, n: n, ane: engine, aneRows: aneRows) }
             }
         }
         RouteBeacon.announce(g.description); RouteBeacon.announce(a.description)
