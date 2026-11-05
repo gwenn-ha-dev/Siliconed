@@ -65,14 +65,27 @@ final class PromptWriterLoopTests: XCTestCase {
         XCTAssertEqual(Array(tokens[..<cut.kept]), head + phrase)
     }
 
-    func testTheLongestPeriodIsCutAfterFourTurnsWithinTheBudget() throws {
+    func testTheLongestPeriodIsCutAfterThreeTurnsWithinTheBudget() throws {
         let head = Array(1000..<1050), period = Array(2000..<(2000 + RepetitionGuard.maximumPeriod))
         let tokens = head + Array(repeating: period, count: 12).flatMap { $0 }
         let cut = try XCTUnwrap(firstCut(tokens))
-        XCTAssertEqual(cut.at, head.count + RepetitionGuard.minimumRepeats * period.count)
+        XCTAssertEqual(cut.at, head.count + RepetitionGuard.longRepeats * period.count)
         XCTAssertEqual(cut.kept, head.count + period.count)
         // The worst case still stops well inside the writer's budget: a page, not pages.
         XCTAssertLessThan(cut.at, PromptWriterNeed.Limits().newTokens)
+    }
+
+    func testAListOfAboutNinetyTokensStartedLateIsCut() throws {
+        // Z-Image's Rewrite: 350 tokens of a drifting description, then thirteen « no visible wear on bike … , » of 7 tokens
+        // over and over to the budget — a period of 91, which four turns would not have fitted.
+        var head: [Int] = []
+        for i in 0..<350 { head.append(3000 + (i * 37) % 251) }
+        let list = (0..<13).flatMap { item in [700, 701, 702, 703, 704, 800 + item, 705] }
+        let budget = PromptWriterNeed.Limits().newTokens
+        let tokens = Array((head + Array(repeating: list, count: 8).flatMap { $0 }).prefix(budget))
+        let cut = try XCTUnwrap(firstCut(tokens))
+        XCTAssertEqual(cut.at, head.count + RepetitionGuard.longRepeats * list.count)
+        XCTAssertEqual(Array(tokens[..<cut.kept]), head + list)
     }
 
     func testALateLoopIsCutEvenNearTheBudget() throws {
