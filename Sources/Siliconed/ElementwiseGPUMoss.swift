@@ -1,0 +1,98 @@
+import Foundation
+import Metal
+
+/// **MOSS-Image's modulated norm on the GPU** — the block's two pre-norms where the denoiser streams (`GPUStream`,
+/// `MossImageDiT.blockStreamed`), in place of `Ops.rmsNorm` then `Ops.modulate` on the CPU, the GPU idle between them:
+///
+///     r    = 1 / √(Σ x² / d + ε)                  fp32, the sum in the GPU's order (below)
+///     out  = ((x · r) · w) · (1 + scale) + shift   each product and the sum rounded, in this order — no contraction
+///
+/// What sets it apart from Z-Image's `ElementwiseGPU.normScale`, and what a port by analogy would miss:
+///
+///   - **a shift**: MOSS's adaLN is `x·(1 + scale) + shift` (`Ops.modulate`: `factor = scale + 1` in fp32, then `x·factor + shift`
+///     in two roundings, as torch), where Z's is a scale alone; the `1 +` is one fp32 sum, commutative, so the CPU's factor's bits;
+///   - **the shared modulation**: `scale` and `shift` are slices of the one modulation every block reads (`shift_a, scale_a, gate_a,
+///     shift_f, scale_f, gate_f`, the shift first), not a per-block table;
+///   - **no norm on the residual**: MOSS's gated residual adds the sublayer as it is (`ElementwiseGPU.residual`), where Z normalises
+///     it first (`normResidual`) — so this kernel is the only norm of the block's stream besides the QK-norm.
+///
+/// **Not the CPU's bits**: the sum of squares is the plain fp32 sum of `ElementwiseGPU`'s `norm_scale` (each lane its strided values,
+/// `simd_sum`, the eight partials in order), not `vDSP_svesq`'s order, which is not reproduced (`QKNormRope`). Judged against the oracle
+/// (`siliconed check moss-image dit`), the rest of the arithmetic the CPU's to the rounding.
+package final class MossImageNormGPU {
+    private static let source = """
+    #include <metal_stdlib>
+    using namespace metal;
+
+    struct NormParams { uint cols; float eps; };
+
+    // `ElementwiseGPU`'s `row_scale`, the same order: one threadgroup of 256 per row.
+    static inline float row_scale(device const float *row, uint cols, float eps, uint t, uint lane, uint sg,
+                                  threadgroup float *partial) {
+        #pragma METAL fp contract(off)
+        float ss = 0.0f;
+        for (uint i = t; i < cols; i += 256) { float v = row[i]; float sq = v * v; ss = ss + sq; }
+        float s = simd_sum(ss);
+        if (lane == 0) partial[sg] = s;
+        threadgroup_barrier(mem_flags::mem_threadgroup);
+        float total = 0.0f;
+        for (uint j = 0; j < 8; j++) total = total + partial[j];
+        float mean = precise::divide(total, float(cols));
+        return precise::divide(1.0f, precise::sqrt(mean + eps));
+    }
+
+    // out = ((x · r) · w) · (1 + scale) + shift — `Ops.rmsNorm` (`vsmul`, `vmul`) then `Ops.modulate`, each rounded.
+    kernel void norm_modulate(device const float *x [[buffer(0)]], device const float *w [[buffer(1)]],
+                              device const float *scale [[buffer(2)]], device const float *shift [[buffer(3)]],
+                              device float *out [[buffer(4)]], constant NormParams &p [[buffer(5)]],
+                              uint row [[threadgroup_position_in_grid]], uint t [[thread_index_in_threadgroup]],
+                              uint lane [[thread_index_in_simdgroup]], uint sg [[simdgroup_index_in_threadgroup]]) {
+        #pragma METAL fp contract(off)
+        threadgroup float partial[8];
+        device const float *source = x + ulong(row) * p.cols;
+        device float *destination = out + ulong(row) * p.cols;
+        float r = row_scale(source, p.cols, p.eps, t, lane, sg, partial);
+        for (uint i = t; i < p.cols; i += 256) {
+            float v = source[i] * r;
+            v = v * w[i];
+            float factor = scale[i] + 1.0f;
+            float product = v * factor;
+            destination[i] = product + shift[i];
+        }
+    }
+    """
+
+    private let queue: MTLCommandQueue
+    private let pipeline: MTLComputePipelineState
+
+    package init(device: MTLDevice, queue: MTLCommandQueue) throws {
+        self.queue = queue
+        let options = MTLCompileOptions()
+        options.mathMode = .safe          // the division and the square root as written
+        let library = try device.makeLibrary(source: Self.source, options: options)
+        guard let function = library.makeFunction(name: "norm_modulate") else { throw GEMM.Failure.noDevice }
+        pipeline = try device.makeComputePipelineState(function: function)
+    }
+
+    private struct NormParams { var cols: UInt32; var eps: Float }
+
+    /// `out[s, :] ← RMSNorm(x[s, :]) · w · (1 + scale) + shift` over `rows × columns`, one threadgroup per row; each operand a buffer and
+    /// an offset in floats. Returns the GPU's seconds — 0 on the stream, where it is queued and judged at the drain.
+    @discardableResult
+    package func normModulate(_ x: ElementwiseGPU.BufferSlice, weight: ElementwiseGPU.BufferSlice, scale: ElementwiseGPU.BufferSlice,
+                              shift: ElementwiseGPU.BufferSlice, into out: ElementwiseGPU.BufferSlice,
+                              rows: Int, columns: Int, eps: Float) -> Double {
+        guard rows > 0, columns > 0, case let commands = queue.checkedCommandBuffer(),
+              let encoder = commands.makeComputeCommandEncoder() else {
+            Attention.report("GPU modulated norm (MOSS-Image): no command buffer, so nothing ran")
+            return 0
+        }
+        var p = NormParams(cols: UInt32(columns), eps: eps)
+        encoder.setComputePipelineState(pipeline)
+        for (i, slice) in [x, weight, scale, shift, out].enumerated() { encoder.setBuffer(slice.buffer, offset: slice.offset * 4, index: i) }
+        encoder.setBytes(&p, length: MemoryLayout<NormParams>.stride, index: 5)
+        encoder.dispatchThreadgroups(MTLSize(width: rows, height: 1, depth: 1), threadsPerThreadgroup: MTLSize(width: 256, height: 1, depth: 1))
+        encoder.endEncoding()
+        return commands.commitSettled(label: "elementwise GPU", what: "GPU modulated norm (MOSS-Image)")
+    }
+}
