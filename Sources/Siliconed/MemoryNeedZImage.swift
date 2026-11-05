@@ -9,6 +9,7 @@ import Foundation
 ///     references  (img2img, Détail) the `fitted` copy when the size differs                     │ a time,
 ///                 + the Flux encoder's two heaps and host copies (`VAEEncoder.plan`)              │ each
 ///     denoising   4 DiT arenas(S, r) + CacheLoRA(r) + the tail's buffers + the sampler's latents │ handing
+///                 (+ the whole DiT file where the plan reads it in place: `Request.mapInPlace`)   │
 ///                 + the full-size attentions the 3 blocks keep (a head split from 1024 rows:     │ back its
 ///                   host arena ⊕ the GPU heads' queries; MPSGraph below) · its GEMM               │ memory
 ///     decoding    the Flux decoder's two heaps and the image it returns (`VAE.plan`)              ┘
@@ -65,6 +66,9 @@ extension MemoryNeed {
         /// What widening the DiT's largest int8 convrot weight allocates outside every arena
         /// (`Widen.rotationScratchBytes`): the Compact's int8 convrot, or an imported Comfy-style one; 0 otherwise.
         package let ditRotationScratch: Int
+        /// **What the DiT's map costs read in place** (`Request.mapInPlace`): the length `Artifact.wrappedMap` wraps — the whole file,
+        /// rounded up to the page — where its products are bf16 (`WeightProducts.prepare` reads only those in place); 0 otherwise.
+        package let ditInPlaceBytes: Int
 
         package init(dit: [String: Any], ditSize: Int = .max, encoder: [String: Any], encoderSize: Int = .max) {
             self.dit = dit; self.ditSize = ditSize; self.encoder = encoder; self.encoderSize = encoderSize
@@ -75,6 +79,9 @@ extension MemoryNeed {
                 Artifact.largestRun(header: encoder, prefixes: TextEncoder.layerPrefixes(config), fileSize: encoderSize)
             } ?? 0
             ditRotationScratch = Widen.rotationScratchBytes(header: dit)
+            let page = Int(getpagesize())
+            let file = ditSize < .max ? ditSize : Artifact.mapBytes(header: dit)
+            ditInPlaceBytes = Artifact.weightFormat(header: dit) == .bf16 ? (file + page - 1) / page * page : 0
         }
 
         /// What one buffer of the DiT's stream holds over `layers`: the largest tensor's run (`Artifact.largestRun`).
@@ -191,6 +198,7 @@ extension MemoryNeed {
             Term("LoRA down staging", request.loraRanks.count > 1
                 ? LoRA.downBytes(k: loraModules.map(\.k).max() ?? 0, rank: request.loraRanks.max() ?? 0) : 0),
             Term("map staging", staging),
+            Term(inPlaceTerm, request.mapInPlace && request.mapInPlaceAvailable ? maps.ditInPlaceBytes : 0),
             // The DiT's velocity `[C, h, w]`.
             Term("sampler", latent + request.solver.historyBytes(count: latent / f)),
             Term("DiT rotation scratch", maps.ditRotationScratch),

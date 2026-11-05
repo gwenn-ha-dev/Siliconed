@@ -540,10 +540,11 @@ package final class WeightProducts {
         let planned = gemm.assignment(k: k, n: n, m: m, weight: format(of: name))
         // **In place, on the stream**: a bf16 weight read where the map holds it (`Artifact.wrappedMap`), no copy into the reserve, so
         // nothing for the CPU to write while the queued products read — the product queues behind the others. Only the GPU's whole
-        // product (no ANE rows, which read the copy), on a rounded activation.
+        // product (no ANE rows, which read the copy), on a rounded activation. Only where the render's plan charges the map
+        // (`MemoryPlan.mapInPlace`): read in place, its pages count in the footprint.
         inPlace = nil
         let stream = gemm.queue.stream
-        if stream.isOn, planned.path == .bf16, planned.roundsActivation, roundsActivations, gemm.bf16Activations,
+        if stream.isOn, MemoryPlan.mapInPlace, planned.path == .bf16, planned.roundsActivation, roundsActivations, gemm.bf16Activations,
            artifact.tensors[name]?.dtype == .bfloat16,
            let offset = artifact.mappedOffset(name), offset % 16 == 0, let map = artifact.wrappedMap(on: gemm.device),
            let rounding = Self.roundingPlan(k: k, n: n, capacity: capacity, weightInReserve: false) {

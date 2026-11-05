@@ -65,6 +65,8 @@ extension MemoryPlan {
         guard let render = current else {
             return decide(fraction > 0 ? (Tail(fraction: fraction, streamed: true).released(layers: layers), true) : (layers, false), "")
         }
+        // Read in place, the map is charged whole (`MemoryPlan.choose`): never streamed.
+        if render.request.mapInPlace { return decide((layers, false), " (the whole map read in place, charged in B)") }
         let mapBytes = artifact.tensors.values.reduce(0) { $0 + $1.bytes }
         let plan = released(spans: spans, mapBytes: mapBytes, ceiling: render.ceiling,
                             streamed: render.denoisingStreamed, cached: render.denoisingCached, fraction: fraction)
