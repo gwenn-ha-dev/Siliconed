@@ -57,27 +57,12 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
     private var window: NSWindow?
     private let selection = SettingsSelection()
 
-    enum Pane: String, CaseIterable, Identifiable {
-        case general, macs, lab, advanced
-        var id: String { rawValue }
+    /// The panes and their order are the library's (`SettingsPane`): `silicontrol settings` names them by the same words.
+    typealias Pane = SettingsPane
 
-        var title: String {
-            switch self {
-            case .general: String(localized: "General")
-            case .macs: String(localized: "Macs")
-            case .lab: String(localized: "Prompt Lab")
-            case .advanced: String(localized: "Advanced")
-            }
-        }
-
-        var symbol: String {
-            switch self {
-            case .general: "gearshape"
-            case .macs: "desktopcomputer.and.macbook"
-            case .lab: "sparkles"
-            case .advanced: "slider.horizontal.3"
-            }
-        }
+    /// What the window shows, or would show when it opens: its pane, and the instruction of Prompt Lab's two menus.
+    var shown: (pane: Pane, family: Family, gesture: PromptWriterInstructions.Gesture) {
+        (selection.pane, selection.instructionFamily, selection.instructionGesture)
     }
 
     func show(_ app: AppState, pane: Pane? = nil) {
@@ -126,16 +111,39 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
         w.setFrame(frame, display: true, animate: w.isVisible)
     }
 
-    /// **Settings › Prompt Lab on one instruction**: the lab's mark opens it on the model it writes for.
-    func showInstruction(_ family: Family, _ gesture: PromptWriterInstructions.Gesture) {
-        selection.instructionFamily = family
-        selection.instructionGesture = gesture
+    /// **Settings › Prompt Lab on one instruction**: the lab's mark opens it on the model it writes for; `silicontrol settings lab`
+    /// too, a menu it does not name left as it is.
+    func showInstruction(_ family: Family?, _ gesture: PromptWriterInstructions.Gesture?) {
+        if let family { selection.instructionFamily = family }
+        if let gesture { selection.instructionGesture = gesture }
         show(MainWindow.shared.local, pane: .lab)
     }
 
     func select(_ pane: Pane) {
         selection.pane = pane
         window?.title = pane.title
+    }
+}
+
+extension SettingsPane: Identifiable {
+    package var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .general: String(localized: "General")
+        case .macs: String(localized: "Macs")
+        case .lab: String(localized: "Prompt Lab")
+        case .advanced: String(localized: "Advanced")
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .general: "gearshape"
+        case .macs: "desktopcomputer.and.macbook"
+        case .lab: "sparkles"
+        case .advanced: "slider.horizontal.3"
+        }
     }
 }
 

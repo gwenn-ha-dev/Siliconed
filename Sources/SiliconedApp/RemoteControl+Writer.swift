@@ -1,5 +1,5 @@
-// `rewrite`, `describe` and `install writer`: the Prompt Lab's two gestures and its one button, from the terminal; and
-// `instructions`, Settings › Prompt Lab: what the writer is told, the user's to rewrite.
+// `rewrite`, `describe` and `install writer`: the Prompt Lab's two gestures and its one button, from the terminal;
+// `instructions`, Settings › Prompt Lab: what the writer is told, the user's to rewrite; and `settings`, the window that shows it.
 // They go through the lab's own functions (`LabRemote.swift`, `Lab.swift`), so a command and a click write the same text.
 //
 // - **The refusals are the lab's** (`LabModel.pause`): the window follows another Mac, an image renders, no writer installed,
@@ -144,15 +144,7 @@ extension RemoteControl {
             }
         }
         let lab = LabModel.shared
-        var family: Family?
-        if let word = order.target {
-            let cards = local.cards
-            guard let f = WriterTarget.named(word, installed: Family.allCases, modelFamily: { id in cards.first { $0.id == id }?.family }) else {
-                throw Refusal("model", String(localized: "unknown model: \"\(word)\""),
-                              help: String(localized: "models: \(Family.allCases.map(\.rawValue).joined(separator: ", "))"))
-            }
-            family = f
-        }
+        let family = try order.target.map(instructionFamily)
         func row(_ f: Family, _ g: PromptWriterInstructions.Gesture) -> [String: Any] {
             ["for": f.rawValue, "gesture": g.rawValue, "edited": lab.instructions.isEdited(f, g),
              "sent": lab.instructions.sent(f, g) == nil ? "ours" : "yours"]
@@ -177,6 +169,39 @@ extension RemoteControl {
         }
         return row(target, gesture).merging(["ok": true, "text": lab.instructions.text(target, gesture),
                                             "instruction": lab.instructions.instruction(for: target, gesture)]) { a, _ in a }
+    }
+
+    /// What `--for` names for an instruction: any family, installed or not — the instructions are the app's, not the library's.
+    private func instructionFamily(_ word: String) throws -> Family {
+        let cards = local.cards
+        guard let f = WriterTarget.named(word, installed: Family.allCases, modelFamily: { id in cards.first { $0.id == id }?.family }) else {
+            throw Refusal("model", String(localized: "unknown model: \"\(word)\""),
+                          help: String(localized: "models: \(Family.allCases.map(\.rawValue).joined(separator: ", "))"))
+        }
+        return f
+    }
+
+    // ── settings ──
+
+    /// **`settings [PANE]`**: Siliconed › Settings… (⌘,), on that pane (`SettingsWindow.show`, the tabs' `select`); without one,
+    /// on the pane last shown. **`settings lab [rewrite|describe] [--for ID]`**: Settings › Prompt Lab on one instruction, as a
+    /// click on the Prompt Lab's « Your Instruction » opens it (`showInstruction`) — without `--for`, the model the Lab writes
+    /// for. The window is this Mac's: allowed while the window follows another one.
+    func settings(_ action: GestureOrder.SettingsAction) throws -> [String: Any] {
+        let window = SettingsWindow.shared
+        switch action {
+        case .show(let pane):
+            window.show(local, pane: pane)
+        case .instruction(let gesture, let word):
+            let family = try word.map(instructionFamily) ?? LabModel.shared.target
+            window.showInstruction(family, gesture)
+        }
+        var o: [String: Any] = ["pane": window.shown.pane.rawValue]
+        if window.shown.pane == .lab {
+            o["for"] = window.shown.family.rawValue
+            o["gesture"] = window.shown.gesture.rawValue
+        }
+        return ["ok": true, "settings": o]
     }
 
     // ── install writer ──

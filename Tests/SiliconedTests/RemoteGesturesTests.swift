@@ -34,6 +34,44 @@ final class RemoteGesturesTests: XCTestCase {
         XCTAssertEqual(GestureOrder.parse("lab", ["--yes"]), .failure(.unknownFlag("--yes")))
     }
 
+    /// `lab rewrite` and `lab describe N`: the bar's two buttons, answered at once or, with `--wait`, once written — `--wait` belongs
+    /// to them alone.
+    func testTheLabWritesInItsText() {
+        XCTAssertEqual(parse("lab", ["rewrite"]), .lab(.rewrite(wait: false)))
+        XCTAssertEqual(parse("lab", ["rewrite", "--wait"]), .lab(.rewrite(wait: true)))
+        XCTAssertEqual(parse("lab", ["--wait", "rewrite"]), .lab(.rewrite(wait: true)))
+        XCTAssertEqual(parse("lab", ["describe", "2"]), .lab(.describe(image: 2, wait: false)))
+        XCTAssertEqual(parse("lab", ["describe", "1", "--wait"]), .lab(.describe(image: 1, wait: true)))
+        XCTAssertEqual(GestureOrder.parse("lab", ["describe", "0"]), .failure(.badValue("image", "0")))
+        XCTAssertEqual(GestureOrder.parse("lab", ["describe", "i7"]), .failure(.badValue("image", "i7")))
+        for arguments in [["rewrite", "a cat"], ["describe"], ["describe", "1", "2"], ["open", "--wait"], ["--wait"], ["add", "a.jpg", "--wait"]] {
+            XCTAssertEqual(GestureOrder.parse("lab", arguments), .failure(.usage(GestureOrder.usage("lab"))), "\(arguments)")
+        }
+        XCTAssertEqual(GestureOrder.parse("lab", ["rewrite", "--for", "krea2"]), .failure(.unknownFlag("--for")))
+    }
+
+    // ── The Settings window ────────────────────────────────────────────────────────────────
+
+    /// `settings [PANE]`, and `settings lab [rewrite|describe] [--for ID]`: Prompt Lab on one instruction, a menu not named left alone.
+    func testSettingsOpensOnAPaneOrAnInstruction() {
+        XCTAssertEqual(parse("settings", []), .settings(.show(nil)))
+        for pane in SettingsPane.allCases { XCTAssertEqual(parse("settings", [pane.rawValue]), .settings(.show(pane))) }
+        XCTAssertEqual(parse("settings", ["Macs"]), .settings(.show(.macs)))
+        XCTAssertEqual(parse("settings", ["lab", "rewrite", "--for", "krea2"]), .settings(.instruction(.rewrite, target: "krea2")))
+        XCTAssertEqual(parse("settings", ["lab", "describe"]), .settings(.instruction(.describe, target: nil)))
+        XCTAssertEqual(parse("settings", ["lab", "--for", "anima"]), .settings(.instruction(nil, target: "anima")))
+        XCTAssertEqual(SettingsPane.allCases.map(\.rawValue), ["general", "macs", "lab", "advanced"])
+        XCTAssertEqual(GestureOrder.parse("settings", ["prompt-lab"]), .failure(.badValue("pane", "prompt-lab")))
+        XCTAssertEqual(GestureOrder.parse("settings", ["lab", "vary"]), .failure(.badValue("gesture", "vary")))
+        let line = GestureOrder.usage("settings")
+        for arguments in [["general", "rewrite"], ["macs", "--for", "krea2"], ["--for", "krea2"], ["lab", "rewrite", "now"]] {
+            XCTAssertEqual(GestureOrder.parse("settings", arguments), .failure(.usage(line)), "\(arguments)")
+        }
+        XCTAssertEqual(GestureOrder.parse("settings", ["lab", "--for"]), .failure(.flagWithoutValue("--for")))
+        XCTAssertEqual(GestureOrder.parse("settings", ["--wait"]), .failure(.unknownFlag("--wait")))
+        XCTAssertTrue(GestureOrder.verbs.contains("settings"))
+    }
+
     // ── Naming a cell ──────────────────────────────────────────────────────────────────────
 
     func testACellIsAGridAndARank() {

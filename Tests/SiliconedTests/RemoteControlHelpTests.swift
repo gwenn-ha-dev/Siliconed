@@ -95,6 +95,24 @@ final class RemoteControlWriterHelpTests: XCTestCase {
             XCTAssertTrue(pages.pages["contract"]?.contains("loading, text") == true)
         }
     }
+
+    /// **The Prompt Lab's buttons and the Settings window**, from the terminal: in the overview, on their pages, their new code in
+    /// `help errors`.
+    func testTheLabButtonsAndSettingsAreDocumented() {
+        for pages in [RemoteControlHelp.english, RemoteControlHelp.french] {
+            for line in ["lab rewrite · lab describe N [--wait]", "settings [", "settings lab [rewrite|describe] [--for ID]"] {
+                XCTAssertTrue(pages.overview.contains(line), line)
+            }
+            for line in ["silicontrol lab rewrite [--wait]", "silicontrol lab describe <n> [--wait]", "empty_text", "\"writing\""] {
+                XCTAssertTrue(pages.pages["lab"]?.contains(line) == true, line)
+            }
+            XCTAssertNotNil(RemoteControlHelp.answer(["settings", "--help"], pages)?["help"] as? String)
+            for pane in ["general", "macs", "lab", "advanced"] {
+                XCTAssertTrue(pages.pages["settings"]?.contains(pane) == true, pane)
+            }
+            XCTAssertTrue(pages.pages["errors"]?.contains("empty_text") == true)
+        }
+    }
 }
 
 /// **What `silicontrol` does of the window's other gestures is documented**, in both languages: the commands in the overview, a page for each

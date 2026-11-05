@@ -33081,6 +33081,46 @@
         }
       }
     },
+    "Stopped in the Prompt Lab." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Im Prompt-Labor angehalten."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Detenido en el Laboratorio de prompts."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Arrêté dans l’Atelier de prompts."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Interrotto nel Laboratorio dei prompt."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "プロンプトラボで停止しました。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已在提示词实验室中停止。"
+          }
+        }
+      }
+    },
     "Stopped — %@ can render again after a new installation: the %@ version was removed to make room. The files already downloaded are kept; the one in progress will start over." : {
       "localizations" : {
         "de" : {
@@ -34570,6 +34610,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "在这台 Mac 的测量选中之处使用神经网络引擎和 GPU 的张量单元（bf16）；关闭后全程使用 fp32。"
+          }
+        }
+      }
+    },
+    "The Prompt Lab’s text is empty: there is nothing to rewrite." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Der Text des Prompt-Labors ist leer: Es gibt nichts umzuschreiben."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El texto del Laboratorio de prompts está vacío: no hay nada que reescribir."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le texte de l’Atelier de prompts est vide : il n’y a rien à réécrire."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il testo del Laboratorio dei prompt è vuoto: non c’è nulla da riscrivere."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "プロンプトラボのテキストが空です。書き直すものがありません。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "提示词实验室的文本为空：没有可改写的内容。"
           }
         }
       }

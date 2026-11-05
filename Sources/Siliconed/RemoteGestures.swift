@@ -1,5 +1,5 @@
 // What `silicontrol` asks of the app for the window's other gestures — the history's (remove, undo, again, reuse, crop), the series'
-// (add its sheet), the models' (import, uninstall), Compute On and the library — kept here, pure, so that the tests read the
+// (add its sheet), the models' (import, uninstall), Compute On, the library, the Prompt Lab's bar and the Settings window — kept here, pure, so that the tests read the
 // arguments, the way a cell is named, a crop's frame and the `--yes` guard without an app.
 //
 // The gestures themselves are the app's (`AppState`, `MainWindow`): a command calls the function the button calls.
@@ -80,8 +80,11 @@ package enum GestureOrder: Equatable, Sendable {
     case library(LibraryAction, confirmed: Bool)
     /// `start-image …`: the rack's starting image (img2img) — an image of the Prompt Lab given the start's role, and its strength.
     case startImage(StartImageAction)
-    /// `lab …`: the Prompt Lab, the bar under the image — what it holds, folded or unfolded, an image in, a role, an image out.
+    /// `lab …`: the Prompt Lab, the bar under the image — what it holds, folded or unfolded, an image in, a role, an image out, and its
+    /// two buttons, Rewrite and Describe, written in its text.
     case lab(LabAction)
+    /// `settings …`: Siliconed › Settings… (⌘,), on a pane — and, on Prompt Lab, on one instruction.
+    case settings(SettingsAction)
 
     package enum Removal: Equatable, Sendable {
         /// A model's id: a publisher's family is uninstalled, an imported model removed.
@@ -120,6 +123,10 @@ package enum GestureOrder: Equatable, Sendable {
         case add([String])
         case role(image: Int, LabInputs.Role)
         case remove(image: Int)
+        /// The bar's « Rewrite », written in its text. `wait`: the answer comes when the text is written, not when it starts.
+        case rewrite(wait: Bool)
+        /// Image N's « Describe », written in the text at the caret.
+        case describe(image: Int, wait: Bool)
 
         /// A role as the command names it: `edited`, `reference`, `start`, `none`.
         package static func role(named word: String) -> LabInputs.Role? {
@@ -135,6 +142,15 @@ package enum GestureOrder: Equatable, Sendable {
         package static func name(_ role: LabInputs.Role) -> String { role == .neutral ? "none" : role.rawValue }
     }
 
+    /// What `settings` opens: a pane, or Settings › Prompt Lab on one instruction — the model and the gesture its two menus show,
+    /// each left as it is when not named.
+    package enum SettingsAction: Equatable, Sendable {
+        /// `nil`: the pane last shown, as ⌘, opens it.
+        case show(SettingsPane?)
+        /// `target`: a model's id or a family, as typed (the app resolves it).
+        case instruction(PromptWriterInstructions.Gesture?, target: String?)
+    }
+
     package enum Failure: Error, Equatable, Sendable {
         /// Not the syntax; the associated value is the usage line.
         case usage(String)
@@ -145,7 +161,7 @@ package enum GestureOrder: Equatable, Sendable {
     }
 
     package static let verbs: Set<String> = ["remove", "undo", "again", "reuse", "crop", "sheet", "import", "uninstall",
-                                             "macs", "compute", "library", "start-image", "lab"]
+                                             "macs", "compute", "library", "start-image", "lab", "settings"]
 
     package static func usage(_ command: String) -> String {
         switch command {
@@ -160,7 +176,8 @@ package enum GestureOrder: Equatable, Sendable {
         case "macs": "macs [connect|disconnect NAME]"
         case "compute": "compute <NAME|this>"
         case "start-image": "start-image [<image|i7>] [--strength 0.65] · start-image --remove"
-        case "lab": "lab [open|close] · lab add <image|i7> … · lab role <n> edited|reference|start|none · lab remove <n>"
+        case "lab": "lab [open|close] · lab add <image|i7> … · lab role <n> edited|reference|start|none · lab remove <n> · lab rewrite [--wait] · lab describe <n> [--wait]"
+        case "settings": "settings [general|macs|lab|advanced] · settings lab [rewrite|describe] [--for ID]"
         default: "library [move DIR|home|open DIR|local] [--yes]"
         }
     }
@@ -180,7 +197,12 @@ package enum GestureOrder: Equatable, Sendable {
         var words: [String] = []
         var yes = false
         var values: [String: String] = [:]
-        let valued: Set<String> = command == "crop" ? ["--box", "--ratio"] : command == "start-image" ? ["--strength"] : []
+        let valued: Set<String> = switch command {
+        case "crop": ["--box", "--ratio"]
+        case "start-image": ["--strength"]
+        case "settings": ["--for"]
+        default: []
+        }
         var i = 0
         while i < arguments.count {
             let a = arguments[i]
@@ -194,6 +216,7 @@ package enum GestureOrder: Equatable, Sendable {
             if a == "--yes", takesYes(command, arguments) { yes = true; i += 1; continue }
             if command == "undo", a == "--redo" { values[a] = ""; i += 1; continue }
             if command == "start-image", a == "--remove" { values[a] = ""; i += 1; continue }
+            if command == "lab", a == "--wait" { values[a] = ""; i += 1; continue }
             if a.hasPrefix("--"), a.count > 2, !a.contains(" ") { return .failure(.unknownFlag(a)) }
             words.append(a)
             i += 1
@@ -254,6 +277,9 @@ package enum GestureOrder: Equatable, Sendable {
         case "lab":
             let rest = Array(words.dropFirst())
             func number(_ word: String) -> Int? { Int(word).flatMap { $0 >= 1 ? $0 : nil } }
+            // `--wait` belongs to the two gestures that write; anywhere else it is a mistake, never ignored.
+            let wait = values["--wait"] != nil
+            if wait, !["rewrite", "describe"].contains(words.first ?? "") { return .failure(.usage(line)) }
             switch words.first {
             case nil: return .success(.lab(.status))
             case "open"?: return rest.isEmpty ? .success(.lab(.unfold)) : .failure(.usage(line))
@@ -267,8 +293,29 @@ package enum GestureOrder: Equatable, Sendable {
             case "remove"?:
                 guard rest.count == 1 else { return .failure(.usage(line)) }
                 return number(rest[0]).map { .success(.lab(.remove(image: $0))) } ?? .failure(.badValue("image", rest[0]))
+            case "rewrite"?: return rest.isEmpty ? .success(.lab(.rewrite(wait: wait))) : .failure(.usage(line))
+            case "describe"?:
+                guard rest.count == 1 else { return .failure(.usage(line)) }
+                return number(rest[0]).map { .success(.lab(.describe(image: $0, wait: wait))) } ?? .failure(.badValue("image", rest[0]))
             default: return .failure(.usage(line))
             }
+        case "settings":
+            guard words.count <= 2 else { return .failure(.usage(line)) }
+            var pane: SettingsPane?
+            if let word = words.first {
+                guard let p = SettingsPane(rawValue: word.lowercased()) else { return .failure(.badValue("pane", word)) }
+                pane = p
+            }
+            let target = values["--for"]
+            guard words.count == 2 || target != nil else { return .success(.settings(.show(pane))) }
+            // A gesture and a model are the Prompt Lab pane's two menus: no other pane has them.
+            guard pane == .lab else { return .failure(.usage(line)) }
+            var gesture: PromptWriterInstructions.Gesture?
+            if words.count == 2 {
+                guard let g = PromptWriterInstructions.Gesture(rawValue: words[1].lowercased()) else { return .failure(.badValue("gesture", words[1])) }
+                gesture = g
+            }
+            return .success(.settings(.instruction(gesture, target: target)))
         default:
             switch words.first {
             case nil: return .success(.library(.status, confirmed: false))
@@ -280,6 +327,14 @@ package enum GestureOrder: Equatable, Sendable {
             }
         }
     }
+}
+
+// MARK: - The panes of Settings
+
+/// **The Settings window's four panes**, in the order of its tabs, by the word `settings` takes — the window draws them
+/// (`SettingsWindow.Pane`) from this one list.
+package enum SettingsPane: String, CaseIterable, Sendable {
+    case general, macs, lab, advanced
 }
 
 // MARK: - A Mac by name

@@ -69,6 +69,8 @@ final class LabModel {
     private(set) var describing: InputImage.ID?
     private(set) var stopped = false
     private(set) var failure: String?
+    /// The engine's stable code of that failure, when it has one (`prompt_too_long`…): what `silicontrol lab rewrite --wait` says.
+    private(set) var failureCode: String?
     /// What a rewrite did not keep of the mentions, in one sentence.
     private(set) var notice: String?
     /// Whether a render is running or queued on this Mac: the writer waits.
@@ -79,7 +81,8 @@ final class LabModel {
     @ObservationIgnored private var naming: (picture: InputImage.ID, known: Int)?
 
     @ObservationIgnored private var task: Task<Void, Never>?
-    @ObservationIgnored private var generation = 0
+    /// One more at each gesture begun or stopped: a gesture that ends with the same number ended by itself (`lab rewrite --wait`).
+    @ObservationIgnored private(set) var generation = 0
     @ObservationIgnored private var watching = false
 
     /// A gesture of the window, or one `silicontrol` asked: there is one writer, and it writes one text at a time.
@@ -260,8 +263,10 @@ final class LabModel {
 
     /// **Rewrite**: the whole text, its mentions put aside and put back. It is written **in the field, as it comes**: the marks
     /// (additions in the accent, removals struck) follow each token, and stay over the text it leaves.
-    func rewrite() {
-        guard canRewrite, let target else { return }
+    /// `false` when it could not start (the button is greyed then): `silicontrol lab rewrite` presses it too.
+    @discardableResult
+    func rewrite() -> Bool {
+        guard canRewrite, let target else { return false }
         let typed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         let (input, guarded) = Self.rewriteInput(typed, capacity: capacity)
         begin(input, for: target, gesture: .rewrite, picture: nil, progress: { [self] written in
@@ -272,6 +277,7 @@ final class LabModel {
             place(Self.splice(back.text, into: text, at: nil))
             changes = Changes(before: typed, after: text)
         }
+        return true
     }
 
     /// **What a rewrite sends the writer** — the lab's and `silicontrol rewrite`'s alike. `@` is a subject's only for a model that
@@ -288,10 +294,12 @@ final class LabModel {
         return (back.text, back.lost, back.intact ? nil : mentionNotice(lost: back.lost))
     }
 
-    /// **Describe**: an image of the rack, or a subject's first picture.
-    func describe(_ picture: InputImage) {
-        guard let data = Self.bytes(of: picture) else { failure = String(localized: "This image could not be read."); return }
-        describe(data: data, id: picture.id)
+    /// **Describe**: an image of the rack, or a subject's first picture. `false` when it could not start: `silicontrol lab describe`
+    /// presses it too.
+    @discardableResult
+    func describe(_ picture: InputImage) -> Bool {
+        guard let data = Self.bytes(of: picture) else { failure = String(localized: "This image could not be read."); return false }
+        return describe(data: data, id: picture.id)
     }
 
     /// An image's bytes as it came — or, for pixels without bytes (a crop, a history image taken whole), a PNG of them.
@@ -313,8 +321,9 @@ final class LabModel {
 
     /// Written in the field as it comes, where the caret was (or over the selection) when the gesture began — the field takes no
     /// key while the writer writes —, marked as an addition.
-    private func describe(data: Data, id: InputImage.ID?) {
-        guard canDescribe, let target else { return }
+    @discardableResult
+    private func describe(data: Data, id: InputImage.ID?) -> Bool {
+        guard canDescribe, let target else { return false }
         let before = text
         // The field off screen: after the text, as a caret at its end would.
         let selection = PromptTextView.current.flatMap { $0.window == nil ? nil : $0.selectedRange() }
@@ -325,13 +334,14 @@ final class LabModel {
             place(Self.splice(written, into: text, at: selection))
             changes = Changes(before: before, after: text)
         }
+        return true
     }
 
     private func begin(_ input: LabInput, for target: Family, gesture: Gesture, picture: InputImage.ID?,
                        progress: @escaping @MainActor (String) -> Void, finished: @escaping @MainActor (String) -> Void) {
         generation += 1
         let mine = generation
-        phase = .loading(nil); stopped = false; failure = nil; notice = nil; changes = nil
+        phase = .loading(nil); stopped = false; failure = nil; failureCode = nil; notice = nil; changes = nil
         running = gesture; describing = picture
         task = Task { [writer] in
             do {
@@ -352,6 +362,7 @@ final class LabModel {
                 guard mine == self.generation else { return }
                 phase = .idle; running = nil; describing = nil; changes = nil
                 failure = error.localizedDescription
+                failureCode = (error as? LabWriterFailure)?.code
             }
         }
     }

@@ -28,7 +28,7 @@ package enum RemoteControlHelp {
     /// The topics in reading order (`help all` follows it).
     static let order = ["contract", "open", "models", "install", "add", "grid", "edit", "wait", "status", "follow",
                         "cancel", "clear", "set", "history", "save", "vary", "enlarge", "crop", "again", "remove", "undo", "sheet", "rewrite", "describe",
-                        "instructions", "start-image", "lab", "subjects", "import", "uninstall", "macs", "library", "diagnose", "measure", "errors", "recipes"]
+                        "instructions", "settings", "start-image", "lab", "subjects", "import", "uninstall", "macs", "library", "diagnose", "measure", "errors", "recipes"]
     static let aliases = ["examples": "recipes", "reuse": "again", "compute": "macs"]
 
     /// French when the user puts it before English. Not `Bundle.main.preferredLocalizations`: the app's
@@ -128,6 +128,9 @@ package enum RemoteControlHelp {
       start-image [<image|i7>] [--strength S] · start-image --remove
                                                the starting image (img2img): an image of the Prompt Lab, and its strength
       lab [open|close] · lab add|role|remove … the Prompt Lab: its images, a role each; folded or not
+      lab rewrite · lab describe N [--wait]    its Rewrite and Describe, written in its text as its buttons write
+      settings [PANE] · settings lab [rewrite|describe] [--for ID]
+                                               opens Settings on a pane, or Prompt Lab on one instruction
       remove i7 [i8 …]                         Remove from History · undo [--redo]: ⌘Z, ⇧⌘Z
       again <i7|file.png> · reuse <i7|file.png> Render Again (Same Seed) · Reuse These Settings (an image, or a PNG of another day)
       crop i7 --box X,Y,W,H | --ratio P:Q      Crop… → a new image (i8)
@@ -160,8 +163,8 @@ package enum RemoteControlHelp {
            text of a help answer raw.
         2. The LAST line is the verdict: {"ok": true, …} or {"ok": false, …}.
         3. The lines before it exist only for add --wait, grid --wait, wait and follow; they carry
-           "type": added, image, sheet, start, stage, step, end. rewrite and describe have their own:
-           started, loading, text (help rewrite); library move, started and progress (help library).
+           "type": added, image, sheet, start, stage, step, end. rewrite, describe and lab rewrite|describe --wait
+           have their own: started, loading, text (help rewrite); library move, started and progress (help library).
         4. A failure: {"ok": false, "error": "<code>", "message": "<sentence>", "hint": "<what to do>"}.
            The code is stable (help errors); "hint" is not always there. "message" and "hint" are
            in the app's language; only "error" is meant for programs.
@@ -828,7 +831,30 @@ package enum RemoteControlHelp {
           "text" is what Settings shows, "instruction" what the writer is sent. The list: {"ok": true, "instructions":
           [{"for": "z-image", "gesture": "rewrite", "edited": false, "sent": "ours"}, …]}.
         Allowed while the window computes on another Mac: the instructions are this Mac's, as its writer is.
+        To see one in Settings › Prompt Lab: settings lab rewrite --for krea2 (help settings).
         FAILURES: usage (a change names its gesture), model (--for names no model), unreadable (--file).
+        """,
+
+        "settings": """
+        silicontrol settings [general|macs|lab|advanced]
+        silicontrol settings lab [rewrite|describe] [--for ID]
+
+        Siliconed › Settings… (⌘,), opened on one of its four panes: general (where the library is, Save Every Image To…),
+        macs (this Mac, its measure, the other Macs), lab (Prompt Lab: the writer's instructions), advanced (Command Line,
+        Beta). Without a pane, the one last shown. The window comes forward as the menu brings it; nothing in it changes.
+
+          silicontrol settings macs
+          silicontrol settings lab rewrite --for krea2      Prompt Lab on Krea 2's Rewrite instruction
+          silicontrol settings lab describe                 the same model, its Describe
+
+        lab with a gesture or --for: Prompt Lab on one instruction, its two menus set as a click on the Prompt Lab's
+        « Your Instruction » sets them. --for ID is a model's id or a family, installed or not; without it, the model the
+        Lab writes for. A menu not named stays as it is.
+
+        Answer: {"ok": true, "settings": {"pane": "lab", "for": "krea2", "gesture": "rewrite"}}   ("for", "gesture": lab only)
+        What the panes set, commands set: set (beta, save-images), library, macs, compute, instructions.
+        Allowed while the window computes on another Mac: Settings are this Mac's.
+        FAILURES: usage (a pane that does not read; a gesture or --for on a pane other than lab), model (--for names no model).
         """,
 
         "lab": """
@@ -836,6 +862,8 @@ package enum RemoteControlHelp {
         silicontrol lab add <image|i7> …
         silicontrol lab role <n> edited|reference|start|none
         silicontrol lab remove <n>
+        silicontrol lab rewrite [--wait]
+        silicontrol lab describe <n> [--wait]
 
         THE PROMPT LAB — the bar under the image, where the next render's text and images are prepared:
         what a drop on the canvas, ⌘V, « Send to the Prompt Lab » and the role menus of its images do. Its
@@ -854,6 +882,21 @@ package enum RemoteControlHelp {
                                        start: choosing another sends the previous image to edit to the
                                        references, the previous start to none.
           lab remove N                 takes image N out
+          lab rewrite                  the bar's « Rewrite »: its text rewritten for the model it writes for (the rack's),
+                                       IN THE TEXT, token by token with its marks (additions, removals struck) — ⌘Z
+                                       brings the text back. « rewrite » answers with a text and leaves the bar alone.
+          lab describe N               image N's « Describe »: what it shows, written in the text where the caret is (at
+                                       its end when the field has no caret), or as the whole text when it is empty
+          --wait                       the answer once the text is written, after the lines of « rewrite » (help rewrite):
+                                       started, loading, text — "text" being the field's whole text as it will read
+
+        Both unfold the bar first (Rewrite and Describe are the unfolded plate's), then press the button: the writer, its
+        instructions and the refusals are those of « rewrite ». Without --wait they answer as soon as the writer starts,
+          {"ok": true, "gesture": "describe", "for": "z-image", "image": 2, "writing": true, "lab": {…}}
+        and « lab » says where it stands ("writing": {"gesture": "describe", "phase": "loading"|"writing", "image": 2}, null
+        once written). With --wait: {"ok": true, "gesture": "rewrite", "for": "z-image", "text": "<the field's text>",
+        "lab": {…}}, and "notice" when a mention was lost. The gesture is the window's: a client that hangs up leaves it
+        writing; the bar's Stop or « lab close » stops it, a render that starts too ("stopped").
 
         A CHANGE OF MODEL never gives a role, nor turns one into another: a reference keeps its role under
         Z-Image, without effect ("used": false), and works again back on Qwen-Image-2.1. "unused" counts
@@ -862,7 +905,11 @@ package enum RemoteControlHelp {
         ANSWER
           {"ok": true, "lab": {"unfolded": false, "model": "qwen-image-2.1", "text": "@alice on the quay",
             "images": [{"n": 1, "name": "quay.jpg", "width": 1536, "height": 1024, "role": "edited",
-                        "used": true}], "unused": 0}}
+                        "used": true}], "unused": 0, "writing": null}}
+        FAILURES: usage, image (no image N), role (a role the rack's model lacks), ref (image N cannot be read);
+        lab rewrite and lab describe: those of « rewrite » (remote, busy, writer_absent, writer_head, writer_memory,
+        writer_preparing, writer_busy), empty_text (lab rewrite on an empty text); with --wait, stopped, writer_failed,
+        prompt_too_long.
         """,
 
         "start-image": """
@@ -1189,7 +1236,7 @@ package enum RemoteControlHelp {
           model                unknown or not installed model
                                                                            → "hint" lists the ready ones; models
           busy                 (install, diagnose, set, import, uninstall, library) a render, an installation or the diagnostic is
-                               running; (crop) the crop editor is open; (sheet) cells are still on their way; (rewrite, describe) an image renders or waits; (add, grid, vary) an installation is running;
+                               running; (crop) the crop editor is open; (sheet) cells are still on their way; (rewrite, describe, lab rewrite|describe) an image renders or waits; (add, grid, vary) an installation is running;
                                (any) more than 8 connections still sending their command
                                                                            → wait, then retry
           library_absent       (add, grid, vary) the library is on a disk that is not connected
@@ -1218,7 +1265,7 @@ package enum RemoteControlHelp {
                                on no axis, more than 64 cells              → help grid
           queue_full           64 jobs waiting, or no room for every alternative or cell
                                                                            → wait, then retry
-          remote               (install, import, rewrite, describe) the window computes on another Mac; these act on
+          remote               (install, import, rewrite, describe, lab rewrite|describe) the window computes on another Mac; these act on
                                this one; (uninstall, library move|home) a removal or a move there waits for a click on
                                the other Mac                               → Render › Compute On › This Mac
           link                 the session with the other Mac is down (add, grid, vary, again); (compute, macs)
@@ -1232,17 +1279,18 @@ package enum RemoteControlHelp {
           unknown_mac          (macs, compute) no paired Mac of that name, or two → macs; the "id"
           library              (library) the library is already where you ask, or the engine refused the destination
                                                                            → "message"
-          writer_absent        (rewrite, describe, install writer) no installed model carries a writer
+          writer_absent        (rewrite, describe, lab rewrite|describe, install writer) no installed model carries a writer
                                                                            → install qwen-image-2.1
-          writer_head          (rewrite, describe) the writer's head is to download (1.25 GB)
+          writer_head          (rewrite, describe, lab rewrite|describe) the writer's head is to download (1.25 GB)
                                                                            → install writer
-          writer_memory        (rewrite, describe, install writer) this Mac is too small for the writer
-          writer_preparing     (rewrite, describe, install writer) the writer is being prepared → status
-          writer_busy          (rewrite, describe) another Rewrite or Describe is under way, from the terminal or
+          writer_memory        (rewrite, describe, lab rewrite|describe, install writer) this Mac is too small for the writer
+          writer_preparing     (rewrite, describe, lab rewrite|describe, install writer) the writer is being prepared → status
+          writer_busy          (rewrite, describe, lab rewrite|describe) another Rewrite or Describe is under way, from the terminal or
                                the Lab's window                            → wait, then retry
-          writer_failed        (rewrite, describe) the writer failed or wrote nothing; the engine's own code
+          writer_failed        (rewrite, describe, lab rewrite|describe) the writer failed or wrote nothing; the engine's own code
                                (render_already_running…) when it has one   → "message"
-          prompt_too_long      (rewrite) the text is longer than the writer reads → shorten it
+          empty_text           (lab rewrite) the Prompt Lab's text is empty  → reuse <i7>, or lab describe <n>
+          prompt_too_long      (rewrite, lab rewrite) the text is longer than the writer reads → shorten it
           license_not_accepted (install writer) Qwen-Image-2.1's license is not accepted yet
                                                                            → install qwen-image-2.1
           unsupported          (measure) --faster-rendering on an app older than silicontrol → same build
@@ -1251,7 +1299,8 @@ package enum RemoteControlHelp {
           write                folder or file cannot be written             → check the path
           render               (wait) a job did not finish                  → "outcome", "message" and "code" of each job
           stopped              (diagnose) the diagnostic was stopped (« Stop » in the sheet); (rewrite,
-                               describe) a render started, which has priority → diagnose again, or wait and retry
+                               describe) a render started, which has priority; (lab rewrite|describe --wait) the same,
+                               or Stop or lab close in the bar             → diagnose again, or wait and retry
           protocol, internal   should not happen                            → report it
         """,
 
@@ -1355,6 +1404,9 @@ package enum RemoteControlHelp {
       start-image [<image|i7>] [--strength S] · start-image --remove
                                                l'image de départ (img2img) : une image de l'Atelier, et sa force
       lab [open|close] · lab add|role|remove … l'Atelier : ses images, un rôle chacune ; replié ou non
+      lab rewrite · lab describe N [--wait]    son Réécrire et son Décrire, écrits dans son texte comme ses boutons l'écrivent
+      settings [VOLET] · settings lab [rewrite|describe] [--for ID]
+                                               ouvre les Réglages sur un volet, ou l'Atelier de prompts sur une consigne
       remove i7 [i8 …]                         Retirer de l'historique · undo [--redo] : ⌘Z, ⇧⌘Z
       again <i7|fichier.png> · reuse <i7|fichier.png> Rendre à nouveau (même graine) · Reprendre ces réglages (une image, ou un PNG d'un autre jour)
       crop i7 --box X,Y,W,H | --ratio P:Q      Recadrer… → une nouvelle image (i8)
@@ -1388,8 +1440,8 @@ package enum RemoteControlHelp {
            le texte "help" d'une réponse d'aide.
         2. La DERNIÈRE ligne est le verdict : {"ok": true, …} ou {"ok": false, …}.
         3. Les lignes d'avant n'existent que pour add --wait, grid --wait, wait et follow ; elles
-           portent "type" : added, image, sheet, start, stage, step, end. rewrite et describe ont les leurs :
-           started, loading, text (help rewrite) ; library move, started et progress (help library).
+           portent "type" : added, image, sheet, start, stage, step, end. rewrite, describe et lab rewrite|describe
+           --wait ont les leurs : started, loading, text (help rewrite) ; library move, started et progress (help library).
         4. Un échec : {"ok": false, "error": "<code>", "message": "<phrase>", "hint": "<quoi faire>"}.
            Le code est stable (help errors) ; "hint" n'est pas toujours là. "message" et "hint"
            sont dans la langue de l'app ; seul "error" est fait pour les programmes.
@@ -2071,7 +2123,32 @@ package enum RemoteControlHelp {
           "text" est ce que montrent les Réglages, "instruction" ce que reçoit le rédacteur. La liste : {"ok": true,
           "instructions": [{"for": "z-image", "gesture": "rewrite", "edited": false, "sent": "ours"}, …]}.
         Permis quand la fenêtre calcule sur un autre Mac : les consignes sont celles de ce Mac, comme son rédacteur.
+        Pour en voir une dans Réglages › Atelier de prompts : settings lab rewrite --for krea2 (help settings).
         ÉCHECS : usage (un changement nomme son geste), model (--for ne nomme aucun modèle), unreadable (--file).
+        """,
+
+        "settings": """
+        silicontrol settings [general|macs|lab|advanced]
+        silicontrol settings lab [rewrite|describe] [--for ID]
+
+        Siliconed › Réglages… (⌘,), ouvert sur l'un de ses quatre volets : general (Général : où est la bibliothèque,
+        Enregistrer chaque image dans…), macs (Mac : ce Mac, sa mesure, les autres Mac), lab (Atelier de prompts : les
+        consignes du rédacteur), advanced (Avancé : Ligne de commande, Bêta). Sans volet, le dernier montré. La fenêtre
+        passe devant comme le menu l'amène ; rien n'y change.
+
+          silicontrol settings macs
+          silicontrol settings lab rewrite --for krea2      l'Atelier de prompts sur la consigne Réécrire de Krea 2
+          silicontrol settings lab describe                 le même modèle, son Décrire
+
+        lab avec un geste ou --for : l'Atelier de prompts sur une consigne, ses deux menus posés comme les pose un clic sur
+        « Votre consigne » dans l'Atelier. --for ID est l'id d'un modèle ou une famille, installé ou non ; sans lui, le modèle
+        pour lequel écrit l'Atelier. Un menu qu'on ne nomme pas reste comme il est.
+
+        Réponse : {"ok": true, "settings": {"pane": "lab", "for": "krea2", "gesture": "rewrite"}}   ("for", "gesture" : lab seulement)
+        Ce que règlent les volets, des commandes le règlent : set (beta, save-images), library, macs, compute, instructions.
+        Permis quand la fenêtre calcule sur un autre Mac : les Réglages sont ceux de ce Mac.
+        ÉCHECS : usage (un volet qui ne se lit pas ; un geste ou --for sur un autre volet que lab), model (--for ne nomme
+        aucun modèle).
         """,
 
         "lab": """
@@ -2079,6 +2156,8 @@ package enum RemoteControlHelp {
         silicontrol lab add <image|i7> …
         silicontrol lab role <n> edited|reference|start|none
         silicontrol lab remove <n>
+        silicontrol lab rewrite [--wait]
+        silicontrol lab describe <n> [--wait]
 
         L'ATELIER — la barre sous l'image, où se préparent le texte et les images du prochain rendu : ce que
         font un dépôt sur le canevas, ⌘V, « Envoyer à l'atelier » et les menus de rôle de ses images. Son
@@ -2098,6 +2177,21 @@ package enum RemoteControlHelp {
                                        Une image à éditer et un départ : en choisir une autre envoie la
                                        précédente image à éditer aux références, le départ précédent à aucun.
           lab remove N                 retire l'image N
+          lab rewrite                  « Réécrire » de la barre : son texte réécrit pour le modèle pour lequel elle écrit
+                                       (celui du rack), DANS LE TEXTE, jeton par jeton avec ses marques (ajouts, retraits
+                                       barrés) — ⌘Z ramène le texte. « rewrite » répond par un texte et laisse la barre.
+          lab describe N               « Décrire » de l'image N : ce qu'elle montre, écrit dans le texte au curseur (à la
+                                       fin quand le champ n'a pas le curseur), ou comme tout le texte quand il est vide
+          --wait                       la réponse une fois le texte écrit, après les lignes de « rewrite » (help rewrite) :
+                                       started, loading, text — "text" étant tout le texte du champ tel qu'il se lira
+
+        Les deux déplient d'abord la barre (Réécrire et Décrire sont du plateau déplié), puis pressent le bouton : le
+        rédacteur, ses consignes et les refus sont ceux de « rewrite ». Sans --wait, ils répondent dès que le rédacteur part,
+          {"ok": true, "gesture": "describe", "for": "z-image", "image": 2, "writing": true, "lab": {…}}
+        et « lab » dit où il en est ("writing" : {"gesture": "describe", "phase": "loading"|"writing", "image": 2}, null une
+        fois écrit). Avec --wait : {"ok": true, "gesture": "rewrite", "for": "z-image", "text": "<le texte du champ>",
+        "lab": {…}}, et "notice" quand une mention s'est perdue. Le geste est celui de la fenêtre : un client qui raccroche
+        le laisse écrire ; Arrêter dans la barre ou « lab close » l'arrête, un rendu qui démarre aussi ("stopped").
 
         UN CHANGEMENT DE MODÈLE ne donne jamais de rôle et n'en change aucun en un autre : une référence
         garde son rôle sous Z-Image, sans effet ("used": false), et resert de retour sous Qwen-Image-2.1.
@@ -2106,7 +2200,11 @@ package enum RemoteControlHelp {
         RÉPONSE
           {"ok": true, "lab": {"unfolded": false, "model": "qwen-image-2.1", "text": "@alice on the quay",
             "images": [{"n": 1, "name": "quai.jpg", "width": 1536, "height": 1024, "role": "edited",
-                        "used": true}], "unused": 0}}
+                        "used": true}], "unused": 0, "writing": null}}
+        ÉCHECS : usage, image (pas d'image N), role (un rôle que le modèle du rack n'a pas), ref (l'image N ne se lit
+        pas) ; lab rewrite et lab describe : ceux de « rewrite » (remote, busy, writer_absent, writer_head, writer_memory,
+        writer_preparing, writer_busy), empty_text (lab rewrite sur un texte vide) ; avec --wait, stopped, writer_failed,
+        prompt_too_long.
         """,
 
         "start-image": """
@@ -2441,7 +2539,7 @@ package enum RemoteControlHelp {
           model                modèle inconnu ou pas installé
                                                                            → "hint" liste les prêts ; models
           busy                 (install, diagnose, set, import, uninstall, library) un rendu, une installation ou le diagnostic
-                               tourne ; (crop) l'éditeur de recadrage est ouvert ; (sheet) des cases sont encore en route ; (rewrite, describe) une image se rend ou attend ; (add, grid, vary) une installation tourne ;
+                               tourne ; (crop) l'éditeur de recadrage est ouvert ; (sheet) des cases sont encore en route ; (rewrite, describe, lab rewrite|describe) une image se rend ou attend ; (add, grid, vary) une installation tourne ;
                                (toutes) plus de 8 connexions qui envoient encore leur commande
                                                                            → attendre, puis réessayer
           library_absent       (add, grid, vary) la bibliothèque est sur un disque qui n'est pas branché
@@ -2470,7 +2568,7 @@ package enum RemoteControlHelp {
                                aucun axe, plus de 64 cases                 → help grid
           queue_full           64 travaux en attente, ou pas de place pour toutes les alternatives ou cases
                                                                            → wait, puis réessayer
-          remote               (install, import, rewrite, describe) la fenêtre calcule sur un autre Mac ; ces commandes
+          remote               (install, import, rewrite, describe, lab rewrite|describe) la fenêtre calcule sur un autre Mac ; ces commandes
                                agissent sur celui-ci ; (uninstall, library move|home) un retrait ou un déplacement
                                attend là un clic sur l'autre Mac           → Rendu › Calculer sur › Ce Mac
           link                 la session avec l'autre Mac est coupée (add, grid, vary, again) ; (compute, macs)
@@ -2484,17 +2582,18 @@ package enum RemoteControlHelp {
           unknown_mac          (macs, compute) aucun Mac appairé de ce nom, ou deux → macs ; l'"id"
           library              (library) la bibliothèque est déjà où on la demande, ou le moteur a refusé la destination
                                                                            → "message"
-          writer_absent        (rewrite, describe, install writer) aucun modèle installé n'a de rédacteur
+          writer_absent        (rewrite, describe, lab rewrite|describe, install writer) aucun modèle installé n'a de rédacteur
                                                                            → install qwen-image-2.1
-          writer_head          (rewrite, describe) la tête du rédacteur est à télécharger (1,25 Go)
+          writer_head          (rewrite, describe, lab rewrite|describe) la tête du rédacteur est à télécharger (1,25 Go)
                                                                            → install writer
-          writer_memory        (rewrite, describe, install writer) ce Mac est trop petit pour le rédacteur
-          writer_preparing     (rewrite, describe, install writer) le rédacteur se prépare → status
-          writer_busy          (rewrite, describe) un autre Réécrire ou Décrire est en cours, du terminal ou de
+          writer_memory        (rewrite, describe, lab rewrite|describe, install writer) ce Mac est trop petit pour le rédacteur
+          writer_preparing     (rewrite, describe, lab rewrite|describe, install writer) le rédacteur se prépare → status
+          writer_busy          (rewrite, describe, lab rewrite|describe) un autre Réécrire ou Décrire est en cours, du terminal ou de
                                la fenêtre de l'Atelier                     → attendre, puis réessayer
-          writer_failed        (rewrite, describe) le rédacteur a échoué ou n'a rien écrit ; le code du moteur
+          writer_failed        (rewrite, describe, lab rewrite|describe) le rédacteur a échoué ou n'a rien écrit ; le code du moteur
                                (render_already_running…) quand il en a un  → "message"
-          prompt_too_long      (rewrite) le texte est plus long que ce que le rédacteur lit → le raccourcir
+          empty_text           (lab rewrite) le texte de l'Atelier est vide → reuse <i7>, ou lab describe <n>
+          prompt_too_long      (rewrite, lab rewrite) le texte est plus long que ce que le rédacteur lit → le raccourcir
           license_not_accepted (install writer) la licence de Qwen-Image-2.1 n'est pas encore acceptée
                                                                            → install qwen-image-2.1
           unsupported          (measure) --faster-rendering avec une app plus ancienne que silicontrol → même build
@@ -2503,7 +2602,8 @@ package enum RemoteControlHelp {
           write                dossier ou fichier impossible à écrire       → vérifier le chemin
           render               (wait) un travail n'a pas fini               → "outcome", "message" et "code" de chaque travail
           stopped              (diagnose) le diagnostic a été arrêté (« Arrêter » dans la feuille) ; (rewrite,
-                               describe) un rendu a démarré, il est prioritaire → relancer diagnose, ou attendre et réessayer
+                               describe) un rendu a démarré, il est prioritaire ; (lab rewrite|describe --wait) de même,
+                               ou Arrêter ou lab close dans la barre        → relancer diagnose, ou attendre et réessayer
           protocol, internal   ne devrait pas arriver                       → le signaler
         """,
 

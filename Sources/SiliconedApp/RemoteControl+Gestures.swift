@@ -48,7 +48,8 @@ extension RemoteControl {
         case .compute(let target): try compute(target, c)
         case .library(let action, let confirmed): try library(action, confirmed: confirmed, cwd: cwd, c)
         case .startImage(let action): finish(c, try startImage(action, cwd: cwd))
-        case .lab(let action): finish(c, try lab(action, cwd: cwd))
+        case .lab(let action): try lab(action, cwd: cwd, c)
+        case .settings(let action): finish(c, try settings(action))
         }
     }
 
