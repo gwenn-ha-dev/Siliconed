@@ -3,27 +3,28 @@
 
     anima.py tokenizer                      the T5 tokenizer on a corpus of edge cases -> anima/t5-corpus.json
     anima.py text [--long]                  both tokenizers, Qwen3-0.6B, the conditioner -> goldens-anima-text[-long]
-    anima.py dit --size 512 [1024 768x512]  one DiT evaluation at the first sigma       -> goldens-anima-dit-<size>
-    anima.py bf16 --size 1024               the same evaluation in bfloat16             -> witness-bf16-anima-dit-<size>
+    anima.py dit --size 512 [1024 768x512 1536]  one DiT evaluation at the first sigma  -> goldens-anima-dit-<size>
+    anima.py bf16 --size 1024 [1536]        the same evaluation in bfloat16             -> witness-bf16-anima-dit-<size>
     anima.py dit|bf16 --size 512 --variant compact|light   the same, for the Compact's or the Light's published DiT
                                             (GGUF), dequantized by gguf-py -> goldens-anima-dit-<variant>-<size>
-    anima.py trajectory --size 512 [1024]   the 8-step Euler loop                       -> goldens-anima-trajectory-<size>
+    anima.py trajectory --size 512 [1024 1536]  the 8-step Euler loop                   -> goldens-anima-trajectory-<size>
     anima.py vae --size 512 [1024 768x512]  the decoder on the final latent             -> goldens-anima-vae-<size>
     anima.py witness --size 512 --step 0    one guided evaluation in float64            -> witness-anima-f64-<size>-step<n>
     anima.py vae-witness --size 512         the decoder in float64                      -> witness-anima-vae-f64-<size>
     anima.py img2img --size 512             img2img at strength 0.6: the picture encoded, the start, the
                                             truncated loop (steps 3-7)                  -> goldens-anima-img2img-<size>
-    anima.py all [--size 512 1024 768x512]  all of the above, in an order that satisfies their dependencies
+    anima.py all [--size 512 1024 768x512 1536]  all of the above, in an order that satisfies their dependencies
 
 `bf16` is the bar of a half-precision path (the ANE's fp16 products): the `dit` evaluation with the
 reference in bfloat16, on the `dit` golden's inputs. It is not part of `all` (costly, and only that path reads it).
 
 Goldens go in `<goldens>/anima/`; `--goldens DIR`, else `SILICONED_GOLDENS`, else `./goldens`. Each stage
 rereads what an earlier one wrote (`dit` the text, `trajectory` the text, `vae` the trajectory, a rectangle's
-`vae` the 1024 trajectory), so run them in the order above. `all` at the default size takes about
-two minutes on an M1 Pro, and about ten with `--size 512 1024 768x512`, which writes everything
-`siliconed check anima` reads. The witness of the DiT is the first step's (the only one the check reads) and
-exists for the squares: a rectangle has no trajectory to take its starting latent from.
+`vae` the 1024 trajectory), so run them in the order above. `all` without `--size` writes everything
+`siliconed check anima` reads: 512, 1024, 768x512 and 1536, where only the DiT's evaluation, trajectory and
+witness exist (the decoder's goldens stop at 1024). With `--size 512` it takes about two minutes on an
+M1 Pro, about ten with `--size 512 1024 768x512`. The witness of the DiT is the first step's (the only one
+the check reads) and exists for the squares: a rectangle has no trajectory to take its starting latent from.
 
 The reference is diffusers' `CosmosTransformer3DModel`, `AnimaTextConditioner` and
 `AutoencoderKLQwenImage`, with transformers' Qwen3 and T5 tokenizer, in float32 on the CPU. The Turbo
@@ -577,8 +578,9 @@ def everything(goldens: Path, sizes: list[str]) -> None:
     stages += [["dit", "--size", s] for s in sizes]
     stages += [["trajectory", "--size", s] for s in needed]
     stages += [["witness", "--size", s, "--step", "0"] for s in squares]
-    stages += [["vae", "--size", s] for s in sizes]
-    stages += [["vae-witness", "--size", s] for s in sizes]
+    decoded = [s for s in sizes if s != "1536"]   # the decoder's check stops at 1024 (`AnimaStages.vae`)
+    stages += [["vae", "--size", s] for s in decoded]
+    stages += [["vae-witness", "--size", s] for s in decoded]
     stages += [["img2img", "--size", "512"]] if "512" in squares else []
     common.run_stages(__file__, goldens, stages)
 
@@ -601,7 +603,7 @@ def main() -> None:
     OUT = common.goldens_directory(args.goldens) / "anima"
     OUT.mkdir(parents=True, exist_ok=True)
     if args.stage == "all":
-        everything(common.goldens_directory(args.goldens), args.size or ["512", "1024", "768x512"])
+        everything(common.goldens_directory(args.goldens), args.size or ["512", "1024", "768x512", "1536"])
     elif args.stage == "tokenizer":
         stage_tokenizer()
     elif args.stage == "text":
