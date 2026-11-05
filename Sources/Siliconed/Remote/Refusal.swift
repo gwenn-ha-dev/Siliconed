@@ -25,8 +25,6 @@ package enum AppRefusal: Codable, Equatable, Sendable {
     case seedCount
     /// The lender's queue has no room for what was asked (`AppState.maxQueueLength`).
     case queueFull
-    /// The lending Mac has no measure of its own yet: its user — or the borrower, from « Measure This Mac… » — starts it.
-    case notMeasured
     case enlargeModelDownload, enlargeFailed
     case gridNotCropped
     case cropNeeds(side: Int), cropSmallest(side: Int)

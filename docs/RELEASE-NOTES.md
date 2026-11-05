@@ -40,7 +40,7 @@ English · [Français](RELEASE-NOTES.fr.md)
 
 ### This Mac's measure
 
-- **It starts only on your click**: no render starts it. Generate waits on « Measure This Mac… », and its sheet asks for a Mac at rest beside Start. A finished measure applies even when the settings were read before it.
+- **Its sheet asks for a Mac at rest** beside Start, when you open it yourself; the first render still starts it by itself, as the command line does. A finished measure applies even when the settings were read before it.
 - **It says its own length better**: the thin products' tiles are chosen on two rounds instead of three (the same plans on the maps of three Macs), and the time it announces now counts its tile trials and its checks of a busy Mac. Maps took 1.7 to 2.1 times what they announced; a Mac slow enough to pass the five-minute ceiling now measures at a lighter tier instead.
 
 ### Libraries made of links

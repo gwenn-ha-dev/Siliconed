@@ -69,24 +69,12 @@ extension AppState {
     /// The footer reads its two halves once per drawing (`formBlocker`, then `memoryBlocker`).
     var blocker: String? { formBlocker ?? memoryBlocker }
 
-    /// **No render before this Mac is measured, and no render starts the measure** (the user, 4/11/2026): the measure wants a Mac
-    /// at rest, which its sheet says before its « Start » (`DiagnosticSheet`) — a render clicked without a thought must not
-    /// start it on a busy Mac. In a mirror the lending Mac judges (`AppRefusal.notMeasured`).
-    var mapBlocker: String? {
-        guard mirror == nil, !settingsRead else { return nil }
-        if diagnosticRunning { return String(localized: "Siliconed is measuring this Mac.") }
-        return storedMap == nil
-            ? String(localized: "Measure this Mac before its first render.")
-            : String(localized: "Measure this Mac again: macOS or Siliconed changed since its last measure.")
-    }
-
     /// What the form itself refuses: everything but the memory.
     var formBlocker: String? {
         if let reason = linkBlocker { return reason }
         if let reason = libraryBlocker { return reason }
         if let reason = installBlocker { return reason }
         if missing != nil { return String(localized: "This model isn’t installed.") }
-        if let reason = mapBlocker { return reason }
         if prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return String(localized: "Write a prompt.") }
         if case .failure(let e) = alternatives { return Problem(e).text }
         // An unknown `@name`, too many images, a mention inside a group: said before the click (`LabInputs.carry`).

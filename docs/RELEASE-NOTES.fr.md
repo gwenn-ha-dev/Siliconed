@@ -40,7 +40,7 @@
 
 ### La mesure de ce Mac
 
-- **Elle ne part que sur votre clic** : aucun rendu ne la lance. Générer attend sur « Mesurer ce Mac… », dont la feuille demande un Mac au repos à côté de Lancer. Une mesure finie s'applique même quand les réglages ont été lus avant elle.
+- **Sa feuille demande un Mac au repos** à côté de Lancer, quand vous l'ouvrez vous-même ; le premier rendu la lance toujours de lui-même, comme la ligne de commande. Une mesure finie s'applique même quand les réglages ont été lus avant elle.
 - **Elle dit mieux sa propre durée** : les tuiles des produits minces se choisissent en deux tours au lieu de trois (les mêmes plans sur les cartes de trois Mac), et le temps qu'elle annonce compte désormais ses essais de tuiles et ses contrôles d'un Mac occupé. Les cartes prenaient 1,7 à 2,1 fois ce qu'elles annonçaient ; un Mac assez lent pour passer le plafond de cinq minutes se mesure désormais à un palier plus léger.
 
 ### Les bibliothèques faites de liens

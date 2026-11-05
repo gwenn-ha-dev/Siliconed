@@ -6499,46 +6499,6 @@
         }
       }
     },
-    "About a minute, the Mac at rest: Siliconed plans its renders from this measure" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Etwa eine Minute, der Mac in Ruhe: Siliconed plant seine Renderings nach dieser Messung"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Un minuto aproximadamente, con el Mac en reposo: Siliconed planifica sus renderizados a partir de esta medición"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Une minute environ, le Mac au repos : Siliconed planifie ses rendus à partir de cette mesure"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Circa un minuto, con il Mac a riposo: Siliconed pianifica i suoi rendering a partire da questa misura"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "約1分、Macを休ませた状態で：Siliconedはこの測定から生成を計画します"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "约一分钟，Mac 保持空闲：Siliconed 依据这次测量规划生成"
-          }
-        }
-      }
-    },
     "Accelerators" : {
       "localizations" : {
         "de" : {
@@ -21623,86 +21583,6 @@
         }
       }
     },
-    "Measure this Mac again: macOS or Siliconed changed since its last measure." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Messen Sie diesen Mac erneut: macOS oder Siliconed hat sich seit der letzten Messung geändert."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Vuelve a medir este Mac: macOS o Siliconed ha cambiado desde su última medición."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mesurez ce Mac à nouveau : macOS ou Siliconed a changé depuis sa dernière mesure."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Misura di nuovo questo Mac: macOS o Siliconed è cambiato dall’ultima misura."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "このMacを再測定してください：前回の測定以降にmacOSまたはSiliconedが変わりました。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "请重新测量这台 Mac：自上次测量以来，macOS 或 Siliconed 已有变化。"
-          }
-        }
-      }
-    },
-    "Measure this Mac before its first render." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Messen Sie diesen Mac vor dem ersten Rendering."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mide este Mac antes de su primer renderizado."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mesurez ce Mac avant son premier rendu."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Misura questo Mac prima del suo primo rendering."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "最初の生成の前に、このMacを測定してください。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "首次生成之前，请先测量这台 Mac。"
-          }
-        }
-      }
-    },
     "Measured" : {
       "localizations" : {
         "de" : {
@@ -31439,86 +31319,6 @@
         }
       }
     },
-    "Siliconed is measuring this Mac — about a minute. Leave it at rest meanwhile." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Siliconed misst diesen Mac – etwa eine Minute. Lassen Sie ihn so lange in Ruhe."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Siliconed está midiendo este Mac — un minuto aproximadamente. Déjalo en reposo mientras tanto."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Siliconed mesure ce Mac — une minute environ. Laissez-le au repos pendant ce temps."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Siliconed sta misurando questo Mac — circa un minuto. Lascialo a riposo nel frattempo."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "SiliconedがこのMacを測定しています（約1分）。その間はMacを休ませてください。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Siliconed 正在测量这台 Mac，约需一分钟。在此期间请让它保持空闲。"
-          }
-        }
-      }
-    },
-    "Siliconed is measuring this Mac." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Siliconed misst diesen Mac."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Siliconed está midiendo este Mac."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Siliconed mesure ce Mac."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Siliconed sta misurando questo Mac."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "SiliconedがこのMacを測定しています。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Siliconed 正在测量这台 Mac。"
-          }
-        }
-      }
-    },
     "Siliconed is up to date." : {
       "localizations" : {
         "de" : {
@@ -31595,6 +31395,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Siliconed 不在磁盘上保留任何内容：未存储的内容会在 App 退出时消失。"
+          }
+        }
+      }
+    },
+    "Siliconed measures this Mac before its first render — about a minute." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Siliconed misst diesen Mac vor dem ersten Rendering – etwa eine Minute."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Siliconed mide este Mac antes de su primer renderizado: alrededor de un minuto."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Siliconed mesure ce Mac avant son premier rendu — environ une minute."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Siliconed misura questo Mac prima del suo primo rendering: circa un minuto."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Siliconedは最初の生成の前にこのMacを測定します — 約1分です。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Siliconed 会在首次生成之前测量这台 Mac——大约一分钟。"
           }
         }
       }
@@ -34124,46 +33964,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "那台 Mac 不提供 %@。"
-          }
-        }
-      }
-    },
-    "That Mac has not been measured yet: Measure This Mac… measures it." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Jener Mac wurde noch nicht gemessen: „Diesen Mac vermessen …“ misst ihn."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ese Mac aún no se ha medido: «Medir este Mac…» lo mide."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ce Mac-là n’a pas encore été mesuré : « Mesurer ce Mac… » le mesure."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Quel Mac non è ancora stato misurato: «Misura questo Mac…» lo misura."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "そのMacはまだ測定されていません：「このMacを測定…」で測定できます。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "那台 Mac 尚未测量：“测量这台 Mac…”可进行测量。"
           }
         }
       }
@@ -36746,42 +36546,42 @@
         }
       }
     },
-    "The measure of %@ was taken with another macOS or another version of Siliconed: measure this Mac again before the next render." : {
+    "The measure of %@ was taken with another macOS or another version of Siliconed: this Mac is measured again before the next render." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Die Messung vom %@ wurde mit einem anderen macOS oder einer anderen Version von Siliconed gemacht: Messen Sie diesen Mac vor dem nächsten Rendering erneut."
+            "value" : "Die Messung vom %@ wurde mit einem anderen macOS oder einer anderen Version von Siliconed gemacht: Dieser Mac wird vor dem nächsten Rendering erneut gemessen."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "La medición del %@ se hizo con otro macOS u otra versión de Siliconed: vuelve a medir este Mac antes del próximo renderizado."
+            "value" : "La medición del %@ se hizo con otro macOS u otra versión de Siliconed: este Mac se mide de nuevo antes del próximo renderizado."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "La mesure du %@ a été prise avec un autre macOS ou une autre version de Siliconed : mesurez ce Mac à nouveau avant le prochain rendu."
+            "value" : "La mesure du %@ a été prise avec un autre macOS ou une autre version de Siliconed : ce Mac est mesuré à nouveau avant le prochain rendu."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "La misura del %@ è stata presa con un altro macOS o un’altra versione di Siliconed: misura di nuovo questo Mac prima del prossimo rendering."
+            "value" : "La misura del %@ è stata presa con un altro macOS o un’altra versione di Siliconed: questo Mac viene misurato di nuovo prima del prossimo rendering."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@の測定は、別のmacOSまたは別のバージョンのSiliconedで行われました：次の生成の前に、このMacを再測定してください。"
+            "value" : "%@の測定は、別のmacOSまたは別のバージョンのSiliconedで行われました：次の生成の前に、このMacが再測定されます。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@ 的测量是在另一个 macOS 或另一个版本的 Siliconed 下进行的：请在下次生成之前重新测量这台 Mac。"
+            "value" : "%@ 的测量是在另一个 macOS 或另一个版本的 Siliconed 下进行的：将在下次生成之前重新测量这台 Mac。"
           }
         }
       }
@@ -39758,42 +39558,42 @@
         }
       }
     },
-    "This Mac has not been measured yet: Siliconed plans its calculations from this measure, and renders once it is taken." : {
+    "This Mac is measured before its first render: Siliconed plans its calculations from it." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Dieser Mac wurde noch nicht gemessen: Siliconed plant seine Berechnungen nach dieser Messung und rendert erst, wenn sie vorliegt."
+            "value" : "Dieser Mac wird vor dem ersten Rendering gemessen: Siliconed plant danach seine Berechnungen."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Este Mac aún no se ha medido: Siliconed planifica sus cálculos a partir de esta medición, y renderiza una vez hecha."
+            "value" : "Este Mac se mide antes de su primer renderizado: Siliconed planifica sus cálculos a partir de ello."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ce Mac n’a pas encore été mesuré : Siliconed planifie ses calculs à partir de cette mesure, et rend une fois qu’elle est prise."
+            "value" : "Ce Mac est mesuré avant son premier rendu : Siliconed planifie ses calculs à partir de là."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Questo Mac non è ancora stato misurato: Siliconed pianifica i suoi calcoli a partire da questa misura, e genera una volta presa."
+            "value" : "Questo Mac viene misurato prima del suo primo rendering: Siliconed pianifica i suoi calcoli a partire da ciò."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "このMacはまだ測定されていません：Siliconedはこの測定から計算を計画し、測定が済んでから生成します。"
+            "value" : "このMacは最初の生成の前に測定されます：Siliconedはその結果から計算を計画します。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "这台 Mac 尚未测量：Siliconed 依据这次测量规划其计算，测量完成后才会生成。"
+            "value" : "这台 Mac 会在首次生成之前接受测量：Siliconed 据此规划其计算。"
           }
         }
       }
@@ -39838,42 +39638,42 @@
         }
       }
     },
-    "This Mac is not measured yet: once it is (Measure This Mac…), the accelerators can be chosen." : {
+    "This Mac is not measured yet: its first render measures it, then the accelerators can be chosen." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Dieser Mac ist noch nicht gemessen: Sobald er es ist (Diesen Mac vermessen …), lassen sich die Beschleuniger wählen."
+            "value" : "Dieser Mac ist noch nicht gemessen: Sein erstes Rendering misst ihn, danach lassen sich die Beschleuniger wählen."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Este Mac aún no está medido: una vez medido (Medir este Mac…), se pueden elegir los aceleradores."
+            "value" : "Este Mac aún no está medido: su primer renderizado lo mide, y después se pueden elegir los aceleradores."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ce Mac n’est pas encore mesuré : une fois qu’il l’est (Mesurer ce Mac…), les accélérateurs peuvent être choisis."
+            "value" : "Ce Mac n’est pas encore mesuré : son premier rendu le mesure, puis les accélérateurs peuvent se choisir."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Questo Mac non è ancora misurato: una volta misurato (Misura questo Mac…), si possono scegliere gli acceleratori."
+            "value" : "Questo Mac non è ancora misurato: il suo primo rendering lo misura, poi si possono scegliere gli acceleratori."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "このMacはまだ測定されていません：測定後（このMacを測定…）、アクセラレータを選べます。"
+            "value" : "このMacはまだ測定されていません。最初の生成で測定され、その後アクセラレータを選べます。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "这台 Mac 尚未测量：测量之后（测量这台 Mac…）即可选择加速器。"
+            "value" : "此 Mac 尚未测量：首次生成时会进行测量，之后即可选择加速器。"
           }
         }
       }
@@ -43374,46 +43174,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "欢迎使用 Siliconed"
-          }
-        }
-      }
-    },
-    "What another app takes from the GPU, the CPU or the Neural Engine meanwhile is counted as missing from this Mac, and every render after it plans with less." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Was eine andere App währenddessen der GPU, der CPU oder der Neural Engine wegnimmt, wird diesem Mac als fehlend angerechnet, und jedes spätere Rendering plant mit weniger."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Lo que otra app tome mientras tanto de la GPU, la CPU o el Neural Engine se cuenta como algo que le falta a este Mac, y cada renderizado posterior planifica con menos."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ce qu’une autre app prend pendant ce temps au GPU, au processeur ou au Neural Engine est compté comme manquant à ce Mac, et chaque rendu ensuite planifie avec moins."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ciò che un’altra app sottrae nel frattempo alla GPU, alla CPU o al Neural Engine viene contato come mancante a questo Mac, e ogni rendering successivo pianifica con meno."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "その間に他のアプリがGPU、CPU、Neural Engineから使った分は、このMacに足りない分として数えられ、以後のすべての生成がそれより少ない前提で計画されます。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "在此期间其他应用占用的 GPU、CPU 或神经网络引擎算力，会被算作这台 Mac 所缺少的部分，之后的每次生成都会按更少的算力来规划。"
           }
         }
       }

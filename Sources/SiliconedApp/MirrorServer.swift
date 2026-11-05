@@ -325,8 +325,6 @@ final class MirrorServer {
     /// **A request becomes a job here**, as if typed on this Mac: what the engine would refuse later
     /// is refused now, with its sentence.
     private func admit(_ asked: RemoteJob, images: [UInt32: Data], from identity: Data) throws -> Job {
-        // This Mac's user starts its measure, never a render — a borrower's neither (`AppState.mapBlocker`).
-        guard app.settingsRead else { throw Refused(.notMeasured) }
         var r = asked
         guard app.readySet.contains(r.model), let card = app.cards.first(where: { $0.id == r.model }) else {
             throw EngineError.modelNotInstalled(model: r.model)
@@ -383,8 +381,6 @@ final class MirrorServer {
     /// **A series becomes cells here**, by `enqueueGrid` as on this Mac's own form: each cell's model ready, its format
     /// and memory judged, the stack forged. The window's series (no request number) is the one published to that Mac.
     private func admit(_ g: RemoteGridRequest, images: [UInt32: Data], from identity: Data) throws -> (run: GridRun, jobs: [Job]) {
-        // This Mac's user starts its measure, never a render — a borrower's neither (`AppState.mapBlocker`).
-        guard app.settingsRead else { throw Refused(.notMeasured) }
         let grid = try g.spec.grid()
         // Before anything is decoded: the cells the queue has room for, and no more images than any model reads.
         guard app.file.count + grid.cells.count <= AppState.maxQueueLength else { throw Refused(.queueFull) }

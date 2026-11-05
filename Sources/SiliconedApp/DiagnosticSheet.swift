@@ -3,8 +3,7 @@
 // sheet is for the tuning, not for the issue (the user, 19/10 and 31/10/2026).
 //
 // Three states in one sheet: what the diagnostic does and how long (about a minute, five at most, no model needed; it occupies
-// the GPU and the CPU, so it waits for an empty queue — and the queue waits for it), and **a Mac at rest asked for beside the
-// button that starts it** — only the user starts it, never a render (4/11/2026); its progress; then
+// the GPU and the CPU, so it waits for an empty queue — and the queue waits for it); its progress; then
 // the report as a person reads it — the map first (always: a finished measure is a map, applied as it stands), then how sure
 // each engine's figure is and what the measure found, said plainly, with no grade; then per engine what it reaches against the
 // peak the silicon announces (a bar where the inventory read one: the GPU's, and only for its matrix products), the column
@@ -63,9 +62,6 @@ struct DiagnosticSheet: View {
             Text("Matrix products and attention on the GPU, the CPU’s matrix unit and the Neural Engine, alone and together, each result checked against the exact one: what Siliconed plans a render with. No model is needed, nothing is downloaded. About a minute, five at most; the queue waits meanwhile.")
                 .font(.callout)
                 .fixedSize(horizontal: false, vertical: true)
-            Text("What another app takes from the GPU, the CPU or the Neural Engine meanwhile is counted as missing from this Mac, and every render after it plans with less.")
-                .font(.callout)
-                .fixedSize(horizontal: false, vertical: true)
             mapStatus
             if let reason = app.diagnosticBlocker {
                 Label(reason, systemImage: "hourglass").foregroundStyle(.orange)
@@ -76,7 +72,7 @@ struct DiagnosticSheet: View {
     }
 
     /// **Where this session stands against the model**: one in use; a newer one waiting for the end of the render under way;
-    /// none yet, or a stale one — no render until the user measures (`AppState.mapBlocker`).
+    /// none yet, or a stale one — the first render measures.
     @ViewBuilder private var mapStatus: some View {
         Text(Self.mapStatus(app)).font(.callout).foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
@@ -91,9 +87,9 @@ struct DiagnosticSheet: View {
                 : "This session plans with the measure of \(day(used.date)); the newer one applies to the next render."
         }
         if let stored = map.stored, !stored.current {
-            return "The measure of \(day(stored.date)) was taken with another macOS or another version of Siliconed: measure this Mac again before the next render."
+            return "The measure of \(day(stored.date)) was taken with another macOS or another version of Siliconed: this Mac is measured again before the next render."
         }
-        return "This Mac has not been measured yet: Siliconed plans its calculations from this measure, and renders once it is taken."
+        return "This Mac is measured before its first render: Siliconed plans its calculations from it."
     }
 
     /// A report's ISO date as a day the user reads.
@@ -125,8 +121,7 @@ struct DiagnosticSheet: View {
                 Text(notice).font(.caption).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             } else if !app.diagnosticRunning {
-                // **Said before the click that starts it** (the user, 4/11/2026: a map measured on a busy Mac, with no word of it
-                // before): beside the button, in every state that has one.
+                // Said before the click that starts it (the user, 4/11/2026: a map measured on a busy Mac, with no word of it before).
                 Label("Leave the Mac at rest during the measure: no render, export, compilation or game.", systemImage: "moon.zzz")
                     .font(.callout.weight(.medium))
                     .fixedSize(horizontal: false, vertical: true)

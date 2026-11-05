@@ -82,6 +82,8 @@ extension AppState {
                 ? Problem(EngineError.renderAlreadyRunning)
                 : Problem(EngineError.internalFailure(component: "diagnostic", detail: failure.detail))
             diagnostic = .failed(problem)
+            // A job waits for this measure: the failure is said where the render's would be.
+            if !settingsRead, !file.isEmpty { self.problem = problem }
         }
         next()
     }
