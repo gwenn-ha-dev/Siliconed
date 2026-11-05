@@ -300,15 +300,14 @@ package final class Block: BoundaryRecording, PhaseTiming {
         let stream = gemm.queue.stream
         stream.drain()                                     // the CPU writes the reserve, the modulation and the bank next
         try modulate(adaln: adaln, adalnDim: adalnDim)
+        // The norms' weights are widened where the map's stream serves them (`DiT.consumptionOrder`), not all at once here: a
+        // streamed tail reads its units in that order into three buffers, and a weight asked before its unit is read finds no buffer
+        // free — it is served through the page cache and strands its unit's buffer until the next evaluation (`TailStream.fallbacks`:
+        // `ffn_norm2` asked first, one per streamed layer). Each lands in its own slice of the bank, which no work queued before it reads.
         let weights = bank.contents().assumingMemoryBound(to: Float.self)
-        for (i, name) in ["attention_norm1.weight", "attention_norm2.weight", "ffn_norm1.weight", "ffn_norm2.weight"].enumerated() {
-            try widen(name, count: d, into: weights + i * d)
-        }
+        func widenNorm(_ index: Int, _ name: String) throws { try widen(name, count: d, into: weights + index * d) }
+        try widenNorm(0, "attention_norm1.weight")
         (weights + 4 * d).update(from: modulationSlot, count: 4 * d)
-        try widen("attention.norm_q.weight", count: headDim, into: scratch)
-        let normQ = Array(UnsafeBufferPointer(start: scratch, count: headDim))
-        try widen("attention.norm_k.weight", count: headDim, into: scratch)
-        let normK = Array(UnsafeBufferPointer(start: scratch, count: headDim))
 
         let xs = try gemm.region(x, bytes: s * d * 4, name: "x")
         let x0: ElementwiseGPU.BufferSlice = (xs.buffer, xs.offset / 4)
@@ -329,6 +328,10 @@ package final class Block: BoundaryRecording, PhaseTiming {
         for (name, buffer) in [("attention.to_q.weight", qb), ("attention.to_k.weight", kb), ("attention.to_v.weight", vb)] {
             try products.linear(prefix + name, a: a, c: buffer, m: s, k: d, n: d)
         }
+        try widen("attention.norm_q.weight", count: headDim, into: scratch)
+        let normQ = Array(UnsafeBufferPointer(start: scratch, count: headDim))
+        try widen("attention.norm_k.weight", count: headDim, into: scratch)
+        let normK = Array(UnsafeBufferPointer(start: scratch, count: headDim))
         // The pass joins the attention's class (`ProductLedger.pass`), its GPU seconds on the stream.
         let passClock = ProductLedger.pass(sequence: s, heads: heads, headDim: headDim, stream: stream)
         timed("qk-norm + rope") {
@@ -338,6 +341,8 @@ package final class Block: BoundaryRecording, PhaseTiming {
         passClock?.finish()
         timed("sdpa wall") { ownTimings["sdpa GPU", default: 0] += tiled.run(q: qb, k: kb, v: vb, into: ob) }
         try products.linear(prefix + "attention.to_out.0.weight", a: ob, c: o, m: s, k: d, n: d)
+        try widenNorm(1, "attention_norm2.weight")
+        try widenNorm(2, "ffn_norm1.weight")
         timed("residual") { elementwise.normResidual(x0, plus: (o, 0), weight: at(1), gate: at(5), rows: s, columns: d, eps: eps) }
 
         // ── feed-forward
@@ -348,6 +353,7 @@ package final class Block: BoundaryRecording, PhaseTiming {
         try products.linear(prefix + "feed_forward.w3.weight", a: a, c: h3, m: s, k: d, n: h)
         timed("swiglu") { ownTimings["elementwise GPU", default: 0] += elementwise.swiglu((h1, 0), (h3, 0), count: s * h) }
         try products.linear(prefix + "feed_forward.w2.weight", a: h1, c: o, m: s, k: h, n: d)
+        try widenNorm(3, "ffn_norm2.weight")
         timed("residual") { elementwise.normResidual(x0, plus: (o, 0), weight: at(3), gate: at(7), rows: s, columns: d, eps: eps) }
         return true
     }

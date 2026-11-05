@@ -222,6 +222,52 @@ final class MemoryBudgetTests: XCTestCase {
         XCTAssertEqual(Prefetcher.firstReleasedLayer(of: 30, tail: MemoryPlan.Tail.lean.fraction), 0)
     }
 
+    /// **The map read in place is a choice of the plan, with its price**: the whole DiT file charged to the denoising, taken only where
+    /// the need with it holds in B — a 64 GB Mac's, not a 16 or an 8 GB one's, whose plans stay those of a process that cannot read in
+    /// place (the same request, the same need, the same tail). Never where the process does not read in place.
+    func testTheMapReadInPlaceIsChargedAndTakenOnlyWhereBHoldsIt() {
+        var request = MemoryFixtures.zImageRequest(1024, 1024)
+        XCTAssertFalse(request.mapInPlaceAvailable)   // no `SILICONED_STREAM` in the tests' process
+        let without = request
+        request.mapInPlaceAvailable = true
+        let page = Int(getpagesize())
+        let file = Artifact.mapBytes(header: MemoryFixtures.zImageMaps().dit)
+        XCTAssertEqual(MemoryFixtures.zImageMaps().ditInPlaceBytes, (file + page - 1) / page * page)
+
+        let roomy = MemoryPlan.choose(request, ceiling: MemoryBudget.ceiling(physical: 64 << 30))
+        XCTAssertTrue(roomy.request.mapInPlace)
+        XCTAssertEqual(roomy.request.tail, .none)
+        let need = roomy.need!
+        XCTAssertEqual(need.inPlaceBytes, MemoryFixtures.zImageMaps().ditInPlaceBytes)
+        XCTAssertLessThanOrEqual(need.peak, roomy.ceiling)
+        XCTAssertEqual(need.need(of: .denoising)!, roomy.denoisingCached + need.inPlaceBytes)
+        // The head and the stream are sized as before, on the denoising's need without the map.
+        let before = MemoryPlan.choose(without, ceiling: roomy.ceiling)
+        XCTAssertFalse(before.request.mapInPlace)
+        XCTAssertEqual(before.denoisingCached, roomy.denoisingCached)
+        XCTAssertEqual(before.denoisingStreamed, roomy.denoisingStreamed)
+
+        for ram in [8, 16] {
+            let ceiling = MemoryBudget.ceiling(physical: ram << 30)
+            let plan = MemoryPlan.choose(request, ceiling: ceiling), old = MemoryPlan.choose(without, ceiling: ceiling)
+            XCTAssertFalse(plan.request.mapInPlace, "\(ram) GB")
+            XCTAssertEqual(plan.need, old.need, "\(ram) GB")
+            XCTAssertEqual(plan.request.tail, old.request.tail)
+            XCTAssertEqual(plan.request.encoderSlots, old.request.encoderSlots)
+            XCTAssertEqual(plan.request.minimumBands, old.request.minimumBands)
+        }
+        // One byte short of the need with the map: the copy into the reserve, nothing charged.
+        let edge = MemoryPlan.choose(request, ceiling: need.peak - 1)
+        XCTAssertFalse(edge.request.mapInPlace)
+        XCTAssertEqual(edge.need?.inPlaceBytes, 0)
+        XCTAssertTrue(MemoryPlan.choose(request, ceiling: need.peak).request.mapInPlace)
+
+        // The products ask the render's plan; outside a render (a check), wherever the map is open.
+        XCTAssertTrue(MemoryPlan.mapInPlace)
+        MemoryPlan.during(edge) { XCTAssertFalse(MemoryPlan.mapInPlace) }
+        MemoryPlan.during(roomy) { XCTAssertTrue(MemoryPlan.mapInPlace) }
+    }
+
     /// **Outside a render, the reference values**; inside, the plan's — the same from the first site
     /// to the last — and the render's state is gone once it ends.
     func testTheRenderStateIsScopedToTheRender() {

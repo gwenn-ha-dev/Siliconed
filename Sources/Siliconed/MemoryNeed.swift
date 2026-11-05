@@ -50,6 +50,15 @@ package struct MemoryNeed: Sendable, Equatable {
         package var loraRanks: [Int] = []
         /// The DiT's map plan (tail fraction and staging buffers).
         package var tail: MemoryPlan.Tail = .init(fraction: 0.5, streamed: true)
+        /// **The DiT's weights read in place** (`Artifact.wrappedMap`, the GPU stream's products): the plan's choice, taken only where
+        /// the need with it holds in B (`MemoryPlan.choose`). Its price is the whole DiT file, charged to the denoising
+        /// (`inPlaceTerm`): once the GPU has read the wrapped map, every page of it the CPU maps — the prefetcher's `MADV_WILLNEED`
+        /// over each block, the CPU's reads — counts in `phys_footprint` until the map is unmapped with the DiT (measured on the
+        /// M5 Pro, 5/11: a GPU read alone adds nothing, a CPU touch after it adds the pages, a `WILLNEED` adds them too).
+        package var mapInPlace = false
+        /// **Whether this process's denoiser can read its map in place** (`MemoryPlan.readsMapInPlace`): the GPU stream's switch and the
+        /// family. A family's need charges the map only where its DiT's products would take it (Z-Image's bf16 map).
+        package var mapInPlaceAvailable = false
         /// The text encoder's staging buffers (`MemoryPlan.encoderSlots`; 0 on the lean plan).
         package var encoderSlots: Int = MemoryPlan.encoderSlots
         /// The decoders' smallest bands (`MemoryPlan.fluxMinimumBand`, `qwenMinimumBand`), as the lean
@@ -95,13 +104,14 @@ package struct MemoryNeed: Sendable, Equatable {
                      promptTokens: Int, loraRanks: [Int] = [], tail: MemoryPlan.Tail = .init(fraction: 0.5, streamed: true)) {
             self.card = card; self.width = width; self.height = height; self.references = references
             self.promptTokens = promptTokens; self.loraRanks = loraRanks; self.tail = tail
+            mapInPlaceAvailable = MemoryPlan.readsMapInPlace(card.family)
         }
 
         /// **The most economical plan** (`MemoryPlan`'s lean one): the whole map streamed through its two
         /// buffers, no encoder buffer, the decoders' smallest bands — the floor a render can go down to.
         package var lean: Request {
             var r = self
-            r.tail = .lean; r.encoderSlots = 0; r.minimumBands = true
+            r.tail = .lean; r.encoderSlots = 0; r.minimumBands = true; r.mapInPlace = false
             return r
         }
 
@@ -205,6 +215,12 @@ package struct MemoryNeed: Sendable, Equatable {
         let pixels = max(1, width * height)
         return MemoryNeed.limit / max(1, (elements + pixels - 1) / pixels)
     }
+
+    /// The name of the term that charges a map read in place (`Request.mapInPlace`).
+    package static let inPlaceTerm = "map read in place"
+    /// **What reading the map in place costs in this need** — 0 where the family's DiT would not read in place (an 8-bit or packed map,
+    /// a family without the GPU stream): `MemoryPlan.choose` takes the in-place reading only where it is charged.
+    package var inPlaceBytes: Int { phases.flatMap(\.terms).filter { $0.name == Self.inPlaceTerm }.map(\.bytes).max() ?? 0 }
 
     /// **The peak**: the largest phase plus what crosses them, plus the base.
     package var peak: Int { (phases.map(\.bytes).max() ?? 0) + crossing + base }

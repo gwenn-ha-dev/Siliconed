@@ -10,6 +10,7 @@ import Foundation
 ///                no encoder buffer, the decoders' smallest bands
 ///                  + the text encoder's four buffers                ── kept if the need stays ≤ B
 ///                  + the decoders' standard bands                   ── kept if the need stays ≤ B
+///                  + the DiT's map read in place, charged whole     ── kept if the need stays ≤ B (no stream then)
 ///                  └─ the map's head left to the page cache: what B leaves beside the denoising (`released`)
 ///
 /// What only buys time is chosen here. What changes a bit — `mlpBudget`, the prefill's groups,
@@ -31,6 +32,11 @@ import Foundation
 ///     (measured: heads of 0.43–0.73 read 6.6–8.6 GB an evaluation, 5.4 at 0.5) — the page cache
 ///     holds less than any figure says. Only a map that fits whole in that room leaves the stream (no
 ///     buffer at all: a 32 GB Mac, an 8-bit map).
+///   - **A map read in place is charged, whole** (`Request.mapInPlace`): wrapped in a GPU buffer (`Artifact.wrappedMap`), the map's
+///     pages the CPU maps count in the footprint once the GPU has read it — the prefetcher's `WILLNEED` maps them all —, so the
+///     reading in place is a choice of the plan with its price, the whole file beside the denoising's anonymous need, taken only
+///     where that holds in B; otherwise the weights are copied into the reserve, the same bits. Taken, the map is never streamed:
+///     its need is the cached one plus the file, which is the condition `released` keeps the map whole on, and more.
 ///   - **Never one buffer**: measured, one serializes the reads behind the computation (Z-Image 512²
 ///     14.4 s a step against 4.1 with two; Qwen 512 20 s against 6), the same bits. The lean plan streams
 ///     the whole map with the stream's buffers (`TailStream.unitSlots`): a budget too short for a head is a cache too short for it, and the
@@ -58,6 +64,16 @@ package enum MemoryPlan {
             streamed ? Prefetcher.firstReleasedLayer(of: layers, tail: fraction) : layers
         }
     }
+
+    /// **Whether this process's denoiser of `family` reads its map in place** (`WeightProducts.prepare`): Z-Image's block on the GPU
+    /// stream (`SILICONED_STREAM`, read once per process; `SILICONED_STREAM_WAIT` turns the stream off). A setting, not the machine's state.
+    package static func readsMapInPlace(_ family: Family) -> Bool {
+        family == .zImage && GPUStream.policy != .off && ProcessInfo.processInfo.environment["SILICONED_STREAM_WAIT"] == nil
+    }
+
+    /// **Whether a product may read its weight in place now** (`WeightProducts.prepare`): the render's plan says so — or, outside a
+    /// render (a check, a bench: no memory contract), wherever the map is open.
+    package static var mapInPlace: Bool { current?.request.mapInPlace ?? true }
 
     /// The text encoder's reference: four buffers (three layers ahead). Nothing between four and none:
     /// one buffer was measured worse than none on the DiT, two and three never.
@@ -101,20 +117,32 @@ package enum MemoryPlan {
             faster(&candidate)
             if let peak = MemoryNeed.of(candidate)?.peak, peak <= ceiling { plan = candidate }
         }
-        let need = MemoryNeed.of(plan)
+        // The head and the stream are sized on the denoising's need without the map: what `released` compares the map with.
+        let streamedNeed = MemoryNeed.of(plan)
         var cached = plan
         cached.tail = .none
+        let cachedNeed = MemoryNeed.of(cached)
+        // The map read in place, last: the whole file charged beside the cached denoising, kept where it holds in B and where the
+        // family's need charges it (a map its products would not read in place costs nothing and is not taken).
+        if request.mapInPlaceAvailable {
+            var inPlace = cached
+            inPlace.mapInPlace = true
+            if let candidate = MemoryNeed.of(inPlace), candidate.inPlaceBytes > 0, candidate.peak <= ceiling { plan = inPlace }
+        }
+        let need = plan.mapInPlace ? MemoryNeed.of(plan) : streamedNeed
         // Unknown: the denoising takes all of B — no room left for a head (`released`).
         var render = Render(ceiling: ceiling, request: plan, need: need, floor: floor,
-                            denoisingStreamed: need?.need(of: .denoising) ?? ceiling,
-                            denoisingCached: MemoryNeed.of(cached)?.need(of: .denoising) ?? ceiling)
+                            denoisingStreamed: streamedNeed?.need(of: .denoising) ?? ceiling,
+                            denoisingCached: cachedNeed?.need(of: .denoising) ?? ceiling)
         guard let need else {
             render.decisions.append(String(format: "plan: need unknown in B %.2f — refused", Double(ceiling) / 1e9))
             return render
         }
-        render.decisions.append(String(format: "plan: need %.2f GB in B %.2f (floor %.2f, process base %.2f)%@",
+        render.decisions.append(String(format: "plan: need %.2f GB in B %.2f (floor %.2f, process base %.2f)%@%@",
                                        Double(need.peak) / 1e9, Double(ceiling) / 1e9, Double(floor) / 1e9,
-                                       Double(need.base) / 1e9, (render.lean ? " — lean plan" : "") as NSString))
+                                       Double(need.base) / 1e9, (render.lean ? " — lean plan" : "") as NSString,
+                                       (plan.mapInPlace ? String(format: " — map read in place (%.2f GB charged)",
+                                                                 Double(need.inPlaceBytes) / 1e9) : "") as NSString))
         return render
     }
 
@@ -140,6 +168,7 @@ package enum MemoryPlan {
     /// from the front of the sequence are read again at every evaluation — the tail, each layer's `spans` — and the head stays in the cache.
     /// 0 where the map fits B whole (`!streamed`: read once, cold, not per evaluation). Pure; `mapBytes` is the whole map.
     package static func streamedBytes(spans: [Int], mapBytes: Int, plan render: Render, fraction: Double) -> Int {
+        if render.request.mapInPlace { return 0 }
         let (released, streamed) = Self.released(spans: spans, mapBytes: mapBytes, ceiling: render.ceiling,
                                                  streamed: render.denoisingStreamed, cached: render.denoisingCached, fraction: fraction)
         return streamed ? spans[released...].reduce(0, +) : 0
