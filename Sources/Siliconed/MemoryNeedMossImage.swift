@@ -115,6 +115,7 @@ extension MemoryNeed {
             Term("DiT arena", MossImageDiT.arenaBytes(config: config, gridHeight: gridHeight, gridWidth: gridWidth,
                                                      maxText: t, rank: rank)),
             Term("map staging", streamed ? TailStream.unitSlots * unit : 0),
+            Term(inPlaceTerm, request.mapInPlace && request.mapInPlaceAvailable ? inPlaceBytes(header: header, fileSize: fileSize) : 0),
             Term("LoRA cache", rank > 0 ? CacheLoRA.arenaBytes(CacheLoRA.bytes(modules: modules.map { ($0.k, $0.n, rank) })) : 0),
             Term("LoRA down staging", request.loraRanks.count > 1
                 ? LoRA.downBytes(k: modules.map(\.k).max() ?? 0, rank: request.loraRanks.max() ?? 0) : 0),

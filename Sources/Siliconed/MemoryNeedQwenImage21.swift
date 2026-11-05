@@ -81,6 +81,8 @@ package struct QwenImage21Maps: Sendable {
     package let ditUnitStaging: Int
     /// Each DiT layer's bytes in the map and the map's, from the header (`Artifact.layerSpans`): what the stream reads per evaluation.
     package let ditLayerSpans: [Int], ditMapBytes: Int
+    /// What the DiT's map costs read in place (`MemoryNeed.inPlaceBytes`, `Request.mapInPlace`).
+    package let ditInPlaceBytes: Int
     /// The largest layer's staging run in the encoder's map: what one of its buffers holds.
     package let encoderLayerStaging: Int
     /// What the tokenizer's two tables map (`Tokenizer.tableBytes`).
@@ -108,6 +110,7 @@ package struct QwenImage21Maps: Sendable {
                                              fileSize: ditSize)
         ditLayerSpans = Artifact.layerSpans(header: dit, prefixes: (0..<ditConfig.layers).map(QwenImage21DiT.layerPrefix), fileSize: ditSize)
         ditMapBytes = Artifact.mapBytes(header: dit)
+        ditInPlaceBytes = MemoryNeed.inPlaceBytes(header: dit, fileSize: ditSize)
         ditLayerStaging = ditStaging; encoderLayerStaging = encoderStaging; self.tokenizerTables = tokenizerTables
         encoderRotationScratch = Widen.rotationScratchBytes(header: encoder)
         ditRotationScratch = Widen.rotationScratchBytes(header: dit, prefixes: (0..<ditConfig.layers).map(QwenImage21DiT.layerPrefix))
@@ -326,6 +329,7 @@ package struct QwenImage21Need {
             // The map's stream buffers: only with the K/V in memory (`QwenImage21DiT.body`).
             Term("map staging", storage == .memory && request.tail.fraction > 0
                 ? TailStream.unitSlots * maps.ditUnitStaging : 0),
+            Term(MemoryNeed.inPlaceTerm, request.mapInPlace && request.mapInPlaceAvailable ? maps.ditInPlaceBytes : 0),
             Term("DiT rotation scratch", maps.ditRotationScratch),
         ]
         // Two slots of the user's stack, on the 7 Linears of a block (`StreamedLoRA`), and, with more

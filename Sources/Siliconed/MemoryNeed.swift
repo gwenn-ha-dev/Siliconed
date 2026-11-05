@@ -221,6 +221,15 @@ package struct MemoryNeed: Sendable, Equatable {
     /// **What reading the map in place costs in this need** — 0 where the family's DiT would not read in place (an 8-bit or packed map,
     /// a family without the GPU stream): `MemoryPlan.choose` takes the in-place reading only where it is charged.
     package var inPlaceBytes: Int { phases.flatMap(\.terms).filter { $0.name == Self.inPlaceTerm }.map(\.bytes).max() ?? 0 }
+    /// **What a DiT map costs read in place**, from its header: the length `Artifact.wrappedMap` wraps — the whole file, rounded up to
+    /// the page — where its products are bf16 (`WeightProducts.prepare` reads only those in place); 0 otherwise. `fileSize` `.max`:
+    /// the header's own extent (`Artifact.mapBytes`).
+    package static func inPlaceBytes(header: [String: Any], fileSize: Int) -> Int {
+        guard Artifact.weightFormat(header: header) == .bf16 else { return 0 }
+        let page = Int(getpagesize())
+        let file = fileSize < .max ? fileSize : Artifact.mapBytes(header: header)
+        return (file + page - 1) / page * page
+    }
 
     /// **The peak**: the largest phase plus what crosses them, plus the base.
     package var peak: Int { (phases.map(\.bytes).max() ?? 0) + crossing + base }

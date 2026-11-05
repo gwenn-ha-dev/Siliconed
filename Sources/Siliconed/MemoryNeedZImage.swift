@@ -79,9 +79,7 @@ extension MemoryNeed {
                 Artifact.largestRun(header: encoder, prefixes: TextEncoder.layerPrefixes(config), fileSize: encoderSize)
             } ?? 0
             ditRotationScratch = Widen.rotationScratchBytes(header: dit)
-            let page = Int(getpagesize())
-            let file = ditSize < .max ? ditSize : Artifact.mapBytes(header: dit)
-            ditInPlaceBytes = Artifact.weightFormat(header: dit) == .bf16 ? (file + page - 1) / page * page : 0
+            ditInPlaceBytes = MemoryNeed.inPlaceBytes(header: dit, fileSize: ditSize)
         }
 
         /// What one buffer of the DiT's stream holds over `layers`: the largest tensor's run (`Artifact.largestRun`).
