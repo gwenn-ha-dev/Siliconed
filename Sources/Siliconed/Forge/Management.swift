@@ -86,7 +86,7 @@ extension Library {
                          encoder: Self.size(map(encoderMap(f))) + otherEncoder
                             + (f.writerHead.map { Self.size(map($0)) } ?? 0),
                          dit: Self.size(dit) + Self.size(adapterPath(fromMap: dit)) + otherDiT
-                            + (f == .qwenImage21 ? Family.supersededQwenImage21Maps.reduce(0) { $0 + Self.size(map($1)) } : 0),
+                            + f.supersededMaps.reduce(0) { $0 + Self.size(map($1)) },
                          variant: own ? variant(of: f) : nil,
                          isReady: i.isReady(f))
         }
@@ -370,9 +370,9 @@ extension Family {
     /// **What a family occupies once installed in `variant`**, in bytes — to state the price before
     /// downloading. Standard: measured on the maps (bf16, as published). Compact: the components are
     /// the Standard's; the maps measured as installed: Z-Image's DiT from
-    /// unsloth's GGUF, its encoder from Disty0's; Qwen-Image-2.1's DiT from Comfy-Org's int8 convrot,
-    /// its encoder from unsloth's; Anima's DiT from vanes430's GGUF Q8_0 (Q4_K_M for the Light), with
-    /// the Standard's encoder; Krea 2's DiT and encoder from Comfy-Org's int8 convrot, its Light's DiT
+    /// Comfy-Org's int8 convrot (unsloth's GGUF Q4_K_M for the Light), its encoder from Disty0's; Qwen-Image-2.1's DiT
+    /// from Comfy-Org's int8 convrot, its encoder from unsloth's; Anima's DiT from Bedovyy's int8 convrot (vanes430's
+    /// GGUF Q4_K_M for the Light), with the Standard's encoder; Krea 2's DiT and encoder from Comfy-Org's int8 convrot, its Light's DiT
     /// from vantagewithai's GGUF Q4_K_M; MOSS-Image's DiT and encoder from Comfy-Org's int8 convrot. An installation needs more while forging: the sources, about as
     /// large as the map, then thrown away (`spaceNeeded`).
     package func installedSize(_ variant: Variant) -> (dit: Int, encoder: Int, components: Int) {
@@ -390,12 +390,12 @@ extension Family {
         }
         if variant == .compact {
             switch self {
-            case .zImage: return (7_247_331_328, 4_317_841_408, installedSize(.standard).components)
+            // Comfy-Org's int8 convrot: 6 199 296 000 B (its fp32 tensors bf16 values, written in bf16 but the two embedders).
+            case .zImage: return (6_199_296_000, 4_317_841_408, installedSize(.standard).components)
             case .qwenImage21: return (7_257_833_472, 9_355_759_616, installedSize(.standard).components)
-            // vanes430's Q8_0: the map, 2 098 118 656 B, and its text adapter, 538 671 696 B — 8-bit in the
-            // source, fp32 here (the conditioner reads no 8-bit), twice the Standard's bf16 one. The
-            // encoder is the Standard's.
-            case .anima: return (2_636_790_352, installedSize(.standard).encoder, installedSize(.standard).components)
+            // Bedovyy's int8 convrot: the map, 2 384 199 680 B, and its text adapter, bf16 as published (269 344 384 B, the
+            // Standard's). The encoder is the Standard's.
+            case .anima: return (2_653_544_064, installedSize(.standard).encoder, installedSize(.standard).components)
             // Comfy-Org's int8 convrot, the DiT's Linears kept 8-bit; the encoder's embedding table
             // in fp32 (a rotated table cannot be read by rows).
             case .krea2: return (14_138_179_584, 5_096_919_040, installedSize(.standard).components)

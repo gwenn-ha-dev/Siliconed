@@ -214,14 +214,9 @@ import Testing
                     ProductAssignment(path: .native, roundsActivation: true, gpu: 4096, amxColumns: 1024), false)) { c in
             isProduct(c, [.int8, .q8, .q4k]) && has(c, .gpu, .bf16) && has(c, .amx)
         },
-        Gap("q8-ane", .hardware,
-            "the ANE beside a GGUF Q8_0 weight read as published: its int8 program takes a scale per column or for the tensor, never "
-                + "Q8_0's blocks (`NeuralEngine.readsInt8`, `isRunnable`), and its fp16 program reads the widened weight, which a native "
-                + "product never makes (the reserve holds the integers and their scales)",
-            probe: (ProductKey(k: 3072, n: 3072, m: 4096, weight: .q8),
-                    ProductAssignment(path: .native, roundsActivation: true, gpu: 2048, ane: 2048), false)) { c in
-            isProduct(c, [.q8]) && has(c, .gpu, .bf16) && has(c, .ane)
-        },
+        // No « q8-ane » entry since Z-Image's and Anima's Compacts became int8 convrot: no version of the catalogue publishes Q8_0, so
+        // no cell names it. The fact stays for an imported GGUF: the ANE's int8 program takes a scale per column or for the tensor,
+        // never Q8_0's blocks (`NeuralEngine.readsInt8`, `ProductAssignment.isRunnable`, `CapacityPlanTests`).
         Gap("lora-sets", .decided,
             "a LoRA's products are thin (`CapacityModel.isThin`): a set's loss was measured on products with no short side, none is "
                 + "offered on one — each engine alone is, by its thin line") { c in
@@ -421,7 +416,8 @@ import Testing
             #expect(!routed.contains { $0.variant == variant && $0.subject.phase == .encoding && $0.lanes.contains(rounded) })
         }
         #expect(routed.contains { $0.subject == .product(.denoising, .int8) }, "no version publishes int8 weights any more: update the test")
-        #expect(routed.contains { $0.subject == .product(.denoising, .q8) }, "no version publishes Q8_0 weights any more: update the test")
+        // No version of the catalogue publishes Q8_0 weights since Z-Image's and Anima's Compacts became int8 convrot: the Q8_0
+        // route stays for an imported GGUF, judged above wherever a version's classes hold it.
         #expect(routed.contains { $0.variant == .light && $0.subject == .product(.denoising, .q4k) && $0.lanes == [rounded] },
                 "the Light's K-quants on a rounded activation (`gpu/q4kact`)")
     }

@@ -1,0 +1,639 @@
+{
+ "repo": "Bedovyy/Anima-INT8",
+ "revision": "d7ba6686f161e9a829373106eb4b881327247ba9",
+ "file": "anima-turbo-v1.1-int8convrot.safetensors",
+ "url": "https://huggingface.co/Bedovyy/Anima-INT8/resolve/d7ba6686f161e9a829373106eb4b881327247ba9/anima-turbo-v1.1-int8convrot.safetensors",
+ "format": "convrot",
+ "family": "anima",
+ "file_bytes": 2649848838,
+ "header": {
+  "bytes": 157616,
+  "sha256": "8da95484a71b05cb4c305060133b72be75d6d49b224617d330c11e608a881a25",
+  "tensors": 1193
+ },
+ "rows": 256,
+ "group": 256,
+ "comfy": {
+  "manifest": "../comfy/manifest.json",
+  "functions": "kitchen/comfy_kitchen/backends/eager/quantization.py: dequantize_int8_convrot_weight; kitchen/comfy_kitchen/tensor/int8_utils.py: _build_hadamard, _rotate_weight"
+ },
+ "libraries": {
+  "torch": "2.14.1",
+  "diffusers": "0.41.0",
+  "safetensors": "0.8.0"
+ },
+ "quantized": [
+  "transformer_blocks.1.attn1.to_v.weight",
+  "transformer_blocks.4.ff.net.2.weight",
+  "transformer_blocks.26.attn1.to_out.0.weight"
+ ],
+ "plain": [
+  "proj_out.weight",
+  "transformer_blocks.0.attn2.norm_k.weight"
+ ],
+ "published": {
+  "model.diffusion_model.blocks.0.cross_attn.k_norm.weight": {
+   "dtype": "BF16",
+   "shape": [
+    128
+   ],
+   "piece_shape": [
+    128
+   ],
+   "rows": [
+    [
+     0,
+     128
+    ]
+   ],
+   "range": [
+    [
+     15386552,
+     15386807
+    ]
+   ],
+   "map": [
+    "transformer_blocks.0.attn2.norm_k.weight"
+   ]
+  },
+  "model.diffusion_model.blocks.1.self_attn.v_proj.comfy_quant": {
+   "dtype": "U8",
+   "shape": [
+    89
+   ],
+   "piece_shape": [
+    89
+   ],
+   "rows": [
+    [
+     0,
+     89
+    ]
+   ],
+   "range": [
+    [
+     2649826855,
+     2649826943
+    ]
+   ],
+   "map": []
+  },
+  "model.diffusion_model.blocks.1.self_attn.v_proj.weight": {
+   "dtype": "I8",
+   "shape": [
+    2048,
+    2048
+   ],
+   "piece_shape": [
+    256,
+    2048
+   ],
+   "rows": [
+    [
+     0,
+     256
+    ]
+   ],
+   "range": [
+    [
+     1139876792,
+     1140401079
+    ]
+   ],
+   "map": [
+    "transformer_blocks.1.attn1.to_v.weight"
+   ]
+  },
+  "model.diffusion_model.blocks.1.self_attn.v_proj.weight_scale": {
+   "dtype": "F32",
+   "shape": [
+    2048,
+    1
+   ],
+   "piece_shape": [
+    256,
+    1
+   ],
+   "rows": [
+    [
+     0,
+     256
+    ]
+   ],
+   "range": [
+    [
+     214968,
+     215991
+    ]
+   ],
+   "map": []
+  },
+  "model.diffusion_model.blocks.26.self_attn.output_proj.comfy_quant": {
+   "dtype": "U8",
+   "shape": [
+    89
+   ],
+   "piece_shape": [
+    89
+   ],
+   "rows": [
+    [
+     0,
+     89
+    ]
+   ],
+   "range": [
+    [
+     2649842519,
+     2649842607
+    ]
+   ],
+   "map": []
+  },
+  "model.diffusion_model.blocks.26.self_attn.output_proj.weight": {
+   "dtype": "I8",
+   "shape": [
+    2048,
+    2048
+   ],
+   "piece_shape": [
+    256,
+    2048
+   ],
+   "rows": [
+    [
+     0,
+     256
+    ]
+   ],
+   "range": [
+    [
+     2230395832,
+     2230920119
+    ]
+   ],
+   "map": [
+    "transformer_blocks.26.attn1.to_out.0.weight"
+   ]
+  },
+  "model.diffusion_model.blocks.26.self_attn.output_proj.weight_scale": {
+   "dtype": "F32",
+   "shape": [
+    2048,
+    1
+   ],
+   "piece_shape": [
+    256,
+    1
+   ],
+   "rows": [
+    [
+     0,
+     256
+    ]
+   ],
+   "range": [
+    [
+     2074552,
+     2075575
+    ]
+   ],
+   "map": []
+  },
+  "model.diffusion_model.blocks.4.mlp.layer2.comfy_quant": {
+   "dtype": "U8",
+   "shape": [
+    89
+   ],
+   "piece_shape": [
+    89
+   ],
+   "rows": [
+    [
+     0,
+     89
+    ]
+   ],
+   "range": [
+    [
+     2649843943,
+     2649844031
+    ]
+   ],
+   "map": []
+  },
+  "model.diffusion_model.blocks.4.mlp.layer2.weight": {
+   "dtype": "I8",
+   "shape": [
+    2048,
+    8192
+   ],
+   "piece_shape": [
+    256,
+    8192
+   ],
+   "rows": [
+    [
+     0,
+     256
+    ]
+   ],
+   "range": [
+    [
+     2301699000,
+     2303796151
+    ]
+   ],
+   "map": [
+    "transformer_blocks.4.ff.net.2.weight"
+   ]
+  },
+  "model.diffusion_model.blocks.4.mlp.layer2.weight_scale": {
+   "dtype": "F32",
+   "shape": [
+    2048,
+    1
+   ],
+   "piece_shape": [
+    256,
+    1
+   ],
+   "rows": [
+    [
+     0,
+     256
+    ]
+   ],
+   "range": [
+    [
+     2230200,
+     2231223
+    ]
+   ],
+   "map": []
+  },
+  "model.diffusion_model.final_layer.linear.weight": {
+   "dtype": "BF16",
+   "shape": [
+    64,
+    2048
+   ],
+   "piece_shape": [
+    64,
+    2048
+   ],
+   "rows": [
+    [
+     0,
+     64
+    ]
+   ],
+   "range": [
+    [
+     811284408,
+     811546551
+    ]
+   ],
+   "map": [
+    "proj_out.weight"
+   ]
+  }
+ },
+ "comparisons": {
+  "model.diffusion_model.blocks.1.self_attn.v_proj.weight": {
+   "kind": "ComfyUI int8_tensorwise convrot",
+   "group": 256,
+   "values": 524288,
+   "comfy_fp32_vs_exact_fp64": {
+    "different_from_rounded_exact": 477063,
+    "max_abs": 5.940091796219349e-08,
+    "channel_error_worst": 4.425743937992744e-07,
+    "channel_error_median": 2.9140864461326185e-07
+   },
+   "rounded_exact_vs_exact_fp64": {
+    "channel_error_worst": 3.105061794004931e-08,
+    "channel_error_median": 2.536049128961422e-08
+   },
+   "comfy_default_bf16": {
+    "different_from_fp32_reference": 523719,
+    "max_rel": 0.0038900576933926104,
+    "channel_error_worst": 0.0017876375926507229,
+    "channel_error_median": 0.001575035790518213
+   },
+   "smallest_nonzero_abs_qR": 0.0625,
+   "smallest_scale": 8.649173832964152e-05
+  },
+  "model.diffusion_model.blocks.4.mlp.layer2.weight": {
+   "kind": "ComfyUI int8_tensorwise convrot",
+   "group": 256,
+   "values": 2097152,
+   "comfy_fp32_vs_exact_fp64": {
+    "different_from_rounded_exact": 1864280,
+    "max_abs": 7.680864655412734e-08,
+    "channel_error_worst": 3.0330322779954974e-07,
+    "channel_error_median": 2.897062003251141e-07
+   },
+   "rounded_exact_vs_exact_fp64": {
+    "channel_error_worst": 2.710617670379521e-08,
+    "channel_error_median": 2.5272218281870465e-08
+   },
+   "comfy_default_bf16": {
+    "different_from_fp32_reference": 2095234,
+    "max_rel": 0.0038878155107286076,
+    "channel_error_worst": 0.001704421707789204,
+    "channel_error_median": 0.0016514500544889106
+   },
+   "smallest_nonzero_abs_qR": 0.0625,
+   "smallest_scale": 0.000287251197732985
+  },
+  "model.diffusion_model.blocks.26.self_attn.output_proj.weight": {
+   "kind": "ComfyUI int8_tensorwise convrot",
+   "group": 256,
+   "values": 524288,
+   "comfy_fp32_vs_exact_fp64": {
+    "different_from_rounded_exact": 465128,
+    "max_abs": 4.659523256123066e-08,
+    "channel_error_worst": 3.1112220858488034e-07,
+    "channel_error_median": 2.892432448966743e-07
+   },
+   "rounded_exact_vs_exact_fp64": {
+    "channel_error_worst": 2.672999729870789e-08,
+    "channel_error_median": 2.524780923865566e-08
+   },
+   "comfy_default_bf16": {
+    "different_from_fp32_reference": 523868,
+    "max_rel": 0.0038897795820266963,
+    "channel_error_worst": 0.0017426080387827499,
+    "channel_error_median": 0.0016509180655654803
+   },
+   "smallest_nonzero_abs_qR": 0.0625,
+   "smallest_scale": 0.0002104893501382321
+  }
+ },
+ "comfy_quant": {
+  "model.diffusion_model.blocks.1.cross_attn.k_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.1.cross_attn.output_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.1.cross_attn.q_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.1.cross_attn.v_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.1.self_attn.k_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.1.self_attn.output_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.1.self_attn.q_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.1.self_attn.v_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.10.cross_attn.k_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.10.cross_attn.output_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.10.cross_attn.q_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.10.cross_attn.v_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.10.mlp.layer1.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.10.mlp.layer2.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.10.self_attn.k_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.10.self_attn.output_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.10.self_attn.q_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.10.self_attn.v_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.11.cross_attn.k_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.11.cross_attn.output_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.11.cross_attn.q_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.11.cross_attn.v_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.11.mlp.layer1.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.11.mlp.layer2.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.11.self_attn.k_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.11.self_attn.output_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.11.self_attn.q_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.11.self_attn.v_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.12.cross_attn.k_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.12.cross_attn.output_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.12.cross_attn.q_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.12.cross_attn.v_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.12.mlp.layer1.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.12.mlp.layer2.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.12.self_attn.k_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.12.self_attn.output_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.12.self_attn.q_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.12.self_attn.v_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.13.cross_attn.k_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.13.cross_attn.output_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.13.cross_attn.q_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.13.cross_attn.v_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.13.mlp.layer1.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.13.mlp.layer2.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.13.self_attn.k_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.13.self_attn.output_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.13.self_attn.q_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.13.self_attn.v_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.14.cross_attn.k_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.14.cross_attn.output_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.14.cross_attn.q_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.14.cross_attn.v_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.14.mlp.layer1.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.14.mlp.layer2.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.14.self_attn.k_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.14.self_attn.output_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.14.self_attn.q_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.14.self_attn.v_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.15.cross_attn.k_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.15.cross_attn.output_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.15.cross_attn.q_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.15.cross_attn.v_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.15.mlp.layer1.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.15.mlp.layer2.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.15.self_attn.k_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.15.self_attn.output_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.15.self_attn.q_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.15.self_attn.v_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.16.cross_attn.k_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.16.cross_attn.output_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.16.cross_attn.q_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.16.cross_attn.v_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.16.mlp.layer1.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.16.mlp.layer2.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.16.self_attn.k_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.16.self_attn.output_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.16.self_attn.q_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.16.self_attn.v_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.17.cross_attn.k_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.17.cross_attn.output_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.17.cross_attn.q_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.17.cross_attn.v_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.17.mlp.layer1.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.17.mlp.layer2.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.17.self_attn.k_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.17.self_attn.output_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.17.self_attn.q_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.17.self_attn.v_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.18.cross_attn.k_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.18.cross_attn.output_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.18.cross_attn.q_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.18.cross_attn.v_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.18.mlp.layer1.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.18.mlp.layer2.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.18.self_attn.k_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.18.self_attn.output_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.18.self_attn.q_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.18.self_attn.v_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.19.cross_attn.k_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.19.cross_attn.output_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.19.cross_attn.q_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.19.cross_attn.v_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.19.mlp.layer1.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.19.mlp.layer2.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.19.self_attn.k_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.19.self_attn.output_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.19.self_attn.q_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.19.self_attn.v_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.2.cross_attn.k_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.2.cross_attn.output_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.2.cross_attn.q_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.2.cross_attn.v_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.2.self_attn.k_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.2.self_attn.output_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.2.self_attn.q_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.2.self_attn.v_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.20.cross_attn.k_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.20.cross_attn.output_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.20.cross_attn.q_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.20.cross_attn.v_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.20.mlp.layer1.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.20.mlp.layer2.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.20.self_attn.k_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.20.self_attn.output_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.20.self_attn.q_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.20.self_attn.v_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.21.cross_attn.k_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.21.cross_attn.output_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.21.cross_attn.q_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.21.cross_attn.v_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.21.mlp.layer1.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.21.mlp.layer2.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.21.self_attn.k_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.21.self_attn.output_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.21.self_attn.q_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.21.self_attn.v_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.22.cross_attn.k_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.22.cross_attn.output_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.22.cross_attn.q_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.22.cross_attn.v_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.22.mlp.layer1.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.22.mlp.layer2.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.22.self_attn.k_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.22.self_attn.output_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.22.self_attn.q_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.22.self_attn.v_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.23.cross_attn.k_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.23.cross_attn.output_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.23.cross_attn.q_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.23.cross_attn.v_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.23.mlp.layer1.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.23.mlp.layer2.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.23.self_attn.k_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.23.self_attn.output_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.23.self_attn.q_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.23.self_attn.v_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.24.cross_attn.k_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.24.cross_attn.output_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.24.cross_attn.q_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.24.cross_attn.v_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.24.mlp.layer1.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.24.mlp.layer2.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.24.self_attn.k_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.24.self_attn.output_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.24.self_attn.q_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.24.self_attn.v_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.25.cross_attn.k_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.25.cross_attn.output_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.25.cross_attn.q_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.25.cross_attn.v_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.25.mlp.layer1.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.25.mlp.layer2.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.25.self_attn.k_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.25.self_attn.output_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.25.self_attn.q_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.25.self_attn.v_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.26.cross_attn.k_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.26.cross_attn.output_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.26.cross_attn.q_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.26.cross_attn.v_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.26.mlp.layer1.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.26.mlp.layer2.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.26.self_attn.k_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.26.self_attn.output_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.26.self_attn.q_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.26.self_attn.v_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.3.cross_attn.k_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.3.cross_attn.output_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.3.cross_attn.q_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.3.cross_attn.v_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.3.self_attn.k_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.3.self_attn.output_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.3.self_attn.q_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.3.self_attn.v_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.4.cross_attn.k_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.4.cross_attn.output_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.4.cross_attn.q_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.4.cross_attn.v_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.4.mlp.layer1.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.4.mlp.layer2.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.4.self_attn.k_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.4.self_attn.output_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.4.self_attn.q_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.4.self_attn.v_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.5.cross_attn.k_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.5.cross_attn.output_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.5.cross_attn.q_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.5.cross_attn.v_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.5.mlp.layer1.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.5.mlp.layer2.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.5.self_attn.k_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.5.self_attn.output_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.5.self_attn.q_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.5.self_attn.v_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.6.cross_attn.k_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.6.cross_attn.output_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.6.cross_attn.q_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.6.cross_attn.v_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.6.mlp.layer1.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.6.mlp.layer2.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.6.self_attn.k_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.6.self_attn.output_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.6.self_attn.q_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.6.self_attn.v_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.7.cross_attn.k_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.7.cross_attn.output_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.7.cross_attn.q_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.7.cross_attn.v_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.7.mlp.layer1.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.7.mlp.layer2.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.7.self_attn.k_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.7.self_attn.output_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.7.self_attn.q_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.7.self_attn.v_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.8.cross_attn.k_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.8.cross_attn.output_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.8.cross_attn.q_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.8.cross_attn.v_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.8.mlp.layer1.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.8.mlp.layer2.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.8.self_attn.k_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.8.self_attn.output_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.8.self_attn.q_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.8.self_attn.v_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.9.cross_attn.k_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.9.cross_attn.output_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.9.cross_attn.q_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.9.cross_attn.v_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.9.mlp.layer1.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.9.mlp.layer2.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.9.self_attn.k_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.9.self_attn.output_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.9.self_attn.q_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}",
+  "model.diffusion_model.blocks.9.self_attn.v_proj.comfy_quant": "{\"format\": \"int8_tensorwise\", \"per_row\": true, \"convrot\": true, \"convrot_groupsize\": 256}"
+ },
+ "pieces": {
+  "file": "pieces.safetensors",
+  "bytes": 3414371,
+  "sha256": "7d0d71062785ab4d41b8376bc0d41abb9d31b66edc0c103a67e7a51a1774e043"
+ },
+ "references": {
+  "file": "references.safetensors",
+  "bytes": 38274632,
+  "sha256": "08c8d407e8f923e0cbb812938ffecbfe599a4fa235a99df7a7e1eea7d70534f8"
+ }
+}

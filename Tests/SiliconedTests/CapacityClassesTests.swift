@@ -173,8 +173,8 @@ final class CapacityClassesTests: XCTestCase {
 
     func testVersionsAndTheirFormats() {
         XCTAssertEqual(CC.weightFormat(.zImage, .standard), .bf16)
-        XCTAssertEqual(CC.weightFormat(.zImage, .compact), .q8)
-        XCTAssertEqual(CC.weightFormat(.anima, .compact), .q8)
+        XCTAssertEqual(CC.weightFormat(.zImage, .compact), .int8)
+        XCTAssertEqual(CC.weightFormat(.anima, .compact), .int8)
         XCTAssertEqual(CC.weightFormat(.krea2, .compact), .int8)
         XCTAssertEqual(CC.weightFormat(.qwenImage21, .light), .q4k)
         XCTAssertNil(CC.weightFormat(.mossImage, .light))
@@ -182,12 +182,12 @@ final class CapacityClassesTests: XCTestCase {
         XCTAssertNil(CC.WeightFormat.q4k.kind)
         XCTAssertEqual(CC.encoderFormat(.anima, .compact), .bf16)
         XCTAssertEqual(CC.encoderFormat(.zImage, .compact), .int8)
-        // The format is in the shape: the same k×n of two versions are two classes — for the blocks the version quantizes; the weights it leaves as
-        // published (Z-Image's refiners and embedders) are the Standard's own classes.
+        // The format is in the shape: the same k×n of two versions are two classes — for the blocks the version quantizes (Z-Image's layers
+        // and refiners); the weights it leaves as published (its embedders) are the Standard's own classes.
         let std = classes(.zImage), cmp = classes(.zImage, .compact)
         func format(_ c: CC.Class) -> CC.WeightFormat? { if case let .product(_, _, _, f) = c.shape { return f } else { return nil } }
         XCTAssertEqual(std.count, cmp.count)
-        let quantized = cmp.filter { format($0) == .q8 }, plain = cmp.filter { format($0) == .bf16 }
+        let quantized = cmp.filter { format($0) == .int8 }, plain = cmp.filter { format($0) == .bf16 }
         XCTAssertFalse(quantized.isEmpty)
         XCTAssertTrue(Set(std.map(\.shape)).isDisjoint(with: Set(quantized.map(\.shape))))
         XCTAssertTrue(plain.allSatisfy { p in std.contains { $0.shape == p.shape } })
@@ -232,11 +232,13 @@ final class CapacityClassesTests: XCTestCase {
         let self1 = anima.first { $0.shape == .attention(sequence: 4096, keys: 4096, heads: 16, kvHeads: 16, headDim: 128, cross: false) }
         let cross = anima.first { $0.shape == .attention(sequence: 4096, keys: 512, heads: 16, kvHeads: 16, headDim: 128, cross: true) }
         XCTAssertEqual(self1?.id, cross?.id, "a self- and a cross-attention of one S share a name: the ledger cannot tell them apart")
-        // Z-Image's Compact quantizes the 30 layers (rows 4 128 and 1 056); the refiners (rows 4 096, 1 024 and the 32 of the context) and the
-        // embedders stay as published, and the engine's record names them so.
+        // Z-Image's Compact (Comfy-Org's int8 convrot) quantizes the 30 layers (rows 4 128 and 1 056) and the refiners (rows 4 096, 1 024 and
+        // the 32 of the context); the embedders stay as published, and the engine's record names them so.
         let compact = classes(.zImage, .compact).filter { $0.phase == .denoising }
-        func rows(_ c: CC.Class) -> Int? { if case let .product(_, _, r, _) = c.shape { return r } else { return nil } }
-        XCTAssertTrue(compact.filter { [4128, 1056].contains(rows($0)) && $0.id.hasPrefix("product:3840x") }.allSatisfy { $0.id.hasSuffix("~q8") || $0.id.contains("x64@") })
-        XCTAssertTrue(compact.filter { [4096, 32].contains(rows($0)) }.allSatisfy { !$0.id.contains("~") })
+        let blocks = compact.filter { ["product:3840x3840@", "product:3840x10240@", "product:10240x3840@"].contains(where: $0.id.hasPrefix) }
+        XCTAssertEqual(Set(blocks.compactMap { c -> Int? in if case let .product(_, _, r, _) = c.shape { r } else { nil } }), [4128, 1056, 4096, 1024, 32])
+        XCTAssertTrue(blocks.allSatisfy { $0.id.hasSuffix("~int8") })
+        XCTAssertTrue(compact.filter { $0.id.contains("x64@") || $0.id.hasPrefix("product:64x") || $0.id.hasPrefix("product:2560x") }
+            .allSatisfy { !$0.id.contains("~") })
     }
 }

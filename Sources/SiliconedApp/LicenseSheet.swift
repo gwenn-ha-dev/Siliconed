@@ -56,9 +56,9 @@ struct LicenseTerms: View {
                         // Nothing is downloaded: the DiT is the user's file, the rest the family's.
                         Text("The image model is the file you imported, under its author’s license. Its text encoder and VAE are those of the installed version, under the licenses linked below.")
                     } else if variant == .compact && card.family == .anima {
-                        // Anima's Compact and Light: one third party, the image model alone (its encoder
-                        // is the publisher's in all three versions).
-                        Text("Siliconed ships no weights. The Compact version’s image model is the publisher’s, republished in 8 bits by vanes430 and downloaded from there; everything else comes from the publisher. The publisher’s license applies, and vanes430’s model card says what it changed.")
+                        // Anima's Compact and Light: one third party each (Bedovyy, vanes430), the image
+                        // model alone (its encoder is the publisher's in all three versions).
+                        Text("Siliconed ships no weights. The Compact version’s image model is the publisher’s, republished in 8 bits by Bedovyy and downloaded from there; everything else comes from the publisher. The publisher’s license applies, and Bedovyy’s model card says what it changed.")
                     } else if variant == .light && card.family == .anima {
                         Text("Siliconed ships no weights. The Light version’s image model is the publisher’s, republished in 4 to 6 bits by vanes430 and downloaded from there; everything else comes from the publisher. The publisher’s license applies, and vanes430’s model card says what it changed.")
                     } else if variant == .compact {

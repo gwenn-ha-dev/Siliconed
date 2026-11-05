@@ -891,10 +891,19 @@ COMFY = dict(
 COMFY_DIR = os.path.join(ROOT, 'comfy')
 
 SOURCES.update({
+    # Z-Image's Compact DiT. The repository answers to `Comfy-Org/z_image_turbo` too (the same commit): the canonical
+    # name, the one the app pins.
     'z-image-convrot': dict(
-        repo='Comfy-Org/z_image_turbo', revision='6fc90a3b1b653e935a0d175e260736de25b84df5',
+        repo='Comfy-Org/Z-Image-Turbo', revision='6fc90a3b1b653e935a0d175e260736de25b84df5',
         file='split_files/diffusion_models/z_image_turbo_int8_convrot.safetensors',
         format='convrot', family='z-image'),
+    # Anima's Compact DiT: Bedovyy's int8 convrot of CircleStone's Turbo v1.1 (every kept tensor the publisher's
+    # `anima-turbo-v1.1.safetensors`'s to the bit), names under `model.diffusion_model.`, its first and last blocks'
+    # attention and five MLPs left in bf16, the text adapter bf16.
+    'anima-turbo-convrot': dict(
+        repo='Bedovyy/Anima-INT8', revision='d7ba6686f161e9a829373106eb4b881327247ba9',
+        file='anima-turbo-v1.1-int8convrot.safetensors',
+        format='convrot', family='anima'),
     'qwen21-convrot': dict(
         repo='Comfy-Org/Qwen-Image-2.1', revision='cb504a4090723e43f17ad01cec0359490e2de613',
         file='diffusion_models/qwen_image_2.1_int8_convrot.safetensors',
@@ -989,24 +998,35 @@ def channel_error(got, expected):
 
 
 def choose_convrot(h):
-    """Deterministic, from the header alone: first block's attention input and widest-K MLP weight
-    (and a fused gate_up), the last block's output projection, an adaLN of K = one group (Z-Image), a
-    refiner's weight; plus a plain 2-D weight and a norm."""
+    """Deterministic, from the header alone: the first quantized block's attention input and widest-K MLP weight
+    (and a fused gate_up), the last quantized block's output projection, an adaLN of K = one group (Z-Image), a
+    refiner's weight; plus a plain 2-D weight and a norm. Anima (Bedovyy's): its names under `model.diffusion_model.`,
+    block 0 left in bf16 and the first quantized MLP in block 4, the attention input its `self_attn.v_proj` (the
+    forge permutes q's and k's rows: never a piece) — the other families' choice is unchanged."""
+    block = lambda k: block_of(k.removeprefix('model.diffusion_model.'))
+    attention = lambda w: re.search(r'\.(attention|attn|self_attn|cross_attn)\.', w)
     qw = sorted(k for k, v in h.items() if k != '__metadata__' and v['dtype'] == 'I8')
-    last = max(b for b in map(block_of, qw) if b is not None)
-    first = [w for w in qw if block_of(w) == 0]
-    attn = [w for w in first if re.search(r'\.(attention\.qkv|attn\.to_q|attn\.wq)\.weight$', w)]
-    mlp = [w for w in first if not re.search(r'\.(attention|attn)\.', w) and 'adaLN' not in w]
+    last = max(b for b in map(block, qw) if b is not None)
+    start = min(b for b in map(block, qw) if b is not None)
+    first = [w for w in qw if block(w) == start]
+    attn = [w for w in first if re.search(r'\.(attention\.qkv|attn\.to_q|attn\.wq|self_attn\.v_proj)\.weight$', w)]
+    mlp = [w for w in first if not attention(w) and 'adaLN' not in w]
+    if not mlp:
+        # Anima: the MLP of its first quantized blocks stays bf16; the first block whose MLP is int8.
+        b = min(block(w) for w in qw if not attention(w) and 'adaLN' not in w)
+        mlp = [w for w in qw if block(w) == b and not attention(w) and 'adaLN' not in w]
     wide = max(mlp, key=lambda w: (h[w]['shape'][1], w))
     fused = [w for w in first if w.endswith('.img_mlp.gate_up.weight')]
     small_k = [w for w in first if h[w]['shape'][1] == 256]
-    last_out = [w for w in qw if block_of(w) == last and re.search(r'\.(attention\.out|attn\.to_out\.0|attn\.wo)\.weight$', w)]
-    outside = [w for w in qw if block_of(w) is None]
+    last_out = [w for w in qw if block(w) == last
+                and re.search(r'\.(attention\.out|attn\.to_out\.0|attn\.wo|self_attn\.output_proj)\.weight$', w)]
+    outside = [w for w in qw if block(w) is None]
     quantized = list(dict.fromkeys(attn[:1] + [wide] + fused[:1] + small_k[:1] + last_out[:1] + outside[:1]))
-    plain = sorted(k for k, v in h.items() if k != '__metadata__' and v['dtype'] in ('F32', 'BF16'))
+    plain = sorted(k for k, v in h.items() if k != '__metadata__' and v['dtype'] in ('F32', 'BF16')
+                   and '.llm_adapter.' not in k and not k.startswith('llm_adapter.'))
     two_d = [k for k in plain if len(h[k]['shape']) == 2 and k.endswith('.weight') and min(h[k]['shape']) > 1]
     plain_2d = min(two_d, key=lambda k: (h[k]['shape'][0] * h[k]['shape'][1], k))
-    norm = [k for k in plain if block_of(k) == 0 and len(h[k]['shape']) == 1 and 'norm' in k][0]
+    norm = [k for k in plain if block(k) == 0 and len(h[k]['shape']) == 1 and 'norm' in k][0]
     return quantized, [plain_2d, norm]
 
 

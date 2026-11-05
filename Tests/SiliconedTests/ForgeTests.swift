@@ -322,6 +322,51 @@ final class ForgeTests: XCTestCase {
         }
     }
 
+    /// **Z-Image's and Anima's Compact until 0.20** (a GGUF Q8_0 DiT map, `.compact.v0`; Anima's with its adapter), replaced by
+    /// the int8 convrot (`.compact.v1`): the old map is recognized, the family is not ready, and the next installation keeps
+    /// the Compact; its encoder and its components stay (the new Compact's own); uninstalling removes it too. One version lives.
+    func testASupersededCompactIsRecognized() throws {
+        for f in [Family.zImage, .anima] {
+            let root = FileManager.default.temporaryDirectory.appendingPathComponent("siliconed-q8-compact-\(f.rawValue)-\(UUID())")
+            defer { try? FileManager.default.removeItem(at: root) }
+            let b = Library(root: root)
+            try FileManager.default.createDirectory(atPath: b.map(""), withIntermediateDirectories: true)
+            try place(f, in: b, dit: false, variant: .compact)
+            let i = Installer(library: b), folder = i.componentsFolder(f)
+            let old = try XCTUnwrap(f.supersededCompactMap)
+            XCTAssertNotEqual(old, f.ditMap(.compact))
+            XCTAssertTrue(old.hasSuffix(".compact.v0.silicon") && f.ditMap(.compact).hasSuffix(".compact.v1.silicon"))
+            XCTAssertTrue(i.supersededFiles(f).isEmpty, "nothing superseded before the old map is there")
+            try Data(repeating: 3, count: 1000).write(to: URL(fileURLWithPath: b.map(old)))
+            var expected = [b.map(old)]
+            if f == .anima {
+                let adapter = adapterPath(fromMap: b.map(old))
+                try Data(repeating: 5, count: 200).write(to: URL(fileURLWithPath: adapter))
+                expected.append(adapter)
+            }
+            XCTAssertEqual(Set(i.supersededFiles(f)), Set(expected), f.rawValue)
+            XCTAssertFalse(i.supersededFiles(f).contains(b.map(f.encoderMap(.compact))), "the encoder is the new Compact's too")
+            XCTAssertFalse(i.supersededFiles(f).contains(folder), "the components are the new Compact's too")
+            XCTAssertFalse(i.isReady(f), "the old map is never rendered")
+            XCTAssertEqual(i.supersededVariant(f), .compact, "the reinstallation keeps the Compact")
+            XCTAssertEqual(try XCTUnwrap(b.occupancy().families.first { $0.family == f }).dit, f == .anima ? 1200 : 1000,
+                           "the superseded map is counted until it goes")
+            // Once the new Compact is forged, nothing is superseded any more — the old map was removed first.
+            for path in expected { try FileManager.default.removeItem(atPath: path) }
+            try place(f, in: b, variant: .compact)
+            XCTAssertTrue(i.supersededFiles(f).isEmpty)
+            XCTAssertTrue(i.isReady(f))
+            XCTAssertEqual(b.ditMap(f), f.ditMap(.compact))
+            // An uninstallation removes an old map left beside it.
+            try Data(repeating: 3, count: 1000).write(to: URL(fileURLWithPath: b.map(old)))
+            try b.uninstall(f)
+            XCTAssertEqual(b.occupancy().total, 0, "nothing of it is kept")
+        }
+        XCTAssertNil(Family.krea2.supersededCompactMap)
+        XCTAssertNil(Family.qwenImage21.supersededCompactMap, "Qwen's superseded maps are the base model's")
+        XCTAssertEqual(Family.qwenImage21.supersededMaps, Family.supersededQwenImage21Maps)
+    }
+
     /// **An imported Qwen map of the superseded kind is removed**, not left out of sight: the catalog
     /// would not list it (no family has that kind) and the engine refuses it. Its map and its
     /// adapter go, with a journal line; an import of the Turbo's kind, and one of another family, stay.
@@ -431,7 +476,7 @@ final class ForgeTests: XCTestCase {
         XCTAssertFalse(fm.fileExists(atPath: b.map(Family.zImage.ditMap)))
         XCTAssertFalse(fm.fileExists(atPath: b.map(Family.zImage.encoderMap)))
         XCTAssertEqual(b.variant(of: .zImage), .compact)
-        XCTAssertEqual(b.ditMap(.zImage), "z-image-turbo-dit.compact.v0.silicon")
+        XCTAssertEqual(b.ditMap(.zImage), "z-image-turbo-dit.compact.v1.silicon")
         XCTAssertEqual(b.encoderMap(.zImage), "qwen3-4b-encoder.compact.v0.silicon")
         let o = b.occupancy()
         let z = try XCTUnwrap(o.families.first { $0.family == .zImage })

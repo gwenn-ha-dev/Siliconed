@@ -20,7 +20,7 @@ git clone --branch v0.20 https://github.com/gwenn-ha-dev/Siliconed && cd Silicon
 python3.12 -m venv oracle-env && oracle-env/bin/pip install -r tools/oracle/requirements.txt
 ```
 
-The first run of an oracle script downloads the reference weights from the Hugging Face Hub, at pinned revisions (sizes in [section 3](#3--every-model)); `HF_HOME` or `HF_HUB_CACHE` decides where they go. Krea 2's reference, `krea/Krea-2-Turbo`, is gated: accept its license on the Hub, then `oracle-env/bin/hf auth login`, before `krea2.py`; do the same for any other repository that asks for it. The int8 convrot code that two of the Compact versions need is fetched, once, at a pinned commit and checked against its sha256.
+The first run of an oracle script downloads the reference weights from the Hugging Face Hub, at pinned revisions (sizes in [section 3](#3--every-model)); `HF_HOME` or `HF_HUB_CACHE` decides where they go. Krea 2's reference, `krea/Krea-2-Turbo`, is gated: accept its license on the Hub, then `oracle-env/bin/hf auth login`, before `krea2.py`; do the same for any other repository that asks for it. The int8 convrot code that every Compact version needs is fetched, once, at a pinned commit and checked against its sha256.
 
 To check your own build instead: `swift build -c release --product siliconed` (Xcode 26), then `.build/release/siliconed` in place of the alias.
 
@@ -275,7 +275,7 @@ SILICONED_MAP=<report.json> siliconed check z-image dit --size 512 --no-accelera
 
 Qwen-Image-2.1's editing, with one and two reference pictures, is part of its `all` and of `siliconed check qwen-image-2.1`; one stage alone is `siliconed check qwen-image-2.1 dit --edit 2`. Its Neural Engine bar is written by `qwen-image-2.1.py bf16 --edit N`.
 
-**The Compact and the Light.** Their DiTs are third parties' files (8-bit GGUF Q8_0 and Comfy-Org's int8 convrot for the Compact, GGUF Q4_K_M for the Light; the app pins each by repository, revision and sha256). Two things are checked, both from outside.
+**The Compact and the Light.** Their DiTs are third parties' files (int8 convrot for the Compact, Comfy-Org's and, for Anima, Bedovyy's; GGUF Q4_K_M for the Light; the app pins each by repository, revision and sha256). Two things are checked, both from outside.
 
 *The dequantization*, value by value: `swift test` reads small pieces of each published file (`Tests/SiliconedTests/Fixtures/quant`, rows cut by HTTP `Range` at the pinned revision, bytes identical to the published ones) and compares the engine's widening with the publisher's own library at the bit: `gguf-py` (llama.cpp's reader, which diffusers' GGUF loader agrees with on every value), ComfyUI's `comfy_kitchen` for the convrot, torchao and SDNQ for the 8-bit float and int8 files. `tools/oracle/quant_fixtures.py` rewrites those fixtures from the published files (`python tools/oracle/quant_fixtures.py [slug ...]`; the manifests hold the sha256 of what it wrote, and a rerun must leave them unchanged).
 

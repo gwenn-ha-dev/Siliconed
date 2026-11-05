@@ -5133,6 +5133,46 @@
         }
       }
     },
+    "8-bit weights published by third parties: the image model from Comfy-Org (int8 convrot), the text encoder from Disty0 (SDNQ int8). Tokenizer and VAE are the publisher’s." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "8-Bit-Gewichte, von Dritten veröffentlicht: das Bildmodell von Comfy-Org (int8 convrot), der Text-Encoder von Disty0 (SDNQ int8). Tokenizer und VAE stammen vom Herausgeber."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pesos de 8 bits publicados por terceros: el modelo de imagen, de Comfy-Org (int8 convrot); el codificador de texto, de Disty0 (SDNQ int8). El tokenizador y el VAE son los del editor."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Poids 8 bits publiés par des tiers : le modèle d’image de Comfy-Org (int8 convrot), l’encodeur de texte de Disty0 (SDNQ int8). Tokenizer et VAE sont ceux de l’éditeur."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pesi a 8 bit pubblicati da terzi: il modello d’immagine da Comfy-Org (int8 convrot), l’encoder di testo da Disty0 (SDNQ int8). Tokenizer e VAE sono quelli dell’editore."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "第三者が公開している8ビットの重み：画像モデルはComfy-Org（int8 convrot）、テキストエンコーダーはDisty0（SDNQ int8）のものです。トークナイザーとVAEは公開元のものです。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "第三方发布的 8 位权重：图像模型来自 Comfy-Org（int8 convrot），文本编码器来自 Disty0（SDNQ int8）。分词器和 VAE 来自发布方。"
+          }
+        }
+      }
+    },
     "8-bit weights published by third parties: the image model from Comfy-Org (int8 convrot), the text encoder from unsloth (int8 convrot). Processor and VAE are the publisher’s." : {
       "localizations" : {
         "de" : {
@@ -5169,46 +5209,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "第三方发布的 8 位权重：图像模型来自 Comfy-Org（int8 convrot），文本编码器来自 unsloth（int8 convrot）。处理器和 VAE 来自发布方。"
-          }
-        }
-      }
-    },
-    "8-bit weights published by third parties: the image model from unsloth (GGUF Q8_0), the text encoder from Disty0 (SDNQ int8). Tokenizer and VAE are the publisher’s." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "8-Bit-Gewichte, von Dritten veröffentlicht: das Bildmodell von unsloth (GGUF Q8_0), der Text-Encoder von Disty0 (SDNQ int8). Tokenizer und VAE stammen vom Herausgeber."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Pesos de 8 bits publicados por terceros: el modelo de imagen, de unsloth (GGUF Q8_0); el codificador de texto, de Disty0 (SDNQ int8). El tokenizador y el VAE son los del editor."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Poids 8 bits publiés par des tiers : le modèle d’image d’unsloth (GGUF Q8_0), l’encodeur de texte de Disty0 (SDNQ int8). Tokenizer et VAE sont ceux de l’éditeur."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Pesi a 8 bit pubblicati da terzi: il modello d’immagine da unsloth (GGUF Q8_0), l’encoder di testo da Disty0 (SDNQ int8). Tokenizer e VAE sono quelli dell’editore."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "第三者が公開している8ビットの重み：画像モデルはunsloth（GGUF Q8_0）、テキストエンコーダーはDisty0（SDNQ int8）のものです。トークナイザーとVAEは公開元のものです。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "第三方发布的 8 位权重：图像模型来自 unsloth（GGUF Q8_0），文本编码器来自 Disty0（SDNQ int8）。分词器和 VAE 来自发布方。"
           }
         }
       }
@@ -31519,42 +31519,42 @@
         }
       }
     },
-    "Siliconed ships no weights. The Compact version’s image model is the publisher’s, republished in 8 bits by vanes430 and downloaded from there; everything else comes from the publisher. The publisher’s license applies, and vanes430’s model card says what it changed." : {
+    "Siliconed ships no weights. The Compact version’s image model is the publisher’s, republished in 8 bits by Bedovyy and downloaded from there; everything else comes from the publisher. The publisher’s license applies, and Bedovyy’s model card says what it changed." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Siliconed enthält keine Gewichte. Das Bildmodell der Compact-Version ist das des Herausgebers, von vanes430 in 8 Bit neu veröffentlicht und von dort geladen; alles andere stammt vom Herausgeber. Es gilt die Lizenz des Herausgebers, und die Modellkarte von vanes430 nennt, was geändert wurde."
+            "value" : "Siliconed enthält keine Gewichte. Das Bildmodell der Compact-Version ist das des Herausgebers, von Bedovyy in 8 Bit neu veröffentlicht und von dort geladen; alles andere stammt vom Herausgeber. Es gilt die Lizenz des Herausgebers, und die Modellkarte von Bedovyy nennt, was geändert wurde."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Siliconed no incluye ningún peso. El modelo de imagen de la versión Compacta es el del editor, republicado en 8 bits por vanes430 y descargado de allí; todo lo demás viene del editor. Se aplica la licencia del editor, y la ficha del modelo de vanes430 indica qué ha cambiado."
+            "value" : "Siliconed no incluye ningún peso. El modelo de imagen de la versión Compacta es el del editor, republicado en 8 bits por Bedovyy y descargado de allí; todo lo demás viene del editor. Se aplica la licencia del editor, y la ficha del modelo de Bedovyy indica qué ha cambiado."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Siliconed ne livre aucun poids. Le modèle d’image de la version Compact est celui de l’éditeur, republié en 8 bits par vanes430 et téléchargé chez lui ; tout le reste vient de l’éditeur. La licence de l’éditeur s’applique, et la fiche de vanes430 dit ce qu’il a changé."
+            "value" : "Siliconed ne livre aucun poids. Le modèle d’image de la version Compact est celui de l’éditeur, republié en 8 bits par Bedovyy et téléchargé chez lui ; tout le reste vient de l’éditeur. La licence de l’éditeur s’applique, et la fiche de Bedovyy dit ce qu’il a changé."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Siliconed non include alcun peso. Il modello d’immagine della versione Compact è quello dell’editore, ripubblicato a 8 bit da vanes430 e scaricato da lì; tutto il resto viene dall’editore. Si applica la licenza dell’editore, e la scheda di vanes430 indica cosa ha cambiato."
+            "value" : "Siliconed non include alcun peso. Il modello d’immagine della versione Compact è quello dell’editore, ripubblicato a 8 bit da Bedovyy e scaricato da lì; tutto il resto viene dall’editore. Si applica la licenza dell’editore, e la scheda di Bedovyy indica cosa ha cambiato."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Siliconedは重みを同梱していません。コンパクトバージョンの画像モデルは、公開元のモデルをvanes430が8ビットで再公開したもので、そこからダウンロードされます。それ以外はすべて公開元のものです。公開元のライセンスが適用され、変更内容はvanes430のモデルカードに記載されています。"
+            "value" : "Siliconedは重みを同梱していません。コンパクトバージョンの画像モデルは、公開元のモデルをBedovyyが8ビットで再公開したもので、そこからダウンロードされます。それ以外はすべて公開元のものです。公開元のライセンスが適用され、変更内容はBedovyyのモデルカードに記載されています。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Siliconed 不附带权重。紧凑版的图像模型是发布方的，由 vanes430 重新发布为 8 位版本并从那里下载；其余一切均来自发布方。适用发布方的许可证，vanes430 的模型卡片会说明其改动了什么。"
+            "value" : "Siliconed 不附带权重。紧凑版的图像模型是发布方的，由 Bedovyy 重新发布为 8 位版本并从那里下载；其余一切均来自发布方。适用发布方的许可证，Bedovyy 的模型卡片会说明其改动了什么。"
           }
         }
       }
@@ -35820,42 +35820,42 @@
         }
       }
     },
-    "The image model in 8 bits, published by vanes430 (GGUF Q8_0). The text encoder (bf16), tokenizers and VAE are the publisher’s." : {
+    "The image model in 8 bits, published by Bedovyy (int8 convrot). The text encoder (bf16), tokenizers and VAE are the publisher’s." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Das Bildmodell in 8 Bit, veröffentlicht von vanes430 (GGUF Q8_0). Text-Encoder (bf16), Tokenizer und VAE stammen vom Herausgeber."
+            "value" : "Das Bildmodell in 8 Bit, veröffentlicht von Bedovyy (int8 convrot). Text-Encoder (bf16), Tokenizer und VAE stammen vom Herausgeber."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "El modelo de imagen en 8 bits, publicado por vanes430 (GGUF Q8_0). El codificador de texto (bf16), los tokenizadores y el VAE son los del editor."
+            "value" : "El modelo de imagen en 8 bits, publicado por Bedovyy (int8 convrot). El codificador de texto (bf16), los tokenizadores y el VAE son los del editor."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Le modèle d’image en 8 bits, publié par vanes430 (GGUF Q8_0). L’encodeur de texte (bf16), les tokenizers et le VAE sont ceux de l’éditeur."
+            "value" : "Le modèle d’image en 8 bits, publié par Bedovyy (int8 convrot). L’encodeur de texte (bf16), les tokenizers et le VAE sont ceux de l’éditeur."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Il modello d’immagine a 8 bit, pubblicato da vanes430 (GGUF Q8_0). Encoder di testo (bf16), tokenizer e VAE sono quelli dell’editore."
+            "value" : "Il modello d’immagine a 8 bit, pubblicato da Bedovyy (int8 convrot). Encoder di testo (bf16), tokenizer e VAE sono quelli dell’editore."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "画像モデルは8ビットでvanes430が公開（GGUF Q8_0）。テキストエンコーダー（bf16）、トークナイザー、VAEは公開元のものです。"
+            "value" : "画像モデルは8ビットでBedovyyが公開（int8 convrot）。テキストエンコーダー（bf16）、トークナイザー、VAEは公開元のものです。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "图像模型为 8 位，由 vanes430 发布（GGUF Q8_0）。文本编码器（bf16）、分词器和 VAE 来自发布方。"
+            "value" : "图像模型为 8 位，由 Bedovyy 发布（int8 convrot）。文本编码器（bf16）、分词器和 VAE 来自发布方。"
           }
         }
       }

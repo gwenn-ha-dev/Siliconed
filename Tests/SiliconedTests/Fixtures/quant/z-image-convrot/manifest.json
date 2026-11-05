@@ -1,8 +1,8 @@
 {
- "repo": "Comfy-Org/z_image_turbo",
+ "repo": "Comfy-Org/Z-Image-Turbo",
  "revision": "6fc90a3b1b653e935a0d175e260736de25b84df5",
  "file": "split_files/diffusion_models/z_image_turbo_int8_convrot.safetensors",
- "url": "https://huggingface.co/Comfy-Org/z_image_turbo/resolve/6fc90a3b1b653e935a0d175e260736de25b84df5/split_files/diffusion_models/z_image_turbo_int8_convrot.safetensors",
+ "url": "https://huggingface.co/Comfy-Org/Z-Image-Turbo/resolve/6fc90a3b1b653e935a0d175e260736de25b84df5/split_files/diffusion_models/z_image_turbo_int8_convrot.safetensors",
  "format": "convrot",
  "family": "z-image",
  "file_bytes": 6201001296,

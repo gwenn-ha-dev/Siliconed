@@ -59,7 +59,7 @@ package enum Infotext {
     /// Turbo" 3400828 (`8b74237a7f50…`, `qwen_image_2.1_turbo_bf16`; its int8 file `8144a0182964…`
     /// is the Compact's DiT), Anima "turbo-v1.1" 3263843 on circlestone_labs' own page
     /// (`fba11953276b…`, `anima-turbo-v1.1` of `circlestone-labs/Anima`, the Standard's DiT; the
-    /// Compact and Light are vanes430's GGUFs of it — checked 15/10/2026). Krea 2 Turbo
+    /// Compact is Bedovyy's int8 convrot of it, the Light vanes430's GGUF — checked 15/10 and 5/11/2026). Krea 2 Turbo
     /// "krea2_turbo_bf16" 3064584 (`78bbf8f4165e…`, the Standard's DiT; its int8 file `8e4eeda70dd5…`,
     /// the Compact's, is version 3091481 of the same page — checked 19/10/2026): Krea has no Civitai
     /// page and CivitaiOfficial's « Krea 2 » is the hosted API, so the page Civitai joins these files

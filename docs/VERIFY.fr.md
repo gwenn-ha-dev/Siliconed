@@ -20,7 +20,7 @@ git clone --branch v0.20 https://github.com/gwenn-ha-dev/Siliconed && cd Silicon
 python3.12 -m venv oracle-env && oracle-env/bin/pip install -r tools/oracle/requirements.txt
 ```
 
-La première exécution d'un script d'oracle télécharge les poids de référence depuis le Hugging Face Hub, à des révisions épinglées (les tailles sont en [section 3](#3--tous-les-modèles)) ; `HF_HOME` ou `HF_HUB_CACHE` décide où ils vont. La référence de Krea 2, `krea/Krea-2-Turbo`, est à accès restreint : acceptez sa licence sur le Hub, puis `oracle-env/bin/hf auth login`, avant `krea2.py` ; faites de même pour tout autre dépôt qui le demande. Le code convrot int8 dont deux versions Compact ont besoin est récupéré une fois, à un commit épinglé, et son sha256 est vérifié.
+La première exécution d'un script d'oracle télécharge les poids de référence depuis le Hugging Face Hub, à des révisions épinglées (les tailles sont en [section 3](#3--tous-les-modèles)) ; `HF_HOME` ou `HF_HUB_CACHE` décide où ils vont. La référence de Krea 2, `krea/Krea-2-Turbo`, est à accès restreint : acceptez sa licence sur le Hub, puis `oracle-env/bin/hf auth login`, avant `krea2.py` ; faites de même pour tout autre dépôt qui le demande. Le code convrot int8 dont toutes les versions Compact ont besoin est récupéré une fois, à un commit épinglé, et son sha256 est vérifié.
 
 Pour vérifier plutôt votre propre compilation : `swift build -c release --product siliconed` (Xcode 26), puis `.build/release/siliconed` à la place de l'alias.
 
@@ -275,7 +275,7 @@ SILICONED_MAP=<rapport.json> siliconed check z-image dit --size 512 --no-acceler
 
 L'édition de Qwen-Image-2.1, avec une et deux images de référence, fait partie de son `all` et de `siliconed check qwen-image-2.1` ; une étape seule, c'est `siliconed check qwen-image-2.1 dit --edit 2`. Sa barre sous le Neural Engine s'écrit par `qwen-image-2.1.py bf16 --edit N`.
 
-**La Compact et la Légère.** Leurs DiT sont des fichiers de tiers (GGUF Q8_0 et int8 convrot de Comfy-Org pour la Compact, GGUF Q4_K_M pour la Légère ; l'app épingle chacun par dépôt, révision et sha256). Deux choses se vérifient, de l'extérieur.
+**La Compact et la Légère.** Leurs DiT sont des fichiers de tiers (int8 convrot pour la Compact, de Comfy-Org et, pour Anima, de Bedovyy ; GGUF Q4_K_M pour la Légère ; l'app épingle chacun par dépôt, révision et sha256). Deux choses se vérifient, de l'extérieur.
 
 *Le déquantage*, valeur par valeur : `swift test` lit de petits morceaux de chaque fichier publié (`Tests/SiliconedTests/Fixtures/quant`, lignes coupées par HTTP `Range` à la révision épinglée, octets identiques aux publiés) et compare l'élargissement du moteur à la bibliothèque de l'éditeur, au bit : `gguf-py` (le lecteur de llama.cpp, avec qui le chargeur GGUF de diffusers s'accorde sur chaque valeur), `comfy_kitchen` de ComfyUI pour le convrot, torchao et SDNQ pour les fichiers float8 et int8. `tools/oracle/quant_fixtures.py` réécrit ces fixtures depuis les fichiers publiés (`python tools/oracle/quant_fixtures.py [slug ...]` ; les manifestes portent le sha256 de ce qu'il a écrit, et une relance doit les laisser inchangés).
 
