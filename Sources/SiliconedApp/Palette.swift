@@ -5,7 +5,7 @@
 //     canvas          #131424                            #F9F6F2
 //     column          #1B1C2F                            #F0ECE7
 //     card            #2A283D                            #FEFDFB
-//     what runs       mint #6EF1DD, dark label           indigo #3F3A8A, white label
+//     what runs       mint #56C0B0, dark label           indigo #3F3A8A, white label
 //     text wire       peach #F2B279                      #B36D2A
 //     image wire      rose #EFA6D6                       #B06194
 //     latent wire     sky #7FCAFE                        #3786C3
@@ -16,6 +16,9 @@
 //   them apart, so that none shouts over the others. The two closest of the six roles (three wires, what runs, a series, a
 //   refusal) stay as far apart as in the former chart (OKLab ΔE ≥ 0.104 against 0.109), and so do the wires for a
 //   deuteranope (0.069 against 0.082 at night).
+// - **What runs is the icon's mint, dimmed** (5/11, the user: « superb in a screenshot, too much in use during a render »,
+//   then « softer still »): the icon's #6EF1DD (OKLCH 0.88 / 0.12 / 182°) brought to 0.74 at the same hue, its chroma in
+//   proportion (0.101) — 60 % of the light, the same color; its dark label at 8.6:1, 0.121 from the sky wire, its nearest.
 // - **What runs is no longer the system's accent**: mint at night, indigo by day, whatever accent System Settings holds.
 //   Mint cannot take macOS's white label (1.3:1): the buttons that start something are drawn here (`ProminentButtonStyle`),
 //   mint with a dark label and a halo at night.
@@ -45,7 +48,7 @@ enum Palette {
     static let bracketInk = dynamicInk(dark: 0xFFD60A, light: 0xB89400)
     static let bracket = Color(nsColor: bracketInk)
     /// What runs: the stage at work, the steps done, the image followed, the button that starts something.
-    static let live = dynamic(dark: 0x6EF1DD, light: 0x3F3A8A)
+    static let live = dynamic(dark: 0x56C0B0, light: 0x3F3A8A)
     /// A selected segment, a checked box: `.tint(Palette.control)` on the control.
     static let control = dynamic(dark: 0x6660CB, light: 0x3F3A8A)
     /// A selection in the prompt (AppKit): `control`, faint, under the words.
