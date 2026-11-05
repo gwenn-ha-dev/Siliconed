@@ -302,6 +302,8 @@ final class AppState {
     var seriesPlaced: [SeriesKey?] = [nil, nil]
     /// The knob whose « Bracket… » bubble is open.
     var bracketing: SeriesKey?
+    /// **Where `silicontrol rack` asks the rack's column to scroll**, and a count so that the same place asked twice scrolls again.
+    var rackScroll: (place: GestureOrder.RackPlace, count: Int)?
     /// **The series shown**: its cells as they arrive, kept once ended — until the next one.
     var explored: GridRun?
     /// The canvas shows the series' grid rather than an image (`SeriesCanvas`).

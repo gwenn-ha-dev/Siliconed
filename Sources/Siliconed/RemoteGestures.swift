@@ -1,5 +1,6 @@
 // What `silicontrol` asks of the app for the window's other gestures — the history's (remove, undo, again, reuse, crop), the series'
-// (add its sheet), the models' (import, uninstall), Compute On, the library, the Prompt Lab's bar and the Settings window — kept here, pure, so that the tests read the
+// (add its sheet, a knob's bubble), the models' (import, uninstall), Compute On, the library, the Prompt Lab's bar, the rack's scroll
+// and the Settings window — kept here, pure, so that the tests read the
 // arguments, the way a cell is named, a crop's frame and the `--yes` guard without an app.
 //
 // The gestures themselves are the app's (`AppState`, `MainWindow`): a command calls the function the button calls.
@@ -85,6 +86,10 @@ package enum GestureOrder: Equatable, Sendable {
     case lab(LabAction)
     /// `settings …`: Siliconed › Settings… (⌘,), on a pane — and, on Prompt Lab, on one instruction.
     case settings(SettingsAction)
+    /// `bracket KNOB` · `bracket close`: a knob's ± clicked (or right-click › « Bracket… »), its bubble open — or closed.
+    case bracket(BracketAction)
+    /// `rack top|dit`: the rack's column scrolled to its head, or to the DiT's settings (the chain then pinned in small at the top).
+    case rack(RackPlace)
 
     package enum Removal: Equatable, Sendable {
         /// A model's id: a publisher's family is uninstalled, an imported model removed.
@@ -142,6 +147,34 @@ package enum GestureOrder: Equatable, Sendable {
         package static func name(_ role: LabInputs.Role) -> String { role == .neutral ? "none" : role.rawValue }
     }
 
+    /// **A knob of the rack, as `bracket` names it** — the ± the bubble opens from. The text's groups have their own bubble, over
+    /// the words (`Vary This Word…`), and no name here.
+    package enum BracketKnob: Equatable, Sendable {
+        /// The Seed line's ±: the lot.
+        case seeds
+        case detail
+        case solver
+        /// The starting image's strength.
+        case start
+        /// The LoRA stack's ±: « Compare LoRAs… ».
+        case compareLoRAs
+        /// One LoRA's strength, by its name in the stack (as `lab` and `status` print it), or its path.
+        case lora(String)
+
+        package static func named(_ word: String) -> BracketKnob? {
+            switch word.lowercased() {
+            case "seed", "seeds", "batch": .seeds
+            case "detail": .detail
+            case "solver": .solver
+            case "start", "strength": .start
+            case "loras", "compare": .compareLoRAs
+            default: nil
+            }
+        }
+    }
+    package enum BracketAction: Equatable, Sendable { case open(BracketKnob), close }
+    package enum RackPlace: String, Equatable, Sendable { case top, dit }
+
     /// What `settings` opens: a pane, or Settings › Prompt Lab on one instruction — the model and the gesture its two menus show,
     /// each left as it is when not named.
     package enum SettingsAction: Equatable, Sendable {
@@ -161,7 +194,7 @@ package enum GestureOrder: Equatable, Sendable {
     }
 
     package static let verbs: Set<String> = ["remove", "undo", "again", "reuse", "crop", "sheet", "import", "uninstall",
-                                             "macs", "compute", "library", "start-image", "lab", "settings"]
+                                             "macs", "compute", "library", "start-image", "lab", "settings", "bracket", "rack"]
 
     package static func usage(_ command: String) -> String {
         switch command {
@@ -178,6 +211,8 @@ package enum GestureOrder: Equatable, Sendable {
         case "start-image": "start-image [<image|i7>] [--strength 0.65] · start-image --remove"
         case "lab": "lab [open|close] · lab add <image|i7> … · lab role <n> edited|reference|start|none · lab remove <n> · lab rewrite [--wait] · lab describe <n> [--wait]"
         case "settings": "settings [general|macs|lab|advanced] · settings lab [rewrite|describe] [--for ID]"
+        case "bracket": "bracket seed|detail|solver|start|loras · bracket lora <name> · bracket close"
+        case "rack": "rack top|dit"
         default: "library [move DIR|home|open DIR|local] [--yes]"
         }
     }
@@ -316,6 +351,18 @@ package enum GestureOrder: Equatable, Sendable {
                 gesture = g
             }
             return .success(.settings(.instruction(gesture, target: target)))
+        case "bracket":
+            switch words.first?.lowercased() {
+            case "close"?: return words.count == 1 ? .success(.bracket(.close)) : .failure(.usage(line))
+            case "lora"?: return words.count == 2 ? .success(.bracket(.open(.lora(words[1])))) : .failure(.usage(line))
+            case let w?:
+                guard words.count == 1 else { return .failure(.usage(line)) }
+                return BracketKnob.named(w).map { .success(.bracket(.open($0))) } ?? .failure(.badValue("knob", words[0]))
+            case nil: return .failure(.usage(line))
+            }
+        case "rack":
+            guard words.count == 1 else { return .failure(.usage(line)) }
+            return RackPlace(rawValue: words[0].lowercased()).map { .success(.rack($0)) } ?? .failure(.badValue("place", words[0]))
         default:
             switch words.first {
             case nil: return .success(.library(.status, confirmed: false))

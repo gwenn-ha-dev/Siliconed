@@ -50,6 +50,13 @@ struct Sidebar: View {
                     }
                 }
                 .animation(Motion.pick(.easeOut(duration: 0.2)), value: chainAway)
+                // `silicontrol rack top|dit`: the scroll the hand would make.
+                .onChange(of: app.rackScroll?.count) {
+                    guard let place = app.rackScroll?.place else { return }
+                    withAnimation(Motion.pick(.easeOut(duration: 0.3))) {
+                        proxy.scrollTo(place == .top ? RackView.top : RackView.dit, anchor: .top)
+                    }
+                }
             }
             Footer(app: app)
         }

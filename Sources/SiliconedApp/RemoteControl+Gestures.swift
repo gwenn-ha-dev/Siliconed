@@ -50,7 +50,48 @@ extension RemoteControl {
         case .startImage(let action): finish(c, try startImage(action, cwd: cwd))
         case .lab(let action): try lab(action, cwd: cwd, c)
         case .settings(let action): finish(c, try settings(action))
+        case .bracket(let action): finish(c, try bracket(action))
+        case .rack(let place): finish(c, rack(place))
         }
+    }
+
+    // MARK: - A knob's bubble, the rack's scroll
+
+    /// **`bracket KNOB`**: a click on that knob's ± (or right-click › « Bracket… »), its bubble open beside it — refused where the
+    /// window draws no ± that would open (Detail on a model without it, no starting image, « Compare LoRAs » with nothing to
+    /// compare, a LoRA not in the stack or switched off). **`bracket close`**: the bubble closed, its values left as they are.
+    func bracket(_ action: GestureOrder.BracketAction) throws -> [String: Any] {
+        guard case .open(let knob) = action else {
+            app.bracketing = nil
+            return ["ok": true, "bracketing": NSNull()]
+        }
+        let key: SeriesKey, name: String
+        switch knob {
+        case .seeds: (key, name) = (.seeds, "seed")
+        case .detail: (key, name) = (.detail, "detail")
+        case .solver: (key, name) = (.solver, "solver")
+        case .start: (key, name) = (.startStrength, "start")
+        case .compareLoRAs: (key, name) = (.comparedLoRAs, "loras")
+        case .lora(let word):
+            let named = app.loras.filter { !$0.path.isEmpty }
+            guard let slot = named.first(where: { $0.path == word || Self.shortName($0.path) == word || app.loraName($0.path) == word }) else {
+                let list = named.map { Self.shortName($0.path) }
+                throw Refusal("lora", String(localized: "No LoRA \"\(word)\" in the rack's stack") + (list.isEmpty ? "" : ": " + list.joined(separator: ", ")))
+            }
+            (key, name) = (.loraStrength(slot.path), "lora " + Self.shortName(slot.path))
+        }
+        guard app.applies(key), app.canBracket(key) else {
+            throw Refusal("bracket", String(localized: "This setting has no ± to open under the current model and settings."), help: "silicontrol help bracket")
+        }
+        app.bracketing = key
+        return ["ok": true, "bracketing": name]
+    }
+
+    /// **`rack top|dit`**: the rack's column scrolled to its head, or to the DiT's box — the chain then pinned in small at the top of
+    /// the column, as when the hand scrolls down to the denoiser's settings.
+    func rack(_ place: GestureOrder.RackPlace) -> [String: Any] {
+        app.rackScroll = (place, (app.rackScroll?.count ?? 0) + 1)
+        return ["ok": true, "rack": place.rawValue]
     }
 
     // MARK: - The history

@@ -28,7 +28,7 @@ package enum RemoteControlHelp {
     /// The topics in reading order (`help all` follows it).
     static let order = ["contract", "open", "models", "install", "add", "grid", "edit", "wait", "status", "follow",
                         "cancel", "clear", "set", "history", "save", "vary", "enlarge", "crop", "again", "remove", "undo", "sheet", "rewrite", "describe",
-                        "instructions", "settings", "start-image", "lab", "subjects", "import", "uninstall", "macs", "library", "diagnose", "measure", "errors", "recipes"]
+                        "instructions", "settings", "start-image", "lab", "bracket", "rack", "subjects", "import", "uninstall", "macs", "library", "diagnose", "measure", "errors", "recipes"]
     static let aliases = ["examples": "recipes", "reuse": "again", "compute": "macs"]
 
     /// French when the user puts it before English. Not `Bundle.main.preferredLocalizations`: the app's
@@ -131,6 +131,8 @@ package enum RemoteControlHelp {
       lab rewrite · lab describe N [--wait]    its Rewrite and Describe, written in its text as its buttons write
       settings [PANE] · settings lab [rewrite|describe] [--for ID]
                                                opens Settings on a pane, or Prompt Lab on one instruction
+      bracket KNOB · bracket close             a knob's ± clicked: its bubble open (seed, detail, solver, start, loras, lora NAME)
+      rack top|dit                             the rack scrolled to its head, or to the DiT's settings
       remove i7 [i8 …]                         Remove from History · undo [--redo]: ⌘Z, ⇧⌘Z
       again <i7|file.png> · reuse <i7|file.png> Render Again (Same Seed) · Reuse These Settings (an image, or a PNG of another day)
       crop i7 --box X,Y,W,H | --ratio P:Q      Crop… → a new image (i8)
@@ -857,6 +859,38 @@ package enum RemoteControlHelp {
         FAILURES: usage (a pane that does not read; a gesture or --for on a pane other than lab), model (--for names no model).
         """,
 
+        "bracket": """
+        silicontrol bracket seed|detail|solver|start|loras
+        silicontrol bracket lora <name>
+        silicontrol bracket close
+
+        A click on a knob's yellow ± (or right-click › « Bracket… »): its bubble opens beside it, with the values the knob would
+        take (three around the current one to begin with) — the window's own bubble, to be read or captured; nothing varies
+        until it is committed there. seed: the Seed line's ± (the lot); start: the starting image's strength; loras: the LoRA
+        stack's « Compare LoRAs… »; lora <name>: one LoRA's strength, by its name in the stack as "loras" prints it (lab, status).
+        close: the bubble closed, the values as they were. To make a series from the terminal: grid (its axes become the
+        window's series, help grid).
+
+          silicontrol bracket detail
+          silicontrol bracket lora incase
+          silicontrol bracket close
+
+        Answer: {"ok": true, "bracketing": "detail"}   ("bracketing": null after close)
+        FAILURES: usage, lora (no LoRA of that name in the stack: the names it holds are listed), bracket (no ± that would open
+        under the current model and settings: Detail on a model without it, no starting image, nothing to compare, a LoRA off).
+        """,
+
+        "rack": """
+        silicontrol rack top|dit
+
+        The rack's column scrolled as the hand scrolls it: top, to its head (the ports and the encoders); dit, to the DiT's box
+        and its settings — the encoders then out of sight, the chain pinned in small at the top of the column, its stage at work
+        lit, a click on it scrolling back. Nothing in the rack changes.
+
+        Answer: {"ok": true, "rack": "dit"}
+        FAILURES: usage (a place that does not read).
+        """,
+
         "lab": """
         silicontrol lab [open|close]
         silicontrol lab add <image|i7> …
@@ -1407,6 +1441,8 @@ package enum RemoteControlHelp {
       lab rewrite · lab describe N [--wait]    son Réécrire et son Décrire, écrits dans son texte comme ses boutons l'écrivent
       settings [VOLET] · settings lab [rewrite|describe] [--for ID]
                                                ouvre les Réglages sur un volet, ou l'Atelier de prompts sur une consigne
+      bracket RÉGLAGE · bracket close          un clic sur le ± d'un réglage : sa bulle ouverte (seed, detail, solver, start, loras, lora NOM)
+      rack top|dit                             le rack défilé jusqu'à sa tête, ou jusqu'aux réglages du DiT
       remove i7 [i8 …]                         Retirer de l'historique · undo [--redo] : ⌘Z, ⇧⌘Z
       again <i7|fichier.png> · reuse <i7|fichier.png> Rendre à nouveau (même graine) · Reprendre ces réglages (une image, ou un PNG d'un autre jour)
       crop i7 --box X,Y,W,H | --ratio P:Q      Recadrer… → une nouvelle image (i8)
@@ -2149,6 +2185,39 @@ package enum RemoteControlHelp {
         Permis quand la fenêtre calcule sur un autre Mac : les Réglages sont ceux de ce Mac.
         ÉCHECS : usage (un volet qui ne se lit pas ; un geste ou --for sur un autre volet que lab), model (--for ne nomme
         aucun modèle).
+        """,
+
+        "bracket": """
+        silicontrol bracket seed|detail|solver|start|loras
+        silicontrol bracket lora <nom>
+        silicontrol bracket close
+
+        Un clic sur le ± jaune d'un réglage (ou clic droit › « Bracketer… ») : sa bulle s'ouvre à côté, avec les valeurs que
+        prendrait le réglage (trois autour de l'actuelle pour commencer) — la bulle de la fenêtre elle-même, à lire ou à
+        capturer ; rien ne varie avant qu'on la valide. seed : le ± de la ligne Graine (le lot) ; start : la force de l'image de
+        départ ; loras : « Comparer des LoRA… » de la pile ; lora <nom> : la force d'une LoRA, par son nom dans la pile tel que
+        l'écrit "loras" (lab, status). close : la bulle fermée, les valeurs comme avant. Pour faire une série depuis le terminal :
+        grid (ses axes deviennent la série de la fenêtre, help grid).
+
+          silicontrol bracket detail
+          silicontrol bracket lora incase
+          silicontrol bracket close
+
+        Réponse : {"ok": true, "bracketing": "detail"}   ("bracketing" : null après close)
+        ÉCHECS : usage, lora (aucune LoRA de ce nom dans la pile : les noms qu'elle tient sont listés), bracket (aucun ± qui
+        s'ouvrirait sous le modèle et les réglages du moment : Détail sur un modèle qui n'en a pas, pas d'image de départ, rien
+        à comparer, une LoRA éteinte).
+        """,
+
+        "rack": """
+        silicontrol rack top|dit
+
+        La colonne du rack défilée comme la main la fait défiler : top, jusqu'à sa tête (les ports et les encodeurs) ; dit,
+        jusqu'à la boîte du DiT et ses réglages — les encodeurs alors hors de vue, la chaîne épinglée en petit en haut de la
+        colonne, l'étage qui travaille allumé, un clic dessus ramenant en haut. Rien ne change dans le rack.
+
+        Réponse : {"ok": true, "rack": "dit"}
+        ÉCHECS : usage (une place qui ne se lit pas).
         """,
 
         "lab": """

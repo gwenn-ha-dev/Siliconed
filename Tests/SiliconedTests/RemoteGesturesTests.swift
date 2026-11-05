@@ -72,6 +72,28 @@ final class RemoteGesturesTests: XCTestCase {
         XCTAssertTrue(GestureOrder.verbs.contains("settings"))
     }
 
+    // ── A knob's bubble, the rack's scroll ─────────────────────────────────────────────────
+
+    /// `bracket KNOB` opens a knob's bubble by its word, `bracket lora NAME` one LoRA's, `bracket close` closes it; `rack top|dit`.
+    func testBracketNamesAKnobAndRackAPlace() {
+        for (word, knob) in [("seed", GestureOrder.BracketKnob.seeds), ("detail", .detail), ("Solver", .solver), ("start", .start),
+                             ("loras", .compareLoRAs)] {
+            XCTAssertEqual(parse("bracket", [word]), .bracket(.open(knob)), word)
+        }
+        XCTAssertEqual(parse("bracket", ["lora", "incase"]), .bracket(.open(.lora("incase"))))
+        XCTAssertEqual(parse("bracket", ["close"]), .bracket(.close))
+        XCTAssertEqual(GestureOrder.parse("bracket", ["steps"]), .failure(.badValue("knob", "steps")))
+        let line = GestureOrder.usage("bracket")
+        for arguments in [[], ["lora"], ["detail", "solver"], ["close", "now"], ["lora", "a", "b"]] {
+            XCTAssertEqual(GestureOrder.parse("bracket", arguments), .failure(.usage(line)), "\(arguments)")
+        }
+        XCTAssertEqual(parse("rack", ["top"]), .rack(.top))
+        XCTAssertEqual(parse("rack", ["DiT"]), .rack(.dit))
+        XCTAssertEqual(GestureOrder.parse("rack", ["vae"]), .failure(.badValue("place", "vae")))
+        XCTAssertEqual(GestureOrder.parse("rack", []), .failure(.usage(GestureOrder.usage("rack"))))
+        XCTAssertTrue(GestureOrder.verbs.isSuperset(of: ["bracket", "rack"]))
+    }
+
     // ── Naming a cell ──────────────────────────────────────────────────────────────────────
 
     func testACellIsAGridAndARank() {

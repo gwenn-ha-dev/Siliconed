@@ -153,6 +153,8 @@ struct RackView: View {
 
     /// The head of the rack, where the mini chain's click scrolls back.
     static let top = "rack.top"
+    /// The DiT's box, where `silicontrol rack dit` scrolls.
+    static let dit = "rack.dit"
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
@@ -169,7 +171,7 @@ struct RackView: View {
             }
             // Away once their titles and lights are: on a tall window the rack's bottom still shows their feet.
             .onGeometryChange(for: Bool.self) { $0.frame(in: .scrollView).minY < 0 } action: { chainAway?.wrappedValue = $0 }
-            DiTBox(app: app).node(.dit)
+            DiTBox(app: app).node(.dit).id(Self.dit)
             vae.node(.vae)
             RenderEstimate(app: app)
             legend

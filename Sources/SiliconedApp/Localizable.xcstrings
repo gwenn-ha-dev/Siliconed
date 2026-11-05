@@ -23145,6 +23145,46 @@
         }
       }
     },
+    "No LoRA \"%@\" in the rack's stack" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keine LoRA „%@“ im Stapel des Racks"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ninguna LoRA «%@» en la pila del rack"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucune LoRA « %@ » dans la pile du rack"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nessuna LoRA «%@» nella pila del rack"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ラックのスタックに LoRA「%@」はありません"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "机架的堆栈中没有 LoRA“%@”"
+          }
+        }
+      }
+    },
     "No LoRA for this model" : {
       "localizations" : {
         "de" : {
@@ -41264,6 +41304,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "本次会话按这台 Mac 在 %@ 的测量结果进行规划。"
+          }
+        }
+      }
+    },
+    "This setting has no ± to open under the current model and settings." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diese Einstellung hat unter dem aktuellen Modell und den aktuellen Einstellungen kein ±, das sich öffnen ließe."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Este ajuste no tiene ningún ± que abrir con el modelo y los ajustes actuales."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce réglage n’a pas de ± à ouvrir sous le modèle et les réglages du moment."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Questa impostazione non ha un ± da aprire con il modello e le impostazioni attuali."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "現在のモデルと設定では、この設定に開ける ± はありません。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在当前模型和设置下，此设置没有可打开的 ±。"
           }
         }
       }
