@@ -129,7 +129,8 @@ package final class Krea2DiT: BoundaryRecording, PhaseTiming {
     /// The six modulation vectors of a block (`temb_mod + table`), where the GPU reads them.
     private let modulationSlot: UnsafeMutablePointer<Float>
     /// The block's elementwise operations — gate, SwiGLU, residuals — on the GPU. The norms stay on the
-    /// CPU: on the GPU, the trajectory's fp64 reference rejected them (see `ElementwiseGPU`).
+    /// CPU: on the GPU, the trajectory's fp64 reference rejected them (see `ElementwiseGPU`) — except in the
+    /// stream's prototype (`blockStreamed`), where the checks judge a plain fp32 sum again.
     private let elementwise: ElementwiseGPU
     /// **The LoRA stack** (`ForgeLoRA`, Krea 2 family): `ΔW = B·A` per module, applied by
     /// `gemm.lora` — two thin products accumulated into the main GEMM's output, like Anima.
@@ -387,6 +388,7 @@ package final class Krea2DiT: BoundaryRecording, PhaseTiming {
         let heads = config.heads, dh = config.headDim
         let prefix = "transformer_blocks.\(layer)."
         let tag = layer == 0 ? "block0_" : nil
+        if try blockStreamed(layer, rows: n, tembMod: tembMod) { return }
 
         // m = temb_mod + table, six vectors of d, in the slice the GPU reads
         let m = modulationSlot
@@ -423,6 +425,129 @@ package final class Krea2DiT: BoundaryRecording, PhaseTiming {
             ownTimings["elementwise GPU", default: 0] += elementwise.residual((xb, 0), plus: (ob, 0), carries: postgate,
                                                                           rows: n, columns: d)
         }
+    }
+
+    // MARK: - the stream (prototype, `SILICONED_STREAM`)
+
+    /// **Where the streamed block's two norms run** (`SILICONED_STREAM_NORMS`, the prototype's second switch): the GPU's
+    /// (`ModulatedNormGPU`, one drain a block) by default; `cpu` the CPU's (`modulatedNorm`), each after a drain — the bits of the
+    /// block without the stream.
+    static let streamNormsOnCPU = ProcessInfo.processInfo.environment["SILICONED_STREAM_NORMS"] == "cpu"
+
+    private lazy var modulatedNormGPU: ModulatedNormGPU? = try? ModulatedNormGPU(device: gemm.device, queue: gemm.queue)
+
+    /// **The block as one stream of GPU work** (`GPUStream`, on the model of Z-Image's `Block.forwardStreamed`): the modulated norms on
+    /// the GPU (`ModulatedNormGPU`), the gate, SwiGLU and gated residuals queued as before but not waited for, the QK-norm and RoPE chained
+    /// to the tiled attention, the products' bf16 weights read in place (`WeightProducts`), and one drain, at the block's end.
+    ///
+    /// What the stream must respect here, read in `block` — what Z-Image's port would get wrong:
+    ///   - **the reserve is the products' rounding buffer** while they are queued: the CPU path reads every norm weight through it
+    ///     (`materialize` into `reserve`), so the streamed block reads them before the stream turns on, into a bank laid over
+    ///     `projected` (the final layer's output, dead until the last block is done) and into arrays for the QK-norm;
+    ///   - **the modulation slot is read by the queued residuals**: the next block writes it only after the drain;
+    ///   - **an attention the CPU takes part in** (the cut by heads), the CPU's QK-norm, or the MPSGraph SDPA (its own submissions, which
+    ///     do not wait for the ANE's rows) **runs after a drain**, by the code of the block without the stream; only the tiled route chains;
+    ///   - **block 0's boundaries** (`attn_out`, `ff_out`) are read after a drain: a check streams too.
+    /// `false` where the prototype does not run (a LoRA, a grid too small for the bank): the block runs as before.
+    private func blockStreamed(_ layer: Int, rows n: Int, tembMod: UnsafePointer<Float>) throws -> Bool {
+        let d = config.dim, hh = config.hidden, kv = config.kvWidth
+        let heads = config.heads, kvHeads = config.kvHeads, dh = config.headDim
+        let normsOnGPU = !Self.streamNormsOnCPU
+        guard GPUStream.policy != .off, lora == nil, cacheLoRA == nil, imageTokens * config.channels >= 4 * d,
+              !normsOnGPU || modulatedNormGPU != nil else { return false }
+        let prefix = "transformer_blocks.\(layer)."
+        let tag = layer == 0 ? "block0_" : nil
+        let eps = Float(config.eps)
+        let stream = gemm.queue.stream
+        stream.drain()                                     // the CPU writes the modulation, the bank and the reserve next
+
+        // m = temb_mod + table; the bank [norm1 | norm2 | 1 + prescale | 1 + postscale], the factors rounded as `Ops.modulate` rounds them
+        let m = modulationSlot, bank = projected
+        try artifact.materialize(prefix + "scale_shift_table", into: m, capacity: 6 * d)
+        vDSP_vadd(m, 1, tembMod, 1, m, 1, vDSP_Length(6 * d))
+        if normsOnGPU { try artifact.materialize(prefix + "norm1.weight", into: bank, capacity: d) }
+        let ones = [Float](repeating: 1, count: d)
+        vDSP_vadd(m, 1, ones, 1, bank + 2 * d, 1, vDSP_Length(d))
+        vDSP_vadd(m + 3 * d, 1, ones, 1, bank + 3 * d, 1, vDSP_Length(d))
+
+        let xb = try slice(x), mb = try slice(m), nb = try slice(normed), ob = try slice(o)
+        let bb = try gemm.wrap(UnsafeMutableRawPointer(bank), bytes: imageTokens * config.channels * 4, name: "c")
+        func norm(_ i: Int, scale: Int, shift: Int) throws {
+            if normsOnGPU {
+                timed("norm") {
+                    ownTimings["elementwise GPU", default: 0] += modulatedNormGPU!.run((xb, 0), weight: (bb, i * d), factor: (bb, (2 + i) * d),
+                                                                                       shift: (mb, shift * d), into: (nb, 0),
+                                                                                       rows: n, columns: d, eps: eps)
+                }
+            } else {
+                stream.drain()                             // the CPU reads `x` and writes `normed` and the reserve
+                try modulatedNorm(prefix + "norm\(i + 1).weight", x, rows: n, scale: m + scale * d, shift: m + shift * d)
+            }
+        }
+        func boundary(_ name: String, _ p: UnsafeMutablePointer<Float>) {
+            guard let tag else { return }
+            stream.drain()
+            record(tag + name, p, n * d)
+        }
+
+        if GPUStream.policy != .off, ProcessInfo.processInfo.environment["SILICONED_STREAM_WAIT"] == nil { stream.isOn = true }
+        defer { stream.isOn = false }                      // drains: the DiT reads `x` and the next block writes the modulation
+
+        // ── attention
+        try norm(0, scale: 0, shift: 1)
+        try linearGPU(prefix + "attn.to_q.weight", a: normed, into: q, m: n, k: d, n: d)
+        try linearGPU(prefix + "attn.to_k.weight", a: normed, into: k, m: n, k: d, n: kv)
+        try linearGPU(prefix + "attn.to_v.weight", a: normed, into: v, m: n, k: d, n: kv)
+        try linearGPU(prefix + "attn.to_gate.weight", a: normed, into: gate, m: n, k: d, n: d)
+        let cut = Krea2DiT.attentionAssignment(gemm.plan, sequence: n, heads: heads, kvHeads: kvHeads, headDim: dh)
+        let chained = cut.usesTiles && !cut.splits && cut.normRopeOnGPU && QKNormRope.runs(headDim: dh)
+        if chained, let pass = QKNormRope.shared(device: gemm.device, queue: gemm.queue),
+           let tiled = tiles[n] ?? TiledAttention.make(cut, device: gemm.device, queue: gemm.queue, heads: heads, sequence: n,
+                                                       headDim: dh, kvHeads: kvHeads) {
+            tiles[n] = tiled
+            // The other weights are read where `consumptionOrder` reads them (a tail stream serves them in that order), into what no
+            // queued work touches: the QK-norm's arrays here, the bank's `norm2` below (read by a kernel queued later).
+            var normQ = [Float](repeating: 0, count: dh), normK = [Float](repeating: 0, count: dh)
+            try normQ.withUnsafeMutableBufferPointer { _ = try artifact.materialize(prefix + "attn.norm_q.weight", into: $0) }
+            try normK.withUnsafeMutableBufferPointer { _ = try artifact.materialize(prefix + "attn.norm_k.weight", into: $0) }
+            let qb = try gemm.wrap(UnsafeMutableRawPointer(q), bytes: maxRows * d * 4, name: "q")
+            let kb = try gemm.wrap(UnsafeMutableRawPointer(k), bytes: maxRows * kv * 4, name: "k")
+            let vb = try gemm.wrap(UnsafeMutableRawPointer(v), bytes: maxRows * kv * 4, name: "v")
+            let mergedb = try gemm.wrap(UnsafeMutableRawPointer(merged), bytes: maxRows * d * 4, name: "merged")
+            let table = try gemm.region(freqs, bytes: n * dh * 4, name: "freqs")
+            let clock = ProductLedger.pass(sequence: n, heads: heads, headDim: dh)
+            timed("qk-norm + rope") {
+                pass.run([.init(qb, heads: heads, weight: normQ), .init(kb, heads: kvHeads, weight: normK)],
+                         rows: n, headDim: dh, eps: eps, freqs: table, layout: .interleaved, wait: !stream.isOn)
+            }
+            clock?.finish()
+            timed("sdpa wall") { ownTimings["sdpa GPU", default: 0] += tiled.run(q: qb, k: kb, v: vb, into: mergedb) }
+        } else {
+            stream.drain()                                 // the CPU reads Q, K, V or writes the reserve; MPSGraph's SDPA submits its own
+            try headNormRope(prefix, rows: n)
+            try attend(rows: n)
+        }
+        let (mergedb, gateb) = (try slice(merged), try slice(gate))
+        timed("gate") { ownTimings["elementwise GPU", default: 0] += elementwise.carries((mergedb, 0), (gateb, 0), count: n * d) }
+        try linearGPU(prefix + "attn.to_out.0.weight", a: merged, into: o, m: n, k: d, n: d)
+        boundary("attn_out", o)
+        timed("norm") {
+            ownTimings["elementwise GPU", default: 0] += elementwise.residual((xb, 0), plus: (ob, 0), carries: (mb, 2 * d), rows: n, columns: d)
+        }
+
+        // ── SwiGLU
+        if normsOnGPU { try artifact.materialize(prefix + "norm2.weight", into: bank + d, capacity: d) }
+        try norm(1, scale: 3, shift: 4)
+        try linearGPU(prefix + "ff.gate.weight", a: normed, into: h1, m: n, k: d, n: hh)
+        try linearGPU(prefix + "ff.up.weight", a: normed, into: h2, m: n, k: d, n: hh)
+        let (h1b, h2b) = (try slice(h1, floats: maxRows * hh), try slice(h2))
+        timed("swiglu") { ownTimings["elementwise GPU", default: 0] += elementwise.swiglu((h1b, 0), (h2b, 0), count: n * hh) }
+        try linearGPU(prefix + "ff.down.weight", a: h1, into: o, m: n, k: hh, n: d)
+        boundary("ff_out", o)
+        timed("norm") {
+            ownTimings["elementwise GPU", default: 0] += elementwise.residual((xb, 0), plus: (ob, 0), carries: (mb, 5 * d), rows: n, columns: d)
+        }
+        return true
     }
 
     // ── plumbing ────────────────────────────────────────────────────────────────────────
