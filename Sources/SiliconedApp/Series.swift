@@ -444,6 +444,8 @@ private struct Bracketable: ViewModifier {
                                       set: { if !$0, app.bracketing == key { app.bracketing = nil } }),
                  arrowEdge: .trailing) {
             BracketBubble(app: app, target: .key(key)) { app.bracketing = nil }
+                // No value selected on opening: the popover gave its first field the focus, its text selected in the system's blue.
+                .onAppear { DispatchQueue.main.async { NSApp.keyWindow?.makeFirstResponder(nil) } }
         }
     }
 

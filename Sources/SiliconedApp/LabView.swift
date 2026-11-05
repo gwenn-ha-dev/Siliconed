@@ -60,6 +60,24 @@ struct LabView: View {
 
     // MARK: Folded
 
+    /// **The folded line's text**: on one line, a `{…}` group said as the field draws its chip — its words between dots, in the
+    /// series' yellow — rather than its braces.
+    static func foldedLine(_ text: String) -> AttributedString {
+        let flat = text.replacingOccurrences(of: "\n", with: " ")
+        var out = AttributedString()
+        var rest = Substring(flat)
+        while let open = rest.firstIndex(of: "{"), let close = rest[open...].firstIndex(of: "}") {
+            out += AttributedString(String(rest[..<open]))
+            let words = rest[rest.index(after: open)..<close].split(separator: "|").map { $0.trimmingCharacters(in: .whitespaces) }
+            var group = AttributedString(words.joined(separator: " · "))
+            group.foregroundColor = Palette.bracket
+            out += group
+            rest = rest[rest.index(after: close)...]
+        }
+        out += AttributedString(String(rest))
+        return out
+    }
+
     private var foldedBar: some View {
         HStack(spacing: 10) {
             sentThumbnails
@@ -68,7 +86,7 @@ struct LabView: View {
                     if model.text.isEmpty {
                         Text("Type the idea… (⌥⌘L)").foregroundStyle(.tertiary)
                     } else {
-                        Text(verbatim: model.text.replacingOccurrences(of: "\n", with: " "))
+                        Text(Self.foldedLine(model.text))
                     }
                 }
                 .lineLimit(1).truncationMode(.tail)
