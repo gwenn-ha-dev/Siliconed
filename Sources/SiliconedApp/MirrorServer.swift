@@ -11,7 +11,7 @@
 //   forged for it. The borrowing Mac's form judged first, with this Mac's B and traits, but its word is
 //   never the last.
 // - **Each Mac sees only its own** (`Entry.owner`, `Job.owner`): its jobs, its images, its preview, its
-//   exploration — published per client (`Seen`). This Mac's own renders and other Macs' are a count and
+//   series — published per client (`Seen`). This Mac's own renders and other Macs' are a count and
 //   a duration (`RemoteQueue.others`), and a client's actions reach only what it asked for. This Mac's
 //   window sees everything: it is its machine.
 // - **An edit's images come as blobs before their render**, but a message never waits for a blob
@@ -43,15 +43,15 @@ final class MirrorServer {
         /// across a cut closes with it.
         var licenseSent = false
     }
-    /// Each Mac's last exploration (grid ordinal) — kept across a reconnection.
+    /// Each Mac's last series (grid ordinal) — kept across a reconnection.
     private var explorations: [Data: Int] = [:]
     /// Each client's last measured render, and its session (images, compute seconds) — in memory, kept
     /// across a reconnection (`statisticsSnapshot`).
     private var measured: [Data: Measures] = [:]
     private var sessions: [Data: (images: Int, seconds: Double)] = [:]
-    /// Those explorations once ended: `finishGrid` takes them out of `gridRuns`.
+    /// Those series once ended: `finishGrid` takes them out of `gridRuns`.
     private var ended: [Int: GridRun] = [:]
-    /// The images each Mac removed, in memory until this Mac quits — kept across a cut, as its exploration
+    /// The images each Mac removed, in memory until this Mac quits — kept across a cut, as its series
     /// is, so that ⌘Z still works after the link came back (`remove`, `restore`).
     private var trash: [Data: SessionTrash<Entry>] = [:]
     private var lastCatalog: MirrorCatalog?
@@ -102,7 +102,7 @@ final class MirrorServer {
         watchCatalog()
     }
 
-    /// A client's job that ended is told to it alone, after its images; an exploration that ended is kept for it.
+    /// A client's job that ended is told to it alone, after its images; a series that ended is kept for it.
     private func signal(_ s: Signal) {
         switch s {
         case .finished(let job, let issue):
@@ -239,7 +239,7 @@ final class MirrorServer {
         release()
     }
 
-    /// A render is answered with its request number; an exploration's refusal is said.
+    /// A render is answered with its request number; a series' refusal is said.
     private func refuse(_ text: RemoteRefusal, _ asked: Asked, to identity: Data) {
         if let n = asked.request { host.send(.answer(request: n, .refused(text)), to: identity) }
         else { host.send(.refused(text), to: identity) }
@@ -623,7 +623,7 @@ final class MirrorServer {
     }
 
     /// What `identity` was not sent yet: its queue, its images (oldest first: the mirror inserts each at
-    /// its place), its exploration and the cells' images.
+    /// its place), its series and the cells' images.
     private func publish(to identity: Data) {
         guard var s = seen[identity] else { return }
         let q = queueSnapshot(for: identity)

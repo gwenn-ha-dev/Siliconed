@@ -28,7 +28,8 @@
 //   not mint, on which a white label reads at 1.3:1. **Not a tint over the window**: macOS 26 paints the label of every
 //   menu and bordered button in it (« Euler », « Add » in violet, 3:1 at night). A link, by `.chartLink`: the system's
 //   `.link` keeps its blue whatever the tint; at night a lighter indigo (#999BEE, 6.6:1 on the column). In the prompt
-//   (`PromptField`), the caret in the text wire's peach and a selection in a faint indigo, not the system's blue.
+//   and the writer's instructions (`Palette.ink`), the caret in the text wire's peach and a selection in a faint indigo,
+//   not the system's blue: both are AppKit text views, since SwiftUI's `TextEditor` has no setting for a selection's color.
 // - **An icon wears its wire** (`IconTile`): a full tile of the color of the wire its stage gives, the glyph hollowed in the
 //   card's color; the stage at work wears what runs, a refused one red. It replaces the former rule — a bare glyph, no chip,
 //   so that nothing in a box's title would read as a button —: the chart's choice, to be judged on screen.
@@ -53,6 +54,12 @@ enum Palette {
     static let control = dynamic(dark: 0x6660CB, light: 0x3F3A8A)
     /// A selection in the prompt (AppKit): `control`, faint, under the words.
     static let selectionInk = dynamicInk(dark: 0x6660CB, light: 0x3F3A8A, alpha: 0.38)
+    /// **A text view in the chart's ink**: the caret in the text wire's peach, a selection in a faint indigo — never the
+    /// system's blue. Every editable text of the app goes through it (`PromptField`, the writer's instructions).
+    @MainActor static func ink(_ view: NSTextView) {
+        view.insertionPointColor = peachInk
+        view.selectedTextAttributes = [.backgroundColor: selectionInk]
+    }
     /// A link's words (`ChartLinkStyle`).
     static let link = dynamic(dark: 0x999BEE, light: 0x3F3A8A)
     /// A label or a glyph on `live`.

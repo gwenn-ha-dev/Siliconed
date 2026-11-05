@@ -5,7 +5,7 @@ import Foundation
 /// decode exactly what the other encoded; the app projects its `Job`, `Entry` and state into them and
 /// back.
 ///
-/// **Each Mac sees only its own**: the queue, the history, the preview and the exploration are published
+/// **Each Mac sees only its own**: the queue, the history, the preview and the series are published
 /// per client — what the mini renders for itself or for another Mac is only a count (`others`).
 ///
 ///     mini → Neo   catalog     the ready models, what each accepts, its LoRAs, B — whenever it changes

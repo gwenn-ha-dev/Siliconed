@@ -19,6 +19,8 @@
 // - **Shown in English whatever the app's language**: it is what the writer reads.
 // - **The Prompt Lab says it** when an instruction of the model it writes for is the user's (`LabView`'s header), and
 //   opens this pane on it.
+// - **An AppKit text view, not a `TextEditor`**: the prompt's caret and selection (`Palette.ink`), which SwiftUI's editor
+//   leaves in the system's blue.
 
 import AppKit
 import Siliconed
@@ -52,14 +54,11 @@ struct LabInstructionsPane: View {
                     }
                     .pickerStyle(.segmented).labelsHidden().fixedSize().tint(Palette.control)
                 }
-                TextEditor(text: Binding(get: { lab.instructions.text(family, gesture) },
-                                         set: { lab.instructions.set($0, for: family, gesture) }))
-                    .font(.callout)
-                    .scrollContentBackground(.hidden)
+                InstructionEditor(text: Binding(get: { lab.instructions.text(family, gesture) },
+                                                set: { lab.instructions.set($0, for: family, gesture) }))
                     .padding(6)
                     .frame(height: 260)
                     .background(Palette.well, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
-                    .accessibilityLabel(Text("Instruction"))
                 HStack(alignment: .firstTextBaseline) {
                     state.font(.caption).foregroundStyle(lab.instructions.isEdited(family, gesture) ? Palette.link : .secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -78,5 +77,53 @@ struct LabInstructionsPane: View {
         guard lab.instructions.isEdited(family, gesture) else { return Text("Siliconed’s instruction, as this version sends it.") }
         guard lab.instructions.sent(family, gesture) != nil else { return Text("Empty: Siliconed’s instruction is sent instead.") }
         return Text("Yours: sent instead of Siliconed’s.")
+    }
+}
+
+/// **The instruction's field**: plain text in the callout font, the chart's caret and selection. A text set from outside
+/// (another model or gesture, « Restore ») starts a new undo history: ⌘Z never brings back another instruction's text.
+private struct InstructionEditor: NSViewRepresentable {
+    @Binding var text: String
+
+    func makeCoordinator() -> Coordinator { Coordinator(text: $text) }
+
+    func makeNSView(context: NSViewRepresentableContext<Self>) -> NSScrollView {
+        let scroll = NSTextView.scrollableTextView()
+        let view = scroll.documentView as! NSTextView
+        view.isRichText = false
+        view.importsGraphics = false
+        view.allowsUndo = true
+        view.drawsBackground = false
+        view.font = .preferredFont(forTextStyle: .callout)
+        view.textContainerInset = .zero
+        Palette.ink(view)
+        view.string = text
+        view.delegate = context.coordinator
+        view.setAccessibilityLabel(String(localized: "Instruction"))
+        scroll.drawsBackground = false
+        scroll.borderType = .noBorder
+        scroll.autohidesScrollers = true
+        return scroll
+    }
+
+    func updateNSView(_ scroll: NSScrollView, context: NSViewRepresentableContext<Self>) {
+        context.coordinator.text = $text
+        guard let view = scroll.documentView as? NSTextView, view.string != text, !view.hasMarkedText() else { return }
+        view.string = text
+        context.coordinator.undo.removeAllActions()
+    }
+
+    @MainActor final class Coordinator: NSObject, NSTextViewDelegate {
+        var text: Binding<String>
+        /// The field's own history, not the Settings window's.
+        let undo = UndoManager()
+        init(text: Binding<String>) { self.text = text }
+
+        func undoManager(for view: NSTextView) -> UndoManager? { undo }
+
+        func textDidChange(_ notification: Notification) {
+            guard let view = notification.object as? NSTextView else { return }
+            text.wrappedValue = view.string
+        }
     }
 }

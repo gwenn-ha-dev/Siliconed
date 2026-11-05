@@ -6,7 +6,7 @@
 //   imports (`libraryBlocker`, `managementPossible`) — never this Mac's in its place; going back to
 //   this Mac's is a gesture of the settings (`useLocalLibrary`).
 // - **The copy starts as soon as a model is chosen** (`warm`): at launch for the model shown, at each
-//   choice, for every model of an exploration as it enters the queue — while the prompt is typed. A
+//   choice, for every model of a series as it enters the queue — while the prompt is typed. A
 //   render prepares again before reading (`prepareCopy`, nothing to do when it is done), so it never
 //   reads the other disk. It is removed when the app quits (`App.swift`).
 
@@ -37,7 +37,7 @@ extension AppState {
         libraryReachable ? nil : Problem(EngineError.libraryAbsent(path: library.root.path, volume: library.volumeName)).title
     }
 
-    /// **Starts copying what the chosen model reads** — or `models` (an exploration's), with their
+    /// **Starts copying what the chosen model reads** — or `models` (a series'), with their
     /// LoRAs. A new choice stops the previous copy; a failure other than a stop is said.
     func warm(_ models: [String]? = nil, loras: [String]? = nil) {
         guard workingCopy != nil, libraryReachable, forgeInProgress == nil else { return }

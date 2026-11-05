@@ -1,8 +1,8 @@
 import XCTest
 @testable import Siliconed
 
-/// **No plan reads the settings.** The app asks for plans (the time foreseen, the exploration, the
-/// grids, `silicontrol add`) before this Mac's map is measured; a plan that read `EngineSettings.effective`
+/// **No plan reads the settings.** The app asks for plans (the time foreseen, a series'
+/// grid, `silicontrol add`) before this Mac's map is measured; a plan that read `EngineSettings.effective`
 /// froze the process on the defaults and the map was refused for the whole session — the AMX off, +20 %
 /// per step, on the first launch after each update (0.15).
 final class PlanReadsNoSettingsTests: XCTestCase {

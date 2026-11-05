@@ -71,11 +71,10 @@ final class FormatFamilyTests: XCTestCase {
         XCTAssertEqual(AnimaDiT.Config(header: [:]).ropePositions, AnimaDiT.Config.publishedRopePositions)
     }
 
-    /// Every recommended format, every edit output and the exploration's three pass every family.
+    /// Every recommended format and every edit output pass every family.
     func testOfferedFormatsPassEveryFamily() {
-        let explored = [RecommendedFormat(512, 512), RecommendedFormat(512, 768), RecommendedFormat(768, 512)]
         for card in ModelCard.allCards {
-            for f in card.formats + explored {
+            for f in card.formats {
                 XCTAssertNoThrow(try Format.check(width: f.width, height: f.height, family: card.family), "\(card.id) \(f)")
             }
         }

@@ -14,7 +14,7 @@
 // - **Its actions are sent** (`enqueue`, `cancel`, `remove`, `stopAll`, `clearQueue`, `delete`: each
 //   starts with `if let mirror`). A job keeps the form's every choice, its seeds included: the mini
 //   renders the same bits as if it had been asked on its own screen.
-// - **Only this Mac's own** comes back: its jobs, its images, its exploration; what the other Mac renders
+// - **Only this Mac's own** comes back: its jobs, its images, its series; what the other Mac renders
 //   for itself or for other Macs is a count and a duration (`othersQueued`), said in the footer.
 // - **Ordinals are the identities** (`t3`, `i7`), as for `silicontrol`: a job or an image keeps its
 //   `UUID` here from one snapshot to the next, so that the selection holds.

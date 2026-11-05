@@ -80,9 +80,7 @@ struct PromptField: NSViewRepresentable {
         view.textContainerInset = NSSize(width: 0, height: 3)
         view.font = PromptStyle.font
         view.typingAttributes = PromptStyle.base
-        // The chart's, not the system's blue (`Palette.swift`): the caret in the text wire's peach, a selection in indigo.
-        view.insertionPointColor = Palette.peachInk
-        view.selectedTextAttributes = [.backgroundColor: Palette.selectionInk]
+        Palette.ink(view)
         view.delegate = context.coordinator
         view.focusChanged = { [weak coordinator = context.coordinator] typing in
             coordinator?.focused.wrappedValue = typing

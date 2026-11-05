@@ -86,7 +86,7 @@ final class AppState {
     /// the LoRA learned — meant for « slider » LoRAs, trained as a difference to be used from −x to +x;
     /// on an ordinary LoRA it mostly damages the image, hence the switch. The engine takes any finite
     /// strength (`LoRA.materialize` folds it into `down`, sign included): the gate is the app's, for
-    /// the rack, the exploration and `silicontrol` alike. Off, the strengths already set come back to 0.
+    /// the rack, a series and `silicontrol` alike. Off, the strengths already set come back to 0.
     var negativeLoRAStrengths = UserDefaults.standard.bool(forKey: AppState.negativeLoRAKey) {
         didSet {
             guard negativeLoRAStrengths != oldValue else { return }
@@ -695,7 +695,7 @@ final class AppState {
     }
 
     /// **The models, read once per catalog**: `Model.named` reads the map headers on disk, and the
-    /// exploration's footer asks for each cell's model at every drawing. Emptied by `refreshCatalog`.
+    /// views ask for the chosen model at every drawing (`offersDetail`, the formats). Emptied by `refreshCatalog`.
     @ObservationIgnored var modelsRead: [String: Model?] = [:]
 
     /// **B, this Mac's memory budget** (`MemoryBudget.machineCeiling()`: ¾ · RAM − 2 GiB, or

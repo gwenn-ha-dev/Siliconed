@@ -17,7 +17,7 @@ import Foundation
 ///   library's: profile, render cache and licenses stay this Mac's.
 /// - **A file is up to date when its size and date are the original's** (`FileCopy.isSame`); it is
 ///   copied under `.partiel`, then renamed.
-/// - **Several models stay** — an exploration across models copies all of its own before its first
+/// - **Several models stay** — a series across models copies all of its own before its first
 ///   cell —, the least recently used thrown out first when room runs short, `margin` always left free
 ///   on the volume; beyond, `diskFull`, before the first byte. A file a preparation needs is never
 ///   thrown out by it.

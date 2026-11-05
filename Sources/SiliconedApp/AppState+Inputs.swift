@@ -147,7 +147,7 @@ extension AppState {
         for (i, slot) in kept.enumerated() where inputs[i].role != slot.role { inputs[i].role = slot.role }
     }
 
-    /// **The edit's images set whole** — a command, an exploration's cell: they take the edited place and the references in
+    /// **The edit's images set whole** — a command, a series' cell: they take the edited place and the references in
     /// their order, the neutral images and the start staying — but not twice: a neutral image of the same file or history
     /// image as one coming in leaves its place to it.
     func setEditImages(_ images: [ReferenceImage]) {
