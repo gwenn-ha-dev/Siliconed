@@ -171,7 +171,8 @@ struct LabView: View {
             PromptField(text: $model.text, subjects: model.subjects, focused: $typing, editable: !model.isWriting,
                         reading: reading, series: model.rack)
                 .opacity(model.changes == nil ? 1 : 0)
-            if model.text.isEmpty {
+            // Not under the marks: Describe writes into an empty text, which stays empty until its last word.
+            if model.text.isEmpty, model.changes == nil {
                 Text("Type or paste a prompt. Write @ to cite a subject.")
                     .foregroundStyle(.tertiary).padding(.leading, 5).padding(.top, 3)
                     .allowsHitTesting(false)
@@ -379,8 +380,8 @@ private struct MarkedText: NSViewRepresentable {
                 out.append(NSAttributedString(string: piece.text, attributes: base))
             case .added:
                 var a = base
-                a[.foregroundColor] = NSColor.controlAccentColor
-                a[.backgroundColor] = NSColor.controlAccentColor.withAlphaComponent(0.12)
+                a[.foregroundColor] = Palette.addedInk
+                a[.backgroundColor] = Palette.addedWash
                 out.append(NSAttributedString(string: piece.text, attributes: a))
             case .removed:
                 let lead = String(piece.text.prefix { $0.isWhitespace })

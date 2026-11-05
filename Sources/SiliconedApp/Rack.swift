@@ -415,7 +415,7 @@ private struct LinkEdge: View {
         let w = MainWindow.shared
         if app.mirror != nil, let id = w.carrier.showing {
             let (color, dashed): (Color, Bool) = switch w.otherMacs.links[id] {
-            case .connected?: (Color(nsColor: .systemBlue), false)
+            case .connected?: (Palette.link, false)
             case .refused?: (Palette.failure, false)
             default: (Color(nsColor: .systemOrange), true)
             }

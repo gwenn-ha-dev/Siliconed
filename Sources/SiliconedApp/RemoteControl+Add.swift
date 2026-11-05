@@ -452,6 +452,9 @@ extension RemoteControl {
         if let strength { app.startStrength = strength }
         if let s = d.seed { app.fixedSeed = true; app.seed = s } else { app.fixedSeed = false }
         _ = app.setSeries(from: g)
+        // …and the canvas shows the grid filling in, as « Generate » shows a series (`renderSeries`).
+        app.followsRender = false
+        app.showsExploration = true
 
         let added = jobs.map { job -> [String: Any] in
             var o = json(job)

@@ -30,6 +30,7 @@
 //   `.link` keeps its blue whatever the tint; at night a lighter indigo (#999BEE, 6.6:1 on the column). In the prompt
 //   and the writer's instructions (`Palette.ink`), the caret in the text wire's peach and a selection in a faint indigo,
 //   not the system's blue: both are AppKit text views, since SwiftUI's `TextEditor` has no setting for a selection's color.
+//   The words Rewrite and Describe bring are marked in the same peach, on a faint wash (`addedInk`): they were the accent's blue.
 // - **An icon wears its wire** (`IconTile`): a full tile of the color of the wire its stage gives, the glyph hollowed in the
 //   card's color; the stage at work wears what runs, a refused one red. It replaces the former rule — a bare glyph, no chip,
 //   so that nothing in a box's title would read as a button —: the chart's choice, to be judged on screen.
@@ -49,7 +50,12 @@ enum Palette {
     static let bracketInk = dynamicInk(dark: 0xFFD60A, light: 0xB89400)
     static let bracket = Color(nsColor: bracketInk)
     /// What runs: the stage at work, the steps done, the image followed, the button that starts something.
-    static let live = dynamic(dark: 0x56C0B0, light: 0x3F3A8A)
+    static let live = Color(nsColor: liveInk)
+    /// The same, for AppKit: the Dock tile's progress.
+    static let liveInk = dynamicInk(dark: 0x56C0B0, light: 0x3F3A8A)
+    /// **The words the writer brings** (Rewrite, Describe), over the text: in the text wire's peach, on a faint wash of it.
+    static let addedInk = peachInk
+    static let addedWash = dynamicInk(dark: 0xF2B279, light: 0xB36D2A, alpha: 0.12)
     /// A selected segment, a checked box: `.tint(Palette.control)` on the control.
     static let control = dynamic(dark: 0x6660CB, light: 0x3F3A8A)
     /// A selection in the prompt (AppKit): `control`, faint, under the words.

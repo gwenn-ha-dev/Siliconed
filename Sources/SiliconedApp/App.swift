@@ -777,7 +777,7 @@ enum DockTile {
             NSBezierPath(roundedRect: track, xRadius: radius, yRadius: radius).fill()
             let inner = track.insetBy(dx: 2, dy: 2)
             let done = NSRect(x: inner.minX, y: inner.minY, width: max(inner.height, inner.width * min(1, max(0, fraction))), height: inner.height)
-            NSColor.controlAccentColor.setFill()
+            Palette.liveInk.setFill()
             NSBezierPath(roundedRect: done, xRadius: done.height / 2, yRadius: done.height / 2).fill()
         }
     }
