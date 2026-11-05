@@ -1,3 +1,4 @@
+import Accelerate
 import Metal
 
 /// **A product by a published weight, whatever the model**: `C[m, n] = A[m, k] · W`, plus the weight's
@@ -136,10 +137,33 @@ package final class WeightProducts {
                 // can run them.
                 let aneRows = planned.path == .bf16 && planned.ane > 0 && planned.ane < m && transposed ? planned.ane : 0
                 if let (map, offset) = inPlace {
-                    aneTook = false
-                    aneDeclined = planned.ane > 0
-                    timings["gemm GPU", default: 0] += gemm.linear(a: a, rounding: (w, rounding.offset, rounding.rows), bf16: map,
-                                                                  weightOffset: offset, c: c, m: m, k: k, n: n, weightIsTransposed: transposed)
+                    // On the stream: the ANE's rows beside the queued GPU work, waited for on the GPU (`GPUStream.neuralEngine`).
+                    if aneRows > 0, GPUStream.policy == .on, let ane = gemm.neuralEngine, ane.accepts(rows: aneRows, k: k, n: n),
+                       let weight = artifact.pointer(name) {
+                        let first = m - aneRows
+                        nonisolated(unsafe) let (pa, pc) = (a.contents().assumingMemoryBound(to: Float.self),
+                                                            c.contents().assumingMemoryBound(to: Float.self))
+                        nonisolated(unsafe) let pw = weight.assumingMemoryBound(to: UInt16.self)
+                        let stream = gemm.queue.stream
+                        let done = stream.neuralEngine(on: gemm.queue, work: {
+                            ane.product(a: pa, bf16: pw, c: pc, first: first, rows: aneRows, k: k, n: n)
+                        }, fallback: {
+                            Self.cpuRows(a: pa, bf16: pw, c: pc, first: first, rows: aneRows, k: k, n: n)
+                        })
+                        if first > 0 {
+                            timings["gemm GPU", default: 0] += gemm.linear(a: a, rounding: (w, rounding.offset, rounding.rows), bf16: map,
+                                                                          weightOffset: offset, c: c, m: first, k: k, n: n,
+                                                                          weightIsTransposed: transposed)
+                        }
+                        stream.neuralEngineQueued(done)
+                        aneTook = true
+                    } else {
+                        aneTook = false
+                        aneDeclined = planned.ane > 0
+                        timings["gemm GPU", default: 0] += gemm.linear(a: a, rounding: (w, rounding.offset, rounding.rows), bf16: map,
+                                                                      weightOffset: offset, c: c, m: m, k: k, n: n,
+                                                                      weightIsTransposed: transposed)
+                    }
                 } else if aneRows > 0, let ane = gemm.neuralEngine, ane.accepts(rows: aneRows, k: k, n: n) {
                     let r = Self.bf16Product(gemm: gemm, rounding: (w, rounding.offset, rounding.rows), reserve: w, a: a, c: c,
                                              m: m, k: k, n: n, ane: ane, aneRows: aneRows)
@@ -288,9 +312,11 @@ package final class WeightProducts {
     /// **Where a bf16 activation fits beside a bf16 weight of `k · n` values** in a reserve of `capacity`
     /// floats: after the weight's pages, `rows` rows of `k` bf16 values, or `nil` when fewer than 64 rows
     /// would (the reserve is the model's, never grown for this path) or `k` is odd.
-    package static func roundingPlan(k: Int, n: Int, capacity: Int) -> Rounding? {
+    package static func roundingPlan(k: Int, n: Int, capacity: Int, weightInReserve: Bool = true) -> Rounding? {
         guard k % 2 == 0 else { return nil }
-        let offset = (2 * k * n + 16383) / 16384 * 16384
+        // A weight read in place (`inPlace`) leaves the whole reserve to the operand: at 1 024² Z-Image's `w2` (k 10 240) is then
+        // one chunk of 4 128 rows instead of 3 840 + 288 — the same bits (rows are independent), one dispatch.
+        let offset = weightInReserve ? (2 * k * n + 16383) / 16384 * 16384 : 0
         let rows = (capacity * 4 - offset) / (2 * k) / 64 * 64
         return rows >= 64 ? Rounding(offset: offset, rows: rows) : nil
     }
@@ -421,6 +447,22 @@ package final class WeightProducts {
     /// the fp32 activation. Each row is one engine's. The ANE's rows refused or non-finite: the whole product again on the GPU's rounded
     /// kernel. What the map measures for the pair (`gpu/bf16act+ane/fp16`) is this function. The weight is `[k, n]`. Returns as
     /// `int8Product(…ane:)`.
+    /// **The ANE's rows refused, computed on the CPU** — the stream's fallback (`GPUStream.neuralEngine`): the GPU already queued what
+    /// reads them, so they are written before the ANE's signal, never left undefined. The operand rounded to bf16 as the GPU's route
+    /// rounds it, the weight widened, sums in fp32 (BLAS): close to the GPU's rows, not their bits — a refusal is rare and counted.
+    static func cpuRows(a: UnsafePointer<Float>, bf16 w: UnsafePointer<UInt16>, c: UnsafeMutablePointer<Float>,
+                        first: Int, rows: Int, k: Int, n: Int) {
+        var operand = [Float](repeating: 0, count: rows * k), weight = [Float](repeating: 0, count: n * k)
+        for i in 0..<(rows * k) {
+            let bits = a[first * k + i].bitPattern
+            operand[i] = Float(bitPattern: (bits &+ 0x7FFF &+ ((bits >> 16) & 1)) & 0xFFFF_0000)
+        }
+        for i in 0..<(n * k) { weight[i] = Float(bitPattern: UInt32(w[i]) << 16) }
+        // `w` is `[k, n]`, the forge's layout (`transposed`, the only one the ANE takes): C = A · W.
+        cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, Int32(rows), Int32(n), Int32(k), 1, operand, Int32(k), weight, Int32(n),
+                    0, c + first * n, Int32(n))
+    }
+
     package static func bf16Product(gemm: GEMM, rounding: TensorGEMM.Rounding, reserve w: MTLBuffer, a: MTLBuffer, c: MTLBuffer,
                                     m: Int, k: Int, n: Int, ane: NeuralEngine, aneRows: Int)
         -> (gpu: Double, computed: Bool, gpuWall: Double, aneWall: Double) {
@@ -462,9 +504,9 @@ package final class WeightProducts {
         inPlace = nil
         let stream = gemm.queue.stream
         if stream.isOn, planned.path == .bf16, planned.roundsActivation, roundsActivations, gemm.bf16Activations,
-           planned.ane == 0 || GPUStream.policy == .gpu, artifact.tensors[name]?.dtype == .bfloat16,
+           artifact.tensors[name]?.dtype == .bfloat16,
            let offset = artifact.mappedOffset(name), offset % 16 == 0, let map = artifact.wrappedMap(on: gemm.device),
-           let rounding = Self.roundingPlan(k: k, n: n, capacity: capacity) {
+           let rounding = Self.roundingPlan(k: k, n: n, capacity: capacity, weightInReserve: false) {
             inPlace = (map, offset)
             return (.bf16(rounding), planned, nil)
         }

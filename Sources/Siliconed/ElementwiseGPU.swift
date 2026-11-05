@@ -171,7 +171,7 @@ package final class ElementwiseGPU {
     private func launch(_ pipeline: MTLComputePipelineState, _ slices: [BufferSlice],
                         constants: (MTLComputeCommandEncoder, Int) -> Void,
                         grid: MTLSize, group: MTLSize, byGroups: Bool = false) -> Double {
-        guard let commands = queue.makeCommandBuffer(), let encoder = commands.makeComputeCommandEncoder() else {
+        guard case let commands = queue.checkedCommandBuffer(), let encoder = commands.makeComputeCommandEncoder() else {
             // Nothing ran, and the output holds whatever was there: said and counted like a refusal.
             Attention.report("GPU elementwise (\(pipeline.label ?? "?")): no command buffer, so nothing ran")
             return 0

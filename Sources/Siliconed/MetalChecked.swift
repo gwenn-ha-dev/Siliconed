@@ -9,6 +9,7 @@ extension MTLCommandQueue {
         guard let commands = makeCommandBuffer() else {
             fatalError("Metal refused a command buffer on queue \(label ?? "unnamed") (invalidated or saturated)")
         }
+        stream.awaitNeuralEngine(in: commands)
         return commands
     }
 }

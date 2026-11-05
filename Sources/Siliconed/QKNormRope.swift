@@ -148,7 +148,7 @@ package final class QKNormRope: @unchecked Sendable {   // immutable after init;
     package func run(_ operands: [Operand], rows: Int, headDim: Int, eps: Float, freqs: (buffer: MTLBuffer, offset: Int)?,
                      layout: Layout, wait: Bool = true) -> Double {
         guard rows > 0, !operands.isEmpty else { return 0 }
-        guard let commands = queue.makeCommandBuffer(), let encoder = commands.makeComputeCommandEncoder() else {
+        guard case let commands = queue.checkedCommandBuffer(), let encoder = commands.makeComputeCommandEncoder() else {
             Attention.report("QK-norm + RoPE on the GPU: no command buffer, so nothing ran")
             return 0
         }

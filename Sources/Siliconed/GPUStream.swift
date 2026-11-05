@@ -78,7 +78,8 @@ package final class GPUStream: @unchecked Sendable {   // its state under `lock`
     /// **Waits for everything queued**, then judges each buffer and adds its GPU seconds: after it the CPU may read and write what
     /// the queued work touched.
     package func drain() {
-        lock.lock(); let queued = pending; pending = []; lock.unlock()
+        lock.lock(); let queued = pending; pending = []; let ane = (event, awaited); lock.unlock()
+        if let event = ane.0, ane.1 > 0 { _ = event.wait(untilSignaledValue: ane.1, timeoutMS: 600_000) }
         guard let last = queued.last else { return }
         let began = DispatchTime.now().uptimeNanoseconds
         last.commands.waitUntilCompleted()
@@ -101,6 +102,58 @@ package final class GPUStream: @unchecked Sendable {   // its state under `lock`
             let gpu = t.gpu.sorted { $0.key < $1.key }.map { String(format: "%@ %.2f s", $0.key, $0.value) }.joined(separator: " · ")
             return String(format: "stream: %d drains, %.2f s waited, %d buffers · ", t.drains, t.waited, t.buffers) + gpu
         }
+    }
+
+    // MARK: The Neural Engine beside the stream
+
+    /// The event the GPU signals when an ANE product's operand is ready, and the ANE's thread when its rows are written.
+    private var event: MTLSharedEvent?
+    private var counter: UInt64 = 0
+    /// The value the next command buffer must wait for (the last ANE product's rows), and the value already waited for in one.
+    private var awaited: UInt64 = 0, encodedWait: UInt64 = 0
+    private let neuralQueue = DispatchQueue(label: "siliconed.stream.ane", qos: .userInitiated)
+
+    /// **An ANE product beside the queued GPU work, with no wait on the CPU**: a buffer signals once the queued work before it is done
+    /// (the operand written); the ANE's thread waits for that, runs `work` (which writes its rows of the output and returns whether it
+    /// computed them), and on a refusal `fallback` (the same rows on the CPU) before signalling; the next command buffer made on this
+    /// queue after `neuralEngineQueued` waits for that signal on the GPU. The GPU's own rows of the product are queued by the caller
+    /// between the two calls, beside the ANE's — not behind them.
+    package func neuralEngine(on queue: MTLCommandQueue, work: @escaping @Sendable () -> Bool,
+                              fallback: @escaping @Sendable () -> Void) -> UInt64 {
+        lock.lock()
+        if event == nil { event = queue.device.makeSharedEvent() }
+        let event = event!
+        counter += 2
+        let ready = counter - 1, done = counter
+        lock.unlock()
+        guard let signal = queue.makeCommandBuffer() else { fatalError("Metal refused a command buffer") }
+        lock.lock()
+        if awaited > encodedWait { signal.encodeWaitForEvent(event, value: awaited); encodedWait = awaited }
+        lock.unlock()
+        signal.encodeSignalEvent(event, value: ready)
+        signal.commit()
+        nonisolated(unsafe) let e = event
+        neuralQueue.async {
+            _ = e.wait(untilSignaledValue: ready, timeoutMS: 600_000)
+            let computed = work()
+            GEMM.neuralEngineTally.withLock { $0.handed += 1; if !computed { $0.givenBack += 1 } }
+            if !computed { fallback() }
+            e.signaledValue = done
+        }
+        return done
+    }
+
+    /// The GPU's rows of the ANE's product are queued: from here every command buffer waits for the ANE's rows (`done`).
+    package func neuralEngineQueued(_ done: UInt64) {
+        lock.lock(); awaited = max(awaited, done); lock.unlock()
+    }
+
+    /// Encodes, at the start of `commands`, the wait for the last ANE product's rows if no buffer waits for them yet.
+    func awaitNeuralEngine(in commands: MTLCommandBuffer) {
+        lock.lock(); defer { lock.unlock() }
+        guard awaited > encodedWait, let event else { return }
+        commands.encodeWaitForEvent(event, value: awaited)
+        encodedWait = awaited
     }
 
     /// The GPU seconds of the stream's buffers by label since the last call, and reset.
