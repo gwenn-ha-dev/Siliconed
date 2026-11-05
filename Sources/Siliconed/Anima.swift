@@ -242,16 +242,28 @@ package final class AnimaDiT: BoundaryRecording, PhaseTiming {
             textCacheValid = false
         }
 
-        for layer in 0..<config.layers {
-            try cancellation.check()   // between two layers, never inside one (see `Cancellation`)
-            for ahead in 1...2 where layer + ahead < config.layers {
-                prefetcher.request(prefetcher.namesOfBlock(prefix: "transformer_blocks.\(layer + ahead)."))
+        // The blocks as one stream of GPU work where the process can run it (`streamKernels`), drained before the CPU's `norm_out`.
+        let streamed = try streamKernels(s)
+        let stream = gemm.queue.stream
+        do {
+            if let streamed { try startStream(row, streamed) }
+            defer { if streamed != nil { stream.isOn = false } }
+            for layer in 0..<config.layers {
+                try cancellation.check()   // between two layers, never inside one (see `Cancellation`)
+                for ahead in 1...2 where layer + ahead < config.layers {
+                    prefetcher.request(prefetcher.namesOfBlock(prefix: "transformer_blocks.\(layer + ahead)."))
+                }
+                if layer == config.layers - 1 {
+                    prefetcher.request(artifact.order.filter { $0.hasPrefix("norm_out.") || $0.hasPrefix("proj_out.") })
+                }
+                if let streamed {
+                    try blockStreamed(layer, sequence: s, streamed)
+                    if recordBoundaries { stream.drain() }
+                } else {
+                    try block(layer, sequence: s, modulations: row + AnimaDiT.ModulationRow.sublayer(layer, 1, config))
+                }
+                record("block\(layer)_out", x, s * d)
             }
-            if layer == config.layers - 1 {
-                prefetcher.request(artifact.order.filter { $0.hasPrefix("norm_out.") || $0.hasPrefix("proj_out.") })
-            }
-            try block(layer, sequence: s, modulations: row + AnimaDiT.ModulationRow.sublayer(layer, 1, config))
-            record("block\(layer)_out", x, s * d)
         }
         textCacheValid = true
 
@@ -347,6 +359,144 @@ package final class AnimaDiT: BoundaryRecording, PhaseTiming {
         try linearGPU(prefix + "ff.net.2.weight", a: h1, into: o, m: s, k: h, n: d)
         if let tag { record(tag + "ff_out", o, s * d) }
         timed("residual") { Ops.gatedResidual(x, plus: o, gate: gate, rows: s, columns: d) }
+    }
+
+    // MARK: The stream (`SILICONED_STREAM`)
+
+    /// What a streamed block runs on: both attentions in tiles (the only route that settles on the stream), the QK pass, the
+    /// residual-and-modulation kernel.
+    private struct StreamKernels {
+        let own, cross: TiledAttention
+        let pass: QKNormRope
+        let elementwise: AnimaElementwiseGPU
+    }
+    private var elementwise: AnimaElementwiseGPU?
+    /// The QK-norms' weights, `[attn1.norm_q, attn1.norm_k, attn2.norm_q, attn2.norm_k]` per layer, `Dh` floats each: read once, while
+    /// nothing is queued (`materialize` writes the reserve, which the queued products' rounding uses).
+    private var streamNorms: [[Float]] = []
+
+    /// **The kernels of a streamed block, or `nil`: the block runs as before** — the stream off (`GPUStream.policy`), a LoRA (its
+    /// stack is expanded on the CPU into buffers the queued products read), an attention the plan does not put in tiles (flash, the cut
+    /// by heads and MPSGraph wait on their own), no QK pass on the GPU, or the modulations larger than the double scratch that holds them.
+    private func streamKernels(_ s: Int) throws -> StreamKernels? {
+        guard GPUStream.policy != .off, lora == nil, QKNormRope.runs(headDim: config.headDim),
+              config.layers * 9 * config.dim * MemoryLayout<Float>.size <= exactWeight * MemoryLayout<Double>.size,
+              case .tiles(let own) = try selfAttention(s), case .tiles(let cross) = try crossAttention(s),
+              let pass = QKNormRope.shared(device: gemm.device, queue: gemm.queue) else { return nil }
+        if elementwise == nil { elementwise = try? AnimaElementwiseGPU(device: gemm.device, queue: gemm.queue) }
+        guard let elementwise else { return nil }
+        return StreamKernels(own: own, cross: cross, pass: pass, elementwise: elementwise)
+    }
+
+    /// **Before the first block, nothing queued**: σ's 28 × 3 `shift, scale, gate` copied where the GPU reads them, the QK-norms'
+    /// weights read once, then the stream on (`SILICONED_STREAM_WAIT`: left off, every call waiting on its own — the same work).
+    ///
+    /// The modulations go into `exactW`, the double scratch of the modulation table's `gemv`s: dead between `tabulate` and the next
+    /// one, which runs before the stream starts (`ensureTabulated`) — 2 MB inside its 100, so the memory need is unchanged. A raw copy,
+    /// read as floats by the GPU only.
+    private func startStream(_ row: UnsafeMutablePointer<Float>, _ kernels: StreamKernels) throws {
+        let stream = gemm.queue.stream
+        stream.drain()
+        let floats = config.layers * 9 * config.dim
+        UnsafeMutableRawPointer(exactW).copyMemory(from: row + AnimaDiT.ModulationRow.sublayer(0, 1, config),
+                                                   byteCount: floats * MemoryLayout<Float>.size)
+        if streamNorms.isEmpty {
+            let dh = config.headDim
+            for layer in 0..<config.layers {
+                for name in ["attn1.norm_q.weight", "attn1.norm_k.weight", "attn2.norm_q.weight", "attn2.norm_k.weight"] {
+                    try artifact.materialize("transformer_blocks.\(layer)." + name, into: reserve, capacity: reserveCapacity)
+                    streamNorms.append(Array(UnsafeBufferPointer(start: reserve, count: dh)))
+                }
+            }
+        }
+        if ProcessInfo.processInfo.environment["SILICONED_STREAM_WAIT"] == nil { stream.isOn = true }
+    }
+
+    /// **One block as GPU work queued on the stream** — the same sublayers as `block`, in the same order, with nothing on the CPU:
+    ///
+    ///     modulate₁ ─ q k v ─ QK-norm + RoPE ─ tiles ─ out ─┐ residual₁ + modulate₂ ─ q ─ (text k v ─ norm k, once) ─ norm q ─
+    ///     tiles ─ out ─┐ residual₂ + modulate₃ ─ W₁ ─ GELU ─ W₂ ─┐ residual₃
+    ///
+    /// The products read their bf16 weight in place in the map (`WeightProducts`); the LayerNorms and the gated residuals run in
+    /// `AnimaElementwiseGPU` (each residual fused with the next sublayer's modulation of the same `x`), the QK-norms in `QKNormRope` —
+    /// the cross-attention's q and the text's k normed without a rotation. Not the CPU's bits (the norms' sums), judged against the
+    /// oracle. A boundary recorded drains first (the checks): the same work, waited for.
+    private func blockStreamed(_ layer: Int, sequence s: Int, _ kernels: StreamKernels) throws {
+        let d = config.dim, h = config.hidden, heads = config.heads, dh = config.headDim
+        let prefix = "transformer_blocks.\(layer)."
+        let stream = gemm.queue.stream
+        let tag = layer == 0 && recordBoundaries ? "block0_" : nil
+        let eps: Float = 1e-6
+        let xb = try gemm.wrap(UnsafeMutableRawPointer(x), bytes: imageTokens * d * 4, name: "x")
+        let nb = try gemm.wrap(UnsafeMutableRawPointer(normed), bytes: imageTokens * d * 4, name: "a")
+        let ob = try gemm.wrap(UnsafeMutableRawPointer(o), bytes: imageTokens * d * 4, name: "c")
+        let qb = try gemm.wrap(UnsafeMutableRawPointer(q), bytes: imageTokens * d * 4, name: "q")
+        let kb = try gemm.wrap(UnsafeMutableRawPointer(k), bytes: imageTokens * d * 4, name: "k")
+        let bank = try gemm.wrap(UnsafeMutableRawPointer(exactW), bytes: exactWeight * MemoryLayout<Double>.size, name: "modulations")
+        /// Sublayer `i`'s `shift`, `scale`, `gate` in the bank, in floats.
+        func piece(_ i: Int, _ j: Int) -> AnimaElementwiseGPU.Slice { (bank, ((layer * 3 + i - 1) * 3 + j) * d) }
+        func norm(_ i: Int) -> [Float] { streamNorms[layer * 4 + i] }
+        /// `residual` of sublayer `i − 1` (its output in `o`), then the modulation of sublayer `i`, into `normed`.
+        func step(residual: Int?, modulate: Int?) {
+            timed(modulate == nil ? "residual" : "norm") {
+                kernels.elementwise.run((xb, 0), residual: residual.map { (y: (ob, 0), gate: piece($0, 2)) },
+                                        modulate: modulate.map { (shift: piece($0, 0), scale: piece($0, 1), out: (nb, 0)) },
+                                        rows: s, columns: d, eps: eps)
+            }
+        }
+        func recorded(_ name: String) {
+            guard let tag else { return }
+            stream.drain()
+            record(tag + name, o, s * d)
+        }
+
+        // ── 1. self-attention
+        step(residual: nil, modulate: 1)
+        try linearGPU(prefix + "attn1.to_q.weight", a: normed, into: q, m: s, k: d, n: d)
+        try linearGPU(prefix + "attn1.to_k.weight", a: normed, into: k, m: s, k: d, n: d)
+        try linearGPU(prefix + "attn1.to_v.weight", a: normed, into: v, m: s, k: d, n: d)
+        let table = try gemm.region(freqs, bytes: s * dh * 4, name: "freqs")
+        timed("qk-norm + rope") {
+            kernels.pass.run([.init(qb, heads: heads, weight: norm(0)), .init(kb, heads: heads, weight: norm(1))],
+                             rows: s, headDim: dh, eps: 1e-5, freqs: table, layout: .interleaved, wait: !stream.isOn)
+        }
+        try attend(.tiles(kernels.own), "sdpa self", q: q, k: k, v: v, keyRows: imageTokens)
+        try linearGPU(prefix + "attn1.to_out.0.weight", a: merged, into: o, m: s, k: d, n: d)
+        recorded("attn1_out")
+
+        // ── 2. cross-attention to the text — no RoPE
+        step(residual: 1, modulate: 2)
+        try linearGPU(prefix + "attn2.to_q.weight", a: normed, into: q, m: s, k: d, n: d)
+        let textK = textKCache + layer * textLength * d, textV = textVCache + layer * textLength * d
+        var operands = [QKNormRope.Operand(qb, heads: heads, weight: norm(2))]
+        if !textCacheValid {
+            try linearGPU(prefix + "attn2.to_k.weight", a: text, into: textK, m: textLength, k: config.textDim, n: d,
+                          rowsA: textLength, rowsC: textLength)
+            try linearGPU(prefix + "attn2.to_v.weight", a: text, into: textV, m: textLength, k: config.textDim, n: d,
+                          rowsA: textLength, rowsC: textLength)
+            let tk = try gemm.wrap(UnsafeMutableRawPointer(textK), bytes: textLength * d * 4, name: "k")
+            operands.append(.init(tk, heads: heads, weight: norm(3)))
+        }
+        // The rows are the image's for q and the text's for k: one call each (the pass takes one row count).
+        timed("qk-norm") {
+            kernels.pass.run([operands[0]], rows: s, headDim: dh, eps: 1e-5, freqs: nil, layout: .interleaved, wait: !stream.isOn)
+            if operands.count > 1 {
+                kernels.pass.run([operands[1]], rows: textLength, headDim: dh, eps: 1e-5, freqs: nil, layout: .interleaved,
+                                 wait: !stream.isOn)
+            }
+        }
+        try attend(.tiles(kernels.cross), "sdpa cross", q: q, k: textK, v: textV, keyRows: textLength)
+        try linearGPU(prefix + "attn2.to_out.0.weight", a: merged, into: o, m: s, k: d, n: d)
+        recorded("attn2_out")
+
+        // ── 3. GELU FFN
+        step(residual: 2, modulate: 3)
+        try linearGPU(prefix + "ff.net.0.proj.weight", a: normed, into: h1, m: s, k: d, n: h)
+        let hb = try gemm.wrap(UnsafeMutableRawPointer(h1), bytes: imageTokens * h * 4, name: "c")
+        timed("gelu") { ownTimings["gelu GPU", default: 0] += gelu.run(hb, count: s * h) }
+        try linearGPU(prefix + "ff.net.2.weight", a: h1, into: o, m: s, k: h, n: d)
+        recorded("ff_out")
+        step(residual: 3, modulate: nil)
     }
 
     // ── plumbing ────────────────────────────────────────────────────────────────────────

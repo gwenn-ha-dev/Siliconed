@@ -90,7 +90,7 @@ package final class AnimaGELU {
         pipeline = try device.makeComputePipelineState(function: function)
     }
 
-    /// In place, on a shared buffer. Returns the GPU time.
+    /// In place, on a shared buffer. Returns the GPU time; on the queue's stream (`GPUStream`), queued and 0.
     @discardableResult
     package func run(_ buffer: MTLBuffer, count: Int) -> Double {
         let commands = queue.checkedCommandBuffer()
@@ -103,8 +103,6 @@ package final class AnimaGELU {
                                 threadsPerThreadgroup: MTLSize(width: min(256, pipeline.maxTotalThreadsPerThreadgroup),
                                                                height: 1, depth: 1))
         encoder.endEncoding()
-        commands.commit()
-        commands.waitUntilCompleted()
-        return Attention.verdict(commands, what: "GPU GELU (\(count) values)")
+        return commands.commitSettled(label: "gelu GPU", what: "GPU GELU (\(count) values)")
     }
 }
