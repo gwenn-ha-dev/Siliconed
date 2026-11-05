@@ -106,12 +106,15 @@ package enum Ops {
     /// **QK-Norm then RoPE, one sequence row at a time** (`rmsNorm` over each head, then `rope`): the
     /// same operations in the same order on each head as the two passes, while the row is in cache.
     ///
+    /// `halfSplit`: MOSS-Image's RoPE instead (`MossImageRope.apply`: the pairs `(j, j + Dh/2)`, the table `[S, sin | cos]`), its products
+    /// and sums in its order — the same bits as `rmsNorm` then `MossImageRope.apply` (`QKNormRopeTests`).
+    ///
     /// - Parameters:
     ///   - x: `[S, H, Dh]`, modified in place
     ///   - weight: `[Dh]`
-    ///   - freqs: `[S, Dh/2, 2]`
+    ///   - freqs: `[S, Dh/2, 2]` (`[S, Dh]` either way)
     package static func rmsNormRope(_ x: UnsafeMutablePointer<Float>, weight: UnsafePointer<Float>, freqs: UnsafePointer<Float>,
-                                   sequence: Int, heads: Int, headDim: Int, eps: Float) {
+                                   sequence: Int, heads: Int, headDim: Int, eps: Float, halfSplit: Bool = false) {
         let pairs = headDim / 2, n = vDSP_Length(headDim)
         Parallel.rows(sequence, width: heads * headDim) { first, howMany in
             for s in first..<(first + howMany) {
@@ -123,6 +126,17 @@ package enum Ops {
                     var scale = 1 / (sumOfSquares / Float(headDim) + eps).squareRoot()
                     vDSP_vsmul(row, 1, &scale, row, 1, n)
                     vDSP_vmul(row, 1, weight, 1, row, 1, n)
+                    if halfSplit {
+                        let sin = f, cos = f + pairs
+                        for j in 0..<pairs {
+                            let a = row[j], b = row[j + pairs]
+                            let ac = a * cos[j], bs = (-b) * sin[j]
+                            let bc = b * cos[j], asn = a * sin[j]
+                            row[j] = ac + bs
+                            row[j + pairs] = bc + asn
+                        }
+                        continue
+                    }
                     for p in 0..<pairs {
                         let re = row[2 * p], im = row[2 * p + 1]
                         let fr = f[2 * p], fi = f[2 * p + 1]

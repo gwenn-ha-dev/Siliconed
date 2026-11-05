@@ -306,13 +306,28 @@ package struct CapacityModel: Codable, Sendable, Equatable {
     package var wake: Double?
     /// The idle from which the wake is paid (seconds): the report's.
     package var wakeIdle: Double?
+    /// **The QK-norm and RoPE before a self-attention, on either side** (`Context.normRope`), each a line in the values it runs over (Q's and
+    /// K's, `S · (H + H_kv) · Dh`): what the solver weighs against each other, the CPU's pass paying the wake besides. `nil`: a map without
+    /// the probe — the CPU's pass, priced as before (at nothing but the wake).
+    package var normRope: NormRope?
+
+    /// The two routes of the QK-norm and RoPE, `t = t₀ + values / rate`.
+    package struct NormRope: Codable, Sendable, Equatable {
+        /// The CPU's pass (`Ops.rmsNormRope`), its wall.
+        package var cpu: Line
+        /// The GPU's kernel queued before the attention (`QKNormRope`, `wait: false`): the GPU's own seconds, what the chain adds.
+        package var gpu: Line
+        /// The same kernel waited for — what a cut by heads pays, its CPU heads reading Q and K after it: its wall, the completion included.
+        package var gpuWaited: Line
+        package init(cpu: Line, gpu: Line, gpuWaited: Line) { self.cpu = cpu; self.gpu = gpu; self.gpuWaited = gpuWaited }
+    }
 
     package init() {}
 
     // MARK: - JSON
 
     private enum CodingKeys: String, CodingKey {
-        case crest, lines, thin, aneRowUnit, sharing, heat, memoryBandwidth, diskBandwidth, diskClasses, preparation, kquantPreparation, kquantStaging, tiles, thinTiles, attentionTiles, noise, wake, wakeIdle
+        case crest, lines, thin, aneRowUnit, sharing, heat, memoryBandwidth, diskBandwidth, diskClasses, preparation, kquantPreparation, kquantStaging, tiles, thinTiles, attentionTiles, noise, wake, wakeIdle, normRope
     }
 
     /// The engines of a dictionary keyed by their names.
@@ -354,6 +369,7 @@ package struct CapacityModel: Codable, Sendable, Equatable {
         diskClasses = try c.decodeIfPresent([String: CapacityDisk.Reading].self, forKey: .diskClasses) ?? [:]
         wake = try c.decodeIfPresent(Double.self, forKey: .wake)
         wakeIdle = try c.decodeIfPresent(Double.self, forKey: .wakeIdle)
+        normRope = try c.decodeIfPresent(NormRope.self, forKey: .normRope)
         let prepared = try c.decodeIfPresent([String: [String: Double]].self, forKey: .preparation) ?? [:]
         for (kindName, paths) in prepared {
             guard let kind = WeightKind(rawValue: kindName) else {
@@ -402,6 +418,7 @@ package struct CapacityModel: Codable, Sendable, Equatable {
         if !diskClasses.isEmpty { try c.encode(diskClasses, forKey: .diskClasses) }
         try c.encodeIfPresent(wake, forKey: .wake)
         try c.encodeIfPresent(wakeIdle, forKey: .wakeIdle)
+        try c.encodeIfPresent(normRope, forKey: .normRope)
         try c.encode(Dictionary(uniqueKeysWithValues: preparation.map { kind, paths in
             (kind.rawValue, Dictionary(uniqueKeysWithValues: paths.map { ($0.key.rawValue, $0.value) }))
         }), forKey: .preparation)
@@ -437,6 +454,8 @@ package struct CapacityModel: Codable, Sendable, Equatable {
         m.kquantStaging = kquantStaging.map(r)
         m.noise = noise.map(r)
         m.wake = wake.map(r); m.wakeIdle = wakeIdle.map(r)
+        func line(_ l: Line) -> Line { Line(t0: r(l.t0), rate: r(l.rate)) }
+        m.normRope = normRope.map { NormRope(cpu: line($0.cpu), gpu: line($0.gpu), gpuWaited: line($0.gpuWaited)) }
         return m
     }
 

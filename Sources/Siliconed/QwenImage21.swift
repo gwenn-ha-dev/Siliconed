@@ -607,10 +607,33 @@ package final class QwenImage21DiT: BoundaryRecording, PhaseTiming {
         if !keysOnly { try linearGPU(prefix + "attn.to_q.weight", a: normed, into: q, m: n, k: d, n: d) }
         try linearGPU(prefix + "attn.to_k.weight", a: normed, into: k, m: n, k: d, n: d)
         try linearGPU(prefix + "attn.to_v.weight", a: normed, into: v, m: n, k: d, n: d)
-        // QK-Norm and RoPE in one pass per row (`Ops.rmsNormRope`).
+        // QK-Norm and RoPE in one pass per row (`Ops.rmsNormRope`) — or on the GPU, chained to the target's attention, where the plan
+        // says (`QKNormRope`): never in the prefill (the conditions', once a render, unplanned).
         let table = freqs + first * config.headDim
-        if !keysOnly { try headNormRope(prefix + "attn.norm_q.weight", q, rows: n, freqs: table) }
-        try headNormRope(prefix + "attn.norm_k.weight", k, rows: n, freqs: table)
+        let target = kind == .prefill ? nil : targetAssignment(queries: all - p, keys: all)
+        // Its seconds join the class of the target's first slice, as `attend` names it (`ProductLedger.pass`).
+        let passClock = kind == .prefill ? nil : ProductLedger.pass(
+            sequence: (all - p) / QwenImage21DiT.attentionSlices(heads: config.heads, queries: all - p, keys: all),
+            heads: config.heads, headDim: config.headDim)
+        if !keysOnly, let target, target.normRopeOnGPU, QKNormRope.runs(headDim: config.headDim),
+           let pass = QKNormRope.shared(device: gemm.device, queue: gemm.queue) {
+            var operands: [QKNormRope.Operand] = []
+            for (name, tensor) in [(prefix + "attn.norm_q.weight", q), (prefix + "attn.norm_k.weight", k)] {
+                try artifact.materialize(name, into: reserve, capacity: reserveCapacity)
+                let r = try gemm.region(tensor, bytes: n * d * 4, name: "qk")
+                operands.append(.init(r.buffer, offset: r.offset, heads: config.heads,
+                                      weight: Array(UnsafeBufferPointer(start: reserve, count: config.headDim))))
+            }
+            let freqsRegion = try gemm.region(table, bytes: n * config.headDim * 4, name: "freqs")
+            timed("qk norm + rope") {
+                pass.run(operands, rows: n, headDim: config.headDim, eps: Float(config.eps), freqs: freqsRegion, layout: .interleaved,
+                         wait: target.splits || !segments.isEmpty)
+            }
+        } else {
+            if !keysOnly { try headNormRope(prefix + "attn.norm_q.weight", q, rows: n, freqs: table) }
+            try headNormRope(prefix + "attn.norm_k.weight", k, rows: n, freqs: table)
+        }
+        passClock?.finish()
         if kind == .step, !fused {
             try timed("kv cache") {
                 if let cache {
@@ -819,10 +842,17 @@ package final class QwenImage21DiT: BoundaryRecording, PhaseTiming {
         }
     }
 
-    /// The plan's answer for an attention of the target's queries: the split or the graph (no flash). The memory need reads the same.
+    /// The plan's answer for an attention of the target's queries: the split or the graph (no flash), the QK-norm and RoPE where the plan
+    /// put them. The memory need reads the same.
     package static func attentionAssignment(_ plan: CapacityPlan, rows: Int, keys: Int, heads: Int, headDim: Int) -> AttentionAssignment {
         let a = plan.assign(AttentionKey(sequence: rows, keys: keys, heads: heads, headDim: headDim))
-        return a.splits || a.usesTiles ? a : .graph
+        return a.splits || a.usesTiles ? a : AttentionAssignment.graph.normRope(onGPU: a.normRopeOnGPU)
+    }
+
+    /// The target's attention as `attend` asks for its first slice: where its QK-norm and RoPE run.
+    private func targetAssignment(queries count: Int, keys: Int) -> AttentionAssignment {
+        let slices = QwenImage21DiT.attentionSlices(heads: config.heads, queries: count, keys: keys)
+        return Self.attentionAssignment(gemm.plan, rows: count / slices, keys: keys, heads: config.heads, headDim: config.headDim)
     }
 
     /// Queries `[queries, queries + count)` of the joint sequence (held from `first`) against the keys

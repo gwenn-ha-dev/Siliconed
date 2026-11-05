@@ -238,6 +238,16 @@ package final class GEMM {
         return buffer
     }
 
+    /// **A pointer anywhere inside an arena slice, seen from the GPU**: the wrapper of the page it lies on (`wrap`), and its offset in
+    /// bytes there. Every slice starts on a page and the arena is rounded to one, so the pages around `bytes` are the arena's
+    /// (`Arena.slice`): a RoPE table read from a row that is not a page's first (Qwen's `first`, Z-Image's caption block).
+    package func region(_ pointer: UnsafeRawPointer, bytes: Int, name: String) throws -> (buffer: MTLBuffer, offset: Int) {
+        let address = Int(bitPattern: pointer), page = Arena.alignment
+        let base = address / page * page
+        let buffer = try wrap(UnsafeMutableRawPointer(bitPattern: base)!, bytes: address - base + bytes, name: name)
+        return (buffer, address - base)
+    }
+
     /// **The plan's answer for a product** of this GEMM's phase: what `WeightProducts` and `linear` read.
     package func assignment(k: Int, n: Int, m: Int, weight: CapacityClasses.WeightFormat = .bf16) -> ProductAssignment {
         plan.assign(ProductKey(k: k, n: n, m: m, weight: weight, phase: phase))

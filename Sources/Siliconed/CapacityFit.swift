@@ -223,6 +223,9 @@ package enum CapacityFit {
         /// **The GPU's wake** (`Context.wake`): the tier's shortest tiled attention timed after the longest and an idle, one per idle (its
         /// microseconds last in `shape`). `nil` in a report that predates it.
         package var wake: [Solo]?
+        /// **The QK-norm and RoPE on either side** (`Context.normRope`): `cpu/normrope` (the CPU's pass), `gpu/normrope` (the kernel's own GPU
+        /// seconds, queued) and `gpu/normrope-wait` (its wall, waited for), at the tier's sequences — `flop` holds the values. `nil` before it.
+        package var normRope: [Solo]?
         package init() {}
 
         /// **The same numbers to `digits` significant digits** — what a report keeps (an exact FLOP count stays exact). The model of a
@@ -246,6 +249,7 @@ package enum CapacityFit {
             m.diskClasses = diskClasses.mapValues { .init(rate: r($0.rate), mean: r($0.mean)) }
             m.preparation = preparation.mapValues { $0.mapValues(r) }
             m.wake = wake?.map { Solo(kernel: $0.kernel, shape: $0.shape, flop: $0.flop, seconds: r($0.seconds)) }
+            m.normRope = normRope?.map { Solo(kernel: $0.kernel, shape: $0.shape, flop: $0.flop, seconds: r($0.seconds), error: $0.error.map { Diagnostic.significant($0, 3) }) }
             return m
         }
     }
@@ -732,9 +736,29 @@ package enum CapacityFit {
         }
         model.noise = m.tileTrials.flatMap(noise)
         if let w = wake(m.wake) { model.wake = w.seconds; model.wakeIdle = w.idle }
+        model.normRope = normRope(m.normRope, wrong: m.wrong)
         model.memoryBandwidth = m.memoryBandwidth
         model.diskBandwidth = m.diskBandwidth
         model.diskClasses = m.diskClasses
         return model
     }
+}
+
+extension CapacityFit {
+    /// **The QK-norm and RoPE's three lines from their probe** (`Context.normRope`), each `t₀ + values / rate` through its points; `nil`
+    /// without the probe, with a route the judge refused, or without a line for each.
+    package static func normRope(_ solos: [Measurements.Solo]?, wrong: [String] = []) -> CapacityModel.NormRope? {
+        guard let solos else { return nil }
+        func fitted(_ name: String) -> CapacityModel.Line? {
+            guard !wrong.contains(name) else { return nil }
+            return line(solos.filter { $0.kernel == name }.map { Point(flop: $0.flop, seconds: $0.seconds) })
+        }
+        guard let cpu = fitted(Measurements.normRopeCPU), let gpu = fitted(Measurements.normRopeGPU),
+              let waited = fitted(Measurements.normRopeGPUWaited) else { return nil }
+        return .init(cpu: cpu, gpu: gpu, gpuWaited: waited)
+    }
+}
+
+extension CapacityFit.Measurements {
+    package static let normRopeCPU = "cpu/normrope", normRopeGPU = "gpu/normrope", normRopeGPUWaited = "gpu/normrope-wait"
 }

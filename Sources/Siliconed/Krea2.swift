@@ -118,7 +118,7 @@ package final class Krea2DiT: BoundaryRecording, PhaseTiming {
     /// reads the same function.
     package static func attentionAssignment(_ plan: CapacityPlan, sequence: Int, heads: Int, kvHeads: Int, headDim: Int) -> AttentionAssignment {
         let a = plan.assign(AttentionKey(sequence: sequence, heads: heads, kvHeads: kvHeads, headDim: headDim))
-        return (a.usesTiles || a.splits) && sequence >= headSplitRows ? a : .graph
+        return (a.usesTiles || a.splits) && sequence >= headSplitRows ? a : AttentionAssignment.graph.normRope(onGPU: a.normRopeOnGPU)
     }
     package static let headSplitRows = 2048
 
@@ -400,12 +400,7 @@ package final class Krea2DiT: BoundaryRecording, PhaseTiming {
         try linearGPU(prefix + "attn.to_k.weight", a: normed, into: k, m: n, k: d, n: kv)
         try linearGPU(prefix + "attn.to_v.weight", a: normed, into: v, m: n, k: d, n: kv)
         try linearGPU(prefix + "attn.to_gate.weight", a: normed, into: gate, m: n, k: d, n: d)
-        try headNorm(prefix + "attn.norm_q.weight", q, rows: n * heads)
-        try headNorm(prefix + "attn.norm_k.weight", k, rows: n * config.kvHeads)
-        timed("rope") {
-            Ops.rope(q, freqs: freqs, sequence: n, heads: heads, headDim: dh)
-            Ops.rope(k, freqs: freqs, sequence: n, heads: config.kvHeads, headDim: dh)
-        }
+        try headNormRope(prefix, rows: n)
         try attend(rows: n)
         let (mergedb, gateb) = (try slice(merged), try slice(gate))
         timed("gate") { ownTimings["elementwise GPU", default: 0] += elementwise.carries((mergedb, 0), (gateb, 0), count: n * d) }
@@ -466,6 +461,34 @@ package final class Krea2DiT: BoundaryRecording, PhaseTiming {
     }
 
     /// QK-Norm: RMSNorm over `head_dim`, eps 1e-5, folded weight. On the CPU, like `modulatedNorm`.
+    /// **QK-Norm then RoPE**, Q on its heads and K on its k/v heads: on the CPU in one pass per row (`Ops.rmsNormRope`, the same operations
+    /// in the same order as the norm then the rotation, so the same bits), or on the GPU, chained to the attention, where the plan says
+    /// (`QKNormRope`; waited for under a cut by heads, whose CPU heads read Q and K next).
+    private func headNormRope(_ prefix: String, rows n: Int) throws {
+        let heads = config.heads, kvHeads = config.kvHeads, dh = config.headDim
+        let cut = Krea2DiT.attentionAssignment(gemm.plan, sequence: n, heads: heads, kvHeads: kvHeads, headDim: dh)
+        let clock = ProductLedger.pass(sequence: n, heads: heads, headDim: dh)
+        defer { clock?.finish() }
+        if cut.normRopeOnGPU, QKNormRope.runs(headDim: dh), let pass = QKNormRope.shared(device: gemm.device, queue: gemm.queue) {
+            var operands: [QKNormRope.Operand] = []
+            for (name, tensor, h) in [(prefix + "attn.norm_q.weight", q, heads), (prefix + "attn.norm_k.weight", k, kvHeads)] {
+                try artifact.materialize(name, into: reserve, capacity: reserveCapacity)
+                operands.append(.init(try slice(tensor), heads: h, weight: Array(UnsafeBufferPointer(start: reserve, count: dh))))
+            }
+            let table = try gemm.region(freqs, bytes: n * dh * 4, name: "freqs")
+            timed("qk-norm + rope") {
+                pass.run(operands, rows: n, headDim: dh, eps: Float(config.eps), freqs: table, layout: .interleaved, wait: cut.splits)
+            }
+            return
+        }
+        for (name, tensor, h) in [(prefix + "attn.norm_q.weight", q, heads), (prefix + "attn.norm_k.weight", k, kvHeads)] {
+            try artifact.materialize(name, into: reserve, capacity: reserveCapacity)
+            timed("qk-norm + rope") {
+                Ops.rmsNormRope(tensor, weight: reserve, freqs: freqs, sequence: n, heads: h, headDim: dh, eps: Float(config.eps))
+            }
+        }
+    }
+
     private func headNorm(_ name: String, _ tensor: UnsafeMutablePointer<Float>, rows: Int) throws {
         try artifact.materialize(name, into: reserve, capacity: reserveCapacity)
         timed("norm") { Ops.rmsNorm(tensor, weight: reserve, into: tensor, rows: rows,

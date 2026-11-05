@@ -14,7 +14,8 @@ import Foundation
 ///
 /// Where it runs: the seven GEMMs on the GPU (with the AMX when co-execution is on, `Conductor`), the
 /// SDPA on the GPU with a share of the heads on the CPU (`HeadSplitAttention`), the SwiGLU on
-/// the GPU (`ElementwiseGPU`), the norms, RoPE and residuals on the CPU. The elementwise ops weigh
+/// the GPU (`ElementwiseGPU`), the QK-norm and RoPE on the CPU or the GPU as the plan says (`QKNormRope`), the other norms and the
+/// residuals on the CPU. The elementwise ops weigh
 /// little in FLOPs, carry all the porting risk, and on the CPU they can be debugged.
 package final class Block: BoundaryRecording, PhaseTiming {
     package struct Shapes {
@@ -302,18 +303,6 @@ package final class Block: BoundaryRecording, PhaseTiming {
             record(label, destination, s * d)
         }
 
-        // QK-Norm over head_dim, AFTER the split into heads and BEFORE the RoPE.
-        try widen("attention.norm_q.weight", count: headDim, into: scratch)
-        timed("qk-norm") { Ops.rmsNorm(qHeads, weight: scratch, into: qHeads, rows: s * heads, columns: headDim, eps: 1e-5) }
-        record("layer0_q_normed", qHeads, s * d)
-        try widen("attention.norm_k.weight", count: headDim, into: scratch)
-        timed("qk-norm") { Ops.rmsNorm(kHeads, weight: scratch, into: kHeads, rows: s * heads, columns: headDim, eps: 1e-5) }
-        record("layer0_k_normed", kHeads, s * d)
-
-        timed("rope") {
-            Ops.rope(qHeads, freqs: freqs, sequence: s, heads: heads, headDim: headDim)
-            Ops.rope(kHeads, freqs: freqs, sequence: s, heads: heads, headDim: headDim)
-        }
         // No more rearrangement here: `q`, `k` and `v` go out as the GEMM wrote them,
         // `[S, H·Dh]` in fp32, and the output comes back in the same layout. The transposition and
         // the precision conversion live in `Attention`'s graph — see its initialization comment
@@ -322,6 +311,47 @@ package final class Block: BoundaryRecording, PhaseTiming {
         let flash = flash()
         let tiled = tiled()
         let split = flash == nil && tiled == nil ? try headSplit() : nil
+
+        // QK-Norm over head_dim, AFTER the split into heads and BEFORE the RoPE (eps 1e-5, not the block's).
+        try widen("attention.norm_q.weight", count: headDim, into: scratch)
+        let normQ = Array(UnsafeBufferPointer(start: scratch, count: headDim))
+        try widen("attention.norm_k.weight", count: headDim, into: scratch)
+        let normK = Array(UnsafeBufferPointer(start: scratch, count: headDim))
+        let passClock = ProductLedger.pass(sequence: s, heads: heads, headDim: headDim)
+        if attentionAssignment.normRopeOnGPU, QKNormRope.runs(headDim: headDim),
+           let pass = QKNormRope.shared(device: gemm.device, queue: gemm.queue) {
+            // On the GPU, chained to the attention (`QKNormRope`); waited for where the CPU reads Q and K next.
+            let table = try gemm.region(freqs, bytes: s * headDim * 4, name: "freqs")
+            timed("qk-norm + rope") {
+                if recordBoundaries {
+                    pass.run([.init(qb, heads: heads, weight: normQ), .init(kb, heads: heads, weight: normK)],
+                             rows: s, headDim: headDim, eps: 1e-5, freqs: nil, layout: .interleaved)
+                    record("layer0_q_normed", qHeads, s * d)
+                    record("layer0_k_normed", kHeads, s * d)
+                    pass.run([.init(qb, heads: heads, weight: nil), .init(kb, heads: heads, weight: nil)],
+                             rows: s, headDim: headDim, eps: 1e-5, freqs: table, layout: .interleaved)
+                } else {
+                    pass.run([.init(qb, heads: heads, weight: normQ), .init(kb, heads: heads, weight: normK)],
+                             rows: s, headDim: headDim, eps: 1e-5, freqs: table, layout: .interleaved, wait: split != nil)
+                }
+            }
+        } else if recordBoundaries {
+            timed("qk-norm") { Ops.rmsNorm(qHeads, weight: normQ, into: qHeads, rows: s * heads, columns: headDim, eps: 1e-5) }
+            record("layer0_q_normed", qHeads, s * d)
+            timed("qk-norm") { Ops.rmsNorm(kHeads, weight: normK, into: kHeads, rows: s * heads, columns: headDim, eps: 1e-5) }
+            record("layer0_k_normed", kHeads, s * d)
+            timed("rope") {
+                Ops.rope(qHeads, freqs: freqs, sequence: s, heads: heads, headDim: headDim)
+                Ops.rope(kHeads, freqs: freqs, sequence: s, heads: heads, headDim: headDim)
+            }
+        } else {
+            // One pass per row, the same operations in the same order as the two passes, so the same bits (`QKNormRopeTests`).
+            timed("qk-norm + rope") {
+                Ops.rmsNormRope(qHeads, weight: normQ, freqs: freqs, sequence: s, heads: heads, headDim: headDim, eps: 1e-5)
+                Ops.rmsNormRope(kHeads, weight: normK, freqs: freqs, sequence: s, heads: heads, headDim: headDim, eps: 1e-5)
+            }
+        }
+        passClock?.finish()
         timed("sdpa wall") {
             if let flash {
                 ownTimings["sdpa GPU", default: 0] += flash.run(q: qb, k: kb, v: vb, into: ob)

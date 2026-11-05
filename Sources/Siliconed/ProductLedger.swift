@@ -151,6 +151,16 @@ package final class ProductLedger: Sendable {
         }
     }
 
+    /// The route name of the QK-norm and RoPE before a self-attention (`pass`): never a route the attention took.
+    package static let passRoute = "qk-norm+rope"
+
+    /// Starts timing the QK-norm and RoPE before the self-attention of `sequence` query rows, on the CPU or the GPU: its seconds join the
+    /// attention's class and no execution (`RenderLoop.compare`) — the plan prices the pass there (`CapacityModel.normRope`), and the
+    /// attention's own clock starts after a CPU pass or a waited GPU pass (a GPU pass left in the queue runs inside it).
+    package static func pass(sequence: Int, heads: Int, headDim: Int) -> Stopwatch? {
+        attention(sequence: sequence, heads: heads, headDim: headDim, route: passRoute)
+    }
+
     /// Starts timing an attention of `sequence` query rows (none under 64: no class decides it) on `route`.
     package static func attention(sequence: Int, heads: Int, headDim: Int, route: String) -> Stopwatch? {
         guard sequence >= 64, let ledger = current else { return nil }
