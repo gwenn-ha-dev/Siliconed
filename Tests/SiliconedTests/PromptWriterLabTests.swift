@@ -67,6 +67,10 @@ final class PromptWriterLabTests: XCTestCase {
             XCTAssertTrue(text.contains("unless the user wrote it"), "\(family)")
             XCTAssertTrue(text.contains("even a single word"), "\(family)")
         }
+        // Z-Image's ran into « no visible wear on bike … » up to the loop guard (5/11/2026): the same rule, in second place.
+        let z = PromptWriterInstructions.instruction(for: .zImage, .rewrite)
+        XCTAssertTrue(z.contains("never what is absent") && z.contains("unless the user wrote it"))
+        XCTAssertLessThan(z.range(of: "never what is absent")!.lowerBound, z.range(of: "Where the text leaves them open")!.lowerBound)
     }
 
     func testDescribeNamesWhatIsVisiblePlainly() {
