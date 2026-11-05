@@ -443,6 +443,7 @@ package final class GEMM {
         // Heights that are not a multiple of 64: the body here, the tail through the tier
         // (`rowQuantum`) — the body's prefixes of `x`, `mid` and `c` are its own rows.
         let (body, tail) = GEMM.rowSplit(m)
+        if tail > 0, queue.stream.isOn { return loraQueued(x: x, down: down, mid: mid, up: up, c: c, body: body, tail: tail, k: k, r: r, n: n) }
         if tail > 0 {
             return lora(x: x, down: down, mid: mid, up: up, c: c, m: body, k: k, r: r, n: n)
                 + padded(first: body, rows: tail)
@@ -450,11 +451,34 @@ package final class GEMM {
         let commands = queue.checkedCommandBuffer()
         encoder(Shape(m: m, k: k, n: r, transposed: true), into: commands, x, down, mid)
         encoder(Shape(m: m, k: r, n: n, transposed: true, accumulates: true), into: commands, mid, up, c)
-        commands.commit()
-        commands.waitUntilCompleted()
-        let elapsed = Attention.verdict(commands, what: "LoRA \(m)×\(k)×\(r)→\(n)")
+        let elapsed = commands.commitSettled(label: "lora GPU", what: "LoRA \(m)×\(k)×\(r)→\(n)")
         let key = "lora \(m)×\(k)×\(r)→\(n)"
         record(key, elapsed)
+        return elapsed
+    }
+
+    /// **The same stack on the stream** (`GPUStream.isOn`): the body and the tier's tail in one command buffer, the tail's rows of `x`
+    /// and `c` copied to the tier and `c`'s back by blits on the GPU — where the waited path copies them on the CPU, which would read
+    /// rows the queued work has not written yet. The same products on the same operands at the same heights: the same bits.
+    private func loraQueued(x: MTLBuffer, down: MTLBuffer, mid: MTLBuffer, up: MTLBuffer, c: MTLBuffer,
+                            body: Int, tail: Int, k: Int, r: Int, n: Int) -> Double {
+        let l = GEMM.submittedRows
+        let (px, pc, pm) = (tiers.a(l * k), tiers.c(l * n), tiers.mid(l * r))
+        let commands = queue.checkedCommandBuffer()
+        encoder(Shape(m: body, k: k, n: r, transposed: true), into: commands, x, down, mid)
+        encoder(Shape(m: body, k: r, n: n, transposed: true, accumulates: true), into: commands, mid, up, c)
+        guard let into = commands.makeBlitCommandEncoder() else { fatalError("Metal refused a blit encoder") }
+        into.copy(from: x, sourceOffset: body * k * 4, to: px, destinationOffset: 0, size: tail * k * 4)
+        into.copy(from: c, sourceOffset: body * n * 4, to: pc, destinationOffset: 0, size: tail * n * 4)
+        into.endEncoding()
+        encoder(Shape(m: l, k: k, n: r, transposed: true), into: commands, px, down, pm)
+        encoder(Shape(m: l, k: r, n: n, transposed: true, accumulates: true), into: commands, pm, up, pc)
+        guard let back = commands.makeBlitCommandEncoder() else { fatalError("Metal refused a blit encoder") }
+        back.copy(from: pc, sourceOffset: 0, to: c, destinationOffset: body * n * 4, size: tail * n * 4)
+        back.endEncoding()
+        let m = body + tail
+        let elapsed = commands.commitSettled(label: "lora GPU", what: "LoRA \(m)×\(k)×\(r)→\(n), queued")
+        record("lora \(m)×\(k)×\(r)→\(n)", elapsed)
         return elapsed
     }
 
