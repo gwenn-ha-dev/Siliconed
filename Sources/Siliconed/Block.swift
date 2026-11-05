@@ -249,15 +249,11 @@ package final class Block: BoundaryRecording, PhaseTiming {
 
     /// `x` as `[S, D]`, modified in place, `S` the sizing length. `freqs` as `[S, Dh/2, 2]`.
     /// `adaln` as `[256]`.
-    package func forward(x: UnsafeMutablePointer<Float>, freqs: UnsafePointer<Float>,
-                        adaln: UnsafePointer<Float>, adalnDim: Int, prefix: String) throws {
-        self.prefix = prefix
-        let s = shapes.sequence
-        let d = shapes.dim, h = shapes.hidden
-        let heads = shapes.heads, headDim = shapes.headDim
-
-        // ── modulation: a bare Linear, with bias, four pieces. No SiLU.
-        let scaleMSA = modulationSlot, gateMSA = modulationSlot + d
+    /// The modulation's four pieces into `modulationSlot` — `scale_msa, gate_msa, scale_mlp, gate_mlp`, tanh on the gates, 1 + on
+    /// the scales; ones without modulation (the context refiners). On the CPU.
+    private func modulate(adaln: UnsafePointer<Float>, adalnDim: Int) throws {
+        let d = shapes.dim
+        let gateMSA = modulationSlot + d, scaleMSA = modulationSlot
         let scaleMLP = modulationSlot + 2 * d, gateMLP = modulationSlot + 3 * d
         if modulation {
             try widen("adaLN_modulation.0.weight", count: 4 * d * adalnDim, into: weightReserve)
@@ -280,6 +276,91 @@ package final class Block: BoundaryRecording, PhaseTiming {
             // duplicate the path, because a second path is a second place to go wrong.
             for i in 0..<(4 * d) { modulationSlot[i] = 1 }
         }
+    }
+
+    // ── the stream (prototype, `SILICONED_STREAM`) ──────────────────────────────────────────────────────────────────────────
+
+    /// The norms' weights and the modulation, where the GPU's norms read them: `[norm1 | norm2 | ffn_norm1 | ffn_norm2 | scale_msa |
+    /// gate_msa | scale_mlp | gate_mlp]`, each `dim` floats. Written by the CPU after the block's drain, read by the queued kernels.
+    private lazy var bank: MTLBuffer? = gemm.device.makeBuffer(length: 8 * shapes.dim * 4, options: .storageModeShared)
+
+    /// **The block as one stream of GPU work** (`GPUStream`): the norms and gated residuals on the GPU (`ElementwiseGPU.normScale`,
+    /// `normResidual`), the QK-norm and RoPE chained to the attention (`QKNormRope`), the products' bf16 weights read in place
+    /// (`WeightProducts`), and one drain, at the block's end. Not the CPU norms' bits (`ElementwiseGPU`: the sum's order): judged
+    /// against the oracle. `false` where the prototype does not run (a boundary recorded, a LoRA, no tiled attention, no QK pass on the
+    /// GPU): the block runs as before.
+    private func forwardStreamed(x: UnsafeMutablePointer<Float>, freqs: UnsafePointer<Float>,
+                                 adaln: UnsafePointer<Float>, adalnDim: Int) throws -> Bool {
+        guard GPUStream.policy != .off, !recordBoundaries, lora == nil, cacheLoRA == nil, flash() == nil, let tiled = tiled(),
+              QKNormRope.runs(headDim: shapes.headDim), let pass = QKNormRope.shared(device: gemm.device, queue: gemm.queue),
+              let bank else { return false }
+        let s = shapes.sequence
+        let d = shapes.dim, h = shapes.hidden
+        let heads = shapes.heads, headDim = shapes.headDim
+        let stream = gemm.queue.stream
+        stream.drain()                                     // the CPU writes the reserve, the modulation and the bank next
+        try modulate(adaln: adaln, adalnDim: adalnDim)
+        let weights = bank.contents().assumingMemoryBound(to: Float.self)
+        for (i, name) in ["attention_norm1.weight", "attention_norm2.weight", "ffn_norm1.weight", "ffn_norm2.weight"].enumerated() {
+            try widen(name, count: d, into: weights + i * d)
+        }
+        (weights + 4 * d).update(from: modulationSlot, count: 4 * d)
+        try widen("attention.norm_q.weight", count: headDim, into: scratch)
+        let normQ = Array(UnsafeBufferPointer(start: scratch, count: headDim))
+        try widen("attention.norm_k.weight", count: headDim, into: scratch)
+        let normK = Array(UnsafeBufferPointer(start: scratch, count: headDim))
+
+        let xs = try gemm.region(x, bytes: s * d * 4, name: "x")
+        let x0: ElementwiseGPU.BufferSlice = (xs.buffer, xs.offset / 4)
+        func at(_ i: Int) -> ElementwiseGPU.BufferSlice { (bank, i * d) }
+        let a = try gemm.wrap(UnsafeMutableRawPointer(normed), bytes: s * d * 4, name: "normed")
+        let o = try gemm.wrap(UnsafeMutableRawPointer(qkv), bytes: s * d * 4, name: "qkv")
+        let qb = try gemm.wrap(UnsafeMutableRawPointer(qHeads), bytes: s * d * 4, name: "q")
+        let kb = try gemm.wrap(UnsafeMutableRawPointer(kHeads), bytes: s * d * 4, name: "k")
+        let vb = try gemm.wrap(UnsafeMutableRawPointer(vHeads), bytes: s * d * 4, name: "v")
+        let ob = try gemm.wrap(UnsafeMutableRawPointer(merged), bytes: s * d * 4, name: "sdpaOut")
+        let table = try gemm.region(freqs, bytes: s * headDim * 4, name: "freqs")
+
+        if GPUStream.policy != .off, ProcessInfo.processInfo.environment["SILICONED_STREAM_WAIT"] == nil { stream.isOn = true }
+        defer { stream.isOn = false }                      // drains: the DiT reads `x` on the CPU after the last block
+
+        // ── attention
+        timed("norm") { elementwise.normScale(x0, weight: at(0), scale: at(4), into: (a, 0), rows: s, columns: d, eps: eps) }
+        for (name, buffer) in [("attention.to_q.weight", qb), ("attention.to_k.weight", kb), ("attention.to_v.weight", vb)] {
+            try products.linear(prefix + name, a: a, c: buffer, m: s, k: d, n: d)
+        }
+        timed("qk-norm + rope") {
+            pass.run([.init(qb, heads: heads, weight: normQ), .init(kb, heads: heads, weight: normK)],
+                     rows: s, headDim: headDim, eps: 1e-5, freqs: table, layout: .interleaved, wait: !stream.isOn)
+        }
+        timed("sdpa wall") { ownTimings["sdpa GPU", default: 0] += tiled.run(q: qb, k: kb, v: vb, into: ob) }
+        try products.linear(prefix + "attention.to_out.0.weight", a: ob, c: o, m: s, k: d, n: d)
+        timed("residual") { elementwise.normResidual(x0, plus: (o, 0), weight: at(1), gate: at(5), rows: s, columns: d, eps: eps) }
+
+        // ── feed-forward
+        timed("norm") { elementwise.normScale(x0, weight: at(2), scale: at(6), into: (a, 0), rows: s, columns: d, eps: eps) }
+        let h1 = try gemm.wrap(UnsafeMutableRawPointer(hidden1), bytes: s * h * 4, name: "h1")
+        let h3 = try gemm.wrap(UnsafeMutableRawPointer(hidden3), bytes: s * h * 4, name: "h3")
+        try products.linear(prefix + "feed_forward.w1.weight", a: a, c: h1, m: s, k: d, n: h)
+        try products.linear(prefix + "feed_forward.w3.weight", a: a, c: h3, m: s, k: d, n: h)
+        timed("swiglu") { ownTimings["elementwise GPU", default: 0] += elementwise.swiglu((h1, 0), (h3, 0), count: s * h) }
+        try products.linear(prefix + "feed_forward.w2.weight", a: h1, c: o, m: s, k: h, n: d)
+        timed("residual") { elementwise.normResidual(x0, plus: (o, 0), weight: at(3), gate: at(7), rows: s, columns: d, eps: eps) }
+        return true
+    }
+
+    package func forward(x: UnsafeMutablePointer<Float>, freqs: UnsafePointer<Float>,
+                        adaln: UnsafePointer<Float>, adalnDim: Int, prefix: String) throws {
+        self.prefix = prefix
+        let s = shapes.sequence
+        let d = shapes.dim, h = shapes.hidden
+        let heads = shapes.heads, headDim = shapes.headDim
+
+        // ── modulation: a bare Linear, with bias, four pieces. No SiLU.
+        let scaleMSA = modulationSlot, gateMSA = modulationSlot + d
+        let scaleMLP = modulationSlot + 2 * d, gateMLP = modulationSlot + 3 * d
+        if try forwardStreamed(x: x, freqs: freqs, adaln: adaln, adalnDim: adalnDim) { return }
+        try modulate(adaln: adaln, adalnDim: adalnDim)
 
         // ── attention ────────────────────────────────────────────────────────────────────
         try widen("attention_norm1.weight", count: d, into: scratch)

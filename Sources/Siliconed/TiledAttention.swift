@@ -193,8 +193,8 @@ package final class TiledAttention {
         let clock = ProductLedger.attention(sequence: sequence, heads: heads, headDim: headDim, route: route)
         defer { clock?.finish() }
         let commands = submit(q: q, k: k, v: v, into: out)
-        commands.waitUntilCompleted()
-        return Attention.verdict(commands, what: "tiled attention S=\(sequence) H=\(computed)/\(heads) \(precision)")
+        let what = "tiled attention S=\(sequence) H=\(computed)/\(heads) \(precision)"
+        return queue.stream.settle(commands, label: "sdpa GPU", what: { what })
     }
 
     /// The same, **committed and not awaited**: the head split computes the CPU's heads meanwhile, then waits on the buffer.

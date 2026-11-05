@@ -161,7 +161,7 @@ extension TensorGEMM {
     /// **`C [m, n] = round_bf16(A [m, k]) · W`**, `W` bf16 as `linear(a:w:…)` takes it. The rounded rows go
     /// to `rounding` by chunks, each chunk's product written where its rows go; one submission. Returns
     /// the GPU seconds, the rounding's included. `k` is even.
-    package func linear(a: MTLBuffer, rounding: Rounding, w: MTLBuffer, c: MTLBuffer, m: Int, k: Int, n: Int,
+    package func linear(a: MTLBuffer, rounding: Rounding, w: MTLBuffer, wOffset: Int = 0, c: MTLBuffer, m: Int, k: Int, n: Int,
                         weightIsTransposed: Bool) -> Double {
         let kernels = rounded!
         let tiled = tiles.products(CapacityModel.Kernel(.gpu, .bf16act), rows: m, k: k, n: n)
@@ -174,16 +174,14 @@ extension TensorGEMM {
             encodeRound(encoder, kernels, from: a, first * k * 4, to: rounding.buffer, rounding.offset, count: rows * k)
             encoder.setComputePipelineState(pipeline)
             encoder.setBuffer(rounding.buffer, offset: rounding.offset, index: 0)
-            encoder.setBuffer(w, offset: 0, index: 1)
+            encoder.setBuffer(w, offset: wOffset, index: 1)
             encoder.setBuffer(c, offset: first * n * 4, index: 2)
             var mkn = SIMD3<UInt32>(UInt32(rows), UInt32(k), UInt32(n))
             encoder.setBytes(&mkn, length: MemoryLayout<SIMD3<UInt32>>.stride, index: 3)
             encoder.dispatchThreadgroups(tile.grid(rows: rows, columns: n), threadsPerThreadgroup: tile.threads(pipeline))
         }
         encoder.endEncoding()
-        commands.commit()
-        commands.waitUntilCompleted()
-        return Attention.verdict(commands, what: "matmul2d bfloat × bfloat \(m)×\(k)×\(n)")
+        return commands.commitSettled(label: "gemm GPU", what: "matmul2d bfloat × bfloat \(m)×\(k)×\(n)")
     }
 }
 

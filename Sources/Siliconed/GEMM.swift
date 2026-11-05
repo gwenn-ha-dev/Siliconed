@@ -374,9 +374,9 @@ package final class GEMM {
 
     /// **The same on an activation rounded to bf16** (`bf16Activations`, which the caller checked): `A`
     /// rounded by chunks of `rounding.rows` rows into the reserve's tail, `wb` the staged weight.
-    package func linear(a: MTLBuffer, rounding: TensorGEMM.Rounding, bf16 wb: MTLBuffer, c: MTLBuffer, m: Int, k: Int,
-                        n: Int, weightIsTransposed: Bool = false) -> Double {
-        let elapsed = tensor!.linear(a: a, rounding: rounding, w: wb, c: c, m: m, k: k, n: n,
+    package func linear(a: MTLBuffer, rounding: TensorGEMM.Rounding, bf16 wb: MTLBuffer, weightOffset: Int = 0, c: MTLBuffer, m: Int,
+                        k: Int, n: Int, weightIsTransposed: Bool = false) -> Double {
+        let elapsed = tensor!.linear(a: a, rounding: rounding, w: wb, wOffset: weightOffset, c: c, m: m, k: k, n: n,
                                      weightIsTransposed: weightIsTransposed)
         let key = "\(m)×\(k)×\(n)\(weightIsTransposed ? "ᵀ" : "")◐"
         record(key, elapsed)

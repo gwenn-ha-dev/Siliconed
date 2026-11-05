@@ -89,10 +89,67 @@ package final class ElementwiseGPU {
         x[i] = x[i] + product;
     }
 
+    // ── RMSNorm by rows, one threadgroup of 256 per row ─────────────────────────────────────────────────────────────────────
+    // The sum of squares in plain fp32 (each lane its strided values, `simd_sum`, then the eight partials in order): not
+    // `vDSP_svesq`'s order (`QKNormRope`), so not the CPU's bits — judged against the oracle. Then the CPU's roundings in its order.
+    struct NormParams { uint cols; float eps; uint scaled; };
+
+    static inline float row_scale(device const float *row, uint cols, float eps, uint t, uint lane, uint sg,
+                                  threadgroup float *partial) {
+        #pragma METAL fp contract(off)
+        float ss = 0.0f;
+        for (uint i = t; i < cols; i += 256) { float v = row[i]; float sq = v * v; ss = ss + sq; }
+        float s = simd_sum(ss);
+        if (lane == 0) partial[sg] = s;
+        threadgroup_barrier(mem_flags::mem_threadgroup);
+        float total = 0.0f;
+        for (uint j = 0; j < 8; j++) total = total + partial[j];
+        float mean = precise::divide(total, float(cols));
+        return precise::divide(1.0f, precise::sqrt(mean + eps));
+    }
+
+    // out = ((x · r) · w) · scale — `Ops.rmsNorm` (`vsmul`, `vmul`) then `Ops.scaleRows`, each rounded.
+    kernel void norm_scale(device const float *x [[buffer(0)]], device const float *w [[buffer(1)]],
+                           device const float *scale [[buffer(2)]], device float *out [[buffer(3)]],
+                           constant NormParams &p [[buffer(4)]], uint row [[threadgroup_position_in_grid]],
+                           uint t [[thread_index_in_threadgroup]], uint lane [[thread_index_in_simdgroup]],
+                           uint sg [[simdgroup_index_in_threadgroup]]) {
+        #pragma METAL fp contract(off)
+        threadgroup float partial[8];
+        device const float *source = x + ulong(row) * p.cols;
+        device float *destination = out + ulong(row) * p.cols;
+        float r = row_scale(source, p.cols, p.eps, t, lane, sg, partial);
+        for (uint i = t; i < p.cols; i += 256) {
+            float v = source[i] * r;
+            v = v * w[i];
+            if (p.scaled != 0) v = v * scale[i];
+            destination[i] = v;
+        }
+    }
+
+    // x += gate · ((y · r) · w) — `Ops.rmsNorm` then `Ops.gatedResidual`: the product, then the sum.
+    kernel void norm_residual(device float *x [[buffer(0)]], device const float *y [[buffer(1)]],
+                              device const float *w [[buffer(2)]], device const float *gate [[buffer(3)]],
+                              constant NormParams &p [[buffer(4)]], uint row [[threadgroup_position_in_grid]],
+                              uint t [[thread_index_in_threadgroup]], uint lane [[thread_index_in_simdgroup]],
+                              uint sg [[simdgroup_index_in_threadgroup]]) {
+        #pragma METAL fp contract(off)
+        threadgroup float partial[8];
+        device const float *source = y + ulong(row) * p.cols;
+        device float *destination = x + ulong(row) * p.cols;
+        float r = row_scale(source, p.cols, p.eps, t, lane, sg, partial);
+        for (uint i = t; i < p.cols; i += 256) {
+            float v = source[i] * r;
+            v = v * w[i];
+            float product = gate[i] * v;
+            destination[i] = destination[i] + product;
+        }
+    }
+
     """
 
     private let queue: MTLCommandQueue
-    private let swigluPipeline, carriesPipeline, residualPipeline: MTLComputePipelineState
+    private let swigluPipeline, carriesPipeline, residualPipeline, normScalePipeline, normResidualPipeline: MTLComputePipelineState
 
     package init(device: MTLDevice, queue: MTLCommandQueue) throws {
         self.queue = queue
@@ -105,6 +162,7 @@ package final class ElementwiseGPU {
         }
         swigluPipeline = try pipeline("swiglu"); carriesPipeline = try pipeline("sigmoid_gate")
         residualPipeline = try pipeline("residual")
+        normScalePipeline = try pipeline("norm_scale"); normResidualPipeline = try pipeline("norm_residual")
     }
 
     /// A buffer (at an offset in floats) — the form in which each kernel receives its operands.
@@ -127,9 +185,8 @@ package final class ElementwiseGPU {
             encoder.dispatchThreads(grid, threadsPerThreadgroup: group)
         }
         encoder.endEncoding()
-        commands.commit()
-        commands.waitUntilCompleted()
-        return Attention.verdict(commands, what: "GPU elementwise (\(pipeline.label ?? "?"))")
+        let what = "GPU elementwise (\(pipeline.label ?? "?"))"
+        return commands.commitSettled(label: "elementwise GPU", what: what)
     }
 
     private func linear(_ count: Int) -> (MTLSize, MTLSize) {
@@ -161,5 +218,27 @@ package final class ElementwiseGPU {
         return launch(residualPipeline, [x, y, carries], constants: { $0.setBytes(&c, length: 4, index: $1) },
                       grid: MTLSize(width: columns, height: rows, depth: 1),
                       group: MTLSize(width: 256, height: 1, depth: 1))
+    }
+
+    private struct NormParams { var cols: UInt32; var eps: Float; var scaled: UInt32 }
+
+    /// `out[s, :] ← (RMSNorm(x[s, :]) · w) · scale` (`scale` nil: the norm alone), one threadgroup per row.
+    @discardableResult
+    package func normScale(_ x: BufferSlice, weight: BufferSlice, scale: BufferSlice?, into out: BufferSlice,
+                           rows: Int, columns: Int, eps: Float) -> Double {
+        var p = NormParams(cols: UInt32(columns), eps: eps, scaled: scale == nil ? 0 : 1)
+        return launch(normScalePipeline, [x, weight, scale ?? weight, out],
+                      constants: { $0.setBytes(&p, length: MemoryLayout<NormParams>.stride, index: $1) },
+                      grid: MTLSize(width: rows, height: 1, depth: 1), group: MTLSize(width: 256, height: 1, depth: 1), byGroups: true)
+    }
+
+    /// `x[s, :] ← x[s, :] + gate · (RMSNorm(y[s, :]) · w)`, one threadgroup per row.
+    @discardableResult
+    package func normResidual(_ x: BufferSlice, plus y: BufferSlice, weight: BufferSlice, gate: BufferSlice,
+                              rows: Int, columns: Int, eps: Float) -> Double {
+        var p = NormParams(cols: UInt32(columns), eps: eps, scaled: 1)
+        return launch(normResidualPipeline, [x, y, weight, gate],
+                      constants: { $0.setBytes(&p, length: MemoryLayout<NormParams>.stride, index: $1) },
+                      grid: MTLSize(width: rows, height: 1, depth: 1), group: MTLSize(width: 256, height: 1, depth: 1), byGroups: true)
     }
 }

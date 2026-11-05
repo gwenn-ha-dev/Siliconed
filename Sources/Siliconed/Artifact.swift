@@ -1,3 +1,4 @@
+import Metal
 import Darwin
 import Foundation
 
@@ -407,6 +408,32 @@ package final class Artifact {
         if let through { return through.read(name, t, page: page) }
         return base.advanced(by: t.offset)
     }
+
+    /// **The tensor's offset in the mapping, when it is read straight from it** — no tail stream, no resident copy, no read-through:
+    /// the bytes a product may read in place, wrapped (`wrappedMap`), instead of a copy into a reserve (`stage`). `nil` otherwise.
+    package func mappedOffset(_ name: String) -> Int? {
+        guard stream == nil, resident == nil, through == nil, let t = tensors[name] else { return nil }
+        return t.offset
+    }
+
+    /// **The whole mapping as one GPU buffer, not copied** (`newBuffer(bytesNoCopy:)` over the read-only file pages, rounded to the
+    /// page): made on first use for `device`, `nil` where Metal refuses it or the map is larger than a buffer may be. The map's pages
+    /// then stay clean and file-backed, never swapped (`DÉCISIONS`: the map in B); what the GPU's first read of each page costs is paid
+    /// once per load.
+    package func wrappedMap(on device: MTLDevice) -> MTLBuffer? {
+        wrapLock.lock(); defer { wrapLock.unlock() }
+        if let wrapped, wrapped.device === device { return wrapped }
+        let pageSize = Int(getpagesize())
+        let length = (size + pageSize - 1) / pageSize * pageSize
+        guard length <= device.maxBufferLength,
+              let b = device.makeBuffer(bytesNoCopy: UnsafeMutableRawPointer(mutating: base), length: length,
+                                        options: .storageModeShared, deallocator: nil) else { return nil }
+        b.label = "map"
+        wrapped = b
+        return b
+    }
+    private var wrapped: MTLBuffer?
+    private let wrapLock = NSLock()
 
     /// **Never through the page cache — for a tool that reads a whole map once** (a developer
     /// check, never the engine). Every `pointer` then returns a copy of the tensor read

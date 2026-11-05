@@ -135,7 +135,12 @@ package final class WeightProducts {
                 // The ANE beside the GPU's rounded rows: the plan's last rows, read from the bf16 copy (`bf16Product`), where the process
                 // can run them.
                 let aneRows = planned.path == .bf16 && planned.ane > 0 && planned.ane < m && transposed ? planned.ane : 0
-                if aneRows > 0, let ane = gemm.neuralEngine, ane.accepts(rows: aneRows, k: k, n: n) {
+                if let (map, offset) = inPlace {
+                    aneTook = false
+                    aneDeclined = planned.ane > 0
+                    timings["gemm GPU", default: 0] += gemm.linear(a: a, rounding: (w, rounding.offset, rounding.rows), bf16: map,
+                                                                  weightOffset: offset, c: c, m: m, k: k, n: n, weightIsTransposed: transposed)
+                } else if aneRows > 0, let ane = gemm.neuralEngine, ane.accepts(rows: aneRows, k: k, n: n) {
                     let r = Self.bf16Product(gemm: gemm, rounding: (w, rounding.offset, rounding.rows), reserve: w, a: a, c: c,
                                              m: m, k: k, n: n, ane: ane, aneRows: aneRows)
                     timings["gemm GPU", default: 0] += r.gpu
@@ -442,12 +447,29 @@ package final class WeightProducts {
     /// this process cannot run (no `TensorGEMM`, no Q8_0 reading, no rounding kernels, a reserve too small for the rounding) is
     /// skipped, not refused: the plain form of the same weight, down to the widened one on the GPU — and the skip is named
     /// (`skipped`, into the render's ledger), never silent.
+    /// The weight of the product being prepared, where it lies in the wrapped map (`prepare`'s in-place path), or `nil`.
+    private var inPlace: (buffer: MTLBuffer, offset: Int)?
+
     private func prepare(_ name: String, count: Int, m: Int, n: Int) throws -> (Path, ProductAssignment, skipped: ProductLedger.Reason?) {
         func expect(_ got: Int) throws {
             guard got == count else { throw Artifact.Failure.badHeader("\(name): \(got) values, \(count) expected") }
         }
         let k = count / n
         let planned = gemm.assignment(k: k, n: n, m: m, weight: format(of: name))
+        // **In place, on the stream**: a bf16 weight read where the map holds it (`Artifact.wrappedMap`), no copy into the reserve, so
+        // nothing for the CPU to write while the queued products read — the product queues behind the others. Only the GPU's whole
+        // product (no ANE rows, which read the copy), on a rounded activation.
+        inPlace = nil
+        let stream = gemm.queue.stream
+        if stream.isOn, planned.path == .bf16, planned.roundsActivation, roundsActivations, gemm.bf16Activations,
+           planned.ane == 0 || GPUStream.policy == .gpu, artifact.tensors[name]?.dtype == .bfloat16,
+           let offset = artifact.mappedOffset(name), offset % 16 == 0, let map = artifact.wrappedMap(on: gemm.device),
+           let rounding = Self.roundingPlan(k: k, n: n, capacity: capacity) {
+            inPlace = (map, offset)
+            return (.bf16(rounding), planned, nil)
+        }
+        // Anything else writes the reserve on the CPU: the queued work that reads it first.
+        stream.drain()
         // How this product reads its weight (the plan's): the bf16 weight as published, its operand rounded to bf16 where the
         // plan says it gains, the 8-bit weight as published, or widened.
         if planned.path == .bf16, let tensor = artifact.tensors[name], tensor.dtype == .bfloat16, gemm.tensorBF16 || (planned.roundsActivation && gemm.bf16Activations) {
