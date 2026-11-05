@@ -171,6 +171,8 @@ package enum Diagnostic {
                                   onProgress: (@Sendable (_ stage: Stage) -> Void)?)
         throws(EngineError) -> (report: Report, probes: CapacityProbes.Result) {
         let started = Date()
+        // The probes' need is planned on the process's base: the text encoder a render kept goes back first (`KeptEncoder`).
+        KeptEncoder.release()
         let machine = machine()
         let before = conditions()
         let probes = try CapacityProbes.run(machine: machine, cancellation: cancellation, validate: validate, skipping: skipping, log: log,

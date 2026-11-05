@@ -533,6 +533,45 @@ package final class Artifact {
         resident = resident.map { $0.joined(with: store) } ?? store
     }
 
+    /// **The same region, read ahead of its use instead of before it** (`KeptEncoder`): returns once the region is mapped, the reads
+    /// running on `TailStream.lanes` threads of their own, in file order, in pieces of at most `TailStream.piece` — the stream's
+    /// reads (`pread` + `F_NOCACHE`), kept instead of handed back. `pointer` serves each tensor from the region once it is read and
+    /// waits for it before: a reader in file order computes behind the reads as it did behind the stream's. A read that fails
+    /// leaves the tensors not read yet to the mapping (`pointer` falls back to it: slower, never another weight) and says so
+    /// (`residentLoad`). Given back with the artifact or `releaseResident`: the lanes stop between two pieces and are waited for
+    /// before the region is unmapped. Only on an artifact that keeps nothing yet.
+    package func keepResidentAhead(prefixes: [String]) throws {
+        precondition(resident == nil, "keepResidentAhead on an artifact that already keeps tensors")
+        let wanted = order.filter { name in prefixes.contains { name.hasPrefix($0) } }
+        guard !wanted.isEmpty else { return }
+        let fd = open(path, O_RDONLY)
+        guard fd >= 0 else { throw Failure.cannotOpen(path, errno) }
+        _ = fcntl(fd, F_NOCACHE, 1)
+        let sizes = wanted.map { (tensors[$0]!.bytes + page - 1) / page * page }
+        let store = ResidentTensors(names: wanted, sizes: sizes)
+        var pieces: [ResidentLoad.Piece] = []
+        for name in wanted {
+            let t = tensors[name]!, destination = store.writable(name)!
+            var at = 0
+            repeat {
+                let length = min(TailStream.piece, t.bytes - at)
+                pieces.append(.init(name: name, file: t.offset + at, bytes: length, destination: destination + at))
+                at += length
+            } while at < t.bytes
+        }
+        store.load = ResidentLoad(descriptor: fd, pieces: pieces, lanes: TailStream.lanes)
+        resident = store
+    }
+
+    /// **Where a read-ahead keep stands** (`keepResidentAhead`): `nil` without one.
+    package var residentLoad: ResidentLoadState? { resident?.load?.state }
+
+    /// Waits until a read-ahead keep has read everything, or failed (`residentLoad` then says which).
+    package func waitForResidentLoad() { resident?.load?.waitForAll() }
+
+    /// Whether `name` is kept in the process's pages (`keepResident`, `keepResidentAhead`): the prefetcher leaves it alone.
+    package func isResident(_ name: String) -> Bool { resident?.holds(name) ?? false }
+
     /// Gives the kept tensors back (their pages are unmapped at once).
     package func releaseResident() { resident = nil }
 
@@ -769,15 +808,112 @@ private final class ResidentTensors {
         self.regions = regions; self.offsets = offsets
     }
 
+    /// The reads still running, for a region read ahead (`Artifact.keepResidentAhead`); stopped and waited for before the
+    /// region goes.
+    var load: ResidentLoad?
+
+    deinit { load?.stop() }
+
     var capacity: Int { regions.reduce(0) { $0 + $1.capacity } }
     func writable(_ name: String) -> UnsafeMutableRawPointer? { offsets[name].map { regions[$0.region].base + $0.offset } }
-    func pointer(_ name: String) -> UnsafeRawPointer? { writable(name).map { UnsafeRawPointer($0) } }
+    func holds(_ name: String) -> Bool { offsets[name] != nil }
+    /// The kept tensor, once read: a region read ahead waits for it, and gives `nil` (the mapping) where its read failed.
+    func pointer(_ name: String) -> UnsafeRawPointer? {
+        guard let place = writable(name) else { return nil }
+        if let load, !load.wait(for: name) { return nil }
+        return UnsafeRawPointer(place)
+    }
 
     /// Both stores' regions, neither copied.
     func joined(with other: ResidentTensors) -> ResidentTensors {
         var table = offsets
         for (name, place) in other.offsets { table[name] = (place.region + regions.count, place.offset) }
-        return ResidentTensors(regions: regions + other.regions, offsets: table)
+        let joined = ResidentTensors(regions: regions + other.regions, offsets: table)
+        // A read still running moves with its region: the store left behind must not stop it.
+        joined.load = load ?? other.load
+        load = nil; other.load = nil
+        return joined
+    }
+}
+
+/// Where a read-ahead keep stands (`Artifact.residentLoad`).
+package enum ResidentLoadState: Sendable, Equatable { case reading, complete, failed }
+
+/// **`Artifact.keepResidentAhead`'s reads**: pieces taken in file order by `lanes` threads, each tensor ready once all its pieces
+/// are read. One condition guards the counts: `wait(for:)` sleeps on it until its tensor is ready, or the load failed or stopped.
+final class ResidentLoad: @unchecked Sendable {
+    struct Piece { let name: String; let file: Int; let bytes: Int; let destination: UnsafeMutableRawPointer }
+    private let descriptor: Int32
+    private let pieces: [Piece]
+    private let condition = NSCondition()
+    private var left: [String: Int] = [:]               // tensor → pieces not read yet
+    private var next = 0, running: Int, failed = false, stopped = false
+    private let lanes = DispatchGroup()
+
+    init(descriptor: Int32, pieces: [Piece], lanes count: Int) {
+        self.descriptor = descriptor
+        self.pieces = pieces
+        for piece in pieces { left[piece.name, default: 0] += 1 }
+        running = max(1, min(count, pieces.count))
+        let queue = DispatchQueue.global(qos: .userInitiated)
+        for _ in 0..<running { queue.async(group: lanes) { [self] in lane() } }
+    }
+
+    deinit { close(descriptor) }
+
+    private func lane() {
+        while let i = take() {
+            let p = pieces[i]
+            var read = 0
+            while read < p.bytes {
+                let n = pread(descriptor, p.destination + read, p.bytes - read, off_t(p.file + read))
+                guard n > 0 else { break }
+                read += n
+            }
+            condition.lock()
+            if read == p.bytes {
+                left[p.name]! -= 1
+                if left[p.name] == 0 { left[p.name] = nil }
+            } else {
+                failed = true
+            }
+            condition.broadcast()
+            condition.unlock()
+        }
+        condition.lock(); running -= 1; condition.broadcast(); condition.unlock()
+    }
+
+    private func take() -> Int? {
+        condition.lock(); defer { condition.unlock() }
+        guard !failed, !stopped, next < pieces.count else { return nil }
+        next += 1
+        return next - 1
+    }
+
+    /// Whether `name` is read — waiting for it while it is not and the reads go on.
+    func wait(for name: String) -> Bool {
+        condition.lock(); defer { condition.unlock() }
+        while left[name] != nil {
+            if failed || stopped || running == 0 { return false }
+            condition.wait()
+        }
+        return true
+    }
+
+    func waitForAll() {
+        condition.lock(); defer { condition.unlock() }
+        while running > 0 { condition.wait() }
+    }
+
+    var state: ResidentLoadState {
+        condition.lock(); defer { condition.unlock() }
+        return failed || (running == 0 && !left.isEmpty) ? .failed : left.isEmpty ? .complete : .reading
+    }
+
+    /// No piece taken from now on; returns once the lanes are out (the region may then go).
+    func stop() {
+        condition.lock(); stopped = true; condition.broadcast(); condition.unlock()
+        lanes.wait()
     }
 }
 

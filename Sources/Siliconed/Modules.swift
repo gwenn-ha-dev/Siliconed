@@ -36,7 +36,7 @@ package struct ZImageTextModule: TextModule {
         context.timings.tokenizer = Date().timeIntervalSince(begin)
         context.footprints.tokenizer = Arena.processFootprint()
         try context.check()
-        let encoder = try TextEncoder(artifact: try Artifact(path: map), sequence: realCount)
+        let encoder = try TextEncoder(artifact: try KeptEncoder.artifact(map), sequence: realCount)
         encoder.cancellation = context.cancellation
         let caps = Array(try encoder.encode(ids: identifiers, realTokens: realCount))
         context.footprints.encoder = Arena.processFootprint()

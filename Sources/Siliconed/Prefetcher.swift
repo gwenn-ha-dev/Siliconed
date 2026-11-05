@@ -84,7 +84,8 @@ package final class Prefetcher {
         // The ranges are cut into slices then distributed: a big tensor must occupy
         // several threads, otherwise parallelism depends on the size of the tensors.
         var slices: [(UnsafeRawPointer, Int)] = []
-        for name in wanted where !staged.contains(name) {
+        // A tensor kept in the process's pages (`Artifact.keepResidentAhead`) is never paged in: its read is the keep's.
+        for name in wanted where !staged.contains(name) && !artifact.isResident(name) {
             guard let tensor = artifact.tensors[name], let base = artifact.mappedPointer(name) else { continue }
             var offset = 0
             while offset < tensor.bytes {

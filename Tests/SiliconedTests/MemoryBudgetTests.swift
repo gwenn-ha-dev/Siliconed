@@ -225,6 +225,22 @@ final class MemoryBudgetTests: XCTestCase {
     /// **The map read in place is a choice of the plan, with its price**: the whole DiT file charged to the denoising, taken only where
     /// the need with it holds in B — a 64 GB Mac's, not a 16 or an 8 GB one's, whose plans stay those of a process that cannot read in
     /// place (the same request, the same need, the same tail). Never where the process does not read in place.
+    /// A map is charged read in place only where a block's product is bf16: an int8 Compact whose bf16 tensors lie outside the
+    /// blocks (Qwen-Image-2.1's `modulation.1`) is never wrapped, a mixed one (Anima's Compact, bf16 feed-forwards) is.
+    func testOnlyABf16BlockWeightChargesTheMapReadInPlace() {
+        func header(_ tensors: [String: (shape: [Int], dtype: String)]) -> [String: Any] {
+            ["tensors": tensors.mapValues { ["shape": $0.shape, "dtype": $0.dtype, "offset": 0, "bytes": 2] as [String: Any] }]
+        }
+        let page = Int(getpagesize())
+        let int8Blocks = header(["modulation.1.weight": ([3072, 18432], "bfloat16"), "img_in.weight": ([64, 3072], "bfloat16"),
+                                 "transformer_blocks.0.attn.to_k.weight": ([3072, 3072], "int8"),
+                                 "transformer_blocks.0.norm.weight": ([3072], "bfloat16")])
+        XCTAssertEqual(MemoryNeed.inPlaceBytes(header: int8Blocks, fileSize: 10 * page), 0)
+        let mixed = header(["transformer_blocks.0.ff.net.0.proj.weight": ([2048, 8192], "bfloat16"),
+                            "transformer_blocks.1.attn1.to_k.weight": ([2048, 2048], "int8")])
+        XCTAssertEqual(MemoryNeed.inPlaceBytes(header: mixed, fileSize: 10 * page + 1), 11 * page)
+    }
+
     func testTheMapReadInPlaceIsChargedAndTakenOnlyWhereBHoldsIt() {
         var request = MemoryFixtures.zImageRequest(1024, 1024)
         XCTAssertFalse(request.mapInPlaceAvailable)   // no `SILICONED_STREAM` in the tests' process
@@ -256,16 +272,88 @@ final class MemoryBudgetTests: XCTestCase {
             XCTAssertEqual(plan.request.encoderSlots, old.request.encoderSlots)
             XCTAssertEqual(plan.request.minimumBands, old.request.minimumBands)
         }
-        // One byte short of the need with the map: the copy into the reserve, nothing charged.
-        let edge = MemoryPlan.choose(request, ceiling: need.peak - 1)
+        // One byte short of the need with the map (the encoder streamed beside it, as before it was kept): the copy into the
+        // reserve, nothing charged.
+        var streaming = roomy.request
+        streaming.encoderKept = false
+        streaming.encoderSlots = MemoryPlan.encoderSlots
+        let inPlace = MemoryNeed.of(streaming)!
+        XCTAssertEqual(inPlace.inPlaceBytes, need.inPlaceBytes)
+        let edge = MemoryPlan.choose(request, ceiling: inPlace.peak - 1)
         XCTAssertFalse(edge.request.mapInPlace)
         XCTAssertEqual(edge.need?.inPlaceBytes, 0)
-        XCTAssertTrue(MemoryPlan.choose(request, ceiling: need.peak).request.mapInPlace)
+        XCTAssertTrue(MemoryPlan.choose(request, ceiling: inPlace.peak).request.mapInPlace)
 
         // The products ask the render's plan; outside a render (a check), wherever the map is open.
         XCTAssertTrue(MemoryPlan.mapInPlace)
         MemoryPlan.during(edge) { XCTAssertFalse(MemoryPlan.mapInPlace) }
         MemoryPlan.during(roomy) { XCTAssertTrue(MemoryPlan.mapInPlace) }
+    }
+
+    /// **The text encoder kept is charged to every phase, and taken only where B holds it and the DiT's map loses nothing**: its
+    /// layers' resident bytes beside each phase (none of its staging buffers then), after the map read in place; never on 8 or
+    /// 16 GB for Z-Image; never where the room it takes is the streamed map's head.
+    func testTheEncoderKeptIsChargedEverywhereAndTakenOnlyWhereBHoldsIt() {
+        var request = MemoryFixtures.zImageRequest(1024, 1024)
+        let maps = MemoryFixtures.zImageMaps()
+        let kept = maps.encoderKeptBytes
+        XCTAssertEqual(kept, Artifact.residentBytes(header: maps.encoder, prefixes: ["layers."]))
+        XCTAssertGreaterThan(kept, 7_000_000_000)   // Qwen3-4B's 35 layers in bf16
+        request.mapInPlaceAvailable = true
+
+        let roomy = MemoryPlan.choose(request, ceiling: MemoryBudget.ceiling(physical: 64 << 30))
+        XCTAssertTrue(roomy.request.mapInPlace)
+        XCTAssertTrue(roomy.request.encoderKept)
+        XCTAssertEqual(roomy.request.encoderSlots, 0, "kept: nothing streamed")
+        let need = roomy.need!
+        XCTAssertEqual(need.keptEncoderBytes, kept)
+        XCTAssertLessThanOrEqual(need.peak, roomy.ceiling)
+        for phase in need.phases { XCTAssertEqual(phase.bytes(MemoryNeed.keptEncoderTerm), kept, "\(phase.kind)") }
+        // Beside the plan it joins: every phase the same plus the layers, the text phase less its staging buffers.
+        var without = roomy.request
+        without.encoderKept = false
+        without.encoderSlots = MemoryPlan.encoderSlots
+        let before = MemoryNeed.of(without)!
+        XCTAssertEqual(need.need(of: .denoising)!, before.need(of: .denoising)! + kept)
+        XCTAssertEqual(need.need(of: .decoding)!, before.need(of: .decoding)! + kept)
+        XCTAssertEqual(need.need(of: .text)!, before.need(of: .text)! + kept - before.phases[0].bytes("encoder staging"))
+        XCTAssertGreaterThan(before.phases[0].bytes("encoder staging"), 0)
+        // The head is sized on the denoising's need without the map, the layers beside it.
+        XCTAssertEqual(roomy.denoisingCached + need.inPlaceBytes, need.need(of: .denoising)!)
+        XCTAssertEqual(MemoryPlan.verdict(request, ceiling: roomy.ceiling).label, "ok +map in place +encoder kept")
+
+        // 8 and 16 GB: the plan of before — the encoder streamed through its buffers, nothing kept.
+        for ram in [8, 16] {
+            let plan = MemoryPlan.choose(request, ceiling: MemoryBudget.ceiling(physical: ram << 30))
+            XCTAssertFalse(plan.request.encoderKept, "\(ram) GB")
+            XCTAssertEqual(plan.need?.keptEncoderBytes, 0)
+        }
+        // One byte short of the need with it: streamed as before, nothing charged; at the need, kept.
+        let edge = MemoryPlan.choose(request, ceiling: need.peak - 1)
+        XCTAssertFalse(edge.request.encoderKept)
+        XCTAssertTrue(edge.request.mapInPlace)
+        XCTAssertEqual(edge.request.encoderSlots, MemoryPlan.encoderSlots)
+        XCTAssertEqual(edge.need?.keptEncoderBytes, 0)
+        XCTAssertTrue(MemoryPlan.choose(request, ceiling: need.peak).request.encoderKept)
+        // Deterministic: the same request in the same B, the same plan.
+        XCTAssertEqual(MemoryPlan.choose(request, ceiling: roomy.ceiling).need, need)
+
+        // A map not read in place: kept only where the whole map still fits the room beside the denoising with it. On 24 GB the
+        // need with the layers holds in B, but the map (12.3 GB) would no longer stay whole: the encoder streams.
+        request.mapInPlaceAvailable = false
+        let cachedMap = MemoryPlan.choose(request, ceiling: MemoryBudget.ceiling(physical: 64 << 30))
+        XCTAssertFalse(cachedMap.request.mapInPlace)
+        XCTAssertTrue(cachedMap.request.encoderKept)
+        XCTAssertLessThanOrEqual(MemoryNeed.ditMapBytes(request)!, cachedMap.ceiling - cachedMap.denoisingCached)
+        let tight = MemoryPlan.choose(request, ceiling: MemoryBudget.ceiling(physical: 24 << 30))
+        XCTAssertFalse(tight.request.encoderKept)
+        var forced = tight.request
+        forced.encoderKept = true; forced.encoderSlots = 0
+        XCTAssertLessThanOrEqual(MemoryNeed.of(forced)!.peak, tight.ceiling, "it would hold in B: the map's room decides")
+
+        // Outside a render, an encoder's map is opened as before (`KeptEncoder.artifact`): nothing held.
+        XCTAssertNil(MemoryPlan.current)
+        XCTAssertEqual(KeptEncoder.heldBytes, 0)
     }
 
     /// **Outside a render, the reference values**; inside, the plan's — the same from the first site

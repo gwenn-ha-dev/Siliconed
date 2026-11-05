@@ -24,7 +24,7 @@ package struct QwenImage21TextModule: ImageTextModule {
         context.timings.tokenizer = Date().timeIntervalSince(begin)
         context.footprints.tokenizer = Arena.processFootprint()
         try context.check()
-        let artifact = try Artifact(path: map)
+        let artifact = try KeptEncoder.artifact(map)
         let encoder = try Qwen3VLEncoder(artifact: artifact, tokenizer: tokenizer)
         encoder.cancellation = context.cancellation
         // Its own autorelease pool: the attention's autoreleased tensor data would otherwise keep

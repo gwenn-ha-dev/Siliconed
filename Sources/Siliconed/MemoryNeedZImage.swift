@@ -69,6 +69,10 @@ extension MemoryNeed {
         /// **What the DiT's map costs read in place** (`Request.mapInPlace`): the length `Artifact.wrappedMap` wraps — the whole file,
         /// rounded up to the page — where its products are bf16 (`WeightProducts.prepare` reads only those in place); 0 otherwise.
         package let ditInPlaceBytes: Int
+        /// What the encoder costs kept (`MemoryNeed.keptEncoderBytes(header:)`, `Request.encoderKept`): its layers, resident.
+        package let encoderKeptBytes: Int
+        /// Every tensor of the DiT's map (`Artifact.mapBytes`): what `MemoryPlan.released` compares with the room beside the denoising.
+        package let ditMapBytes: Int
 
         package init(dit: [String: Any], ditSize: Int = .max, encoder: [String: Any], encoderSize: Int = .max) {
             self.dit = dit; self.ditSize = ditSize; self.encoder = encoder; self.encoderSize = encoderSize
@@ -80,6 +84,8 @@ extension MemoryNeed {
             } ?? 0
             ditRotationScratch = Widen.rotationScratchBytes(header: dit)
             ditInPlaceBytes = MemoryNeed.inPlaceBytes(header: dit, fileSize: ditSize)
+            encoderKeptBytes = MemoryNeed.keptEncoderBytes(header: encoder)
+            ditMapBytes = Artifact.mapBytes(header: dit)
         }
 
         /// What one buffer of the DiT's stream holds over `layers`: the largest tensor's run (`Artifact.largestRun`).
@@ -217,5 +223,6 @@ extension MemoryNeed {
                                                                  band: band)) + [batchImages(request)])
 
         return MemoryNeed(phases: [text] + references + [denoising, decoding], crossing: crossing, base: request.base)
+            .keeping(request, encoder: maps.encoderKeptBytes)
     }
 }
