@@ -2,6 +2,12 @@ English · [Français](RELEASE-NOTES.fr.md)
 
 # Siliconed — release notes
 
+## 0.21
+
+### The Compacts of Z-Image and Anima
+
+- **Z-Image's and Anima's Compacts are now int8 convrot**, like Qwen-Image-2.1's: Z-Image's image model from Comfy-Org, Anima's from Bedovyy, in place of unsloth's and vanes430's GGUF Q8_0. Their text encoders do not change, and both are checked against diffusers (`siliconed check`). An installed Compact takes its new image model at its next installation (6.2 GB for Z-Image, 2.6 GB for Anima), which removes the old one.
+
 ## 0.20
 
 ### The Prompt Lab, under the image

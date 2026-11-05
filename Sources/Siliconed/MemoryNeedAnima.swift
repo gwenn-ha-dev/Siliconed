@@ -25,7 +25,7 @@ import Foundation
 ///
 /// What the formula has to know and a port by analogy with Z-Image would miss:
 ///
-///   - **the DiT's map is never in the need, whatever its type** — Standard (bf16), Compact (Q8_0),
+///   - **the DiT's map is never in the need, whatever its type** — Standard (bf16), Compact (int8 convrot),
 ///     Light (Q4_K_M): `AnimaDiT` reads it through the page cache (the prefetcher's `madvise`, no
 ///     streamed tail, no staging buffer) and widens each weight into one fp32 `reserve` of `d·h`. The
 ///     three versions have **the same denoising need**; the map's type shows only through the text
@@ -67,7 +67,7 @@ extension MemoryNeed {
         /// The largest tensor's run in the encoder's layers (`Artifact.largestRun`): what one of its buffers holds.
         package let encoderLayerStaging: Int
         /// What widening the DiT's largest int8 convrot weight allocates outside every arena
-        /// (`Widen.rotationScratchBytes`): an imported Comfy-style convrot DiT; 0 otherwise.
+        /// (`Widen.rotationScratchBytes`): the Compact's int8 convrot, or an imported Comfy-style one; 0 otherwise.
         package let ditRotationScratch: Int
         /// The formats the two maps' products are published in (`Artifact.weightFormat`): the plan's keys.
         package let ditFormat: CapacityClasses.WeightFormat, encoderFormat: CapacityClasses.WeightFormat

@@ -476,7 +476,7 @@ struct VersionChoice: View {
     static func details(_ v: Variant, _ f: Family) -> String {
         switch (v, f) {
         case (.compact, .zImage):
-            String(localized: "8-bit weights published by third parties: the image model from unsloth (GGUF Q8_0), the text encoder from Disty0 (SDNQ int8). Tokenizer and VAE are the publisher’s.")
+            String(localized: "8-bit weights published by third parties: the image model from Comfy-Org (int8 convrot), the text encoder from Disty0 (SDNQ int8). Tokenizer and VAE are the publisher’s.")
         case (.compact, .qwenImage21):
             String(localized: "8-bit weights published by third parties: the image model from Comfy-Org (int8 convrot), the text encoder from unsloth (int8 convrot). Processor and VAE are the publisher’s.")
         case (.light, .zImage):
@@ -484,7 +484,7 @@ struct VersionChoice: View {
         case (.light, .qwenImage21):
             String(localized: "The image model in 4 to 8 bits, published by unsloth (GGUF Q4_K_M); the Compact’s 8-bit text encoder, from unsloth (int8 convrot). Processor and VAE are the publisher’s.")
         case (.compact, .anima):
-            String(localized: "The image model in 8 bits, published by vanes430 (GGUF Q8_0). The text encoder (bf16), tokenizers and VAE are the publisher’s.")
+            String(localized: "The image model in 8 bits, published by Bedovyy (int8 convrot). The text encoder (bf16), tokenizers and VAE are the publisher’s.")
         case (.light, .anima):
             String(localized: "The image model in 4 to 6 bits, published by vanes430 (GGUF Q4_K_M). The text encoder (bf16), tokenizers and VAE are the publisher’s.")
         // Krea's own repository is gated: every byte comes from copies proven equal to its files.

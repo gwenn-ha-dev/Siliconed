@@ -76,7 +76,7 @@ package enum CapacityClasses {
         case loraDown, loraUp
 
         /// **The convrot group of the format's rotation**, `nil` for none: every int8 DiT of the catalogue is Comfy's `int8_tensorwise`
-        /// convrot of group 256 (the headers of the three Compact maps, checked), so the plan reasons on 256 — what the ANE's int8
+        /// convrot of group 256 (the headers of the five Compact maps, checked), so the plan reasons on 256 — what the ANE's int8
         /// program needs to know to cut K (`NeuralEngine.readsInt8`) and the memory need to size its rotated row. A tensor of
         /// another group is not refused here: the engine reads the tensor's own and declines what its program cannot cut.
         package var rotationGroup: Int? { self == .int8 ? Widen.largestRotationGroup : nil }
@@ -97,12 +97,11 @@ package enum CapacityClasses {
 
     // MARK: - Versions
 
-    /// **The DiT's weight format of a version**: Standard bf16; Compact Q8_0 (Z-Image, Anima) or int8 convrot (Qwen-Image-2.1,
-    /// Krea 2, MOSS-Image); Light Q4_K (no Light for MOSS-Image: `nil`).
+    /// **The DiT's weight format of a version**: Standard bf16; Compact int8 convrot (every family: Z-Image's and Anima's were
+    /// GGUF Q8_0 until 0.20); Light Q4_K (no Light for MOSS-Image: `nil`).
     package static func weightFormat(_ family: Family, _ variant: Variant) -> WeightFormat? {
         switch (variant, family) {
         case (.standard, _): return .bf16
-        case (.compact, .zImage), (.compact, .anima): return .q8
         case (.compact, _): return .int8
         case (.light, .mossImage): return nil
         case (.light, _): return .q4k
@@ -371,15 +370,17 @@ package enum CapacityClasses {
         switch r.family {
         case .zImage:
             let c = DiT.Config(header: [:]), m = t + text, hd = c.dim / c.heads
-            func block(_ rows: Int, _ layers: Int, quantized: Bool) {
-                let format = quantized ? f : plain
+            func block(_ rows: Int, _ layers: Int, _ format: WeightFormat, stack: Bool) {
                 b.product(.denoising, c.dim, c.dim, rows, format, times: 4 * layers * times)
                 b.product(.denoising, c.dim, c.hidden, rows, format, times: 2 * layers * times)
                 b.product(.denoising, c.hidden, c.dim, rows, format, times: layers * times)
-                if quantized { lora(c.dim, c.dim, rows, 4 * layers); lora(c.dim, c.hidden, rows, 2 * layers); lora(c.hidden, c.dim, rows, layers) }
+                if stack { lora(c.dim, c.dim, rows, 4 * layers); lora(c.dim, c.hidden, rows, 2 * layers); lora(c.hidden, c.dim, rows, layers) }
             }
-            block(m, c.layers, quantized: true)                                  // the layers
-            block(t, c.refiners, quantized: false); block(text, c.refiners, quantized: false)   // noise and context refiners
+            block(m, c.layers, f, stack: true)                                   // the layers
+            // The noise and context refiners: int8 in the Compact (Comfy-Org's convrot quantizes them with the layers), as published
+            // in the Light; no LoRA on them.
+            let refiners = r.variant == .compact ? f : plain
+            block(t, c.refiners, refiners, stack: false); block(text, c.refiners, refiners, stack: false)
             let latent = c.patch * c.patch * c.channels
             q(latent, c.dim, t, 1); q(c.capDim, c.dim, text, 1); q(c.dim, latent, m, 1)   // x_embedder, cap_embedder, the final linear
             b.attention(m, keys: m, heads: c.heads, kv: c.heads, dim: hd, times: c.layers * times)
@@ -397,8 +398,12 @@ package enum CapacityClasses {
             b.attention(t, keys: t + text, heads: c.heads, kv: c.heads, dim: c.headDim, times: c.layers * times)
         case .anima:
             let c = AnimaDiT.Config(header: [:])
-            p(c.dim, c.dim, t, 6 * c.layers)                                   // self q k v o, cross q o
-            p(c.dim, c.hidden, t, c.layers); p(c.hidden, c.dim, t, c.layers)
+            // The Compact's blocks left in bf16 by its publisher (`animaCompactPlain`), with the stack like the others.
+            let (attention, mlp) = r.variant == .compact ? animaCompactPlain : (0, 0)
+            func kept(_ k: Int, _ n: Int, _ count: Int) { q(k, n, t, count); lora(k, n, t, count) }
+            p(c.dim, c.dim, t, 6 * (c.layers - attention)); kept(c.dim, c.dim, 6 * attention)   // self q k v o, cross q o
+            p(c.dim, c.hidden, t, c.layers - mlp); p(c.hidden, c.dim, t, c.layers - mlp)
+            kept(c.dim, c.hidden, mlp); kept(c.hidden, c.dim, mlp)
             q((c.channels + 1) * c.patch * c.patch, c.dim, t, 1); q(c.dim, c.channels * c.patch * c.patch, t, 1)   // patch_embed, proj_out
             b.attention(t, keys: t, heads: c.heads, kv: c.heads, dim: c.headDim, times: c.layers * times)
             b.attention(t, keys: Self.animaTextRows, heads: c.heads, kv: c.heads, dim: c.headDim, cross: true, times: c.layers * times)
@@ -423,6 +428,10 @@ package enum CapacityClasses {
     /// Anima's text, padded to 512 rows: the cross-attention's keys, and its k/v products' height.
     static let animaTextRows = 512
 
+    /// **The blocks Anima's Compact leaves in bf16** (Bedovyy's int8 convrot, its header checked): the attention of 2 blocks (0 and
+    /// 27: self q k v o, cross q k v o) and the MLP of 5 (0 to 3, and 27); every adaLN too, products of one row, no class.
+    static let animaCompactPlain = (attention: 2, mlp: 5)
+
     /// **What the DiT computes from the conditions**, once per pass (each grid has its own DiT, built and run apart): Anima's cross k/v
     /// and Qwen-Image-2.1's prefill. Krea 2's text fusion runs once per render.
     private static func conditions(_ b: inout Builder, _ r: Request, _ f: WeightFormat, passes: Int) {
@@ -430,7 +439,9 @@ package enum CapacityClasses {
         switch r.family {
         case .anima:
             let c = AnimaDiT.Config(header: [:])
-            b.product(.denoising, c.textDim, c.dim, animaTextRows, f, times: 2 * c.layers * passes)
+            let attention = r.variant == .compact ? animaCompactPlain.attention : 0
+            b.product(.denoising, c.textDim, c.dim, animaTextRows, f, times: 2 * (c.layers - attention) * passes)
+            b.product(.denoising, c.textDim, c.dim, animaTextRows, plain, times: 2 * attention * passes)
         case .qwenImage21:
             // The prefill: the conditions through every layer, the last one only for its keys and values; txt_in's two products first.
             let c = QwenImage21DiT.Config(header: [:]), rows = textRows(.qwenImage21, promptTokens: r.promptTokens)

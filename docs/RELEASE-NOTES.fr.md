@@ -2,6 +2,12 @@
 
 # Siliconed — notes de version
 
+## 0.21
+
+### Les Compact de Z-Image et d'Anima
+
+- **Les Compact de Z-Image et d'Anima passent en int8 convrot**, comme celle de Qwen-Image-2.1 : le modèle d'image de Z-Image vient de Comfy-Org, celui d'Anima de Bedovyy, à la place des GGUF Q8_0 d'unsloth et de vanes430. Leurs encodeurs de texte ne changent pas, et les deux sont contrôlées contre diffusers (`siliconed check`). Une Compact installée prend son nouveau modèle d'image à sa prochaine installation (6,2 Go pour Z-Image, 2,6 Go pour Anima), qui retire l'ancien.
+
 ## 0.20
 
 ### L'Atelier de prompts, sous l'image

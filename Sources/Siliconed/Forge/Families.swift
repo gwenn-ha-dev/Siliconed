@@ -86,14 +86,15 @@ package enum Family: String, CaseIterable, Sendable, Codable {
     }
 
     /// The DiT map of a version, in `store/`. The Standard's is `ditMap`; the others have their own
-    /// name, so that two are never taken for each other (one is removed when another installs).
+    /// name, so that two are never taken for each other (one is removed when another installs). Z-Image's
+    /// and Anima's Compacts are `v1`: int8 convrot after 0.20, the GGUF Q8_0 `v0` until then (`supersededCompactMap`).
     package func ditMap(_ v: Variant) -> String {
         switch (self, v) {
-        case (.zImage, .compact): return "z-image-turbo-dit.compact.v0.silicon"
+        case (.zImage, .compact): return "z-image-turbo-dit.compact.v1.silicon"
         case (.qwenImage21, .compact): return "qwen-image-2.1-turbo-dit.compact.v0.silicon"
         case (.zImage, .light): return "z-image-turbo-dit.light.v0.silicon"
         case (.qwenImage21, .light): return "qwen-image-2.1-turbo-dit.light.v0.silicon"
-        case (.anima, .compact): return "anima-turbo-dit.compact.v0.silicon"
+        case (.anima, .compact): return "anima-turbo-dit.compact.v1.silicon"
         case (.anima, .light): return "anima-turbo-dit.light.v0.silicon"
         case (.krea2, .compact): return "krea2-turbo-dit.compact.v0.silicon"
         case (.krea2, .light): return "krea2-turbo-dit.light.v0.silicon"
@@ -129,6 +130,26 @@ package enum Family: String, CaseIterable, Sendable, Codable {
     package static let supersededQwenImage21Maps = ["qwen-image-2.1-dit.v0.silicon", "qwen-image-2.1-dit.compact.v0.silicon",
                                                     "qwen-image-2.1-dit.light.v0.silicon"]
 
+    /// **The Compact's DiT map until 0.20**, in `store/`: a third party's GGUF Q8_0 (unsloth's for Z-Image, vanes430's for
+    /// Anima, beside its text adapter in fp32), replaced by an int8 convrot of the same model (`ditMap(.compact)`, `v1`) — other
+    /// published weights, another image. Removed by the next installation before its first byte (`Installer.supersededFiles`),
+    /// never read: one version lives. `nil` for the families whose Compact never changed.
+    package var supersededCompactMap: String? {
+        switch self {
+        case .zImage: return "z-image-turbo-dit.compact.v0.silicon"
+        case .anima: return "anima-turbo-dit.compact.v0.silicon"
+        default: return nil
+        }
+    }
+
+    /// Every superseded DiT map of the family that may lie in `store/`, by name (with an Anima map's adapter beside it): what the
+    /// disk's occupancy counts and an installation or an uninstallation removes.
+    package var supersededMaps: [String] {
+        if self == .qwenImage21 { return Self.supersededQwenImage21Maps }
+        guard let map = supersededCompactMap else { return [] }
+        return self == .anima ? [map, adapterPath(fromMap: map)] : [map]
+    }
+
     /// **The language head of the family's writer** (`PromptWriter`): the final norm and `lm_head` its encoder
     /// map leaves out, in a map of their own so that the encoder map stays the same to the byte. `nil`: the
     /// family has no writer. Not a model: counted with the family's encoder on disk, removed with the family.
@@ -152,10 +173,9 @@ package enum Variant: String, CaseIterable, Sendable, Codable {
     /// publisher's weights unless the user chooses so).
     case standard
     /// 8-bit weights published by a third party, **DiT and text encoder**, kept 8-bit in the maps:
-    /// about 40 % smaller on disk, an image slightly different from the Standard's, a step a little
-    /// slower (the weights are widened at each evaluation). Tokenizers and VAE are the Standard's.
-    /// Anima's Compact is its DiT alone in GGUF Q8_0 (vanes430's): its encoder stays the Standard's.
-    /// Krea 2's are Comfy-Org's int8 convrot, DiT and encoder.
+    /// about 40 % smaller on disk, an image slightly different from the Standard's. Tokenizers and VAE
+    /// are the Standard's. Every Compact DiT is an int8 convrot (Comfy-Org's; Bedovyy's for Anima);
+    /// Anima's Compact is its DiT alone: its encoder stays the Standard's.
     case compact
     /// **The DiT in 4 to 6 bits as a third party publishes it** (a GGUF Q4_K_M — unsloth's, vanes430's
     /// for Anima, vantagewithai's for Krea 2 — its blocks kept whole), the Compact's text encoder, the Standard's tokenizers and VAE: the smallest

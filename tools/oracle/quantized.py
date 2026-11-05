@@ -5,10 +5,11 @@ them (`Forge/Installation.swift`: repository, revision, sha256). A variant's ora
 DiT of diffusers, in float32 on the CPU, with **those published weights, dequantized by the publisher's
 library**, never by ours:
 
-* GGUF (unsloth's Z-Image and Qwen-Image-2.1, vanes430's Anima, vantagewithai's Krea 2): `gguf-py`, llama.cpp's
+* GGUF (the Lights: unsloth's Z-Image and Qwen-Image-2.1, vanes430's Anima, vantagewithai's Krea 2): `gguf-py`, llama.cpp's
   own reader, `gguf.quants.dequantize` on the stored blocks. diffusers' GGUF loader, asked for float32,
   gives the same bits on every tensor (`quant_fixtures.py` counts the differing bits and stops at one).
-* ComfyUI's int8 convrot (Comfy-Org's Qwen-Image-2.1, Krea 2 and MOSS-Image): `dequantize_int8_convrot_weight` of
+* ComfyUI's int8 convrot (the Compacts: Comfy-Org's Z-Image, Qwen-Image-2.1, Krea 2 and MOSS-Image, Bedovyy's Anima):
+  `dequantize_int8_convrot_weight` of
   comfy_kitchen at the frozen version `quant_fixtures.py` downloads and hashes (`(q * scale)` rotated back
   by the Hadamard blocks, in float32).
 
@@ -34,9 +35,9 @@ import quant_fixtures as qf  # noqa: E402
 # family -> variant -> where the app reads the DiT. Same pins as `Forge/Installation.swift`.
 SOURCES = {
     "z-image": {
-        "compact": dict(repo="unsloth/Z-Image-Turbo-GGUF", revision="6c80814333b7b6a70a2e5b469a7c6437ce65de0f",
-                        file="z-image-turbo-Q8_0.gguf", format="gguf",
-                        sha256="f163d60b0eb427469510b8226243d196574a18139a2e40c017409cfbda95ecfe"),
+        "compact": dict(repo="Comfy-Org/Z-Image-Turbo", revision="6fc90a3b1b653e935a0d175e260736de25b84df5",
+                        file="split_files/diffusion_models/z_image_turbo_int8_convrot.safetensors", format="convrot",
+                        sha256="be517ebd47c912a5626a588e1aeea43e6be4a43c0cdcd2b48a2a780d9f358635"),
         "light": dict(repo="unsloth/Z-Image-Turbo-GGUF", revision="6c80814333b7b6a70a2e5b469a7c6437ce65de0f",
                       file="z-image-turbo-Q4_K_M.gguf", format="gguf",
                       sha256="e6494f87de6abaf6a561924f50317a5f271fc34bb4222aabbd801197df8f7daa"),
@@ -50,9 +51,9 @@ SOURCES = {
                       sha256="8940e8b522af886e0c0f5afddf720e82dd223cb9a43580b5f61c4d740452ac20"),
     },
     "anima": {
-        "compact": dict(repo="vanes430/Anima-Turbo-V1.1-GGUF", revision="efdf070de980a52fc03027d2f6ed543cc1d87a8f",
-                        file="anima-turbo-v1.1-Q8_0.gguf", format="gguf",
-                        sha256="74d6c9251f34bc4152fda460dd7befaa9cec79946c270a378fee3d33048153bd"),
+        "compact": dict(repo="Bedovyy/Anima-INT8", revision="d7ba6686f161e9a829373106eb4b881327247ba9",
+                        file="anima-turbo-v1.1-int8convrot.safetensors", format="convrot",
+                        sha256="c462bea054de87ea03000e83f2b60e6d58fbcb6b925d9f607f8a470eeaad52b4"),
         "light": dict(repo="vanes430/Anima-Turbo-V1.1-GGUF", revision="efdf070de980a52fc03027d2f6ed543cc1d87a8f",
                       file="anima-turbo-v1.1-Q4_K_M.gguf", format="gguf",
                       sha256="709fceeec6b4f0eb155330c83fd2539406e86c01e431407276a1f31095484782"),

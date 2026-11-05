@@ -57,6 +57,11 @@ package struct Installer {
     static let qwenImage21Turbo = Repository(name: "Qwen/Qwen-Image-2.1-Turbo", revision: "d65dbc9a7e8f6b5479e33dee6030eaab2a906509")
     // The Compacts' third parties: 8-bit weights of the same models, read by `Range` and
     // judged before being recipes.
+    // Z-Image's Compact DiT: Comfy-Org's int8 convrot of the Turbo (every tensor it keeps unquantized is
+    // the publisher's, in fp32, value for value; the 202 linears of the blocks and refiners int8, group 256).
+    // The repository is also reachable as `Comfy-Org/z_image_turbo`, the same commit.
+    static let zImageComfy = Repository(name: "Comfy-Org/Z-Image-Turbo", revision: "6fc90a3b1b653e935a0d175e260736de25b84df5")
+    // The Light's DiT and the Compact's encoder, unchanged.
     static let zImageGGUF = Repository(name: "unsloth/Z-Image-Turbo-GGUF", revision: "6c80814333b7b6a70a2e5b469a7c6437ce65de0f")
     static let zImageSDNQ = Repository(name: "Disty0/Z-Image-Turbo-SDNQ-int8", revision: "43d0947f91c14b93da75704be27565ee30694f21")
     // Qwen: the Compact's DiT is Comfy-Org's int8 convrot of the Turbo (the repository holds the base's
@@ -67,9 +72,12 @@ package struct Installer {
     // The Light's DiT: unsloth's GGUF Q4_K_M, judged whole at the bit.
     // Z-Image's is in the Compact's repository (`zImageGGUF`), at the same revision.
     static let qwenImage21GGUF = Repository(name: "unsloth/Qwen-Image-2.1-Turbo-GGUF", revision: "5d1f9f759ea877ae556cda88dbec958b62ad3809")
-    // Anima's Compact and Light DiTs: vanes430's GGUFs of Turbo v1.1 (ComfyUI-GGUF, `cosmos`), the
-    // Compact's Q8_0 and the Light's Q4_K_M in one repository; its encoder is the Standard's.
+    // Anima's Light DiT: vanes430's GGUF Q4_K_M of Turbo v1.1 (ComfyUI-GGUF, `cosmos`); its encoder is the Standard's.
     static let animaGGUF = Repository(name: "vanes430/Anima-Turbo-V1.1-GGUF", revision: "efdf070de980a52fc03027d2f6ed543cc1d87a8f")
+    // Anima's Compact DiT: Bedovyy's int8 convrot of CircleStone's Turbo v1.1 (the repository holds every
+    // Anima release; this file is v1.1's: its unquantized tensors are `anima-turbo-v1.1.safetensors`'s to the
+    // bit, and none of the other releases'). Its encoder is the Standard's.
+    static let animaINT8 = Repository(name: "Bedovyy/Anima-INT8", revision: "d7ba6686f161e9a829373106eb4b881327247ba9")
     // Krea 2's Light DiT: vantagewithai's GGUF Q4_K_M. `Abiray/Krea-2-Turbo-GGUF`'s is the same tensors
     // at the same offsets, plus 48 bytes appended after the data (`L2P_bypass_…`): a copy, not taken.
     static let krea2GGUF = Repository(name: "vantagewithai/Krea-2-Turbo-GGUF", revision: "390847e2835c16bdf82303731e3d35b874760d89")
@@ -143,24 +151,28 @@ package struct Installer {
     ///   license — as for the third parties, the license is the publisher's, the cards say whose bytes.
     /// - Qwen-Image-2.1-Turbo carries the base model's Qwen Research text (same git blob): one file.
     /// - **A Compact also downloads from third parties**, which publish no license file: their model
-    ///   card (`README.md`) declares it — Apache 2.0 for unsloth's and Disty0's Z-Image, Qwen
+    ///   card (`README.md`) declares it — Apache 2.0 for Comfy-Org's and Disty0's Z-Image, Qwen
     ///   Research (`license_link` to Qwen's file) for Comfy-Org's and unsloth's Qwen-Image-2.1 (the
     ///   Turbo's DiT; the encoder, the base's, the same tensors). They
     ///   come after the Standard's: the license is the publisher's, the cards say whose bytes.
     /// - **A Light** links the card of its DiT's repository (unsloth's GGUF: Apache 2.0 for Z-Image,
-    ///   Qwen Research for Qwen-Image-2.1), then the card of its encoder's, the Compact's.
+    ///   Qwen Research for Qwen-Image-2.1), then the card of its encoder's, the Compact's (Disty0's for Z-Image).
     /// - **MOSS-Image's Compact** adds Comfy-Org's card (`license: apache-2.0`, `base_model` the publisher's
     ///   two repositories): its DiT and its encoder are Comfy-Org's int8 convrot of the publisher's weights.
     /// - **Krea 2's Compact** adds nothing: its DiT and its encoder are Comfy-Org's, whose card is the
     ///   Standard's. **Its Light** adds vantagewithai's card (`license: other`, Krea's license link,
     ///   `base_model: krea/Krea-2-Turbo`).
-    /// - **Anima's Compact and Light** link vanes430's card after the publisher's two files. The card
-    ///   says `apache-2.0` and `base_model: circlestone-labs/Anima`: the bytes are CircleStone's DiT
+    /// - **Anima's Compact** links Bedovyy's card after the publisher's two files (`license_link` to
+    ///   CircleStone's, `base_model: circlestone-labs/Anima`); **its Light** vanes430's, whose card says
+    ///   `apache-2.0` and `base_model: circlestone-labs/Anima`. Either way the bytes are CircleStone's DiT
     ///   requantized, under CircleStone's license, which the publisher's files say — as for the others,
     ///   the license is the publisher's, the card says whose bytes. No encoder card: the Standard's.
     static func licenseFiles(_ f: Family, _ v: Variant = .standard) -> [File] {
         switch (f, v) {
-        case (.zImage, .compact), (.zImage, .light):
+        case (.zImage, .compact):
+            return licenseFiles(f) + [File(repository: zImageComfy, path: "README.md", destination: nil),
+                                      File(repository: zImageSDNQ, path: "README.md", destination: nil)]
+        case (.zImage, .light):
             return licenseFiles(f) + [File(repository: zImageGGUF, path: "README.md", destination: nil),
                                       File(repository: zImageSDNQ, path: "README.md", destination: nil)]
         case (.qwenImage21, .compact):
@@ -169,7 +181,9 @@ package struct Installer {
         case (.qwenImage21, .light):
             return licenseFiles(f) + [File(repository: qwenImage21GGUF, path: "README.md", destination: nil),
                                       File(repository: qwenImage21Unsloth, path: "README.md", destination: nil)]
-        case (.anima, .compact), (.anima, .light):
+        case (.anima, .compact):
+            return licenseFiles(f) + [File(repository: animaINT8, path: "README.md", destination: nil)]
+        case (.anima, .light):
             return licenseFiles(f) + [File(repository: animaGGUF, path: "README.md", destination: nil)]
         case (.krea2, .light):
             return licenseFiles(f) + [File(repository: krea2GGUF, path: "README.md", destination: nil)]
@@ -263,9 +277,9 @@ package struct Installer {
         }
     }
 
-    /// The vendor's DiT (Krea 2's: Comfy-Org's copy of it) — or a Compact's single 8-bit file: unsloth's
-    /// GGUF Q8_0 of Z-Image, Comfy-Org's int8 convrot of Qwen-Image-2.1-Turbo and of Krea 2 Turbo,
-    /// vanes430's GGUF Q8_0 of Anima, all kept 8-bit by `ForgeDiT` — or a Light's single GGUF Q4_K_M
+    /// The vendor's DiT (Krea 2's: Comfy-Org's copy of it) — or a Compact's single 8-bit file, an int8 convrot
+    /// in every family: Comfy-Org's of Z-Image Turbo, Qwen-Image-2.1-Turbo, Krea 2 Turbo and MOSS-Image, Bedovyy's
+    /// of Anima Turbo v1.1, all kept 8-bit by `ForgeDiT` — or a Light's single GGUF Q4_K_M
     /// (unsloth's; vanes430's for Anima, vantagewithai's for Krea 2), its blocks kept whole. No Q4_K_M carries a type under 4 bits: Z-Image's Q4_K, Q5_K, Q6_K;
     /// Qwen-Turbo's Q4_K, Q5_K, Q6_K and Q8_0 (the base's types and offsets, two metadata keys more);
     /// Anima's below.
@@ -278,8 +292,10 @@ package struct Installer {
             return [File(repository: qwenImage21GGUF, path: "qwen-image-2.1-turbo-Q4_K_M.gguf", destination: nil,
                          sha256: "8940e8b522af886e0c0f5afddf720e82dd223cb9a43580b5f61c4d740452ac20")]
         case (.zImage, .compact):
-            return [File(repository: zImageGGUF, path: "z-image-turbo-Q8_0.gguf", destination: nil,
-                         sha256: "f163d60b0eb427469510b8226243d196574a18139a2e40c017409cfbda95ecfe")]
+            // int8 convrot ×202 (the 30 layers' and the 4 refiners' qkv, out, w1, w2, w3 and adaLN), the rest fp32 as the
+            // publisher's. Until 0.20 the Compact was unsloth's GGUF Q8_0 (`Family.supersededCompactMap`).
+            return [File(repository: zImageComfy, path: "split_files/diffusion_models/z_image_turbo_int8_convrot.safetensors", destination: nil,
+                         sha256: "be517ebd47c912a5626a588e1aeea43e6be4a43c0cdcd2b48a2a780d9f358635", size: 6201001296)]
         case (.anima, .light):
             // Q4_K ×386, Q6_K ×124, F32 ×169, BF16 ×6: nothing under 4 bits. 118 of its tensors are the
             // text adapter (Q4_K ×50, Q6_K ×12, F32 ×56), written dequantized in fp32 beside the map.
@@ -295,9 +311,11 @@ package struct Installer {
             return [File(repository: krea2Comfy, path: "diffusion_models/krea2_turbo_int8_convrot.safetensors", destination: nil,
                          sha256: "8e4eeda70dd5037ab1ba2bef6b417f9f901e26093117cf397f741fc1fdaaf3f1")]
         case (.anima, .compact):
-            // Q8_0 ×510, F32 ×169, BF16 ×6 (the adapter: Q8_0 ×62, F32 ×56).
-            return [File(repository: animaGGUF, path: "anima-turbo-v1.1-Q8_0.gguf", destination: nil,
-                         sha256: "74d6c9251f34bc4152fda460dd7befaa9cec79946c270a378fee3d33048153bd")]
+            // int8 convrot ×254, the rest bf16 as the publisher's: every adaLN, blocks 0 and 27's attention, the MLP of
+            // blocks 0 to 3 and 27, and the text adapter (written in bf16 beside the map). Until 0.20 the Compact was
+            // vanes430's GGUF Q8_0 (`Family.supersededCompactMap`).
+            return [File(repository: animaINT8, path: "anima-turbo-v1.1-int8convrot.safetensors", destination: nil,
+                         sha256: "c462bea054de87ea03000e83f2b60e6d58fbcb6b925d9f607f8a470eeaad52b4", size: 2649848838)]
         case (.qwenImage21, .compact):
             // Its 31 `comfy_attention.config` (ComfyUI's attention preference) are ignored by the forge.
             return [File(repository: qwenImage21Comfy, path: "diffusion_models/qwen_image_2.1_turbo_int8_convrot.safetensors",
@@ -463,7 +481,11 @@ package struct Installer {
     /// (`Family.supersededQwenImage21Kind`) — and by an uninstallation; nothing is kept. The encoder
     /// maps stay: the Turbo's encoder is the base's to the bit, and the Compact's 8-bit encoder is
     /// still the one the Compact and the Light read.
+    ///
+    /// **Z-Image's and Anima's Compact until 0.20** (`Family.supersededCompactMap`): the GGUF Q8_0 DiT map (Anima's with its
+    /// adapter), replaced by the int8 convrot one. The components and the encoder are the new Compact's own: they stay.
     package func supersededFiles(_ f: Family) -> [String] {
+        if f.supersededCompactMap != nil { return f.supersededMaps.map(library.map).filter(Library.exists) }
         guard f == .qwenImage21 else { return [] }
         let folder = componentsFolder(f), maps = Family.supersededQwenImage21Maps.map(library.map)
         let marks = maps + [folder + "/viggle-turbo-v0.3.lora.silicon", folder + "/scheduler-turbo.json",
@@ -476,6 +498,7 @@ package struct Installer {
     /// reinstallation keeps when none is asked (`install`): the `variant` file goes with the folder,
     /// and the Compact's encoder alone would make a Light look like a Compact.
     func supersededVariant(_ f: Family) -> Variant? {
+        if let old = f.supersededCompactMap { return Library.exists(library.map(old)) ? .compact : nil }
         guard f == .qwenImage21 else { return nil }
         let names = Family.supersededQwenImage21Maps
         if Library.exists(library.map(names[2])) { return .light }
@@ -514,7 +537,9 @@ package struct Installer {
         let variant = variant ?? (superseded.isEmpty ? nil : supersededVariant(f) ?? library.installedVariant(of: f))
         if !superseded.isEmpty {
             let bytes = superseded.reduce(0) { $0 + Library.size($1) }
-            journal(String(format: "  the superseded installation removed first (base model and third-party turbo LoRA): %.2f GB freed",
+            journal(String(format: f == .qwenImage21
+                           ? "  the superseded installation removed first (base model and third-party turbo LoRA): %.2f GB freed"
+                           : "  the superseded Compact removed first (GGUF Q8_0, replaced by the int8 convrot): %.2f GB freed",
                            Double(bytes) / 1e9))
             for path in superseded { try fm.removeItem(atPath: path) }
         }
