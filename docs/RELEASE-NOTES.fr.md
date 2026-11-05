@@ -2,6 +2,63 @@
 
 # Siliconed — notes de version
 
+## 0.20
+
+### L'Atelier de prompts, sous l'image
+
+- **L'Atelier de prompts est une barre sous l'image** au lieu d'une fenêtre à part. Replié, c'est une ligne : les images qui partent, le texte, ✦ Réécrire, le temps que prendra le rendu et **Générer**. Déplié (un clic sur le texte, Présentation › Afficher l’Atelier de prompts ou ⌥⌘L ; Échap le replie), c'est une plaque de verre par-dessus l'image, aux bords qui s'estompent, l'image gardant sa taille ; un clic sur l'image le replie. La fenêtre s'ouvre sur lui déplié. Replié, sa ligne ne lance rien : un clic dessus ne fait que le déplier.
+- **Un texte, un jeu d'images** : le texte de l'atelier est le prompt du rack et ses images sont les entrées du rack, chacune avec son rôle. Plus rien à porter : Porter dans le rack et Utiliser le prompt du rack disparaissent. Les sujets que cite le texte (`@alice`) se traduisent à la mise en file ; le PNG garde le texte tapé et ce qu'a lu le modèle.
+- **Générer là où l'idée s'écrit** : au bout de la ligne repliée, et au pied de la plaque dépliée avec ce que coûte le rendu (taille, mémoire, rendus, temps). Ce qui empêche Générer s'y dit, avec la plus grande taille que ce Mac rend quand la mémoire manque, comme les images que le rendu ne lira pas.
+- **Les rôles** : sous Qwen-Image-2.1 une image prend la place suivante (l'image à éditer, puis les références) ; sous Z-Image, Anima, Krea 2 et MOSS-Image elle arrive sans rôle, avec Décrire et Partir de cette image. Changer de modèle ne donne jamais de rôle et n'en change aucun en un autre : un rôle que le modèle n'a pas reste, sans effet, et resservira au retour sur le modèle qui l'a. La force d'une image de départ se règle sur sa vignette seule.
+- **Ce qui est grisé ne part pas** : sous un modèle qui ne lit pas d'image, le `@nom` d'un sujet est grisé dans le texte et retiré de ce que lit le modèle (tout autre `@` reste du texte : les artistes d'Anima) ; sous tout modèle, de même pour un renvoi à une image que le rendu n'emporte pas (`image 3` avec deux images). Le texte tapé les garde, et le pointeur posé dessus dit pourquoi.
+- **Décrire et Réécrire** défilent en écrivant et gardent en vue la fin de ce qu'ils ajoutent ; la main reprend le défilement quand elle veut.
+
+### Le rack et l'historique
+
+- **Le rack lit l'atelier** : deux petits ports en lecture en tête, Texte et Images (ou Image de départ), chacun au-dessus de l'encodeur qu'il nourrit, son fil tombant droit ; un clic sur l'un ou l'autre déplie l'atelier. Son pied garde la file, la mesure de ce Mac et ce qui a échoué.
+- **La chaîne en petit** : descendu jusqu'aux réglages du débruiteur, une bande en haut du rack montre la chaîne, l'étage qui travaille allumé, le temps de chaque étage dessous ; un clic ramène les boîtes.
+- **Les pas** ne paraissent dans la boîte du débruiteur qu'hors de la recette du modèle (réglages d'un PNG repris, `silicontrol add --steps`), avec une ✕ pour revenir aux 8 pour lesquels il est distillé.
+- **Les LoRA en cartes** : un seul Ajouter (les LoRA du modèle, puis Importer…), et une carte par LoRA : une case pour l'éteindre sans la perdre, sa force au curseur ou en chiffre tapé, ses mots déclencheurs en bouton qui les met en tête du prompt ; clic droit pour la remplacer, la remettre à 0,8 ou la retirer.
+- **L'historique est une colonne à droite** : Envoyer à l'atelier et Éditer avec Qwen-Image-2.1 au menu d'un rendu. Une image déposée sur le canevas va à l'atelier, et Reprendre ces réglages est au menu de sa vignette : un PNG écrit par Siliconed ne change plus le rack de lui-même.
+- **Rendre à nouveau (même graine) garde la taille de l'image** : une édition faite à une taille tapée revenait aux proportions de sa première image.
+
+### Les séries, par le bracketing
+
+- **Un ± jaune à droite de tout ce qui peut varier** : la graine (sur la ligne Graine : un lot de trois, ce sont trois graines, s, s+1, s+2), la force d'une LoRA, celle de l'image de départ, le solveur, le Détail, et le texte. Vide, il propose ; plein, il fait varier. Sa bulle (ou Bracketer… au clic droit) tient les valeurs en pastilles, une croix sur chacune, un + et un pas et un nombre qui les refont ; trois valeurs autour de l'actuelle pour commencer (une LoRA à ±0,2, un départ à ±15 points, trois graines). **Comparer des LoRA…** sur la pile des LoRA met une LoRA par case, à côté de l'image sans.
+- **Varier ce mot…** sur un mot ou une sélection : le groupe se dessine en pastille dans le texte (« teal · coral red · mustard yellow »), des accolades tapées à la main en deviennent une ; un clic dessus ouvre sa bulle.
+- **Générer rend toute la série en images finies**, à leur nombre de pas, chacune dans l'historique dès qu'elle finit ; le canevas montre la grille pendant le rendu et jusqu'à ce qu'on choisisse une image, et **Ajouter la planche à l'historique** en fait une image. Deux axes au plus, colonnes et rangées : une ligne par axe à côté de Générer dit ce qui varie, sa ✕ ramène ce réglage à une valeur, ⇄ échange colonnes et rangées, et le bouton compte ce qu'il rendra (« Générer 9 images »).
+- **Les esquisses, Finir cette image et le panneau d'exploration disparaissent** : une série n'est faite que d'images finies. Chaque case est l'image qu'un rendu seul donnerait, contrôlée au bit près (un 3 × 3 de mots et de graines, et un lot de trois graines, contre les mêmes rendus faits un par un).
+
+### Vos consignes au rédacteur
+
+- **Réglages › Atelier de prompts montre les dix consignes** que suit le rédacteur (Réécrire et Décrire, pour chacun des cinq modèles), entières, en anglais, telles qu'elles partent. Modifiez-en une et la vôtre part à la place de la nôtre, pour ce modèle et ce geste seulement ; Rétablir ramène la nôtre ; une consigne laissée telle quelle suit la nôtre d'une version à l'autre. La barre de l'atelier dit « Votre consigne » à côté du nom du modèle, et un clic dessus l'ouvre.
+
+### La charte de l'icône, et les Réglages
+
+- **La fenêtre prend les couleurs de l'icône** : la nuit un indigo, avec une lueur menthe pour ce qui tourne ; le jour une nacre à l'encre indigo ; les fils en pêche, rose et ciel à clarté égale, une série en jaune, un refus en rouge. Le bleu du système quitte la fenêtre : segments, cases et liens dans l'indigo de la charte, le curseur en pêche et la sélection en indigo léger dans le prompt et dans les consignes au rédacteur.
+- **Les Réglages redessinés** : des onglets à icône, Général · Mac · Atelier de prompts · Avancé, une rangée par réglage avec son nom, une ligne, et la phrase entière au survol. Mac tient ce Mac — sa puce, sa mémoire, sa mesure en quelques mots — et les Mac qu'il emprunte ; Général dit où est la bibliothèque, ce qu'elle pèse et ce qui reste sur son disque.
+
+### La mesure de ce Mac
+
+- **Elle ne part que sur votre clic** : aucun rendu ne la lance. Générer attend sur « Mesurer ce Mac… », dont la feuille demande un Mac au repos à côté de Lancer. Une mesure finie s'applique même quand les réglages ont été lus avant elle.
+- **Elle dit mieux sa propre durée** : les tuiles des produits minces se choisissent en deux tours au lieu de trois (les mêmes plans sur les cartes de trois Mac), et le temps qu'elle annonce compte désormais ses essais de tuiles et ses contrôles d'un Mac occupé. Les cartes prenaient 1,7 à 2,1 fois ce qu'elles annonçaient ; un Mac assez lent pour passer le plafond de cinq minutes se mesure désormais à un palier plus léger.
+
+### Les bibliothèques faites de liens
+
+- **Une bibliothèque dont le stock, les cartes ou les composants sont des liens symboliques** se pèse à travers eux (un dossier lié ne pesait rien), se déplace avec les fichiers qu'ils atteignent (un déplacement n'en emportait aucun, puis retirait les liens de l'ancienne place) et se copie dans la copie de travail. Retirer quoi que ce soit retire toujours le lien, jamais sa cible.
+
+### silicontrol
+
+- **`silicontrol lab`** : ce que tient l'atelier, replié ou déplié ; le déplier et le replier, y ajouter une image, lui donner un rôle, l'en retirer ; **`lab rewrite`** et **`lab describe N`** pressent ses boutons, le texte écrit dans le champ avec ses marques. Les LoRA du rack disent si elles sont allumées.
+- **`silicontrol settings [general|macs|lab|advanced]`** ouvre les Réglages sur un onglet, et `settings lab rewrite --for ID` sur une consigne ; **`silicontrol instructions`** les lit, les fixe et les rétablit.
+- **`silicontrol grid --no-sheet`** rend une grille comme Générer rend une série ; `grid` donne ses axes à la série de la fenêtre. `grid --sketch` et `finish` partent avec les esquisses.
+
+### Contrôles
+
+- **Le DiT d'Anima et sa trajectoire en 8 pas se contrôlent en 1536²** contre diffusers, en pleine précision et sur les chemins en demi-précision (`siliconed check anima`) ; leurs goldens s'écrivent sur demande (`anima.py --size 1536`).
+
+- **La même image qu'en 0.19** pour les mêmes réglages et la même graine, contrôlée au bit près sur un rendu Z-Image, un départ d'image sous Z-Image et une édition Qwen-Image-2.1 avec un sujet et deux images.
+
 ## 0.19
 
 ### Partir d'une image (img2img)
