@@ -43,8 +43,9 @@ package enum OperatorFootprint {
 
     /// **The process's footprint now** (`phys_footprint`, `Arena.processFootprint`): what a render about
     /// to start finds already held — the app's or the command line's own. Read from this process alone,
-    /// never from the kernel's state of the others.
-    package static func processBase() -> Int { Arena.processFootprint() }
+    /// never from the kernel's state of the others. **Less the text encoder kept** (`KeptEncoder.heldBytes`): a plan charges it
+    /// itself, or gives it back before its first computation.
+    package static func processBase() -> Int { max(0, Arena.processFootprint() - KeptEncoder.heldBytes) }
 
     /// **The frameworks a render runs on, brought up before its base is read** — once per process: the
     /// Metal device and a queue, and MPSGraph's own start (one graph of one addition, run). What they

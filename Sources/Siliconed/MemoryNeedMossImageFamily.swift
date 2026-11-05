@@ -46,6 +46,9 @@ extension MemoryNeed {
         package let encoderRotationScratch: Int
         /// The format the encoder's products are published in (`Artifact.weightFormat`): the plan's key.
         package let encoderFormat: CapacityClasses.WeightFormat
+        /// What the encoder costs kept (`MemoryNeed.keptEncoderBytes(header:)`, `Request.encoderKept`), and every tensor of the
+        /// DiT's map (`Artifact.mapBytes`).
+        package let encoderKeptBytes: Int, ditMapBytes: Int
 
         package init?(dit: [String: Any], ditSize: Int = .max, encoder: [String: Any], encoderSize: Int = .max, turboRank: Int) {
             guard let encoderConfig = try? Qwen35Encoder.Config(header: encoder), turboRank > 0 else { return nil }
@@ -59,6 +62,7 @@ extension MemoryNeed {
             encoderUnit = unit; self.turboRank = turboRank
             encoderRotationScratch = Widen.rotationScratchBytes(header: encoder, prefixes: (0..<encoderConfig.layers).map { "layers.\($0)." })
             encoderFormat = Artifact.weightFormat(header: encoder)
+            encoderKeptBytes = MemoryNeed.keptEncoderBytes(header: encoder); ditMapBytes = Artifact.mapBytes(header: dit)
         }
 
         /// The maps this card renders with: the library's installed version — DiT, encoder, the DMD LoRA.
@@ -137,5 +141,6 @@ extension MemoryNeed {
                              terms: vae("FLUX.2 decoder", Flux2VAE.plan(latentHeight: request.height / 8, latentWidth: request.width / 8,
                                                                        band: band)) + [batchImages(request)])
         return MemoryNeed(phases: [text] + references + [denoising, decoding], crossing: crossing, base: request.base)
+            .keeping(request, encoder: maps.encoderKeptBytes)
     }
 }

@@ -61,6 +61,12 @@ package struct MemoryNeed: Sendable, Equatable {
         package var mapInPlaceAvailable = false
         /// The text encoder's staging buffers (`MemoryPlan.encoderSlots`; 0 on the lean plan).
         package var encoderSlots: Int = MemoryPlan.encoderSlots
+        /// **The text encoder kept** (`KeptEncoder`): its layers read once into the process's pages and kept from one render to the
+        /// next, instead of streamed again at every new prompt — the plan's choice, taken only where it holds in B
+        /// (`MemoryPlan.choose`). Its price, the layers' resident bytes (`keptEncoderBytes(header:)`), is charged to **every phase**
+        /// (`keptEncoderTerm`): read in the text phase, it stays beside the denoising and the decoding, and between renders. No
+        /// staging buffer then (`encoderSlots` 0): nothing is streamed.
+        package var encoderKept = false
         /// The decoders' smallest bands (`MemoryPlan.fluxMinimumBand`, `qwenMinimumBand`), as the lean
         /// plan takes them; otherwise the standard ones.
         package var minimumBands = false
@@ -111,7 +117,7 @@ package struct MemoryNeed: Sendable, Equatable {
         /// buffers, no encoder buffer, the decoders' smallest bands — the floor a render can go down to.
         package var lean: Request {
             var r = self
-            r.tail = .lean; r.encoderSlots = 0; r.minimumBands = true; r.mapInPlace = false
+            r.tail = .lean; r.encoderSlots = 0; r.minimumBands = true; r.mapInPlace = false; r.encoderKept = false
             return r
         }
 
@@ -229,6 +235,38 @@ package struct MemoryNeed: Sendable, Equatable {
         let page = Int(getpagesize())
         let file = fileSize < .max ? fileSize : Artifact.mapBytes(header: header)
         return (file + page - 1) / page * page
+    }
+
+    /// The name of the term that charges the text encoder kept (`Request.encoderKept`), in every phase.
+    package static let keptEncoderTerm = "text encoder kept"
+    /// **What keeping the text encoder costs in this need** — 0 where it is not kept.
+    package var keptEncoderBytes: Int { phases.flatMap(\.terms).filter { $0.name == Self.keptEncoderTerm }.map(\.bytes).max() ?? 0 }
+    /// **What an encoder's map costs kept**, from its header: the bytes `Artifact.keepResidentAhead` maps for the tensors
+    /// `KeptEncoder.prefixes` names — each tensor rounded to the map's page, the region to the arena's alignment
+    /// (`Artifact.residentBytes`).
+    package static func keptEncoderBytes(header: [String: Any]) -> Int {
+        Artifact.residentBytes(header: header, prefixes: KeptEncoder.prefixes)
+    }
+    /// **This need with the encoder kept**: `bytes` (`keptEncoderBytes(header:)`) in every phase, where the request keeps it. Each
+    /// family's formula ends here.
+    func keeping(_ request: Request, encoder bytes: Int) -> MemoryNeed {
+        guard request.encoderKept, bytes > 0 else { return self }
+        var need = self
+        need.phases = phases.map { Phase(kind: $0.kind, terms: $0.terms + [Term(Self.keptEncoderTerm, bytes)]) }
+        return need
+    }
+
+    /// **The DiT's map, all of it** (`Artifact.mapBytes`, from the family's maps): what the page cache's room beside the denoising
+    /// must hold for the map to leave the stream (`MemoryPlan.released`). The plan keeps the encoder only where the map stays whole
+    /// beside it, or is read in place (`MemoryPlan.choose`). `nil`: the maps cannot be read.
+    package static func ditMapBytes(_ request: Request) -> Int? {
+        switch request.card.family {
+        case .zImage: (request.zImageMaps ?? ZImageMaps(card: request.card, library: request.library))?.ditMapBytes
+        case .qwenImage21: (request.qwenMaps ?? QwenImage21Maps(card: request.card, library: request.library))?.ditMapBytes
+        case .anima: (request.animaMaps ?? AnimaMaps(card: request.card, library: request.library))?.ditMapBytes
+        case .krea2: (request.krea2Maps ?? Krea2Maps(card: request.card, library: request.library))?.ditMapBytes
+        case .mossImage: (request.mossMaps ?? MossMaps(card: request.card, library: request.library))?.ditMapBytes
+        }
     }
 
     /// **The peak**: the largest phase plus what crosses them, plus the base.

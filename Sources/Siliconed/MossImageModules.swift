@@ -29,7 +29,7 @@ package struct MossImageTextModule: TextModule {
         context.timings.tokenizer = Date().timeIntervalSince(begin)
         context.footprints.tokenizer = Arena.processFootprint()
         try context.check()
-        let artifact = try Artifact(path: map)
+        let artifact = try KeptEncoder.artifact(map)
         let hidden = try autoreleasepool { () throws -> [Float] in
             let encoder = try Qwen35Encoder(artifact: artifact, sequence: ids.count)
             encoder.cancellation = context.cancellation

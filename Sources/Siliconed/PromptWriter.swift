@@ -214,7 +214,9 @@ package final class PromptWriter: @unchecked Sendable {
             throw Failure.promptTooLong(tokens: prepared.ids.count, limit: limits.promptTokens)
         }
         var need = PromptWriterNeed(maps: maps, promptTokens: prepared.ids.count, newTokens: limits.newTokens, patches: pixels?.patches)
-        // The process's footprint now, less what this writer holds (that is in the need, not in the base).
+        // The process's footprint now, less what this writer holds (that is in the need, not in the base). The text encoder a
+        // render kept is in neither: it goes back first.
+        KeptEncoder.release()
         need.base = ownBase(measured: OperatorFootprint.processBase())
         // The plan, in B, before the first token: how many layers the cache keeps, how many are read around it.
         let b = ceiling()

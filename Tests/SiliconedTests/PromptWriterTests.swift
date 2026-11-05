@@ -336,6 +336,31 @@ final class PromptWriterTests: XCTestCase {
         XCTAssertEqual(map.residentCapacity, 0, "a cancelled load keeps nothing")
     }
 
+    /// **Tensors read ahead are the map's bytes too** (`keepResidentAhead`, the kept text encoder's): served from the pages once
+    /// read, the size the need charges, the prefetcher's to leave alone; given back with the artifact's keep.
+    func testResidentTensorsReadAheadAreTheMapsBytes() throws {
+        let c = try checkpoint()
+        let out = root.appendingPathComponent("head.silicon").path
+        _ = try ForgeText.forgeHead(folder: c.folder, to: out)
+        let map = try Artifact(path: out)
+        var before = [Float](repeating: 0, count: 48)
+        _ = try before.withUnsafeMutableBufferPointer { try map.materialize("lm_head.weight", into: $0) }
+        let mapped = map.pointer("lm_head.weight")
+        XCTAssertNil(map.residentLoad)
+        try map.keepResidentAhead(prefixes: ["lm_head.weight", "norm.weight"])
+        XCTAssertTrue(map.isResident("lm_head.weight"))
+        var after = [Float](repeating: 0, count: 48)
+        _ = try after.withUnsafeMutableBufferPointer { try map.materialize("lm_head.weight", into: $0) }
+        XCTAssertEqual(before, after)
+        XCTAssertNotEqual(map.pointer("lm_head.weight"), mapped, "served from the pages, not from the mapping")
+        map.waitForResidentLoad()
+        XCTAssertEqual(map.residentLoad, .complete)
+        XCTAssertEqual(map.residentCapacity, Artifact.residentBytes(header: map.header, names: ["lm_head.weight", "norm.weight"]))
+        map.releaseResident()
+        XCTAssertFalse(map.isResident("lm_head.weight"))
+        XCTAssertEqual(map.pointer("lm_head.weight"), mapped)
+    }
+
     /// The head's files are the family's own (the Turbo's `text_encoder/` configs) and two pinned byte ranges of its encoder
     /// file; the family's map is counted with its encoder and removed with it, and a family without a writer has none.
     func testTheHeadIsPinnedAndManaged() throws {

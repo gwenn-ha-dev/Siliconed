@@ -79,6 +79,8 @@ extension MemoryNeed {
         package let ditInPlaceBytes: Int
         /// The largest encoder layer's staging run: what one of its buffers holds.
         package let encoderLayerStaging: Int
+        /// What the encoder costs kept (`MemoryNeed.keptEncoderBytes(header:)`, `Request.encoderKept`).
+        package let encoderKeptBytes: Int
         /// The largest timestep weight the tabulation widens (`Krea2Exact.linears`: a weight not
         /// published in fp32); 0 when the three are fp32.
         package let timestepWidening: Int
@@ -105,6 +107,7 @@ extension MemoryNeed {
             ditMapBytes = Artifact.mapBytes(header: dit)
             ditInPlaceBytes = MemoryNeed.inPlaceBytes(header: dit, fileSize: ditSize)
             ditLayerStaging = ditStaging; encoderLayerStaging = encoderStaging
+            encoderKeptBytes = MemoryNeed.keptEncoderBytes(header: encoder)
             timestepWidening = Krea2DiT.timestepWidening(header: dit, config: config)
             encoderRotationScratch = Widen.rotationScratchBytes(header: encoder, prefixes: TextEncoder.layerPrefixes(encoderConfig))
             ditRotationScratch = Widen.rotationScratchBytes(header: dit, prefixes: (0..<config.layers).map(Krea2DiT.layerPrefix))
@@ -247,6 +250,7 @@ extension MemoryNeed {
 
         return MemoryNeed(phases: [textPhase] + references + [fusionPhase, denoising, decoding], crossing: crossing,
                           base: request.base)
+            .keeping(request, encoder: maps.encoderKeptBytes)
     }
 }
 

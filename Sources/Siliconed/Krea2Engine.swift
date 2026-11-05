@@ -43,7 +43,7 @@ package enum Krea2Text {
     /// `[T, 12, 2560]`, `T` = identifiers − template.
     package static func hiddenStates(_ ids: [Int], encoder: String, sockets: [Int],
                                    cancellation: Cancellation? = nil) throws -> [Float] {
-        let encoder = try TextEncoder(artifact: try Artifact(path: encoder), sequence: ids.count)
+        let encoder = try TextEncoder(artifact: try KeptEncoder.artifact(encoder), sequence: ids.count)
         encoder.cancellation = cancellation
         return try encoder.encodeTaps(ids: ids, taps: sockets, dropping: templateTokens)
     }

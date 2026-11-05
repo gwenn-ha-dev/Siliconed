@@ -71,6 +71,9 @@ extension MemoryNeed {
         package let ditRotationScratch: Int
         /// What the DiT's map costs read in place (`MemoryNeed.inPlaceBytes`, `Request.mapInPlace`): its header's extent.
         package let ditInPlaceBytes: Int
+        /// What the encoder costs kept (`MemoryNeed.keptEncoderBytes(header:)`, `Request.encoderKept`), and every tensor of the
+        /// DiT's map (`Artifact.mapBytes`).
+        package let encoderKeptBytes: Int, ditMapBytes: Int
         /// The formats the two maps' products are published in (`Artifact.weightFormat`): the plan's keys.
         package let ditFormat: CapacityClasses.WeightFormat, encoderFormat: CapacityClasses.WeightFormat
 
@@ -84,6 +87,7 @@ extension MemoryNeed {
             self.dit = AnimaDiT.Config(header: dit); self.encoder = config; encoderLayerStaging = staging
             ditRotationScratch = Widen.rotationScratchBytes(header: dit)
             ditInPlaceBytes = MemoryNeed.inPlaceBytes(header: dit, fileSize: .max)
+            encoderKeptBytes = MemoryNeed.keptEncoderBytes(header: encoder); ditMapBytes = Artifact.mapBytes(header: dit)
             ditFormat = Artifact.weightFormat(header: dit); encoderFormat = Artifact.weightFormat(header: encoder)
         }
 
@@ -193,5 +197,6 @@ extension MemoryNeed {
         let decoding = Phase(kind: .decoding, terms: vae("Qwen-Image decoder", plan) + [batchImages(request)])
 
         return MemoryNeed(phases: [textPhase] + references + [denoising, decoding], crossing: crossing, base: request.base)
+            .keeping(request, encoder: maps.encoderKeptBytes)
     }
 }

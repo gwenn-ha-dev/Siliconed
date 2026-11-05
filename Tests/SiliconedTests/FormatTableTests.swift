@@ -107,7 +107,7 @@ final class FormatTableTests: XCTestCase {
                 let floor = self.floor(card, w, h)
                 for ram in Self.rams {
                     switch MemoryPlan.verdict(request(card, w, h), ceiling: ceiling(ram)) {
-                    case let .plan(planFloor, need, _, _):
+                    case let .plan(planFloor, need, _, _, _, _):
                         XCTAssertEqual(planFloor, floor)
                         XCTAssertLessThanOrEqual(floor, ceiling(ram), "\(card.id) \(w)×\(h) on \(ram) GB")
                         XCTAssertLessThanOrEqual(need, ceiling(ram), "\(card.id) \(w)×\(h) on \(ram) GB: the plan stays in B")

@@ -11,6 +11,7 @@ import Foundation
 ///                  + the text encoder's four buffers                ── kept if the need stays ≤ B
 ///                  + the decoders' standard bands                   ── kept if the need stays ≤ B
 ///                  + the DiT's map read in place, charged whole     ── kept if the need stays ≤ B (no stream then)
+///                  + the text encoder kept, charged to every phase  ── kept if the need stays ≤ B and the map loses nothing
 ///                  └─ the map's head left to the page cache: what B leaves beside the denoising (`released`)
 ///
 /// What only buys time is chosen here. What changes a bit — `mlpBudget`, the prefill's groups,
@@ -20,7 +21,10 @@ import Foundation
 ///
 ///   - **Each knob lives in its own phase** — the encoder's buffers in `text`, the bands in `decoding`,
 ///     the map's buffers in `denoising` — and the need is the largest phase: each is kept or dropped
-///     alone, and adding one never raises another phase.
+///     alone, and adding one never raises another phase. **Except the encoder kept** (`KeptEncoder`), which lives in all of them
+///     and between renders: chosen last, beside everything else, and only where the DiT's map keeps all it had — read in place,
+///     or whole in the room beside the denoising (with the layers in it). Where the map is streamed, that room is its head,
+///     read at every evaluation: the encoder, read once per new prompt, does not take it.
 ///   - **No map read through the page cache is in the need** — B bounds the process's footprint
 ///     (`phys_footprint`), and a mapped map's pages are clean and file-backed: the kernel drops them
 ///     without writing, never swaps them, and they are nobody's footprint. So the text encoder with no
@@ -131,20 +135,39 @@ package enum MemoryPlan {
             inPlace.mapInPlace = true
             if let candidate = MemoryNeed.of(inPlace), candidate.inPlaceBytes > 0, candidate.peak <= ceiling { plan = inPlace }
         }
-        let need = plan.mapInPlace ? MemoryNeed.of(plan) : streamedNeed
+        var need = plan.mapInPlace ? MemoryNeed.of(plan) : streamedNeed
+        var (denoisingStreamed, denoisingCached) = (streamedNeed?.need(of: .denoising), cachedNeed?.need(of: .denoising))
+        // The text encoder kept, after everything else: its layers charged to every phase, kept where the need with them holds in B
+        // **and the DiT's map loses nothing to them** — read in place, or still whole in the room the cache has beside the
+        // denoising (`released`). Where the map is streamed, that room is its head, read at every evaluation: taking it for an
+        // encoder read once per prompt would cost more than it saves.
+        // The denoising's needs the head is sized on (`released`) carry the layers too: they stay beside it.
+        if need != nil, let mapBytes = MemoryNeed.ditMapBytes(request), let cachedDenoising = denoisingCached {
+            var kept = plan
+            kept.encoderKept = true
+            kept.encoderSlots = 0
+            if let candidate = MemoryNeed.of(kept), candidate.keptEncoderBytes > 0, candidate.peak <= ceiling,
+               plan.mapInPlace || mapBytes <= ceiling - (cachedDenoising + candidate.keptEncoderBytes) {
+                plan = kept
+                need = candidate
+                denoisingStreamed = denoisingStreamed.map { $0 + candidate.keptEncoderBytes }
+                denoisingCached = cachedDenoising + candidate.keptEncoderBytes
+            }
+        }
         // Unknown: the denoising takes all of B — no room left for a head (`released`).
         var render = Render(ceiling: ceiling, request: plan, need: need, floor: floor,
-                            denoisingStreamed: streamedNeed?.need(of: .denoising) ?? ceiling,
-                            denoisingCached: cachedNeed?.need(of: .denoising) ?? ceiling)
+                            denoisingStreamed: denoisingStreamed ?? ceiling, denoisingCached: denoisingCached ?? ceiling)
         guard let need else {
             render.decisions.append(String(format: "plan: need unknown in B %.2f — refused", Double(ceiling) / 1e9))
             return render
         }
-        render.decisions.append(String(format: "plan: need %.2f GB in B %.2f (floor %.2f, process base %.2f)%@%@",
+        render.decisions.append(String(format: "plan: need %.2f GB in B %.2f (floor %.2f, process base %.2f)%@%@%@",
                                        Double(need.peak) / 1e9, Double(ceiling) / 1e9, Double(floor) / 1e9,
                                        Double(need.base) / 1e9, (render.lean ? " — lean plan" : "") as NSString,
                                        (plan.mapInPlace ? String(format: " — map read in place (%.2f GB charged)",
-                                                                 Double(need.inPlaceBytes) / 1e9) : "") as NSString))
+                                                                 Double(need.inPlaceBytes) / 1e9) : "") as NSString,
+                                       (plan.encoderKept ? String(format: " — text encoder kept (%.2f GB charged)",
+                                                                  Double(need.keptEncoderBytes) / 1e9) : "") as NSString))
         return render
     }
 
@@ -183,7 +206,7 @@ package enum MemoryPlan {
     /// 128 GB Macs, and what the plan report prints.
     package enum Verdict: Sendable, Equatable {
         /// The render goes: the lean plan's `floor` is within B, and `need` is the chosen plan's peak.
-        case plan(floor: Int, need: Int, encoderBuffers: Bool, standardBands: Bool)
+        case plan(floor: Int, need: Int, encoderBuffers: Bool, standardBands: Bool, mapInPlace: Bool = false, encoderKept: Bool = false)
         /// B is too small: `needed` is the floor, `mac` the smallest Mac sold whose B holds it.
         case refused(needed: Int, mac: Int)
         /// No Mac's RAM holds it (`MemoryNeed.limit`); `area` is the largest area the family addresses.
@@ -194,9 +217,10 @@ package enum MemoryPlan {
         /// One word for a table: `ok` plus what the plan gives up, `needs 64 GB`, `unaddressable`.
         package var label: String {
             switch self {
-            case let .plan(_, _, encoderBuffers, standardBands):
+            case let .plan(_, _, encoderBuffers, standardBands, mapInPlace, encoderKept):
                 return "ok" + (encoderBuffers && standardBands ? "" : " (lean" + (encoderBuffers ? "" : ", no encoder buffers")
                                + (standardBands ? "" : ", small bands") + ")")
+                    + (mapInPlace ? " +map in place" : "") + (encoderKept ? " +encoder kept" : "")
             case let .refused(_, mac): return "needs \(mac) GB"
             case .unaddressable: return "unaddressable"
             case .unknown: return "unknown"
@@ -212,6 +236,7 @@ package enum MemoryPlan {
         guard floor.peak <= ceiling else { return .refused(needed: floor.peak, mac: MemoryBudget.macNeeded(for: floor.peak)) }
         let plan = choose(request, ceiling: ceiling)
         return .plan(floor: floor.peak, need: plan.need?.peak ?? floor.peak,
-                     encoderBuffers: plan.request.encoderSlots > 0, standardBands: !plan.request.minimumBands)
+                     encoderBuffers: plan.request.encoderSlots > 0 || plan.request.encoderKept, standardBands: !plan.request.minimumBands,
+                     mapInPlace: plan.request.mapInPlace, encoderKept: plan.request.encoderKept)
     }
 }

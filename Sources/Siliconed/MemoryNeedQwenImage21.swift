@@ -85,6 +85,9 @@ package struct QwenImage21Maps: Sendable {
     package let ditInPlaceBytes: Int
     /// The largest layer's staging run in the encoder's map: what one of its buffers holds.
     package let encoderLayerStaging: Int
+    /// What the encoder costs kept (`MemoryNeed.keptEncoderBytes(header:)`, `Request.encoderKept`): its language layers, never the
+    /// vision tower (an edit's, read through the map).
+    package let encoderKeptBytes: Int
     /// What the tokenizer's two tables map (`Tokenizer.tableBytes`).
     package let tokenizerTables: Int
     /// What widening the largest rotated (int8 convrot) weight allocates beside the arenas
@@ -112,6 +115,7 @@ package struct QwenImage21Maps: Sendable {
         ditMapBytes = Artifact.mapBytes(header: dit)
         ditInPlaceBytes = MemoryNeed.inPlaceBytes(header: dit, fileSize: ditSize)
         ditLayerStaging = ditStaging; encoderLayerStaging = encoderStaging; self.tokenizerTables = tokenizerTables
+        encoderKeptBytes = MemoryNeed.keptEncoderBytes(header: encoder)
         encoderRotationScratch = Widen.rotationScratchBytes(header: encoder)
         ditRotationScratch = Widen.rotationScratchBytes(header: dit, prefixes: (0..<ditConfig.layers).map(QwenImage21DiT.layerPrefix))
         ditFormat = Artifact.weightFormat(header: dit); encoderFormat = Artifact.weightFormat(header: encoder)
@@ -402,6 +406,7 @@ package struct QwenImage21Need {
     package var need: MemoryNeed {
         MemoryNeed(phases: [visionPhase, textPhase, referencesPhase, denoisingPhase, decodingPhase].compactMap { $0 },
                    crossing: crossing, base: request.base)
+            .keeping(request, encoder: maps.encoderKeptBytes)
     }
 
     // ── the pieces ───────────────────────────────────────────────────────────────────────────

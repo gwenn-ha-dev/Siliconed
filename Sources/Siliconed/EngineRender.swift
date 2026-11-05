@@ -129,6 +129,10 @@ extension Engine {
         // are its caller's — the lean plan, no check.
         let need = memoryPlan.need
         if need == nil, model.library != nil { throw EngineError.memoryNeedUnknown(model: model.card.id) }
+        // What this plan does not keep of the text encoder held by the last render goes back before the phases' ledger opens: the
+        // base was read without it (`OperatorFootprint.processBase`). A read left unfinished is not held after the render.
+        KeptEncoder.settle(for: memoryPlan)
+        defer { KeptEncoder.renderEnded() }
         // A hand-composed chain is the caller's: said in the render's warnings, so that nobody takes it for the product's.
         let outsideContract = model.library == nil
         PhaseBoundary.begin()

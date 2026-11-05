@@ -76,9 +76,11 @@ extension MemoryPlan {
         return decide(plan, why)
     }
 
-    /// **The text encoder's buffers**, as it starts: the plan's. Outside a render, the reference (4).
+    /// **The text encoder's buffers**, as it starts: the plan's. Outside a render, the reference (4). None for an encoder kept
+    /// (`KeptEncoder`): its layers are in the process's pages, nothing is streamed.
     package static func encoderSlots(artifact: Artifact, layerBlocks: [[String]]) -> Int {
         guard let render = current else { return encoderSlots }
+        if render.request.encoderKept { return 0 }
         let block = layerBlocks.map { artifact.span(of: $0) }.max() ?? 0
         note(String(format: "text encoder %d buffer(s) of %.0f MB", render.request.encoderSlots, Double(block) / 1e6))
         return render.request.encoderSlots

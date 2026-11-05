@@ -35,7 +35,7 @@ package struct AnimaTextModule: TextModule {
         context.timings.tokenizer = Date().timeIntervalSince(begin)
         context.footprints.tokenizer = Arena.processFootprint()
         try context.check()
-        let encoder = try TextEncoder(artifact: try Artifact(path: map), sequence: qwenIds.count)
+        let encoder = try TextEncoder(artifact: try KeptEncoder.artifact(map), sequence: qwenIds.count)
         encoder.cancellation = context.cancellation
         let hidden = try encoder.encode(ids: qwenIds, realTokens: qwenIds.count)
         context.footprints.encoder = Arena.processFootprint()

@@ -227,8 +227,8 @@ final class MemoryNeedAnimaTests: XCTestCase {
     }
 
     /// **The plan in B**: on a 16 GB Mac (B = 10 GiB) and an 8 GB one (B = 4 GiB), every format of every
-    /// version passes the preflight and takes the fastest plan (the encoder's four buffers), its need
-    /// ≤ B; a B below the floor refuses before any computation.
+    /// version passes the preflight and takes the fastest plan (the encoder's four buffers, or its 0.9 GB kept where the map stays
+    /// whole beside it), its need ≤ B; a B below the floor refuses before any computation.
     func testThePlanIsChosenInB() throws {
         for physical in [16, 8] {
             let ceiling = MemoryBudget.ceiling(physical: physical << 30)
@@ -239,7 +239,8 @@ final class MemoryNeedAnimaTests: XCTestCase {
                     let plan = MemoryPlan.choose(request, ceiling: ceiling)
                     let need = try XCTUnwrap(plan.need)
                     XCTAssertLessThanOrEqual(need.peak, ceiling)
-                    XCTAssertEqual(plan.request.encoderSlots, MemoryPlan.encoderSlots)
+                    XCTAssertTrue(plan.request.encoderKept || plan.request.encoderSlots == MemoryPlan.encoderSlots)
+                    XCTAssertEqual(plan.request.encoderKept, need.keptEncoderBytes > 0)
                     XCTAssertLessThanOrEqual(plan.floor, need.peak)
                 }
             }
