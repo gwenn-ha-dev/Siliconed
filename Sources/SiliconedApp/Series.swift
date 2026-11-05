@@ -511,7 +511,7 @@ struct BracketBubble: View {
                 }
                 Spacer()
                 Button("Cancel", action: close).keyboardShortcut(.cancelAction)
-                Button("Bracket", action: commit).keyboardShortcut(.defaultAction).disabled(!valid)
+                Button("Bracket", action: commit).keyboardShortcut(.defaultAction).tint(Palette.control).disabled(!valid)
             }
         }
         .padding(14)
@@ -539,7 +539,7 @@ struct BracketBubble: View {
                             selected: Binding(get: { draft.loras }, set: { draft.loras = $0 }))
                 HStack {
                     Text("Strength").foregroundStyle(.secondary)
-                    Slider(value: $draft.strength, in: app.loraStrengthRange).controlSize(.small)
+                    Slider(value: $draft.strength, in: app.loraStrengthRange).controlSize(.small).tint(Palette.control)
                     Text(verbatim: Figures.strength(draft.strength)).monospacedDigit().frame(width: 36, alignment: .trailing)
                 }
                 .font(.callout)

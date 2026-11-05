@@ -50,7 +50,7 @@ struct Banner: View {
         VStack(spacing: 6) {
             Text(app.history.count == 1 ? String(localized: "1 image") : String(localized: "\(app.history.count) images"))
                 .font(.caption).monospacedDigit().foregroundStyle(.secondary)
-            Slider(value: $app.thumbnailSide, in: 48...160).controlSize(.mini)
+            Slider(value: $app.thumbnailSide, in: 48...160).controlSize(.mini).tint(Palette.control)
                 .foregroundStyle(.secondary)
                 .help("Thumbnail size")
                 .accessibilityLabel(Text("Thumbnail size"))

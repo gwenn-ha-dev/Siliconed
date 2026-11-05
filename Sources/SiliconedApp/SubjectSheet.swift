@@ -114,7 +114,7 @@ struct SubjectSheet: View {
                 Button("Cancel", role: .cancel) { dismiss() }
                     .keyboardShortcut(.cancelAction)
                 Button(draft.original == nil ? String(localized: "Create") : String(localized: "Save")) { save() }
-                    .keyboardShortcut(.defaultAction)
+                    .keyboardShortcut(.defaultAction).tint(Palette.control)
                     .disabled(draft.nameProblem != nil || draft.count == 0)
             }
         }

@@ -79,7 +79,7 @@ struct CustomSize: View {
                     .labelsHidden()
                     .frame(width: 140)
                     .onSubmit(apply)
-                Button("Use", action: apply).keyboardShortcut(.defaultAction)
+                Button("Use", action: apply).keyboardShortcut(.defaultAction).tint(Palette.control)
             }
             if let refusal {
                 Text(refusal.title).font(.caption).foregroundStyle(.red)

@@ -238,7 +238,7 @@ private struct StartStrength: View {
             }
             .font(.caption)
             Slider(value: Binding(get: { rack.startStrength }, set: { rack.setStartStrength($0) }), in: 0...1)
-                .controlSize(.mini)
+                .controlSize(.mini).tint(Palette.control)
                 .accessibilityLabel(Text("Strength"))
                 .accessibilityValue(Text(verbatim: StartWords.percent(rack.startStrength)))
             if rack.startIgnored {

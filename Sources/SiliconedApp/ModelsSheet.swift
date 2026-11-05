@@ -159,7 +159,7 @@ struct ModelManagement: View {
                     .help("A model (.safetensors or .gguf) or a LoRA (.safetensors), as published on Civitai")
             }
             Button("Done") { shutDown() }
-                .keyboardShortcut(.defaultAction)
+                .keyboardShortcut(.defaultAction).tint(Palette.control)
         }
         .padding(16)
         .background(.bar)
@@ -443,7 +443,7 @@ struct VersionChoice: View {
                     }.tag(v)
                 }
             }
-            .pickerStyle(.radioGroup)
+            .pickerStyle(.radioGroup).tint(Palette.control)
             .labelsHidden()
             Text(Self.summary(variant, family))
                 .font(.caption).foregroundStyle(.secondary)

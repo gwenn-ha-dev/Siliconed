@@ -136,14 +136,14 @@ struct DiagnosticSheet: View {
             case .ready:
                 Button("Close") { dismiss() }.keyboardShortcut(.cancelAction)
                 Button("Start") { app.startDiagnostic() }
-                    .keyboardShortcut(.defaultAction)
+                    .keyboardShortcut(.defaultAction).tint(Palette.control)
                     .disabled(app.diagnosticBlocker != nil)
             case .running:
                 Button("Stop") { app.cancelDiagnostic() }.keyboardShortcut(.cancelAction)
             case .failed:
                 Button("Close") { dismiss() }.keyboardShortcut(.cancelAction)
                 Button("Measure Again") { notice = nil; app.startDiagnostic() }
-                    .keyboardShortcut(.defaultAction)
+                    .keyboardShortcut(.defaultAction).tint(Palette.control)
                     .disabled(app.diagnosticBlocker != nil)
             case .finished(let report):
                 // Sharing the report is an option the user goes to, never the default: « Close » is.
@@ -155,7 +155,7 @@ struct DiagnosticSheet: View {
                 .help("Copies the report and opens GitHub’s form; you paste it and submit it there")
                 Button("Measure Again") { notice = nil; app.startDiagnostic() }
                     .disabled(app.diagnosticBlocker != nil)
-                Button("Close") { dismiss() }.keyboardShortcut(.defaultAction)
+                Button("Close") { dismiss() }.keyboardShortcut(.defaultAction).tint(Palette.control)
             }
         }
     }

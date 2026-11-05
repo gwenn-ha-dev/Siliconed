@@ -94,7 +94,7 @@ struct SeriesCanvas: View {
             Text("\(run.entries.count) of \(run.jobs.count)").monospacedDigit().foregroundStyle(.secondary)
             HStack(spacing: 4) {
                 Image(systemName: "photo").imageScale(.small)
-                Slider(value: $app.exploreCellSide, in: AppState.cellSides).frame(width: 110).controlSize(.small)
+                Slider(value: $app.exploreCellSide, in: AppState.cellSides).frame(width: 110).controlSize(.small).tint(Palette.control)
                 Image(systemName: "photo").imageScale(.large)
             }
             .foregroundStyle(.secondary)

@@ -476,7 +476,7 @@ struct LoRARow: View {
             }
             HStack(spacing: 8) {
                 Slider(value: $slot.strength, in: app.loraStrengthRange)
-                    .controlSize(.small)
+                    .controlSize(.small).tint(Palette.control)
                     .accessibilityLabel(Text("Strength"))
                 TextField(value: strength, format: .number.precision(.fractionLength(2))) { Text("Strength") }
                     .labelsHidden().textFieldStyle(.roundedBorder).controlSize(.small).monospacedDigit()

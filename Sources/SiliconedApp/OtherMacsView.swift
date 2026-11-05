@@ -169,10 +169,10 @@ private struct HostPairingSheet: View {
                 }
             case .paired(_, let client)?:
                 Text("Paired with “\(client)”.").font(.headline)
-                Button("Done", action: done).keyboardShortcut(.defaultAction)
+                Button("Done", action: done).keyboardShortcut(.defaultAction).tint(Palette.control)
             case .ended(let how)?:
                 Text(Self.ended(how)).font(.headline).multilineTextAlignment(.center)
-                Button("Close", action: done).keyboardShortcut(.defaultAction)
+                Button("Close", action: done).keyboardShortcut(.defaultAction).tint(Palette.control)
             }
         }
         .padding(24)
@@ -207,10 +207,10 @@ private struct ClientPairingSheet: View {
                     Code(code: code)
                 case .paired:
                     Text("Paired with “\(a.with.name)”.").font(.headline)
-                    Button("Done", action: done).keyboardShortcut(.defaultAction)
+                    Button("Done", action: done).keyboardShortcut(.defaultAction).tint(Palette.control)
                 case .ended(let how):
                     Text(Self.ended(how, a.with.name)).font(.headline).multilineTextAlignment(.center)
-                    Button("Close", action: done).keyboardShortcut(.defaultAction)
+                    Button("Close", action: done).keyboardShortcut(.defaultAction).tint(Palette.control)
                 }
                 if case .paired = a.step {} else if case .ended = a.step {} else {
                     Button("Cancel", action: done).keyboardShortcut(.cancelAction)

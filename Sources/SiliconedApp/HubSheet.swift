@@ -14,9 +14,10 @@ struct HubSheet: View {
         VStack(alignment: .leading, spacing: 14) {
             Text("From Hugging Face").font(.title3.weight(.semibold))
             if let offer {
-                Link(destination: URL(string: "https://huggingface.co/\(offer.link.repository)")!) {
+                Button { NSWorkspace.shared.open(URL(string: "https://huggingface.co/\(offer.link.repository)")!) } label: {
                     Text(verbatim: offer.link.repository).font(.body.monospaced())
                 }
+                .buttonStyle(.chartLink)
                 if let p = offer.problem {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(p.title)
@@ -43,7 +44,7 @@ struct HubSheet: View {
                 Button("Cancel") { app.hubOffer = nil }
                     .keyboardShortcut(.cancelAction)
                 Button(importTitle(offer)) { app.importFromHub() }
-                    .keyboardShortcut(.defaultAction)
+                    .keyboardShortcut(.defaultAction).tint(Palette.control)
                     .disabled(!(offer.map { AppState.HubOffer.importable($0.choice?.verdict) } ?? false) || !app.libraryManageable)
             }
         }

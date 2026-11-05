@@ -80,9 +80,9 @@ struct LicenseTerms: View {
                 ForEach(urls, id: \.self) { url in
                     Group {
                         if urls.count == 1 {
-                            Link("Read the License", destination: url)
+                            Button("Read the License") { NSWorkspace.shared.open(url) }.buttonStyle(.chartLink)
                         } else {
-                            Link("Read the License: \(Self.repository(url))", destination: url)
+                            Button("Read the License: \(Self.repository(url))") { NSWorkspace.shared.open(url) }.buttonStyle(.chartLink)
                         }
                     }
                     .help(url.absoluteString)
