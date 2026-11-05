@@ -151,6 +151,10 @@ extension Engine {
             //    image encoder below receive this same copy. ──
             let prepared = request.references.isEmpty ? [] : try chain.denoising.preparedReferences(request.references)
 
+            // ── The DiT's map read in place: wired for the GPU on its own thread, beside the text (`MapWarmup`). ──
+            if memoryPlan.warmsMap, let map = chain.denoising.inPlaceMap { MapWarmup.begin(path: map) }
+            defer { MapWarmup.end() }
+
             // ── The text, once for the whole batch. The module returns its memory on exit. ──
             try context.check()
             context.emit(.stage(.text, image: 0))

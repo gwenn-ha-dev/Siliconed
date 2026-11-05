@@ -36,6 +36,8 @@ package struct Krea2TextModule: TextModule {
 /// LoRA touches both — which is why the fusion lives here and not in the text stage.
 package struct Krea2DenoisingModule: DenoisingModule {
     package var map: String
+    /// The map the plan may make resident beside the text (`MapWarmup`); the denoising opens it through `MapWarmup.open`.
+    package var inPlaceMap: String? { map }
     package var model: String { "krea2" }
     package var name: String { "DiT Krea 2" }
     package var entry: TextFormat { .krea2 }
@@ -83,7 +85,7 @@ package struct Krea2DenoisingModule: DenoisingModule {
     /// the modulation table (a function of σ alone); the fused text is the same rows.
     package func denoise(_ latent: inout Latent, text: Conditioning, steps: Int, start: Int, lora: LoRA?,
                           context: Context) throws {
-        let artifact = try Artifact(path: map)
+        let artifact = try MapWarmup.open(map)
         let tokens = text.rows
         let merged = try fusion(text, artifact: artifact, lora: lora, context: context)
         let (height, width) = (latent.height, latent.width)

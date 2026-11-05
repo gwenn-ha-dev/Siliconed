@@ -53,6 +53,8 @@ package struct AnimaTextModule: TextModule {
 /// Anima Turbo's Cosmos DiT: Euler, CFG 1.
 package struct AnimaDenoisingModule: DenoisingModule {
     package var map: String
+    /// The map the plan may make resident beside the text (`MapWarmup`); the denoising opens it through `MapWarmup.open`.
+    package var inPlaceMap: String? { map }
     package var model: String { "anima" }
     package var name: String { "DiT Anima" }
     package var entry: TextFormat { .anima }
@@ -119,7 +121,7 @@ package struct AnimaDenoisingModule: DenoisingModule {
         let schedule = sigmas(steps: steps)
         let told = context.told(schedule, start: start)
         let build = { (h: Int, w: Int, range: Range<Int>) throws -> AnimaDiT in
-            let dit = try AnimaDiT(artifact: try Artifact(path: map), latentHeight: h, latentWidth: w,
+            let dit = try AnimaDiT(artifact: try MapWarmup.open(map), latentHeight: h, latentWidth: w,
                                    textLength: text.rows, accelerators: context.accelerators, lora: lora)
             dit.cancellation = context.cancellation
             try dit.tabulate(sigmas: Array(told[range]))

@@ -100,6 +100,9 @@ package enum MemoryPlan {
         /// The denoising's need with the map streamed (its buffers), and with it wholly cached.
         package var denoisingStreamed: Int
         package var denoisingCached: Int
+        /// **The map made resident beside the text** (`MapWarmup`): read in place, and the wired map holds in B beside every phase
+        /// before the denoising — its wired pages are not in the footprint, they are in the RAM.
+        package var warmsMap = false
         /// What each site decided, in order, for the report (the report prints it).
         package var decisions: [String] = []
         /// The lean plan, all of it: no encoder buffer and the smallest bands.
@@ -140,11 +143,15 @@ package enum MemoryPlan {
             render.decisions.append(String(format: "plan: need unknown in B %.2f — refused", Double(ceiling) / 1e9))
             return render
         }
-        render.decisions.append(String(format: "plan: need %.2f GB in B %.2f (floor %.2f, process base %.2f)%@%@",
+        // Read in place, the map is wired for the GPU before the denoising where the phases before it hold in B beside it.
+        let before = [MemoryNeed.Phase.Kind.text, .vision, .references].compactMap { need.need(of: $0) }.max() ?? 0
+        render.warmsMap = plan.mapInPlace && before + need.inPlaceBytes <= ceiling
+        render.decisions.append(String(format: "plan: need %.2f GB in B %.2f (floor %.2f, process base %.2f)%@%@%@",
                                        Double(need.peak) / 1e9, Double(ceiling) / 1e9, Double(floor) / 1e9,
                                        Double(need.base) / 1e9, (render.lean ? " — lean plan" : "") as NSString,
                                        (plan.mapInPlace ? String(format: " — map read in place (%.2f GB charged)",
-                                                                 Double(need.inPlaceBytes) / 1e9) : "") as NSString))
+                                                                 Double(need.inPlaceBytes) / 1e9) : "") as NSString,
+                                       (render.warmsMap ? " and made resident beside the text" : "") as NSString))
         return render
     }
 

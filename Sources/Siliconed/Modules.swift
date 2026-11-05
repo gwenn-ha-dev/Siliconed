@@ -49,6 +49,8 @@ package struct ZImageTextModule: TextModule {
 /// start is on).
 package struct ZImageDenoisingModule: DenoisingModule {
     package var map: String
+    /// The map the plan may make resident beside the text (`MapWarmup`); the denoising opens it through `MapWarmup.open`.
+    package var inPlaceMap: String? { map }
 
     package var model: String { "z-image" }
     package var name: String { "DiT Z-Image" }
@@ -99,7 +101,7 @@ package struct ZImageDenoisingModule: DenoisingModule {
                            faster: context.fasterRendering)
         let full = { () throws -> DiT in
             if let kept = context.keptDenoiser as? DiT { return kept }
-            let dit = try DiT(artifact: try Artifact(path: map), latentHeight: height, latentWidth: width,
+            let dit = try DiT(artifact: try MapWarmup.open(map), latentHeight: height, latentWidth: width,
                               capLength: text.rows, accelerators: context.accelerators, lora: lora)
             dit.cancellation = context.cancellation
             context.keptDenoiser = dit
@@ -109,7 +111,7 @@ package struct ZImageDenoisingModule: DenoisingModule {
         if planned.reduced > 0 {
             // One DiT at a time: a batch's kept full DiT goes before the half-size one is built.
             context.keptDenoiser = nil
-            let half = try DiT(artifact: try Artifact(path: map), latentHeight: planned.reducedHeight,
+            let half = try DiT(artifact: try MapWarmup.open(map), latentHeight: planned.reducedHeight,
                                latentWidth: planned.reducedWidth, capLength: text.rows,
                                accelerators: context.accelerators, lora: lora)
             half.cancellation = context.cancellation

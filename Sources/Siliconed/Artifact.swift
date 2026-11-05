@@ -394,6 +394,10 @@ package final class Artifact {
         stream = nil   // its reads finish before the descriptor closes
         through = nil
         resident = nil
+        // The GPU's hold on the pages goes before the pages do.
+        residency?.endResidency()
+        residency = nil
+        wrapped = nil
         munmap(UnsafeMutableRawPointer(mutating: base), size)
         close(descriptor)
     }
@@ -434,6 +438,30 @@ package final class Artifact {
     }
     private var wrapped: MTLBuffer?
     private let wrapLock = NSLock()
+
+    /// **The wrapped map made resident for the GPU now, on the calling thread** (`MapWarmup`): what the GPU's first read of the
+    /// wrapped map would otherwise cost inside the first command buffer that names it. That cost is the kernel's, not the GPU's:
+    /// the first residency of a `bytesNoCopy` buffer wires and maps **every page of it** for the GPU, whatever the command reads
+    /// (measured on the M5 Pro, 5/11, the 14.2 GB map of Qwen-Image-2.1 from a warm page cache: one page read costs 0.96 s of
+    /// system time on the committing thread and 1 ms of GPU; the whole map read again, 1 ms; from a cold cache, 2.9 s with the
+    /// file's reads). Wired pages are not in `phys_footprint` (the same measure: +0 MB). Kept until the map goes (`deinit`):
+    /// ending the residency gives back part of it (a first read after it, 0.24 s). `false` where the map cannot be wrapped.
+    @discardableResult
+    package func makeResident(on device: MTLDevice) -> Bool {
+        guard let buffer = wrappedMap(on: device) else { return false }
+        wrapLock.lock(); defer { wrapLock.unlock() }
+        if residency != nil { return true }
+        let descriptor = MTLResidencySetDescriptor()
+        descriptor.label = "map"
+        descriptor.initialCapacity = 1
+        guard let set = try? device.makeResidencySet(descriptor: descriptor) else { return false }
+        set.addAllocation(buffer)
+        set.commit()
+        set.requestResidency()
+        residency = set
+        return true
+    }
+    private var residency: MTLResidencySet?
 
     /// **Never through the page cache — for a tool that reads a whole map once** (a developer
     /// check, never the engine). Every `pointer` then returns a copy of the tensor read

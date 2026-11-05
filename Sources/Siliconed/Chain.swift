@@ -304,6 +304,9 @@ package protocol DenoisingModule: Sendable {
     func plan(height: Int, width: Int, steps: Int, start: Int, withLoRA: Bool, faster: Bool) -> DenoisingPlan
     func denoise(_ latent: inout Latent, text: Conditioning, steps: Int, start: Int, lora: LoRA?,
                    context: Context) throws
+    /// **The DiT's map, where its products may read it in place** (`MapWarmup`): the path the denoising opens through
+    /// `MapWarmup.open`. `nil` by default: nothing warmed.
+    var inPlaceMap: String? { get }
     /// **How many reference images it can read** (editing): 0 for a denoiser
     /// without. A reference is not a starting point (img2img): it enters the sequence, next to the
     /// generated image, and the denoiser re-reads it at each layer.
@@ -355,6 +358,7 @@ package extension DenoisingModule {
         plan(height: height, width: width, steps: steps, start: start, withLoRA: false, faster: false)
     }
     var maxReferences: Int { 0 }
+    var inPlaceMap: String? { nil }
     func denoise(_ latent: inout Latent, text: Conditioning, steps: Int, start: Int,
                    references: [Latent], lora: LoRA?, context: Context) throws {
         guard references.isEmpty else { throw Request.Failure.references(references.count, max: maxReferences) }

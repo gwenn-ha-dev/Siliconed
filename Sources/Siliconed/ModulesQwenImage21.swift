@@ -43,6 +43,8 @@ package struct QwenImage21TextModule: ImageTextModule {
 /// prefill per render. The user's LoRAs, if any, apply to the Turbo's map itself. See `QwenImage21Pipeline`.
 package struct QwenImage21DenoisingModule: DenoisingModule {
     package var map: String
+    /// The map the plan may make resident beside the text (`MapWarmup`); the denoising opens it through `MapWarmup.open`.
+    package var inPlaceMap: String? { map }
     package var scheduler: QwenImage21Pipeline.Scheduler
     /// `output_resolution`: the references' area (`R²`), and the edit format's.
     package var resolution: Int
@@ -134,7 +136,7 @@ package struct QwenImage21DenoisingModule: DenoisingModule {
             throw Chain.Failure.incompatibleText(output: text.format, entry: entry)
         }
         try check(steps: steps, startImage: start > 0)
-        var sampler = QwenImage21Sampler(artifact: try Artifact(path: map), lora: lora)
+        var sampler = QwenImage21Sampler(artifact: try MapWarmup.open(map), lora: lora)
         sampler.accelerators = context.accelerators
         sampler.cancellation = context.cancellation
         sampler.storage = storage
