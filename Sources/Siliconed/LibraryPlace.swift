@@ -146,15 +146,14 @@ package enum LibraryMove {
     }
 
     /// The files a move carries, relative to the library's root: everything but this Mac's own and
-    /// what a crash left half-written (`.partiel`).
+    /// what a crash left half-written (`.partiel`). Through links (`regularFiles(under:)`): a linked
+    /// map, or a `store/` that is a link, is carried as the file it reaches — skipped, the old place's
+    /// emptying would take the link and the moved library would lack what it pointed to.
     static func files(of source: Library) -> [String] {
         let root = source.root
-        guard let e = FileManager.default.enumerator(at: root, includingPropertiesForKeys: [.isRegularFileKey]) else { return [] }
         var found: [String] = []
         let prefix = root.path.hasSuffix("/") ? root.path : root.path + "/"
-        while let u = e.nextObject() as? URL {
-            guard (try? u.resourceValues(forKeys: [.isRegularFileKey]))?.isRegularFile == true else { continue }
-            let path = u.standardizedFileURL.path
+        for (path, _) in Library.regularFiles(under: root.path) {
             guard path.hasPrefix(prefix) else { continue }
             let relative = String(path.dropFirst(prefix.count))
             let name = (relative as NSString).lastPathComponent

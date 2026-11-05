@@ -158,6 +158,58 @@ final class LibraryPlaceTests: XCTestCase {
             || $0 == "accepted-licenses.json" }, "\(files)")
     }
 
+    /// **A library made of links moves what they reach and leaves the targets alone**: a `store/` that
+    /// is a link, or one whose map and components are links, arrives as files; the old place loses its
+    /// links, never the files they pointed to.
+    func testALibraryOfLinksMovesWhatTheLinksReach() throws {
+        let fm = FileManager.default
+        let b = try space()
+        let targets = [b.map(Family.zImage.ditMap), b.map(Family.zImage.encoderMap),
+                       Installer(library: b).componentsFolder(.zImage) + "/vae.safetensors"]
+        // A whole store linked.
+        let whole = Library(root: root.appendingPathComponent("whole"))
+        try fm.createDirectory(at: whole.root, withIntermediateDirectories: true)
+        try fm.createSymbolicLink(atPath: whole.root.appendingPathComponent("store").path,
+                                  withDestinationPath: b.root.appendingPathComponent("store").path)
+        // A store of links: a map, and the components' folder.
+        let parts = Library(root: root.appendingPathComponent("parts"))
+        try fm.createDirectory(at: parts.root.appendingPathComponent("store"), withIntermediateDirectories: true)
+        try fm.createSymbolicLink(atPath: parts.map(Family.zImage.ditMap), withDestinationPath: b.map(Family.zImage.ditMap))
+        try fm.createSymbolicLink(atPath: parts.map(Family.zImage.encoderMap), withDestinationPath: b.map(Family.zImage.encoderMap))
+        try fm.createSymbolicLink(atPath: parts.root.appendingPathComponent("store/composants").path,
+                                  withDestinationPath: b.root.appendingPathComponent("store/composants").path)
+
+        for (source, name) in [(whole, "a"), (parts, "b")] {
+            XCTAssertEqual(LibraryMove.files(of: source).filter { !$0.contains("lora") }.count, 3, "\(LibraryMove.files(of: source))")
+            let plan = try LibraryMove.plan(source, to: root.appendingPathComponent("disk-\(name)/Siliconed"))
+            XCTAssertEqual(plan.bytes, LibraryMove.files(of: source).reduce(0) { $0 + Library.size(source.root.appendingPathComponent($1).path) })
+            let moved = try LibraryMove.move(source, to: root.appendingPathComponent("disk-\(name)/Siliconed"))
+            XCTAssertEqual(read(URL(fileURLWithPath: moved.map(Family.zImage.ditMap))), "dit")
+            XCTAssertEqual(read(URL(fileURLWithPath: try moved.component(.zImage, "vae.safetensors"))), "vae")
+            XCTAssertNil(try? fm.destinationOfSymbolicLink(atPath: moved.map(Family.zImage.ditMap)), "a file, not a link")
+            XCTAssertNil(try? fm.destinationOfSymbolicLink(atPath: moved.root.appendingPathComponent("store").path))
+            XCTAssertFalse(fm.fileExists(atPath: source.map(Family.zImage.ditMap)), "the old place emptied of its links")
+            for t in targets { XCTAssertTrue(fm.fileExists(atPath: t), "the target stays: \(t)") }
+        }
+    }
+
+    /// The working copy of a library whose components are a link holds them as files.
+    func testTheWorkingCopyCopiesWhatALinkReaches() throws {
+        let fm = FileManager.default
+        let b = try space()
+        let parts = Library(root: root.appendingPathComponent("parts"))
+        try fm.createDirectory(at: parts.root.appendingPathComponent("store/composants"), withIntermediateDirectories: true)
+        for map in [Family.zImage.ditMap, Family.zImage.encoderMap] {
+            try fm.createSymbolicLink(atPath: parts.map(map), withDestinationPath: b.map(map))
+        }
+        try fm.createSymbolicLink(atPath: Installer(library: parts).componentsFolder(.zImage),
+                                  withDestinationPath: Installer(library: b).componentsFolder(.zImage))
+        let copy = try WorkingCopy(source: parts, base: root.appendingPathComponent("caches"))
+        try copy.prepare(models: ["z-image"])
+        XCTAssertEqual(read(URL(fileURLWithPath: try copy.library.component(.zImage, "vae.safetensors"))), "vae")
+        XCTAssertEqual(read(URL(fileURLWithPath: copy.library.map(Family.zImage.encoderMap))), "encoder")
+    }
+
     // ── opening, an absent disk ────────────────────────────────────────────────────────────────
 
     /// A folder with a library opens (itself, or its `Siliconed` subfolder); one without is refused;

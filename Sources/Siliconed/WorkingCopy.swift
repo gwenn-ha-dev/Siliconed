@@ -113,13 +113,11 @@ package final class WorkingCopy: @unchecked Sendable {
             guard let card = cards.first(where: { $0.id == id }) else { throw .unknownModel(model: id) }
             let f = card.family
             let components = Installer(library: source).componentsFolder(f)
-            if let e = FileManager.default.enumerator(at: URL(fileURLWithPath: components), includingPropertiesForKeys: [.isRegularFileKey]) {
-                while let u = e.nextObject() as? URL {
-                    let name = u.lastPathComponent
-                    guard (try? u.resourceValues(forKeys: [.isRegularFileKey]))?.isRegularFile == true,
-                          name != ".DS_Store", !name.hasSuffix(".partiel") else { continue }
-                    add(u.standardizedFileURL.path)
-                }
+            // Through links: a linked tokenizer is copied as the file it reaches, never left out.
+            for (path, _) in Library.regularFiles(under: components) {
+                let name = (path as NSString).lastPathComponent
+                guard name != ".DS_Store", !name.hasSuffix(".partiel") else { continue }
+                add(path)
             }
             add(source.map(source.encoderMap(f)))
             let dit = card.map ?? source.map(source.ditMap(f))

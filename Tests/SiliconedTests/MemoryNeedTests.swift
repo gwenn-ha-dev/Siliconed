@@ -66,6 +66,44 @@ final class MemoryNeedTests: XCTestCase {
         XCTAssertNil(Library.fileSize(root.appendingPathComponent("absent").path))
     }
 
+    /// **A broken link is a file absent** — no size, the same stamp, the need's « unknown » —, and a
+    /// folder weighs each file it reaches once: a linked folder what it holds, a link beside its
+    /// target nothing more.
+    func testABrokenLinkIsAnAbsentFileAndAFolderCountsEachFileOnce() throws {
+        let fm = FileManager.default
+        let store = root.appendingPathComponent("store")
+        try fm.createDirectory(at: store.appendingPathComponent("composants"), withIntermediateDirectories: true)
+        let file = store.appendingPathComponent("map.silicon").path
+        try Data(count: 4_096).write(to: URL(fileURLWithPath: file))
+        try Data(count: 100).write(to: store.appendingPathComponent("composants/vae.safetensors"))
+        let absent = root.appendingPathComponent("absent").path
+        let broken = store.appendingPathComponent("broken.silicon").path
+        try fm.createSymbolicLink(atPath: broken, withDestinationPath: absent)
+        XCTAssertNil(Library.fileSize(broken))
+        XCTAssertEqual(MemoryNeed.InstalledFiles.size(broken), MemoryNeed.InstalledFiles.size(absent))
+        XCTAssertEqual(MemoryNeed.InstalledFiles(paths: [broken]).stamps, MemoryNeed.InstalledFiles(paths: [absent]).stamps)
+        XCTAssertEqual(Library.size(broken), 0)
+        XCTAssertEqual(Library.regularFiles(under: store.path).map(\.path).filter { $0.hasSuffix("broken.silicon") }, [])
+
+        let linked = store.appendingPathComponent("again.silicon").path
+        try fm.createSymbolicLink(atPath: linked, withDestinationPath: file)
+        XCTAssertEqual(Library.fileSize(linked), Library.fileSize(file))
+        XCTAssertEqual(Library.size(store.path), 4_196, "the map once, though reached twice")
+
+        // A store that is a link, and a folder linked inside a store: walked as folders.
+        let linkedStore = root.appendingPathComponent("linked-store").path
+        try fm.createSymbolicLink(atPath: linkedStore, withDestinationPath: store.path)
+        XCTAssertEqual(Library.size(linkedStore), 4_196)
+        let other = root.appendingPathComponent("other/store")
+        try fm.createDirectory(at: other, withIntermediateDirectories: true)
+        try fm.createSymbolicLink(atPath: other.appendingPathComponent("composants").path,
+                                  withDestinationPath: store.appendingPathComponent("composants").path)
+        XCTAssertEqual(Library.size(other.path), 100)
+        // A link back to a parent is walked once.
+        try fm.createSymbolicLink(atPath: store.appendingPathComponent("composants/up").path, withDestinationPath: store.path)
+        XCTAssertEqual(Library.size(store.path), 4_196)
+    }
+
     func testTheEncoderArenaIsTheFormula() throws {
         let artifact = try Artifact(path: try map(tinyEncoder))
         let config = try TextEncoder.Config(header: artifact.header)

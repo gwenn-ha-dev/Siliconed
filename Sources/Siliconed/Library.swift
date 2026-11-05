@@ -113,4 +113,33 @@ package struct Library: Sendable {
         var info = stat()
         return stat(path, &info) == 0 ? Int(info.st_size) : nil
     }
+
+    /// **The regular files under `folder`, every link followed**: a link to a file is that file, a link
+    /// to a folder (the store itself, a family's components) is walked as a folder, a broken link is
+    /// nothing — like a file absent. A `FileManager` enumerator does none of this: it lists a link as a
+    /// link and never enters a linked folder, so a library made of links weighed nothing and a move
+    /// carried none of it. Paths are spelt as `folder`'s tree spells them (a link keeps its name),
+    /// each with the `stat` of what it reaches — one file reached twice (a link beside its target, a
+    /// hard link) has one `st_dev`/`st_ino`. A folder reached twice (a link to a parent) is walked once.
+    package static func regularFiles(under folder: String) -> [(path: String, info: stat)] {
+        var found: [(path: String, info: stat)] = []
+        var walked = Set<[Int]>()
+        func walk(_ directory: String) {
+            var d = stat()
+            guard stat(directory, &d) == 0, d.st_mode & S_IFMT == S_IFDIR,
+                  walked.insert([Int(d.st_dev), Int(d.st_ino)]).inserted else { return }
+            for name in ((try? FileManager.default.contentsOfDirectory(atPath: directory)) ?? []).sorted() {
+                let path = (directory as NSString).appendingPathComponent(name)
+                var info = stat()
+                guard stat(path, &info) == 0 else { continue }
+                switch info.st_mode & S_IFMT {
+                case S_IFDIR: walk(path)
+                case S_IFREG: found.append((path, info))
+                default: continue
+                }
+            }
+        }
+        walk(folder)
+        return found
+    }
 }

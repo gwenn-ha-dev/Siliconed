@@ -41,7 +41,7 @@ package struct MapSummary: Sendable {
     /// Reads the header alone (no mapping of the tensors).
     package init(path: String) throws {
         let header = try Artifact.header(path)
-        let size = (try FileManager.default.attributesOfItem(atPath: path)[.size] as? NSNumber)?.intValue ?? 0
+        let size = Library.fileSize(path) ?? 0      // through a link: a linked map weighs its file
         var counts: [String: Int] = [:]
         for entry in (header["tensors"] as? [String: [String: Any]] ?? [:]).values {
             if let dtype = entry["dtype"] as? String { counts[dtype, default: 0] += 1 }

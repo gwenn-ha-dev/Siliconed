@@ -345,20 +345,17 @@ extension Library {
 
     static func exists(_ path: String) -> Bool { FileManager.default.fileExists(atPath: path) }
 
-    /// The size of a file, or of a whole folder; 0 if it does not exist.
+    /// The size of a file, or of a whole folder; 0 if it does not exist. Through links, like a file
+    /// alone (`fileSize`): a linked map weighs what it points to, a linked folder what it holds
+    /// (`regularFiles(under:)`) — and a file reached twice in a folder counts once.
     package static func size(_ path: String) -> Int {
-        let fm = FileManager.default
-        var folder: ObjCBool = false
-        guard fm.fileExists(atPath: path, isDirectory: &folder) else { return 0 }
-        guard folder.boolValue else { return Library.fileSize(path) ?? 0 }
-        var total = 0
-        let e = fm.enumerator(at: URL(fileURLWithPath: path), includingPropertiesForKeys: [.fileSizeKey, .isRegularFileKey])
-        while let u = e?.nextObject() as? URL {
-            // Through a link, like a file alone (`fileSize`): a linked map weighs what it points to.
-            let v = try? u.resolvingSymlinksInPath().resourceValues(forKeys: [.fileSizeKey, .isRegularFileKey])
-            if v?.isRegularFile == true { total += v?.fileSize ?? 0 }
+        var info = stat()
+        guard stat(path, &info) == 0 else { return 0 }
+        guard info.st_mode & S_IFMT == S_IFDIR else { return Int(info.st_size) }
+        var counted = Set<[Int]>()
+        return regularFiles(under: path).reduce(0) {
+            counted.insert([Int($1.info.st_dev), Int($1.info.st_ino)]).inserted ? $0 + Int($1.info.st_size) : $0
         }
-        return total
     }
 }
 
