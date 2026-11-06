@@ -146,6 +146,8 @@ package final class WeightProducts {
         /// The int8 slot, `nil` for a bf16 operand.
         package let int8: Quantized?
         fileprivate let k: Int, rows: Int, generation: UInt64
+        /// The operand's row length: its product's `k`.
+        package var columns: Int { k }
 
         /// Where an int8 operand lies: its codes `[rows, k]` and its rows' scales fp32, in bytes, page-aligned at the first row; the
         /// rotation the product's weight carries (`stages`, `norm` as `quantize_rows` takes them).
@@ -191,8 +193,10 @@ package final class WeightProducts {
     /// The slot for `name`'s operand (`[m, k]`), or `nil` where its product would not read it (another path, rows in several
     /// chunks, the stream off for a bf16 one, `SILICONED_ROUND_FUSED=0`). Asked just before the producer is encoded: nothing but the
     /// products that read the operand may write the reserve until they are encoded. `quantizes`: the producer can write an int8
-    /// operand too (`ElementwiseGPU.normScale`, a row of up to `ElementwiseGPU.quantizedColumns`); else it is the first product's.
-    package func roundedOperand(_ name: String, m: Int, k: Int, n: Int, quantizes: Bool = false) throws -> RoundedOperand? {
+    /// operand too, a row of up to `holding` columns (`ElementwiseGPU.normScale`'s `quantizedColumns`, `swiglu`'s
+    /// `swigluQuantizedColumns`); else it is the first product's.
+    package func roundedOperand(_ name: String, m: Int, k: Int, n: Int, quantizes: Bool = false,
+                                holding: Int = ElementwiseGPU.quantizedColumns) throws -> RoundedOperand? {
         guard Self.fusesRounding else { return nil }
         let planned = gemm.assignment(k: k, n: n, m: m, weight: format(of: name))
         let w = try gemm.wrap(UnsafeMutableRawPointer(reserve), bytes: capacity * 4, name: "w")
@@ -204,7 +208,7 @@ package final class WeightProducts {
         let inPlacePlan = inPlaceInt8(name, k: k, n: n, m: m, planned: planned).flatMap { $0.plan.quantizedOffset > 0 ? $0.plan : nil }
         guard Self.sharesQuantized != .off, let plan = inPlacePlan ?? quantizedPlan(name, k: k, n: n, planned: planned), plan.chunk >= m,
               aneInt8Rows(planned, plan, m: m, k: k, n: n) == 0, let stages = W8A8.stages(group: plan.group) else { return nil }
-        let byProducer = quantizes && Self.sharesQuantized == .producer && k <= ElementwiseGPU.quantizedColumns
+        let byProducer = quantizes && Self.sharesQuantized == .producer && k <= holding
         wroteReserve()
         quantizedSlot = (reserveWrites, 0, byProducer)
         return RoundedOperand(bf16: nil, int8: .init(buffer: w, codesOffset: plan.quantizedOffset, scalesOffset: plan.quantizedScalesOffset,
