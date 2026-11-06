@@ -347,10 +347,13 @@ package final class Block: BoundaryRecording, PhaseTiming {
                      rows: s, headDim: headDim, eps: 1e-5, freqs: table, layout: .interleaved, wait: !stream.isOn)
         }
         passClock?.finish()
+        // The attention writes `to_out`'s operand rounded too, where it reads it so: no pass of the product's own.
+        let attended = tiled.writesRounded ? try products.roundedOperand(prefix + "attention.to_out.0.weight", m: s, k: d, n: d) : nil
         timed("sdpa wall") {
-            ownTimings["sdpa GPU", default: 0] += tiled.run(q: qb, k: kb, v: vb, into: ob, prerounded: copies == nil ? [] : [.q, .k])
+            ownTimings["sdpa GPU", default: 0] += tiled.run(q: qb, k: kb, v: vb, into: ob, prerounded: copies == nil ? [] : [.q, .k],
+                                                            rounded: attended?.bf16)
         }
-        try products.linear(prefix + "attention.to_out.0.weight", a: ob, c: o, m: s, k: d, n: d)
+        try products.linear(prefix + "attention.to_out.0.weight", a: ob, c: o, m: s, k: d, n: d, rounded: attended)
         try widenNorm(1, "attention_norm2.weight")
         try widenNorm(2, "ffn_norm1.weight")
         timed("residual") { elementwise.normResidual(x0, plus: (o, 0), weight: at(1), gate: at(5), rows: s, columns: d, eps: eps) }

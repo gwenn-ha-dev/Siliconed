@@ -466,8 +466,9 @@ package final class AnimaDiT: BoundaryRecording, PhaseTiming {
                               .init(kb, heads: heads, weight: norm(1), rounded: own.map { ($0.k, kernels.own.precision) }, keepsFP32: false)],
                              rows: s, headDim: dh, eps: 1e-5, freqs: table, layout: .interleaved, wait: !stream.isOn)
         }
-        try attend(.tiles(kernels.own), "sdpa self", q: q, k: k, v: v, keyRows: imageTokens, prerounded: own == nil ? [] : [.q, .k])
-        try linearGPU(prefix + "attn1.to_out.0.weight", a: merged, into: o, m: s, k: d, n: d)
+        let attended1 = kernels.own.writesRounded ? try products.roundedOperand(prefix + "attn1.to_out.0.weight", m: s, k: d, n: d) : nil
+        try attend(.tiles(kernels.own), "sdpa self", q: q, k: k, v: v, keyRows: imageTokens, prerounded: own == nil ? [] : [.q, .k], rounded: attended1)
+        try linearGPU(prefix + "attn1.to_out.0.weight", a: merged, into: o, m: s, k: d, n: d, rounded: attended1)
         recorded("attn1_out")
 
         // ── 2. cross-attention to the text — no RoPE
@@ -494,8 +495,9 @@ package final class AnimaDiT: BoundaryRecording, PhaseTiming {
                                  wait: !stream.isOn)
             }
         }
-        try attend(.tiles(kernels.cross), "sdpa cross", q: q, k: textK, v: textV, keyRows: textLength, prerounded: cross == nil ? [] : [.q])
-        try linearGPU(prefix + "attn2.to_out.0.weight", a: merged, into: o, m: s, k: d, n: d)
+        let attended2 = kernels.cross.writesRounded ? try products.roundedOperand(prefix + "attn2.to_out.0.weight", m: s, k: d, n: d) : nil
+        try attend(.tiles(kernels.cross), "sdpa cross", q: q, k: textK, v: textV, keyRows: textLength, prerounded: cross == nil ? [] : [.q], rounded: attended2)
+        try linearGPU(prefix + "attn2.to_out.0.weight", a: merged, into: o, m: s, k: d, n: d, rounded: attended2)
         recorded("attn2_out")
 
         // ── 3. GELU FFN
@@ -587,9 +589,11 @@ package final class AnimaDiT: BoundaryRecording, PhaseTiming {
         return p
     }
 
+    /// `rounded`: the output also written rounded where `to_out` reads its operand so (`TiledAttention.run(…rounded:)`) — the tiles'
+    /// only, the only path the caller hands one.
     private func attend(_ path: AttentionPath, _ phase: String, q: UnsafeMutablePointer<Float>,
                         k: UnsafeMutablePointer<Float>, v: UnsafeMutablePointer<Float>, keyRows: Int,
-                        prerounded: TiledAttention.Prerounded = []) throws {
+                        prerounded: TiledAttention.Prerounded = [], rounded: WeightProducts.RoundedOperand? = nil) throws {
         let d = config.dim
         let qb = try gemm.wrap(UnsafeMutableRawPointer(q), bytes: imageTokens * d * 4, name: "q")
         let kb = try gemm.wrap(UnsafeMutableRawPointer(k), bytes: keyRows * d * 4, name: "k")
@@ -600,7 +604,8 @@ package final class AnimaDiT: BoundaryRecording, PhaseTiming {
                 switch path {
                 case .graph(let a): ownTimings["sdpa GPU", default: 0] += a.run(q: qb, k: kb, v: vb, into: ob)
                 case .flash(let f): ownTimings["sdpa GPU", default: 0] += f.run(q: qb, k: kb, v: vb, into: ob)
-                case .tiles(let t): ownTimings["sdpa GPU", default: 0] += t.run(q: qb, k: kb, v: vb, into: ob, prerounded: prerounded)
+                case .tiles(let t): ownTimings["sdpa GPU", default: 0] += t.run(q: qb, k: kb, v: vb, into: ob, prerounded: prerounded,
+                                                                                rounded: rounded?.bf16)
                 case .split(let h):
                     let (gpu, cpu) = h.run(q: qb, k: kb, v: vb, into: ob, q: q, k: k, v: v, out: merged)
                     ownTimings["sdpa GPU", default: 0] += gpu

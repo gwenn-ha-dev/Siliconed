@@ -518,8 +518,10 @@ package final class MossImageDiT: BoundaryRecording, PhaseTiming {
             }
         }
         clock?.finish()
-        try attend(rows: n, prerounded: copies == nil ? [] : [.q, .k])
-        try linearGPU(prefix + "proj.o.weight", a: merged, into: o, m: n, k: d, n: d)
+        // The attention writes `proj.o`'s operand rounded too, where it reads it so: no pass of the product's own.
+        let attended = tiled?.writesRounded == true ? try products.roundedOperand(prefix + "proj.o.weight", m: n, k: d, n: d) : nil
+        try attend(rows: n, prerounded: copies == nil ? [] : [.q, .k], rounded: attended)
+        try linearGPU(prefix + "proj.o.weight", a: merged, into: o, m: n, k: d, n: d, rounded: attended)
         timed("residual") { elementwise.residual((xb, 0), plus: (ob, 0), carries: (mb, 2 * d), rows: n, columns: d) }
 
         // ── feed-forward: shift_f m[3], scale_f m[4], gate_f m[5]
@@ -660,9 +662,12 @@ package final class MossImageDiT: BoundaryRecording, PhaseTiming {
         Ops.addBias(c, bias: reserve, rows: rows, columns: columns)
     }
 
-    private func attend(rows n: Int, prerounded: TiledAttention.Prerounded = []) throws {
+    /// `rounded`: the output also written rounded where `proj.o` reads its operand so (`TiledAttention.run(…rounded:)`) — handed only
+    /// where the block found the tiles (the same instance, `tiles[n]`).
+    private func attend(rows n: Int, prerounded: TiledAttention.Prerounded = [], rounded: WeightProducts.RoundedOperand? = nil) throws {
         let qb = try slice(q), kb = try slice(k), vb = try slice(v), ob = try slice(merged)
         let cut = MossImageDiT.attentionAssignment(gemm.plan, sequence: n, heads: config.heads, headDim: config.headDim)
+        precondition(rounded == nil || (cut.usesTiles && !cut.splits), "the output rounded by an attention that is not the tiles")
         if cut.splits {
             let split: HeadSplitAttention
             if let s = splits[n] { split = s } else {
@@ -682,10 +687,13 @@ package final class MossImageDiT: BoundaryRecording, PhaseTiming {
                                                         headDim: config.headDim)
             if let tiled {
                 tiles[n] = tiled
-                timed("sdpa wall") { ownTimings["sdpa GPU", default: 0] += tiled.run(q: qb, k: kb, v: vb, into: ob, prerounded: prerounded) }
+                timed("sdpa wall") {
+                    ownTimings["sdpa GPU", default: 0] += tiled.run(q: qb, k: kb, v: vb, into: ob, prerounded: prerounded, rounded: rounded?.bf16)
+                }
                 return
             }
         }
+        precondition(rounded == nil, "the output rounded by an attention that is not the tiles")
         let attention: Attention
         if let a = attentions[n] { attention = a } else {
             attention = Attention(device: gemm.device, queue: gemm.queue, heads: config.heads,
