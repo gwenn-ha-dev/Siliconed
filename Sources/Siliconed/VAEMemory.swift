@@ -539,14 +539,26 @@ package final class VAEMemory {
     /// 0.1 s since the VAEs run in single-kernel passes —, and the memory need says a VAE hands
     /// everything back before it returns (`MemoryNeed`): without the wait, the next phase started beside
     /// what was not yet returned (+35 MB between two Qwen-Image-2.1 references), uncharged. So the
-    /// graphics ledger is polled back to its level before the heaps (`baseline`, within
-    /// `releaseTolerance`), for `releaseWait` at most — past it, what is left is the check's to report.
+    /// graphics ledger is polled until **our two heaps** have left it — down by their size from its level
+    /// just before they are released, or back to `baseline` if that comes first, within `releaseTolerance` —
+    /// for `releaseWait` at most; past it, what is left is the check's to report.
+    ///
+    /// **The heaps, not the baseline**: after a render's denoising, ~50 MB of Metal's own that the first
+    /// graphs allocated beside the heaps stays in the ledger ~1.2 s after they are gone (Z-Image 1024²:
+    /// 1173 → 61 MB in 27 ms, then 61 → 11–19 MB at +1.2 s; never in the decoder alone, where it leaves
+    /// with them), and the ledger lands a few MB either side of a baseline of 14 MB. Polled back to the
+    /// baseline, every render's decoding waited 1.2 s, or the full `releaseWait` when it landed above
+    /// `baseline + releaseTolerance` (2.33 s of decoding for 1.1 s of passes). Never later than the
+    /// baseline: what Metal keeps of its own it returns on its own time, inside the phase's charge.
     func finish() {
-        guard heap != nil, workspace != nil else { return }
+        // Their sizes only: a reference held here would keep them alive through the wait.
+        guard let heapBytes = heap?.size, let workspaceBytes = workspace?.heap.size else { return }
         precondition(walk.empty, "VAEMemory: registers still live at the end")
+        let returned = VAEMemory.graphicsFootprint() - heapBytes - workspaceBytes
         heap = nil; workspace = nil; queue = nil
+        let target = max(baseline, returned) + VAEMemory.releaseTolerance
         let deadline = Date().addingTimeInterval(VAEMemory.releaseWait)
-        while VAEMemory.graphicsFootprint() > baseline + VAEMemory.releaseTolerance, Date() < deadline { usleep(1000) }
+        while VAEMemory.graphicsFootprint() > target, Date() < deadline { usleep(1000) }
     }
 
     /// How long `finish` waits for Metal at most, and what it leaves above the baseline: measured
