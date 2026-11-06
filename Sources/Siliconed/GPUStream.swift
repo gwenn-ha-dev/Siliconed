@@ -1,5 +1,6 @@
 import Foundation
 import Metal
+import ObjectiveC
 import Synchronization
 
 /// **The GPU's work queued without waiting, and waited for only where the CPU reads or writes** — a denoiser's evaluation as one
@@ -57,15 +58,16 @@ package final class GPUStream: @unchecked Sendable {   // its state under `lock`
     }
 
     private static let lock = NSLock()
-    nonisolated(unsafe) private static var streams: [ObjectIdentifier: GPUStream] = [:]
+    nonisolated(unsafe) private static let key = UnsafeMutableRawPointer.allocate(byteCount: 1, alignment: 1)
 
-    /// The stream of `queue`, made on first use.
+    /// The stream of `queue`, made on first use. It rides on the queue (an associated object) and dies with it: a table by the queue's
+    /// address would hand a dead queue's stream — its switch, its pending buffers — to a new queue made at the same address, and queues
+    /// die now (`PhaseBoundary.returnedDenoiser`).
     package static func of(_ queue: MTLCommandQueue) -> GPUStream {
         lock.lock(); defer { lock.unlock() }
-        let key = ObjectIdentifier(queue)
-        if let s = streams[key] { return s }
+        if let s = objc_getAssociatedObject(queue, key) as? GPUStream { return s }
         let s = GPUStream()
-        streams[key] = s
+        objc_setAssociatedObject(queue, key, s, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
         return s
     }
 
