@@ -75,9 +75,9 @@ enum AnimaStages {
     static let dit = Stage(
         model: model, name: "dit",
         proves: "one evaluation of the DiT at σ = 1, boundary by boundary, and its output per latent plane against the fp64 witness",
-        sizes: ["512", "1024", "768x512", "1536"], options: ["--map", "--neural-engine", "--bf16-activations", "--bf16-attention", "--fp16-attention", "--no-accelerators", "--variant"],
-        oracle: "tools/oracle/anima.py dit --size {size}; witness --size {size} --step 0; with --neural-engine, --bf16-activations, --bf16-attention or --fp16-attention, bf16 --size {size}; with --variant compact or light, dit and bf16 with --variant, at 512 \(Wording.publishers)", weights: ["DiT"],
-        rule: "the rule, floor 5e-4; model_out per latent plane at the fp64 witness; \(Wording.rectangle); \(Wording.halfPrecision)"
+        sizes: ["512", "1024", "768x512", "1536"], options: ["--map", "--neural-engine", "--bf16-activations", "--bf16-attention", "--fp16-attention", "--int8-activations", "--no-accelerators", "--variant"],
+        oracle: "tools/oracle/anima.py dit --size {size}; witness --size {size} --step 0; with --neural-engine, --bf16-activations, --bf16-attention or --fp16-attention, bf16 --size {size}; with --variant compact or light, dit and bf16 with --variant, at 512 \(Wording.publishers); with --int8-activations, w8a8 --size {size} --variant compact (ComfyUI's own int8 products)", weights: ["DiT"],
+        rule: "the rule, floor 5e-4; model_out per latent plane at the fp64 witness; \(Wording.rectangle); \(Wording.halfPrecision); with --int8-activations, against ComfyUI's W8A8 error + 25 %"
     ) { invocation in
         let version = try invocation.quantizedVariant()
         let report = Report(title: "\(model) dit\(version.map { " " + $0.rawValue } ?? "") \(invocation.size)")
@@ -97,7 +97,8 @@ enum AnimaStages {
         let started = Date()
         _ = try dit.forward(latent: latent.baseAddress!, context: context.baseAddress!, sigma: sigma[0])
         if invocation.profile { printTimings(dit.timings, seconds: Date().timeIntervalSince(started)) }
-        let half = try invocation.halfReference(file, script: "tools/oracle/anima.py bf16 --size \(invocation.size)\(version.map { " --variant " + $0.rawValue } ?? "")")
+        let half = try invocation.reference(file, script: "tools/oracle/anima.py bf16 --size \(invocation.size)\(version.map { " --variant " + $0.rawValue } ?? "")",
+                                            w8a8Script: "tools/oracle/anima.py w8a8 --size \(invocation.size) --variant compact")
         let d = dit.config.dim
         let widths = ["temb": 3 * d, "embedded_timestep": d, "model_out": height * width]
         // Per channel against the oracle: the witness's worst POSITION is a noisy statistic here (an
@@ -117,6 +118,7 @@ enum AnimaStages {
         if invocation.bf16Activations { try BF16ActivationRun.account(report) }
         if invocation.bf16Attention { try BF16AttentionRun.account(report) }
         if invocation.fp16Attention { try FP16AttentionRun.account(report) }
+        if invocation.int8Activations { try W8A8Run.account(report) }
         return report
     }
 

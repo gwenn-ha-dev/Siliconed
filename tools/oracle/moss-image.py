@@ -17,6 +17,8 @@ The recipe is the community turbo: MOSS-Image-SFT + the LoRA `lodestones/MOSS-Im
                                                witness-moss-dit-compact-f64-512
     moss-image.py dit-bf16 [--variant compact] the dit evaluation in bfloat16, on its golden's inputs (taps)
                                                -> witness-bf16-moss-dit[-compact]-512 (the bar of --neural-engine)
+    moss-image.py w8a8 --variant compact       `dit-bf16 --variant compact` with ComfyUI's default int8 products in the
+                                               int8 layers (the W8A8 bar)    -> witness-w8a8-moss-dit-compact-512
     moss-image.py bf16                         LoRA merged into bf16 weights vs kept apart   -> witness-moss-bf16-512
     moss-image.py trajectory                   the 8 steps with the LoRA                     -> goldens-moss-trajectory-512
     moss-image.py vae-final                    the final latent decoded, the image's md5     -> goldens-moss-vae-final-512
@@ -641,6 +643,36 @@ def stage_dit_bf16(size: str):
           {"dtype": "bfloat16", "inputs": stem, **({"weights": model.published.describe()} if VARIANT else {})})
 
 
+def stage_w8a8(size: str):
+    """`dit-bf16 --variant compact` with every linear the Compact publishes in int8 convrot computed by comfy_kitchen's own
+    `int8_linear` on the published integers (`quantized.Int8Products`, the recipe cited there): the bar of the engine's
+    W8A8 route. The frozen ComfyUI of `quant_fixtures.COMFY` (v0.39.0) predates MOSS-Image: its graph is read at
+    ComfyUI 63e5bf59 (comfy/ldm/moss_image/model.py; the fused situ came in a639f187), which needs comfy_kitchen 0.2.38 or
+    later for one thing only, the `situ` input activation. `backends/eager/quantization.py` of 0.2.38 is the frozen
+    0.2.37's byte for byte, and 0.2.41's (what 63e5bf59 requires) only adds functions: `int8_linear` is the same. The
+    blocks call `qkv` fused (one quantization of
+    y for the three: the same integers as three products on y) and `o` plainly, and the feed-forward
+    `linear_input_act(ffn_down, ffn_up_gate(y), "situ")`: on the eager backend `apply_input_act` evaluates situ in bf16
+    before the quantization, "in the same order and dtype as MOSS-Image's module" (0.2.38 `_activations.py`), which is
+    the reference's `_situ` in bf16 here, op for op; the text blocks call theirs plainly. Inputs: the Compact's dit golden,
+    as `dit-bf16` reads them. Writes `witness-w8a8-moss-dit-compact-<size>`, the bf16 bar's keys."""
+    if VARIANT != "compact":
+        raise SystemExit("w8a8: the Compact only (--variant compact): its int8 convrot is what ComfyUI computes in W8A8")
+    _, _, name = common.parse_size(size)
+    stem = quantized.stem(f"goldens-moss-dit-{name}", VARIANT)
+    golden = read(stem, f"moss-image.py dit --variant {VARIANT}")
+    model = load_dit(torch.bfloat16)
+    products = quantized.Int8Products(model, model.published)
+    taps = probe_dit(model)
+    out = model(golden["latent_in"][None], golden["timestep"], golden["text_in"][None]).sample
+    assert products.calls == len(products.layers), (products.calls, len(products.layers))
+    payload = {"model_out": out[0].float(), **{k: v.float() for k, v in taps.items()}}
+    for k in ("model_out", "block0_out", "block41_out"):
+        print(f"  {k}: w8a8 against fp32, {relative(golden[k], payload[k], 0 if golden[k].ndim == 3 else -1)}")
+    write(stem.replace("goldens-", "witness-w8a8-"), payload,
+          {"dtype": "bfloat16", "inputs": stem, "int8": products.describe(), "weights": model.published.describe()})
+
+
 # ------------------------------------------------------------------ the trajectory
 
 def stage_trajectory(size: str):
@@ -831,16 +863,19 @@ def main() -> None:
     common.unbuffered()
     p = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     p.add_argument("stage", choices=["schedule", "tokenizer", "text", "text-witness", "vae", "vae-witness", "dit", "witness",
-                                     "dit-bf16", "bf16", "trajectory", "vae-final", "img2img", "all"])
+                                     "dit-bf16", "w8a8", "bf16", "trajectory", "vae-final", "img2img", "all"])
     p.add_argument("--size", default="512", help="512 (every stage); 1024 for dit, witness and dit-bf16")
     p.add_argument("--lora", action="store_true", help="dit, witness: the 8-step LoRA merged at strength 1")
     p.add_argument("--variant", choices=list(quantized.SOURCES["moss-image"]),
-                   help="dit, witness, dit-bf16, img2img: the Compact's published DiT (Comfy-Org's int8 convrot) instead of the publisher's")
+                   help="dit, witness, dit-bf16, img2img: the Compact's published DiT (Comfy-Org's int8 convrot) instead of the publisher's;"
+                        " w8a8: compact, required")
     p.add_argument("--goldens", help="output folder (default: $SILICONED_GOLDENS, else ./goldens)")
     args = p.parse_args()
     global VARIANT
-    if args.variant and (args.stage not in ("dit", "witness", "dit-bf16", "img2img") or args.lora):
-        p.error("--variant goes with dit, witness, dit-bf16 or img2img, without --lora (the Compact takes the Standard's LoRA)")
+    if args.variant and (args.stage not in ("dit", "witness", "dit-bf16", "w8a8", "img2img") or args.lora):
+        p.error("--variant goes with dit, witness, dit-bf16, w8a8 or img2img, without --lora (the Compact takes the Standard's LoRA)")
+    if args.stage == "w8a8" and args.variant != "compact":
+        p.error("w8a8 takes --variant compact: the Compact's int8 convrot is what ComfyUI computes in W8A8")
     VARIANT = args.variant
     OUT = common.goldens_directory(args.goldens) / "moss"
     OUT.mkdir(parents=True, exist_ok=True)
@@ -853,7 +888,8 @@ def main() -> None:
     else:
         {"schedule": stage_schedule, "tokenizer": stage_tokenizer, "text": stage_text, "text-witness": stage_text_witness,
          "vae": lambda: stage_vae(args.size), "vae-witness": lambda: stage_vae_witness(args.size),
-         "bf16": lambda: stage_bf16(args.size), "dit-bf16": lambda: stage_dit_bf16(args.size), "trajectory": lambda: stage_trajectory(args.size),
+         "bf16": lambda: stage_bf16(args.size), "dit-bf16": lambda: stage_dit_bf16(args.size), "w8a8": lambda: stage_w8a8(args.size),
+         "trajectory": lambda: stage_trajectory(args.size),
          "vae-final": lambda: stage_vae_final(args.size), "img2img": lambda: stage_img2img(args.size)}[args.stage]()
 
 

@@ -7,6 +7,8 @@
     anima.py bf16 --size 1024 [1536]        the same evaluation in bfloat16             -> witness-bf16-anima-dit-<size>
     anima.py dit|bf16 --size 512 --variant compact|light   the same, for the Compact's or the Light's published DiT
                                             (GGUF), dequantized by gguf-py -> goldens-anima-dit-<variant>-<size>
+    anima.py w8a8 --size 512 --variant compact   `bf16 --variant compact` with ComfyUI's default int8 products in the
+                                            int8 layers (the W8A8 bar)      -> witness-w8a8-anima-dit-compact-<size>
     anima.py trajectory --size 512 [1024 1536]  the 8-step Euler loop                   -> goldens-anima-trajectory-<size>
     anima.py vae --size 512 [1024 768x512]  the decoder on the final latent             -> goldens-anima-vae-<size>
     anima.py witness --size 512 --step 0    one guided evaluation in float64            -> witness-anima-f64-<size>-step<n>
@@ -18,6 +20,8 @@
 
 `bf16` is the bar of a half-precision path (the ANE's fp16 products): the `dit` evaluation with the
 reference in bfloat16, on the `dit` golden's inputs. It is not part of `all` (costly, and only that path reads it).
+`w8a8` is the bar of the engine's W8A8 route (`check anima dit --variant compact --int8-activations`): the same bf16
+evaluation with every int8 layer computed as ComfyUI does by default (`quantized.Int8Products`); not part of `all` either.
 
 Goldens go in `<goldens>/anima/`; `--goldens DIR`, else `SILICONED_GOLDENS`, else `./goldens`. Each stage
 rereads what an earlier one wrote (`dit` the text, `trajectory` the text, `vae` the trajectory, a rectangle's
@@ -359,6 +363,34 @@ def stage_bf16(size: str, variant: str | None = None):
            **({"weights": model.published.describe()} if variant else {})})
 
 
+def stage_w8a8(size: str, variant: str):
+    """`bf16 --variant compact` with every linear the Compact publishes in int8 convrot computed by comfy_kitchen's own
+    `int8_linear` on the published integers (`quantized.Int8Products`, the recipe cited there): the bar of the engine's
+    W8A8 route. ComfyUI's Anima (comfy/ldm/anima/model.py over comfy/ldm/cosmos/predict2.py, at the frozen commit of
+    `quant_fixtures.COMFY`) calls its linears plainly: `GPT2FeedForward` is `layer2(GELU(layer1(x)))`, the attention's
+    q, k, v and output projections and the adaLN-LoRA pairs one `Linear` each, no input activation or residual folded
+    into a product. Bedovyy quantizes 254 of them: the eight attention projections of blocks 1 to 26 and the MLP of
+    blocks 4 to 26. Blocks 0 and 27 whole, the MLPs of blocks 1 to 3, every adaLN, the embedders and the head are BF16 in
+    the file, and run in bf16 here as there: block 0's boundaries are the bf16 bar's to the bit. Inputs: the Standard's
+    dit golden, as `bf16` reads them. Writes `witness-w8a8-anima-dit-compact-<size>`, the bf16 bar's keys."""
+    if variant != "compact":
+        raise SystemExit("w8a8: the Compact only (--variant compact): its int8 convrot is what ComfyUI computes in W8A8")
+    height, width, name = common.parse_size(size)
+    golden = read(f"goldens-anima-dit-{name}", f"anima.py dit --size {name}")
+    half = torch.bfloat16
+    model = load_transformer(variant).to(half)
+    products = quantized.Int8Products(model, model.published)
+    taps = probe_dit(model)
+    out = model(hidden_states=golden["latent_in"][:, None][None].to(half), timestep=golden["timestep"].to(half),
+                encoder_hidden_states=golden["prompt_embeds"][None].to(half),
+                padding_mask=torch.zeros(1, 1, height, width, dtype=half), return_dict=False)[0]
+    taps["model_out"] = out[0, :, 0]
+    assert products.calls == len(products.layers), (products.calls, len(products.layers))
+    write(quantized.stem(f"witness-w8a8-anima-dit-{name}", variant), {k: v.float() for k, v in taps.items()},
+          {"dtype": "bfloat16", "inputs": f"goldens-anima-dit-{name}", "int8": products.describe(),
+           "weights": model.published.describe()})
+
+
 def stage_trajectory(size: str):
     resolution = int(size)
     embeds = read("goldens-anima-text", "anima.py text")["prompt_embeds"][None]
@@ -614,18 +646,20 @@ def main() -> None:
     global OUT
     common.unbuffered()
     p = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    p.add_argument("stage", choices=["tokenizer", "text", "dit", "bf16", "trajectory", "vae", "witness", "vae-witness", "vae-bf16",
-                                          "img2img", "all"])
+    p.add_argument("stage", choices=["tokenizer", "text", "dit", "bf16", "w8a8", "trajectory", "vae", "witness", "vae-witness",
+                                          "vae-bf16", "img2img", "all"])
     p.add_argument("--size", nargs="+", default=None,
                    help="512, 1024 or WIDTHxHEIGHT (dit, vae: a rectangle too; default 512, all: every size)")
     p.add_argument("--step", type=int, default=0, help="witness only: the step of the trajectory (default 0, the one the check reads)")
     p.add_argument("--long", action="store_true", help="text only: the long prompt, past 512 tokens -> goldens-anima-text-long")
     p.add_argument("--variant", choices=quantized.VARIANTS,
-                   help="dit and bf16: the Compact's or the Light's published DiT instead of the Standard's")
+                   help="dit and bf16: the Compact's or the Light's published DiT instead of the Standard's; w8a8: compact, required")
     p.add_argument("--goldens", help="output folder (default: $SILICONED_GOLDENS, else ./goldens)")
     args = p.parse_args()
-    if args.variant and args.stage not in ("dit", "bf16"):
-        p.error("--variant goes with dit or bf16")
+    if args.variant and args.stage not in ("dit", "bf16", "w8a8"):
+        p.error("--variant goes with dit, bf16 or w8a8")
+    if args.stage == "w8a8" and args.variant != "compact":
+        p.error("w8a8 takes --variant compact: the Compact's int8 convrot is what ComfyUI computes in W8A8")
     OUT = common.goldens_directory(args.goldens) / "anima"
     OUT.mkdir(parents=True, exist_ok=True)
     if args.stage == "all":
@@ -637,7 +671,7 @@ def main() -> None:
     else:
         for size in args.size or ["512"]:
             if args.variant:
-                {"dit": stage_dit_variant, "bf16": stage_bf16}[args.stage](size, args.variant)
+                {"dit": stage_dit_variant, "bf16": stage_bf16, "w8a8": stage_w8a8}[args.stage](size, args.variant)
             elif args.stage == "witness":
                 stage_witness(size, args.step)
             else:

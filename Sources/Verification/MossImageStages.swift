@@ -54,10 +54,10 @@ package enum MossImageStages {
     static let dit = Stage(
         model: model, name: "dit",
         proves: "one evaluation of the DiT at σ = 1, boundary by boundary — time, modulations, RoPE, text path, block 0 inside out, blocks 1, 13, 27, 41, the head —, judged at the fp64 witness",
-        sizes: ["512", "1024"], options: ["--map", "--neural-engine", "--bf16-activations", "--bf16-attention", "--fp16-attention", "--no-accelerators", "--variant"],
-        oracle: "tools/oracle/moss-image.py dit --size {size}; witness --size {size}; with --neural-engine, --bf16-activations, --bf16-attention or --fp16-attention, dit-bf16 --size {size}; with --variant compact, dit, witness and dit-bf16 with --variant at 512 \(Wording.publishers)",
+        sizes: ["512", "1024"], options: ["--map", "--neural-engine", "--bf16-activations", "--bf16-attention", "--fp16-attention", "--int8-activations", "--no-accelerators", "--variant"],
+        oracle: "tools/oracle/moss-image.py dit --size {size}; witness --size {size}; with --neural-engine, --bf16-activations, --bf16-attention or --fp16-attention, dit-bf16 --size {size}; with --variant compact, dit, witness and dit-bf16 with --variant at 512 \(Wording.publishers); with --int8-activations, w8a8 --variant compact (ComfyUI's own int8 products)",
         weights: ["DiT"],
-        rule: "the rule, floor 5e-4, at the fp64 witness where it exists; model_out per latent plane at the witness; \(Wording.halfPrecision)"
+        rule: "the rule, floor 5e-4, at the fp64 witness where it exists; model_out per latent plane at the witness; \(Wording.halfPrecision); with --int8-activations, against ComfyUI's W8A8 error + 25 %"
     ) { invocation in try evaluate(invocation, lora: false) }
 
     static let ditLoRA = Stage(
@@ -175,8 +175,9 @@ package enum MossImageStages {
             .replacingOccurrences(of: "-\(invocation.size)", with: "-f64-\(invocation.size)")
         let witness = invocation.goldens.optional(witnessStem + ".safetensors")
         // `dit-lora` lists no half-precision option: `half` is nil there.
-        let half = useLoRA ? nil : try invocation.halfReference(
-            stem + ".safetensors", script: "tools/oracle/moss-image.py dit-bf16\(version.map { " --variant " + $0.rawValue } ?? "")")
+        let half = useLoRA ? nil : try invocation.reference(
+            stem + ".safetensors", script: "tools/oracle/moss-image.py dit-bf16\(version.map { " --variant " + $0.rawValue } ?? "")",
+            w8a8Script: "tools/oracle/moss-image.py w8a8 --variant compact")
         // Published int8 weights (the Compact): the evaluation along the int8 kernel, `model_out` once widened below (`Int8Route`).
         let int8 = Int8Route(artifact, invocation)
         let dit = try MossImageDiT(artifact: artifact, gridHeight: height, gridWidth: width, maxText: t,
@@ -224,6 +225,7 @@ package enum MossImageStages {
         if invocation.bf16Activations { try BF16ActivationRun.account(report) }
         if invocation.bf16Attention { try BF16AttentionRun.account(report) }
         if invocation.fp16Attention { try FP16AttentionRun.account(report) }
+        if invocation.int8Activations { try W8A8Run.account(report) }
         return report
     }
 }

@@ -6,6 +6,8 @@
     krea2.py bf16 --size 512 [1024 768x512]    the same evaluation in bfloat16               -> witness-bf16-krea2-dit-<size>
     krea2.py dit|bf16|witness|witness-step --size 512 --variant compact|light   the same, for the Compact's (Comfy-Org int8 convrot) or the
                                                Light's (GGUF Q4_K_M) published DiT -> goldens-krea2-dit-<variant>-<size>
+    krea2.py w8a8 --size 512 --variant compact   `bf16 --variant compact` with ComfyUI's default int8 products in the
+                                               int8 layers (the W8A8 bar)    -> witness-w8a8-krea2-dit-compact-<size>
     krea2.py trajectory --size 512 [1024]      the 8-step Euler loop                         -> goldens-krea2-trajectory-<size>
     krea2.py trajectory --size 512 --permute 0 N [N...] [--permute-kind group|full]   the free 8-step loop under each
                                                drawn summation order (0: the identity, same calls) -> draw-krea2-<size>-trajectory-perm<kind>N
@@ -34,6 +36,8 @@ fp32) just before its forward pass and dropped just after. Expect minutes per ev
 
 `bf16` is the bar of a half-precision path (the ANE's fp16 products): the `dit` evaluation with the
 reference in bfloat16, on the `dit` golden's inputs. It is not part of `all` (costly, and only that path reads it).
+`w8a8` is the bar of the engine's W8A8 route (`check krea2 dit --variant compact --int8-activations`): the same bf16
+evaluation with every int8 layer computed as ComfyUI does by default (`quantized.Int8Products`); not part of `all` either.
 
 `all` writes what `siliconed check krea2` reads at the sizes asked (default 512): the text, the DiT
 evaluation and its head witness, the trajectory and the float64 witness of every one of its eight steps
@@ -355,6 +359,37 @@ def stage_bf16(size: str, variant: str | None = None):
     write(quantized.stem(f"witness-bf16-krea2-dit-{name}", variant), payload,
           {"dtype": "bfloat16", "inputs": f"goldens-krea2-dit-{name}",
            **({"weights": model.published.describe()} if variant else {})})
+
+
+def stage_w8a8(size: str, variant: str):
+    """`bf16 --variant compact` with every linear the Compact publishes in int8 convrot computed by comfy_kitchen's own
+    `int8_linear` on the published integers (`quantized.Int8Products`, the recipe cited there): the bar of the engine's
+    W8A8 route. ComfyUI's Krea 2 (comfy/ldm/krea2/model.py at the frozen commit of `quant_fixtures.COMFY`) calls its
+    linears plainly: the attention's `wq`, `wk`, `wv` and `gate` one `Linear` each on the same x (the same integers four
+    times), `wo(out * sigmoid(gate))`, the MLP `down(silu(gate(x)) * up(x))`, no input activation or residual folded into a
+    product. Inputs: the Standard's dit golden, as `bf16` reads them. Writes `witness-w8a8-krea2-dit-compact-<size>`, the
+    bf16 bar's keys."""
+    if variant != "compact":
+        raise SystemExit("w8a8: the Compact only (--variant compact): its int8 convrot is what ComfyUI computes in W8A8")
+    height, width, name = common.parse_size(size)
+    golden = read(f"goldens-krea2-dit-{name}", f"krea2.py dit --size {name}")
+    embeds, mask = text_inputs()
+    model = load_transformer(torch.bfloat16, variant)
+    products = quantized.Int8Products(model, model.published)
+    pipe = make_pipeline(transformer=model)
+    positions = pipe.prepare_position_ids(embeds.shape[1], height // 16, width // 16, torch.device("cpu"))
+    packed = pipe._pack_latents(golden["latent_in"][None], 1, 16, height // 8, width // 8)
+    taps = probe_dit(model, mask)
+    half = torch.bfloat16
+    out = model(hidden_states=packed.to(half), encoder_hidden_states=embeds.to(half),
+                timestep=golden["timestep"].to(half), position_ids=positions, encoder_attention_mask=mask,
+                return_dict=False)[0].float()
+    assert products.calls == len(products.layers), (products.calls, len(products.layers))
+    payload = {"model_out": unpack(pipe, out, height, width), "model_out_packed": out[0],
+               **{k: v.float() for k, v in taps.items()}}
+    write(quantized.stem(f"witness-w8a8-krea2-dit-{name}", variant), payload,
+          {"dtype": "bfloat16", "inputs": f"goldens-krea2-dit-{name}", "int8": products.describe(),
+           "weights": model.published.describe()})
 
 
 def stage_trajectory(size: str):
@@ -960,7 +995,7 @@ def main() -> None:
     global OUT
     common.unbuffered()
     p = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    p.add_argument("stage", choices=["text", "dit", "bf16", "trajectory", "vae", "witness", "witness-step", "draw",
+    p.add_argument("stage", choices=["text", "dit", "bf16", "w8a8", "trajectory", "vae", "witness", "witness-step", "draw",
                                      "vae-witness", "vae-bf16", "img2img", "img2img-witness", "img2img-draw", "all"])
     p.add_argument("--size", nargs="+", default=None,
                    help="512, 1024 or WIDTHxHEIGHT (dit, witness, vae: a rectangle too; default 512, all: every size)")
@@ -977,12 +1012,14 @@ def main() -> None:
     p.add_argument("--draws", type=int, default=0, help="all only: jitters 1..N of every step's draw (default 0: none)")
     p.add_argument("--long", action="store_true", help="text only: the long prompt, past 512 tokens -> goldens-krea2-text-long")
     p.add_argument("--variant", choices=quantized.VARIANTS,
-                   help="dit and bf16: the Compact's or the Light's published DiT instead of the Standard's")
+                   help="dit and bf16: the Compact's or the Light's published DiT instead of the Standard's; w8a8: compact, required")
     p.add_argument("--goldens", help="output folder (default: $SILICONED_GOLDENS, else ./goldens)")
     args = p.parse_args()
-    if args.variant and args.stage not in ("dit", "bf16", "witness", "witness-step", "draw", "img2img", "img2img-witness",
+    if args.stage == "w8a8" and args.variant != "compact":
+        p.error("w8a8 takes --variant compact: the Compact's int8 convrot is what ComfyUI computes in W8A8")
+    if args.variant and args.stage not in ("dit", "bf16", "w8a8", "witness", "witness-step", "draw", "img2img", "img2img-witness",
                                            "img2img-draw"):
-        p.error("--variant goes with dit, bf16, witness, witness-step, draw, img2img, img2img-witness or img2img-draw")
+        p.error("--variant goes with dit, bf16, w8a8, witness, witness-step, draw, img2img, img2img-witness or img2img-draw")
     global CONFIG_ONLY, VARIANT
     CONFIG_ONLY, VARIANT = bool(args.variant), args.variant
     OUT = common.goldens_directory(args.goldens) / "krea2"
@@ -1019,8 +1056,8 @@ def main() -> None:
             stage_img2img_witness(size, args.step[0])
         elif args.stage == "draw":
             stage_draw(size, args.step[0], args.jitter[0])
-        elif args.variant and args.stage in ("dit", "bf16"):
-            {"dit": stage_dit_variant, "bf16": stage_bf16}[args.stage](size, args.variant)
+        elif args.variant and args.stage in ("dit", "bf16", "w8a8"):
+            {"dit": stage_dit_variant, "bf16": stage_bf16, "w8a8": stage_w8a8}[args.stage](size, args.variant)
         else:
             {"dit": stage_dit, "bf16": stage_bf16, "trajectory": stage_trajectory, "vae": stage_vae, "witness": stage_witness,
              "vae-witness": stage_vae_witness, "vae-bf16": stage_vae_bf16, "img2img": stage_img2img}[args.stage](size)
