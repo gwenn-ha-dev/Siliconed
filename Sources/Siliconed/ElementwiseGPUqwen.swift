@@ -90,21 +90,68 @@ package final class ModulatedLayerNormGPU {
             pairs[j] = rounded(v0) | (rounded(v1) << 16);
         }
     }
+
+    \(QuantizedKernels.rowSource)
+
+    // The same, and the row quantized to int8 for W8A8 where the next products read their operand (`WeightProducts.RoundedOperand`):
+    // each value computed as above, by the thread that holds its column as `quantize_rows` would read it (chunk c of 256 in
+    // simdgroup c % 8, eight consecutive columns a lane), then `quantize_held` — `quantize_rows`'s own code. q: the rotation's
+    // stages, its norm's bits. Up to `ElementwiseGPU.quantizedColumns`.
+    kernel void layer_norm_scale_quantized(device const float *x [[buffer(0)]], device const float *scale [[buffer(1)]],
+                                           device float *out [[buffer(2)]], constant LayerNormParams &p [[buffer(3)]],
+                                           device char *codes [[buffer(4)]], device float *scales [[buffer(5)]],
+                                           constant uint2 &q [[buffer(6)]],
+                                           uint row [[threadgroup_position_in_grid]], uint t [[thread_index_in_threadgroup]],
+                                           uint lane [[thread_index_in_simdgroup]], uint sg [[simdgroup_index_in_threadgroup]]) {
+        #pragma METAL fp contract(off)
+        threadgroup float partialMean[8], partialSquares[8], part[32];
+        device const float *source = x + ulong(row) * p.cols;
+        device float *destination = out + ulong(row) * p.cols;
+        float sum = 0.0f;
+        for (uint i = t; i < p.cols; i += 256) sum = sum + source[i];
+        float mean = precise::divide(block_sum(sum, lane, sg, partialMean), float(p.cols));
+        float negativeMean = -mean;
+        float squares = 0.0f;
+        for (uint i = t; i < p.cols; i += 256) { float v = source[i] + negativeMean; float sq = v * v; squares = squares + sq; }
+        float total = block_sum(squares, lane, sg, partialSquares);
+        float r = precise::divide(1.0f, precise::sqrt(precise::divide(total, float(p.cols)) + p.eps));
+        const uint chunks = (p.cols + 255) / 256;
+        float held[MAXC][8];
+        for (uint i = 0; i < MAXC; ++i) {
+            const uint c = sg + i * 8;
+            if (c < chunks) {
+                for (uint j = 0; j < 8; ++j) {
+                    const uint col = c * 256 + lane * 8 + j;
+                    float v = 0.0f;
+                    if (col < p.cols) {
+                        v = source[col] + negativeMean;
+                        v = v * r;
+                        v = v * scale[col];
+                        destination[col] = v;
+                    }
+                    held[i][j] = v;
+                }
+            }
+        }
+        quantize_held(held, p.cols, q.x, as_type<float>(q.y), codes + ulong(row) * p.cols, scales + row, sg, 8, lane, part);
+    }
     """
 
     private let queue: MTLCommandQueue
-    private let pipeline, roundedPipeline: MTLComputePipelineState
+    private let pipeline, roundedPipeline, quantizedPipeline: MTLComputePipelineState
 
     package init(device: MTLDevice, queue: MTLCommandQueue) throws {
         self.queue = queue
         let options = MTLCompileOptions()
         options.mathMode = .safe          // no fast-math: the division and the square root as written
         let library = try device.makeLibrary(source: Self.source, options: options)
-        guard let f = library.makeFunction(name: "layer_norm_scale"), let g = library.makeFunction(name: "layer_norm_scale_rounded") else {
+        guard let f = library.makeFunction(name: "layer_norm_scale"), let g = library.makeFunction(name: "layer_norm_scale_rounded"),
+              let h = library.makeFunction(name: "layer_norm_scale_quantized") else {
             throw GEMM.Failure.noDevice
         }
         pipeline = try device.makeComputePipelineState(function: f)
         roundedPipeline = try device.makeComputePipelineState(function: g)
+        quantizedPipeline = try device.makeComputePipelineState(function: h)
     }
 
     /// **One per command queue**, compiled once: every layer of the DiT shares it.
@@ -125,15 +172,27 @@ package final class ModulatedLayerNormGPU {
     /// (`commitSettled`): queued when the stream is on, waited for otherwise. Returns the GPU seconds when waited for.
     @discardableResult
     /// `rounded`: `out` also written rounded to bf16 there (its rows from the slot's), as the next products read their operand
-    /// (`WeightProducts.roundedOperand`).
+    /// (`WeightProducts.roundedOperand`) — or quantized to int8 for W8A8, where the operand says the producer writes it (`byProducer`).
     package func run(_ x: ElementwiseGPU.BufferSlice, scale: ElementwiseGPU.BufferSlice, into out: ElementwiseGPU.BufferSlice,
-                     rows: Int, columns: Int, eps: Float, rounded: WeightProducts.RoundedOperand? = nil) -> Double {
+                     rows: Int, columns: Int, eps: Float, rounded operand: WeightProducts.RoundedOperand? = nil) -> Double {
+        let rounded = operand?.bf16
+        let quantized = operand?.int8.flatMap { $0.byProducer ? $0 : nil }
         guard rows > 0 else { return 0 }
         guard case let commands = queue.checkedCommandBuffer(), let encoder = commands.makeComputeCommandEncoder() else {
             Attention.report("GPU LayerNorm: no command buffer, so nothing ran")
             return 0
         }
         var p = Params(cols: UInt32(columns), eps: eps)
+        if let quantized {
+            precondition(columns <= ElementwiseGPU.quantizedColumns)
+            encoder.setComputePipelineState(quantizedPipeline)
+            for (i, t) in [x, scale, out].enumerated() { encoder.setBuffer(t.buffer, offset: t.offset * 4, index: i) }
+            encoder.setBytes(&p, length: MemoryLayout<Params>.stride, index: 3)
+            quantized.bind(encoder, at: 4)
+            encoder.dispatchThreadgroups(MTLSize(width: rows, height: 1, depth: 1), threadsPerThreadgroup: MTLSize(width: 256, height: 1, depth: 1))
+            encoder.endEncoding()
+            return commands.commitSettled(label: "elementwise GPU", what: "GPU LayerNorm")
+        }
         encoder.setComputePipelineState(rounded == nil ? pipeline : roundedPipeline)
         var slices = [x, scale, out]
         if let rounded {

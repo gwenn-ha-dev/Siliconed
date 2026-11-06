@@ -452,7 +452,7 @@ package final class AnimaDiT: BoundaryRecording, PhaseTiming {
         }
 
         // ── 1. self-attention
-        let normed1 = try products.roundedOperand(prefix + "attn1.to_q.weight", m: s, k: d, n: d)
+        let normed1 = try products.roundedOperand(prefix + "attn1.to_q.weight", m: s, k: d, n: d, quantizes: true)
         step(residual: nil, modulate: 1, rounded: normed1)
         try linearGPU(prefix + "attn1.to_q.weight", a: normed, into: q, m: s, k: d, n: d, rounded: normed1)
         try linearGPU(prefix + "attn1.to_k.weight", a: normed, into: k, m: s, k: d, n: d, rounded: normed1)
@@ -471,7 +471,7 @@ package final class AnimaDiT: BoundaryRecording, PhaseTiming {
         recorded("attn1_out")
 
         // ── 2. cross-attention to the text — no RoPE
-        let normed2 = try products.roundedOperand(prefix + "attn2.to_q.weight", m: s, k: d, n: d)
+        let normed2 = try products.roundedOperand(prefix + "attn2.to_q.weight", m: s, k: d, n: d, quantizes: true)
         step(residual: 1, modulate: 2, rounded: normed2)
         try linearGPU(prefix + "attn2.to_q.weight", a: normed, into: q, m: s, k: d, n: d, rounded: normed2)
         let textK = textKCache + layer * textLength * d, textV = textVCache + layer * textLength * d
@@ -499,7 +499,7 @@ package final class AnimaDiT: BoundaryRecording, PhaseTiming {
         recorded("attn2_out")
 
         // ── 3. GELU FFN
-        let normed3 = try products.roundedOperand(prefix + "ff.net.0.proj.weight", m: s, k: d, n: h)
+        let normed3 = try products.roundedOperand(prefix + "ff.net.0.proj.weight", m: s, k: d, n: h, quantizes: true)
         step(residual: 2, modulate: 3, rounded: normed3)
         try linearGPU(prefix + "ff.net.0.proj.weight", a: normed, into: h1, m: s, k: d, n: h, rounded: normed3)
         let hb = try gemm.wrap(UnsafeMutableRawPointer(h1), bytes: imageTokens * h * 4, name: "c")

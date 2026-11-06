@@ -324,8 +324,9 @@ package final class Block: BoundaryRecording, PhaseTiming {
         defer { stream.isOn = false }                      // drains: the DiT reads `x` on the CPU after the last block
 
         // ── attention
-        // The norm writes the operand of the three products rounded too (`WeightProducts.RoundedOperand`): one rounding, not three.
-        let normed1 = try products.roundedOperand(prefix + "attention.to_q.weight", m: s, k: d, n: d)
+        // The norm writes the operand of the three products rounded too (`WeightProducts.RoundedOperand`): one rounding, not three —
+        // or, for W8A8, quantized to int8 as it writes it: no pass of the products' own.
+        let normed1 = try products.roundedOperand(prefix + "attention.to_q.weight", m: s, k: d, n: d, quantizes: true)
         timed("norm") { elementwise.normScale(x0, weight: at(0), scale: at(4), into: (a, 0), rows: s, columns: d, eps: eps, rounded: normed1) }
         for (name, buffer) in [("attention.to_q.weight", qb), ("attention.to_k.weight", kb), ("attention.to_v.weight", vb)] {
             try products.linear(prefix + name, a: a, c: buffer, m: s, k: d, n: d, rounded: normed1)
@@ -355,7 +356,7 @@ package final class Block: BoundaryRecording, PhaseTiming {
         timed("residual") { elementwise.normResidual(x0, plus: (o, 0), weight: at(1), gate: at(5), rows: s, columns: d, eps: eps) }
 
         // ── feed-forward
-        let normed2 = try products.roundedOperand(prefix + "feed_forward.w1.weight", m: s, k: d, n: h)
+        let normed2 = try products.roundedOperand(prefix + "feed_forward.w1.weight", m: s, k: d, n: h, quantizes: true)
         timed("norm") { elementwise.normScale(x0, weight: at(2), scale: at(6), into: (a, 0), rows: s, columns: d, eps: eps, rounded: normed2) }
         let h1 = try gemm.wrap(UnsafeMutableRawPointer(hidden1), bytes: s * h * 4, name: "h1")
         let h3 = try gemm.wrap(UnsafeMutableRawPointer(hidden3), bytes: s * h * 4, name: "h3")

@@ -480,8 +480,9 @@ package final class MossImageDiT: BoundaryRecording, PhaseTiming {
 
         // ── attention: shift_a m[0], scale_a m[1], gate_a m[2]
         try artifact.materialize(prefix + "norm1.weight", into: norms, capacity: d)
-        // The norms and the SITU write the next products' operand rounded too, where they read it so (`WeightProducts.RoundedOperand`).
-        let normed1 = try products.roundedOperand(prefix + "proj.q.weight", m: n, k: d, n: d)
+        // The norms and the SITU write the next products' operand rounded too, where they read it so (`WeightProducts.RoundedOperand`);
+        // the norms, quantized to int8 for W8A8.
+        let normed1 = try products.roundedOperand(prefix + "proj.q.weight", m: n, k: d, n: d, quantizes: true)
         timed("norm") {
             normGPU.normModulate((xb, 0), weight: (wb, 0), scale: (mb, d), shift: (mb, 0), into: (nb, 0), rows: n, columns: d, eps: eps,
                                  rounded: normed1)
@@ -523,7 +524,7 @@ package final class MossImageDiT: BoundaryRecording, PhaseTiming {
 
         // ── feed-forward: shift_f m[3], scale_f m[4], gate_f m[5]
         try artifact.materialize(prefix + "norm2.weight", into: norms + d, capacity: d)
-        let normed2 = try products.roundedOperand(prefix + "proj.ffn_up_gate.weight", m: n, k: d, n: 2 * f)
+        let normed2 = try products.roundedOperand(prefix + "proj.ffn_up_gate.weight", m: n, k: d, n: 2 * f, quantizes: true)
         timed("norm") {
             normGPU.normModulate((xb, 0), weight: (wb, d), scale: (mb, 4 * d), shift: (mb, 3 * d), into: (nb, 0), rows: n, columns: d,
                                  eps: eps, rounded: normed2)
@@ -931,7 +932,8 @@ package final class MossImageKernels {
     @discardableResult
     /// `rounded`: `out` also written rounded to bf16 there, as the next product reads its operand (`WeightProducts.roundedOperand`).
     package func situ(hidden: ElementwiseGPU.BufferSlice, gate: ElementwiseGPU.BufferSlice, into out: ElementwiseGPU.BufferSlice,
-                      rows: Int, columns: Int, strides: (Int, Int, Int), rounded: WeightProducts.RoundedOperand? = nil) -> Double {
+                      rows: Int, columns: Int, strides: (Int, Int, Int), rounded operand: WeightProducts.RoundedOperand? = nil) -> Double {
+        let rounded = operand?.bf16                        // an int8 operand is its first product's to quantize
         precondition(rounded == nil || strides.2 == columns, "the rounded operand is out's compact rows")
         guard rows > 0, columns > 0, case let commands = queue.checkedCommandBuffer(),
               let encoder = commands.makeComputeCommandEncoder() else {

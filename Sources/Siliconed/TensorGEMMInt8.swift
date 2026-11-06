@@ -6,10 +6,12 @@ import Metal
 /// GPU's tensor units at the integers' rate. Compiled only when asked, apart from the default library.
 ///
 ///     x fp32 [rows, k] ─▶ quantize_rows  per group of G along k: y = x · H_G/√G   (convrot moved to the activation, as `rotate_groups`)
-///                                        s_x = max(max|y| / 127, 1e-30)           (per row, the whole row: Comfy's `quantize_int8_rowwise`)
-///                                        q_x = clamp(rint(y / s_x), −128, 127)
-///                      ─▶ codes int8 [rows, k], s_x fp32 [rows]                   (the reserve's tail — or all of it, the weight read in
-///                                                                                  place in the map —, a chunk of rows at a time)
+///          │     (`quantize_held`)       s_x = max(max|y| / 127, 1e-30)           (per row, the whole row: Comfy's `quantize_int8_rowwise`)
+///          │                             q_x = clamp(rint(y / s_x), −128, 127)
+///          │           ─▶ codes int8 [rows, k], s_x fp32 [rows]                   (the reserve's tail — or all of it, the weight read in
+///          │                                                                       place in the map —, a chunk of rows at a time)
+///          └─ or written by x's producer: a norm that holds the row calls `quantize_held` on the values it writes
+///             (`WeightProducts.RoundedOperand.int8`), or the first product on x — the next products skip the pass (`prequantized`)
 ///     codes × q_w      matmul2d  int8_t × int8_t → int32                        (exact: |Σ| < 2³¹ for any k under 2¹⁷)
 ///     C int32 ─▶ scale_products  C = float(acc) · (s_x[row] · s_w[col])         (in place, the int32 read where the fp32 is written)
 ///
@@ -28,19 +30,21 @@ import Metal
 ///     dtype (bf16 in its renders): here in fp32, the activation as the engine holds it — nothing rounded that the recipe does not round;
 ///   - **the integer sum is exact, so the tile is bits-free**: every candidate tile (`MatmulTile`, `gpu/int8x8`) writes the same int32,
 ///     and the chunks of rows are independent (a row's scale is its own): the route's bits depend on neither;
-///   - **no AMX, no ANE beside it** (the AMX reads the fp32 activation; the ANE's int8 × int8 is another lot): the GPU's whole product.
+///   - **no AMX, no ANE beside it** (the AMX reads the fp32 activation; the ANE's int8 × int8 is another lot): the GPU's whole product;
+///   - **the quantization is one Metal function, wherever it runs** (`rowSource`'s `quantize_held`): `quantize_rows` and the norms that
+///     quantize as they write (`norm_scale_quantized` and each family's) hold the row in the same registers and call the same code, so
+///     an operand quantized by its producer is the pass's, bit for bit, though the norm runs 8 simdgroups and the pass up to 32 (the
+///     row's maximum is exact in any order). A pass per operand, not per product: q, k and v read one, w1 and w3 one.
 package final class QuantizedKernels {
     let quantize, product, scale: MTLComputePipelineState
     /// Chunks of 256 columns a simdgroup holds in registers (`maxChunks` × 8 floats a lane): with 32 simdgroups, a row of 32 768.
     static let maxChunks = 4
 
-    static let source = """
-    #include <metal_stdlib>
-    #include <metal_tensor>
-    #include <MetalPerformancePrimitives/MetalPerformancePrimitives.h>
-    using namespace metal;
-    using namespace mpp::tensor_ops;
-
+    /// **The rotation and the per-row quantization of a row held in registers**, as one Metal function both `quantize_rows` and a
+    /// producer that holds the whole row call (`ElementwiseGPU`'s `norm_scale_quantized`, `WeightProducts.RoundedOperand`): the same
+    /// code, hence the same codes and scale from the same fp32 row, whatever the threadgroup's count of simdgroups (the row's
+    /// maximum is exact in any order). Interpolated into each library that quantizes; `MAXC` is `maxChunks`.
+    static let rowSource = """
     #define MAXC \(maxChunks)
 
     // `rotate_groups`'s butterfly: the four outputs of one radix-4 stage, its operations in its order.
@@ -84,24 +88,16 @@ package final class QuantizedKernels {
         if (stages > 3) { for (uint r = 0; r < 8; ++r) v[r] = acrossLanes(v[r], lane, 8); }
     }
 
-    // x fp32 [rows, K] → codes int8 [rows, K], scales fp32 [rows]. One threadgroup a row; chunk c of 256 columns to simdgroup c % sgs.
-    // p: K, the rotation's stages, its norm's bits.
-    kernel void quantize_rows(device const float *x [[buffer(0)]], device char *q [[buffer(1)]], device float *s [[buffer(2)]],
-                              constant uint3 &p [[buffer(3)]], uint row [[threadgroup_position_in_grid]],
-                              uint sg [[simdgroup_index_in_threadgroup]], uint sgs [[simdgroups_per_threadgroup]],
-                              uint lane [[thread_index_in_simdgroup]]) {
-        threadgroup float part[32];
-        const uint K = p.x, stages = p.y, chunks = (K + 255) / 256;
-        const float norm = as_type<float>(p.z);
-        device const float *xr = x + size_t(row) * K;
-        device char *qr = q + size_t(row) * K;
-        float v[MAXC][8];
+    // A row of K held as `quantize_rows` holds it — chunk c of 256 columns in simdgroup c % sgs, its columns lane · 8 … lane · 8 + 7
+    // in v[c / sgs], zero past K — rotated by `stages`, times `norm`, then quantized over the whole row: its codes to `qr`, its scale
+    // to `*s`. Every simdgroup of the threadgroup calls it (a barrier); `part`: 32 floats of threadgroup memory nothing else uses.
+    inline void quantize_held(thread float (*v)[8], uint K, uint stages, float norm, device char *qr, device float *s,
+                              uint sg, uint sgs, uint lane, threadgroup float *part) {
+        const uint chunks = (K + 255) / 256;
         float m = 0;
         for (uint i = 0; i < MAXC; ++i) {
             const uint c = sg + i * sgs;
             if (c < chunks) {          // the same for every lane of the simdgroup: the shuffles see all of them
-                const uint base = c * 256 + lane * 8;
-                for (uint r = 0; r < 8; ++r) v[i][r] = base + r < K ? xr[base + r] : 0.0f;
                 rotate(v[i], lane, stages);
                 for (uint r = 0; r < 8; ++r) { v[i][r] *= norm; m = max(m, fabs(v[i][r])); }
             }
@@ -121,7 +117,37 @@ package final class QuantizedKernels {
                 }
             }
         }
-        if (sg == 0 && lane == 0) s[row] = scale;
+        if (sg == 0 && lane == 0) *s = scale;
+    }
+    """
+
+    static let source = """
+    #include <metal_stdlib>
+    #include <metal_tensor>
+    #include <MetalPerformancePrimitives/MetalPerformancePrimitives.h>
+    using namespace metal;
+    using namespace mpp::tensor_ops;
+
+    \(rowSource)
+
+    // x fp32 [rows, K] → codes int8 [rows, K], scales fp32 [rows]. One threadgroup a row; chunk c of 256 columns to simdgroup c % sgs.
+    // p: K, the rotation's stages, its norm's bits.
+    kernel void quantize_rows(device const float *x [[buffer(0)]], device char *q [[buffer(1)]], device float *s [[buffer(2)]],
+                              constant uint3 &p [[buffer(3)]], uint row [[threadgroup_position_in_grid]],
+                              uint sg [[simdgroup_index_in_threadgroup]], uint sgs [[simdgroups_per_threadgroup]],
+                              uint lane [[thread_index_in_simdgroup]]) {
+        threadgroup float part[32];
+        const uint K = p.x, chunks = (K + 255) / 256;
+        device const float *xr = x + size_t(row) * K;
+        float v[MAXC][8];
+        for (uint i = 0; i < MAXC; ++i) {
+            const uint c = sg + i * sgs;
+            if (c < chunks) {
+                const uint base = c * 256 + lane * 8;
+                for (uint r = 0; r < 8; ++r) v[i][r] = base + r < K ? xr[base + r] : 0.0f;
+            }
+        }
+        quantize_held(v, K, p.y, as_type<float>(p.z), q + size_t(row) * K, s + row, sg, sgs, lane, part);
     }
 
     // C [rows, N] int32 → fp32 in place: float(acc) · (s_x[row] · s_w[col · stride]). p: N, the weight scale's stride (1 per column,
@@ -205,9 +231,14 @@ extension TensorGEMM {
     /// not awaited; the whole product (no AMX columns). `nil` when the library is not compiled, the rotation's group is not one the
     /// kernel takes, or the row is longer than it holds: the caller reads the integers another way. `weightOffset`: where the integers
     /// start in `w` — 0 in the reserve, the tensor's offset in the wrapped map when read in place (16-aligned).
-    func submitQuantized(a: MTLBuffer, int8 w: MTLBuffer, weightOffset: Int = 0, scales: MTLBuffer, scalesOffset: Int, perColumn: Bool, group: Int?,
-                         quantizing: Quantizing, c: MTLBuffer, m: Int, k: Int, n: Int) -> MTLCommandBuffer? {
+    ///
+    /// `prequantized`: `quantizing` already holds the `m` rows' codes and scales, the ones this pass would write (by the operand's
+    /// producer or the product before, `WeightProducts.RoundedOperand`): the products alone, in one chunk.
+    func submitQuantized(a: MTLBuffer, int8 w: MTLBuffer, weightOffset: Int = 0, scales: MTLBuffer, scalesOffset: Int, perColumn: Bool,
+                         group: Int?, quantizing: Quantizing, prequantized: Bool = false, c: MTLBuffer, m: Int, k: Int, n: Int)
+        -> MTLCommandBuffer? {
         guard let kernels = quantized, let stages = W8A8.stages(group: group), let simdgroups = kernels.simdgroups(k: k) else { return nil }
+        precondition(!prequantized || quantizing.rows >= m, "an operand quantized ahead holds all the rows")
         let kernel = CapacityModel.Kernel(.gpu, .int8x8)
         let tiled = tiles.products(kernel, rows: m, k: k, n: n)
         let tile = tiled?.tile ?? MatmulTile.standard(for: kernel)
@@ -217,13 +248,16 @@ extension TensorGEMM {
         var norm = SIMD3<UInt32>(UInt32(k), UInt32(stages), (group.map { 1 / Float($0).squareRoot() } ?? 1).bitPattern)
         for first in stride(from: 0, to: m, by: quantizing.rows) {
             let count = min(quantizing.rows, m - first)
-            encoder.setComputePipelineState(kernels.quantize)
-            encoder.setBuffer(a, offset: first * k * 4, index: 0)
-            encoder.setBuffer(quantizing.buffer, offset: quantizing.codesOffset, index: 1)
-            encoder.setBuffer(quantizing.buffer, offset: quantizing.scalesOffset, index: 2)
-            encoder.setBytes(&norm, length: MemoryLayout<SIMD3<UInt32>>.stride, index: 3)
-            encoder.dispatchThreadgroups(MTLSize(width: count, height: 1, depth: 1),
-                                         threadsPerThreadgroup: MTLSize(width: 32 * simdgroups, height: 1, depth: 1))
+            if !prequantized {
+                GEMM.quantizePasses.withLock { $0 += 1 }
+                encoder.setComputePipelineState(kernels.quantize)
+                encoder.setBuffer(a, offset: first * k * 4, index: 0)
+                encoder.setBuffer(quantizing.buffer, offset: quantizing.codesOffset, index: 1)
+                encoder.setBuffer(quantizing.buffer, offset: quantizing.scalesOffset, index: 2)
+                encoder.setBytes(&norm, length: MemoryLayout<SIMD3<UInt32>>.stride, index: 3)
+                encoder.dispatchThreadgroups(MTLSize(width: count, height: 1, depth: 1),
+                                             threadsPerThreadgroup: MTLSize(width: 32 * simdgroups, height: 1, depth: 1))
+            }
             encoder.setComputePipelineState(pipeline)
             encoder.setBuffer(quantizing.buffer, offset: quantizing.codesOffset, index: 0)
             encoder.setBuffer(w, offset: weightOffset, index: 1)

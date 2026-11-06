@@ -178,6 +178,13 @@ package final class GEMM {
     package static let roundedProducts = Mutex<Int>(0)
     /// ... of which read the operand its producer had already rounded (`WeightProducts.RoundedOperand`): no pass of their own.
     package static let producerRounded = Mutex<Int>(0)
+    /// The W8A8 activation passes encoded (`quantize_rows`, one per chunk of rows) in this process.
+    package static let quantizePasses = Mutex<Int>(0)
+    /// W8A8 products that read an operand already quantized (`WeightProducts.RoundedOperand`): by its producer, or by the product
+    /// before on the same operand — no pass of their own.
+    package static let prequantizedProducts = Mutex<Int>(0)
+    /// Operands their producer quantized as it wrote them (`ElementwiseGPU.normScale`'s `norm_scale_quantized`).
+    package static let producerQuantized = Mutex<Int>(0)
     /// Products that read a published int8 weight as it is (`gemm_int8`, `WeightProducts.linear`) in this process: a check
     /// says the route it judged was the one taken.
     package static let int8Products = Mutex<Int>(0)

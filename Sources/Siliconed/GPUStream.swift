@@ -144,6 +144,8 @@ package final class GPUStream: @unchecked Sendable {   // its state under `lock`
                 + (t.ane > 0 ? String(format: " · ANE's side %.2f s", t.ane) : "")
                 + (t.buffers > 0 ? String(format: " · inside the spans: behind the GPU %.2f s, behind the ANE %.2f s", t.behindGPU, t.behindANE) : "")
                 + " · rounded products \(GEMM.roundedProducts.withLock { $0 }), their operand rounded by its producer \(GEMM.producerRounded.withLock { $0 })"
+                + " · W8A8 activation passes \(GEMM.quantizePasses.withLock { $0 }), products on an operand quantized ahead"
+                + " \(GEMM.prequantizedProducts.withLock { $0 }), operands quantized by their producer \(GEMM.producerQuantized.withLock { $0 })"
         }
     }
 

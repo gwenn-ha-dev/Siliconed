@@ -263,8 +263,8 @@ package final class TensorGEMM {
     /// only where the CPU writes nothing this product reads before the next drain: its weight read in place, not staged.
     package func linear(a: MTLBuffer, int8 w: MTLBuffer, weightOffset: Int = 0, scales: MTLBuffer, scalesOffset: Int, perColumn: Bool,
                         block: Int? = nil, rotation: (group: Int, scratch: MTLBuffer, offset: Int, chunk: Int)?,
-                        rounding: Rounding? = nil, quantizing: Quantizing? = nil, c: MTLBuffer, m: Int, k: Int, n: Int,
-                        settled: Bool = false) -> Double {
+                        rounding: Rounding? = nil, quantizing: Quantizing? = nil, prequantized: Bool = false,
+                        c: MTLBuffer, m: Int, k: Int, n: Int, settled: Bool = false) -> Double {
         func finish(_ commands: MTLCommandBuffer, _ what: @escaping @Sendable () -> String) -> Double {
             if settled { return queue.stream.settle(commands, label: "gemm GPU", what: what) }
             commands.waitUntilCompleted()
@@ -272,7 +272,8 @@ package final class TensorGEMM {
         }
         if let quantizing, block == nil,
            let commands = submitQuantized(a: a, int8: w, weightOffset: weightOffset, scales: scales, scalesOffset: scalesOffset,
-                                          perColumn: perColumn, group: rotation?.group, quantizing: quantizing, c: c, m: m, k: k, n: n) {
+                                          perColumn: perColumn, group: rotation?.group, quantizing: quantizing, prequantized: prequantized,
+                                          c: c, m: m, k: k, n: n) {
             GEMM.quantizedProducts.withLock { $0 += 1 }
             return finish(commands) { "matmul2d int8 × int8 \(m)×\(k)×\(n)" }
         }

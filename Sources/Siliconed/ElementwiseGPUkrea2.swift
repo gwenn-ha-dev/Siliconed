@@ -89,21 +89,71 @@ package final class ModulatedNormGPU {
             pairs[j] = rounded(v0) | (rounded(v1) << 16);
         }
     }
+
+    \(QuantizedKernels.rowSource)
+
+    // The same, and the row quantized to int8 for W8A8 where the next products read their operand (`WeightProducts.RoundedOperand`):
+    // each value computed as above, by the thread that holds its column as `quantize_rows` would read it (chunk c of 256 in
+    // simdgroup c % 8, eight consecutive columns a lane), then `quantize_held` — `quantize_rows`'s own code. q: the rotation's
+    // stages, its norm's bits. Up to `ElementwiseGPU.quantizedColumns`.
+    kernel void norm_modulate_quantized(device const float *x [[buffer(0)]], device const float *w [[buffer(1)]],
+                                        device const float *factor [[buffer(2)]], device const float *shift [[buffer(3)]],
+                                        device float *out [[buffer(4)]], constant NormParams &p [[buffer(5)]],
+                                        device char *codes [[buffer(6)]], device float *scales [[buffer(7)]],
+                                        constant uint2 &q [[buffer(8)]],
+                                        uint row [[threadgroup_position_in_grid]], uint t [[thread_index_in_threadgroup]],
+                                        uint lane [[thread_index_in_simdgroup]], uint sg [[simdgroup_index_in_threadgroup]]) {
+        #pragma METAL fp contract(off)
+        threadgroup float partial[8], part[32];
+        device const float *source = x + ulong(row) * p.cols;
+        device float *destination = out + ulong(row) * p.cols;
+        float ss = 0.0f;
+        for (uint i = t; i < p.cols; i += 256) { float v = source[i]; float sq = v * v; ss = ss + sq; }
+        float s = simd_sum(ss);
+        if (lane == 0) partial[sg] = s;
+        threadgroup_barrier(mem_flags::mem_threadgroup);
+        float total = 0.0f;
+        for (uint j = 0; j < 8; j++) total = total + partial[j];
+        float mean = precise::divide(total, float(p.cols));
+        float r = precise::divide(1.0f, precise::sqrt(mean + p.eps));
+        const uint chunks = (p.cols + 255) / 256;
+        float held[MAXC][8];
+        for (uint i = 0; i < MAXC; ++i) {
+            const uint c = sg + i * 8;
+            if (c < chunks) {
+                for (uint j = 0; j < 8; ++j) {
+                    const uint col = c * 256 + lane * 8 + j;
+                    float y = 0.0f;
+                    if (col < p.cols) {
+                        y = source[col] * r;
+                        y = y * w[col];
+                        y = y * factor[col];
+                        y = y + shift[col];
+                        destination[col] = y;
+                    }
+                    held[i][j] = y;
+                }
+            }
+        }
+        quantize_held(held, p.cols, q.x, as_type<float>(q.y), codes + ulong(row) * p.cols, scales + row, sg, 8, lane, part);
+    }
     """
 
     private let queue: MTLCommandQueue
-    private let pipeline, roundedPipeline: MTLComputePipelineState
+    private let pipeline, roundedPipeline, quantizedPipeline: MTLComputePipelineState
 
     package init(device: MTLDevice, queue: MTLCommandQueue) throws {
         self.queue = queue
         let options = MTLCompileOptions()
         options.mathMode = .safe          // no fast-math: the division and the square root as written
         let library = try device.makeLibrary(source: Self.source, options: options)
-        guard let f = library.makeFunction(name: "norm_modulate"), let g = library.makeFunction(name: "norm_modulate_rounded") else {
+        guard let f = library.makeFunction(name: "norm_modulate"), let g = library.makeFunction(name: "norm_modulate_rounded"),
+              let h = library.makeFunction(name: "norm_modulate_quantized") else {
             throw GEMM.Failure.noDevice
         }
         pipeline = try device.makeComputePipelineState(function: f)
         roundedPipeline = try device.makeComputePipelineState(function: g)
+        quantizedPipeline = try device.makeComputePipelineState(function: h)
     }
 
     private struct NormParams { var cols: UInt32; var eps: Float }
@@ -111,15 +161,19 @@ package final class ModulatedNormGPU {
     /// `out[s, :] ← ((RMSNorm(x[s, :]) · w) · factor) + shift`, one threadgroup per row; `factor` is `1 + scale`, rounded by the caller.
     /// Settled on the queue's stream (`commitSettled`): waited for and its GPU seconds returned off the stream, queued and 0 on it.
     @discardableResult
-    /// `rounded`: `out` also written rounded to bf16 there, as the next products read their operand (`WeightProducts.roundedOperand`).
+    /// `rounded`: `out` also written rounded to bf16 there, as the next products read their operand (`WeightProducts.roundedOperand`) —
+    /// or quantized to int8 for W8A8, where the operand says the producer writes it (`byProducer`).
     package func run(_ x: ElementwiseGPU.BufferSlice, weight: ElementwiseGPU.BufferSlice, factor: ElementwiseGPU.BufferSlice,
                      shift: ElementwiseGPU.BufferSlice, into out: ElementwiseGPU.BufferSlice, rows: Int, columns: Int, eps: Float,
-                     rounded: WeightProducts.RoundedOperand? = nil) -> Double {
+                     rounded operand: WeightProducts.RoundedOperand? = nil) -> Double {
+        let rounded = operand?.bf16
+        let quantized = operand?.int8.flatMap { $0.byProducer ? $0 : nil }
         let commands = queue.checkedCommandBuffer()
         let encoder = commands.checkedEncoder()
-        encoder.setComputePipelineState(rounded == nil ? pipeline : roundedPipeline)
+        encoder.setComputePipelineState(quantized != nil ? quantizedPipeline : rounded == nil ? pipeline : roundedPipeline)
         var slices = [x, weight, factor, shift, out]
-        if let rounded {
+        if let quantized { precondition(columns <= ElementwiseGPU.quantizedColumns); quantized.bind(encoder, at: slices.count + 1) }
+        else if let rounded {
             precondition(columns % 2 == 0 && rounded.offset % 4 == 0)
             slices.append((rounded.buffer, rounded.offset / 4))
         }

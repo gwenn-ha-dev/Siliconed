@@ -176,6 +176,48 @@ package final class ElementwiseGPU {
         }
     }
 
+    \(QuantizedKernels.rowSource)
+
+    // The same, and the row quantized to int8 for W8A8 where the next products read their operand (`WeightProducts.RoundedOperand`):
+    // the fp32 values computed as `norm_scale` computes them, each thread holding the columns `quantize_rows` would read into its
+    // registers (chunk c of 256 in simdgroup c % 8, eight consecutive columns a lane), then `quantize_held` — `quantize_rows`'s own
+    // code on the values it would have read back. One read of the row for the norm's sum, one for its values, one write of each form.
+    // q: the rotation's stages, its norm's bits. Up to 8 · MAXC chunks of 256 (`ElementwiseGPU.quantizedColumns`).
+    kernel void norm_scale_quantized(device const float *x [[buffer(0)]], device const float *w [[buffer(1)]],
+                                     device const float *scale [[buffer(2)]], device float *out [[buffer(3)]],
+                                     device char *codes [[buffer(4)]], device float *scales [[buffer(5)]],
+                                     constant NormParams &p [[buffer(6)]], constant uint2 &q [[buffer(7)]],
+                                     uint row [[threadgroup_position_in_grid]],
+                                     uint t [[thread_index_in_threadgroup]], uint lane [[thread_index_in_simdgroup]],
+                                     uint sg [[simdgroup_index_in_threadgroup]]) {
+        #pragma METAL fp contract(off)
+        threadgroup float partial[8];
+        threadgroup float part[32];
+        device const float *source = x + ulong(row) * p.cols;
+        device float *destination = out + ulong(row) * p.cols;
+        float r = row_scale(source, p.cols, p.eps, t, lane, sg, partial);
+        const uint chunks = (p.cols + 255) / 256;
+        float v[MAXC][8];
+        for (uint i = 0; i < MAXC; ++i) {
+            const uint c = sg + i * 8;
+            if (c < chunks) {
+                const uint base = c * 256 + lane * 8;
+                for (uint j = 0; j < 8; ++j) {
+                    const uint col = base + j;
+                    float y = 0.0f;
+                    if (col < p.cols) {
+                        y = source[col] * r;
+                        y = y * w[col];
+                        if (p.scaled != 0) y = y * scale[col];
+                        destination[col] = y;
+                    }
+                    v[i][j] = y;
+                }
+            }
+        }
+        quantize_held(v, p.cols, q.x, as_type<float>(q.y), codes + ulong(row) * p.cols, scales + row, sg, 8, lane, part);
+    }
+
     // x += gate · ((y · r) · w) — `Ops.rmsNorm` then `Ops.gatedResidual`: the product, then the sum.
     kernel void norm_residual(device float *x [[buffer(0)]], device const float *y [[buffer(1)]],
                               device const float *w [[buffer(2)]], device const float *gate [[buffer(3)]],
@@ -200,6 +242,9 @@ package final class ElementwiseGPU {
     private let queue: MTLCommandQueue
     private let swigluPipeline, carriesPipeline, residualPipeline, normScalePipeline, normResidualPipeline: MTLComputePipelineState
     private let swigluRoundedPipeline, normScaleRoundedPipeline, carriesRoundedPipeline: MTLComputePipelineState
+    private let normScaleQuantizedPipeline: MTLComputePipelineState
+    /// The longest row `norm_scale_quantized` holds: eight simdgroups of `QuantizedKernels.maxChunks` chunks of 256.
+    package static let quantizedColumns = 8 * QuantizedKernels.maxChunks * 256
 
     package init(device: MTLDevice, queue: MTLCommandQueue) throws {
         self.queue = queue
@@ -215,6 +260,7 @@ package final class ElementwiseGPU {
         normScalePipeline = try pipeline("norm_scale"); normResidualPipeline = try pipeline("norm_residual")
         swigluRoundedPipeline = try pipeline("swiglu_rounded"); normScaleRoundedPipeline = try pipeline("norm_scale_rounded")
         carriesRoundedPipeline = try pipeline("sigmoid_gate_rounded")
+        normScaleQuantizedPipeline = try pipeline("norm_scale_quantized")
     }
 
     /// A buffer (at an offset in floats) — the form in which each kernel receives its operands.
@@ -249,7 +295,7 @@ package final class ElementwiseGPU {
     /// as the next product reads its operand (`WeightProducts.roundedOperand`; `count` even).
     @discardableResult
     package func swiglu(_ a: BufferSlice, _ b: BufferSlice, count: Int, rounded: WeightProducts.RoundedOperand? = nil) -> Double {
-        if let rounded {
+        if let rounded = rounded?.bf16 {                   // an int8 operand is its first product's to quantize
             precondition(count % 2 == 0 && a.offset % 2 == 0 && b.offset % 2 == 0 && rounded.offset % 4 == 0)
             var n = UInt32(count / 2)
             let (g, t) = linear(count / 2)
@@ -265,7 +311,7 @@ package final class ElementwiseGPU {
     /// `x ← x · σ(g)`. `rounded`: as `swiglu`'s.
     @discardableResult
     package func carries(_ x: BufferSlice, _ g: BufferSlice, count: Int, rounded: WeightProducts.RoundedOperand? = nil) -> Double {
-        if let rounded {
+        if let rounded = rounded?.bf16 {                   // an int8 operand is its first product's to quantize
             precondition(count % 2 == 0 && x.offset % 2 == 0 && g.offset % 2 == 0 && rounded.offset % 4 == 0)
             var n = UInt32(count / 2)
             let (grid, t) = linear(count / 2)
@@ -290,12 +336,16 @@ package final class ElementwiseGPU {
     private struct NormParams { var cols: UInt32; var eps: Float; var scaled: UInt32 }
 
     /// `out[s, :] ← (RMSNorm(x[s, :]) · w) · scale` (`scale` nil: the norm alone), one threadgroup per row. `rounded`: `out` also
-    /// written rounded to bf16 there, as the next product reads its operand (`WeightProducts.roundedOperand`; `columns` even).
+    /// written rounded to bf16 there, as the next product reads its operand (`WeightProducts.roundedOperand`; `columns` even) — or
+    /// quantized to int8 for W8A8, where the operand says the producer writes it (`byProducer`, `columns` ≤ `quantizedColumns`).
     @discardableResult
     package func normScale(_ x: BufferSlice, weight: BufferSlice, scale: BufferSlice?, into out: BufferSlice,
-                           rows: Int, columns: Int, eps: Float, rounded: WeightProducts.RoundedOperand? = nil) -> Double {
+                           rows: Int, columns: Int, eps: Float, rounded operand: WeightProducts.RoundedOperand? = nil) -> Double {
+        if let q = operand?.int8, q.byProducer {
+            return normScale(x, weight: weight, scale: scale, into: out, rows: rows, columns: columns, eps: eps, quantized: q)
+        }
         var p = NormParams(cols: UInt32(columns), eps: eps, scaled: scale == nil ? 0 : 1)
-        if let rounded {
+        if let rounded = operand?.bf16 {
             precondition(columns % 2 == 0 && rounded.offset % 4 == 0)
             return launch(normScaleRoundedPipeline, [x, weight, scale ?? weight, out, (rounded.buffer, rounded.offset / 4)],
                           constants: { $0.setBytes(&p, length: MemoryLayout<NormParams>.stride, index: $1) },
@@ -303,6 +353,24 @@ package final class ElementwiseGPU {
         }
         return launch(normScalePipeline, [x, weight, scale ?? weight, out],
                       constants: { $0.setBytes(&p, length: MemoryLayout<NormParams>.stride, index: $1) },
+                      grid: MTLSize(width: rows, height: 1, depth: 1), group: MTLSize(width: 256, height: 1, depth: 1), byGroups: true)
+    }
+
+    /// `normScale`, and `out` also quantized to int8 into `q` (W8A8) — its codes and scales `quantize_rows` would write from `out`,
+    /// bit for bit (`quantize_held`, the same code). `columns` ≤ `quantizedColumns`.
+    @discardableResult
+    package func normScale(_ x: BufferSlice, weight: BufferSlice, scale: BufferSlice?, into out: BufferSlice,
+                           rows: Int, columns: Int, eps: Float, quantized q: WeightProducts.RoundedOperand.Quantized) -> Double {
+        precondition(columns <= Self.quantizedColumns && q.codesOffset % 4 == 0 && q.scalesOffset % 4 == 0)
+        GEMM.producerQuantized.withLock { $0 += 1 }
+        var p = NormParams(cols: UInt32(columns), eps: eps, scaled: scale == nil ? 0 : 1)
+        var rotation = SIMD2<UInt32>(UInt32(q.stages), q.norm.bitPattern)
+        return launch(normScaleQuantizedPipeline, [x, weight, scale ?? weight, out, (q.buffer, q.codesOffset / 4),
+                                                   (q.buffer, q.scalesOffset / 4)],
+                      constants: { encoder, index in
+                          encoder.setBytes(&p, length: MemoryLayout<NormParams>.stride, index: index)
+                          encoder.setBytes(&rotation, length: MemoryLayout<SIMD2<UInt32>>.stride, index: index + 1)
+                      },
                       grid: MTLSize(width: rows, height: 1, depth: 1), group: MTLSize(width: 256, height: 1, depth: 1), byGroups: true)
     }
 

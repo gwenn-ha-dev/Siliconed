@@ -757,7 +757,7 @@ package final class QwenImage21DiT: BoundaryRecording, PhaseTiming {
         let normK = try headWeight(prefix + "attn.norm_k.weight")
         let (xb, nb, mb) = (try slice(xs), try slice(normed), try slice(modulationSlot))
         // The norm writes the next products' operand rounded too, where they read it so (`WeightProducts.RoundedOperand`), each band
-        // at its rows.
+        // at its rows — or quantized to int8 for W8A8.
         func modulatedNorm(scale: Int, rounded: WeightProducts.RoundedOperand? = nil) {
             timed("norm") {
                 for band in bands {
@@ -772,7 +772,7 @@ package final class QwenImage21DiT: BoundaryRecording, PhaseTiming {
         defer { stream.isOn = false }      // drains: the CPU reads `x` (a boundary, `norm_out`) and the K/V (the cache) next
 
         // ── attention
-        let normed1 = try products.roundedOperand(prefix + "attn.to_k.weight", m: n, k: d, n: d)
+        let normed1 = try products.roundedOperand(prefix + "attn.to_k.weight", m: n, k: d, n: d, quantizes: true)
         modulatedNorm(scale: 0, rounded: normed1)
         if !keysOnly { try linearGPU(prefix + "attn.to_q.weight", a: normed, into: q, m: n, k: d, n: d, rounded: normed1) }
         try linearGPU(prefix + "attn.to_k.weight", a: normed, into: k, m: n, k: d, n: d, rounded: normed1)
@@ -809,7 +809,7 @@ package final class QwenImage21DiT: BoundaryRecording, PhaseTiming {
         let chunks = (n + mlpRows - 1) / mlpRows
         // In one chunk the norm rounds the MLP's operand too; by chunks the SwiGLU's operand takes the slot after the first, and each
         // chunk's products round their own rows.
-        let normed2 = chunks == 1 ? try products.roundedOperand(prefix + "img_mlp.gate_layer.weight", m: n, k: d, n: hh) : nil
+        let normed2 = chunks == 1 ? try products.roundedOperand(prefix + "img_mlp.gate_layer.weight", m: n, k: d, n: hh, quantizes: true) : nil
         modulatedNorm(scale: 2 * d, rounded: normed2)
         for chunk in 0..<chunks {
             let begin = chunk * n / chunks, rows = (chunk + 1) * n / chunks - begin

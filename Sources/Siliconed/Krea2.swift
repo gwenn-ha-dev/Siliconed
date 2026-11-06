@@ -472,10 +472,11 @@ package final class Krea2DiT: BoundaryRecording, PhaseTiming {
 
         let xb = try slice(x), mb = try slice(m), nb = try slice(normed), ob = try slice(o)
         let bb = try gemm.wrap(UnsafeMutableRawPointer(bank), bytes: imageTokens * config.channels * 4, name: "c")
-        // The norm writes the next products' operand rounded too, where they read it so (`WeightProducts.RoundedOperand`).
+        // The norm writes the next products' operand rounded too, where they read it so (`WeightProducts.RoundedOperand`) — or
+        // quantized to int8 for W8A8.
         func norm(_ i: Int, scale: Int, shift: Int, for product: String, n out: Int) throws -> WeightProducts.RoundedOperand? {
             if normsOnGPU {
-                let rounded = try products.roundedOperand(prefix + product, m: n, k: d, n: out)
+                let rounded = try products.roundedOperand(prefix + product, m: n, k: d, n: out, quantizes: true)
                 timed("norm") {
                     ownTimings["elementwise GPU", default: 0] += modulatedNormGPU!.run((xb, 0), weight: (bb, i * d), factor: (bb, (2 + i) * d),
                                                                                        shift: (mb, shift * d), into: (nb, 0),
