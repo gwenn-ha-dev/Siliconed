@@ -433,6 +433,7 @@ package final class Artifact {
               let b = device.makeBuffer(bytesNoCopy: UnsafeMutableRawPointer(mutating: base), length: length,
                                         options: .storageModeShared, deallocator: nil) else { return nil }
         b.label = "map"
+        MetalWraps.track(b)
         wrapped = b
         return b
     }

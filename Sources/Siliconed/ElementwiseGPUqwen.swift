@@ -139,9 +139,18 @@ package final class ModulatedLayerNormGPU {
 
     private let queue: MTLCommandQueue
     private let pipeline, roundedPipeline, quantizedPipeline: MTLComputePipelineState
+    private typealias Pipelines = (MTLComputePipelineState, MTLComputePipelineState, MTLComputePipelineState)
 
-    package init(device: MTLDevice, queue: MTLCommandQueue) throws {
+    package convenience init(device: MTLDevice, queue: MTLCommandQueue) throws {
+        self.init(queue: queue, pipelines: try ModulatedLayerNormGPU.compile(device))
+    }
+
+    private init(queue: MTLCommandQueue, pipelines: Pipelines) {
         self.queue = queue
+        (pipeline, roundedPipeline, quantizedPipeline) = pipelines
+    }
+
+    private static func compile(_ device: MTLDevice) throws -> Pipelines {
         let options = MTLCompileOptions()
         options.mathMode = .safe          // no fast-math: the division and the square root as written
         let library = try device.makeLibrary(source: Self.source, options: options)
@@ -149,22 +158,23 @@ package final class ModulatedLayerNormGPU {
               let h = library.makeFunction(name: "layer_norm_scale_quantized") else {
             throw GEMM.Failure.noDevice
         }
-        pipeline = try device.makeComputePipelineState(function: f)
-        roundedPipeline = try device.makeComputePipelineState(function: g)
-        quantizedPipeline = try device.makeComputePipelineState(function: h)
+        return (try device.makeComputePipelineState(function: f), try device.makeComputePipelineState(function: g),
+                try device.makeComputePipelineState(function: h))
     }
 
-    /// **One per command queue**, compiled once: every layer of the DiT shares it.
+    /// **Compiled once per device, on the caller's queue**: every layer of the DiT shares the pipelines. Never a cache by queue: it
+    /// kept every DiT's queue alive, and the driver's command-buffer memory with it (`QKNormRope.shared`).
     package static func shared(device: MTLDevice, queue: MTLCommandQueue) -> ModulatedLayerNormGPU? {
-        let key = ObjectIdentifier(queue)
-        return built.withLock { cache in
-            if let k = cache[key] { return k }
-            guard let made = try? ModulatedLayerNormGPU(device: device, queue: queue) else { return nil }
-            cache[key] = made
+        let pipelines = compiled.withLock { cache -> Pipelines? in
+            if let p = cache[ObjectIdentifier(device)] { return p }
+            guard let made = try? ModulatedLayerNormGPU.compile(device) else { return nil }
+            cache[ObjectIdentifier(device)] = made
             return made
         }
+        return pipelines.map { ModulatedLayerNormGPU(queue: queue, pipelines: $0) }
     }
-    private static let built = Mutex<[ObjectIdentifier: ModulatedLayerNormGPU]>([:])
+    /// By device; each pipeline holds its device, so a key is never another's.
+    private static let compiled = Mutex<[ObjectIdentifier: Pipelines]>([:])
 
     private struct Params { var cols: UInt32; var eps: Float }
 

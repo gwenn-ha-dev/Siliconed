@@ -250,6 +250,7 @@ package final class Qwen3VLDecoder {
         guard let buffer = device.makeBuffer(bytesNoCopy: pages.base, length: pages.capacity, options: .storageModeShared,
                                              deallocator: nil) else { throw Failure.gpu("the K/V cache cannot be wrapped") }
         buffer.label = "K/V cache"
+        MetalWraps.track(buffer)
         residency?.addAllocation(buffer); residency?.commit()
         cache = (buffer, layerStride)
     }
@@ -416,6 +417,7 @@ extension Qwen3VLDecoder {
                 throw Failure.unsupported("\(name): the GPU refuses its \(tensor.bytes) bytes")
             }
             buffer.label = name
+            MetalWraps.track(buffer)
             return (buffer, tensor)
         }
         /// `at`: the tensor's place in a streamed layer's staging buffer (`buffer` is then the slot's), 0 where it has its own.
@@ -523,6 +525,7 @@ package final class TailFeeder: @unchecked Sendable {
                 throw Qwen3VLDecoder.Failure.unsupported("the GPU refuses a staging buffer of \(p.capacity) bytes")
             }
             b.label = "tail staging"
+            MetalWraps.track(b)
             made.append(b)
         }
         buffers = made

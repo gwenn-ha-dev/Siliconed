@@ -189,6 +189,7 @@ package final class Arena {
             throw Failure.allocationFailed(length)
         }
         buffer.label = name
+        MetalWraps.track(buffer)
         return buffer
     }
 
