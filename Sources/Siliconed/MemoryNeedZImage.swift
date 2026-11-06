@@ -40,7 +40,7 @@ import Foundation
 ///     `CacheLoRA` (every module a stack can touch, `DiT.loraTargets` — the worst case), and, with more than one LoRA, the `down`
 ///     staging of one module while the cache fills (`LoRA.downBytes`);
 ///   - **the VAEs hand everything back before they return** (two heaps of ours; `finish` waits until
-///     Metal's ledger is back to its level before them, under 0.1 s): the encoder's memory is not
+///     Metal's ledger has let them go, under 0.1 s): the encoder's memory is not
 ///     carried into the denoising any more, nor the DiT's into the decoding (`Context.keptDenoiser`
 ///     released first);
 ///   - Z-Image has no reference image: `references` are img2img's (and Détail's) starting image as
