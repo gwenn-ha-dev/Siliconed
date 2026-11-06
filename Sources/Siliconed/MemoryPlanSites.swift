@@ -87,12 +87,13 @@ extension MemoryPlan {
     }
 
     /// **A decoder's band**, as it starts decoding: the plan's — the measured size (FLUX's 2²³ elements,
-    /// Qwen's 2¹⁸ pixels), or the smallest proved one on a plan that could not hold it. Never larger:
-    /// 2²⁴ costs 140 MB more for the same time. Outside a render, `standard` — the static a check may
-    /// have set.
-    package static func decoderBand(standard: Int, minimum: Int, unit: String) -> Int {
+    /// Qwen's 2¹⁸ pixels), the smallest proved one on a plan that could not hold it, or `wide` where the plan
+    /// holds that (`Request.wideBands`: Flux's 2²⁵, Z-Image's decoder — the same bits). Outside a render, `standard` — the static a
+    /// check may have set.
+    package static func decoderBand(standard: Int, minimum: Int, wide: Int? = nil, unit: String) -> Int {
         guard let render = current else { return standard }
-        let band = render.request.minimumBands ? min(standard, minimum) : standard
+        let band = render.request.minimumBands ? min(standard, minimum)
+            : render.request.wideBands ? max(standard, wide ?? standard) : standard
         note("decoder bands of 2^\(band.trailingZeroBitCount) \(unit)")
         return band
     }

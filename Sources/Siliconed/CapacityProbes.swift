@@ -311,7 +311,7 @@ extension Diagnostic {
             let truths = 160 << 20
             // The disk stage runs beside the operands: its staging slots and scratch piece are charged (`CapacityDisk.probeMemoryBytes`).
             let routes = operands + 3 * gemm + ane + aneIntegers + multiply + exact + truths + attention + 2 * bandwidthBytes
-                + CapacityDisk.probeMemoryBytes()
+                + CapacityDisk.probeMemoryBytes() + Context.convolutionBytes()
             let w = Diagnostic.blocks[0], count = w.dim * w.hidden
             let widening = [count * 4, count * 2, count * 2, count + 2 * w.hidden, count, 1 << 20].map { Arena.capacity(for: $0) }.reduce(0, +)
             return Need(steps: ["widening": widening + frameworks, "routes": routes + frameworks])

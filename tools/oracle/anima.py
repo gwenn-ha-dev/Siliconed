@@ -11,6 +11,7 @@
     anima.py vae --size 512 [1024 768x512]  the decoder on the final latent             -> goldens-anima-vae-<size>
     anima.py witness --size 512 --step 0    one guided evaluation in float64            -> witness-anima-f64-<size>-step<n>
     anima.py vae-witness --size 512         the decoder in float64                      -> witness-anima-vae-f64-<size>
+    anima.py vae-bf16 --size 512            the decoder in bfloat16, as the pipeline runs it -> witness-bf16-anima-vae-<size>
     anima.py img2img --size 512             img2img at strength 0.6: the picture encoded, the start, the
                                             truncated loop (steps 3-7)                  -> goldens-anima-img2img-<size>
     anima.py all [--size 512 1024 768x512] [1536]  all of the above, in an order that satisfies their dependencies
@@ -569,6 +570,28 @@ def stage_vae_witness(size: str):
     print(f"-> {path}")
 
 
+def stage_vae_bf16(size: str):
+    """**The decoder in bfloat16, as the modular pipeline runs it with `torch_dtype=torch.bfloat16`** on
+    `goldens-anima-vae-<size>`'s latent (`anima/decoders.py`): `latents.to(vae.dtype)`, `/ (1 / std) + mean` in bf16, then
+    `vae.decode`. The bar of the engine's bf16 decoder (invariant 3): no further from the fp64 witness than this, + 25 %. Its
+    convolutions on bf16 operands with fp32 sums (`common.bf16_convolutions_in_fp32`): call it in a process that does nothing else."""
+    from diffusers import AutoencoderKLQwenImage
+    _, _, name = common.parse_size(size)
+    common.bf16_convolutions_in_fp32()
+    bf16 = torch.bfloat16
+    decoded = read(f"goldens-anima-vae-{name}", f"anima.py vae --size {name}")
+    exact = read(f"witness-anima-vae-f64-{name}", f"anima.py vae-witness --size {name}")["image"]
+    vae = AutoencoderKLQwenImage.from_pretrained(base() / "vae", torch_dtype=bf16).eval()
+    latent = decoded["latent_final"][None, :, None].to(bf16)
+    mean = torch.tensor(vae.config.latents_mean).view(1, 16, 1, 1, 1).to(bf16)
+    inv_std = 1.0 / torch.tensor(vae.config.latents_std).view(1, 16, 1, 1, 1).to(bf16)
+    with torch.no_grad():
+        image = vae.decode(latent / inv_std + mean, return_dict=False)[0][0, :, 0].float()
+    worst, median, plane = common.per_plane(image, exact)
+    print(f"  decoder {name}: bf16 vs fp64 - worst plane {worst:.3e} (plane {plane}), median {median:.3e}")
+    write(f"witness-bf16-anima-vae-{name}", {"image": image})
+
+
 def everything(goldens: Path, sizes: list[str]) -> None:
     """Text first, then per size what the check reads: the DiT evaluation, the trajectory and the DiT's
     witness (squares), the decoder and its witness. A rectangle's decoder crops the 1024 trajectory's final
@@ -582,6 +605,7 @@ def everything(goldens: Path, sizes: list[str]) -> None:
     decoded = [s for s in sizes if s != "1536"]   # the decoder's check stops at 1024 (`AnimaStages.vae`)
     stages += [["vae", "--size", s] for s in decoded]
     stages += [["vae-witness", "--size", s] for s in decoded]
+    stages += [["vae-bf16", "--size", s] for s in decoded]
     stages += [["img2img", "--size", "512"]] if "512" in squares else []
     common.run_stages(__file__, goldens, stages)
 
@@ -590,7 +614,8 @@ def main() -> None:
     global OUT
     common.unbuffered()
     p = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    p.add_argument("stage", choices=["tokenizer", "text", "dit", "bf16", "trajectory", "vae", "witness", "vae-witness", "img2img", "all"])
+    p.add_argument("stage", choices=["tokenizer", "text", "dit", "bf16", "trajectory", "vae", "witness", "vae-witness", "vae-bf16",
+                                          "img2img", "all"])
     p.add_argument("--size", nargs="+", default=None,
                    help="512, 1024 or WIDTHxHEIGHT (dit, vae: a rectangle too; default 512, all: every size)")
     p.add_argument("--step", type=int, default=0, help="witness only: the step of the trajectory (default 0, the one the check reads)")
@@ -617,7 +642,7 @@ def main() -> None:
                 stage_witness(size, args.step)
             else:
                 {"dit": stage_dit, "bf16": stage_bf16, "trajectory": stage_trajectory, "vae": stage_vae,
-                 "vae-witness": stage_vae_witness, "img2img": stage_img2img}[args.stage](size)
+                 "vae-witness": stage_vae_witness, "vae-bf16": stage_vae_bf16, "img2img": stage_img2img}[args.stage](size)
 
 
 if __name__ == "__main__":

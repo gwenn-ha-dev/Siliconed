@@ -288,3 +288,18 @@ package struct HalfPrecisionReference {
     /// The bf16 reference's values at `name`, if it holds that boundary.
     package func values(_ name: String) -> [Float]? { tensors.float32(name).map(Array.init) }
 }
+
+/// **Invariant 3 for a decoder in bf16** (`VAEPrecision`): the bar is the reference decoded in bf16 on the golden's latent, beside it
+/// as `witness-bf16-X` (`goldens-X` renamed) — required when the decoder computes in bf16 (the fp32 rule would fail it for what it is,
+/// not for a fault), `nil` when it computes in fp32. `published`: the decoder's published format (each decoder's `publishedInBF16`).
+package enum DecoderReference {
+    package static func image(_ goldens: Goldens, file: String, publishedInBF16 published: Bool, script: String) throws -> [Float]? {
+        guard VAEPrecision.half(plan: EngineSettings.effective.plan, publishedInBF16: published) else { return nil }
+        let name = file.replacingOccurrences(of: "goldens-", with: "witness-bf16-")
+        guard let reference = goldens.optional(name), let image = reference.float32("image") else {
+            throw Skip("the decoder computes in bf16 and \(name) is missing — \(script)")
+        }
+        print("the decoder computes in bf16: judged against \(name) at the fp64 witness, + 25 %")
+        return Array(image)
+    }
+}

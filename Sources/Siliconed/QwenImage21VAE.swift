@@ -259,6 +259,9 @@ package enum QwenImage21VAE {
         var workspace = VAELayout.minimumAsk / 4
         var build: ((VAEBuildingBlocks, [MPSGraphTensor]) throws -> MPSGraphTensor)? = nil
         var kernel: ((VAEMemory, [VAERegister], VAERegister) throws -> Void)? = nil
+        /// **An RMSNorm pass** (`QwenImageRMS_norm` at `prefix`, then the SiLU if `silu`): in bf16 (`VAEMemory.half`) it runs as a
+        /// kernel of ours, fp32 inside, rounded once (`VAEMemory.rmsNorm`); in fp32, `build`'s graph.
+        var norm: (prefix: String, channels: Int, silu: Bool)? = nil
 
         /// A graph pass.
         init(_ inputs: [String], _ output: String, _ shape: [Int], weights: [Int] = [], forget: [String] = [],
@@ -294,7 +297,12 @@ package enum QwenImage21VAE {
         for (index, stage) in stages.enumerated() {
             let feeds = stage.inputs.map { registers[$0]! }
             let result: VAERegister
-            if let kernel = stage.kernel {
+            if memory.half, let norm = stage.norm {
+                result = try memory.register(stage.shape)
+                let gamma = try memory.kernelWeights([norm.prefix + ".gamma"], counts: [norm.channels], file: weights, vae: name)
+                if memory.isLive { memory.rmsNorm(feeds[0], into: result, gamma: gamma[0], silu: norm.silu) }
+                memory.free(gamma)
+            } else if let kernel = stage.kernel {
                 result = stage.inPlace ? feeds[0] : try memory.register(stage.shape)
                 precondition(result.shape == stage.shape, "QwenImage21VAE: pass \(stage.label ?? stage.output) in place on another shape")
                 if memory.isLive { try kernel(memory, feeds, result) }
@@ -308,8 +316,9 @@ package enum QwenImage21VAE {
                         if let b = graphs?.built[index] { return b }
                         let fed = FedWeights()
                         let graph = MPSGraph()
-                        let placeholders = feeds.map { graph.placeholder(shape: $0.nsShape, dataType: .float32, name: nil) }
-                        let output = try stage.build!(VAEBuildingBlocks(graph: graph, weights: weights!, name: name, fed: fed),
+                        let placeholders = feeds.map { graph.placeholder(shape: $0.nsShape, dataType: $0.dataType, name: nil) }
+                        let output = try stage.build!(VAEBuildingBlocks(graph: graph, weights: weights!, name: name, fed: fed,
+                                                                        dataType: memory.activation),
                                                       placeholders)
                         precondition(output.shape?.map(\.intValue) == stage.shape,
                                      "QwenImage21VAE: stage \(stage.label ?? stage.output) is not the shape its plan charges")
@@ -346,11 +355,15 @@ package enum QwenImage21VAE {
     static func resnet(_ prefix: String, _ i: Int, _ o: Int, size: (h: Int, w: Int), keep: String? = nil,
                        label: String) -> [Stage] {
         let (a, b) = ([1, i, size.h, size.w], [1, o, size.h, size.w])
+        var norm1 = Stage(["x"], "h", a, weights: WeightList.rms(i), keep: keep) { k, t in
+            try k.silu(k.rmsNorm(t[0], prefix + ".norm1", channels: i)) }
+        norm1.norm = (prefix + ".norm1", i, true)
+        var norm2 = Stage(["h"], "h", b, weights: WeightList.rms(o)) { k, t in try k.silu(k.rmsNorm(t[0], prefix + ".norm2", channels: o)) }
+        norm2.norm = (prefix + ".norm2", o, true)
         var passes = [
-            Stage(["x"], "h", a, weights: WeightList.rms(i), keep: keep) { k, t in
-                try k.silu(k.rmsNorm(t[0], prefix + ".norm1", channels: i)) },
+            norm1,
             Stage(["h"], "h", b, weights: WeightList.conv(o, i)) { k, t in try k.conv(t[0], prefix + ".conv1", padding: 1) },
-            Stage(["h"], "h", b, weights: WeightList.rms(o)) { k, t in try k.silu(k.rmsNorm(t[0], prefix + ".norm2", channels: o)) },
+            norm2,
         ]
         if i != o {
             var shortcut = Stage(["x"], "r", b, weights: WeightList.conv(o, i, kernel: 1)) { k, t in
@@ -379,8 +392,10 @@ package enum QwenImage21VAE {
             k.scaledDotProduct(t[0], t[1], t[2], channels: c, requestBlock: requestBlock) }
         sdpa.workspace = max(sdpa.workspace, VAELayout.sdpaAsk(tokens: s, channels: c))
         sdpa.outside = VAELayout.sdpaOutside(tokens: s, channels: c)
-        return [Stage(["x"], "n", [1, c, size.h, size.w], weights: WeightList.rms(c)) { k, t in
-                    try k.rmsNorm(t[0], prefix + ".norm", channels: c) },
+        var norm = Stage(["x"], "n", [1, c, size.h, size.w], weights: WeightList.rms(c)) { k, t in
+            try k.rmsNorm(t[0], prefix + ".norm", channels: c) }
+        norm.norm = (prefix + ".norm", c, false)
+        return [norm,
                 Stage(["n"], "t", tokens, inPlace: false, forget: ["n"]) { memory, t, out in
                     memory.dispatch(.tokens, [t[0], out], constants: [UInt32(c), UInt32(s)],
                                     grid: MTLSize(width: c, height: s, depth: 1)) }]
@@ -465,9 +480,10 @@ package final class QwenImage21VAEDecoder {
         let started = Date()
         let bandPixels = MemoryPlan.decoderBand(standard: QwenImage21VAEDecoder.bandPixels,
                                                 minimum: MemoryPlan.qwenMinimumBand, unit: "pixels")
+        let half = VAEPrecision.half(publishedInBF16: QwenImage21VAEDecoder.publishedInBF16, weights: weights)
         let plan = QwenImage21VAEDecoder.plan(config: config, latentHeight: latentHeight, latentWidth: latentWidth,
-                                              bandPixels: bandPixels)
-        let memory = try VAEMemory(plan: plan, device: device, queue: queue)
+                                              bandPixels: bandPixels, half: half)
+        let memory = try VAEMemory(plan: plan, device: device, queue: queue, half: half)
         let rgba = try autoreleasepool {
             try QwenImage21VAEDecoder.decode(latent, config: config, latentHeight: latentHeight, latentWidth: latentWidth,
                                              bandPixels: bandPixels, weights: weights, memory: memory)
@@ -480,18 +496,21 @@ package final class QwenImage21VAEDecoder {
     /// registers' heap, the largest stage's workspace, and the RGBA it returns — `decode` walked
     /// without a device. `decode` allocates exactly this before its first graph.
     package static func plan(config: QwenImage21VAE.Config, latentHeight h: Int, latentWidth w: Int,
-                             bandPixels: Int = QwenImage21VAEDecoder.bandPixels) -> VAELayout {
-        plans(VAEPlanKey(config, [h, w, bandPixels])) {
-            walk(config: config, latentHeight: h, latentWidth: w, bandPixels: bandPixels)
+                             bandPixels: Int = QwenImage21VAEDecoder.bandPixels, half: Bool = false) -> VAELayout {
+        plans(VAEPlanKey(config, [h, w, bandPixels, half ? 1 : 0])) {
+            walk(config: config, latentHeight: h, latentWidth: w, bandPixels: bandPixels, half: half)
         }
     }
+
+    /// The Turbo's decoder is published in bf16 (`VAEPrecision`).
+    package static let publishedInBF16 = true
 
     private static let plans = ShapeMemo<VAEPlanKey<QwenImage21VAE.Config>, VAELayout>()
 
     /// `plan`, walked every time: what the memory keeps, and what the tests compare it with.
     package static func walk(config: QwenImage21VAE.Config, latentHeight h: Int, latentWidth w: Int,
-                             bandPixels: Int = QwenImage21VAEDecoder.bandPixels) -> VAELayout {
-        let memory = VAEMemory()
+                             bandPixels: Int = QwenImage21VAEDecoder.bandPixels, half: Bool = false) -> VAELayout {
+        let memory = VAEMemory(half: half)
         do {
             _ = try decode(nil, config: config, latentHeight: h, latentWidth: w, bandPixels: bandPixels, weights: nil,
                            memory: memory)
@@ -505,10 +524,20 @@ package final class QwenImage21VAEDecoder {
                                bandPixels: Int, weights: Safetensors?, memory: VAEMemory) throws -> [Float] {
         let input = try memory.register([1, config.zDim, h, w])
         if let latent, memory.isLive {
-            let plane = h * w, z = input.values
+            // In bf16 (`VAEMemory.half`) the fp32 de-normalization is rounded once into the register, a plane at a time.
+            let plane = h * w
+            var row = [Float](repeating: 0, count: input.isHalf ? plane : 0)
             for c in 0..<config.zDim {
                 let (s, m) = (config.std[c], config.mean[c])
-                for p in (c * plane)..<((c + 1) * plane) { let scaled = latent[p] * s; z[p] = scaled + m }
+                if input.isHalf {
+                    for p in 0..<plane { let scaled = latent[c * plane + p] * s; row[p] = scaled + m }
+                    row.withUnsafeBufferPointer {
+                        Widen.float32ToBfloat16(source: $0.baseAddress!, destination: input.raw + 2 * c * plane, count: plane)
+                    }
+                } else {
+                    let z = input.values
+                    for p in (c * plane)..<((c + 1) * plane) { let scaled = latent[p] * s; z[p] = scaled + m }
+                }
             }
         }
         let registers = try QwenImage21VAE.run(try stages(config: config, latentHeight: h, latentWidth: w), weights: weights,
@@ -625,12 +654,14 @@ package final class QwenImage21VAEDecoder {
             }
         }
         let last = config.up(first + levels).output
-        passes.append(V.Stage(["x"], "h", [1, last, factor * window, W], weights: WeightList.rms(last), forget: ["x"]) { k, t in
-            try k.silu(k.rmsNorm(t[0], "decoder.norm_out", channels: last)) })
+        var normOut = V.Stage(["x"], "h", [1, last, factor * window, W], weights: WeightList.rms(last), forget: ["x"]) { k, t in
+            try k.silu(k.rmsNorm(t[0], "decoder.norm_out", channels: last)) }
+        normOut.norm = ("decoder.norm_out", last, true)
+        passes.append(normOut)
         passes.append(V.Stage(["h"], "x", [1, config.outChannels, factor * window, W],
                               weights: WeightList.conv(config.outChannels, last), forget: ["h"]) { k, t in
             k.graph.clamp(try k.conv(t[0], "decoder.conv_out", padding: 1),
-                          min: k.graph.constant(-1, dataType: .float32), max: k.graph.constant(1, dataType: .float32), name: nil) })
+                          min: k.graph.constant(-1, dataType: k.dataType), max: k.graph.constant(1, dataType: k.dataType), name: nil) })
         memory.host(4 * config.outChannels * H * W)
         var rgba = [Float](repeating: 0, count: memory.isLive ? config.outChannels * H * W : 0)
         // The passes' graphs are kept for the next band — when there is one. Kept, ~20 graphs hold their
@@ -645,8 +676,10 @@ package final class QwenImage21VAEDecoder {
             if memory.isLive {
                 let pairs: [(VAERegister, VAERegister, Int)] = [(x, xw, cx), (skip, sw, cs)]
                 for (source, target, channels) in pairs {
-                    let (from, to) = (source.values, target.values)
-                    for c in 0..<channels { (to + c * window * w).update(from: from + (c * h + start) * w, count: window * w) }
+                    let (from, to, e) = (source.raw, target.raw, source.elementSize)
+                    for c in 0..<channels {
+                        (to + e * c * window * w).copyMemory(from: from + e * (c * h + start) * w, byteCount: e * window * w)
+                    }
                 }
             }
             let registers = try V.run(passes, weights: weights, name: "VAE Qwen-Image-2.1", memory: memory,
@@ -654,12 +687,17 @@ package final class QwenImage21VAEDecoder {
             precondition(registers.count == 1, "QwenImage21VAEDecoder: the tail left \(registers.keys.sorted()) alive")
             let out = registers["x"]!
             if memory.isLive {
-                // Keep the core: full-resolution rows [F·c0, F·c1), found at F·(c0 − start) in the window.
+                // Keep the core: full-resolution rows [F·c0, F·c1), found at F·(c0 − start) in the window (widened from bf16
+                // in half precision, exactly).
                 rgba.withUnsafeMutableBufferPointer { target in
                     for c in 0..<config.outChannels {
-                        (target.baseAddress! + (c * H + factor * c0) * W)
-                            .update(from: out.values + (c * factor * window + factor * (c0 - start)) * W,
-                                    count: factor * (c1 - c0) * W)
+                        let to = target.baseAddress! + (c * H + factor * c0) * W
+                        let from = (c * factor * window + factor * (c0 - start)) * W, count = factor * (c1 - c0) * W
+                        if out.isHalf {
+                            Widen.bfloat16ToFloat32(source: UnsafeRawPointer(out.raw + 2 * from), destination: to, count: count)
+                        } else {
+                            to.update(from: out.values + from, count: count)
+                        }
                     }
                 }
                 V.stageDone?("tail \(c0)-\(c1)")

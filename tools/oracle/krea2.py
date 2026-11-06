@@ -17,6 +17,7 @@
     krea2.py draw --size 512 --step 0 --permute N [N...] [--permute-kind group|full]   fp32 draws whose summation
                                                order is drawn (the residual stream permuted) -> draw-krea2-<size>-step<i>-perm<kind>N
     krea2.py vae-witness --size 512            the decoder in float64                        -> witness-krea2-vae-f64-<size>
+    krea2.py vae-bf16 --size 512               the decoder in bfloat16, as the pipeline runs it -> witness-bf16-krea2-vae-<size>
     krea2.py img2img --size 512 [--variant compact]   img2img at strength 0.6: the picture encoded, the start, the
                                                truncated loop (steps 3-7)                    -> goldens-krea2-img2img[-<variant>]-<size>
     krea2.py img2img-witness --size 512 --step 3 4 5 6 7 [--variant compact]   an img2img step in float64
@@ -911,6 +912,28 @@ def stage_vae_witness(size: str):
     print(f"-> {path}")
 
 
+def stage_vae_bf16(size: str):
+    """**The decoder in bfloat16, as the pipeline runs it with `torch_dtype=torch.bfloat16`** on `goldens-krea2-vae-<size>`'s
+    latent: `latents.to(vae.dtype)`, `/ (1 / std) + mean` in bf16, then `vae.decode` (`pipeline_qwenimage.py`'s decoding, which
+    Krea's follows). The bar of the engine's bf16 decoder (invariant 3): no further from the fp64 witness than this, + 25 %. Its
+    convolutions on bf16 operands with fp32 sums (`common.bf16_convolutions_in_fp32`): call it in a process that does nothing else."""
+    from diffusers import AutoencoderKLQwenImage
+    _, _, name = common.parse_size(size)
+    common.bf16_convolutions_in_fp32()
+    bf16 = torch.bfloat16
+    decoded = read(f"goldens-krea2-vae-{name}", f"krea2.py vae --size {name}")
+    exact = read(f"witness-krea2-vae-f64-{name}", f"krea2.py vae-witness --size {name}")["image"]
+    vae = AutoencoderKLQwenImage.from_pretrained(snap() / "vae", torch_dtype=bf16).eval()
+    latent = decoded["latent_final"][None, :, None].to(bf16)
+    mean = torch.tensor(vae.config.latents_mean).view(1, 16, 1, 1, 1).to(bf16)
+    inv_std = 1.0 / torch.tensor(vae.config.latents_std).view(1, 16, 1, 1, 1).to(bf16)
+    with torch.no_grad():
+        image = vae.decode(latent / inv_std + mean, return_dict=False)[0][0, :, 0].float()
+    worst, median, plane = common.per_plane(image, exact)
+    print(f"  decoder {name}: bf16 vs fp64 - worst plane {worst:.3e} (plane {plane}), median {median:.3e}")
+    write(f"witness-bf16-krea2-vae-{name}", {"image": image})
+
+
 def everything(goldens: Path, sizes: list[str], witness_steps: list[int], draws: int) -> None:
     """Per size, in dependency order: the text, the evaluation and its head witness, the trajectory and the
     whole-evaluation witnesses of its steps (squares: they start from the trajectory's latents), then the
@@ -927,6 +950,7 @@ def everything(goldens: Path, sizes: list[str], witness_steps: list[int], draws:
                for s in squares for i in range(8) for j in range(1, draws + 1)]
     stages += [["vae", "--size", s] for s in sizes]
     stages += [["vae-witness", "--size", s] for s in sizes]
+    stages += [["vae-bf16", "--size", s] for s in sizes]
     if "512" in squares:
         stages += [["img2img", "--size", "512"]] + [["img2img-witness", "--size", "512", "--step", str(i)] for i in range(3, STEPS)]
     common.run_stages(__file__, goldens, stages)
@@ -937,7 +961,7 @@ def main() -> None:
     common.unbuffered()
     p = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     p.add_argument("stage", choices=["text", "dit", "bf16", "trajectory", "vae", "witness", "witness-step", "draw",
-                                     "vae-witness", "img2img", "img2img-witness", "img2img-draw", "all"])
+                                     "vae-witness", "vae-bf16", "img2img", "img2img-witness", "img2img-draw", "all"])
     p.add_argument("--size", nargs="+", default=None,
                    help="512, 1024 or WIDTHxHEIGHT (dit, witness, vae: a rectangle too; default 512, all: every size)")
     p.add_argument("--step", type=int, nargs="+", default=[0],
@@ -999,7 +1023,7 @@ def main() -> None:
             {"dit": stage_dit_variant, "bf16": stage_bf16}[args.stage](size, args.variant)
         else:
             {"dit": stage_dit, "bf16": stage_bf16, "trajectory": stage_trajectory, "vae": stage_vae, "witness": stage_witness,
-             "vae-witness": stage_vae_witness, "img2img": stage_img2img}[args.stage](size)
+             "vae-witness": stage_vae_witness, "vae-bf16": stage_vae_bf16, "img2img": stage_img2img}[args.stage](size)
 
 
 if __name__ == "__main__":

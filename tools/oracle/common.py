@@ -308,6 +308,33 @@ def save_preview(image: torch.Tensor, path: Path) -> None:
     print(f"-> {path}")
 
 
+def bf16_convolutions_in_fp32() -> None:
+    """**A decoder in bfloat16 at the speed of fp32 on the CPU**: torch's CPU convolution on bf16 operands has no fast path on
+    this machine (one core, a 768x512 decoding still running after 25 minutes), so every `Conv2d` / `Conv3d` given bf16
+    operands is computed here on the same values widened to fp32 (exact), its bias added in the sum, and its output rounded once
+    to bf16 — a bf16 convolution with fp32 sums, the most exact one there is: a bar of the bf16 decoder that can only be stricter
+    than torch's own. Everything else (norms, activations, attention, every sum between two operations) stays torch's bf16.
+    Process-wide and not undoable: call it in a stage that does nothing else."""
+    import torch.nn as nn
+    import torch.nn.functional as F
+    conv2d, conv3d = nn.Conv2d._conv_forward, nn.Conv3d._conv_forward
+
+    def forward2d(self, input, weight, bias):
+        if input.dtype != torch.bfloat16 or self.padding_mode != "zeros":
+            return conv2d(self, input, weight, bias)
+        return F.conv2d(input.float(), weight.float(), None if bias is None else bias.float(),
+                        self.stride, self.padding, self.dilation, self.groups).to(torch.bfloat16)
+
+    def forward3d(self, input, weight, bias):
+        if input.dtype != torch.bfloat16 or self.padding_mode != "zeros":
+            return conv3d(self, input, weight, bias)
+        return F.conv3d(input.float(), weight.float(), None if bias is None else bias.float(),
+                        self.stride, self.padding, self.dilation, self.groups).to(torch.bfloat16)
+
+    nn.Conv2d._conv_forward = forward2d
+    nn.Conv3d._conv_forward = forward3d
+
+
 def decoder_in_double() -> None:
     """Makes the Qwen-Image VAE (`AutoencoderKLQwenImage`, used by Anima and Krea 2) and Flux's
     (`AutoencoderKL`, Z-Image's: only the banded convolutions and attention concern it) computable in

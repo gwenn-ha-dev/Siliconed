@@ -63,6 +63,8 @@ package final class Flux2VAE {
     private let scale: [Float], shift: [Float]
     /// The grid of the decoder's input (after the unpatchify): the image is `8×` that.
     package let latentHeight, latentWidth: Int
+    /// MOSS-Image publishes its FLUX.2 decoder in fp32: it computes in fp32 (`VAEPrecision`).
+    package static let publishedInBF16 = false
     package var imageHeight: Int { latentHeight * 8 }
     package var imageWidth: Int { latentWidth * 8 }
 

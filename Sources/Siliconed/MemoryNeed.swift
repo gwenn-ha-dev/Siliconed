@@ -70,6 +70,9 @@ package struct MemoryNeed: Sendable, Equatable {
         /// The decoders' smallest bands (`MemoryPlan.fluxMinimumBand`, `qwenMinimumBand`), as the lean
         /// plan takes them; otherwise the standard ones.
         package var minimumBands = false
+        /// **Flux's wide band** (`MemoryPlan.fluxWideBand`), taken after the standard ones where the need stays ≤ B: the same bits
+        /// (the bands only cut the rows, every statistic is the whole tensor's), fewer passes. Ignored with `minimumBands`.
+        package var wideBands = false
         /// The update rule (`Solver.history`): the latents its walk keeps between two steps.
         package var solver: Solver = .euler
         /// **The plan the products and attentions are asked of** (`CapacityPlan`): the same questions, with the same keys, the engine
@@ -117,7 +120,7 @@ package struct MemoryNeed: Sendable, Equatable {
         /// buffers, no encoder buffer, the decoders' smallest bands — the floor a render can go down to.
         package var lean: Request {
             var r = self
-            r.tail = .lean; r.encoderSlots = 0; r.minimumBands = true; r.mapInPlace = false; r.encoderKept = false
+            r.tail = .lean; r.encoderSlots = 0; r.minimumBands = true; r.wideBands = false; r.mapInPlace = false; r.encoderKept = false
             return r
         }
 

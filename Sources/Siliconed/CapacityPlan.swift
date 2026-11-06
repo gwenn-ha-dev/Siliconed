@@ -61,12 +61,27 @@ package final class CapacityPlan: Sendable {
         /// **The attention may run in half-precision operands** (`tiles16`, `tilesbf16`): the denoiser's attention rounds Q, K, V and
         /// the probabilities to half or bf16.
         package var halfAttention = false
+        /// **The decoders compute in bf16** where their weights are published in bf16 (`VAEPrecision`): activations and weights bf16
+        /// between two operations, the norms' statistics and every sum in fp32 — the map's convolution faster in bf16
+        /// (`CapacityModel.Convolution.prefersHalf`), or a check's forcing. Never under `restricted(accelerators: false)`. Not in
+        /// `halfPrecision`: the denoiser's checks are not the decoder's (each decoder stage asks `VAEPrecision` itself).
+        package var halfDecoder = false
         package init(amx: Bool = false, ane: Bool = false, bf16Weights: Bool = false, int8Weights: Bool = false,
                      q8Weights: Bool = false, roundedActivations: Bool = false, aneInt8: Bool = false, halfAttention: Bool = false) {
             self.halfAttention = halfAttention
             self.amx = amx; self.ane = ane; self.bf16Weights = bf16Weights; self.int8Weights = int8Weights
             self.q8Weights = q8Weights; self.roundedActivations = roundedActivations
             self.aneInt8 = aneInt8 && ane && int8Weights
+        }
+        private enum CodingKeys: String, CodingKey {
+            case amx, ane, bf16Weights, int8Weights, q8Weights, roundedActivations, aneInt8, halfAttention, halfDecoder
+        }
+        package init(from decoder: any Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            func flag(_ k: CodingKeys) throws -> Bool { try c.decodeIfPresent(Bool.self, forKey: k) ?? false }
+            amx = try flag(.amx); ane = try flag(.ane); bf16Weights = try flag(.bf16Weights); int8Weights = try flag(.int8Weights)
+            q8Weights = try flag(.q8Weights); roundedActivations = try flag(.roundedActivations); aneInt8 = try flag(.aneInt8)
+            halfAttention = try flag(.halfAttention); halfDecoder = try flag(.halfDecoder)
         }
         /// `TensorGEMM` is built when any native form is.
         package var usesTensor: Bool { bf16Weights || int8Weights || q8Weights || roundedActivations }
@@ -172,13 +187,15 @@ package final class CapacityPlan: Sendable {
         // activation rounded to bf16 (`int8act`, `q8act`): either line brings the integers' kernels up.
         // A K-quant read as published (`q4kact`) rounds its activation too: its line brings the rounding's library up, the K-quants' with it.
         let rounds = allowsHalfPrecision && (has(.gpu, .bf16act) || has(.gpu, .int8act) || has(.gpu, .q8act) || has(.gpu, .q4kact))
-        resources = Resources(amx: has(.amx, .fp32), ane: allowsANE && has(.ane, .fp16),
+        var resources = Resources(amx: has(.amx, .fp32), ane: allowsANE && has(.ane, .fp16),
                               bf16Weights: has(.gpu, .bf16), int8Weights: has(.gpu, .int8) || (allowsHalfPrecision && has(.gpu, .int8act)),
                               q8Weights: has(.gpu, .q8) || (allowsHalfPrecision && has(.gpu, .q8act)),
                               roundedActivations: rounds,
                               aneInt8: allowsANE && has(.ane, .fp16) && has(.ane, .int8),
                               halfAttention: (CapacitySolver.Constraints.allowsHalf(ane: allowsANE, rounding: allowsHalfPrecision) && has(.gpu, .tiles16))
                                   || (allowsHalfPrecision && has(.gpu, .tilesbf16)))
+        resources.halfDecoder = allowsHalfPrecision && (model.convolution?.prefersHalf ?? false)
+        self.resources = resources
         override = nil; attentionOverride = nil
         identity = "model " + Self.fingerprint(model) + (allowsANE ? "" : " no-ane") + (allowsHalfPrecision ? "" : " fp32")
     }
@@ -188,7 +205,7 @@ package final class CapacityPlan: Sendable {
     package init(resources: Resources, label: String, allowsANE: Bool = true, allowsHalfPrecision: Bool = true,
                  override: Override? = nil, attentionOverride: AttentionOverride? = nil) {
         var resources = resources
-        if !allowsHalfPrecision { resources.roundedActivations = false; resources.halfAttention = false }
+        if !allowsHalfPrecision { resources.roundedActivations = false; resources.halfAttention = false; resources.halfDecoder = false }
         self.resources = resources; identity = label; model = nil; self.allowsANE = allowsANE && resources.ane
         self.allowsHalfPrecision = allowsHalfPrecision
         limits = CapacitySolver.Limits(); sustained = true; excluded = []; self.override = override
@@ -278,6 +295,7 @@ package final class CapacityPlan: Sendable {
         parts.append("noise \(model.noise.map { "\($0)" } ?? "-")")
         // Only where the map has it: a map before the probe keeps its fingerprint (its plan is the same).
         if let n = model.normRope { parts.append("normrope \(n.cpu.t0) \(n.cpu.rate) \(n.gpu.t0) \(n.gpu.rate) \(n.gpuWaited.t0) \(n.gpuWaited.rate)") }
+        if let c = model.convolution { parts.append("conv \(c.fp32.t0) \(c.fp32.rate) \(c.bf16.t0) \(c.bf16.rate) \(c.work)") }
         var hash: UInt64 = 0xcbf29ce484222325
         for byte in parts.joined(separator: "\n").utf8 { hash = (hash ^ UInt64(byte)) &* 0x100000001b3 }
         return String(hash, radix: 16)
@@ -679,22 +697,25 @@ extension CapacityPlan {
     ///     tile);
     ///   - `normRope` (`normrope`): every self-attention's QK-norm and RoPE on the GPU (`QKNormRope`), whatever the kernel — the route
     ///     the map may choose, forced where a check judges it against the reference;
+    ///   - `decoderBF16` (`vaebf16`): every decoder whose weights are published in bf16 computes in bf16 (`VAEPrecision`) — the route
+    ///     the map's convolution may choose, judged by the decoder stages against the reference decoded in bf16;
     ///   - `tiles`, `tiles16`, `tilesbf16`: the three stages by tiles of query rows for every attention the plan speaks of (fp32; fp16
     ///     or bf16 operands with fp32 sums, whose checks judge against the half-precision reference like the ANE's); `fused`: the
     ///     half-precision one in the fused form, at the first candidate tile (`AttentionTile.candidates`) — a developer's forcing, the
     ///     map choosing otherwise.
     package static func forcing(neuralEngine: Bool = false, bf16Activations: Bool = false, amx: Bool = false, flash: Bool = false,
-                                tiles: Bool = false, tiles16: Bool = false, tilesbf16: Bool = false, fused: Bool = false, cut: Bool = false, aneInt8: Bool = false, int8: Bool = false, q8: Bool = false, normRope: Bool = false, aneMinimumRows: Int = 2 * NeuralEngine.rowUnit,
+                                tiles: Bool = false, tiles16: Bool = false, tilesbf16: Bool = false, fused: Bool = false, cut: Bool = false, aneInt8: Bool = false, int8: Bool = false, q8: Bool = false, normRope: Bool = false, decoderBF16: Bool = false, aneMinimumRows: Int = 2 * NeuralEngine.rowUnit,
                                 roundingMinimumRows: Int = 256) -> CapacityPlan {
         let neuralEngine = neuralEngine || aneInt8
-        let resources = Resources(amx: amx, ane: neuralEngine, bf16Weights: bf16Activations, int8Weights: aneInt8 || int8 || bf16Activations,
+        var resources = Resources(amx: amx, ane: neuralEngine, bf16Weights: bf16Activations, int8Weights: aneInt8 || int8 || bf16Activations,
                                   q8Weights: q8 || bf16Activations,
                                   roundedActivations: bf16Activations, aneInt8: aneInt8, halfAttention: tiles16 || tilesbf16)
+        resources.halfDecoder = decoderBF16
         let label = "forcing" + (neuralEngine ? " ane≥\(aneMinimumRows)" : "") + (aneInt8 ? " aneint8" : "") + (int8 ? " int8" : "") + (q8 ? " q8" : "")
             + (bf16Activations ? " bf16act≥\(roundingMinimumRows)" : "")
             + (amx ? " amx 0.631" : "") + (flash ? " flash" : "")
             + (tiles16 ? " tiles16" : tilesbf16 ? " tilesbf16" : tiles ? " tiles" : "") + (fused && (tiles16 || tilesbf16) ? " fused" : "")
-            + (cut && (tiles || tiles16 || tilesbf16) ? " cut" : "") + (normRope ? " normrope" : "")
+            + (cut && (tiles || tiles16 || tilesbf16) ? " cut" : "") + (normRope ? " normrope" : "") + (decoderBF16 ? " vaebf16" : "")
         var attention: AttentionOverride?
         if tiles16 || tilesbf16 || tiles {
             // Every attention the plan speaks of (the encoders', which no caller asks it, stay the graph's); a flash caller takes tiles too.
@@ -775,10 +796,12 @@ extension CapacityPlan {
     /// `nil` for an empty list; a word it does not know makes the whole list unread.
     package static func forcing(named list: String) -> CapacityPlan? {
         let words = Set(list.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces).lowercased() }.filter { !$0.isEmpty })
-        guard !words.isEmpty, words.isSubset(of: ["amx", "flash", "tiles", "tiles16", "tilesbf16", "fused", "cut", "ane", "aneint8", "int8", "q8", "bf16act", "normrope"]) else { return nil }
+        guard !words.isEmpty, words.isSubset(of: ["amx", "flash", "tiles", "tiles16", "tilesbf16", "fused", "cut", "ane", "aneint8", "int8", "q8", "bf16act", "normrope",
+                                                "vaebf16"]) else { return nil }
         return forcing(neuralEngine: words.contains("ane"), bf16Activations: words.contains("bf16act"),
                        amx: words.contains("amx"), flash: words.contains("flash"), tiles: words.contains("tiles"),
                        tiles16: words.contains("tiles16"), tilesbf16: words.contains("tilesbf16"), fused: words.contains("fused"), cut: words.contains("cut"), aneInt8: words.contains("aneint8"),
-                       int8: words.contains("int8"), q8: words.contains("q8"), normRope: words.contains("normrope"))
+                       int8: words.contains("int8"), q8: words.contains("q8"), normRope: words.contains("normrope"),
+                       decoderBF16: words.contains("vaebf16"))
     }
 }

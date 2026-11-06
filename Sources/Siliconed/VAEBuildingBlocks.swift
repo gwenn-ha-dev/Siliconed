@@ -33,9 +33,13 @@ struct VAEBuildingBlocks {
     /// When set, every weight becomes a placeholder recorded here (`VAEMemory.weights` feeds them);
     /// `nil`: a constant of the graph (the checks' one-piece graphs).
     var fed: FedWeights? = nil
+    /// The type of the activations and of the fed weights: fp32, or bf16 for a decoder in half precision (`VAEMemory.half`).
+    var dataType: MPSDataType = .float32
 
-    init(graph: MPSGraph, weights: Safetensors, name: String, groups: Int = 32, fed: FedWeights? = nil) {
+    init(graph: MPSGraph, weights: Safetensors, name: String, groups: Int = 32, fed: FedWeights? = nil,
+         dataType: MPSDataType = .float32) {
         self.graph = graph; self.weights = weights; self.name = name; self.groups = groups; self.fed = fed
+        self.dataType = dataType
     }
 
     // ── the weights ─────────────────────────────────────────────────────────────────────────
@@ -88,6 +92,28 @@ struct VAEBuildingBlocks {
         }
     }
 
+    /// **The weight as published, bf16, copied bit for bit into `target`** — a decoder in half precision reads its weights
+    /// so (`VAEMemory.half`). A tensor published in another format is refused: rounding a weight would compute under it.
+    static func copyHalf(_ file: Safetensors, _ name: String, rows: Range<Int>?, vae: String,
+                         into target: UnsafeMutableRawPointer) throws {
+        let (_, pieces) = try layout(file, name, rows: rows, vae: vae)
+        let entry = file.entries[name]!, source = file.pointer(name)!
+        guard entry.dtype == "BF16" else {
+            throw Safetensors.Failure.badHeader("\(vae): \(name) is published in \(entry.dtype), not bf16 — the decoder computes in fp32")
+        }
+        var target = target
+        for piece in pieces {
+            target.copyMemory(from: source + 2 * piece.start, byteCount: 2 * piece.count)
+            target += 2 * piece.count
+        }
+    }
+
+    /// **Whether every decoder tensor of `file` is published in bf16** — what lets a decoder compute in bf16 (`VAEPrecision`).
+    static func decoderInBF16(_ file: Safetensors) -> Bool {
+        let decoder = file.entries.filter { $0.key.hasPrefix("decoder.") || $0.key.hasPrefix("post_quant_conv.") }
+        return !decoder.isEmpty && decoder.values.allSatisfy { $0.dtype == "BF16" }
+    }
+
     /// **A weight in the graph**: a placeholder when `fed`, otherwise a constant widened into pages of
     /// ours (`Pages`), never into `malloc` — on macOS 27 a large `malloc` block freed stays counted.
     /// `shape`: the shape the graph takes it at, as many floats as the weight's.
@@ -97,7 +123,7 @@ struct VAEBuildingBlocks {
         precondition(shape.reduce(1, *) == natural.reduce(1, *), "VAEBuildingBlocks: \(name) reshaped to another size")
         let ns = shape.map { NSNumber(value: $0) }
         if let fed {
-            let p = graph.placeholder(shape: ns, dataType: .float32, name: nil)
+            let p = graph.placeholder(shape: ns, dataType: dataType, name: nil)
             fed.items.append((p, name, rows, shape))
             return p
         }

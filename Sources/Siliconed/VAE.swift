@@ -88,6 +88,9 @@ package final class VAE {
     /// it (`MemoryPlan.decoderBand`). Set as `decodeBanded` starts.
     private var band = VAE.bandElements
 
+    /// Z-Image's decoder is published in bf16 (`VAEPrecision`).
+    package static let publishedInBF16 = true
+
     /// The channels of the four up blocks, from the bottleneck out (`block_out_channels` reversed).
     private static let levels = [512, 512, 256, 128]
 
@@ -140,15 +143,17 @@ package final class VAE {
     private static func decodeBanded(_ latent: UnsafePointer<Float>?, height h: Int, width w: Int, config: Config,
                                      bands: Bands) throws -> [Float] {
         let memory = bands.memory
-        let input = try memory.register([1, config.latentChannels, h, w])
+        let input = try memory.register([1, config.latentChannels, h, w], .float32)
         if let latent, memory.isLive { input.values.update(from: latent, count: input.count) }
         // The head, at the latent's grid: the denormalization, `conv_in`, the
         // middle block and its attention, the first up block's three resnets, by passes.
+        // In bf16 (`VAEMemory.half`) the denormalization is computed on the fp32 latent and rounded once, into the activations.
         var x = input
-        if config.scaling != 1 || config.shift != 0 {
+        if config.scaling != 1 || config.shift != 0 || memory.half {
             x = try bands.whole([input], input.shape, weights: []) { b, p in
-                b.graph.addition(b.graph.division(p[0], b.graph.constant(Double(config.scaling), dataType: .float32), name: nil),
-                                 b.graph.constant(Double(config.shift), dataType: .float32), name: "denormalize")
+                let y = b.graph.addition(b.graph.division(p[0], b.graph.constant(Double(config.scaling), dataType: .float32), name: nil),
+                                         b.graph.constant(Double(config.shift), dataType: .float32), name: "denormalize")
+                return memory.half ? b.graph.cast(y, to: .bFloat16, name: nil) : y
             }
             memory.free(input)
         }
@@ -174,34 +179,39 @@ package final class VAE {
                                        residual: nil, into: nil)
         memory.free(x)
         memory.host(4 * image.count)
-        let pixels = memory.isLive ? Array(UnsafeBufferPointer(start: image.values, count: image.count)) : []
+        let pixels = memory.isLive ? image.floats() : []
         memory.free(image)
         return pixels
     }
 
     /// **Everything `decodeBanded` holds, for a `h × w` latent at a band of `band` elements** — the
     /// same function walked without a device: its registers' heap, the largest graph's workspace,
-    /// and the image it returns. `decode` allocates exactly this before its first graph.
+    /// and the image it returns. `decode` allocates exactly this before its first graph. `half`: the decoder in bf16
+    /// (`VAEPrecision`).
     package static func plan(latentHeight h: Int, latentWidth w: Int, config: Config = Config(),
-                             band: Int = VAE.bandElements) -> VAELayout {
-        plans(VAEPlanKey(config, [h, w, band])) { walk(latentHeight: h, latentWidth: w, config: config, band: band) }
+                             band: Int = VAE.bandElements, half: Bool = false) -> VAELayout {
+        plans(VAEPlanKey(config, [h, w, band, half ? 1 : 0])) {
+            walk(latentHeight: h, latentWidth: w, config: config, band: band, half: half)
+        }
     }
 
     private static let plans = ShapeMemo<VAEPlanKey<Config>, VAELayout>()
 
     /// `plan`, walked every time: what the memory keeps, and what the tests compare it with.
     package static func walk(latentHeight h: Int, latentWidth w: Int, config: Config = Config(),
-                             band: Int = VAE.bandElements) -> VAELayout {
-        let memory = VAEMemory()
+                             band: Int = VAE.bandElements, half: Bool = false) -> VAELayout {
+        let memory = VAEMemory(half: half)
         let bands = Bands(memory: memory, weights: nil, name: "VAE", groups: config.groups, band: band)
         do { _ = try decodeBanded(nil, height: h, width: w, config: config, bands: bands) } catch { preconditionFailure("VAE plan walk refused: \(error)") }
         return memory.layout
     }
 
     private func decodeBanded(_ latent: UnsafePointer<Float>, height h: Int, width w: Int) throws -> [Float] {
-        band = MemoryPlan.decoderBand(standard: VAE.bandElements, minimum: MemoryPlan.fluxMinimumBand, unit: "elements")
-        let memory = try VAEMemory(plan: VAE.plan(latentHeight: h, latentWidth: w, config: config, band: band),
-                                   device: device, queue: queue)
+        band = MemoryPlan.decoderBand(standard: VAE.bandElements, minimum: MemoryPlan.fluxMinimumBand, wide: MemoryPlan.fluxWideBand,
+                                      unit: "elements")
+        let half = VAEPrecision.half(publishedInBF16: VAE.publishedInBF16, weights: weights)
+        let memory = try VAEMemory(plan: VAE.plan(latentHeight: h, latentWidth: w, config: config, band: band, half: half),
+                                   device: device, queue: queue, half: half)
         let image = try autoreleasepool {
             try VAE.decodeBanded(latent, height: h, width: w, config: config,
                                  bands: Bands(memory: memory, weights: weights, name: "VAE", groups: config.groups, band: band))
@@ -238,12 +248,16 @@ package final class VAE {
         return (window, bands)
     }
 
-    /// `count` contiguous floats of each of `channels` planes, from one stride to another — a window's rows
-    /// in, a core's rows out. Split over the cores: one thread copied 2–3 GB per layer at 1024².
-    private static func copyPlanes(_ channels: Int, from source: UnsafeMutablePointer<Float>, stride s: Int,
-                                   to target: UnsafeMutablePointer<Float>, stride t: Int, count: Int) {
-        Parallel.rows(channels, width: count) { first, n in
-            for c in first..<(first + n) { (target + c * t).update(from: source + c * s, count: count) }
+    /// `count` contiguous elements of each of `channels` planes, from one stride to another — a window's rows
+    /// in, a core's rows out; offsets, strides and count in elements of the registers' type (both the same). Split over the
+    /// cores: one thread copied 2–3 GB per layer at 1024².
+    static func copyPlanes(_ channels: Int, from source: VAERegister, at s0: Int, stride s: Int,
+                           to target: VAERegister, at t0: Int, stride t: Int, count: Int) {
+        precondition(source.dataType == target.dataType, "VAE.copyPlanes: registers of two types")
+        let e = source.elementSize
+        let (from, to) = (source.raw + e * s0, target.raw + e * t0)
+        Parallel.rows(channels, width: count * e / 4) { first, n in
+            for c in first..<(first + n) { (to + e * c * t).copyMemory(from: from + e * c * s, byteCount: e * count) }
         }
     }
 
@@ -354,7 +368,7 @@ extension VAE {
         }
 
         func blocks(_ graph: MPSGraph, _ fed: FedWeights) -> VAEBuildingBlocks {
-            VAEBuildingBlocks(graph: graph, weights: weights!, name: name, groups: groups, fed: fed)
+            VAEBuildingBlocks(graph: graph, weights: weights!, name: name, groups: groups, fed: fed, dataType: memory.activation)
         }
 
         /// A graph of one kernel over `inputs`, its weights in registers, ready to run on every band.
@@ -371,7 +385,7 @@ extension VAE {
             let fed = FedWeights()
             let built = try memory.graph(largest: workspace) { () -> (MPSGraph, [MPSGraphTensor], MPSGraphTensor) in
                 let graph = MPSGraph()
-                let placeholders = inputs.map { graph.placeholder(shape: $0.nsShape, dataType: .float32, name: nil) }
+                let placeholders = inputs.map { graph.placeholder(shape: $0.nsShape, dataType: $0.dataType, name: nil) }
                 return (graph, placeholders, try build(blocks(graph, fed), placeholders))
             }
             let w = try memory.weights(declared, built.map { _ in fed }, file: weights, vae: name)
@@ -425,6 +439,7 @@ extension VAE {
         /// reduction by groups of groups would spare more, and **changes the bits** (another kernel per
         /// row count): refuted. MPS's reduction asks 2 MiB of workspace of its own.
         private func statistics(_ x: VAERegister) throws -> (mean: VAERegister, variance: VAERegister) {
+            if memory.half { return try memory.groupStatistics(x, groups: groups) }
             let perGroup = x.shape[1] / groups * x.shape[2] * x.shape[3]
             let m = try memory.register([1, groups, 1]), v = try memory.register([1, groups, 1])
             let shape = [1, groups, perGroup].map { NSNumber(value: $0) }
@@ -451,6 +466,9 @@ extension VAE {
         /// written after the band ran).
         func normConv(_ x: VAERegister, norm: String, conv: String, outChannels: Int,
                       residual: (input: VAERegister, shortcut: String?)?, into target: VAERegister?) throws -> VAERegister {
+            if memory.half {
+                return try normConvHalf(x, norm: norm, conv: conv, outChannels: outChannels, residual: residual, into: target)
+            }
             let (cx, H, W) = (x.shape[1], x.shape[2], x.shape[3])
             let stats = try statistics(x)
             let cr = residual?.input.shape[1] ?? 0
@@ -482,10 +500,10 @@ extension VAE {
                     return p.count > 1 ? b.graph.addition(p[1], y, name: nil) : y
                 }
                 for (c0, c1, start) in bands where memory.isLive {
-                    VAE.copyPlanes(cx, from: x.values + start * W, stride: H * W, to: xw.values, stride: window * W,
+                    VAE.copyPlanes(cx, from: x, at: start * W, stride: H * W, to: xw, at: 0, stride: window * W,
                                    count: window * W)
                     if let residual, let rw {
-                        VAE.copyPlanes(cr, from: residual.input.values + start * W, stride: H * W, to: rw.values,
+                        VAE.copyPlanes(cr, from: residual.input, at: start * W, stride: H * W, to: rw, at: 0,
                                        stride: window * W, count: window * W)
                     }
                     run(normalize, into: ng)
@@ -494,8 +512,8 @@ extension VAE {
                     run(convolve, into: out)
                     // The core: rows [c0, c1), at c0 − start in the window. Written after the band ran — which is
                     // what lets the output overwrite the residual: a kept row reads only its own residual row.
-                    VAE.copyPlanes(outChannels, from: out.values + (c0 - start) * W, stride: window * W,
-                                   to: output.values + c0 * W, stride: H * W, count: (c1 - c0) * W)
+                    VAE.copyPlanes(outChannels, from: out, at: (c0 - start) * W, stride: window * W,
+                                   to: output, at: c0 * W, stride: H * W, count: (c1 - c0) * W)
                 }
                 done(convolve)
                 if let shortcut { done(shortcut) }
@@ -505,6 +523,54 @@ extension VAE {
             if let sw { memory.free(sw) }
             if let rw { memory.free(rw) }
             memory.free(out); memory.free(nw); memory.free(ng); memory.free(xw)
+            memory.free(stats.variance); memory.free(stats.mean)
+            return output
+        }
+
+        /// **`normConv` in bf16** (`VAEMemory.half`): the statistics over the whole of `x` (fp32), then by bands the norm, its
+        /// affine and SiLU in one kernel of ours (fp32 inside, rounded once to bf16), the shortcut, the convolution and its sum.
+        private func normConvHalf(_ x: VAERegister, norm: String, conv: String, outChannels: Int,
+                                  residual: (input: VAERegister, shortcut: String?)?, into target: VAERegister?) throws -> VAERegister {
+            let (cx, H, W) = (x.shape[1], x.shape[2], x.shape[3])
+            let stats = try statistics(x)
+            let cr = residual?.input.shape[1] ?? 0
+            let output = try target.map { try memory.view($0, as: [1, outChannels, H, W]) }
+                ?? memory.register([1, outChannels, H, W])
+            let (window, bands) = VAE.bands(rows: H, core: VAE.normConvCore(band: band, channels: max(cx, cr, outChannels), width: W),
+                                            margin: 1)
+            let xw = try memory.register([1, cx, window, W]), nw = try memory.register([1, cx, window, W])
+            let out = try memory.register([1, outChannels, window, W])
+            let rw = try residual.map { try memory.register([1, $0.input.shape[1], window, W]) }
+            let sw = try residual?.shortcut.map { _ in try memory.register([1, outChannels, window, W]) }
+            let affine = try memory.groupNormWeights(norm, channels: cx, file: weights, vae: name)
+            try autoreleasepool {
+                let shortcut = try residual?.shortcut.map { name in
+                    try pass([rw!], weights: WeightList.conv(outChannels, cr, kernel: 1),
+                             workspace: VAELayout.reformattedWeights(outChannels * cr) / 4) { b, p in try b.conv(p[0], name, padding: 0) }
+                }
+                let convolve = try pass([nw] + ((sw ?? rw).map { [$0] } ?? []), weights: WeightList.conv(outChannels, cx)) { b, p in
+                    let y = try b.conv(p[0], conv, padding: 1)
+                    return p.count > 1 ? b.graph.addition(p[1], y, name: nil) : y
+                }
+                for (c0, c1, start) in bands where memory.isLive {
+                    VAE.copyPlanes(cx, from: x, at: start * W, stride: H * W, to: xw, at: 0, stride: window * W, count: window * W)
+                    if let residual, let rw {
+                        VAE.copyPlanes(cr, from: residual.input, at: start * W, stride: H * W, to: rw, at: 0,
+                                       stride: window * W, count: window * W)
+                    }
+                    memory.groupNorm(xw, into: nw, stats: stats, groups: groups, affine: affine, silu: true, epsilon: 1e-6)
+                    if let shortcut, let sw { run(shortcut, into: sw) }
+                    run(convolve, into: out)
+                    VAE.copyPlanes(outChannels, from: out, at: (c0 - start) * W, stride: window * W,
+                                   to: output, at: c0 * W, stride: H * W, count: (c1 - c0) * W)
+                }
+                done(convolve)
+                if let shortcut { done(shortcut) }
+            }
+            memory.free(affine)
+            if let sw { memory.free(sw) }
+            if let rw { memory.free(rw) }
+            memory.free(out); memory.free(nw); memory.free(xw)
             memory.free(stats.variance); memory.free(stats.mean)
             return output
         }
@@ -519,11 +585,11 @@ extension VAE {
             try autoreleasepool {
                 let p = try pass([xw], weights: WeightList.conv(outChannels, cx)) { b, p in try b.conv(p[0], prefix, padding: 1) }
                 for (c0, c1, start) in bands where memory.isLive {
-                    VAE.copyPlanes(cx, from: x.values + start * W, stride: H * W, to: xw.values, stride: window * W,
+                    VAE.copyPlanes(cx, from: x, at: start * W, stride: H * W, to: xw, at: 0, stride: window * W,
                                    count: window * W)
                     run(p, into: out)
-                    VAE.copyPlanes(outChannels, from: out.values + (c0 - start) * W, stride: window * W,
-                                   to: output.values + c0 * W, stride: H * W, count: (c1 - c0) * W)
+                    VAE.copyPlanes(outChannels, from: out, at: (c0 - start) * W, stride: window * W,
+                                   to: output, at: c0 * W, stride: H * W, count: (c1 - c0) * W)
                 }
                 done(p)
             }
@@ -542,13 +608,13 @@ extension VAE {
             try autoreleasepool {
                 let p = try pass([dw], weights: WeightList.conv(c, c)) { b, p in try b.conv(p[0], prefix + ".conv", padding: 1) }
                 for (c0, c1, start) in bands where memory.isLive {
-                    VAE.copyPlanes(c, from: x.values + start * w, stride: h * w, to: xw.values, stride: window * w,
+                    VAE.copyPlanes(c, from: x, at: start * w, stride: h * w, to: xw, at: 0, stride: window * w,
                                    count: window * w)
                     memory.dispatch(.double, [xw, dw], constants: [UInt32(window), UInt32(w)],
                                     grid: MTLSize(width: 2 * w, height: 2 * window, depth: c))
                     run(p, into: out)
-                    VAE.copyPlanes(c, from: out.values + 2 * (c0 - start) * 2 * w, stride: 2 * window * 2 * w,
-                                   to: output.values + 2 * c0 * 2 * w, stride: 2 * h * 2 * w, count: 2 * (c1 - c0) * 2 * w)
+                    VAE.copyPlanes(c, from: out, at: 2 * (c0 - start) * 2 * w, stride: 2 * window * 2 * w,
+                                   to: output, at: 2 * c0 * 2 * w, stride: 2 * h * 2 * w, count: 2 * (c1 - c0) * 2 * w)
                 }
                 done(p)
             }
@@ -573,11 +639,11 @@ extension VAE {
                     try b.downsample(p[0], prefix)
                 }
                 for (c0, c1, start) in bands where memory.isLive {
-                    VAE.copyPlanes(c, from: x.values + 2 * start * W, stride: H * W, to: xw.values, stride: 2 * window * W,
+                    VAE.copyPlanes(c, from: x, at: 2 * start * W, stride: H * W, to: xw, at: 0, stride: 2 * window * W,
                                    count: 2 * window * W)
                     run(p, into: out)
-                    VAE.copyPlanes(c, from: out.values + (c0 - start) * w, stride: window * w,
-                                   to: output.values + c0 * w, stride: h * w, count: (c1 - c0) * w)
+                    VAE.copyPlanes(c, from: out, at: (c0 - start) * w, stride: window * w,
+                                   to: output, at: c0 * w, stride: h * w, count: (c1 - c0) * w)
                 }
                 done(p)
             }
@@ -592,15 +658,27 @@ extension VAE {
         func attention(_ x: VAERegister, _ prefix: String) throws {
             let (c, h, w) = (x.shape[1], x.shape[2], x.shape[3]), s = h * w
             let stats = try statistics(x)
-            let g = try whole([memory.view(x, as: [1, groups, c / groups * s]), stats.mean, stats.variance],
-                              [1, groups, c / groups * s], weights: []) { b, p in
-                b.groupNormalize(p[0], mean: p[1], variance: p[2])
+            let n: VAERegister
+            if memory.half {
+                // The norm and its affine in one kernel of ours, fp32 inside, rounded once.
+                n = try memory.register(x.shape)
+                let affine = try memory.groupNormWeights(prefix + ".group_norm", channels: c, file: weights, vae: name)
+                if memory.isLive {
+                    memory.groupNorm(x, into: n, stats: stats, groups: groups, affine: affine, silu: false, epsilon: 1e-6)
+                }
+                memory.free(affine)
+                memory.free(stats.variance); memory.free(stats.mean)
+            } else {
+                let g = try whole([memory.view(x, as: [1, groups, c / groups * s]), stats.mean, stats.variance],
+                                  [1, groups, c / groups * s], weights: []) { b, p in
+                    b.groupNormalize(p[0], mean: p[1], variance: p[2])
+                }
+                memory.free(stats.variance); memory.free(stats.mean)
+                n = try whole([memory.view(g, as: x.shape)], x.shape, weights: WeightList.groupNorm(c)) { b, p in
+                    try b.affine(p[0], prefix + ".group_norm")
+                }
+                memory.free(g)
             }
-            memory.free(stats.variance); memory.free(stats.mean)
-            let n = try whole([memory.view(g, as: x.shape)], x.shape, weights: WeightList.groupNorm(c)) { b, p in
-                try b.affine(p[0], prefix + ".group_norm")
-            }
-            memory.free(g)
             let t = try memory.register([1, s, c])
             memory.dispatch(.tokens, [n, t], constants: [UInt32(c), UInt32(s)], grid: MTLSize(width: c, height: s, depth: 1))
             memory.free(n)
@@ -637,5 +715,30 @@ extension VAE {
             memory.dispatch(.untokensAdd, [x, o], constants: [UInt32(c), UInt32(s)], grid: MTLSize(width: s, height: c, depth: 1))
             memory.free(o)
         }
+    }
+}
+
+// ── the decoders' precision ──────────────────────────────────────────────────────────────────────
+
+/// **Whether a decoder computes in bf16** — the precision rule: never under the published weights, so only a
+/// decoder whose weights are **published in bf16** (Z-Image's Flux decoder, the Qwen-Image decoder of Anima and Krea 2,
+/// Qwen-Image-2.1's; not MOSS-Image's FLUX.2, published in fp32), and only where the plan says so (`CapacityPlan.Resources.halfDecoder`:
+/// the map measured MPSGraph's convolution faster on bf16 operands, `CapacityModel.Convolution`; never with the accelerators off).
+///
+/// In bf16, as a card computing in bf16 does: the activations and the weights bf16 between two operations, every sum and every
+/// norm's statistics in fp32 (MPSGraph's convolutions and products on bf16 operands; the norms kernels of ours, fp32 inside,
+/// rounded once at their output); the latent the decoder reads and the pipeline's denormalization in fp32. Judged by each decoder
+/// stage against the reference decoded in bf16 (invariant 3: no further from the fp64 witness than diffusers in bf16, + 25 %).
+package enum VAEPrecision {
+    /// The plan a decoder runs under: the render's (`MemoryPlan.current`, under its accelerators switch), the process's outside one.
+    static var plan: CapacityPlan { MemoryPlan.current?.request.ditPlan ?? EngineSettings.effective.plan }
+
+    /// **For the memory need**: `published` the decoder's published format (each decoder's `publishedInBF16`, the family's files
+    /// fixed by their sha256), `plan` the request's.
+    package static func half(plan: CapacityPlan, publishedInBF16 published: Bool) -> Bool { published && plan.resources.halfDecoder }
+
+    /// **For a decoding**: the same, its file read — a tensor of the decoder not published in bf16 keeps it in fp32.
+    static func half(publishedInBF16 published: Bool, weights: Safetensors) -> Bool {
+        half(plan: plan, publishedInBF16: published) && VAEBuildingBlocks.decoderInBF16(weights)
     }
 }

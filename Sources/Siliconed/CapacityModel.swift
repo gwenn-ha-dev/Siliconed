@@ -322,12 +322,31 @@ package struct CapacityModel: Codable, Sendable, Equatable {
         package init(cpu: Line, gpu: Line, gpuWaited: Line) { self.cpu = cpu; self.gpu = gpu; self.gpuWaited = gpuWaited }
     }
 
+    /// **The decoders' 3×3 convolution, on fp32 operands and on bf16 ones** (`Context.convolution`): MPSGraph's, each a line in its
+    /// FLOP. What the plan reads to run a decoder whose weights are published in bf16 in bf16 (`CapacityPlan.Resources.halfDecoder`).
+    /// `nil`: a map without the probe, or whose bf16 convolution the judge refused — the decoders in fp32, as before.
+    package var convolution: Convolution?
+
+    /// The two lines of the decoders' convolution, `t = t₀ + FLOP / rate`, and the work they are compared at.
+    package struct Convolution: Codable, Sendable, Equatable {
+        package var fp32: Line
+        package var bf16: Line
+        /// The FLOP of the probe's largest convolution: a decoder's convolutions are of that order (a band's), never thin.
+        package var work: Double
+        package init(fp32: Line, bf16: Line, work: Double) { self.fp32 = fp32; self.bf16 = bf16; self.work = work }
+        /// **bf16 is the faster at the decoders' work**: what the plan takes, where half precision is allowed.
+        package var prefersHalf: Bool {
+            func seconds(_ l: Line) -> Double { l.rate > 0 ? l.t0 + work / l.rate : .infinity }
+            return seconds(bf16) < seconds(fp32)
+        }
+    }
+
     package init() {}
 
     // MARK: - JSON
 
     private enum CodingKeys: String, CodingKey {
-        case crest, lines, thin, aneRowUnit, sharing, heat, memoryBandwidth, diskBandwidth, diskClasses, preparation, kquantPreparation, kquantStaging, tiles, thinTiles, attentionTiles, noise, wake, wakeIdle, normRope
+        case crest, lines, thin, aneRowUnit, sharing, heat, memoryBandwidth, diskBandwidth, diskClasses, preparation, kquantPreparation, kquantStaging, tiles, thinTiles, attentionTiles, noise, wake, wakeIdle, normRope, convolution
     }
 
     /// The engines of a dictionary keyed by their names.
@@ -370,6 +389,7 @@ package struct CapacityModel: Codable, Sendable, Equatable {
         wake = try c.decodeIfPresent(Double.self, forKey: .wake)
         wakeIdle = try c.decodeIfPresent(Double.self, forKey: .wakeIdle)
         normRope = try c.decodeIfPresent(NormRope.self, forKey: .normRope)
+        convolution = try c.decodeIfPresent(Convolution.self, forKey: .convolution)
         let prepared = try c.decodeIfPresent([String: [String: Double]].self, forKey: .preparation) ?? [:]
         for (kindName, paths) in prepared {
             guard let kind = WeightKind(rawValue: kindName) else {
@@ -419,6 +439,7 @@ package struct CapacityModel: Codable, Sendable, Equatable {
         try c.encodeIfPresent(wake, forKey: .wake)
         try c.encodeIfPresent(wakeIdle, forKey: .wakeIdle)
         try c.encodeIfPresent(normRope, forKey: .normRope)
+        try c.encodeIfPresent(convolution, forKey: .convolution)
         try c.encode(Dictionary(uniqueKeysWithValues: preparation.map { kind, paths in
             (kind.rawValue, Dictionary(uniqueKeysWithValues: paths.map { ($0.key.rawValue, $0.value) }))
         }), forKey: .preparation)
@@ -456,6 +477,7 @@ package struct CapacityModel: Codable, Sendable, Equatable {
         m.wake = wake.map(r); m.wakeIdle = wakeIdle.map(r)
         func line(_ l: Line) -> Line { Line(t0: r(l.t0), rate: r(l.rate)) }
         m.normRope = normRope.map { NormRope(cpu: line($0.cpu), gpu: line($0.gpu), gpuWaited: line($0.gpuWaited)) }
+        m.convolution = convolution.map { Convolution(fp32: line($0.fp32), bf16: line($0.bf16), work: r($0.work)) }
         return m
     }
 

@@ -191,8 +191,9 @@ extension MemoryNeed {
                  plan: request.ditPlan, weight: maps.ditFormat))
 
         // ── decoding: the decoder's two heaps and the image it returns; the latent it reads crosses ──
-        let plan = animaDecoderPlans([latentHeight, latentWidth]) {
-            AnimaVAE.plan(latentHeight: latentHeight, latentWidth: latentWidth)
+        let half = VAEPrecision.half(plan: request.ditPlan, publishedInBF16: AnimaVAE.publishedInBF16)
+        let plan = animaDecoderPlans([latentHeight, latentWidth, half ? 1 : 0]) {
+            AnimaVAE.plan(latentHeight: latentHeight, latentWidth: latentWidth, half: half)
         }
         let decoding = Phase(kind: .decoding, terms: vae("Qwen-Image decoder", plan) + [batchImages(request)])
 

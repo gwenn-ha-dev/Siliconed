@@ -381,7 +381,8 @@ package struct QwenImage21Need {
         let band = request.minimumBands ? min(QwenImage21VAEDecoder.bandPixels, MemoryPlan.qwenMinimumBand)
                                         : QwenImage21VAEDecoder.bandPixels
         let plan = QwenImage21VAEDecoder.plan(config: vae, latentHeight: target.height, latentWidth: target.width,
-                                              bandPixels: band)
+                                              bandPixels: band, half: VAEPrecision.half(plan: request.ditPlan,
+                                                                                        publishedInBF16: QwenImage21VAEDecoder.publishedInBF16))
         let rgb = 3 * H * W * 4
         return .init(kind: .decoding, terms: MemoryNeed.vae("Qwen decoder", plan)
             + [Term("RGB copy beyond the heaps", max(0, rgb - plan.registers - plan.workspace)),

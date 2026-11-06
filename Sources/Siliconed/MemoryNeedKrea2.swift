@@ -243,8 +243,9 @@ extension MemoryNeed {
         let denoising = Phase(kind: .denoising, terms: terms)
 
         // ── decoding: the decoder's two heaps and the image it returns; the latent it reads crosses ──
-        let plan = krea2DecoderPlans([latentHeight, latentWidth]) {
-            AnimaVAE.plan(latentHeight: latentHeight, latentWidth: latentWidth)
+        let half = VAEPrecision.half(plan: request.ditPlan, publishedInBF16: AnimaVAE.publishedInBF16)
+        let plan = krea2DecoderPlans([latentHeight, latentWidth, half ? 1 : 0]) {
+            AnimaVAE.plan(latentHeight: latentHeight, latentWidth: latentWidth, half: half)
         }
         let decoding = Phase(kind: .decoding, terms: vae("Qwen-Image decoder", plan) + [batchImages(request)])
 

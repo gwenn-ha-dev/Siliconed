@@ -217,10 +217,13 @@ extension MemoryNeed {
                  plan: request.ditPlan, weight: Artifact.weightFormat(header: maps.dit)))
 
         // ── decoding: the decoder's two heaps and the image it returns; the latent it reads crosses ──
-        let band = request.minimumBands ? min(VAE.bandElements, MemoryPlan.fluxMinimumBand) : VAE.bandElements
+        let band = request.minimumBands ? min(VAE.bandElements, MemoryPlan.fluxMinimumBand)
+            : request.wideBands ? max(VAE.bandElements, MemoryPlan.fluxWideBand) : VAE.bandElements
         let decoding = Phase(kind: .decoding,
-                             terms: vae("Flux decoder", VAE.plan(latentHeight: latentHeight, latentWidth: latentWidth,
-                                                                 band: band)) + [batchImages(request)])
+                             terms: vae("Flux decoder", VAE.plan(latentHeight: latentHeight, latentWidth: latentWidth, band: band,
+                                                                 half: VAEPrecision.half(plan: request.ditPlan,
+                                                                                         publishedInBF16: VAE.publishedInBF16)))
+                                 + [batchImages(request)])
 
         return MemoryNeed(phases: [text] + references + [denoising, decoding], crossing: crossing, base: request.base)
             .keeping(request, encoder: maps.encoderKeptBytes)

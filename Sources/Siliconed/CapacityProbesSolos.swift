@@ -463,6 +463,8 @@ extension Diagnostic.CapacityProbes.Context {
             }
         }
         normRope(&measurements, sequences: sizes.attention, q: pages.q, k: pages.k, buffers: (buffers.q, buffers.k), busy: busy)
+        // The decoders' convolution in both formats (`CapacityProbesConvolution.swift`).
+        convolution(&measurements)
     }
 
     /// **The attention as a set of two engines**: the system graph on the GPU's heads beside the CPU's, at the heads the two solo lines

@@ -226,6 +226,9 @@ package enum CapacityFit {
         /// **The QK-norm and RoPE on either side** (`Context.normRope`): `cpu/normrope` (the CPU's pass), `gpu/normrope` (the kernel's own GPU
         /// seconds, queued) and `gpu/normrope-wait` (its wall, waited for), at the tier's sequences — `flop` holds the values. `nil` before it.
         package var normRope: [Solo]?
+        /// **The decoders' convolution in fp32 and in bf16** (`Context.convolution`): `gpu/conv`, `gpu/convbf16` at the probe's shapes.
+        /// `nil` before it.
+        package var convolution: [Solo]?
         package init() {}
 
         /// **The same numbers to `digits` significant digits** — what a report keeps (an exact FLOP count stays exact). The model of a
@@ -250,6 +253,7 @@ package enum CapacityFit {
             m.preparation = preparation.mapValues { $0.mapValues(r) }
             m.wake = wake?.map { Solo(kernel: $0.kernel, shape: $0.shape, flop: $0.flop, seconds: r($0.seconds)) }
             m.normRope = normRope?.map { Solo(kernel: $0.kernel, shape: $0.shape, flop: $0.flop, seconds: r($0.seconds), error: $0.error.map { Diagnostic.significant($0, 3) }) }
+            m.convolution = convolution?.map { Solo(kernel: $0.kernel, shape: $0.shape, flop: $0.flop, seconds: r($0.seconds), error: $0.error.map { Diagnostic.significant($0, 3) }) }
             return m
         }
     }
@@ -737,6 +741,7 @@ package enum CapacityFit {
         model.noise = m.tileTrials.flatMap(noise)
         if let w = wake(m.wake) { model.wake = w.seconds; model.wakeIdle = w.idle }
         model.normRope = normRope(m.normRope, wrong: m.wrong)
+        model.convolution = convolution(m.convolution, wrong: m.wrong)
         model.memoryBandwidth = m.memoryBandwidth
         model.diskBandwidth = m.diskBandwidth
         model.diskClasses = m.diskClasses

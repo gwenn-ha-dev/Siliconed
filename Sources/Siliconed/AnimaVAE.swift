@@ -50,6 +50,8 @@ package final class AnimaVAE {
     private let weights: Safetensors
     private let config: Config
     package let latentHeight, latentWidth: Int
+    /// The Qwen-Image decoder is published in bf16 (`VAEPrecision`; Krea's fp32 copy is the same values widened, not installed).
+    package static let publishedInBF16 = true
     package var imageHeight: Int { latentHeight * 8 }
     package var imageWidth: Int { latentWidth * 8 }
 
@@ -85,9 +87,11 @@ package final class AnimaVAE {
         let shape: [Int] = [1, config.latentChannels, 1, 1]
         // The pipeline denormalizes BEFORE the decoder: `latents × std + mean`, per channel.
         var passes: [V.Stage] = [
+            // On the fp32 latent; rounded once into the activations in bf16 (`VAEMemory.half`).
             V.Stage(["x"], "x", [1, config.latentChannels, h, w]) { b, x in
-                b.graph.addition(b.graph.multiplication(x[0], b.constant(config.std, shape), name: nil),
-                                 b.constant(config.mean, shape), name: "denormalize") },
+                let y = b.graph.addition(b.graph.multiplication(x[0], b.constant(config.std, shape), name: nil),
+                                         b.constant(config.mean, shape), name: "denormalize")
+                return b.dataType == .float32 ? y : b.graph.cast(y, to: b.dataType, name: nil) },
             V.conv("post_quant_conv", 16, 16, size: L, kernel: 1),
             V.conv("decoder.conv_in", 16, 384, size: L),
         ]
@@ -110,11 +114,13 @@ package final class AnimaVAE {
         for r in 0..<3 { passes += V.resnet("decoder.up_blocks.2.resnets.\(r)", 192, 192, size: L4, label: "2.resnet\(r)") }
         passes += upsample("decoder.up_blocks.2.upsamplers.0", 192, size: L4)
         for r in 0..<3 { passes += V.resnet("decoder.up_blocks.3.resnets.\(r)", 96, 96, size: L8, label: "3.resnet\(r)") }
-        passes.append(V.Stage(["x"], "x", [1, 96, L8.h, L8.w], weights: WeightList.rms(96)) { b, x in
-            try b.silu(b.rmsNorm(x[0], "decoder.norm_out", channels: 96)) })
+        var normOut = V.Stage(["x"], "x", [1, 96, L8.h, L8.w], weights: WeightList.rms(96)) { b, x in
+            try b.silu(b.rmsNorm(x[0], "decoder.norm_out", channels: 96)) }
+        normOut.norm = ("decoder.norm_out", 96, true)
+        passes.append(normOut)
         passes.append(V.Stage(["x"], "x", [1, 3, L8.h, L8.w], weights: WeightList.conv(3, 96), label: "3") { b, x in
             b.graph.clamp(try b.conv(x[0], "decoder.conv_out", padding: 1),
-                          min: b.graph.constant(-1, dataType: .float32), max: b.graph.constant(1, dataType: .float32), name: nil) })
+                          min: b.graph.constant(-1, dataType: b.dataType), max: b.graph.constant(1, dataType: b.dataType), name: nil) })
         return passes
     }
 
@@ -138,20 +144,20 @@ package final class AnimaVAE {
     /// **Everything a decoding holds** for an `h × w` latent: the registers' heap (the latent, each
     /// stage's output, its weights), the largest stage's workspace, the image it returns — `decode`
     /// walked without a device.
-    package static func plan(latentHeight h: Int, latentWidth w: Int, config: Config = .qwenImage) -> VAELayout {
-        let memory = VAEMemory()
+    package static func plan(latentHeight h: Int, latentWidth w: Int, config: Config = .qwenImage, half: Bool = false) -> VAELayout {
+        let memory = VAEMemory(half: half)
         do { _ = try decode(nil, latentHeight: h, latentWidth: w, config: config, weights: nil, memory: memory) } catch { preconditionFailure("VAE plan walk refused: \(error)") }
         return memory.layout
     }
 
     private static func decode(_ latent: UnsafePointer<Float>?, latentHeight h: Int, latentWidth w: Int, config: Config,
                                weights: Safetensors?, memory: VAEMemory) throws -> [Float] {
-        let input = try memory.register([1, config.latentChannels, h, w])
+        let input = try memory.register([1, config.latentChannels, h, w], .float32)
         if let latent, memory.isLive { input.values.update(from: latent, count: input.count) }
         let image = try QwenImage21VAE.run(stages(config: config, latentHeight: h, latentWidth: w), weights: weights,
                                            name: "VAE Qwen-Image", memory: memory, registers: ["x": input])["x"]!
         memory.host(4 * image.count)
-        let pixels = memory.isLive ? Array(UnsafeBufferPointer(start: image.values, count: image.count)) : []
+        let pixels = memory.isLive ? image.floats() : []
         memory.free(image)
         return pixels
     }
@@ -159,8 +165,9 @@ package final class AnimaVAE {
     /// `latent` as `[16, h, w]` as the sampler returns it. Outputs `[3, 8h, 8w]` in `[-1, 1]`.
     package func decode(latent: UnsafePointer<Float>) throws -> (image: [Float], seconds: Double) {
         let started = Date()
-        let memory = try VAEMemory(plan: AnimaVAE.plan(latentHeight: latentHeight, latentWidth: latentWidth, config: config),
-                                   device: device, queue: queue)
+        let half = VAEPrecision.half(publishedInBF16: AnimaVAE.publishedInBF16, weights: weights)
+        let memory = try VAEMemory(plan: AnimaVAE.plan(latentHeight: latentHeight, latentWidth: latentWidth, config: config, half: half),
+                                   device: device, queue: queue, half: half)
         let image = try autoreleasepool {
             try AnimaVAE.decode(latent, latentHeight: latentHeight, latentWidth: latentWidth, config: config,
                                 weights: weights, memory: memory)

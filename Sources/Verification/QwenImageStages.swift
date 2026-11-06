@@ -450,11 +450,18 @@ enum QwenImageStages {
     static let vae = Stage(
         model: model, name: "vae",
         proves: "the decoder on the trajectory's final latent (with --edit N, the edit's): unpacking and de-normalization to the bit, then the RGBA image plane by plane",
-        options: ["--edit"], variants: edits, oracle: "tools/oracle/qwen-image-2.1.py vae [--edit N]; vae-witness", weights: ["VAE"],
-        rule: "vae_in bit for bit; the rule per plane, floor 5e-4, at the fp64 witness where one exists; on a rectangle, the transposed image must deviate"
+        options: ["--edit"], variants: edits, oracle: "tools/oracle/qwen-image-2.1.py vae [--edit N]; vae-witness; vae-bf16", weights: ["VAE"],
+        rule: "vae_in bit for bit; the rule per plane, floor 5e-4, at the fp64 witness where one exists; a decoder in bf16 no further from it than the reference in bf16, + 25 %; on a rectangle, the transposed image must deviate"
     ) { invocation in
         let tag = invocation.edit.map { "-edit\($0)" } ?? ""
         let report = Report(title: "\(model) vae\(tag) \(invocation.size)")
+        // A decoder in bf16 is judged at the fp64 witness, which only the plain latent has: an edit's decoding is skipped then.
+        if !tag.isEmpty, VAEPrecision.half(plan: EngineSettings.effective.plan, publishedInBF16: QwenImage21VAEDecoder.publishedInBF16) {
+            throw Skip("the decoder computes in bf16 and the edit's decoding has no fp64 witness: judged on the plain latent")
+        }
+        let reference = try DecoderReference.image(invocation.goldens, file: "qwen21/goldens-qwen21-vae-\(invocation.size).safetensors",
+                                                   publishedInBF16: QwenImage21VAEDecoder.publishedInBF16,
+                                                   script: "tools/oracle/qwen-image-2.1.py vae-bf16")
         let goldens = try invocation.goldens.open("qwen21/goldens-qwen21-vae\(tag)-\(invocation.size).safetensors")
         let witness = tag.isEmpty ? invocation.goldens.optional("qwen21/witness-qwen21-vae-f64-\(invocation.size).safetensors") : nil
         guard let tokensEntry = goldens.entries["latent_final"], let tokens = goldens.float32("latent_final"),
@@ -469,7 +476,8 @@ enum QwenImageStages {
         // `_unpack_latents` then `z · std + mean`: exact arithmetic, the same bits.
         report.add(Judge.identical("unpack · ×std + mean", QwenImage21VAE.denormalize(planar, config: decoder.config), vaeIn))
         let (rgba, _) = try decoder.decode(latent: planar)
-        report.add(Judge.planes("image RGBA", engine: rgba, oracle: expected, witness: witness?.float32("image"), planes: 4))
+        report.add(Judge.planes("image RGBA", engine: rgba, oracle: expected, witness: witness?.float32("image"), reference: reference,
+                                planes: 4))
         if let m = Judge.orientation(rgba, expected, height: decoder.imageHeight, width: decoder.imageWidth) { report.add(m) }
         return report
     }

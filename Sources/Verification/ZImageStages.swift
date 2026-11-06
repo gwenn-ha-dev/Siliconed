@@ -240,10 +240,13 @@ enum ZImageStages {
         model: "z-image", name: "vae",
         proves: "Flux's decoder on a rectangular latent (the centered crop of the final 1024² latent), plane by plane: what a square cannot see",
         sizes: ["768x512"],
-        oracle: "tools/oracle/z-image.py vae --size {size}; vae-witness --size {size}", weights: ["VAE"],
-        rule: "the rule per plane, floor 5e-4, at the fp64 witness (no floor there); on a rectangle, the transposed image must deviate"
+        oracle: "tools/oracle/z-image.py vae --size {size}; vae-witness --size {size}; vae-bf16 --size {size}", weights: ["VAE"],
+        rule: "the rule per plane, floor 5e-4, at the fp64 witness (no floor there); a decoder in bf16 no further from it than the reference in bf16, + 25 %; on a rectangle, the transposed image must deviate"
     ) { invocation in
         let report = Report(title: "z-image vae \(invocation.size)")
+        let reference = try DecoderReference.image(invocation.goldens, file: "goldens-vae-\(invocation.size).safetensors",
+                                                   publishedInBF16: VAE.publishedInBF16,
+                                                   script: "tools/oracle/z-image.py vae-bf16 --size \(invocation.size)")
         let goldens = try invocation.goldens.open("goldens-vae-\(invocation.size).safetensors")
         let witness = invocation.goldens.optional("witness-vae-f64-\(invocation.size).safetensors")
         guard let entry = goldens.entries["latent"], let latent = goldens.float32("latent"),
@@ -253,7 +256,8 @@ enum ZImageStages {
         let decoder = try VAE(path: try Library.processWide.component(.zImage, "vae.safetensors"),
                               latentHeight: entry.shape[1], latentWidth: entry.shape[2])
         let (image, _) = try decoder.decode(latent: latent.baseAddress!)
-        report.add(Judge.planes("image RGB", engine: image, oracle: expected, witness: witness?.float32("image"), planes: 3))
+        report.add(Judge.planes("image RGB", engine: image, oracle: expected, witness: witness?.float32("image"), reference: reference,
+                                planes: 3))
         if let m = Judge.orientation(image, expected, height: decoder.imageHeight, width: decoder.imageWidth) { report.add(m) }
         return report
     }

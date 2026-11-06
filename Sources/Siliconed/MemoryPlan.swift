@@ -10,6 +10,7 @@ import Foundation
 ///                no encoder buffer, the decoders' smallest bands
 ///                  + the text encoder's four buffers                ── kept if the need stays ≤ B
 ///                  + the decoders' standard bands                   ── kept if the need stays ≤ B
+///                  + Flux's wide band                               ── kept if the need stays ≤ B
 ///                  + the DiT's map read in place, charged whole     ── kept if the need stays ≤ B (no stream then)
 ///                  + the text encoder kept, charged to every phase  ── kept if the need stays ≤ B and the map loses nothing
 ///                  └─ the map's head left to the page cache: what B leaves beside the denoising (`released`)
@@ -87,6 +88,9 @@ package enum MemoryPlan {
 
     /// Flux's decoder (Z-Image): the smallest band proved and timed (7.3 s at 1024² against 4.4).
     package static let fluxMinimumBand = 1 << 20
+    /// Flux's decoder, where B holds it: four times the standard band, the same bits — at 1024² 1.09 s against 1.21 in bf16
+    /// (+0.2 GB), 2.34 against 2.51 in fp32 (+0.5 GB); wider bought nothing more.
+    package static let fluxWideBand = 1 << 25
     /// Qwen-Image-2.1's decoder: a quarter of the measured band (bits proved down to 2 rows; time not measured).
     package static let qwenMinimumBand = 1 << 16
 
@@ -121,7 +125,8 @@ package enum MemoryPlan {
         var plan = request.lean
         let floor = MemoryNeed.of(plan)?.peak ?? .max
         for faster in [{ (r: inout MemoryNeed.Request) in r.encoderSlots = encoderSlots },
-                       { (r: inout MemoryNeed.Request) in r.minimumBands = false }] {
+                       { (r: inout MemoryNeed.Request) in r.minimumBands = false },
+                       { (r: inout MemoryNeed.Request) in if !r.minimumBands { r.wideBands = true } }] {
             var candidate = plan
             faster(&candidate)
             if let peak = MemoryNeed.of(candidate)?.peak, peak <= ceiling { plan = candidate }
