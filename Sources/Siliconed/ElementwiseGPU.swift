@@ -72,6 +72,31 @@ package final class ElementwiseGPU {
         a[i] = over_one_plus_exp(float2(p, fma(v, w, -p)), v);
     }
 
+    \(BFloatKernels.roundingSource)
+
+    // The same, and the value rounded to bf16 where the next product reads its operand (`WeightProducts.RoundedOperand`): two
+    // values per thread, one 32-bit store, as `round_bf16` writes them. `n` is the count of pairs.
+    kernel void swiglu_rounded(device float2 *a [[buffer(0)]], device const float2 *b [[buffer(1)]], device uint *r [[buffer(2)]],
+                               constant uint &n [[buffer(3)]], uint i [[thread_position_in_grid]]) {
+        if (i >= n) return;
+        float2 v = a[i], w = b[i];
+        float2 p = v * w;
+        float2 y = float2(over_one_plus_exp(float2(p.x, fma(v.x, w.x, -p.x)), v.x),
+                          over_one_plus_exp(float2(p.y, fma(v.y, w.y, -p.y)), v.y));
+        a[i] = y;
+        r[i] = rounded(y.x) | (rounded(y.y) << 16);
+    }
+
+    // `sigmoid_gate`, and the value rounded as `swiglu_rounded` writes it. `n` is the count of pairs.
+    kernel void sigmoid_gate_rounded(device float2 *x [[buffer(0)]], device const float2 *g [[buffer(1)]], device uint *r [[buffer(2)]],
+                                     constant uint &n [[buffer(3)]], uint i [[thread_position_in_grid]]) {
+        if (i >= n) return;
+        float2 v = x[i], w = g[i];
+        float2 y = float2(over_one_plus_exp(float2(v.x, 0.0f), w.x), over_one_plus_exp(float2(v.y, 0.0f), w.y));
+        x[i] = y;
+        r[i] = rounded(y.x) | (rounded(y.y) << 16);
+    }
+
     kernel void sigmoid_gate(device float *x [[buffer(0)]], device const float *g [[buffer(1)]],
                       constant uint &n [[buffer(2)]], uint i [[thread_position_in_grid]]) {
         if (i >= n) return;
@@ -127,6 +152,30 @@ package final class ElementwiseGPU {
         }
     }
 
+    // The same, and each value rounded to bf16 where the next product reads its operand (`WeightProducts.RoundedOperand`): a pair
+    // of adjacent columns per thread and step, one 32-bit store (`cols` even), each value computed as above.
+    kernel void norm_scale_rounded(device const float *x [[buffer(0)]], device const float *w [[buffer(1)]],
+                                   device const float *scale [[buffer(2)]], device float *out [[buffer(3)]],
+                                   device uint *rounded_out [[buffer(4)]],
+                                   constant NormParams &p [[buffer(5)]], uint row [[threadgroup_position_in_grid]],
+                                   uint t [[thread_index_in_threadgroup]], uint lane [[thread_index_in_simdgroup]],
+                                   uint sg [[simdgroup_index_in_threadgroup]]) {
+        #pragma METAL fp contract(off)
+        threadgroup float partial[8];
+        device const float *source = x + ulong(row) * p.cols;
+        device float *destination = out + ulong(row) * p.cols;
+        device uint *pairs = rounded_out + ulong(row) * (p.cols / 2);
+        float r = row_scale(source, p.cols, p.eps, t, lane, sg, partial);
+        for (uint j = t; j < p.cols / 2; j += 256) {
+            uint i = 2 * j;
+            float v0 = source[i] * r, v1 = source[i + 1] * r;
+            v0 = v0 * w[i]; v1 = v1 * w[i + 1];
+            if (p.scaled != 0) { v0 = v0 * scale[i]; v1 = v1 * scale[i + 1]; }
+            destination[i] = v0; destination[i + 1] = v1;
+            pairs[j] = rounded(v0) | (rounded(v1) << 16);
+        }
+    }
+
     // x += gate · ((y · r) · w) — `Ops.rmsNorm` then `Ops.gatedResidual`: the product, then the sum.
     kernel void norm_residual(device float *x [[buffer(0)]], device const float *y [[buffer(1)]],
                               device const float *w [[buffer(2)]], device const float *gate [[buffer(3)]],
@@ -150,6 +199,7 @@ package final class ElementwiseGPU {
 
     private let queue: MTLCommandQueue
     private let swigluPipeline, carriesPipeline, residualPipeline, normScalePipeline, normResidualPipeline: MTLComputePipelineState
+    private let swigluRoundedPipeline, normScaleRoundedPipeline, carriesRoundedPipeline: MTLComputePipelineState
 
     package init(device: MTLDevice, queue: MTLCommandQueue) throws {
         self.queue = queue
@@ -163,6 +213,8 @@ package final class ElementwiseGPU {
         swigluPipeline = try pipeline("swiglu"); carriesPipeline = try pipeline("sigmoid_gate")
         residualPipeline = try pipeline("residual")
         normScalePipeline = try pipeline("norm_scale"); normResidualPipeline = try pipeline("norm_residual")
+        swigluRoundedPipeline = try pipeline("swiglu_rounded"); normScaleRoundedPipeline = try pipeline("norm_scale_rounded")
+        carriesRoundedPipeline = try pipeline("sigmoid_gate_rounded")
     }
 
     /// A buffer (at an offset in floats) — the form in which each kernel receives its operands.
@@ -193,18 +245,33 @@ package final class ElementwiseGPU {
         (MTLSize(width: count, height: 1, depth: 1), MTLSize(width: 256, height: 1, depth: 1))
     }
 
-    /// `a ← silu(a) · b` over `count` elements. Returns the GPU time.
+    /// `a ← silu(a) · b` over `count` elements. Returns the GPU time. `rounded`: the result also written rounded to bf16 there,
+    /// as the next product reads its operand (`WeightProducts.roundedOperand`; `count` even).
     @discardableResult
-    package func swiglu(_ a: BufferSlice, _ b: BufferSlice, count: Int) -> Double {
+    package func swiglu(_ a: BufferSlice, _ b: BufferSlice, count: Int, rounded: WeightProducts.RoundedOperand? = nil) -> Double {
+        if let rounded {
+            precondition(count % 2 == 0 && a.offset % 2 == 0 && b.offset % 2 == 0 && rounded.offset % 4 == 0)
+            var n = UInt32(count / 2)
+            let (g, t) = linear(count / 2)
+            return launch(swigluRoundedPipeline, [a, b, (rounded.buffer, rounded.offset / 4)],
+                          constants: { $0.setBytes(&n, length: 4, index: $1) }, grid: g, group: t)
+        }
         var n = UInt32(count)
         let (g, t) = linear(count)
         return launch(swigluPipeline, [a, b], constants: { $0.setBytes(&n, length: 4, index: $1) },
                       grid: g, group: t)
     }
 
-    /// `x ← x · σ(g)`.
+    /// `x ← x · σ(g)`. `rounded`: as `swiglu`'s.
     @discardableResult
-    package func carries(_ x: BufferSlice, _ g: BufferSlice, count: Int) -> Double {
+    package func carries(_ x: BufferSlice, _ g: BufferSlice, count: Int, rounded: WeightProducts.RoundedOperand? = nil) -> Double {
+        if let rounded {
+            precondition(count % 2 == 0 && x.offset % 2 == 0 && g.offset % 2 == 0 && rounded.offset % 4 == 0)
+            var n = UInt32(count / 2)
+            let (grid, t) = linear(count / 2)
+            return launch(carriesRoundedPipeline, [x, g, (rounded.buffer, rounded.offset / 4)],
+                          constants: { $0.setBytes(&n, length: 4, index: $1) }, grid: grid, group: t)
+        }
         var n = UInt32(count)
         let (grid, t) = linear(count)
         return launch(carriesPipeline, [x, g], constants: { $0.setBytes(&n, length: 4, index: $1) },
@@ -222,11 +289,18 @@ package final class ElementwiseGPU {
 
     private struct NormParams { var cols: UInt32; var eps: Float; var scaled: UInt32 }
 
-    /// `out[s, :] ← (RMSNorm(x[s, :]) · w) · scale` (`scale` nil: the norm alone), one threadgroup per row.
+    /// `out[s, :] ← (RMSNorm(x[s, :]) · w) · scale` (`scale` nil: the norm alone), one threadgroup per row. `rounded`: `out` also
+    /// written rounded to bf16 there, as the next product reads its operand (`WeightProducts.roundedOperand`; `columns` even).
     @discardableResult
     package func normScale(_ x: BufferSlice, weight: BufferSlice, scale: BufferSlice?, into out: BufferSlice,
-                           rows: Int, columns: Int, eps: Float) -> Double {
+                           rows: Int, columns: Int, eps: Float, rounded: WeightProducts.RoundedOperand? = nil) -> Double {
         var p = NormParams(cols: UInt32(columns), eps: eps, scaled: scale == nil ? 0 : 1)
+        if let rounded {
+            precondition(columns % 2 == 0 && rounded.offset % 4 == 0)
+            return launch(normScaleRoundedPipeline, [x, weight, scale ?? weight, out, (rounded.buffer, rounded.offset / 4)],
+                          constants: { $0.setBytes(&p, length: MemoryLayout<NormParams>.stride, index: $1) },
+                          grid: MTLSize(width: rows, height: 1, depth: 1), group: MTLSize(width: 256, height: 1, depth: 1), byGroups: true)
+        }
         return launch(normScalePipeline, [x, weight, scale ?? weight, out],
                       constants: { $0.setBytes(&p, length: MemoryLayout<NormParams>.stride, index: $1) },
                       grid: MTLSize(width: rows, height: 1, depth: 1), group: MTLSize(width: 256, height: 1, depth: 1), byGroups: true)

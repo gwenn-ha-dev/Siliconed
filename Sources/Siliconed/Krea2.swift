@@ -472,16 +472,20 @@ package final class Krea2DiT: BoundaryRecording, PhaseTiming {
 
         let xb = try slice(x), mb = try slice(m), nb = try slice(normed), ob = try slice(o)
         let bb = try gemm.wrap(UnsafeMutableRawPointer(bank), bytes: imageTokens * config.channels * 4, name: "c")
-        func norm(_ i: Int, scale: Int, shift: Int) throws {
+        // The norm writes the next products' operand rounded too, where they read it so (`WeightProducts.RoundedOperand`).
+        func norm(_ i: Int, scale: Int, shift: Int, for product: String, n out: Int) throws -> WeightProducts.RoundedOperand? {
             if normsOnGPU {
+                let rounded = try products.roundedOperand(prefix + product, m: n, k: d, n: out)
                 timed("norm") {
                     ownTimings["elementwise GPU", default: 0] += modulatedNormGPU!.run((xb, 0), weight: (bb, i * d), factor: (bb, (2 + i) * d),
                                                                                        shift: (mb, shift * d), into: (nb, 0),
-                                                                                       rows: n, columns: d, eps: eps)
+                                                                                       rows: n, columns: d, eps: eps, rounded: rounded)
                 }
+                return rounded
             } else {
                 stream.drain()                             // the CPU reads `x` and writes `normed` and the reserve
                 try modulatedNorm(prefix + "norm\(i + 1).weight", x, rows: n, scale: m + scale * d, shift: m + shift * d)
+                return nil
             }
         }
         func boundary(_ name: String, _ p: UnsafeMutablePointer<Float>) {
@@ -494,11 +498,11 @@ package final class Krea2DiT: BoundaryRecording, PhaseTiming {
         defer { stream.isOn = false }                      // drains: the DiT reads `x` and the next block writes the modulation
 
         // ── attention
-        try norm(0, scale: 0, shift: 1)
-        try linearGPU(prefix + "attn.to_q.weight", a: normed, into: q, m: n, k: d, n: d)
-        try linearGPU(prefix + "attn.to_k.weight", a: normed, into: k, m: n, k: d, n: kv)
-        try linearGPU(prefix + "attn.to_v.weight", a: normed, into: v, m: n, k: d, n: kv)
-        try linearGPU(prefix + "attn.to_gate.weight", a: normed, into: gate, m: n, k: d, n: d)
+        let normed1 = try norm(0, scale: 0, shift: 1, for: "attn.to_q.weight", n: d)
+        try linearGPU(prefix + "attn.to_q.weight", a: normed, into: q, m: n, k: d, n: d, rounded: normed1)
+        try linearGPU(prefix + "attn.to_k.weight", a: normed, into: k, m: n, k: d, n: kv, rounded: normed1)
+        try linearGPU(prefix + "attn.to_v.weight", a: normed, into: v, m: n, k: d, n: kv, rounded: normed1)
+        try linearGPU(prefix + "attn.to_gate.weight", a: normed, into: gate, m: n, k: d, n: d, rounded: normed1)
         let cut = Krea2DiT.attentionAssignment(gemm.plan, sequence: n, heads: heads, kvHeads: kvHeads, headDim: dh)
         let chained = cut.usesTiles && !cut.splits && cut.normRopeOnGPU && QKNormRope.runs(headDim: dh)
         if chained, let pass = QKNormRope.shared(device: gemm.device, queue: gemm.queue),
@@ -528,8 +532,11 @@ package final class Krea2DiT: BoundaryRecording, PhaseTiming {
             try attend(rows: n)
         }
         let (mergedb, gateb) = (try slice(merged), try slice(gate))
-        timed("gate") { ownTimings["elementwise GPU", default: 0] += elementwise.carries((mergedb, 0), (gateb, 0), count: n * d) }
-        try linearGPU(prefix + "attn.to_out.0.weight", a: merged, into: o, m: n, k: d, n: d)
+        let gated = try products.roundedOperand(prefix + "attn.to_out.0.weight", m: n, k: d, n: d)
+        timed("gate") {
+            ownTimings["elementwise GPU", default: 0] += elementwise.carries((mergedb, 0), (gateb, 0), count: n * d, rounded: gated)
+        }
+        try linearGPU(prefix + "attn.to_out.0.weight", a: merged, into: o, m: n, k: d, n: d, rounded: gated)
         boundary("attn_out", o)
         timed("norm") {
             ownTimings["elementwise GPU", default: 0] += elementwise.residual((xb, 0), plus: (ob, 0), carries: (mb, 2 * d), rows: n, columns: d)
@@ -537,12 +544,15 @@ package final class Krea2DiT: BoundaryRecording, PhaseTiming {
 
         // ── SwiGLU
         if normsOnGPU { try artifact.materialize(prefix + "norm2.weight", into: bank + d, capacity: d) }
-        try norm(1, scale: 3, shift: 4)
-        try linearGPU(prefix + "ff.gate.weight", a: normed, into: h1, m: n, k: d, n: hh)
-        try linearGPU(prefix + "ff.up.weight", a: normed, into: h2, m: n, k: d, n: hh)
+        let normed2 = try norm(1, scale: 3, shift: 4, for: "ff.gate.weight", n: hh)
+        try linearGPU(prefix + "ff.gate.weight", a: normed, into: h1, m: n, k: d, n: hh, rounded: normed2)
+        try linearGPU(prefix + "ff.up.weight", a: normed, into: h2, m: n, k: d, n: hh, rounded: normed2)
         let (h1b, h2b) = (try slice(h1, floats: maxRows * hh), try slice(h2))
-        timed("swiglu") { ownTimings["elementwise GPU", default: 0] += elementwise.swiglu((h1b, 0), (h2b, 0), count: n * hh) }
-        try linearGPU(prefix + "ff.down.weight", a: h1, into: o, m: n, k: hh, n: d)
+        let swiglued = try products.roundedOperand(prefix + "ff.down.weight", m: n, k: hh, n: d)
+        timed("swiglu") {
+            ownTimings["elementwise GPU", default: 0] += elementwise.swiglu((h1b, 0), (h2b, 0), count: n * hh, rounded: swiglued)
+        }
+        try linearGPU(prefix + "ff.down.weight", a: h1, into: o, m: n, k: hh, n: d, rounded: swiglued)
         boundary("ff_out", o)
         timed("norm") {
             ownTimings["elementwise GPU", default: 0] += elementwise.residual((xb, 0), plus: (ob, 0), carries: (mb, 5 * d), rows: n, columns: d)
@@ -677,10 +687,11 @@ package final class Krea2DiT: BoundaryRecording, PhaseTiming {
     /// - Parameters rowsA, rowsC: the **reserved** rows of the two slices (default: `maxRows`).
     ///   Metal wrappers are memoized by address, at their maximum size.
     private func linearGPU(_ name: String, a: UnsafeMutablePointer<Float>, into c: UnsafeMutablePointer<Float>,
-                           m: Int, k: Int, n: Int, rowsA: Int? = nil, rowsC: Int? = nil) throws {
+                           m: Int, k: Int, n: Int, rowsA: Int? = nil, rowsC: Int? = nil,
+                           rounded: WeightProducts.RoundedOperand? = nil) throws {
         let ab = try gemm.wrap(UnsafeMutableRawPointer(a), bytes: (rowsA ?? maxRows) * k * 4, name: "a")
         let cb = try gemm.wrap(UnsafeMutableRawPointer(c), bytes: (rowsC ?? maxRows) * n * 4, name: "c")
-        try products.linear(name, a: ab, c: cb, m: m, k: k, n: n)
+        try products.linear(name, a: ab, c: cb, m: m, k: k, n: n, rounded: rounded)
     }
 }
 

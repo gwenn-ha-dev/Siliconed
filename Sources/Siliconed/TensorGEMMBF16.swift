@@ -20,6 +20,10 @@ import Metal
 ///   - **rounded by the engine's own code, not `bfloat(x)`**: the conversion's rounding on a GPU without
 ///     bf16 in hardware is the compiler's to choose; the integer sequence (add 0x7FFF and the lowest kept
 ///     bit, shift) is torch's rounding on every Mac, and what the check compares to diffusers' bf16;
+///   - **on the stream, the producer rounds instead** (`WeightProducts.RoundedOperand`): where the weight is read in place and the
+///     whole operand fits the reserve, the norm, the SwiGLU, the gate or the GELU that makes it also writes it rounded there, with this
+///     same integer sequence (`roundingSource`), and the products that read it encode no pass — one rounding for Q, K and V instead of
+///     three, none of its own for the others; the same bits (Z-Image 1 024²: 0.79 s of GPU per image in 1 808 passes, 1 536 of them gone);
 ///   - **the tile is the map's** (`MatmulTile`, `gpu/bf16act` and `gpu/int8act`), compiled apart; the kernels here are the
 ///     standard ones (64 × 32 for a bf16 weight, 64 × 64 for an int8 one), and the Q8_0 one keeps its 64 × 64 (its weight is staged in
 ///     threadgroup memory as `q · s` in fp32 — exact, but an fp32 operand, which the tensor units do not take at their half-precision
@@ -29,6 +33,18 @@ package final class BFloatKernels {
     let blocks: MTLComputePipelineState?
     /// The K-quants' kernels (`KQuantKernels`, a library of their own: a refusal there widens the K-quants and nothing else).
     let kquant: KQuantKernels?
+
+    /// **The rounding itself**, one text for every kernel that writes a bf16 operand (`round_bf16` here, the norms and the SwiGLU
+    /// that write the product's operand directly, `ElementwiseGPU`): the same integer sequence wherever it runs, so the operand a
+    /// producer writes is the one this pass would have written, bit for bit.
+    static let roundingSource = """
+    // fp32 → bf16, nearest-even; a NaN stays a (quiet) NaN, an overflow rounds to infinity as torch's.
+    inline uint rounded(float f) {
+        uint u = as_type<uint>(f);
+        if ((u & 0x7fffffffu) > 0x7f800000u) return (u >> 16) | 0x40u;
+        return (u + 0x7fffu + ((u >> 16) & 1u)) >> 16;
+    }
+    """
 
     static let source = """
     #include <metal_stdlib>
@@ -45,12 +61,7 @@ package final class BFloatKernels {
         t.store(c);
     }
 
-    // fp32 → bf16, nearest-even; a NaN stays a (quiet) NaN, an overflow rounds to infinity as torch's.
-    inline uint rounded(float f) {
-        uint u = as_type<uint>(f);
-        if ((u & 0x7fffffffu) > 0x7f800000u) return (u >> 16) | 0x40u;
-        return (u + 0x7fffu + ((u >> 16) & 1u)) >> 16;
-    }
+    \(roundingSource)
 
     // Two values per thread, one 32-bit store: `pairs` of them (an even count of values).
     kernel void round_bf16(device const float2 *x [[buffer(0)]], device uint *y [[buffer(1)]],
@@ -160,9 +171,11 @@ extension TensorGEMM {
 
     /// **`C [m, n] = round_bf16(A [m, k]) · W`**, `W` bf16 as `linear(a:w:…)` takes it. The rounded rows go
     /// to `rounding` by chunks, each chunk's product written where its rows go; one submission. Returns
-    /// the GPU seconds, the rounding's included. `k` is even.
+    /// the GPU seconds, the rounding's included. `k` is even. `operandRounded`: the producer of `A` already wrote its rounded rows at
+    /// `rounding` (`WeightProducts.roundedOperand`), all `m` of them in one chunk — the pass is not encoded again.
     package func linear(a: MTLBuffer, rounding: Rounding, w: MTLBuffer, wOffset: Int = 0, c: MTLBuffer, m: Int, k: Int, n: Int,
-                        weightIsTransposed: Bool) -> Double {
+                        weightIsTransposed: Bool, operandRounded: Bool = false) -> Double {
+        precondition(!operandRounded || rounding.rows >= m, "an operand rounded by its producer is one chunk")
         let kernels = rounded!
         let tiled = tiles.products(CapacityModel.Kernel(.gpu, .bf16act), rows: m, k: k, n: n)
         let pipeline = (weightIsTransposed ? tiled?.byColumns : tiled?.byRows) ?? (weightIsTransposed ? kernels.byColumns : kernels.byRows)
@@ -171,7 +184,7 @@ extension TensorGEMM {
         let encoder = commands.checkedEncoder()
         for first in stride(from: 0, to: m, by: rounding.rows) {
             let rows = min(rounding.rows, m - first)
-            encodeRound(encoder, kernels, from: a, first * k * 4, to: rounding.buffer, rounding.offset, count: rows * k)
+            if !operandRounded { encodeRound(encoder, kernels, from: a, first * k * 4, to: rounding.buffer, rounding.offset, count: rows * k) }
             encoder.setComputePipelineState(pipeline)
             encoder.setBuffer(rounding.buffer, offset: rounding.offset, index: 0)
             encoder.setBuffer(w, offset: wOffset, index: 1)

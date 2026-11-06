@@ -324,9 +324,11 @@ package final class Block: BoundaryRecording, PhaseTiming {
         defer { stream.isOn = false }                      // drains: the DiT reads `x` on the CPU after the last block
 
         // ── attention
-        timed("norm") { elementwise.normScale(x0, weight: at(0), scale: at(4), into: (a, 0), rows: s, columns: d, eps: eps) }
+        // The norm writes the operand of the three products rounded too (`WeightProducts.RoundedOperand`): one rounding, not three.
+        let normed1 = try products.roundedOperand(prefix + "attention.to_q.weight", m: s, k: d, n: d)
+        timed("norm") { elementwise.normScale(x0, weight: at(0), scale: at(4), into: (a, 0), rows: s, columns: d, eps: eps, rounded: normed1) }
         for (name, buffer) in [("attention.to_q.weight", qb), ("attention.to_k.weight", kb), ("attention.to_v.weight", vb)] {
-            try products.linear(prefix + name, a: a, c: buffer, m: s, k: d, n: d)
+            try products.linear(prefix + name, a: a, c: buffer, m: s, k: d, n: d, rounded: normed1)
         }
         try widen("attention.norm_q.weight", count: headDim, into: scratch)
         let normQ = Array(UnsafeBufferPointer(start: scratch, count: headDim))
@@ -346,13 +348,15 @@ package final class Block: BoundaryRecording, PhaseTiming {
         timed("residual") { elementwise.normResidual(x0, plus: (o, 0), weight: at(1), gate: at(5), rows: s, columns: d, eps: eps) }
 
         // ── feed-forward
-        timed("norm") { elementwise.normScale(x0, weight: at(2), scale: at(6), into: (a, 0), rows: s, columns: d, eps: eps) }
+        let normed2 = try products.roundedOperand(prefix + "feed_forward.w1.weight", m: s, k: d, n: h)
+        timed("norm") { elementwise.normScale(x0, weight: at(2), scale: at(6), into: (a, 0), rows: s, columns: d, eps: eps, rounded: normed2) }
         let h1 = try gemm.wrap(UnsafeMutableRawPointer(hidden1), bytes: s * h * 4, name: "h1")
         let h3 = try gemm.wrap(UnsafeMutableRawPointer(hidden3), bytes: s * h * 4, name: "h3")
-        try products.linear(prefix + "feed_forward.w1.weight", a: a, c: h1, m: s, k: d, n: h)
-        try products.linear(prefix + "feed_forward.w3.weight", a: a, c: h3, m: s, k: d, n: h)
-        timed("swiglu") { ownTimings["elementwise GPU", default: 0] += elementwise.swiglu((h1, 0), (h3, 0), count: s * h) }
-        try products.linear(prefix + "feed_forward.w2.weight", a: h1, c: o, m: s, k: h, n: d)
+        try products.linear(prefix + "feed_forward.w1.weight", a: a, c: h1, m: s, k: d, n: h, rounded: normed2)
+        try products.linear(prefix + "feed_forward.w3.weight", a: a, c: h3, m: s, k: d, n: h, rounded: normed2)
+        let gated = try products.roundedOperand(prefix + "feed_forward.w2.weight", m: s, k: h, n: d)
+        timed("swiglu") { ownTimings["elementwise GPU", default: 0] += elementwise.swiglu((h1, 0), (h3, 0), count: s * h, rounded: gated) }
+        try products.linear(prefix + "feed_forward.w2.weight", a: h1, c: o, m: s, k: h, n: d, rounded: gated)
         try widenNorm(3, "ffn_norm2.weight")
         timed("residual") { elementwise.normResidual(x0, plus: (o, 0), weight: at(3), gate: at(7), rows: s, columns: d, eps: eps) }
         return true

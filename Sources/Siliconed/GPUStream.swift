@@ -143,6 +143,7 @@ package final class GPUStream: @unchecked Sendable {   // its state under `lock`
             return String(format: "stream: %d drains, %.2f s waited, %d buffers · ", t.drains, t.waited, t.buffers) + gpu
                 + (t.ane > 0 ? String(format: " · ANE's side %.2f s", t.ane) : "")
                 + (t.buffers > 0 ? String(format: " · inside the spans: behind the GPU %.2f s, behind the ANE %.2f s", t.behindGPU, t.behindANE) : "")
+                + " · rounded products \(GEMM.roundedProducts.withLock { $0 }), their operand rounded by its producer \(GEMM.producerRounded.withLock { $0 })"
         }
     }
 

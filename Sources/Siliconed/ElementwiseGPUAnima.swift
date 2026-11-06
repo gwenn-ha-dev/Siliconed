@@ -80,19 +80,67 @@ package final class AnimaElementwiseGPU {
             destination[i] = c + shift[i];
         }
     }
+
+    \(BFloatKernels.roundingSource)
+
+    // The same, and each modulated value rounded to bf16 where the next products read their operand (`WeightProducts.RoundedOperand`):
+    // one 16-bit store per value, in the same loops (a thread reads back only what it wrote).
+    kernel void residual_modulate_rounded(device float *x [[buffer(0)]], device const float *y [[buffer(1)]],
+                                          device const float *gate [[buffer(2)]], device const float *shift [[buffer(3)]],
+                                          device const float *scale [[buffer(4)]], device float *out [[buffer(5)]],
+                                          device ushort *rounded_out [[buffer(6)]],
+                                          constant Params &p [[buffer(7)]], uint row [[threadgroup_position_in_grid]],
+                                          uint t [[thread_index_in_threadgroup]], uint lane [[thread_index_in_simdgroup]],
+                                          uint sg [[simdgroup_index_in_threadgroup]]) {
+        #pragma METAL fp contract(off)
+        threadgroup float partialMean[8], partialSquares[8];
+        device float *source = x + ulong(row) * p.cols;
+        device const float *added = y + ulong(row) * p.cols;
+        float sum = 0.0f;
+        for (uint i = t; i < p.cols; i += 256) {
+            float v = source[i];
+            if (p.residual != 0) {
+                float product = gate[i] * added[i];
+                v = v + product;
+                source[i] = v;
+            }
+            sum = sum + v;
+        }
+        float mean = precise::divide(row_sum(sum, lane, sg, partialMean), float(p.cols));
+        float squares = 0.0f;
+        for (uint i = t; i < p.cols; i += 256) { float c = source[i] - mean; float sq = c * c; squares = squares + sq; }
+        float variance = precise::divide(row_sum(squares, lane, sg, partialSquares), float(p.cols));
+        float inverse = precise::divide(1.0f, precise::sqrt(variance + p.eps));
+        device float *destination = out + ulong(row) * p.cols;
+        device ushort *bf = rounded_out + ulong(row) * p.cols;
+        for (uint i = t; i < p.cols; i += 256) {
+            float c = source[i] - mean;
+            c = c * inverse;
+            float factor = 1.0f + scale[i];
+            c = c * factor;
+            float v = c + shift[i];
+            destination[i] = v;
+            bf[i] = ushort(rounded(v));
+        }
+    }
     """
 
     private let queue: MTLCommandQueue
-    private let pipeline: MTLComputePipelineState
+    private let pipeline, roundedPipeline: MTLComputePipelineState
 
     package init(device: MTLDevice, queue: MTLCommandQueue) throws {
         self.queue = queue
         let options = MTLCompileOptions()
         options.mathMode = .safe          // no fast-math: the division and the square root as written
         let library = try device.makeLibrary(source: Self.source, options: options)
-        guard let f = library.makeFunction(name: "residual_modulate") else { throw GEMM.Failure.noDevice }
+        guard let f = library.makeFunction(name: "residual_modulate"), let g = library.makeFunction(name: "residual_modulate_rounded") else {
+            throw GEMM.Failure.noDevice
+        }
         pipeline = try device.makeComputePipelineState(function: f)
-        guard pipeline.maxTotalThreadsPerThreadgroup >= 256 else { throw GEMM.Failure.noDevice }
+        roundedPipeline = try device.makeComputePipelineState(function: g)
+        guard pipeline.maxTotalThreadsPerThreadgroup >= 256, roundedPipeline.maxTotalThreadsPerThreadgroup >= 256 else {
+            throw GEMM.Failure.noDevice
+        }
     }
 
     /// A buffer at an offset in floats (`ElementwiseGPU.BufferSlice`).
@@ -104,14 +152,21 @@ package final class AnimaElementwiseGPU {
     /// `modulate` is given — one threadgroup per row, one command buffer, settled on the queue's stream (`commitSettled`). Returns the
     /// GPU's seconds off the stream, 0 on it.
     @discardableResult
+    /// `rounded` (with `modulate`): `out` also written rounded to bf16 there, as the next products read their operand
+    /// (`WeightProducts.roundedOperand`).
     package func run(_ x: Slice, residual: (y: Slice, gate: Slice)?, modulate: (shift: Slice, scale: Slice, out: Slice)?,
-                     rows: Int, columns: Int, eps: Float) -> Double {
+                     rows: Int, columns: Int, eps: Float, rounded: WeightProducts.RoundedOperand? = nil) -> Double {
         guard rows > 0, residual != nil || modulate != nil else { return 0 }
         let commands = queue.checkedCommandBuffer()
         let encoder = commands.checkedEncoder()
-        encoder.setComputePipelineState(pipeline)
+        let rounded = modulate == nil ? nil : rounded
+        encoder.setComputePipelineState(rounded == nil ? pipeline : roundedPipeline)
         // Unused operands are bound to `x`, never read.
-        let slices = [x, residual?.y ?? x, residual?.gate ?? x, modulate?.shift ?? x, modulate?.scale ?? x, modulate?.out ?? x]
+        var slices = [x, residual?.y ?? x, residual?.gate ?? x, modulate?.shift ?? x, modulate?.scale ?? x, modulate?.out ?? x]
+        if let rounded {
+            precondition(rounded.offset % 4 == 0)
+            slices.append((rounded.buffer, rounded.offset / 4))
+        }
         for (i, s) in slices.enumerated() { encoder.setBuffer(s.buffer, offset: s.offset * 4, index: i) }
         var p = Params(cols: UInt32(columns), eps: eps, residual: residual == nil ? 0 : 1, modulate: modulate == nil ? 0 : 1)
         encoder.setBytes(&p, length: MemoryLayout<Params>.stride, index: slices.count)

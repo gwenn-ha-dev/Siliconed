@@ -171,6 +171,8 @@ package final class GEMM {
     package let bf16Activations: Bool
     /// Products that went through the bf16 activation path in this process: a check says what ran.
     package static let roundedProducts = Mutex<Int>(0)
+    /// ... of which read the operand its producer had already rounded (`WeightProducts.RoundedOperand`): no pass of their own.
+    package static let producerRounded = Mutex<Int>(0)
     /// Products that read a published int8 weight as it is (`gemm_int8`, `WeightProducts.linear`) in this process: a check
     /// says the route it judged was the one taken.
     package static let int8Products = Mutex<Int>(0)
@@ -375,9 +377,9 @@ package final class GEMM {
     /// **The same on an activation rounded to bf16** (`bf16Activations`, which the caller checked): `A`
     /// rounded by chunks of `rounding.rows` rows into the reserve's tail, `wb` the staged weight.
     package func linear(a: MTLBuffer, rounding: TensorGEMM.Rounding, bf16 wb: MTLBuffer, weightOffset: Int = 0, c: MTLBuffer, m: Int,
-                        k: Int, n: Int, weightIsTransposed: Bool = false) -> Double {
+                        k: Int, n: Int, weightIsTransposed: Bool = false, rounded: Bool = false) -> Double {
         let elapsed = tensor!.linear(a: a, rounding: rounding, w: wb, wOffset: weightOffset, c: c, m: m, k: k, n: n,
-                                     weightIsTransposed: weightIsTransposed)
+                                     weightIsTransposed: weightIsTransposed, operandRounded: rounded)
         let key = "\(m)×\(k)×\(n)\(weightIsTransposed ? "ᵀ" : "")◐"
         record(key, elapsed)
         Self.roundedProducts.withLock { $0 += 1 }

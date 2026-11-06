@@ -60,18 +60,48 @@ package final class MossImageNormGPU {
             destination[i] = product + shift[i];
         }
     }
+
+    \(BFloatKernels.roundingSource)
+
+    // The same, and each value rounded to bf16 where the next products read their operand (`WeightProducts.RoundedOperand`): a
+    // pair of adjacent columns per thread and step (`cols` even), each value computed as above.
+    kernel void norm_modulate_rounded(device const float *x [[buffer(0)]], device const float *w [[buffer(1)]],
+                                      device const float *scale [[buffer(2)]], device const float *shift [[buffer(3)]],
+                                      device float *out [[buffer(4)]], device uint *rounded_out [[buffer(5)]],
+                                      constant NormParams &p [[buffer(6)]],
+                                      uint row [[threadgroup_position_in_grid]], uint t [[thread_index_in_threadgroup]],
+                                      uint lane [[thread_index_in_simdgroup]], uint sg [[simdgroup_index_in_threadgroup]]) {
+        #pragma METAL fp contract(off)
+        threadgroup float partial[8];
+        device const float *source = x + ulong(row) * p.cols;
+        device float *destination = out + ulong(row) * p.cols;
+        device uint *pairs = rounded_out + ulong(row) * (p.cols / 2);
+        float r = row_scale(source, p.cols, p.eps, t, lane, sg, partial);
+        for (uint j = t; j < p.cols / 2; j += 256) {
+            uint i = 2 * j;
+            float v0 = source[i] * r, v1 = source[i + 1] * r;
+            v0 = v0 * w[i]; v1 = v1 * w[i + 1];
+            float factor0 = scale[i] + 1.0f, factor1 = scale[i + 1] + 1.0f;
+            float product0 = v0 * factor0, product1 = v1 * factor1;
+            float y0 = product0 + shift[i], y1 = product1 + shift[i + 1];
+            destination[i] = y0; destination[i + 1] = y1;
+            pairs[j] = rounded(y0) | (rounded(y1) << 16);
+        }
+    }
     """
 
     private let queue: MTLCommandQueue
-    private let pipeline: MTLComputePipelineState
+    private let pipeline, roundedPipeline: MTLComputePipelineState
 
     package init(device: MTLDevice, queue: MTLCommandQueue) throws {
         self.queue = queue
         let options = MTLCompileOptions()
         options.mathMode = .safe          // the division and the square root as written
         let library = try device.makeLibrary(source: Self.source, options: options)
-        guard let function = library.makeFunction(name: "norm_modulate") else { throw GEMM.Failure.noDevice }
+        guard let function = library.makeFunction(name: "norm_modulate"), let rounded = library.makeFunction(name: "norm_modulate_rounded")
+        else { throw GEMM.Failure.noDevice }
         pipeline = try device.makeComputePipelineState(function: function)
+        roundedPipeline = try device.makeComputePipelineState(function: rounded)
     }
 
     private struct NormParams { var cols: UInt32; var eps: Float }
@@ -81,16 +111,21 @@ package final class MossImageNormGPU {
     @discardableResult
     package func normModulate(_ x: ElementwiseGPU.BufferSlice, weight: ElementwiseGPU.BufferSlice, scale: ElementwiseGPU.BufferSlice,
                               shift: ElementwiseGPU.BufferSlice, into out: ElementwiseGPU.BufferSlice,
-                              rows: Int, columns: Int, eps: Float) -> Double {
+                              rows: Int, columns: Int, eps: Float, rounded: WeightProducts.RoundedOperand? = nil) -> Double {
         guard rows > 0, columns > 0, case let commands = queue.checkedCommandBuffer(),
               let encoder = commands.makeComputeCommandEncoder() else {
             Attention.report("GPU modulated norm (MOSS-Image): no command buffer, so nothing ran")
             return 0
         }
         var p = NormParams(cols: UInt32(columns), eps: eps)
-        encoder.setComputePipelineState(pipeline)
-        for (i, slice) in [x, weight, scale, shift, out].enumerated() { encoder.setBuffer(slice.buffer, offset: slice.offset * 4, index: i) }
-        encoder.setBytes(&p, length: MemoryLayout<NormParams>.stride, index: 5)
+        encoder.setComputePipelineState(rounded == nil ? pipeline : roundedPipeline)
+        var slices = [x, weight, scale, shift, out]
+        if let rounded {
+            precondition(columns % 2 == 0 && rounded.offset % 4 == 0)
+            slices.append((rounded.buffer, rounded.offset / 4))
+        }
+        for (i, slice) in slices.enumerated() { encoder.setBuffer(slice.buffer, offset: slice.offset * 4, index: i) }
+        encoder.setBytes(&p, length: MemoryLayout<NormParams>.stride, index: slices.count)
         encoder.dispatchThreadgroups(MTLSize(width: rows, height: 1, depth: 1), threadsPerThreadgroup: MTLSize(width: 256, height: 1, depth: 1))
         encoder.endEncoding()
         return commands.commitSettled(label: "elementwise GPU", what: "GPU modulated norm (MOSS-Image)")

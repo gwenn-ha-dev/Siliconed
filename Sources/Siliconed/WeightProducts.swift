@@ -72,6 +72,9 @@ package final class WeightProducts {
     private let mergesLoRA: Bool
     /// The operand of a product is rounded to bf16 where the settings and the machine allow it (`gemm_bf16_act`).
     private let roundsActivations: Bool
+    /// Every write into the reserve this module makes (a staging, a widening, a rounding pass, a LoRA's scratch), counted: an
+    /// operand a producer rounded into it (`RoundedOperand`) is read only while nothing has written over it since.
+    private var reserveWrites: UInt64 = 0
     /// The last int8 or rounded bf16 product had rows on the ANE, and it computed them (`classification`).
     private var aneTook = false
     /// ... and it took every row of the product: the ledger names the route `ane/int8`, as the plan does (`ProductAssignment.route`).
@@ -101,11 +104,47 @@ package final class WeightProducts {
         return result
     }
 
+    // MARK: The operand rounded by its producer
+
+    /// **Where the kernel that makes a product's operand may also write it rounded to bf16**, so the product does not round it
+    /// again (`TensorGEMM.linear(…rounded:)`): the reserve's head, as `round_bf16` would have written it — the operand of a bf16 weight
+    /// read in place on the stream, all its `m` rows in one chunk. The producer writes the fp32 operand too (the ANE's rows, the
+    /// LoRA stack and any product that does not take this path read it), so a product that finds the reserve written since
+    /// (`reserveWrites`) or another path rounds it again from there: the same bits either way.
+    package struct RoundedOperand {
+        package let buffer: MTLBuffer
+        /// In bytes, 16-aligned.
+        package let offset: Int
+        fileprivate let k: Int, rows: Int, generation: UInt64
+
+        /// The same operand from its row `first` on: a product over a slice of the rows (a chunk of an MLP).
+        package func rows(from first: Int) -> RoundedOperand {
+            RoundedOperand(buffer: buffer, offset: offset + first * k * 2, k: k, rows: rows - first, generation: generation)
+        }
+    }
+
+    /// The slot for `name`'s operand (`[m, k]`), or `nil` where its product would not read it (another path, rows in several
+    /// chunks, the stream off, `SILICONED_ROUND_FUSED=0`). Asked just before the producer is encoded: nothing but the products that
+    /// read the operand may write the reserve until they are encoded.
+    package func roundedOperand(_ name: String, m: Int, k: Int, n: Int) throws -> RoundedOperand? {
+        guard Self.fusesRounding else { return nil }
+        let planned = gemm.assignment(k: k, n: n, m: m, weight: format(of: name))
+        guard let (_, _, rounding) = inPlaceRounding(name, k: k, n: n, planned: planned), rounding.rows >= m else { return nil }
+        let w = try gemm.wrap(UnsafeMutableRawPointer(reserve), bytes: capacity * 4, name: "w")
+        reserveWrites &+= 1                        // the producer writes the slot: any operand rounded there before is gone
+        return RoundedOperand(buffer: w, offset: rounding.offset, k: k, rows: m, generation: reserveWrites)
+    }
+
+    /// `SILICONED_ROUND_FUSED=0`: every product rounds its own operand again, as before the producers wrote it (a forcing of
+    /// measurement: the same bits).
+    package static let fusesRounding = ProcessInfo.processInfo.environment["SILICONED_ROUND_FUSED"] != "0"
+
     /// **`C = A · W` (+ the stack of `target`)**, `W` the map's `name`. `a` and `c` are the model's
     /// buffers, wrapped at their reserved size (`GEMM.wrap` memoizes by address). `target`: the module
-    /// the LoRA stack is keyed by — `name` without `.weight` unless said.
+    /// the LoRA stack is keyed by — `name` without `.weight` unless said. `rounded`: `a` already rounded by its producer
+    /// (`roundedOperand`), read from there where this product takes the path it was given for.
     package func linear(_ name: String, a: MTLBuffer, c: MTLBuffer, m: Int, k: Int, n: Int,
-                        target: String? = nil) throws {
+                        target: String? = nil, rounded operand: RoundedOperand? = nil) throws {
         let w = try gemm.wrap(UnsafeMutableRawPointer(reserve), bytes: capacity * 4, name: "w")
         let (path, planned, skipped) = try prepare(name, count: k * n, m: m, n: n)
         let staged = path != .widened
@@ -142,6 +181,12 @@ package final class WeightProducts {
                 // can run them.
                 let aneRows = planned.path == .bf16 && planned.ane > 0 && planned.ane < m && transposed ? planned.ane : 0
                 if let (map, offset) = inPlace {
+                    // The operand its producer rounded, where nothing wrote over it since; else this product's own pass writes the
+                    // reserve.
+                    let reuse = operand.map { $0.generation == reserveWrites && $0.k == k && $0.rows >= m && $0.buffer === w
+                                              && rounding.offset == 0 && rounding.rows >= m } ?? false
+                    if reuse { GEMM.producerRounded.withLock { $0 += 1 } } else { reserveWrites &+= 1 }
+                    let rounding = reuse ? Rounding(offset: operand!.offset, rows: rounding.rows) : rounding
                     // On the stream: the ANE's rows beside the queued GPU work, waited for on the GPU (`GPUStream.neuralEngine`).
                     if aneRows > 0, GPUStream.policy == .on, let ane = gemm.neuralEngine, ane.accepts(rows: aneRows, k: k, n: n),
                        let weight = artifact.pointer(name) {
@@ -158,7 +203,7 @@ package final class WeightProducts {
                         if first > 0 {
                             timings["gemm GPU", default: 0] += gemm.linear(a: a, rounding: (w, rounding.offset, rounding.rows), bf16: map,
                                                                           weightOffset: offset, c: c, m: first, k: k, n: n,
-                                                                          weightIsTransposed: transposed)
+                                                                          weightIsTransposed: transposed, rounded: reuse)
                         }
                         stream.neuralEngineQueued(done)
                         aneTook = true
@@ -167,7 +212,7 @@ package final class WeightProducts {
                         aneDeclined = planned.ane > 0
                         timings["gemm GPU", default: 0] += gemm.linear(a: a, rounding: (w, rounding.offset, rounding.rows), bf16: map,
                                                                       weightOffset: offset, c: c, m: m, k: k, n: n,
-                                                                      weightIsTransposed: transposed)
+                                                                      weightIsTransposed: transposed, rounded: reuse)
                     }
                 } else if aneRows > 0, let ane = gemm.neuralEngine, ane.accepts(rows: aneRows, k: k, n: n) {
                     let r = Self.bf16Product(gemm: gemm, rounding: (w, rounding.offset, rounding.rows), reserve: w, a: a, c: c,
@@ -234,6 +279,10 @@ package final class WeightProducts {
         }
         // A refused slice leaves its columns as they were: a plausible image, wrong exactly there.
         if let failure { throw Artifact.Failure.badHeader(failure) }
+        // The stack writes the reserve where the CPU's engines take rows of its second product (`GEMM.accumulatedLinear`'s scratch),
+        // or where it was merged into the weight there; wholly the GPU's, it does not.
+        if let stack, merged || !(gemm.runsOnGPUAlone(k: k, n: stack.rank, m: m, weight: .loraDown)
+                                  && gemm.runsOnGPUAlone(k: stack.rank, n: n, m: m, weight: .loraUp)) { reserveWrites &+= 1 }
         if !merged, let stack, let mid {
             let mb = try gemm.wrap(UnsafeMutableRawPointer(mid), bytes: midFloats * 4, name: "loraMid")
             lora(x: a, stack: stack, mid: mb, c: c, scratch: w, m: m, k: k, n: n)
@@ -542,6 +591,17 @@ package final class WeightProducts {
     /// The weight of the product being prepared, where it lies in the wrapped map (`prepare`'s in-place path), or `nil`.
     private var inPlace: (buffer: MTLBuffer, offset: Int)?
 
+    /// The in-place path's condition (`prepare`), without its side effects: the weight where the map holds it and the rounded
+    /// operand from the reserve's head.
+    private func inPlaceRounding(_ name: String, k: Int, n: Int, planned: ProductAssignment)
+        -> (map: MTLBuffer, offset: Int, rounding: Rounding)? {
+        guard gemm.queue.stream.isOn, MemoryPlan.mapInPlace, planned.path == .bf16, planned.roundsActivation, roundsActivations,
+              gemm.bf16Activations, artifact.tensors[name]?.dtype == .bfloat16,
+              let offset = artifact.mappedOffset(name), offset % 16 == 0, let map = artifact.wrappedMap(on: gemm.device),
+              let rounding = Self.roundingPlan(k: k, n: n, capacity: capacity, weightInReserve: false) else { return nil }
+        return (map, offset, rounding)
+    }
+
     private func prepare(_ name: String, count: Int, m: Int, n: Int) throws -> (Path, ProductAssignment, skipped: ProductLedger.Reason?) {
         func expect(_ got: Int) throws {
             guard got == count else { throw Artifact.Failure.badHeader("\(name): \(got) values, \(count) expected") }
@@ -554,14 +614,12 @@ package final class WeightProducts {
         // (`MemoryPlan.mapInPlace`): read in place, its pages count in the footprint.
         inPlace = nil
         let stream = gemm.queue.stream
-        if stream.isOn, MemoryPlan.mapInPlace, planned.path == .bf16, planned.roundsActivation, roundsActivations, gemm.bf16Activations,
-           artifact.tensors[name]?.dtype == .bfloat16,
-           let offset = artifact.mappedOffset(name), offset % 16 == 0, let map = artifact.wrappedMap(on: gemm.device),
-           let rounding = Self.roundingPlan(k: k, n: n, capacity: capacity, weightInReserve: false) {
+        if let (map, offset, rounding) = inPlaceRounding(name, k: k, n: n, planned: planned) {
             inPlace = (map, offset)
             return (.bf16(rounding), planned, nil)
         }
         // Anything else writes the reserve on the CPU: the queued work that reads it first.
+        reserveWrites &+= 1
         stream.drain()
         // How this product reads its weight (the plan's): the bf16 weight as published, its operand rounded to bf16 where the
         // plan says it gains, the 8-bit weight as published, or widened.

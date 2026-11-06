@@ -480,10 +480,15 @@ package final class MossImageDiT: BoundaryRecording, PhaseTiming {
 
         // ── attention: shift_a m[0], scale_a m[1], gate_a m[2]
         try artifact.materialize(prefix + "norm1.weight", into: norms, capacity: d)
-        timed("norm") { normGPU.normModulate((xb, 0), weight: (wb, 0), scale: (mb, d), shift: (mb, 0), into: (nb, 0), rows: n, columns: d, eps: eps) }
-        try linearGPU(prefix + "proj.q.weight", a: normed, into: q, m: n, k: d, n: d)
-        try linearGPU(prefix + "proj.k.weight", a: normed, into: k, m: n, k: d, n: d)
-        try linearGPU(prefix + "proj.v.weight", a: normed, into: v, m: n, k: d, n: d)
+        // The norms and the SITU write the next products' operand rounded too, where they read it so (`WeightProducts.RoundedOperand`).
+        let normed1 = try products.roundedOperand(prefix + "proj.q.weight", m: n, k: d, n: d)
+        timed("norm") {
+            normGPU.normModulate((xb, 0), weight: (wb, 0), scale: (mb, d), shift: (mb, 0), into: (nb, 0), rows: n, columns: d, eps: eps,
+                                 rounded: normed1)
+        }
+        try linearGPU(prefix + "proj.q.weight", a: normed, into: q, m: n, k: d, n: d, rounded: normed1)
+        try linearGPU(prefix + "proj.k.weight", a: normed, into: k, m: n, k: d, n: d, rounded: normed1)
+        try linearGPU(prefix + "proj.v.weight", a: normed, into: v, m: n, k: d, n: d, rounded: normed1)
         var weights: [[Float]] = []
         for name in [prefix + "q_norm.weight", prefix + "k_norm.weight"] {
             var w = [Float](repeating: 0, count: dh)
@@ -513,10 +518,17 @@ package final class MossImageDiT: BoundaryRecording, PhaseTiming {
 
         // ── feed-forward: shift_f m[3], scale_f m[4], gate_f m[5]
         try artifact.materialize(prefix + "norm2.weight", into: norms + d, capacity: d)
-        timed("norm") { normGPU.normModulate((xb, 0), weight: (wb, d), scale: (mb, 4 * d), shift: (mb, 3 * d), into: (nb, 0), rows: n, columns: d, eps: eps) }
-        try linearGPU(prefix + "proj.ffn_up_gate.weight", a: normed, into: h1, m: n, k: d, n: 2 * f)
-        timed("situ") { kernels.situ(hidden: (h1b, 0), gate: (h1b, f), into: (h2b, 0), rows: n, columns: f, strides: (2 * f, 2 * f, f)) }
-        try linearGPU(prefix + "proj.ffn_down.weight", a: h2, into: o, m: n, k: f, n: d)
+        let normed2 = try products.roundedOperand(prefix + "proj.ffn_up_gate.weight", m: n, k: d, n: 2 * f)
+        timed("norm") {
+            normGPU.normModulate((xb, 0), weight: (wb, d), scale: (mb, 4 * d), shift: (mb, 3 * d), into: (nb, 0), rows: n, columns: d,
+                                 eps: eps, rounded: normed2)
+        }
+        try linearGPU(prefix + "proj.ffn_up_gate.weight", a: normed, into: h1, m: n, k: d, n: 2 * f, rounded: normed2)
+        let gated = try products.roundedOperand(prefix + "proj.ffn_down.weight", m: n, k: f, n: d)
+        timed("situ") {
+            kernels.situ(hidden: (h1b, 0), gate: (h1b, f), into: (h2b, 0), rows: n, columns: f, strides: (2 * f, 2 * f, f), rounded: gated)
+        }
+        try linearGPU(prefix + "proj.ffn_down.weight", a: h2, into: o, m: n, k: f, n: d, rounded: gated)
         timed("residual") { elementwise.residual((xb, 0), plus: (ob, 0), carries: (mb, 5 * d), rows: n, columns: d) }
         return true
     }
@@ -679,10 +691,10 @@ package final class MossImageDiT: BoundaryRecording, PhaseTiming {
 
     /// `C[m, n] = A[m, k] · W`, W laid out `[k, n]` by the forge. Both buffers wrapped at their slice's size.
     private func linearGPU(_ name: String, a: UnsafeMutablePointer<Float>, into c: UnsafeMutablePointer<Float>,
-                           m: Int, k: Int, n: Int) throws {
+                           m: Int, k: Int, n: Int, rounded: WeightProducts.RoundedOperand? = nil) throws {
         let ab = try gemm.wrap(UnsafeMutableRawPointer(a), bytes: reserved[a]! * 4, name: "a")
         let cb = try gemm.wrap(UnsafeMutableRawPointer(c), bytes: reserved[c]! * 4, name: "c")
-        try products.linear(name, a: ab, c: cb, m: m, k: k, n: n)
+        try products.linear(name, a: ab, c: cb, m: m, k: k, n: n, rounded: rounded)
     }
 }
 
@@ -872,26 +884,50 @@ package final class MossImageKernels {
         float value = 25.0f * precise::tanh(hv / 25.0f);
         out[p.y * strides.z + p.x] = gate * value;
     }
+
+    \(BFloatKernels.roundingSource)
+
+    // The same, and the value rounded to bf16 where the next product reads its operand (`WeightProducts.RoundedOperand`), at `out`'s
+    // place (the operand is `out`'s compact rows).
+    kernel void situ_rounded(device const float *h [[buffer(0)]], device const float *g [[buffer(1)]],
+                             device float *out [[buffer(2)]], constant uint &cols [[buffer(3)]],
+                             constant uint4 &strides [[buffer(4)]], constant uint2 &offsets [[buffer(5)]],
+                             device ushort *r [[buffer(6)]], uint2 p [[thread_position_in_grid]]) {
+        #pragma METAL fp contract(off)
+        if (p.x >= cols) return;
+        float hv = h[offsets.x + p.y * strides.x + p.x];
+        float gv = g[offsets.y + p.y * strides.y + p.x];
+        float gate = 4.0f * precise::tanh(gv / 4.0f) * precise::divide(1.0f, 1.0f + precise::exp(-gv));
+        float value = 25.0f * precise::tanh(hv / 25.0f);
+        float y = gate * value;
+        out[p.y * strides.z + p.x] = y;
+        r[p.y * strides.z + p.x] = ushort(rounded(y));
+    }
     """
 
     private let queue: MTLCommandQueue
-    private let pipeline: MTLComputePipelineState
+    private let pipeline, roundedPipeline: MTLComputePipelineState
 
     package init(device: MTLDevice, queue: MTLCommandQueue) throws {
         self.queue = queue
         let options = MTLCompileOptions()
         options.mathMode = .safe
         let library = try device.makeLibrary(source: Self.source, options: options)
-        guard let function = library.makeFunction(name: "situ") else { throw GEMM.Failure.noDevice }
+        guard let function = library.makeFunction(name: "situ"), let rounded = library.makeFunction(name: "situ_rounded") else {
+            throw GEMM.Failure.noDevice
+        }
         pipeline = try device.makeComputePipelineState(function: function)
+        roundedPipeline = try device.makeComputePipelineState(function: rounded)
     }
 
     /// `out[r, j] = SITU(hidden[r, j], gate[r, j])` for `rows × columns`; each operand is a buffer and an offset
     /// in floats, `strides` the row strides in floats of `(hidden, gate, out)`. Returns the GPU time — 0 on the stream (`GPUStream`),
     /// where it is queued behind the products and waited for at the drain.
     @discardableResult
+    /// `rounded`: `out` also written rounded to bf16 there, as the next product reads its operand (`WeightProducts.roundedOperand`).
     package func situ(hidden: ElementwiseGPU.BufferSlice, gate: ElementwiseGPU.BufferSlice, into out: ElementwiseGPU.BufferSlice,
-                      rows: Int, columns: Int, strides: (Int, Int, Int)) -> Double {
+                      rows: Int, columns: Int, strides: (Int, Int, Int), rounded: WeightProducts.RoundedOperand? = nil) -> Double {
+        precondition(rounded == nil || strides.2 == columns, "the rounded operand is out's compact rows")
         guard rows > 0, columns > 0, case let commands = queue.checkedCommandBuffer(),
               let encoder = commands.makeComputeCommandEncoder() else {
             Attention.report("GPU SITU: no command buffer, so nothing ran")
@@ -900,7 +936,8 @@ package final class MossImageKernels {
         var cols = UInt32(columns)
         var s = SIMD4<UInt32>(UInt32(strides.0), UInt32(strides.1), UInt32(strides.2), 0)
         var offsets = SIMD2<UInt32>(UInt32(hidden.offset), UInt32(gate.offset))
-        encoder.setComputePipelineState(pipeline)
+        encoder.setComputePipelineState(rounded == nil ? pipeline : roundedPipeline)
+        if let rounded { encoder.setBuffer(rounded.buffer, offset: rounded.offset, index: 6) }
         encoder.setBuffer(hidden.buffer, offset: 0, index: 0)
         encoder.setBuffer(gate.buffer, offset: 0, index: 1)
         encoder.setBuffer(out.buffer, offset: out.offset * 4, index: 2)

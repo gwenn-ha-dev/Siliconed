@@ -54,18 +54,56 @@ package final class ModulatedNormGPU {
             destination[i] = v;
         }
     }
+
+    \(BFloatKernels.roundingSource)
+
+    // The same, and each value rounded to bf16 where the next products read their operand (`WeightProducts.RoundedOperand`): a
+    // pair of adjacent columns per thread and step (`cols` even), each value computed as above.
+    kernel void norm_modulate_rounded(device const float *x [[buffer(0)]], device const float *w [[buffer(1)]],
+                                      device const float *factor [[buffer(2)]], device const float *shift [[buffer(3)]],
+                                      device float *out [[buffer(4)]], device uint *rounded_out [[buffer(5)]],
+                                      constant NormParams &p [[buffer(6)]],
+                                      uint row [[threadgroup_position_in_grid]], uint t [[thread_index_in_threadgroup]],
+                                      uint lane [[thread_index_in_simdgroup]], uint sg [[simdgroup_index_in_threadgroup]]) {
+        #pragma METAL fp contract(off)
+        threadgroup float partial[8];
+        device const float *source = x + ulong(row) * p.cols;
+        device float *destination = out + ulong(row) * p.cols;
+        device uint *pairs = rounded_out + ulong(row) * (p.cols / 2);
+        float ss = 0.0f;
+        for (uint i = t; i < p.cols; i += 256) { float v = source[i]; float sq = v * v; ss = ss + sq; }
+        float s = simd_sum(ss);
+        if (lane == 0) partial[sg] = s;
+        threadgroup_barrier(mem_flags::mem_threadgroup);
+        float total = 0.0f;
+        for (uint j = 0; j < 8; j++) total = total + partial[j];
+        float mean = precise::divide(total, float(p.cols));
+        float r = precise::divide(1.0f, precise::sqrt(mean + p.eps));
+        for (uint j = t; j < p.cols / 2; j += 256) {
+            uint i = 2 * j;
+            float v0 = source[i] * r, v1 = source[i + 1] * r;
+            v0 = v0 * w[i]; v1 = v1 * w[i + 1];
+            v0 = v0 * factor[i]; v1 = v1 * factor[i + 1];
+            v0 = v0 + shift[i]; v1 = v1 + shift[i + 1];
+            destination[i] = v0; destination[i + 1] = v1;
+            pairs[j] = rounded(v0) | (rounded(v1) << 16);
+        }
+    }
     """
 
     private let queue: MTLCommandQueue
-    private let pipeline: MTLComputePipelineState
+    private let pipeline, roundedPipeline: MTLComputePipelineState
 
     package init(device: MTLDevice, queue: MTLCommandQueue) throws {
         self.queue = queue
         let options = MTLCompileOptions()
         options.mathMode = .safe          // no fast-math: the division and the square root as written
         let library = try device.makeLibrary(source: Self.source, options: options)
-        guard let f = library.makeFunction(name: "norm_modulate") else { throw GEMM.Failure.noDevice }
+        guard let f = library.makeFunction(name: "norm_modulate"), let g = library.makeFunction(name: "norm_modulate_rounded") else {
+            throw GEMM.Failure.noDevice
+        }
         pipeline = try device.makeComputePipelineState(function: f)
+        roundedPipeline = try device.makeComputePipelineState(function: g)
     }
 
     private struct NormParams { var cols: UInt32; var eps: Float }
@@ -73,14 +111,21 @@ package final class ModulatedNormGPU {
     /// `out[s, :] ← ((RMSNorm(x[s, :]) · w) · factor) + shift`, one threadgroup per row; `factor` is `1 + scale`, rounded by the caller.
     /// Settled on the queue's stream (`commitSettled`): waited for and its GPU seconds returned off the stream, queued and 0 on it.
     @discardableResult
+    /// `rounded`: `out` also written rounded to bf16 there, as the next products read their operand (`WeightProducts.roundedOperand`).
     package func run(_ x: ElementwiseGPU.BufferSlice, weight: ElementwiseGPU.BufferSlice, factor: ElementwiseGPU.BufferSlice,
-                     shift: ElementwiseGPU.BufferSlice, into out: ElementwiseGPU.BufferSlice, rows: Int, columns: Int, eps: Float) -> Double {
+                     shift: ElementwiseGPU.BufferSlice, into out: ElementwiseGPU.BufferSlice, rows: Int, columns: Int, eps: Float,
+                     rounded: WeightProducts.RoundedOperand? = nil) -> Double {
         let commands = queue.checkedCommandBuffer()
         let encoder = commands.checkedEncoder()
-        encoder.setComputePipelineState(pipeline)
-        for (i, t) in [x, weight, factor, shift, out].enumerated() { encoder.setBuffer(t.buffer, offset: t.offset * 4, index: i) }
+        encoder.setComputePipelineState(rounded == nil ? pipeline : roundedPipeline)
+        var slices = [x, weight, factor, shift, out]
+        if let rounded {
+            precondition(columns % 2 == 0 && rounded.offset % 4 == 0)
+            slices.append((rounded.buffer, rounded.offset / 4))
+        }
+        for (i, t) in slices.enumerated() { encoder.setBuffer(t.buffer, offset: t.offset * 4, index: i) }
         var p = NormParams(cols: UInt32(columns), eps: eps)
-        encoder.setBytes(&p, length: MemoryLayout<NormParams>.stride, index: 5)
+        encoder.setBytes(&p, length: MemoryLayout<NormParams>.stride, index: slices.count)
         encoder.dispatchThreadgroups(MTLSize(width: rows, height: 1, depth: 1), threadsPerThreadgroup: MTLSize(width: 256, height: 1, depth: 1))
         encoder.endEncoding()
         return commands.commitSettled(label: "elementwise GPU", what: "GPU elementwise (norm_modulate)")

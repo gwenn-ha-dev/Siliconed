@@ -756,12 +756,14 @@ package final class QwenImage21DiT: BoundaryRecording, PhaseTiming {
         let normQ = keysOnly ? nil : try headWeight(prefix + "attn.norm_q.weight")
         let normK = try headWeight(prefix + "attn.norm_k.weight")
         let (xb, nb, mb) = (try slice(xs), try slice(normed), try slice(modulationSlot))
-        func modulatedNorm(scale: Int) {
+        // The norm writes the next products' operand rounded too, where they read it so (`WeightProducts.RoundedOperand`), each band
+        // at its rows.
+        func modulatedNorm(scale: Int, rounded: WeightProducts.RoundedOperand? = nil) {
             timed("norm") {
                 for band in bands {
                     ownTimings["elementwise GPU", default: 0] += kernels.norm.run(
                         (xb, band.row * d), scale: (mb, band.modulation - modulationSlot + scale), into: (nb, band.row * d),
-                        rows: band.count, columns: d, eps: eps)
+                        rows: band.count, columns: d, eps: eps, rounded: rounded?.rows(from: band.row))
                 }
             }
         }
@@ -770,10 +772,11 @@ package final class QwenImage21DiT: BoundaryRecording, PhaseTiming {
         defer { stream.isOn = false }      // drains: the CPU reads `x` (a boundary, `norm_out`) and the K/V (the cache) next
 
         // ── attention
-        modulatedNorm(scale: 0)
-        if !keysOnly { try linearGPU(prefix + "attn.to_q.weight", a: normed, into: q, m: n, k: d, n: d) }
-        try linearGPU(prefix + "attn.to_k.weight", a: normed, into: k, m: n, k: d, n: d)
-        try linearGPU(prefix + "attn.to_v.weight", a: normed, into: v, m: n, k: d, n: d)
+        let normed1 = try products.roundedOperand(prefix + "attn.to_k.weight", m: n, k: d, n: d)
+        modulatedNorm(scale: 0, rounded: normed1)
+        if !keysOnly { try linearGPU(prefix + "attn.to_q.weight", a: normed, into: q, m: n, k: d, n: d, rounded: normed1) }
+        try linearGPU(prefix + "attn.to_k.weight", a: normed, into: k, m: n, k: d, n: d, rounded: normed1)
+        try linearGPU(prefix + "attn.to_v.weight", a: normed, into: v, m: n, k: d, n: d, rounded: normed1)
         var operands: [QKNormRope.Operand] = []
         for (tensor, weight) in (normQ.map { [(q, $0)] } ?? []) + [(k, normK)] {
             let r = try gemm.region(tensor, bytes: n * d * 4, name: "qk")
@@ -802,15 +805,21 @@ package final class QwenImage21DiT: BoundaryRecording, PhaseTiming {
         try residual(xs, rows: n, bands: bands, gate: d)
 
         // ── MLP
-        modulatedNorm(scale: 2 * d)
         let (h1b, h2b) = (try slice(h1), try slice(h2))
         let chunks = (n + mlpRows - 1) / mlpRows
+        // In one chunk the norm rounds the MLP's operand too; by chunks the SwiGLU's operand takes the slot after the first, and each
+        // chunk's products round their own rows.
+        let normed2 = chunks == 1 ? try products.roundedOperand(prefix + "img_mlp.gate_layer.weight", m: n, k: d, n: hh) : nil
+        modulatedNorm(scale: 2 * d, rounded: normed2)
         for chunk in 0..<chunks {
             let begin = chunk * n / chunks, rows = (chunk + 1) * n / chunks - begin
-            try linearGPU(prefix + "img_mlp.gate_layer.weight", a: normed + begin * d, into: h1, m: rows, k: d, n: hh)
-            try linearGPU(prefix + "img_mlp.proj.weight", a: normed + begin * d, into: h2, m: rows, k: d, n: hh)
-            timed("swiglu") { ownTimings["elementwise GPU", default: 0] += elementwise.swiglu((h1b, 0), (h2b, 0), count: rows * hh) }
-            try linearGPU(prefix + "img_mlp.out.weight", a: h1, into: o + begin * d, m: rows, k: hh, n: d)
+            try linearGPU(prefix + "img_mlp.gate_layer.weight", a: normed + begin * d, into: h1, m: rows, k: d, n: hh, rounded: normed2)
+            try linearGPU(prefix + "img_mlp.proj.weight", a: normed + begin * d, into: h2, m: rows, k: d, n: hh, rounded: normed2)
+            let gated = try products.roundedOperand(prefix + "img_mlp.out.weight", m: rows, k: hh, n: d)
+            timed("swiglu") {
+                ownTimings["elementwise GPU", default: 0] += elementwise.swiglu((h1b, 0), (h2b, 0), count: rows * hh, rounded: gated)
+            }
+            try linearGPU(prefix + "img_mlp.out.weight", a: h1, into: o + begin * d, m: rows, k: hh, n: d, rounded: gated)
         }
         try residual(xs, rows: n, bands: bands, gate: 3 * d)
     }
@@ -1075,8 +1084,8 @@ package final class QwenImage21DiT: BoundaryRecording, PhaseTiming {
     /// Under a plan that reads the bf16 weight as published, it goes into the reserve as it is (`Artifact.stage`) and the product
     /// is `TensorGEMM`'s: the stack is then always added after it — merging would widen the weight again.
     private func linearGPU(_ name: String, a: UnsafeMutablePointer<Float>, into c: UnsafeMutablePointer<Float>,
-                           m: Int, k: Int, n: Int) throws {
-        try products.linear(name, a: try slice(a), c: try slice(c), m: m, k: k, n: n)
+                           m: Int, k: Int, n: Int, rounded: WeightProducts.RoundedOperand? = nil) throws {
+        try products.linear(name, a: try slice(a), c: try slice(c), m: m, k: k, n: n, rounded: rounded)
     }
 }
 

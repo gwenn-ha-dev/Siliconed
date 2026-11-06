@@ -74,29 +74,43 @@ package final class AnimaGELU {
         if (i >= n) return;
         x[i] = gelu_exact(x[i]);
     }
+
+    \(BFloatKernels.roundingSource)
+
+    // The same, and the value rounded to bf16 where the next product reads its operand (`WeightProducts.RoundedOperand`).
+    kernel void gelu_rounded(device float *x [[buffer(0)]], constant uint &n [[buffer(1)]], device ushort *r [[buffer(2)]],
+                             uint i [[thread_position_in_grid]]) {
+        if (i >= n) return;
+        float y = gelu_exact(x[i]);
+        x[i] = y;
+        r[i] = ushort(rounded(y));
+    }
     """
 
     private let queue: MTLCommandQueue
-    private let pipeline: MTLComputePipelineState
+    private let pipeline, roundedPipeline: MTLComputePipelineState
 
     package init(device: MTLDevice, queue: MTLCommandQueue) throws {
         self.queue = queue
         let options = MTLCompileOptions()
         options.mathMode = .safe          // no fast-math: `exp` and `fma` as written
         let library = try device.makeLibrary(source: Self.source, options: options)
-        guard let function = library.makeFunction(name: "gelu") else {
+        guard let function = library.makeFunction(name: "gelu"), let rounded = library.makeFunction(name: "gelu_rounded") else {
             throw GEMM.Failure.noDevice
         }
         pipeline = try device.makeComputePipelineState(function: function)
+        roundedPipeline = try device.makeComputePipelineState(function: rounded)
     }
 
     /// In place, on a shared buffer. Returns the GPU time; on the queue's stream (`GPUStream`), queued and 0.
     @discardableResult
-    package func run(_ buffer: MTLBuffer, count: Int) -> Double {
+    /// `rounded`: the result also written rounded to bf16 there, as the next product reads its operand (`WeightProducts.roundedOperand`).
+    package func run(_ buffer: MTLBuffer, count: Int, rounded: WeightProducts.RoundedOperand? = nil) -> Double {
         let commands = queue.checkedCommandBuffer()
         let encoder = commands.checkedEncoder()
         var n = UInt32(count)
-        encoder.setComputePipelineState(pipeline)
+        encoder.setComputePipelineState(rounded == nil ? pipeline : roundedPipeline)
+        if let rounded { encoder.setBuffer(rounded.buffer, offset: rounded.offset, index: 2) }
         encoder.setBuffer(buffer, offset: 0, index: 0)
         encoder.setBytes(&n, length: 4, index: 1)
         encoder.dispatchThreads(MTLSize(width: count, height: 1, depth: 1),

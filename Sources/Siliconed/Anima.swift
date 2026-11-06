@@ -437,11 +437,12 @@ package final class AnimaDiT: BoundaryRecording, PhaseTiming {
         func piece(_ i: Int, _ j: Int) -> AnimaElementwiseGPU.Slice { (bank, ((layer * 3 + i - 1) * 3 + j) * d) }
         func norm(_ i: Int) -> [Float] { streamNorms[layer * 4 + i] }
         /// `residual` of sublayer `i − 1` (its output in `o`), then the modulation of sublayer `i`, into `normed`.
-        func step(residual: Int?, modulate: Int?) {
+        /// `rounded`: the modulated rows also written rounded, where the next products read their operand (`WeightProducts.RoundedOperand`).
+        func step(residual: Int?, modulate: Int?, rounded: WeightProducts.RoundedOperand? = nil) {
             timed(modulate == nil ? "residual" : "norm") {
                 kernels.elementwise.run((xb, 0), residual: residual.map { (y: (ob, 0), gate: piece($0, 2)) },
                                         modulate: modulate.map { (shift: piece($0, 0), scale: piece($0, 1), out: (nb, 0)) },
-                                        rows: s, columns: d, eps: eps)
+                                        rows: s, columns: d, eps: eps, rounded: rounded)
             }
         }
         func recorded(_ name: String) {
@@ -451,10 +452,11 @@ package final class AnimaDiT: BoundaryRecording, PhaseTiming {
         }
 
         // ── 1. self-attention
-        step(residual: nil, modulate: 1)
-        try linearGPU(prefix + "attn1.to_q.weight", a: normed, into: q, m: s, k: d, n: d)
-        try linearGPU(prefix + "attn1.to_k.weight", a: normed, into: k, m: s, k: d, n: d)
-        try linearGPU(prefix + "attn1.to_v.weight", a: normed, into: v, m: s, k: d, n: d)
+        let normed1 = try products.roundedOperand(prefix + "attn1.to_q.weight", m: s, k: d, n: d)
+        step(residual: nil, modulate: 1, rounded: normed1)
+        try linearGPU(prefix + "attn1.to_q.weight", a: normed, into: q, m: s, k: d, n: d, rounded: normed1)
+        try linearGPU(prefix + "attn1.to_k.weight", a: normed, into: k, m: s, k: d, n: d, rounded: normed1)
+        try linearGPU(prefix + "attn1.to_v.weight", a: normed, into: v, m: s, k: d, n: d, rounded: normed1)
         let table = try gemm.region(freqs, bytes: s * dh * 4, name: "freqs")
         timed("qk-norm + rope") {
             kernels.pass.run([.init(qb, heads: heads, weight: norm(0)), .init(kb, heads: heads, weight: norm(1))],
@@ -465,8 +467,9 @@ package final class AnimaDiT: BoundaryRecording, PhaseTiming {
         recorded("attn1_out")
 
         // ── 2. cross-attention to the text — no RoPE
-        step(residual: 1, modulate: 2)
-        try linearGPU(prefix + "attn2.to_q.weight", a: normed, into: q, m: s, k: d, n: d)
+        let normed2 = try products.roundedOperand(prefix + "attn2.to_q.weight", m: s, k: d, n: d)
+        step(residual: 1, modulate: 2, rounded: normed2)
+        try linearGPU(prefix + "attn2.to_q.weight", a: normed, into: q, m: s, k: d, n: d, rounded: normed2)
         let textK = textKCache + layer * textLength * d, textV = textVCache + layer * textLength * d
         var operands = [QKNormRope.Operand(qb, heads: heads, weight: norm(2))]
         if !textCacheValid {
@@ -490,11 +493,13 @@ package final class AnimaDiT: BoundaryRecording, PhaseTiming {
         recorded("attn2_out")
 
         // ── 3. GELU FFN
-        step(residual: 2, modulate: 3)
-        try linearGPU(prefix + "ff.net.0.proj.weight", a: normed, into: h1, m: s, k: d, n: h)
+        let normed3 = try products.roundedOperand(prefix + "ff.net.0.proj.weight", m: s, k: d, n: h)
+        step(residual: 2, modulate: 3, rounded: normed3)
+        try linearGPU(prefix + "ff.net.0.proj.weight", a: normed, into: h1, m: s, k: d, n: h, rounded: normed3)
         let hb = try gemm.wrap(UnsafeMutableRawPointer(h1), bytes: imageTokens * h * 4, name: "c")
-        timed("gelu") { ownTimings["gelu GPU", default: 0] += gelu.run(hb, count: s * h) }
-        try linearGPU(prefix + "ff.net.2.weight", a: h1, into: o, m: s, k: h, n: d)
+        let activated = try products.roundedOperand(prefix + "ff.net.2.weight", m: s, k: h, n: d)
+        timed("gelu") { ownTimings["gelu GPU", default: 0] += gelu.run(hb, count: s * h, rounded: activated) }
+        try linearGPU(prefix + "ff.net.2.weight", a: h1, into: o, m: s, k: h, n: d, rounded: activated)
         recorded("ff_out")
         step(residual: 3, modulate: nil)
     }
@@ -800,10 +805,11 @@ package final class AnimaDiT: BoundaryRecording, PhaseTiming {
     ///   are memoized by address and at their maximum size; so we always wrap the whole slice,
     ///   never the part a call uses.
     private func linearGPU(_ name: String, a: UnsafeMutablePointer<Float>, into c: UnsafeMutablePointer<Float>,
-                           m: Int, k: Int, n: Int, rowsA: Int? = nil, rowsC: Int? = nil) throws {
+                           m: Int, k: Int, n: Int, rowsA: Int? = nil, rowsC: Int? = nil,
+                           rounded: WeightProducts.RoundedOperand? = nil) throws {
         let ab = try gemm.wrap(UnsafeMutableRawPointer(a), bytes: (rowsA ?? imageTokens) * k * 4, name: "a")
         let cb = try gemm.wrap(UnsafeMutableRawPointer(c), bytes: (rowsC ?? imageTokens) * n * 4, name: "c")
-        try products.linear(name, a: ab, c: cb, m: m, k: k, n: n)
+        try products.linear(name, a: ab, c: cb, m: m, k: k, n: n, rounded: rounded)
     }
 }
 
