@@ -365,7 +365,8 @@ package final class Block: BoundaryRecording, PhaseTiming {
         let h3 = try gemm.wrap(UnsafeMutableRawPointer(hidden3), bytes: s * h * 4, name: "h3")
         try products.linear(prefix + "feed_forward.w1.weight", a: a, c: h1, m: s, k: d, n: h, rounded: normed2)
         try products.linear(prefix + "feed_forward.w3.weight", a: a, c: h3, m: s, k: d, n: h, rounded: normed2)
-        let gated = try products.roundedOperand(prefix + "feed_forward.w2.weight", m: s, k: h, n: d)
+        let gated = try products.roundedOperand(prefix + "feed_forward.w2.weight", m: s, k: h, n: d, quantizes: true,
+                                                holding: elementwise.swigluQuantizedColumns)
         timed("swiglu") { ownTimings["elementwise GPU", default: 0] += elementwise.swiglu((h1, 0), (h3, 0), count: s * h, rounded: gated) }
         try products.linear(prefix + "feed_forward.w2.weight", a: h1, c: o, m: s, k: h, n: d, rounded: gated)
         try widenNorm(3, "ffn_norm2.weight")

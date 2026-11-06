@@ -218,6 +218,51 @@ package final class ElementwiseGPU {
         quantize_held(v, p.cols, q.x, as_type<float>(q.y), codes + ulong(row) * p.cols, scales + row, sg, 8, lane, part);
     }
 
+    // `swiglu` quantized to int8 for W8A8 where the next product reads its operand (`WeightProducts.RoundedOperand`), and only
+    // there: `quantize_rows`'s threadgroup (one a row, the same columns a lane), each value computed as `swiglu` computes it, in the
+    // registers `quantize_rows` would read it into, then `quantize_held`. One read of each input, one write of the codes — neither
+    // the fp32 row `swiglu` wrote nor the pass that read it back. p: the row's length, the rotation's stages, its norm's bits.
+    kernel void swiglu_quantized(device const float *a [[buffer(0)]], device const float *b [[buffer(1)]],
+                                 device char *codes [[buffer(2)]], device float *scales [[buffer(3)]],
+                                 constant uint3 &p [[buffer(4)]], uint row [[threadgroup_position_in_grid]],
+                                 uint sg [[simdgroup_index_in_threadgroup]], uint sgs [[simdgroups_per_threadgroup]],
+                                 uint lane [[thread_index_in_simdgroup]]) {
+        threadgroup float part[32];
+        const uint K = p.x, chunks = (K + 255) / 256;
+        device const float *ar = a + ulong(row) * K;
+        device const float *br = b + ulong(row) * K;
+        float v[MAXC][8];
+        for (uint i = 0; i < MAXC; ++i) {
+            const uint c = sg + i * sgs;
+            if (c < chunks) {
+                const uint base = c * 256 + lane * 8;
+                if (K % 8 == 0) {                  // a lane's eight columns as two float4 each way: whole lines, not 32 strided floats
+                    device const float4 *a4 = (device const float4 *)(ar + base);
+                    device const float4 *b4 = (device const float4 *)(br + base);
+                    for (uint h = 0; h < 2; ++h) {
+                        const float4 x = a4[h], w = b4[h];
+                        const float4 pr = x * w;
+                        float4 y;
+                        for (uint r = 0; r < 4; ++r) y[r] = over_one_plus_exp(float2(pr[r], fma(x[r], w[r], -pr[r])), x[r]);
+                        for (uint r = 0; r < 4; ++r) v[i][4 * h + r] = y[r];
+                    }
+                } else {
+                    for (uint r = 0; r < 8; ++r) {
+                        const uint col = base + r;
+                        float y = 0.0f;
+                        if (col < K) {
+                            const float x = ar[col], w = br[col];
+                            const float pr = x * w;
+                            y = over_one_plus_exp(float2(pr, fma(x, w, -pr)), x);
+                        }
+                        v[i][r] = y;
+                    }
+                }
+            }
+        }
+        quantize_held(v, K, p.y, as_type<float>(p.z), codes + ulong(row) * K, scales + row, sg, sgs, lane, part);
+    }
+
     // x += gate · ((y · r) · w) — `Ops.rmsNorm` then `Ops.gatedResidual`: the product, then the sum.
     kernel void norm_residual(device float *x [[buffer(0)]], device const float *y [[buffer(1)]],
                               device const float *w [[buffer(2)]], device const float *gate [[buffer(3)]],
@@ -242,7 +287,7 @@ package final class ElementwiseGPU {
     private let queue: MTLCommandQueue
     private let swigluPipeline, carriesPipeline, residualPipeline, normScalePipeline, normResidualPipeline: MTLComputePipelineState
     private let swigluRoundedPipeline, normScaleRoundedPipeline, carriesRoundedPipeline: MTLComputePipelineState
-    private let normScaleQuantizedPipeline: MTLComputePipelineState
+    private let normScaleQuantizedPipeline, swigluQuantizedPipeline: MTLComputePipelineState
     /// The longest row `norm_scale_quantized` holds: eight simdgroups of `QuantizedKernels.maxChunks` chunks of 256.
     package static let quantizedColumns = 8 * QuantizedKernels.maxChunks * 256
 
@@ -261,7 +306,14 @@ package final class ElementwiseGPU {
         swigluRoundedPipeline = try pipeline("swiglu_rounded"); normScaleRoundedPipeline = try pipeline("norm_scale_rounded")
         carriesRoundedPipeline = try pipeline("sigmoid_gate_rounded")
         normScaleQuantizedPipeline = try pipeline("norm_scale_quantized")
+        swigluQuantizedPipeline = try pipeline("swiglu_quantized")
+        let most = min(32, swigluQuantizedPipeline.maxTotalThreadsPerThreadgroup / 32)
+        swigluQuantizedColumns = swigluQuantizedPipeline.threadExecutionWidth == 32 ? most * QuantizedKernels.maxChunks * 256 : 0
     }
+
+    /// The longest row `swiglu_quantized` holds — `quantize_rows`'s threadgroup, up to 32 simdgroups as this device compiles it: what
+    /// `WeightProducts.roundedOperand(…holding:)` is told, so that an operand its producer cannot quantize is quantized by its product.
+    package let swigluQuantizedColumns: Int
 
     /// A buffer (at an offset in floats) — the form in which each kernel receives its operands.
     package typealias BufferSlice = (buffer: MTLBuffer, offset: Int)
@@ -292,10 +344,14 @@ package final class ElementwiseGPU {
     }
 
     /// `a ← silu(a) · b` over `count` elements. Returns the GPU time. `rounded`: the result also written rounded to bf16 there,
-    /// as the next product reads its operand (`WeightProducts.roundedOperand`; `count` even).
+    /// as the next product reads its operand (`WeightProducts.roundedOperand`; `count` even) — or, an int8 operand its producer
+    /// writes (`byProducer`), the result quantized there and nowhere else (`a` keeps its input).
     @discardableResult
     package func swiglu(_ a: BufferSlice, _ b: BufferSlice, count: Int, rounded: WeightProducts.RoundedOperand? = nil) -> Double {
-        if let rounded = rounded?.bf16 {                   // an int8 operand is its first product's to quantize
+        if let operand = rounded, let q = operand.int8, q.byProducer {
+            return swiglu(a, b, rows: count / operand.columns, columns: operand.columns, quantized: q)
+        }
+        if let rounded = rounded?.bf16 {                   // an int8 operand not the producer's is its first product's to quantize
             precondition(count % 2 == 0 && a.offset % 2 == 0 && b.offset % 2 == 0 && rounded.offset % 4 == 0)
             var n = UInt32(count / 2)
             let (g, t) = linear(count / 2)
@@ -306,6 +362,25 @@ package final class ElementwiseGPU {
         let (g, t) = linear(count)
         return launch(swigluPipeline, [a, b], constants: { $0.setBytes(&n, length: 4, index: $1) },
                       grid: g, group: t)
+    }
+
+    /// `swiglu` over `rows` rows of `columns`, quantized to int8 into `q` (W8A8) — the codes and scales `quantize_rows` would write
+    /// from it, bit for bit (`quantize_held`, the same code) — and written nowhere else: `a` keeps its input, as the product reads the
+    /// codes alone (`roundedOperand` gives a producer's slot only to a product of one chunk, the GPU's alone, whose kernel takes the
+    /// row). The fewest simdgroups a row (`maxChunks` chunks each): more rows in flight, the same codes (the row's maximum is exact in
+    /// any order). `columns` ≤ `swigluQuantizedColumns`.
+    @discardableResult
+    package func swiglu(_ a: BufferSlice, _ b: BufferSlice, rows: Int, columns: Int, quantized q: WeightProducts.RoundedOperand.Quantized)
+        -> Double {
+        let chunks = (columns + 255) / 256
+        let simdgroups = (chunks + QuantizedKernels.maxChunks - 1) / QuantizedKernels.maxChunks
+        precondition(columns <= swigluQuantizedColumns && q.codesOffset % 4 == 0 && q.scalesOffset % 4 == 0)
+        GEMM.producerQuantized.withLock { $0 += 1 }
+        var p = SIMD3<UInt32>(UInt32(columns), UInt32(q.stages), q.norm.bitPattern)
+        return launch(swigluQuantizedPipeline, [a, b, (q.buffer, q.codesOffset / 4), (q.buffer, q.scalesOffset / 4)],
+                      constants: { $0.setBytes(&p, length: MemoryLayout<SIMD3<UInt32>>.stride, index: $1) },
+                      grid: MTLSize(width: rows, height: 1, depth: 1), group: MTLSize(width: 32 * simdgroups, height: 1, depth: 1),
+                      byGroups: true)
     }
 
     /// `x ← x · σ(g)`. `rounded`: as `swiglu`'s.
