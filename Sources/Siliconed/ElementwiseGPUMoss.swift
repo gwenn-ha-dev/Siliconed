@@ -88,39 +88,86 @@ package final class MossImageNormGPU {
             pairs[j] = rounded(y0) | (rounded(y1) << 16);
         }
     }
+
+    \(QuantizedKernels.rowSource)
+
+    // The same, and the row quantized to int8 for W8A8 where the next products read their operand (`WeightProducts.RoundedOperand`):
+    // each value computed as above, by the thread that holds its column as `quantize_rows` would read it (chunk c of 256 in
+    // simdgroup c % 8, eight consecutive columns a lane), then `quantize_held` — `quantize_rows`'s own code. q: the rotation's
+    // stages, its norm's bits. Up to `ElementwiseGPU.quantizedColumns`.
+    kernel void norm_modulate_quantized(device const float *x [[buffer(0)]], device const float *w [[buffer(1)]],
+                                        device const float *scale [[buffer(2)]], device const float *shift [[buffer(3)]],
+                                        device float *out [[buffer(4)]], constant NormParams &p [[buffer(5)]],
+                                        device char *codes [[buffer(6)]], device float *scales [[buffer(7)]],
+                                        constant uint2 &q [[buffer(8)]],
+                                        uint row [[threadgroup_position_in_grid]], uint t [[thread_index_in_threadgroup]],
+                                        uint lane [[thread_index_in_simdgroup]], uint sg [[simdgroup_index_in_threadgroup]]) {
+        #pragma METAL fp contract(off)
+        threadgroup float partial[8], part[32];
+        device const float *source = x + ulong(row) * p.cols;
+        device float *destination = out + ulong(row) * p.cols;
+        float r = row_scale(source, p.cols, p.eps, t, lane, sg, partial);
+        const uint chunks = (p.cols + 255) / 256;
+        float held[MAXC][8];
+        for (uint i = 0; i < MAXC; ++i) {
+            const uint c = sg + i * 8;
+            if (c < chunks) {
+                for (uint j = 0; j < 8; ++j) {
+                    const uint col = c * 256 + lane * 8 + j;
+                    float y = 0.0f;
+                    if (col < p.cols) {
+                        float v = source[col] * r;
+                        v = v * w[col];
+                        float factor = scale[col] + 1.0f;
+                        float product = v * factor;
+                        y = product + shift[col];
+                        destination[col] = y;
+                    }
+                    held[i][j] = y;
+                }
+            }
+        }
+        quantize_held(held, p.cols, q.x, as_type<float>(q.y), codes + ulong(row) * p.cols, scales + row, sg, 8, lane, part);
+    }
     """
 
     private let queue: MTLCommandQueue
-    private let pipeline, roundedPipeline: MTLComputePipelineState
+    private let pipeline, roundedPipeline, quantizedPipeline: MTLComputePipelineState
 
     package init(device: MTLDevice, queue: MTLCommandQueue) throws {
         self.queue = queue
         let options = MTLCompileOptions()
         options.mathMode = .safe          // the division and the square root as written
         let library = try device.makeLibrary(source: Self.source, options: options)
-        guard let function = library.makeFunction(name: "norm_modulate"), let rounded = library.makeFunction(name: "norm_modulate_rounded")
+        guard let function = library.makeFunction(name: "norm_modulate"), let rounded = library.makeFunction(name: "norm_modulate_rounded"),
+              let quantized = library.makeFunction(name: "norm_modulate_quantized")
         else { throw GEMM.Failure.noDevice }
         pipeline = try device.makeComputePipelineState(function: function)
         roundedPipeline = try device.makeComputePipelineState(function: rounded)
+        quantizedPipeline = try device.makeComputePipelineState(function: quantized)
     }
 
     private struct NormParams { var cols: UInt32; var eps: Float }
 
     /// `out[s, :] ← RMSNorm(x[s, :]) · w · (1 + scale) + shift` over `rows × columns`, one threadgroup per row; each operand a buffer and
-    /// an offset in floats. Returns the GPU's seconds — 0 on the stream, where it is queued and judged at the drain.
+    /// an offset in floats. Returns the GPU's seconds — 0 on the stream, where it is queued and judged at the drain. `rounded`: `out`
+    /// also written rounded to bf16 there, or quantized to int8 for W8A8 where the operand says the producer writes it (`byProducer`).
     @discardableResult
     package func normModulate(_ x: ElementwiseGPU.BufferSlice, weight: ElementwiseGPU.BufferSlice, scale: ElementwiseGPU.BufferSlice,
                               shift: ElementwiseGPU.BufferSlice, into out: ElementwiseGPU.BufferSlice,
-                              rows: Int, columns: Int, eps: Float, rounded: WeightProducts.RoundedOperand? = nil) -> Double {
+                              rows: Int, columns: Int, eps: Float, rounded operand: WeightProducts.RoundedOperand? = nil) -> Double {
+        let rounded = operand?.bf16
+        let quantized = operand?.int8.flatMap { $0.byProducer ? $0 : nil }
         guard rows > 0, columns > 0, case let commands = queue.checkedCommandBuffer(),
               let encoder = commands.makeComputeCommandEncoder() else {
             Attention.report("GPU modulated norm (MOSS-Image): no command buffer, so nothing ran")
             return 0
         }
         var p = NormParams(cols: UInt32(columns), eps: eps)
-        encoder.setComputePipelineState(rounded == nil ? pipeline : roundedPipeline)
+        encoder.setComputePipelineState(quantized != nil ? quantizedPipeline : rounded == nil ? pipeline : roundedPipeline)
         var slices = [x, weight, scale, shift, out]
-        if let rounded {
+        if let quantized { precondition(columns <= ElementwiseGPU.quantizedColumns); quantized.bind(encoder, at: slices.count + 1) }
+        else if let rounded {
             precondition(columns % 2 == 0 && rounded.offset % 4 == 0)
             slices.append((rounded.buffer, rounded.offset / 4))
         }

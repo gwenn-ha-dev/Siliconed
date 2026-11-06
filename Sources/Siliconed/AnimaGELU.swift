@@ -105,7 +105,8 @@ package final class AnimaGELU {
     /// In place, on a shared buffer. Returns the GPU time; on the queue's stream (`GPUStream`), queued and 0.
     @discardableResult
     /// `rounded`: the result also written rounded to bf16 there, as the next product reads its operand (`WeightProducts.roundedOperand`).
-    package func run(_ buffer: MTLBuffer, count: Int, rounded: WeightProducts.RoundedOperand? = nil) -> Double {
+    package func run(_ buffer: MTLBuffer, count: Int, rounded operand: WeightProducts.RoundedOperand? = nil) -> Double {
+        let rounded = operand?.bf16                        // an int8 operand is its first product's to quantize
         let commands = queue.checkedCommandBuffer()
         let encoder = commands.checkedEncoder()
         var n = UInt32(count)

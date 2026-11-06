@@ -21,6 +21,8 @@ import Metal
 ///              │                                (`ProductAssignment.ane` on a native weight)   beside the GPU's rows
 ///              │     or W8A8                    the activation rotated and quantized to   ─▶ matmul2d int8 × int8 → int32,
 ///              │                                int8 per row in the reserve's tail          × s_x · s_w after (`QuantizedKernels`)
+///              │                                — by its producer, a norm (`RoundedOperand.int8`), or once by the first product
+///              │                                that reads it: the next ones read the same codes
 ///              │     or a K-quant (Q4_K, Q5_K)  its blocks copied as stored, unpacked on  ─▶ matmul2d bfloat × half per
 ///              │                                the GPU into sc·q, d, dmin·m (`KQuantKernels`)  super-block, the activation rounded
 ///              └─ path widened                 widened on the CPU (`Artifact.materialize`) ─▶ MPS (+ AMX, + ANE rows)
@@ -54,6 +56,9 @@ import Metal
 ///     converts the bf16 values as they are (a widening is a shift: the fp16 operand of the widened route, bit for bit), its rows read
 ///     the fp32 activation; the GPU's rows round theirs into the reserve's tail, past the weight the ANE reads. A program the process
 ///     cannot run (a refusal, a weight laid out `[n, k]`) or a non-finite output hands the rows back to the GPU's rounded kernel;
+///   - **an operand quantized ahead survives the next int8 weights' staging** (`quantizedSlot`): its codes lie past the integers,
+///     scales and AMX columns of the weight that asked for it (`Int8Plan.rotatedOffset`), so k and v, staged after q, still read
+///     the codes the norm wrote; any write that may reach them (another path, a rotation, a LoRA, a pass of a product's own) drops it;
 ///   - **a rounded activation rounds the operand of a product and nothing else** (`roundsActivations`, which a
 ///     DiT sets and a text encoder does not): the caller's activation stays fp32 — the LoRA stack reads it —,
 ///     the rounded copy lives in the reserve's tail beside the weight (`roundingPlan`), the sums and the
@@ -78,6 +83,16 @@ package final class WeightProducts {
     /// Every write into the reserve this module makes (a staging, a widening, a rounding pass, a LoRA's scratch), counted: an
     /// operand a producer rounded into it (`RoundedOperand`) is read only while nothing has written over it since.
     private var reserveWrites: UInt64 = 0
+    /// The int8 operand handed out last (`roundedOperand`, W8A8): its generation, how far into the reserve the writes since reached —
+    /// an int8 weight staged below its codes leaves them whole, so q, k and v each stage theirs and still read them —, and whether
+    /// they are written yet (by the producer, or by the first product that read the operand). `nil`: overwritten, or none.
+    private var quantizedSlot: (generation: UInt64, reach: Int, filled: Bool)?
+
+    /// A write into the reserve that may reach anywhere in it: no operand rounded or quantized there before survives it.
+    private func wroteReserve() {
+        reserveWrites &+= 1
+        quantizedSlot = nil
+    }
     /// The last int8 or rounded bf16 product had rows on the ANE, and it computed them (`classification`).
     private var aneTook = false
     /// ... and it took every row of the product: the ledger names the route `ane/int8`, as the plan does (`ProductAssignment.route`).
@@ -107,40 +122,112 @@ package final class WeightProducts {
         return result
     }
 
-    // MARK: The operand rounded by its producer
+    // MARK: The operand rounded or quantized by its producer
 
     /// **Where the kernel that makes a product's operand may also write it rounded to bf16**, so the product does not round it
     /// again (`TensorGEMM.linear(…rounded:)`): the reserve's head, as `round_bf16` would have written it — the operand of a bf16 weight
     /// read in place on the stream, all its `m` rows in one chunk. The producer writes the fp32 operand too (the ANE's rows, the
     /// LoRA stack and any product that does not take this path read it), so a product that finds the reserve written since
     /// (`reserveWrites`) or another path rounds it again from there: the same bits either way.
+    ///
+    /// **Or quantized to int8, for W8A8** (`int8`): the codes and the rows' scales where the product's plan puts them
+    /// (`Int8Plan.quantizedOffset`), all `m` rows in one chunk, as `quantize_rows` writes them. A producer that holds the whole row
+    /// writes them as it writes the fp32 operand (`ElementwiseGPU.normScale`, `byProducer`); any other leaves them to the first
+    /// product that reads the operand, and the next ones read them — one pass per operand, not one per product (q, k and v; w1 and
+    /// w3). A producer that only rounds reads `bf16`, `nil` here: the int8 slot is never its to write.
     package struct RoundedOperand {
-        package let buffer: MTLBuffer
-        /// In bytes, 16-aligned.
-        package let offset: Int
+        /// The bf16 slot (offset in bytes, 16-aligned), `nil` for an int8 operand.
+        package let bf16: (buffer: MTLBuffer, offset: Int)?
+        /// The int8 slot, `nil` for a bf16 operand.
+        package let int8: Quantized?
         fileprivate let k: Int, rows: Int, generation: UInt64
 
-        /// The same operand from its row `first` on: a product over a slice of the rows (a chunk of an MLP).
+        /// Where an int8 operand lies: its codes `[rows, k]` and its rows' scales fp32, in bytes, page-aligned at the first row; the
+        /// rotation the product's weight carries (`stages`, `norm` as `quantize_rows` takes them).
+        package struct Quantized {
+            package let buffer: MTLBuffer
+            package let codesOffset: Int, scalesOffset: Int
+            package let group: Int?
+            package let stages: Int
+            package var norm: Float { group.map { 1 / Float($0).squareRoot() } ?? 1 }
+            /// The producer writes the codes (`ElementwiseGPU.normScale`); else the first product that reads the operand does.
+            package let byProducer: Bool
+
+            /// The slot as a producer's quantizing kernel takes it — the codes at `index`, the scales at `index + 1`, the rotation
+            /// (`uint2`: its stages, its norm's bits) at `index + 2` — counted (`GEMM.producerQuantized`).
+            package func bind(_ encoder: MTLComputeCommandEncoder, at index: Int) {
+                encoder.setBuffer(buffer, offset: codesOffset, index: index)
+                encoder.setBuffer(buffer, offset: scalesOffset, index: index + 1)
+                var rotation = SIMD2<UInt32>(UInt32(stages), norm.bitPattern)
+                encoder.setBytes(&rotation, length: MemoryLayout<SIMD2<UInt32>>.stride, index: index + 2)
+                GEMM.producerQuantized.withLock { $0 += 1 }
+            }
+        }
+
+        /// An int8 operand no product reads (a producer's kernel run alone, the tests): never a live slot.
+        package init(producing q: Quantized, k: Int, rows: Int) {
+            self.init(bf16: nil, int8: q, k: k, rows: rows, generation: 0)
+        }
+
+        fileprivate init(bf16: (buffer: MTLBuffer, offset: Int)?, int8: Quantized?, k: Int, rows: Int, generation: UInt64) {
+            self.bf16 = bf16; self.int8 = int8; self.k = k; self.rows = rows; self.generation = generation
+        }
+
+        /// The same operand from its row `first` on: a product over a slice of the rows (a chunk of an MLP), a producer by bands.
         package func rows(from first: Int) -> RoundedOperand {
-            RoundedOperand(buffer: buffer, offset: offset + first * k * 2, k: k, rows: rows - first, generation: generation)
+            RoundedOperand(bf16: bf16.map { ($0.buffer, $0.offset + first * k * 2) },
+                           int8: int8.map { Quantized(buffer: $0.buffer, codesOffset: $0.codesOffset + first * k,
+                                                      scalesOffset: $0.scalesOffset + first * 4, group: $0.group, stages: $0.stages,
+                                                      byProducer: $0.byProducer) },
+                           k: k, rows: rows - first, generation: generation)
         }
     }
 
     /// The slot for `name`'s operand (`[m, k]`), or `nil` where its product would not read it (another path, rows in several
-    /// chunks, the stream off, `SILICONED_ROUND_FUSED=0`). Asked just before the producer is encoded: nothing but the products that
-    /// read the operand may write the reserve until they are encoded.
-    package func roundedOperand(_ name: String, m: Int, k: Int, n: Int) throws -> RoundedOperand? {
+    /// chunks, the stream off for a bf16 one, `SILICONED_ROUND_FUSED=0`). Asked just before the producer is encoded: nothing but the
+    /// products that read the operand may write the reserve until they are encoded. `quantizes`: the producer can write an int8
+    /// operand too (`ElementwiseGPU.normScale`, a row of up to `ElementwiseGPU.quantizedColumns`); else it is the first product's.
+    package func roundedOperand(_ name: String, m: Int, k: Int, n: Int, quantizes: Bool = false) throws -> RoundedOperand? {
         guard Self.fusesRounding else { return nil }
         let planned = gemm.assignment(k: k, n: n, m: m, weight: format(of: name))
-        guard let (_, _, rounding) = inPlaceRounding(name, k: k, n: n, planned: planned), rounding.rows >= m else { return nil }
         let w = try gemm.wrap(UnsafeMutableRawPointer(reserve), bytes: capacity * 4, name: "w")
-        reserveWrites &+= 1                        // the producer writes the slot: any operand rounded there before is gone
-        return RoundedOperand(buffer: w, offset: rounding.offset, k: k, rows: m, generation: reserveWrites)
+        if let (_, _, rounding) = inPlaceRounding(name, k: k, n: n, planned: planned), rounding.rows >= m {
+            wroteReserve()                         // the producer writes the slot: any operand rounded there before is gone
+            return RoundedOperand(bf16: (w, rounding.offset), int8: nil, k: k, rows: m, generation: reserveWrites)
+        }
+        guard Self.sharesQuantized != .off, let plan = quantizedPlan(name, k: k, n: n, planned: planned), plan.chunk >= m,
+              aneInt8Rows(planned, plan, m: m, k: k, n: n) == 0, let stages = W8A8.stages(group: plan.group) else { return nil }
+        let byProducer = quantizes && Self.sharesQuantized == .producer && k <= ElementwiseGPU.quantizedColumns
+        wroteReserve()
+        quantizedSlot = (reserveWrites, 0, byProducer)
+        return RoundedOperand(bf16: nil, int8: .init(buffer: w, codesOffset: plan.quantizedOffset, scalesOffset: plan.quantizedScalesOffset,
+                                                     group: plan.group, stages: stages, byProducer: byProducer),
+                              k: k, rows: m, generation: reserveWrites)
     }
 
-    /// `SILICONED_ROUND_FUSED=0`: every product rounds its own operand again, as before the producers wrote it (a forcing of
-    /// measurement: the same bits).
+    /// `SILICONED_ROUND_FUSED=0`: every product rounds or quantizes its own operand again, as before the producers wrote it (a forcing
+    /// of measurement: the same bits).
     package static let fusesRounding = ProcessInfo.processInfo.environment["SILICONED_ROUND_FUSED"] != "0"
+
+    /// **Who quantizes a W8A8 operand that several products read** (`SILICONED_QUANT_FUSED`, a forcing of measurement: the same bits):
+    /// `producer`, the default — the producer that can (`roundedOperand(…quantizes:)`), else the first product; `pass` (`pass`) — the
+    /// first product always, the next ones read its codes; `off` (`0`) — every product its own, as before.
+    package enum QuantizedSharing { case off, pass, producer }
+    package static let sharesQuantized: QuantizedSharing = switch ProcessInfo.processInfo.environment["SILICONED_QUANT_FUSED"] {
+    case "0", "off": .off
+    case "pass": .pass
+    default: .producer
+    }
+
+    /// The int8 slot of `operand` where this W8A8 product of `plan` may read it: handed out last, nothing written over its codes since
+    /// (`quantizedSlot`, this product's staging included), the same rotation, all the rows. With whether its codes are written yet.
+    private func sharedQuantized(_ operand: RoundedOperand?, plan: Int8Plan, w: MTLBuffer, m: Int, k: Int)
+        -> (quantizing: TensorGEMM.Quantizing, written: Bool)? {
+        guard let operand, let q = operand.int8, let slot = quantizedSlot, slot.generation == operand.generation,
+              slot.reach <= q.codesOffset, plan.quantizedOffset > 0, plan.group == q.group, operand.k == k, operand.rows >= m,
+              q.buffer === w else { return nil }
+        return ((w, q.codesOffset, q.scalesOffset, operand.rows), slot.filled)
+    }
 
     /// **`C = A · W` (+ the stack of `target`)**, `W` the map's `name`. `a` and `c` are the model's
     /// buffers, wrapped at their reserved size (`GEMM.wrap` memoizes by address). `target`: the module
@@ -186,10 +273,11 @@ package final class WeightProducts {
                 if let (map, offset) = inPlace {
                     // The operand its producer rounded, where nothing wrote over it since; else this product's own pass writes the
                     // reserve.
-                    let reuse = operand.map { $0.generation == reserveWrites && $0.k == k && $0.rows >= m && $0.buffer === w
+                    let slot = operand?.bf16
+                    let reuse = operand.map { $0.generation == reserveWrites && $0.k == k && $0.rows >= m && slot?.buffer === w
                                               && rounding.offset == 0 && rounding.rows >= m } ?? false
-                    if reuse { GEMM.producerRounded.withLock { $0 += 1 } } else { reserveWrites &+= 1 }
-                    let rounding = reuse ? Rounding(offset: operand!.offset, rows: rounding.rows) : rounding
+                    if reuse { GEMM.producerRounded.withLock { $0 += 1 } } else { wroteReserve() }
+                    let rounding = reuse ? Rounding(offset: slot!.offset, rows: rounding.rows) : rounding
                     // On the stream: the ANE's rows beside the queued GPU work, waited for on the GPU (`GPUStream.neuralEngine`).
                     if aneRows > 0, GPUStream.policy == .on, let ane = gemm.neuralEngine, ane.accepts(rows: aneRows, k: k, n: n),
                        let weight = artifact.pointer(name) {
@@ -237,6 +325,7 @@ package final class WeightProducts {
                 // the reserve beside the GPU's int8 kernel. The engine takes them only if it can run them (`aneInt8Rows`).
                 let aneRows = aneInt8Rows(planned, plan, m: m, k: k, n: n)
                 if aneRows > 0, let ane = gemm.neuralEngine {
+                    quantizedSlot = nil                    // the GPU's rows quantize theirs into the tail
                     let r = Self.int8Product(gemm: gemm, plan: plan, reserve: w, a: a, c: c, m: m, k: k, n: n, ane: ane, aneRows: aneRows)
                     timings["gemm GPU", default: 0] += r.gpu
                     aneTook = r.computed
@@ -244,7 +333,12 @@ package final class WeightProducts {
                 } else {
                     aneTook = false; aneAlone = false
                     aneDeclined = planned.ane > 0
-                    let r = Self.int8Product(gemm: gemm, plan: plan, reserve: w, a: a, c: c, m: m, k: k, n: n)
+                    // W8A8 on an operand quantized ahead (`RoundedOperand.int8`): read where its producer or the product before wrote
+                    // it, or written there by this one for the next. Anything else writes the reserve's tail (its own pass, a rotation).
+                    let shared = sharedQuantized(operand, plan: plan, w: w, m: m, k: k)
+                    if let shared, shared.written { GEMM.prequantizedProducts.withLock { $0 += 1 } }
+                    let r = Self.int8Product(gemm: gemm, plan: plan, reserve: w, a: a, c: c, m: m, k: k, n: n, quantized: shared)
+                    if shared != nil { quantizedSlot?.filled = true } else { quantizedSlot = nil }
                     timings["gemm GPU", default: 0] += r.gpu
                     timings["widening", default: 0] += r.widening
                     if r.status != 0 { failure = "\(name): the AMX refused its columns (BNNS \(r.status))" }
@@ -285,7 +379,7 @@ package final class WeightProducts {
         // The stack writes the reserve where the CPU's engines take rows of its second product (`GEMM.accumulatedLinear`'s scratch),
         // or where it was merged into the weight there; wholly the GPU's, it does not.
         if let stack, merged || !(gemm.runsOnGPUAlone(k: k, n: stack.rank, m: m, weight: .loraDown)
-                                  && gemm.runsOnGPUAlone(k: stack.rank, n: n, m: m, weight: .loraUp)) { reserveWrites &+= 1 }
+                                  && gemm.runsOnGPUAlone(k: stack.rank, n: n, m: m, weight: .loraUp)) { wroteReserve() }
         if !merged, let stack, let mid {
             let mb = try gemm.wrap(UnsafeMutableRawPointer(mid), bytes: midFloats * 4, name: "loraMid")
             lora(x: a, stack: stack, mid: mb, c: c, scratch: w, m: m, k: k, n: n)
@@ -451,17 +545,21 @@ package final class WeightProducts {
     /// the first columns — all of them without a conductor or AMX columns —, the CPU widening the last ones
     /// meanwhile, the AMX on them. What the map measures (`Diagnostic`) is this function. Returns the GPU
     /// seconds, the widening's, BNNS's status (0, or its refusal: those columns are then unwritten).
+    ///
+    /// `quantized` (W8A8): the activation quantized into an operand's slot instead of the plan's (`RoundedOperand.int8`) — read from
+    /// there if `written`, else written there in one chunk.
     package static func int8Product(gemm: GEMM, plan: Int8Plan, reserve w: MTLBuffer, a: MTLBuffer, c: MTLBuffer,
-                                    m: Int, k: Int, n: Int) -> (gpu: Double, widening: Double, status: Int32) {
+                                    m: Int, k: Int, n: Int, quantized: (quantizing: TensorGEMM.Quantizing, written: Bool)? = nil)
+        -> (gpu: Double, widening: Double, status: Int32) {
         let rotation = plan.group.map { (group: $0, scratch: w, offset: plan.rotatedOffset, chunk: plan.chunk) }
         let rounding = plan.roundedOffset > 0 ? (buffer: w, offset: plan.roundedOffset, rows: plan.chunk) : nil
-        let quantizing = plan.quantizedOffset > 0
-            ? (buffer: w, codesOffset: plan.quantizedOffset, scalesOffset: plan.quantizedScalesOffset, rows: plan.chunk) : nil
+        let quantizing = quantized?.quantizing ?? (plan.quantizedOffset > 0
+            ? (buffer: w, codesOffset: plan.quantizedOffset, scalesOffset: plan.quantizedScalesOffset, rows: plan.chunk) : nil)
         if rounding != nil { GEMM.roundedProducts.withLock { $0 += 1 } }
         guard plan.amxColumns > 0, let conductor = gemm.conductor else {
             return (gemm.tensor!.linear(a: a, int8: w, scales: w, scalesOffset: plan.scalesOffset, perColumn: plan.perColumn,
                                         block: plan.block, rotation: rotation, rounding: rounding, quantizing: quantizing,
-                                        c: c, m: m, k: k, n: n), 0, 0)
+                                        prequantized: quantized?.written ?? false, c: c, m: m, k: k, n: n), 0, 0)
         }
         let g = n - plan.amxColumns
         let commands = gemm.tensor!.submit(a: a, int8: w, scales: w, scalesOffset: plan.scalesOffset, perColumn: plan.perColumn,
@@ -627,6 +725,18 @@ package final class WeightProducts {
         return (map, offset, rounding)
     }
 
+    /// **The W8A8 plan `prepare` gives `name`'s product**, without staging anything (`roundedOperand` asks it ahead): a published
+    /// int8 weight scaled per column or for the tensor, the activation quantized where the plan says, this caller quantizes (the
+    /// DiT's), the kernels are built and take the row. `nil`: another path.
+    private func quantizedPlan(_ name: String, k: Int, n: Int, planned: ProductAssignment) -> Int8Plan? {
+        guard planned.path == .native, planned.quantizesActivation, roundsActivations, gemm.int8Activations, transposed,
+              let tensor = artifact.tensors[name], tensor.dtype == .int8, let scale = tensor.scale, scale.block == nil,
+              scale.shape.count <= 1, tensor.shape == [k, n], gemm.tensorInt8, gemm.tensor?.quantized?.simdgroups(k: k) != nil
+        else { return nil }
+        return Self.int8Plan(k: k, n: n, capacity: capacity, perColumn: scale.shape.count == 1, group: tensor.rotation?.group,
+                             amxColumns: 0, quantized: true)
+    }
+
     private func prepare(_ name: String, count: Int, m: Int, n: Int) throws -> (Path, ProductAssignment, skipped: ProductLedger.Reason?) {
         func expect(_ got: Int) throws {
             guard got == count else { throw Artifact.Failure.badHeader("\(name): \(got) values, \(count) expected") }
@@ -643,8 +753,10 @@ package final class WeightProducts {
             inPlace = (map, offset)
             return (.bf16(rounding), planned, nil)
         }
-        // Anything else writes the reserve on the CPU: the queued work that reads it first.
-        reserveWrites &+= 1
+        // Anything else writes the reserve on the CPU: the queued work that reads it first. An int8 operand's codes survive an int8
+        // weight staged below them (`quantizedSlot`).
+        let slot = quantizedSlot
+        wroteReserve()
         stream.drain()
         // How this product reads its weight (the plan's): the bf16 weight as published, its operand rounded to bf16 where the
         // plan says it gains, the 8-bit weight as published, or widened.
@@ -667,15 +779,11 @@ package final class WeightProducts {
             let (perColumn, group) = (scale.shape.count == 1, tensor.rotation?.group)
             let roundsHere = planned.roundsActivation && roundsActivations && gemm.bf16Activations
                 && (scale.block == nil || gemm.tensor?.roundsBlocks == true)
-            // W8A8: the activation quantized where the plan says, this caller quantizes (the DiT's), the kernels are built and take
-            // the row; else the integers on the fp32 activation, said in the record.
-            let quantizesHere = planned.quantizesActivation && roundsActivations && gemm.int8Activations && scale.block == nil
-                && gemm.tensor?.quantized?.simdgroups(k: k) != nil
             // The AMX's columns the plan gave: widened alone beside the GPU's. Rounded, the GPU alone: the AMX reads the fp32
             // activation, one rounding for some columns only.
             let amxColumns = gemm.conductor == nil ? 0 : planned.amxColumns
-            guard let plan = (quantizesHere ? Self.int8Plan(k: k, n: n, capacity: capacity, perColumn: perColumn, group: group,
-                                                            amxColumns: 0, quantized: true) : nil)
+            // W8A8 first (`quantizedPlan`); else the integers on the fp32 activation, said in the record.
+            guard let plan = quantizedPlan(name, k: k, n: n, planned: planned)
                     ?? (roundsHere ? Self.int8Plan(k: k, n: n, capacity: capacity, perColumn: perColumn, group: group,
                                                          amxColumns: 0, block: scale.block, rounded: true) : nil)
                     ?? Self.int8Plan(k: k, n: n, capacity: capacity, perColumn: perColumn, group: group,
@@ -686,6 +794,8 @@ package final class WeightProducts {
             try expect(tensor.count)
             try timed("staging") { try artifact.stageInt8(name, into: UnsafeMutableRawPointer(reserve),
                                                           scalesAt: plan.scalesOffset) }
+            // The staging and the AMX's columns write below `rotatedOffset`: an int8 operand's codes past it are whole.
+            if let slot { quantizedSlot = (slot.generation, max(slot.reach, plan.rotatedOffset), slot.filled) }
             let unavailable: ProductLedger.Reason? = planned.quantizesActivation && plan.quantizedOffset == 0 ? .quantizingUnavailable
                 : planned.roundsActivation && plan.roundedOffset == 0 ? .roundingUnavailable : nil
             return (.int8(plan), planned, unavailable)

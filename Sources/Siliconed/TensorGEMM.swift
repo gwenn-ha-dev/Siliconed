@@ -261,10 +261,12 @@ package final class TensorGEMM {
     /// GPU seconds.
     package func linear(a: MTLBuffer, int8 w: MTLBuffer, scales: MTLBuffer, scalesOffset: Int, perColumn: Bool,
                         block: Int? = nil, rotation: (group: Int, scratch: MTLBuffer, offset: Int, chunk: Int)?,
-                        rounding: Rounding? = nil, quantizing: Quantizing? = nil, c: MTLBuffer, m: Int, k: Int, n: Int) -> Double {
+                        rounding: Rounding? = nil, quantizing: Quantizing? = nil, prequantized: Bool = false,
+                        c: MTLBuffer, m: Int, k: Int, n: Int) -> Double {
         if let quantizing, block == nil,
            let commands = submitQuantized(a: a, int8: w, scales: scales, scalesOffset: scalesOffset, perColumn: perColumn,
-                                          group: rotation?.group, quantizing: quantizing, c: c, m: m, k: k, n: n) {
+                                          group: rotation?.group, quantizing: quantizing, prequantized: prequantized,
+                                          c: c, m: m, k: k, n: n) {
             commands.waitUntilCompleted()
             GEMM.quantizedProducts.withLock { $0 += 1 }
             return Attention.verdict(commands, what: "matmul2d int8 × int8 \(m)×\(k)×\(n)")
