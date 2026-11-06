@@ -112,6 +112,36 @@ import Testing
         }
     }
 
+    /// **The pass writing Q and K rounded into the attention's copies** (`Operand.rounded`, `TiledAttention.operands`) gives the
+    /// attention the operands its own conversion would: the same output to the bit, fp32 Q and K left unwritten and unread.
+    @Test(arguments: [TiledAttention.Precision.fp16, .bf16]) func theRoundedCopyIsTheAttentionsOwnConversionToTheBit(_ precision: TiledAttention.Precision) throws {
+        guard let device = MTLCreateSystemDefaultDevice(), device.supportsFamily(.metal4), let queue = device.makeCommandQueue() else { return }
+        let gpu = try QKNormRope(device: device, queue: queue)
+        let d = Self.headDim, rows = 77, heads = 4, kvHeads = 2
+        let f = table(rows: rows, layout: .interleaved)
+        func buffer(_ values: [Float]) throws -> MTLBuffer {
+            try #require(device.makeBuffer(bytes: values, length: values.count * 4, options: .storageModeShared))
+        }
+        let x = random(rows * heads * d, seed: 1, scale: 30), y = random(rows * kvHeads * d, seed: 2, scale: 30)
+        let w = random(d, seed: 3, scale: 2), table = try buffer(f), v = try buffer(random(rows * kvHeads * d, seed: 4, scale: 50))
+        func attention(rounded: Bool) throws -> [UInt32] {
+            let q = try buffer(x), k = try buffer(y), out = try buffer([Float](repeating: 0, count: rows * heads * d))
+            let tiled = try TiledAttention(device: device, queue: queue, heads: heads, sequence: rows, headDim: d, kvHeads: kvHeads,
+                                           precision: precision, tile: AttentionTile.candidates[0])
+            let copies = rounded ? try #require(tiled.operands) : nil
+            gpu.run([.init(q, heads: heads, weight: w, rounded: copies.map { ($0.q, precision) }, keepsFP32: false),
+                     .init(k, heads: kvHeads, weight: w, rounded: copies.map { ($0.k, precision) }, keepsFP32: false)],
+                    rows: rows, headDim: d, eps: 1e-5, freqs: (table, 0), layout: .interleaved)
+            if rounded {
+                #expect(Array(UnsafeBufferPointer(start: q.contents().assumingMemoryBound(to: Float.self), count: x.count)) == x,
+                        "the fp32 Q left as it was")
+            }
+            _ = tiled.run(q: q, k: k, v: v, into: out, prerounded: rounded ? [.q, .k] : [])
+            return Array(UnsafeBufferPointer(start: out.contents().assumingMemoryBound(to: UInt32.self), count: rows * heads * d))
+        }
+        #expect(try attention(rounded: true) == attention(rounded: false), "\(precision)")
+    }
+
     // MARK: - The map, the solver, the plan
 
     func model(cpuRate: Double = 4e9, gpuRate: Double = 40e9, wake: Double? = 0.00085) -> M {

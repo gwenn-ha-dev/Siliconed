@@ -42,10 +42,12 @@ package final class QKNormRope: @unchecked Sendable {   // immutable after init;
     #include <metal_stdlib>
     using namespace metal;
 
-    struct Params { uint vectors; uint heads; uint headDim; float eps; uint norm; uint rope; uint halfSplit; uint freqStride; };
+    struct Params { uint vectors; uint heads; uint headDim; float eps; uint norm; uint rope; uint halfSplit; uint freqStride;
+                    uint copy; uint keep; };
 
     kernel void qk_norm_rope(device float *x [[buffer(0)]], constant float *weight [[buffer(1)]],
                              device const float *freqs [[buffer(2)]], constant Params &p [[buffer(3)]],
+                             device void *copy [[buffer(4)]],
                              uint group [[threadgroup_position_in_grid]], uint sg [[simdgroup_index_in_threadgroup]],
                              uint lane [[thread_index_in_simdgroup]], uint groups [[simdgroups_per_threadgroup]]) {
         // The products and the sums as written, each rounded: no FMA (`.safe` alone does not forbid the contraction).
@@ -88,7 +90,10 @@ package final class QKNormRope: @unchecked Sendable {   // immutable after init;
                     a = rr - ii; b = ri + ir;
                 }
             }
-            row[i0] = a; row[i1] = b;
+            if (p.keep != 0) { row[i0] = a; row[i1] = b; }
+            // The attention's operand, rounded once from these fp32 values as its own conversion would (round to nearest even).
+            if (p.copy == 1) { device half *h = (device half *)copy + ulong(vector) * p.headDim; h[i0] = half(a); h[i1] = half(b); }
+            if (p.copy == 2) { device bfloat *h = (device bfloat *)copy + ulong(vector) * p.headDim; h[i0] = bfloat(a); h[i1] = bfloat(b); }
         }
     }
     """
@@ -97,13 +102,21 @@ package final class QKNormRope: @unchecked Sendable {   // immutable after init;
     package enum Layout: UInt32, Sendable { case interleaved = 0, halfSplit = 1 }
 
     /// One tensor `[rows, heads, Dh]` at `offset` bytes into `buffer`, normed by `weight` (`[Dh]`; `nil`: no norm) then rotated.
+    /// `rounded`: the result also written rounded to the attention's operand type, at the same index of that buffer (from its offset 0:
+    /// the attention's compact copy, `TiledAttention.operands`); `keepsFP32: false` then leaves `buffer` as it was — only where nothing
+    /// reads the fp32 result (the tiled attention given the rounded copy reads nothing else).
     package struct Operand {
         package var buffer: MTLBuffer
         package var offset: Int
         package var heads: Int
         package var weight: [Float]?
-        package init(_ buffer: MTLBuffer, offset: Int = 0, heads: Int, weight: [Float]?) {
+        package var rounded: (buffer: MTLBuffer, precision: TiledAttention.Precision)?
+        package var keepsFP32: Bool
+        package init(_ buffer: MTLBuffer, offset: Int = 0, heads: Int, weight: [Float]?,
+                     rounded: (buffer: MTLBuffer, precision: TiledAttention.Precision)? = nil, keepsFP32: Bool = true) {
             self.buffer = buffer; self.offset = offset; self.heads = heads; self.weight = weight
+            let copy = rounded.flatMap { $0.precision == .fp32 ? nil : $0 }
+            self.rounded = copy; self.keepsFP32 = keepsFP32 || copy == nil
         }
     }
 
@@ -112,6 +125,7 @@ package final class QKNormRope: @unchecked Sendable {   // immutable after init;
 
     private struct Params {
         var vectors: UInt32, heads: UInt32, headDim: UInt32, eps: Float, norm: UInt32, rope: UInt32, halfSplit: UInt32, freqStride: UInt32
+        var copy: UInt32, keep: UInt32
     }
 
     private let queue: MTLCommandQueue
@@ -156,12 +170,14 @@ package final class QKNormRope: @unchecked Sendable {   // immutable after init;
         let simdgroups = 8
         for o in operands {
             var p = Params(vectors: UInt32(rows * o.heads), heads: UInt32(o.heads), headDim: UInt32(headDim), eps: eps,
-                           norm: o.weight == nil ? 0 : 1, rope: freqs == nil ? 0 : 1, halfSplit: layout.rawValue, freqStride: UInt32(headDim))
+                           norm: o.weight == nil ? 0 : 1, rope: freqs == nil ? 0 : 1, halfSplit: layout.rawValue, freqStride: UInt32(headDim),
+                           copy: o.rounded.map { $0.precision == .fp16 ? 1 : 2 } ?? 0, keep: o.keepsFP32 ? 1 : 0)
             encoder.setBuffer(o.buffer, offset: o.offset, index: 0)
             var weight = o.weight ?? [0]
             encoder.setBytes(&weight, length: weight.count * 4, index: 1)
             encoder.setBuffer(freqs?.buffer ?? o.buffer, offset: freqs?.offset ?? o.offset, index: 2)
             encoder.setBytes(&p, length: MemoryLayout<Params>.stride, index: 3)
+            encoder.setBuffer(o.rounded?.buffer ?? o.buffer, offset: 0, index: 4)
             let groups = (rows * o.heads + simdgroups - 1) / simdgroups
             encoder.dispatchThreadgroups(MTLSize(width: groups, height: 1, depth: 1),
                                          threadsPerThreadgroup: MTLSize(width: 32 * simdgroups, height: 1, depth: 1))

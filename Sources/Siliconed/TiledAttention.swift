@@ -36,7 +36,8 @@ import Synchronization
 ///     reduction), which the check against fp64 proves on every Mac (`KernelStages`). O's rescale is skipped when no row's maximum
 ///     moved (every factor exactly 1: same bits), and only the last chunk asks for each score's index. Where the time goes (M5 Pro,
 ///     S = 4 128, 30 heads): the two products alone 12.0 ms, the softmax ~1.2 ms more, the rounding of Q, K, V before the kernel
-///     ~1.1 ms. Mapping O's iterator straight into the factor's reduction (no threadgroup memory), P handed through threadgroup
+///     ~1.1 ms — where the QK-norm and RoPE pass precedes the attention it writes Q and K rounded into `operands` itself (Z, Krea 2,
+///     MOSS, Anima), and only V is converted here: its product has too many routes (ANE rows, LoRA added after) to write it rounded. Mapping O's iterator straight into the factor's reduction (no threadgroup memory), P handed through threadgroup
 ///     memory, two chunks a pass, `exp2` on a folded scale, 8 or 16 simdgroups: all as fast or slower there.
 ///   - **Any length**: the tensors carry the real extents, so a block of 100 rows or a key length that is no multiple of 32 needs no
 ///     padding rows. Cross-attention (`keys ≠ sequence`) and grouped k/v heads are the same code; a causal mask is not (the callers
@@ -191,18 +192,35 @@ package final class TiledAttention {
         switch precision { case .fp32: "tiles"; case .fp16: "tiles16"; case .bf16: "tilesbf16" }
     }
 
+    /// `SILICONED_ATTN_ROUND_FUSED=0`: every operand converted before the kernel again, as before their producers wrote them rounded
+    /// (a forcing for a measurement; the same bits either way).
+    package static let fusesRounding = ProcessInfo.processInfo.environment["SILICONED_ATTN_ROUND_FUSED"] != "0"
+
+    /// The operands an attention may be handed already rounded (`Prerounded`): written by their producer into `operands`.
+    package struct Prerounded: OptionSet, Sendable {
+        package let rawValue: Int
+        package init(rawValue: Int) { self.rawValue = rawValue }
+        package static let q = Prerounded(rawValue: 1), k = Prerounded(rawValue: 2), v = Prerounded(rawValue: 4)
+    }
+
+    /// **The half-precision copies the kernel reads**, where a producer may write them itself (the QK-norm and RoPE pass,
+    /// `QKNormRope.Operand.rounded`) and spare the conversion before the kernel: `q [S, H·Dh]`, `k` and `v [keys, KVH·Dh]`, the callers'
+    /// own layouts — so only when this instance computes every head (a head split's GPU share keeps a compact copy of its columns).
+    /// `nil` in fp32 or under a split. The same rounding of the same fp32 values either way: the same bits.
+    package var operands: (q: MTLBuffer, k: MTLBuffer, v: MTLBuffer)? { computed == heads ? half : nil }
+
     /// **Runs the attention** over `q [S, H·Dh]`, `k` and `v [keys, KVH·Dh]` (fp32, offset 0), writing `out [S, H·Dh]`: one command
-    /// buffer. Returns the GPU seconds.
-    package func run(q: MTLBuffer, k: MTLBuffer, v: MTLBuffer, into out: MTLBuffer) -> Double {
+    /// buffer. Returns the GPU seconds. `prerounded`: the operands already in `operands`, whose fp32 source is then not read.
+    package func run(q: MTLBuffer, k: MTLBuffer, v: MTLBuffer, into out: MTLBuffer, prerounded: Prerounded = []) -> Double {
         let clock = ProductLedger.attention(sequence: sequence, heads: heads, headDim: headDim, route: route, stream: queue.stream)
         defer { clock?.finish() }
-        let commands = submit(q: q, k: k, v: v, into: out)
+        let commands = submit(q: q, k: k, v: v, into: out, prerounded: operands == nil ? [] : prerounded)
         let what = "tiled attention S=\(sequence) H=\(computed)/\(heads) \(precision)"
         return queue.stream.settle(commands, label: "sdpa GPU", what: { what })
     }
 
     /// The same, **committed and not awaited**: the head split computes the CPU's heads meanwhile, then waits on the buffer.
-    package func submit(q: MTLBuffer, k: MTLBuffer, v: MTLBuffer, into out: MTLBuffer) -> MTLCommandBuffer {
+    package func submit(q: MTLBuffer, k: MTLBuffer, v: MTLBuffer, into out: MTLBuffer, prerounded: Prerounded = []) -> MTLCommandBuffer {
         if precision == .bf16 { Self.bf16Runs.withLock { $0 += 1 } }
         if precision == .fp16 { Self.fp16Runs.withLock { $0 += 1 } }
         let commands = queue.checkedCommandBuffer()
@@ -217,9 +235,10 @@ package final class TiledAttention {
             let kvComputed = computed / group
             e.setComputePipelineState(halfPipeline)
             // (source, copy, rows, columns converted, source row stride): the first columns of each row, the computed heads'.
-            for (from, to, rows, columns, stride) in [(q, half.q, sequence, computed * headDim, qWidth),
-                                                      (k, half.k, keys, kvComputed * headDim, kvWidth),
-                                                      (v, half.v, keys, kvComputed * headDim, kvWidth)] {
+            for (operand, from, to, rows, columns, stride) in [(Prerounded.q, q, half.q, sequence, computed * headDim, qWidth),
+                                                               (.k, k, half.k, keys, kvComputed * headDim, kvWidth),
+                                                               (.v, v, half.v, keys, kvComputed * headDim, kvWidth)]
+                where !prerounded.contains(operand) {
                 var shape = SIMD3<UInt32>(UInt32(columns), UInt32(stride), UInt32(columns))
                 e.setBuffer(from, offset: 0, index: 0); e.setBuffer(to, offset: 0, index: 1)
                 e.setBytes(&shape, length: MemoryLayout<SIMD3<UInt32>>.stride, index: 2)

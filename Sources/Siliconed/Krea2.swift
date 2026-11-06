@@ -520,12 +520,18 @@ package final class Krea2DiT: BoundaryRecording, PhaseTiming {
             let mergedb = try gemm.wrap(UnsafeMutableRawPointer(merged), bytes: maxRows * d * 4, name: "merged")
             let table = try gemm.region(freqs, bytes: n * dh * 4, name: "freqs")
             let clock = ProductLedger.pass(sequence: n, heads: heads, headDim: dh)
+            // Q and K written rounded straight into the attention's copies, the fp32 left unwritten: nothing else reads them here.
+            let copies = TiledAttention.fusesRounding ? tiled.operands : nil
+            let precision = tiled.precision
             timed("qk-norm + rope") {
-                pass.run([.init(qb, heads: heads, weight: normQ), .init(kb, heads: kvHeads, weight: normK)],
+                pass.run([.init(qb, heads: heads, weight: normQ, rounded: copies.map { ($0.q, precision) }, keepsFP32: false),
+                          .init(kb, heads: kvHeads, weight: normK, rounded: copies.map { ($0.k, precision) }, keepsFP32: false)],
                          rows: n, headDim: dh, eps: eps, freqs: table, layout: .interleaved, wait: !stream.isOn)
             }
             clock?.finish()
-            timed("sdpa wall") { ownTimings["sdpa GPU", default: 0] += tiled.run(q: qb, k: kb, v: vb, into: mergedb) }
+            timed("sdpa wall") {
+                ownTimings["sdpa GPU", default: 0] += tiled.run(q: qb, k: kb, v: vb, into: mergedb, prerounded: copies == nil ? [] : [.q, .k])
+            }
         } else {
             stream.drain()                                 // the CPU reads Q, K, V or writes the reserve; MPSGraph's SDPA submits its own
             try headNormRope(prefix, rows: n)

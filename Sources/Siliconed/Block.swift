@@ -336,12 +336,19 @@ package final class Block: BoundaryRecording, PhaseTiming {
         let normK = Array(UnsafeBufferPointer(start: scratch, count: headDim))
         // The pass joins the attention's class (`ProductLedger.pass`), its GPU seconds on the stream.
         let passClock = ProductLedger.pass(sequence: s, heads: heads, headDim: headDim, stream: stream)
+        // The pass writes Q and K rounded straight into the attention's copies (no conversion before its kernel, no fp32 written back:
+        // nothing else reads them here); the same rounding of the same values, the same bits.
+        let copies = TiledAttention.fusesRounding ? tiled.operands : nil
+        let precision = tiled.precision
         timed("qk-norm + rope") {
-            pass.run([.init(qb, heads: heads, weight: normQ), .init(kb, heads: heads, weight: normK)],
+            pass.run([.init(qb, heads: heads, weight: normQ, rounded: copies.map { ($0.q, precision) }, keepsFP32: false),
+                      .init(kb, heads: heads, weight: normK, rounded: copies.map { ($0.k, precision) }, keepsFP32: false)],
                      rows: s, headDim: headDim, eps: 1e-5, freqs: table, layout: .interleaved, wait: !stream.isOn)
         }
         passClock?.finish()
-        timed("sdpa wall") { ownTimings["sdpa GPU", default: 0] += tiled.run(q: qb, k: kb, v: vb, into: ob) }
+        timed("sdpa wall") {
+            ownTimings["sdpa GPU", default: 0] += tiled.run(q: qb, k: kb, v: vb, into: ob, prerounded: copies == nil ? [] : [.q, .k])
+        }
         try products.linear(prefix + "attention.to_out.0.weight", a: ob, c: o, m: s, k: d, n: d)
         try widenNorm(1, "attention_norm2.weight")
         try widenNorm(2, "ffn_norm1.weight")

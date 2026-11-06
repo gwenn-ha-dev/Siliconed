@@ -498,10 +498,15 @@ package final class MossImageDiT: BoundaryRecording, PhaseTiming {
         let queued = tiled != nil && stream.isOn
         if !queued { stream.drain() }                        // the graph and the cut by heads wait on their own; the CPU's pass reads Q, K
         let clock = ProductLedger.pass(sequence: n, heads: heads, headDim: dh)
+        // Where the tiled attention follows, Q and K written rounded straight into its copies, the fp32 left unwritten: it reads
+        // nothing else (`attend`, the same instance).
+        let copies = pass != nil && TiledAttention.fusesRounding ? tiled?.operands : nil
         if let pass {
             let (qb, kb) = (try slice(q), try slice(k))
+            let precision = tiled?.precision ?? .fp32
             timed("qk-norm + rope") {
-                pass.run([.init(qb, heads: heads, weight: weights[0]), .init(kb, heads: heads, weight: weights[1])],
+                pass.run([.init(qb, heads: heads, weight: weights[0], rounded: copies.map { ($0.q, precision) }, keepsFP32: false),
+                          .init(kb, heads: heads, weight: weights[1], rounded: copies.map { ($0.k, precision) }, keepsFP32: false)],
                          rows: n, headDim: dh, eps: eps, freqs: table, layout: .halfSplit, wait: !queued)
             }
         } else {
@@ -512,7 +517,7 @@ package final class MossImageDiT: BoundaryRecording, PhaseTiming {
             }
         }
         clock?.finish()
-        try attend(rows: n)
+        try attend(rows: n, prerounded: copies == nil ? [] : [.q, .k])
         try linearGPU(prefix + "proj.o.weight", a: merged, into: o, m: n, k: d, n: d)
         timed("residual") { elementwise.residual((xb, 0), plus: (ob, 0), carries: (mb, 2 * d), rows: n, columns: d) }
 
@@ -654,7 +659,7 @@ package final class MossImageDiT: BoundaryRecording, PhaseTiming {
         Ops.addBias(c, bias: reserve, rows: rows, columns: columns)
     }
 
-    private func attend(rows n: Int) throws {
+    private func attend(rows n: Int, prerounded: TiledAttention.Prerounded = []) throws {
         let qb = try slice(q), kb = try slice(k), vb = try slice(v), ob = try slice(merged)
         let cut = MossImageDiT.attentionAssignment(gemm.plan, sequence: n, heads: config.heads, headDim: config.headDim)
         if cut.splits {
@@ -676,7 +681,7 @@ package final class MossImageDiT: BoundaryRecording, PhaseTiming {
                                                         headDim: config.headDim)
             if let tiled {
                 tiles[n] = tiled
-                timed("sdpa wall") { ownTimings["sdpa GPU", default: 0] += tiled.run(q: qb, k: kb, v: vb, into: ob) }
+                timed("sdpa wall") { ownTimings["sdpa GPU", default: 0] += tiled.run(q: qb, k: kb, v: vb, into: ob, prerounded: prerounded) }
                 return
             }
         }
