@@ -258,16 +258,23 @@ package final class TensorGEMM {
     /// `perColumn` false), `R` the convrot rotation of group `rotation` (nil: none). The rotation goes
     /// to the activation — `x · R · q · s` — by chunks of `chunk` rows into `rotated` (fp32, the
     /// reserve's tail), each chunk's product written where its rows go. One submission; returns the
-    /// GPU seconds.
-    package func linear(a: MTLBuffer, int8 w: MTLBuffer, scales: MTLBuffer, scalesOffset: Int, perColumn: Bool,
+    /// GPU seconds. `weightOffset`: where `q` starts in `w` (the tensor's offset in the wrapped map, read in place). `settled`: the
+    /// buffer goes to the queue's stream (`GPUStream.settle`: queued, 0 returned, while the stream is on) instead of being waited for —
+    /// only where the CPU writes nothing this product reads before the next drain: its weight read in place, not staged.
+    package func linear(a: MTLBuffer, int8 w: MTLBuffer, weightOffset: Int = 0, scales: MTLBuffer, scalesOffset: Int, perColumn: Bool,
                         block: Int? = nil, rotation: (group: Int, scratch: MTLBuffer, offset: Int, chunk: Int)?,
-                        rounding: Rounding? = nil, quantizing: Quantizing? = nil, c: MTLBuffer, m: Int, k: Int, n: Int) -> Double {
-        if let quantizing, block == nil,
-           let commands = submitQuantized(a: a, int8: w, scales: scales, scalesOffset: scalesOffset, perColumn: perColumn,
-                                          group: rotation?.group, quantizing: quantizing, c: c, m: m, k: k, n: n) {
+                        rounding: Rounding? = nil, quantizing: Quantizing? = nil, c: MTLBuffer, m: Int, k: Int, n: Int,
+                        settled: Bool = false) -> Double {
+        func finish(_ commands: MTLCommandBuffer, _ what: @escaping @Sendable () -> String) -> Double {
+            if settled { return queue.stream.settle(commands, label: "gemm GPU", what: what) }
             commands.waitUntilCompleted()
+            return Attention.verdict(commands, what: what())
+        }
+        if let quantizing, block == nil,
+           let commands = submitQuantized(a: a, int8: w, weightOffset: weightOffset, scales: scales, scalesOffset: scalesOffset,
+                                          perColumn: perColumn, group: rotation?.group, quantizing: quantizing, c: c, m: m, k: k, n: n) {
             GEMM.quantizedProducts.withLock { $0 += 1 }
-            return Attention.verdict(commands, what: "matmul2d int8 × int8 \(m)×\(k)×\(n)")
+            return finish(commands) { "matmul2d int8 × int8 \(m)×\(k)×\(n)" }
         }
         // Refused (no pipeline for this k): the fp32 activation, rotated in the room the codes had — a row of fp32 takes four times
         // a row of codes, so the chunk is a quarter or less.
@@ -275,20 +282,20 @@ package final class TensorGEMM {
         if let quantizing, let r = rotation {
             rotation = (r.group, r.scratch, r.offset, max(1, quantizing.rows * (k + 4) / (4 * k)))
         }
-        let commands = submit(a: a, int8: w, scales: scales, scalesOffset: scalesOffset, perColumn: perColumn,
-                              block: block, rotation: rotation, rounding: rounding, c: c, m: m, k: k, n: n, columns: n)
-        commands.waitUntilCompleted()
-        return Attention.verdict(commands, what: "matmul2d float × int8 \(m)×\(k)×\(n)")
+        let commands = submit(a: a, int8: w, weightOffset: weightOffset, scales: scales, scalesOffset: scalesOffset,
+                              perColumn: perColumn, block: block, rotation: rotation, rounding: rounding, c: c, m: m, k: k, n: n,
+                              columns: n)
+        return finish(commands) { "matmul2d float × int8 \(m)×\(k)×\(n)" }
     }
 
     /// The same on the first `columns` of `C` only, **committed and not awaited**: the caller computes
     /// the other columns meanwhile (the AMX, `WeightProducts`), then waits on the buffer. `block`: the
     /// scales are per block of that many rows and column (GGUF Q8_0, `[k / block, n]`), applied inside
-    /// the product — no rotation then (`Artifact` refuses one there).
-    package func submit(a: MTLBuffer, int8 w: MTLBuffer, scales: MTLBuffer, scalesOffset: Int, perColumn: Bool,
+    /// the product — no rotation then (`Artifact` refuses one there). `weightOffset`: where `q` starts in `w`.
+    package func submit(a: MTLBuffer, int8 w: MTLBuffer, weightOffset: Int = 0, scales: MTLBuffer, scalesOffset: Int, perColumn: Bool,
                         block: Int? = nil, rotation: (group: Int, scratch: MTLBuffer, offset: Int, chunk: Int)?,
                         rounding: Rounding? = nil, c: MTLBuffer, m: Int, k: Int, n: Int, columns: Int) -> MTLCommandBuffer {
-        if let rounding, let rounded = submitRounded(a: a, int8: w, scales: scales, scalesOffset: scalesOffset,
+        if let rounding, let rounded = submitRounded(a: a, int8: w, weightOffset: weightOffset, scales: scales, scalesOffset: scalesOffset,
                                                      perColumn: perColumn, block: block, rotation: rotation,
                                                      rounding: rounding, c: c, m: m, k: k, n: n, columns: columns) {
             return rounded
@@ -299,7 +306,7 @@ package final class TensorGEMM {
         if let block, let blocks {
             encoder.setComputePipelineState(blocks)
             encoder.setBuffer(a, offset: 0, index: 0)
-            encoder.setBuffer(w, offset: 0, index: 1)
+            encoder.setBuffer(w, offset: weightOffset, index: 1)
             encoder.setBuffer(c, offset: 0, index: 2)
             encoder.setBytes(&mkn, length: MemoryLayout<SIMD3<UInt32>>.stride, index: 3)
             encoder.setBuffer(scales, offset: scalesOffset, index: 4)
@@ -318,7 +325,7 @@ package final class TensorGEMM {
         func product(_ x: MTLBuffer, _ xOffset: Int, first: Int, rows: Int) {
             encoder.setComputePipelineState(int8)
             encoder.setBuffer(x, offset: xOffset, index: 0)
-            encoder.setBuffer(w, offset: 0, index: 1)
+            encoder.setBuffer(w, offset: weightOffset, index: 1)
             encoder.setBuffer(c, offset: first * n * 4, index: 2)
             mkn.x = UInt32(rows)
             encoder.setBytes(&mkn, length: MemoryLayout<SIMD3<UInt32>>.stride, index: 3)

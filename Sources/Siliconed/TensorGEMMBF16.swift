@@ -202,8 +202,9 @@ extension TensorGEMM {
     /// **`submit` on an activation rounded to bf16**: the same product on the first `columns` of `C`,
     /// committed and not awaited. Per chunk of `rounding.rows` rows: the convrot rotation if any (fp32, into
     /// `rotation.scratch`), the rounding of that operand into `rounding`, the product; then the scale's pass
-    /// over `C`. Falls back to `nil` when the bf16 library lacks the Q8_0 kernel and `block` asks for it.
-    func submitRounded(a: MTLBuffer, int8 w: MTLBuffer, scales: MTLBuffer, scalesOffset: Int, perColumn: Bool,
+    /// over `C`. Falls back to `nil` when the bf16 library lacks the Q8_0 kernel and `block` asks for it. `weightOffset`: where the
+    /// integers start in `w` (`submit`'s).
+    func submitRounded(a: MTLBuffer, int8 w: MTLBuffer, weightOffset: Int = 0, scales: MTLBuffer, scalesOffset: Int, perColumn: Bool,
                        block: Int?, rotation: (group: Int, scratch: MTLBuffer, offset: Int, chunk: Int)?,
                        rounding: Rounding, c: MTLBuffer, m: Int, k: Int, n: Int, columns: Int) -> MTLCommandBuffer? {
         let kernels = rounded!
@@ -242,7 +243,7 @@ extension TensorGEMM {
                 encoder.setComputePipelineState(pipeline)
             }
             encoder.setBuffer(rounding.buffer, offset: rounding.offset, index: 0)
-            encoder.setBuffer(w, offset: 0, index: 1)
+            encoder.setBuffer(w, offset: weightOffset, index: 1)
             encoder.setBuffer(c, offset: first * n * 4, index: 2)
             encoder.setBytes(&mkn, length: MemoryLayout<SIMD3<UInt32>>.stride, index: 3)
             encoder.dispatchThreadgroups(tile.grid(rows: count, columns: columns), threadsPerThreadgroup: tile.threads(pipeline))

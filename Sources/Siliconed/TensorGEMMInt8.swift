@@ -8,7 +8,8 @@ import Metal
 ///     x fp32 [rows, k] ─▶ quantize_rows  per group of G along k: y = x · H_G/√G   (convrot moved to the activation, as `rotate_groups`)
 ///                                        s_x = max(max|y| / 127, 1e-30)           (per row, the whole row: Comfy's `quantize_int8_rowwise`)
 ///                                        q_x = clamp(rint(y / s_x), −128, 127)
-///                      ─▶ codes int8 [rows, k], s_x fp32 [rows]                   (the reserve's tail, a chunk of rows at a time)
+///                      ─▶ codes int8 [rows, k], s_x fp32 [rows]                   (the reserve's tail — or all of it, the weight read in
+///                                                                                  place in the map —, a chunk of rows at a time)
 ///     codes × q_w      matmul2d  int8_t × int8_t → int32                        (exact: |Σ| < 2³¹ for any k under 2¹⁷)
 ///     C int32 ─▶ scale_products  C = float(acc) · (s_x[row] · s_w[col])         (in place, the int32 read where the fp32 is written)
 ///
@@ -202,8 +203,9 @@ extension TensorGEMM {
     /// **`submit` on an activation quantized to int8** (W8A8): per chunk of `quantizing.rows` rows, the rotation and quantization of those
     /// rows into `quantizing`, their int8 × int8 product into `C`'s rows as int32, and the scales' pass that makes them fp32. Committed and
     /// not awaited; the whole product (no AMX columns). `nil` when the library is not compiled, the rotation's group is not one the
-    /// kernel takes, or the row is longer than it holds: the caller reads the integers another way.
-    func submitQuantized(a: MTLBuffer, int8 w: MTLBuffer, scales: MTLBuffer, scalesOffset: Int, perColumn: Bool, group: Int?,
+    /// kernel takes, or the row is longer than it holds: the caller reads the integers another way. `weightOffset`: where the integers
+    /// start in `w` — 0 in the reserve, the tensor's offset in the wrapped map when read in place (16-aligned).
+    func submitQuantized(a: MTLBuffer, int8 w: MTLBuffer, weightOffset: Int = 0, scales: MTLBuffer, scalesOffset: Int, perColumn: Bool, group: Int?,
                          quantizing: Quantizing, c: MTLBuffer, m: Int, k: Int, n: Int) -> MTLCommandBuffer? {
         guard let kernels = quantized, let stages = W8A8.stages(group: group), let simdgroups = kernels.simdgroups(k: k) else { return nil }
         let kernel = CapacityModel.Kernel(.gpu, .int8x8)
@@ -224,7 +226,7 @@ extension TensorGEMM {
                                          threadsPerThreadgroup: MTLSize(width: 32 * simdgroups, height: 1, depth: 1))
             encoder.setComputePipelineState(pipeline)
             encoder.setBuffer(quantizing.buffer, offset: quantizing.codesOffset, index: 0)
-            encoder.setBuffer(w, offset: 0, index: 1)
+            encoder.setBuffer(w, offset: weightOffset, index: 1)
             encoder.setBuffer(c, offset: first * n * 4, index: 2)
             var mkn = SIMD3<UInt32>(UInt32(count), UInt32(k), UInt32(n))
             encoder.setBytes(&mkn, length: MemoryLayout<SIMD3<UInt32>>.stride, index: 3)

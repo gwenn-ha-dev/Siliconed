@@ -226,19 +226,34 @@ final class MemoryBudgetTests: XCTestCase {
     /// **The map read in place is a choice of the plan, with its price**: the whole DiT file charged to the denoising, taken only where
     /// the need with it holds in B — a 64 GB Mac's, not a 16 or an 8 GB one's, whose plans stay those of a process that cannot read in
     /// place (the same request, the same need, the same tail). Never where the process does not read in place.
-    /// A map is charged read in place only where a block's product is bf16: an int8 Compact whose bf16 tensors lie outside the
-    /// blocks (Qwen-Image-2.1's `modulation.1`) is never wrapped, a mixed one (Anima's Compact, bf16 feed-forwards) is.
-    func testOnlyABf16BlockWeightChargesTheMapReadInPlace() {
-        func header(_ tensors: [String: (shape: [Int], dtype: String)]) -> [String: Any] {
-            ["tensors": tensors.mapValues { ["shape": $0.shape, "dtype": $0.dtype, "offset": 0, "bytes": 2] as [String: Any] }]
+    /// A map is charged read in place only where a block's product may read its weight there (`WeightProducts.prepare`): a bf16 one, or
+    /// an int8 one whose scale is fp32 per column or for the tensor (every Compact's, `inPlaceInt8`) — not one whose bf16 tensors all lie
+    /// outside the blocks (Qwen-Image-2.1's `modulation.1`) beside int8 blocks that copy (a bf16 scale, Q8_0's blocks, none).
+    func testOnlyABlockWeightReadInPlaceChargesTheMap() {
+        func header(_ tensors: [String: (shape: [Int], dtype: String, scale: [String: Any]?)]) -> [String: Any] {
+            ["tensors": tensors.mapValues { t in
+                var entry: [String: Any] = ["shape": t.shape, "dtype": t.dtype, "offset": 0, "bytes": 2]
+                if let scale = t.scale { entry["scale"] = scale }
+                return entry
+            }]
         }
         let page = Int(getpagesize())
-        let int8Blocks = header(["modulation.1.weight": ([3072, 18432], "bfloat16"), "img_in.weight": ([64, 3072], "bfloat16"),
-                                 "transformer_blocks.0.attn.to_k.weight": ([3072, 3072], "int8"),
-                                 "transformer_blocks.0.norm.weight": ([3072], "bfloat16")])
-        XCTAssertEqual(MemoryNeed.inPlaceBytes(header: int8Blocks, fileSize: 10 * page), 0)
-        let mixed = header(["transformer_blocks.0.ff.net.0.proj.weight": ([2048, 8192], "bfloat16"),
-                            "transformer_blocks.1.attn1.to_k.weight": ([2048, 2048], "int8")])
+        func int8Blocks(_ scale: [String: Any]?) -> [String: Any] {
+            header(["modulation.1.weight": ([3072, 18432], "bfloat16", nil), "img_in.weight": ([64, 3072], "bfloat16", nil),
+                    "transformer_blocks.0.attn.to_k.weight": ([3072, 3072], "int8", scale),
+                    "transformer_blocks.0.norm.weight": ([3072], "bfloat16", nil)])
+        }
+        XCTAssertEqual(MemoryNeed.inPlaceBytes(header: int8Blocks(nil), fileSize: 10 * page), 0)
+        XCTAssertEqual(MemoryNeed.inPlaceBytes(header: int8Blocks(["dtype": "bfloat16", "shape": [3072], "offset": 9437184]),
+                                               fileSize: 10 * page), 0, "a bf16 scale is widened by the copy")
+        XCTAssertEqual(MemoryNeed.inPlaceBytes(header: int8Blocks(["dtype": "float32", "shape": [96, 3072], "block": 32, "offset": 9437184]),
+                                               fileSize: 10 * page), 0, "Q8_0's blocks are copied")
+        XCTAssertEqual(MemoryNeed.inPlaceBytes(header: int8Blocks(["dtype": "float32", "shape": [3072], "offset": 9437184]),
+                                               fileSize: 10 * page), 10 * page, "a Compact's int8 weight, read in place")
+        XCTAssertEqual(MemoryNeed.inPlaceBytes(header: int8Blocks(["dtype": "float32", "shape": [], "offset": 9437184]),
+                                               fileSize: 10 * page), 10 * page, "a scale for the tensor")
+        let mixed = header(["transformer_blocks.0.ff.net.0.proj.weight": ([2048, 8192], "bfloat16", nil),
+                            "transformer_blocks.1.attn1.to_k.weight": ([2048, 2048], "int8", nil)])
         XCTAssertEqual(MemoryNeed.inPlaceBytes(header: mixed, fileSize: 10 * page + 1), 11 * page)
     }
 

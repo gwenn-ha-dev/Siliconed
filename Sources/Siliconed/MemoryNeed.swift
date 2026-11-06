@@ -231,9 +231,11 @@ package struct MemoryNeed: Sendable, Equatable {
     /// a family without the GPU stream): `MemoryPlan.choose` takes the in-place reading only where it is charged.
     package var inPlaceBytes: Int { phases.flatMap(\.terms).filter { $0.name == Self.inPlaceTerm }.map(\.bytes).max() ?? 0 }
     /// **What a DiT map costs read in place**, from its header: the length `Artifact.wrappedMap` wraps — the whole file, rounded up to
-    /// the page — where a block's product is bf16 (`WeightProducts.prepare` reads only those in place: a 2-D bf16 weight under an
-    /// indexed block, `isBlockWeight`); 0 otherwise — an int8 Compact whose bf16 tensors all lie outside the blocks (Qwen-Image-2.1's
-    /// `modulation.1`, the embedders) never wraps its map. `fileSize` `.max`: the header's own extent (`Artifact.mapBytes`).
+    /// the page — where a block's product may read its weight there (`WeightProducts.prepare`: a 2-D weight under an indexed block,
+    /// `isBlockWeight`, in bf16 or in int8 with an fp32 scale per column or for the tensor — every Compact's, `inPlaceInt8`); 0
+    /// otherwise — a map whose block weights all widen or copy (Q8_0's blocks, a bf16 or fp16 scale) never wraps it. The whole file
+    /// whatever the product's rows end up on (an ANE's or an AMX's keep the copy): the bound the wrapped buffer holds.
+    /// `fileSize` `.max`: the header's own extent (`Artifact.mapBytes`).
     /// A tensor of an indexed block: a numeric component with a module and a parameter after it (`layers.7.attention.to_q.weight`),
     /// not a `Sequential`'s index (`modulation.1.weight`).
     private static func isBlockWeight(_ name: String) -> Bool {
@@ -242,10 +244,19 @@ package struct MemoryNeed: Sendable, Equatable {
     }
 
     package static func inPlaceBytes(header: [String: Any], fileSize: Int) -> Int {
+        func readInPlace(_ entry: [String: Any]) -> Bool {
+            switch entry["dtype"] as? String ?? Artifact.DType.bfloat16.rawValue {
+            case Artifact.DType.bfloat16.rawValue: return true
+            case Artifact.DType.int8.rawValue:
+                guard let scale = entry["scale"] as? [String: Any] else { return false }
+                return scale["dtype"] as? String == Artifact.DType.float32.rawValue && scale["block"] == nil
+                    && ((scale["shape"] as? [Int])?.count ?? 2) <= 1
+            default: return false
+            }
+        }
         guard let table = header["tensors"] as? [String: [String: Any]],
               table.contains(where: { name, entry in
-                  (entry["shape"] as? [Int])?.count == 2 && (entry["dtype"] as? String ?? Artifact.DType.bfloat16.rawValue) == Artifact.DType.bfloat16.rawValue
-                      && isBlockWeight(name)
+                  (entry["shape"] as? [Int])?.count == 2 && readInPlace(entry) && isBlockWeight(name)
               }) else { return 0 }
         let page = Int(getpagesize())
         let file = fileSize < .max ? fileSize : Artifact.mapBytes(header: header)
