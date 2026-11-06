@@ -65,7 +65,9 @@ import Metal
 /// (`EngineSettings.adopt(map:)`), never during one. The command line, the checks and the close-out
 /// never designate one unless a developer names it (`SILICONED_MAP`): today's defaults.
 package enum Diagnostic {
-    /// The JSON's version: the script that aggregates the reports reads it. **24** (6/11/2026): W8A8 on an 8-bit weight — the activation
+    /// The JSON's version: the script that aggregates the reports reads it. **25** (6/11/2026): a `matmul2d` tile is chosen over three
+    /// wide products (the largest solo, a long `k`, a long `n`: `Sizes.wide`) and among candidates in Z order too (`MatmulTile.morton`) —
+    /// one square product chose a tile that lost 13 % on a long `k`. **24** (6/11/2026): W8A8 on an 8-bit weight — the activation
     /// rotated and quantized per row, the int8 × int8 product in int32 (`gpu/int8x8`, its tile among candidates) — is measured on the
     /// rounded kernels' eight shapes and the thin ones, judged against the exact product of its own codes; a map without its line would
     /// never offer it. **23** (5/11/2026): a stage's projection counts the tiles'
@@ -86,8 +88,8 @@ package enum Diagnostic {
     /// effect on the plan, replace the green flag and the defects, and the fit's aberrant figures are bounded; 15 (30/10/2026) was the
     /// capacity model — inventory, the probes' raw measurements, the model they fit, the judge per kernel, the memory, the stages and
     /// a verdict of defects; 14 and before were a table of routes timed against each other (grid of classes, pairs A B A B), which the
-    /// engine no longer reads. A report of a schema under 24 is not a map: the app measures again (`isCurrent`).
-    package static let schema = 24
+    /// engine no longer reads. A report of a schema under 25 is not a map: the app measures again (`isCurrent`).
+    package static let schema = 25
     package static let repository = "https://github.com/gwenn-ha-dev/Siliconed"
     /// **Wall seconds the whole diagnostic may take, inventory and witnesses included, on any Mac: a ceiling, not a target** (the
     /// user, 1/11/2026: a Mac pays once per version rather than a few percent at every render). The duration is a result: about forty

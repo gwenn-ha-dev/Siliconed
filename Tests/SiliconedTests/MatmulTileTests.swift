@@ -16,6 +16,49 @@ import Testing
         let data = try JSONEncoder().encode([t])
         #expect(String(decoding: data, as: UTF8.self) == "[\"128x64\\/8\"]")
         #expect(try JSONDecoder().decode([MatmulTile].self, from: data) == [t])
+        let z = MatmulTile(128, 128, simdgroups: 8, morton: true)
+        #expect(z.description == "128x128/8z" && MatmulTile("128x128/8z") == z && z != MatmulTile(128, 128, simdgroups: 8))
+    }
+
+    /// **Z order covers every tile once**: the line of codes holds the tiles' rows and columns in their bits, and the codes past C are left out
+    /// by the kernel (the same decoding, here in Swift, as `zOrderSource`'s).
+    @Test func zOrderCoversEveryTileOnce() {
+        func compact(_ x: UInt32) -> UInt32 {
+            var x = x & 0x5555_5555
+            x = (x | (x >> 1)) & 0x3333_3333; x = (x | (x >> 2)) & 0x0f0f_0f0f
+            x = (x | (x >> 4)) & 0x00ff_00ff; x = (x | (x >> 8)) & 0x0000_ffff
+            return x
+        }
+        for (m, n) in [(4128, 3840), (4128, 10240), (128, 64), (300, 7000), (4096, 4096)] {
+            let t = MatmulTile(128, 128, simdgroups: 8, morton: true)
+            let (across, down) = ((n + 127) / 128, (m + 127) / 128)
+            let xb = UInt32(MatmulTile.bits(across)), yb = UInt32(MatmulTile.bits(down)), paired = min(xb, yb)
+            var seen = Set<[UInt32]>()
+            for code in 0..<UInt32(t.grid(rows: m, columns: n).width) {
+                let p = code & (paired == 0 ? 0 : (1 << (2 * paired)) - 1)
+                var g = (compact(p), compact(p >> 1)), tail = code >> (2 * paired)
+                if xb > paired { g.0 |= (tail & ((1 << (xb - paired)) - 1)) << paired; tail >>= xb - paired }
+                if yb > paired { g.1 |= tail << paired }
+                if g.0 < across && g.1 < down { #expect(seen.insert([g.0, g.1]).inserted) }
+            }
+            #expect(seen.count == across * down, "\(m)×\(n)")
+        }
+    }
+
+    /// **Z order is a wide candidate of the tensor units' kernels only**, last, and never a thin one.
+    @Test func zOrderIsTheLastWideCandidateOfTheTensorUnitsKernels() {
+        for k in MatmulTile.kernels {
+            let wide = MatmulTile.candidates(for: k), thin = MatmulTile.candidates(for: k, thin: true)
+            #expect(thin.allSatisfy { !$0.morton })
+            let units = [CapacityModel.Form.bf16act, .int8act, .int8x8].contains(k.form)
+            #expect(wide == thin + (units ? [MatmulTile(128, 128, simdgroups: 8, morton: true)] : []), "\(k)")
+        }
+        let z = MatmulTile(128, 128, simdgroups: 8, morton: true)
+        for k in [Kernel(.gpu, .bf16act), Kernel(.gpu, .int8x8)] {
+            let source = z.source(for: k)
+            #expect(source.contains("z_order(code, tiles)") && source.contains("[[buffer(7)]]"))
+        }
+        #expect(!MatmulTile(128, 128, simdgroups: 8).source(for: Kernel(.gpu, .bf16act)).contains("z_order"))
     }
 
     @Test func theStandardTileIsTheSourceOneAndTheFirstCandidate() {

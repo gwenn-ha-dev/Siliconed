@@ -246,7 +246,7 @@ package final class TensorGEMM {
         encoder.setBuffer(c, offset: 0, index: 2)
         var mkn = SIMD3<UInt32>(UInt32(m), UInt32(k), UInt32(n))
         encoder.setBytes(&mkn, length: MemoryLayout<SIMD3<UInt32>>.stride, index: 3)
-        encoder.dispatchThreadgroups(tile.grid(rows: m, columns: n), threadsPerThreadgroup: tile.threads(pipeline))
+        tile.dispatch(encoder, pipeline, rows: m, columns: n)
         encoder.endEncoding()
         commands.commit()
         commands.waitUntilCompleted()
@@ -330,7 +330,7 @@ package final class TensorGEMM {
             encoder.setBuffer(c, offset: first * n * 4, index: 2)
             mkn.x = UInt32(rows)
             encoder.setBytes(&mkn, length: MemoryLayout<SIMD3<UInt32>>.stride, index: 3)
-            encoder.dispatchThreadgroups(tile.grid(rows: rows, columns: columns), threadsPerThreadgroup: tile.threads(int8))
+            tile.dispatch(encoder, int8, rows: rows, columns: columns)
         }
         if let rotation {
             var groupNorm = SIMD2<UInt32>(UInt32(rotation.group), (1 / Float(rotation.group).squareRoot()).bitPattern)

@@ -99,8 +99,9 @@ extension Diagnostic.CapacityProbes.Context {
         return chosen
     }
 
-    /// **The tiles of a `matmul2d` kernel** (`MatmulTile`): every candidate, judged, then timed in alternated rounds — three on the largest solo
-    /// product for the wide tile (a render's height; the middle one, 1.5 ms on an M5 Pro, ran 30 % apart between two maps), two over the thin
+    /// **The tiles of a `matmul2d` kernel** (`MatmulTile`): every candidate, judged, then timed in alternated rounds — three over the wide
+    /// products for the wide tile (`Sizes.wide`: the largest solo, a long `k`, a long `n`, at a render's height; the middle solo, 1.5 ms on
+    /// an M5 Pro, ran 30 % apart between two maps), two over the thin
     /// shapes (`Sizes.thin`) for the thin one (`MatmulTile.rounds(thin:)`) —, each shape on its fast side (the least of the rounds, as the map
     /// reads every disturbed figure), the shapes summed, and `MatmulTile.choose`. The chosen tiles run the kernel's lines and its products, and go in the report with every
     /// candidate's solos.
@@ -108,7 +109,7 @@ extension Diagnostic.CapacityProbes.Context {
         let kernel = probe.kernel
         guard MatmulTile.kernels.contains(kernel), !skipped.contains(kernel), !sizes.solo.isEmpty,
               let tensor = (probe == .gpu_int8 ? both : alone).tensor else { return }
-        let candidates = MatmulTile.candidates(for: kernel), standard = MatmulTile.standard(for: kernel)
+        let standard = MatmulTile.standard(for: kernel)
         // Each candidate's seconds per shape, round by round (`every[tile][shape]`), the candidates alternated within a round.
         func run(_ tiles: [MatmulTile], _ shapes: [Sizes.Shape], thin: Bool, rounds: Int,
                  into every: inout [MatmulTile: [Int: [Double]]], refused: inout Set<MatmulTile>) {
@@ -137,6 +138,7 @@ extension Diagnostic.CapacityProbes.Context {
             return (seconds.filter { $0.value > 0 }, rounds)
         }
         func decide(_ shapes: [Sizes.Shape], thin: Bool) -> MatmulTile {
+            let candidates = MatmulTile.candidates(for: kernel, thin: thin)
             let margin = thin ? MatmulTile.thinMargin : MatmulTile.margin
             var every: [MatmulTile: [Int: [Double]]] = [:], refused: Set<MatmulTile> = []
             run(candidates, shapes, thin: thin, rounds: MatmulTile.rounds(thin: thin), into: &every, refused: &refused)
@@ -156,7 +158,7 @@ extension Diagnostic.CapacityProbes.Context {
             tensor.tiles.use(chosen, for: kernel, thin: thin)
             return chosen
         }
-        let wide = decide([sizes.solo[sizes.solo.count - 1]], thin: false)
+        let wide = decide(sizes.tileShapes(kernel).wide, thin: false)
         m.tiles = (m.tiles ?? [:]).merging([kernel.description: wide.description]) { $1 }
         let thinShapes = sizes.thin.filter { CapacityModel.isThin(rows: $0.m, k: $0.k, n: $0.n) }
         if !thinShapes.isEmpty {
@@ -221,14 +223,16 @@ extension Diagnostic.CapacityProbes.Context {
             restoreB()
             run = { _ = self.alone.linear(a: self.aloneB.a, bf16: self.bf16, c: self.aloneB.c, m: m, k: k, n: n, weightIsTransposed: true); return true }
         case .gpu_bf16act:
-            guard alone.bf16Activations, let plan = WeightProducts.roundingPlan(k: k, n: n, capacity: k * n) else { return nil }
+            // The weight read in place, as a render reads it from the map (`WeightProducts`, `inPlace`): the whole reserve to the rounded
+            // operand, so that a render's height is one chunk, as in a render. Staged in the reserve's head, the weight left it `n` rows: the
+            // probe ran 4 096 rows as 3 072 + 1 024, two passes and two products — a tile chosen there lost 25 % on a render's
+            // long `k` (6/11/2026: 128 × 64 against 128 × 128 in Z order, 17.9 against 14.1 ms on 4 096 × 12 288 × 3 072).
+            guard alone.bf16Activations, let plan = WeightProducts.roundingPlan(k: k, n: n, capacity: k * n, weightInReserve: false)
+            else { return nil }
             truthKind = .rounded
-            staged = { [self] in
-                Widen.copyBfloat16(source: operands.bf16.base, destination: operands.b.base, count: k * n)
-                dirty = max(dirty, k * n)
-            }
+            staged = { [self] in dirty = max(dirty, (min(m, plan.rows) * k + 1) / 2) }
             run = {
-                _ = self.alone.linear(a: self.aloneB.a, rounding: (self.aloneB.b, plan.offset, plan.rows), bf16: self.aloneB.b,
+                _ = self.alone.linear(a: self.aloneB.a, rounding: (self.aloneB.b, plan.offset, plan.rows), bf16: self.bf16,
                                       c: self.aloneB.c, m: m, k: k, n: n, weightIsTransposed: true)
                 return true
             }

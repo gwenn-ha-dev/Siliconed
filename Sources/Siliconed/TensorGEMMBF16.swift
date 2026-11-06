@@ -191,7 +191,7 @@ extension TensorGEMM {
             encoder.setBuffer(c, offset: first * n * 4, index: 2)
             var mkn = SIMD3<UInt32>(UInt32(rows), UInt32(k), UInt32(n))
             encoder.setBytes(&mkn, length: MemoryLayout<SIMD3<UInt32>>.stride, index: 3)
-            encoder.dispatchThreadgroups(tile.grid(rows: rows, columns: n), threadsPerThreadgroup: tile.threads(pipeline))
+            tile.dispatch(encoder, pipeline, rows: rows, columns: n)
         }
         encoder.endEncoding()
         return commands.commitSettled(label: "gemm GPU", what: "matmul2d bfloat × bfloat \(m)×\(k)×\(n)")
@@ -246,7 +246,7 @@ extension TensorGEMM {
             encoder.setBuffer(w, offset: weightOffset, index: 1)
             encoder.setBuffer(c, offset: first * n * 4, index: 2)
             encoder.setBytes(&mkn, length: MemoryLayout<SIMD3<UInt32>>.stride, index: 3)
-            encoder.dispatchThreadgroups(tile.grid(rows: count, columns: columns), threadsPerThreadgroup: tile.threads(pipeline))
+            tile.dispatch(encoder, pipeline, rows: count, columns: columns)
         }
         if block == nil {
             encoder.setComputePipelineState(scaleColumns)

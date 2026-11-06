@@ -33,18 +33,23 @@ package struct MatmulTile: Hashable, Sendable, Codable, CustomStringConvertible 
     package var rows: Int
     package var columns: Int
     package var simdgroups: Int
-    package init(_ rows: Int, _ columns: Int, simdgroups: Int) {
-        self.rows = rows; self.columns = columns; self.simdgroups = simdgroups
+    /// **The threadgroups in Z (Morton) order**, not row by row: the tiles the GPU runs at one time are a square of C rather than a
+    /// row of it, so the slices of A and W they read are shared through the cache (an M5 Pro, 5/11/2026: `bf16act` 128 × 128 on 4 128 × 10 240
+    /// × 3 840, 15.5 → 14.4 ms). Only the order of the threadgroups: each one computes the same sums, the same bits as its tile row by row.
+    package var morton: Bool
+    package init(_ rows: Int, _ columns: Int, simdgroups: Int, morton: Bool = false) {
+        self.rows = rows; self.columns = columns; self.simdgroups = simdgroups; self.morton = morton
     }
 
-    /// `128x64/4`.
-    package var description: String { "\(rows)x\(columns)/\(simdgroups)" }
+    /// `128x64/4`, `128x128/8z` in Z order.
+    package var description: String { "\(rows)x\(columns)/\(simdgroups)\(morton ? "z" : "")" }
     package init?(_ text: String) {
-        let parts = text.split(separator: "/")
+        let morton = text.hasSuffix("z")
+        let parts = (morton ? String(text.dropLast()) : text).split(separator: "/")
         guard parts.count == 2, let s = Int(parts[1]) else { return nil }
         let dims = parts[0].split(separator: "x")
         guard dims.count == 2, let r = Int(dims[0]), let c = Int(dims[1]), r > 0, c > 0, s > 0 else { return nil }
-        self.init(r, c, simdgroups: s)
+        self.init(r, c, simdgroups: s, morton: morton)
     }
     package init(from decoder: any Decoder) throws {
         let text = try decoder.singleValueContainer().decode(String.self)
@@ -66,8 +71,17 @@ package struct MatmulTile: Hashable, Sendable, Codable, CustomStringConvertible 
         kernel.form == .int8 || kernel.form == .int8act || kernel.form == .int8x8 ? MatmulTile(64, 64, simdgroups: 4) : MatmulTile(64, 32, simdgroups: 4)
     }
 
-    /// **What the map measures for a kernel**, the standard first. The same list on every Mac.
-    package static func candidates(for kernel: CapacityModel.Kernel) -> [MatmulTile] {
+    /// **What the map measures for a kernel**, the standard first. The same list on every Mac. On the wide products of the kernels whose
+    /// operands are the tensor units' own (`bf16act`, `int8act`, `int8x8`), the largest tile in Z order last (`morton`: the rows' order
+    /// wins unless Z order beats it by the margin) — on a thin product there are too few tiles for their order to matter, and an fp32
+    /// operand gains nothing from any tile.
+    package static func candidates(for kernel: CapacityModel.Kernel, thin: Bool = false) -> [MatmulTile] {
+        let ordered = rowOrder(for: kernel)
+        guard !thin, [.bf16act, .int8act, .int8x8].contains(kernel.form) else { return ordered }
+        return ordered + [MatmulTile(128, 128, simdgroups: 8, morton: true)]
+    }
+
+    private static func rowOrder(for kernel: CapacityModel.Kernel) -> [MatmulTile] {
         switch kernel.form {
         case .int8:
             return [MatmulTile(64, 64, simdgroups: 4), MatmulTile(128, 64, simdgroups: 4), MatmulTile(128, 64, simdgroups: 8),
@@ -152,15 +166,66 @@ package struct MatmulTile: Hashable, Sendable, Codable, CustomStringConvertible 
         return out
     }
 
-    /// The threadgroups that cover `rows × columns` of C.
+    /// The threadgroups that cover `rows × columns` of C: a row-major grid, or in Z order one line of `2^(bits of the tiles' rows + bits of
+    /// their columns)` codes, those past C returning at once (`zOrderSource`).
     func grid(rows m: Int, columns n: Int) -> MTLSize {
-        MTLSize(width: (n + columns - 1) / columns, height: (m + rows - 1) / rows, depth: 1)
+        let (across, down) = ((n + columns - 1) / columns, (m + rows - 1) / rows)
+        guard morton else { return MTLSize(width: across, height: down, depth: 1) }
+        return MTLSize(width: 1 << (Self.bits(across) + Self.bits(down)), height: 1, depth: 1)
+    }
+    /// The bits that number `count` tiles (0 for one).
+    static func bits(_ count: Int) -> Int { count <= 1 ? 0 : Int.bitWidth - (count - 1).leadingZeroBitCount }
+
+    /// **Dispatches the product's threadgroups over `rows × columns` of C**: in Z order, the tiles' counts first (`buffer(7)`), which the
+    /// kernel decodes its position against — `columns` may be fewer than the weight's (the AMX's beside it), so they cannot come from `mkn`.
+    func dispatch(_ encoder: MTLComputeCommandEncoder, _ pipeline: MTLComputePipelineState, rows m: Int, columns n: Int) {
+        if morton {
+            var tiles = SIMD2<UInt32>(UInt32((n + columns - 1) / columns), UInt32((m + rows - 1) / rows))
+            encoder.setBytes(&tiles, length: MemoryLayout<SIMD2<UInt32>>.stride, index: 7)
+        }
+        encoder.dispatchThreadgroups(grid(rows: m, columns: n), threadsPerThreadgroup: threads(pipeline))
     }
     func threads(_ pipeline: MTLComputePipelineState) -> MTLSize {
         MTLSize(width: pipeline.threadExecutionWidth * simdgroups, height: 1, depth: 1)
     }
 
     // MARK: - The variants' source
+
+    /// **Z order's decoding** (Draw Things' `morton_decode_rectangular_2d`, NAMatMulKernel.cpp): the low bits of the code interleave the
+    /// tiles' column and row, the longer side's extra bits follow.
+    static let zOrderSource = """
+    inline uint compact_even_bits(uint x) {
+        x &= 0x55555555u;
+        x = (x | (x >> 1)) & 0x33333333u;
+        x = (x | (x >> 2)) & 0x0f0f0f0fu;
+        x = (x | (x >> 4)) & 0x00ff00ffu;
+        x = (x | (x >> 8)) & 0x0000ffffu;
+        return x;
+    }
+    inline uint low_bits(uint n) { return n == 0 ? 0 : (1u << n) - 1; }
+    inline uint bits_of(uint count) { return count <= 1 ? 0 : 32 - clz(count - 1); }
+    inline uint2 z_order(uint code, uint2 tiles) {
+        const uint xb = bits_of(tiles.x), yb = bits_of(tiles.y), paired = min(xb, yb);
+        const uint p = code & low_bits(paired * 2);
+        uint2 g = uint2(compact_even_bits(p), compact_even_bits(p >> 1));
+        uint tail = code >> (paired * 2);
+        if (xb > paired) { g.x |= (tail & low_bits(xb - paired)) << paired; tail >>= xb - paired; }
+        if (yb > paired) { g.y |= tail << paired; }
+        return g;
+    }
+
+    """
+
+    /// The kernel's last parameter and its first lines: the tile's position `g` in C, read from the grid or decoded from Z order.
+    var position: String {
+        morton ? """
+        constant uint2 &tiles [[buffer(7)]], uint code [[threadgroup_position_in_grid]]) {
+            const uint2 g = z_order(code, tiles);
+            if (g.x >= tiles.x || g.y >= tiles.y) return;
+        """ : """
+        uint2 g [[threadgroup_position_in_grid]]) {
+        """
+    }
 
     /// **The kernels of `kernel` at this tile**: `linear_kn` and `linear_nk` for the bf16 weights (`A` fp32 for `gpu/bf16`, bfloat for
     /// `gpu/bf16act`), `linear_int8` for the int8 ones (`A` fp32 for `gpu/int8`, bfloat for `gpu/int8act`) — the default library's
@@ -174,7 +239,7 @@ package struct MatmulTile: Hashable, Sendable, Codable, CustomStringConvertible 
             using namespace metal;
             using namespace mpp::tensor_ops;
 
-            \(Self.integerProduct(rows: rows, columns: columns, simdgroups: simdgroups))
+            \(morton ? Self.zOrderSource : "")\(integerProduct)
             """
         }
         let a = kernel.form == .bf16act || kernel.form == .int8act ? "bfloat" : "float"
@@ -193,11 +258,12 @@ package struct MatmulTile: Hashable, Sendable, Codable, CustomStringConvertible 
             t.store(c);
         }
 
+        \(morton ? Self.zOrderSource : "")
         """
         func product(_ name: String, weight: String, transposed: Bool) -> String {
             """
             kernel void \(name)(device \(a) *a [[buffer(0)]], device \(weight) *w [[buffer(1)]], device float *c [[buffer(2)]],
-                                constant uint3 &mkn [[buffer(3)]], uint2 g [[threadgroup_position_in_grid]]) {
+                                constant uint3 &mkn [[buffer(3)]], \(position)
                 const int M = mkn.x, K = mkn.y, N = mkn.z;
                 tensor<device \(a), dextents<int32_t, 2>, tensor_inline> A(a, dextents<int32_t, 2>(K, M));
                 tensor<device \(weight), dextents<int32_t, 2>, tensor_inline> B(w, dextents<int32_t, 2>(\(transposed ? "K, N" : "N, K")));
@@ -218,11 +284,11 @@ package struct MatmulTile: Hashable, Sendable, Codable, CustomStringConvertible 
 extension MatmulTile {
     /// **`linear_i8i8` at a tile** (`gpu/int8x8`): the quantized activation `[M, K]` int8 × the published int8 `[K, N]` (the forge's layout)
     /// → `C [M, N]` int32, one tile of C a threadgroup, its cooperative destination int32 — the sums exact. The library's headers and
-    /// namespaces are the caller's (`QuantizedKernels`, `source(for:)`).
-    static func integerProduct(rows: Int, columns: Int, simdgroups: Int) -> String {
+    /// namespaces are the caller's (`QuantizedKernels`, `source(for:)`), Z order's decoding too when the tile takes it.
+    var integerProduct: String {
         """
         kernel void linear_i8i8(device int8_t *a [[buffer(0)]], device int8_t *w [[buffer(1)]], device int32_t *c [[buffer(2)]],
-                                constant uint3 &mkn [[buffer(3)]], uint2 g [[threadgroup_position_in_grid]]) {
+                                constant uint3 &mkn [[buffer(3)]], \(position)
             const int M = mkn.x, K = mkn.y, N = mkn.z;
             tensor<device int8_t, dextents<int32_t, 2>, tensor_inline> A(a, dextents<int32_t, 2>(K, M));
             tensor<device int8_t, dextents<int32_t, 2>, tensor_inline> B(w, dextents<int32_t, 2>(N, K));

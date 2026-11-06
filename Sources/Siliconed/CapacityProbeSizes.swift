@@ -138,6 +138,17 @@ extension Diagnostic.CapacityProbes {
             solo + product + integers + small + thin + chains + sharing + stairRows.map { (m: $0, k: Self.stair.k, n: Self.stair.n) } + [Self.witness]
         }
 
+        /// **The wide product a tile is chosen on** (`chooseTiles`): the largest solo's work on a long `k` (twice its `k`, half its `n`), inside
+        /// the surfaces the tier's products already size (`products` leaves it out: it runs on the GPU's tiles alone, and adds neither an operand
+        /// nor an ANE program). A square product cannot see a tile that loses on a long `k`, and a long `k` sees the square's order: on an
+        /// M5 Pro (5/11/2026), `bf16act` 128 × 64 and 128 × 128 within 2 % of each other on 4 128 × 3 840², 13 % apart on 4 128 × 10 240 × 3 840,
+        /// the candidates in the same order on both and on a long `n`, the gaps widest on the long `k` (6/11/2026: a DiT's down projection ran at
+        /// 17.8 TFLOP/s against 20.8 for its up projection, on the tile the square had chosen).
+        package var wide: [Shape] {
+            guard let s = solo.last else { return [] }
+            return [(m: s.m, k: 2 * s.k, n: s.n / 2)]
+        }
+
         /// A lower tier's operands are inside the allocated ones: every dimension of `a`, `b`, `c` is no larger.
         package func operandsFit(in other: Sizes) -> Bool {
             func biggest(_ s: Sizes) -> (a: Int, b: Int, c: Int) {
@@ -255,20 +266,21 @@ extension Diagnostic.CapacityProbes {
             }
         }
 
-        /// **The shapes a tiled kernel's candidates are timed on** (`chooseTiles`): the largest solo for the wide tile, the thin shapes the
-        /// kernel takes (`takes`) for the thin one.
+        /// **The shapes a tiled kernel's candidates are timed on** (`chooseTiles`): the wide products (`wide`) for the wide tile, the thin
+        /// shapes for the thin one, each that the kernel takes (`takes`).
         func tileShapes(_ kernel: CapacityModel.Kernel) -> (wide: [Shape], thin: [Shape]) {
             let takes = { (s: Shape) in Self.takes(kernel.form, s) }
-            return (solo.last.map { [$0] }?.filter(takes) ?? [], thin.filter { CapacityModel.isThin(rows: $0.m, k: $0.k, n: $0.n) && takes($0) })
+            return (wide.filter(takes), thin.filter { CapacityModel.isThin(rows: $0.m, k: $0.k, n: $0.n) && takes($0) })
         }
 
         /// **The trials of a tiled kernel** (`chooseTiles`): each candidate, `MatmulTile.rounds(thin:)` rounds over its class's shapes — the
         /// rounds a candidate in doubt is measured again are not counted (no count gives them).
         func tileTrials(_ kernel: CapacityModel.Kernel) -> [Shape] {
             let (wide, thin) = tileShapes(kernel)
-            let round = Array(repeating: wide, count: MatmulTile.rounds(thin: false)).flatMap { $0 }
-                + Array(repeating: thin, count: MatmulTile.rounds(thin: true)).flatMap { $0 }
-            return Array(repeating: round, count: MatmulTile.candidates(for: kernel).count).flatMap { $0 }
+            let wideRound = Array(repeating: wide, count: MatmulTile.rounds(thin: false)).flatMap { $0 }
+            let thinRound = Array(repeating: thin, count: MatmulTile.rounds(thin: true)).flatMap { $0 }
+            return Array(repeating: wideRound, count: MatmulTile.candidates(for: kernel).count).flatMap { $0 }
+                + Array(repeating: thinRound, count: MatmulTile.candidates(for: kernel, thin: true).count).flatMap { $0 }
         }
 
         /// The stage a tiled kernel's tiles are chosen in (`probes`): bf16 before its solos, the others before theirs.

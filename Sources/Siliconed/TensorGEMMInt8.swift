@@ -159,7 +159,7 @@ package final class QuantizedKernels {
         c[i] = as_type<int>(float(c[i]) * (sx[r] * sw[j * p.y]));
     }
 
-    \(MatmulTile.integerProduct(rows: 64, columns: 64, simdgroups: 4))
+    \(MatmulTile(64, 64, simdgroups: 4).integerProduct)
     """
 
     /// `nil` when this macOS's compiler refuses the library or a kernel: the integers are then read on the rounded or fp32 activation.
@@ -264,7 +264,7 @@ extension TensorGEMM {
             encoder.setBuffer(c, offset: first * n * 4, index: 2)
             var mkn = SIMD3<UInt32>(UInt32(count), UInt32(k), UInt32(n))
             encoder.setBytes(&mkn, length: MemoryLayout<SIMD3<UInt32>>.stride, index: 3)
-            encoder.dispatchThreadgroups(tile.grid(rows: count, columns: n), threadsPerThreadgroup: tile.threads(pipeline))
+            tile.dispatch(encoder, pipeline, rows: count, columns: n)
             encoder.setComputePipelineState(kernels.scale)
             encoder.setBuffer(c, offset: first * n * 4, index: 0)
             encoder.setBuffer(quantizing.buffer, offset: quantizing.scalesOffset, index: 1)
