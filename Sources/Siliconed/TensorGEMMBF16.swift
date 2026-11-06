@@ -21,9 +21,10 @@ import Metal
 ///     bf16 in hardware is the compiler's to choose; the integer sequence (add 0x7FFF and the lowest kept
 ///     bit, shift) is torch's rounding on every Mac, and what the check compares to diffusers' bf16;
 ///   - **on the stream, the producer rounds instead** (`WeightProducts.RoundedOperand`): where the weight is read in place and the
-///     whole operand fits the reserve, the norm, the SwiGLU, the gate or the GELU that makes it also writes it rounded there, with this
-///     same integer sequence (`roundingSource`), and the products that read it encode no pass — one rounding for Q, K and V instead of
-///     three, none of its own for the others; the same bits (Z-Image 1 024²: 0.79 s of GPU per image in 1 808 passes, 1 536 of them gone);
+///     whole operand fits the reserve, the norm, the SwiGLU, the gate, the GELU or the attention (`TiledAttention.run(…rounded:)`, for
+///     `to_out`) that makes it also writes it rounded there, with this same integer sequence (`roundingSource`), and the products that
+///     read it encode no pass — one rounding for Q, K and V instead of three, none of its own for the others; the same bits (Z-Image
+///     1 024²: 0.79 s of GPU per image in 1 808 passes, 1 792 of them gone);
 ///   - **the tile is the map's** (`MatmulTile`, `gpu/bf16act` and `gpu/int8act`), compiled apart; the kernels here are the
 ///     standard ones (64 × 32 for a bf16 weight, 64 × 64 for an int8 one), and the Q8_0 one keeps its 64 × 64 (its weight is staged in
 ///     threadgroup memory as `q · s` in fp32 — exact, but an fp32 operand, which the tensor units do not take at their half-precision

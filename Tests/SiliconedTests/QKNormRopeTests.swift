@@ -142,6 +142,40 @@ import Testing
         #expect(try attention(rounded: true) == attention(rounded: false), "\(precision)")
     }
 
+    /// **The attention writing its output rounded for the next product** (`TiledAttention.run(…rounded:)`): the slot holds `round_bf16`
+    /// of the fp32 output to the bit, at the slot's offset and row stride, the rows past the last tile left untouched; the fp32 output is
+    /// the one written without it. The fused form and the three stages, each operand type, a sequence no multiple of a tile.
+    @Test(arguments: [(TiledAttention.Precision.fp32, false), (.fp16, false), (.fp16, true), (.bf16, false), (.bf16, true)])
+    func theOutputRoundedIsTheProductsOwnRoundingToTheBit(_ form: (precision: TiledAttention.Precision, fused: Bool)) throws {
+        guard let device = MTLCreateSystemDefaultDevice(), device.supportsFamily(.metal4), let queue = device.makeCommandQueue() else { return }
+        let d = Self.headDim, rows = 77, heads = 4, kvHeads = 2, width = heads * d, offset = 256
+        func buffer(_ values: [Float]) throws -> MTLBuffer {
+            try #require(device.makeBuffer(bytes: values, length: values.count * 4, options: .storageModeShared))
+        }
+        let x = random(rows * width, seed: 5, scale: 3), y = random(rows * kvHeads * d, seed: 6, scale: 3)
+        let z = random(rows * kvHeads * d, seed: 7, scale: 50)
+        let tiled = try TiledAttention(device: device, queue: queue, heads: heads, sequence: rows, headDim: d, kvHeads: kvHeads,
+                                       precision: form.precision, tile: form.fused ? AttentionTile.candidates[0] : nil)
+        #expect(tiled.writesRounded)
+        func attention(rounded slot: MTLBuffer?) throws -> [UInt32] {
+            let out = try buffer([Float](repeating: 0, count: rows * width))
+            _ = tiled.run(q: try buffer(x), k: try buffer(y), v: try buffer(z), into: out, rounded: slot.map { ($0, offset) })
+            return Array(UnsafeBufferPointer(start: out.contents().assumingMemoryBound(to: UInt32.self), count: rows * width))
+        }
+        let sentinel: UInt16 = 0xABCD, slotCount = offset / 2 + rows * width + 64
+        let slot = try #require(device.makeBuffer(bytes: [UInt16](repeating: sentinel, count: slotCount), length: slotCount * 2,
+                                                  options: .storageModeShared))
+        let withSlot = try attention(rounded: slot), without = try attention(rounded: nil)
+        #expect(withSlot == without, "the fp32 output as without the slot")
+        let written = Array(UnsafeBufferPointer(start: slot.contents().assumingMemoryBound(to: UInt16.self), count: slotCount))
+        let expected = withSlot.map { u -> UInt16 in        // `BFloatKernels.roundingSource`, as `round_bf16` writes it
+            (u & 0x7fff_ffff) > 0x7f80_0000 ? UInt16((u >> 16) | 0x40) : UInt16(truncatingIfNeeded: (u &+ 0x7fff &+ ((u >> 16) & 1)) >> 16)
+        }
+        #expect(Array(written[(offset / 2)..<(offset / 2 + rows * width)]) == expected, "\(form)")
+        #expect(written[..<(offset / 2)].allSatisfy { $0 == sentinel } && written[(offset / 2 + rows * width)...].allSatisfy { $0 == sentinel },
+                "nothing written outside the slot")
+    }
+
     // MARK: - The map, the solver, the plan
 
     func model(cpuRate: Double = 4e9, gpuRate: Double = 40e9, wake: Double? = 0.00085) -> M {

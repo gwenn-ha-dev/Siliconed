@@ -793,15 +793,23 @@ package final class QwenImage21DiT: BoundaryRecording, PhaseTiming {
         for segment in segments {
             try attend(queries: segment.start, count: segment.end - segment.start, keys: segment.end, causal: segment.isText, first: first)
         }
+        // Where the target's slices write every row of `merged` (a step: no prefix rows here), each also writes its rows of `to_out`'s
+        // operand rounded, where it reads it so: no pass of the product's own.
+        let covered = kind != .prefill && segments.isEmpty && first == p && kernels.target.allSatisfy { $0.kernel.writesRounded }
+            && kernels.target.reduce(0) { $0 + $1.rows } == n
+        let attended = covered ? try products.roundedOperand(prefix + "attn.to_out.0.weight", m: n, k: d, n: d) : nil
         if kind != .prefill {
             let (kb, vb) = (try slice(keys), try slice(values))
             for piece in kernels.target {
                 let local = p + piece.begin - first
                 let (qb, ob) = (try slice(q + local * d), try slice(merged + local * d))
-                timed("sdpa wall") { ownTimings["sdpa GPU", default: 0] += piece.kernel.run(q: qb, k: kb, v: vb, into: ob) }
+                timed("sdpa wall") {
+                    ownTimings["sdpa GPU", default: 0] += piece.kernel.run(q: qb, k: kb, v: vb, into: ob,
+                                                                           rounded: attended?.rows(from: local).bf16)
+                }
             }
         }
-        try linearGPU(prefix + "attn.to_out.0.weight", a: merged, into: o, m: n, k: d, n: d)
+        try linearGPU(prefix + "attn.to_out.0.weight", a: merged, into: o, m: n, k: d, n: d, rounded: attended)
         try residual(xs, rows: n, bands: bands, gate: d)
 
         // ── MLP
