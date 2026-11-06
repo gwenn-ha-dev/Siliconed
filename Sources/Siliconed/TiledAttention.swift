@@ -33,7 +33,11 @@ import Synchronization
 ///     Where the GPU has matrix accelerators both products reach them (M5: 18 TFLOP/s against 7 for the three stages); the tile that
 ///     fits the registers is the machine's (M5: 16 rows — the 16 × 128 accumulator; 32 rows halves the speed), hence measured.
 ///     P is written at S's own index: the two destinations of one descriptor share the layout (`map_iterator` maps only into a
-///     reduction), which the check against fp64 proves on every Mac (`KernelStages`).
+///     reduction), which the check against fp64 proves on every Mac (`KernelStages`). O's rescale is skipped when no row's maximum
+///     moved (every factor exactly 1: same bits), and only the last chunk asks for each score's index. Where the time goes (M5 Pro,
+///     S = 4 128, 30 heads): the two products alone 12.0 ms, the softmax ~1.2 ms more, the rounding of Q, K, V before the kernel
+///     ~1.1 ms. Mapping O's iterator straight into the factor's reduction (no threadgroup memory), P handed through threadgroup
+///     memory, two chunks a pass, `exp2` on a folded scale, 8 or 16 simdgroups: all as fast or slower there.
 ///   - **Any length**: the tensors carry the real extents, so a block of 100 rows or a key length that is no multiple of 32 needs no
 ///     padding rows. Cross-attention (`keys ≠ sequence`) and grouped k/v heads are the same code; a causal mask is not (the callers
 ///     that need one never ask).
@@ -475,19 +479,27 @@ package final class TiledAttention {
             for (uint16_t i = 0; i < Sc.get_capacity(); ++i) { if (Sc.is_valid_element(i)) Sc[i] = 0; }
                 scores.run(Qb, Kc, Sc);
                 // The keys past the length (the last chunk's) leave the softmax: −∞, hence P = 0 (V's rows there read as zeros).
-                const int valid = min(BC, keys - j0);
-                #pragma unroll
-            for (uint16_t i = 0; i < Sc.get_capacity(); ++i) {
-                    if (Sc.is_valid_element(i)) { auto at = Sc.get_multidimensional_index(i); Sc[i] = at[0] < valid ? Sc[i] * p.scale : -INFINITY; }
+                // Only the last chunk can hold such keys: the others scale without asking for each score's index.
+                const int valid = keys - j0;
+                if (valid < BC) {
+                    #pragma unroll
+                    for (uint16_t i = 0; i < Sc.get_capacity(); ++i) {
+                        if (Sc.is_valid_element(i)) { auto at = Sc.get_multidimensional_index(i); Sc[i] = at[0] < valid ? Sc[i] * p.scale : -INFINITY; }
+                    }
+                } else {
+                    #pragma unroll
+                    for (uint16_t i = 0; i < Sc.get_capacity(); ++i) { if (Sc.is_valid_element(i)) Sc[i] *= p.scale; }
                 }
                 auto mx = scores.get_row_reduction_destination_cooperative_tensor<QT, KT, float>();
                 reduce_rows(Sc, mx, reduction_operation::max, -INFINITY);
+                bool unchanged = true;
                 #pragma unroll
             for (uint16_t i = 0; i < mx.get_capacity(); ++i) {
                     if (mx.is_valid_element(i)) {
                         const float mn = max(m[i], mx[i]);
                         const float alpha = precise::exp(m[i] - mn);
                         m[i] = mn; mx[i] = alpha;
+                        unchanged = unchanged && alpha == 1.0f;
                         factor[mx.get_multidimensional_index(i)[0]] = alpha;
                     }
                 }
@@ -504,10 +516,13 @@ package final class TiledAttention {
                 reduce_rows(Sc, sum, reduction_operation::sum, 0.0f);
                 #pragma unroll
             for (uint16_t i = 0; i < l.get_capacity(); ++i) { if (l.is_valid_element(i)) l[i] = l[i] * mx[i] + sum[i]; }
-                simdgroup_barrier(mem_flags::mem_threadgroup);
-                #pragma unroll
-            for (uint16_t i = 0; i < Oc.get_capacity(); ++i) {
-                    if (Oc.is_valid_element(i)) { auto at = Oc.get_multidimensional_index(i); Oc[i] *= factor[at[1]]; }
+                // No row's maximum moved (every factor exactly 1, uniform over the simdgroup): rescaling O would change no bit — skipped.
+                if (!simd_all(unchanged)) {
+                    simdgroup_barrier(mem_flags::mem_threadgroup);
+                    #pragma unroll
+                    for (uint16_t i = 0; i < Oc.get_capacity(); ++i) {
+                        if (Oc.is_valid_element(i)) { auto at = Oc.get_multidimensional_index(i); Oc[i] *= factor[at[1]]; }
+                    }
                 }
                 auto Pin = product.get_left_input_cooperative_tensor<T, T, float>(P);
                 auto Vc = V.slice(0, j0);
