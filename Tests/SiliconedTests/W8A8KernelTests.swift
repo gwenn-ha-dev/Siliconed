@@ -9,7 +9,7 @@ import XCTest
 /// (two per simdgroup), a group of 64, no rotation on a `k` that is no whole chunk, a scale per column and one for the tensor, a row of zeros
 /// (its scale the recipe's floor, 1e-30), a massive column. Skipped without the Metal 4 tensor kernels.
 final class W8A8KernelTests: XCTestCase {
-    private struct Case { let m, k, n: Int; let group: Int?; let perColumn: Bool; let chunk: Int }
+    private struct Case { let m, k, n: Int; let group: Int?; let perColumn: Bool; let chunk: Int; var inMap = false }
 
     private func run(_ t: Case) throws {
         let device = try XCTUnwrap(MTLCreateSystemDefaultDevice()), queue = try XCTUnwrap(device.makeCommandQueue())
@@ -27,15 +27,21 @@ final class W8A8KernelTests: XCTestCase {
         for r in 0..<m { a[r * k + k / 3] *= 300 }                 // a massive column
         let q = (0..<(k * n)).map { _ in Int8(Int((next() * 254).rounded())) }
         let sw = (0..<(t.perColumn ? n : 1)).map { _ in (abs(next()) + 0.01) / 64 }
-        // The reserve as `WeightProducts.int8Plan` lays it: the integers, their scales, the codes and the activation's scales.
+        // The reserve as `WeightProducts.int8Plan` lays it: the integers, their scales, the codes and the activation's scales — or, the
+        // weight read in place (`inMap`), the integers and their scale where a map holds them (a page in, the scale on the next 16 bytes
+        // past the values, as `Artifact.Scale` lays it), and the reserve the activation's alone from its second page.
         func page(_ b: Int) -> Int { (b + 16383) / 16384 * 16384 }
-        let scalesOffset = page(k * n), codesOffset = page(scalesOffset + sw.count * 4), activationScales = page(codesOffset + t.chunk * k)
+        let weightOffset = t.inMap ? 16384 : 0
+        let scalesOffset = t.inMap ? weightOffset + (k * n + 15) / 16 * 16 : page(k * n)
+        let codesOffset = t.inMap ? 16384 : page(scalesOffset + sw.count * 4), activationScales = page(codesOffset + t.chunk * k)
         let reserve = try XCTUnwrap(device.makeBuffer(length: activationScales + page(t.chunk * 4), options: .storageModeShared))
-        q.withUnsafeBytes { reserve.contents().copyMemory(from: $0.baseAddress!, byteCount: q.count) }
-        sw.withUnsafeBytes { (reserve.contents() + scalesOffset).copyMemory(from: $0.baseAddress!, byteCount: $0.count) }
+        let weight = t.inMap ? try XCTUnwrap(device.makeBuffer(length: page(scalesOffset + sw.count * 4), options: .storageModeShared)) : reserve
+        q.withUnsafeBytes { (weight.contents() + weightOffset).copyMemory(from: $0.baseAddress!, byteCount: q.count) }
+        sw.withUnsafeBytes { (weight.contents() + scalesOffset).copyMemory(from: $0.baseAddress!, byteCount: $0.count) }
         let input = try XCTUnwrap(device.makeBuffer(bytes: a, length: 4 * a.count, options: .storageModeShared))
         let output = try XCTUnwrap(device.makeBuffer(length: 4 * m * n, options: .storageModeShared))
-        let commands = try XCTUnwrap(gemm.submitQuantized(a: input, int8: reserve, scales: reserve, scalesOffset: scalesOffset,
+        let commands = try XCTUnwrap(gemm.submitQuantized(a: input, int8: weight, weightOffset: weightOffset, scales: weight,
+                                                          scalesOffset: scalesOffset,
                                                           perColumn: t.perColumn, group: t.group,
                                                           quantizing: (reserve, codesOffset, activationScales, t.chunk),
                                                           c: output, m: m, k: k, n: n))
@@ -69,6 +75,12 @@ final class W8A8KernelTests: XCTestCase {
     func testALongRowTwoChunksASimdgroup() throws { try run(Case(m: 70, k: 10240, n: 72, group: 256, perColumn: true, chunk: 64)) }
     func testAGroupOf64AndATensorScale() throws { try run(Case(m: 65, k: 448, n: 130, group: 64, perColumn: false, chunk: 128)) }
     func testNoRotationOnAPartialChunk() throws { try run(Case(m: 33, k: 520, n: 40, group: nil, perColumn: true, chunk: 64)) }
+    /// The weight read in place (`WeightProducts.inPlaceInt8`): the integers at a page of another buffer, their scale right past them,
+    /// the activation's codes from the reserve's second page — the recipe's bits, as from the reserve.
+    func testTheWeightReadInPlaceInTheMap() throws {
+        try run(Case(m: 150, k: 768, n: 96, group: 256, perColumn: true, chunk: 64, inMap: true))
+        try run(Case(m: 65, k: 448, n: 130, group: 64, perColumn: false, chunk: 128, inMap: true))
+    }
 
     /// The route's own plan: the codes and their scales past the integers, in the reserve a model holds, chunked by what is left.
     func testThePlanLaysTheQuantizedActivationInTheReserve() throws {
@@ -84,5 +96,31 @@ final class W8A8KernelTests: XCTestCase {
                      "a rotation group the kernel does not take")
         XCTAssertNil(WeightProducts.int8Plan(k: 4096, n: 64, capacity: 4096 * 64, perColumn: false, group: nil, amxColumns: 0, block: 32,
                                              quantized: true), "Q8_0's blocks cut the integers' sum")
+    }
+
+    /// **The weight read in place leaves the reserve to the activation** (`WeightProducts.inPlaceInt8`): the same route from the reserve's
+    /// second page (an offset of 0 is the plan's "none"), more rows a chunk than beside the copy, in the reserve still; no AMX columns.
+    func testThePlanOfAWeightReadInPlace() throws {
+        let (k, n) = (10240, 3840), capacity = 10240 * 3840
+        for (rounded, quantized) in [(false, true), (true, false)] {
+            let copied = try XCTUnwrap(WeightProducts.int8Plan(k: k, n: n, capacity: capacity, perColumn: true, group: 256, amxColumns: 0,
+                                                               rounded: rounded, quantized: quantized))
+            let inPlace = try XCTUnwrap(WeightProducts.int8Plan(k: k, n: n, capacity: capacity, perColumn: true, group: 256, amxColumns: 0,
+                                                                rounded: rounded, quantized: quantized, weightInReserve: false))
+            XCTAssertEqual(inPlace.rotatedOffset, 16384)
+            XCTAssertEqual(inPlace.quantizedOffset > 0, quantized)
+            XCTAssertEqual(inPlace.roundedOffset > 0, rounded)
+            XCTAssertGreaterThan(inPlace.chunk, copied.chunk)
+            if quantized {
+                XCTAssertEqual(inPlace.quantizedOffset, 16384)
+                XCTAssertGreaterThanOrEqual(inPlace.quantizedScalesOffset, inPlace.quantizedOffset + inPlace.chunk * k)
+                XCTAssertLessThanOrEqual(inPlace.quantizedScalesOffset + inPlace.chunk * 4, capacity * 4)
+            } else {
+                XCTAssertGreaterThanOrEqual(inPlace.roundedOffset, inPlace.rotatedOffset + inPlace.chunk * k * 4)
+                XCTAssertLessThanOrEqual(inPlace.roundedOffset + inPlace.chunk * k * 2, capacity * 4)
+            }
+        }
+        XCTAssertNil(WeightProducts.int8Plan(k: k, n: n, capacity: capacity, perColumn: true, group: 256, amxColumns: 512,
+                                             weightInReserve: false), "the AMX's columns are widened from the copy")
     }
 }

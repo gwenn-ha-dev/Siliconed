@@ -67,7 +67,8 @@ extension MemoryNeed {
         /// (`Widen.rotationScratchBytes`): the Compact's int8 convrot, or an imported Comfy-style one; 0 otherwise.
         package let ditRotationScratch: Int
         /// **What the DiT's map costs read in place** (`Request.mapInPlace`): the length `Artifact.wrappedMap` wraps — the whole file,
-        /// rounded up to the page — where its products are bf16 (`WeightProducts.prepare` reads only those in place); 0 otherwise.
+        /// rounded up to the page — where its block products may read their weight there, bf16 or int8 (`MemoryNeed.inPlaceBytes`); 0
+        /// otherwise.
         package let ditInPlaceBytes: Int
         /// What the encoder costs kept (`MemoryNeed.keptEncoderBytes(header:)`, `Request.encoderKept`): its layers, resident.
         package let encoderKeptBytes: Int
