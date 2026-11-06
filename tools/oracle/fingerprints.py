@@ -34,8 +34,18 @@ HERE = Path(__file__).resolve().parent
 PUBLISHED = HERE / "fingerprints.json"
 
 # The relative tolerance on a float tensor's norm and mean absolute value. Rounding moves them by
-# ~1e-6; the free-running trajectories of the oracle, which chain eight evaluations, by more.
-TOLERANCE = 1e-3
+# ~1e-6; the free-running trajectories of the oracle, which chain eight evaluations, by more. 1e-3 was too
+# loose for one evaluation: another file of published weights moved a model output's norm by 5.6e-4 and
+# passed unseen.
+TOLERANCE = 1e-4
+TRAJECTORY_TOLERANCE = 1e-3
+
+
+def tolerance_for(relative: str, tolerance: float | None) -> float:
+    """The tolerance asked, else the one for this golden: looser for a chain of evaluations."""
+    if tolerance is not None:
+        return tolerance
+    return TRAJECTORY_TOLERANCE if "trajectory" in relative else TOLERANCE
 
 
 def fingerprint(tensor: torch.Tensor) -> dict:
@@ -95,7 +105,7 @@ def relative_gap(ours: float, theirs: float) -> float:
     return 0.0 if scale == 0 else abs(ours - theirs) / scale
 
 
-def compare(directory: Path, tolerance: float) -> int:
+def compare(directory: Path, asked: float | None) -> int:
     published = json.loads(PUBLISHED.read_text())
     present = dict(goldens(directory))
     failures, compared, worst = [], 0, (0.0, "")
@@ -104,6 +114,7 @@ def compare(directory: Path, tolerance: float) -> int:
             continue
         compared += 1
         found = read(present[relative])
+        tolerance = tolerance_for(relative, asked)
         for name, ours in expected.items():
             theirs = found.get(name)
             where = f"{relative} · {name}"
@@ -140,7 +151,8 @@ def main() -> int:
     parser.add_argument("action", choices=["compare", "write", "add"])
     parser.add_argument("--only", nargs="+", action="extend", default=[], help="add: the texts a new golden's path must hold one of")
     parser.add_argument("--goldens", help="the goldens folder (default: $SILICONED_GOLDENS, else ./goldens)")
-    parser.add_argument("--tolerance", type=float, default=TOLERANCE)
+    parser.add_argument("--tolerance", type=float, default=None,
+                        help=f"compare: one tolerance for every golden (default {TOLERANCE:.0e}, {TRAJECTORY_TOLERANCE:.0e} for a trajectory)")
     arguments = parser.parse_args()
     directory = goldens_directory(arguments.goldens)
     if arguments.action == "add":
