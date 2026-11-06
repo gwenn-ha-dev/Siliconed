@@ -55,12 +55,15 @@ package enum OperatorFootprint {
     /// carried it uncharged into every phase after. Brought up first, the base reads it.
     /// The same work a render did anyway, moved before it: no time added.
     /// Under a plan with the ANE, Core ML's too (`NeuralEngine.bringUp`).
+    /// The queue dies with the bring-up, never kept: the Metal driver holds its command-buffer memory
+    /// (tens of MB) while any queue that ever submitted lives, and gives it back at once when the last
+    /// one goes — a queue kept here would leave a released model's share to the idle trim, a second later.
     package static func bringUp() {
         _ = frameworks
         if EngineSettings.effective.plan.usesANE { _ = NeuralEngine.bringUp }
     }
 
-    private static let frameworks: (MTLDevice, MTLCommandQueue)? = {
+    private static let frameworks: MTLDevice? = {
         guard let device = MTLCreateSystemDefaultDevice(), let queue = device.makeCommandQueue() else { return nil }
         autoreleasepool {
             let graph = MPSGraph()
@@ -71,6 +74,6 @@ package enum OperatorFootprint {
                               targetTensors: [y], targetOperations: nil)
             }
         }
-        return (device, queue)
+        return device
     }()
 }

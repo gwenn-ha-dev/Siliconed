@@ -159,6 +159,7 @@ package final class Attention {
             let shape: [NSNumber] = [1, 1, NSNumber(value: sequence), NSNumber(value: keys)]
             let buffer = device.makeBuffer(bytesNoCopy: pages.base, length: pages.capacity,
                                            options: .storageModeShared, deallocator: nil)!
+            MetalWraps.track(buffer)
             mask = graph.placeholder(shape: shape, dataType: .float32, name: "mask")
             maskFeed = (mask!, MPSGraphTensorData(buffer, shape: shape, dataType: .float32), pages)
         }

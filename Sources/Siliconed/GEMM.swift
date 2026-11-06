@@ -250,6 +250,7 @@ package final class GEMM {
             throw Failure.unalignedBuffer(name)
         }
         buffer.label = name
+        MetalWraps.track(buffer)
         buffers[key] = buffer
         return buffer
     }
@@ -693,6 +694,7 @@ package final class GEMM {
         guard let fresh = device.makeBuffer(bytesNoCopy: c.contents(), length: c.length,
                                             options: .storageModeShared, deallocator: nil) else { return c }
         fresh.label = c.label
+        MetalWraps.track(fresh)
         let key = UInt(bitPattern: c.contents())
         if buffers[key] === c { buffers[key] = fresh }
         return fresh

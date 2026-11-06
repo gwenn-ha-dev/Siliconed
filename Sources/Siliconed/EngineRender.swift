@@ -261,7 +261,7 @@ extension Engine {
             }
 
             context.keptDenoiser = nil
-            PhaseBoundary.returned()
+            PhaseBoundary.returnedDenoiser()
             PhaseBoundary.mark("denoiser released")
 
             var renderResults: [Render] = []

@@ -133,24 +133,37 @@ package final class QKNormRope: @unchecked Sendable {   // immutable after init;
 
     package init(device: MTLDevice, queue: MTLCommandQueue) throws {
         self.queue = queue
+        pipeline = try QKNormRope.compile(device)
+    }
+
+    private init(queue: MTLCommandQueue, pipeline: MTLComputePipelineState) {
+        self.queue = queue
+        self.pipeline = pipeline
+    }
+
+    private static func compile(_ device: MTLDevice) throws -> MTLComputePipelineState {
         let options = MTLCompileOptions()
         options.mathMode = .safe
         let library = try device.makeLibrary(source: Self.source, options: options)
         guard let f = library.makeFunction(name: "qk_norm_rope") else { throw GEMM.Failure.noDevice }
-        pipeline = try device.makeComputePipelineState(function: f)
+        return try device.makeComputePipelineState(function: f)
     }
 
-    /// **One per command queue**, compiled once: every block of a family shares it.
+    /// **Compiled once per device, on the caller's queue**: every block of a family shares the pipeline. Never a cache by queue —
+    /// it kept every DiT's queue alive for the process, and with it the driver's command-buffer memory (~50 MB in the graphics
+    /// ledger, given back at once when the last queue that submitted dies, ~1.2 s after its last submission otherwise), beside the
+    /// next phase.
     package static func shared(device: MTLDevice, queue: MTLCommandQueue) -> QKNormRope? {
-        let key = ObjectIdentifier(queue)
-        return built.withLock { cache in
-            if let k = cache[key] { return k }
-            guard let made = try? QKNormRope(device: device, queue: queue) else { return nil }
-            cache[key] = made
+        let pipeline = compiled.withLock { cache -> MTLComputePipelineState? in
+            if let p = cache[ObjectIdentifier(device)] { return p }
+            guard let made = try? QKNormRope.compile(device) else { return nil }
+            cache[ObjectIdentifier(device)] = made
             return made
         }
+        return pipeline.map { QKNormRope(queue: queue, pipeline: $0) }
     }
-    private static let built = Mutex<[ObjectIdentifier: QKNormRope]>([:])
+    /// By device; each pipeline holds its device, so a key is never another's.
+    private static let compiled = Mutex<[ObjectIdentifier: MTLComputePipelineState]>([:])
 
     /// **Every operand in one command buffer**: each normed (where it has a weight) then rotated (where `freqs` is given, `[rows, Dh]`
     /// floats from its offset in bytes), in place. Returns the GPU's seconds when `wait`.

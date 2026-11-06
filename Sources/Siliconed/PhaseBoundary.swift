@@ -1,4 +1,5 @@
 import Foundation
+import Metal
 import os
 
 // **The render's memory ledger**: the phase boundaries (`PhaseBoundary`) and the `phys_footprint`
@@ -38,10 +39,34 @@ package enum PhaseBoundary {
     /// at most. Metal returns a released buffer late (`VAEMemory.finish`, which does the same for a
     /// VAE's heaps): Qwen-Image-2.1's DiT, released, still had 10 MB in the ledger when the decoder
     /// started, beside it. Called where a phase hands back everything GPU-side and nothing
-    /// GPU-side crosses: after the text, after the denoiser's release.
-    package static func returned() {
+    /// GPU-side crosses: after the text. After the denoiser: `returnedDenoiser()`.
+    package static func returned() { wait(above: graphicsAtBegin) }
+
+    private static let device = MTLCreateSystemDefaultDevice()
+
+    /// **The denoiser released, waits until the graphics ledger is down to what Metal still has allocated** — the system device's
+    /// `currentAllocatedSize` less our wraps over our own memory (`MetalWraps`: their pages are anonymous memory or a file's, never
+    /// the ledger's), within `VAEMemory.releaseTolerance`, for `VAEMemory.releaseWait` at most. Read again at every poll.
+    ///
+    /// **What is still allocated, not the start's level**: the ledger also carries the Metal driver's command-buffer memory
+    /// (~40–60 MB), which no allocation holds. The driver keeps it while a command queue that submitted lives, trims it ~1.2 s after
+    /// the process's last command buffer, and gives it back at once when the last such queue dies — the denoiser's, now that no
+    /// cache keeps a queue (`QKNormRope.shared`, `OperatorFootprint.bringUp`). The start's level held the bring-up's share, gone by
+    /// then: waited back to it, the boundary waited for the trim (0.42–0.52 s on Z-Image 1024², 1.1 s on Anima 512²) while
+    /// the driver's share was still there, and stopped short of the late returns once it had left (Krea 2 512², +30 MB beside the
+    /// decoder). What the driver returns late — the private buffers of the tiled attention, the head split's MPSGraph temporaries
+    /// on Krea 2, up to ~0.35 s after their release — is out of `currentAllocatedSize` and still in the ledger: waited for.
+    /// Measured on the M5 Pro after each family's denoiser: the ledger meets the allocations within 0.03–0.17 s.
+    package static func returnedDenoiser() {
+        guard let device else { return returned() }
         let deadline = Date().addingTimeInterval(VAEMemory.releaseWait)
-        while VAEMemory.graphicsFootprint() > graphicsAtBegin + VAEMemory.releaseTolerance, Date() < deadline { usleep(1000) }
+        while VAEMemory.graphicsFootprint() > device.currentAllocatedSize - MetalWraps.live + VAEMemory.releaseTolerance,
+              Date() < deadline { usleep(1000) }
+    }
+
+    private static func wait(above floor: Int) {
+        let deadline = Date().addingTimeInterval(VAEMemory.releaseWait)
+        while VAEMemory.graphicsFootprint() > floor + VAEMemory.releaseTolerance, Date() < deadline { usleep(1000) }
     }
 
     package static func mark(_ name: String) {
