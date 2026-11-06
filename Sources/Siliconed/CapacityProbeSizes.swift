@@ -157,10 +157,11 @@ extension Diagnostic.CapacityProbes {
         /// What a kernel's rate is to the GPU's fp32 product (M1 Pro, three runs: bf16 0.62, bf16 rounded 0.49, int8 0.97, Q8_0 0.31). The
         /// 8-bit ones on a rounded activation were never run on a GPU without bf16 in hardware: priced as the rounded bf16 kernel (the same
         /// bfloat operand) and as Q8_0's (the same fill of threadgroup memory); the K-quant's as the rounded bf16 kernel (its operands' rate).
-        /// W8A8 (`int8x8`) as the int8 kernel: the same integers, an int8 operand in place of the fp32 one — never timed on an M1 Pro; on
-        /// an M5 Pro the int8 × int8 product ran twice the bf16 one (6/11/2026).
+        /// W8A8 (`int8x8`) by the same rule, as the rounded kernels: it runs their tensor operations, not the int8 kernel's simdgroups, and
+        /// no GPU without int8 tensor units has timed it. Where both ran, it was never slower than the rounded int8 one (M5 Pro: 3.4 to 6.3
+        /// times the fp32 product, against 2.7 to 3.4): an upper bound in seconds. Priced as the int8 kernel (0.97) it hid half its time.
         static let formRatio: [String: Double] = ["bf16": 0.62, "bf16act": 0.49, "int8": 0.97, "q8": 0.31, "int8act": 0.49, "q8act": 0.31,
-                                                     "q4kact": 0.49, "int8x8": 0.97]
+                                                     "q4kact": 0.49, "int8x8": 0.49]
         /// Attention kernels' rates to the GPU's product (M1 Pro: the system graph 0.40, the flash kernel 0.46).
         static let graphRatio = 0.40, flashRatio = 0.46
         /// The three stages by tiles, fp32 and fp16 operands (M1 Pro: 0.43 and 0.49 of the GPU's product; the matrix units of a bigger GPU

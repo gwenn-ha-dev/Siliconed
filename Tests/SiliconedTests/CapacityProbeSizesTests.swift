@@ -84,8 +84,8 @@ import Testing
         #expect(Sizes.tier(for: Self.m1Pro, startingAt: 1).tier == 1, "a tier is never stepped back up")
     }
 
-    /// **The time chooses no tier on the Macs of the fleet**: the M1 Pro, the Neo, a hot Neo all project the first tier, with the heat's
-    /// margin, under the ceiling — the memory alone sets their tier. A Neo at a third of its speed steps down: its map would take
+    /// **The time chooses no tier on the Macs of the fleet**: the M1 Pro and the Neo project the first tier, with the heat's margin, under
+    /// the ceiling, and a hot Neo the second, the one its memory allows — the memory alone sets their tier. A Neo at a third of its speed steps down: its map would take
     /// more than the margin leaves, which a projection without the tiles' trials and the pulses hid (it kept the first tier at 0.6 of the
     /// ceiling, and the five maps of the fleet took 1.7 to 2.1 times their projection). A slower GPU never picks a bigger tier.
     @Test func aSlowMacStepsDownOnlyPastTheCeiling() {
@@ -94,10 +94,16 @@ import Testing
         func pulsed(_ r: Rates) -> Rates { var r = r; r.pulse = 0.018; return r }
         let hot = Rates(gpu: 1.19e12, amx: 0.83e12, ane: 4.13e12, cpu: 0.4e12)
         let third = Rates(gpu: 0.477e12, amx: 0.5e12, ane: 1.38e12, cpu: 0.17e12)
-        for (name, r) in [("M1 Pro", Self.m1Pro), ("Neo", Self.neo), ("hot Neo", hot)].map({ ($0.0, pulsed($0.1)) }) {
+        for (name, r) in [("M1 Pro", Self.m1Pro), ("Neo", Self.neo)].map({ ($0.0, pulsed($0.1)) }) {
             #expect(Sizes.tier(for: r).tier == 0, "\(name)")
             #expect(Sizes.full.projectedSeconds(r) * Sizes.margin <= budget, "\(name): \(Sizes.full.projectedSeconds(r)) s")
         }
+        // A hot Neo at the first tier projects past the ceiling since W8A8 is priced as the rounded kernels; its B never offers that tier
+        // (the second, `theWitnessesStepTheTierDownAndNeverUp`), where it holds.
+        let warm = pulsed(hot)
+        #expect(Sizes.tier(for: warm).tier == 1 && Sizes.tiers[1].projectedSeconds(warm) * Sizes.margin <= budget,
+                "hot Neo: \(Sizes.full.projectedSeconds(warm)) s at the first tier, \(Sizes.tiers[1].projectedSeconds(warm)) at the second")
+        #expect(Sizes.tier(for: warm, startingAt: 1).tier == 1, "the tier its memory allows holds")
         var old = pulsed(third); old.pulse = 0; old.tiled = false
         #expect(Sizes.full.projectedSeconds(old) * Sizes.margin <= budget, "the projection without trials nor pulses kept the first tier")
         #expect(Sizes.full.projectedSeconds(pulsed(third)) * Sizes.margin > budget && Sizes.tier(for: pulsed(third)).tier > 0,
