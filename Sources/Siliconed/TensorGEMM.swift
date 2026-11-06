@@ -51,7 +51,11 @@ import Synchronization
 ///     it). P20 allows it (bf16 between two operations, fp32 accumulations); the plan assigns it by the
 ///     measured throughput, and the check judges it against diffusers in bf16;
 ///   - **the rotation moves to the activation**: `W = R · q · s` along K (`Widen.dequantizeRotated`),
-///     `x · W = (x · R) · q · s`, `R = H/√G` — fp32 butterflies on `x`, the integers never touched.
+///     `x · W = (x · R) · q · s`, `R = H/√G` — fp32 butterflies on `x`, the integers never touched;
+///   - **a quantized activation: W8A8, the quant's own author's forward** (`QuantizedKernels`, a third library compiled only when asked):
+///     the rotated activation quantized to int8 per row, `int8_t × int8_t → int32`, then `s_x · s_w` — ComfyUI's `int8_linear` on the
+///     published int8 convrot, at the integers' rate of the tensor units. Only beside a published 8-bit weight (the multiplication in
+///     the weight's own format), judged against Comfy's own forward: no further from the fp64 witness than it, + 25 %.
 package final class TensorGEMM {
     private let queue: MTLCommandQueue
     func makeCommands() -> MTLCommandBuffer { queue.checkedCommandBuffer() }
@@ -67,6 +71,9 @@ package final class TensorGEMM {
     /// compiled.
     let rounded: BFloatKernels?
     package var roundsActivations: Bool { rounded != nil }
+    /// The products on an activation quantized to int8 (W8A8, `QuantizedKernels`), `nil` unless asked at `init` and compiled.
+    let quantized: QuantizedKernels?
+    package var quantizesActivations: Bool { quantized != nil }
     /// ... and the Q8_0 kernel on it compiled.
     package var roundsBlocks: Bool { rounded?.blocks != nil }
     /// The tile each kernel runs (`MatmulTile`): the map's, or the standard one of the default library.
@@ -196,7 +203,7 @@ package final class TensorGEMM {
 
     /// `nil` on a device without Metal 4, or when this macOS's compiler refuses the kernel: the caller keeps the
     /// default path — and the refusal is said (`MetalCompile`), since that path is slower and another arithmetic.
-    package init?(device: MTLDevice, queue: MTLCommandQueue, roundingActivations: Bool = false) {
+    package init?(device: MTLDevice, queue: MTLCommandQueue, roundingActivations: Bool = false, quantizingActivations: Bool = false) {
         guard device.supportsFamily(.metal4) else { return nil }
         let options = MTLCompileOptions()
         options.languageVersion = .version4_0
@@ -220,6 +227,8 @@ package final class TensorGEMM {
         } else {
             rounded = nil
         }
+        // Refused by this compiler: the integers are read on the rounded or fp32 activation, as before W8A8 (said by `MetalCompile`).
+        quantized = quantizingActivations ? QuantizedKernels(device: device, options: options) : nil
     }
 
     /// `C [m, n] = A [m, k] · W`, `A` and `C` fp32, `W` bf16 — `[k, n]` when `weightIsTransposed`
@@ -252,7 +261,20 @@ package final class TensorGEMM {
     /// GPU seconds.
     package func linear(a: MTLBuffer, int8 w: MTLBuffer, scales: MTLBuffer, scalesOffset: Int, perColumn: Bool,
                         block: Int? = nil, rotation: (group: Int, scratch: MTLBuffer, offset: Int, chunk: Int)?,
-                        rounding: Rounding? = nil, c: MTLBuffer, m: Int, k: Int, n: Int) -> Double {
+                        rounding: Rounding? = nil, quantizing: Quantizing? = nil, c: MTLBuffer, m: Int, k: Int, n: Int) -> Double {
+        if let quantizing, block == nil,
+           let commands = submitQuantized(a: a, int8: w, scales: scales, scalesOffset: scalesOffset, perColumn: perColumn,
+                                          group: rotation?.group, quantizing: quantizing, c: c, m: m, k: k, n: n) {
+            commands.waitUntilCompleted()
+            GEMM.quantizedProducts.withLock { $0 += 1 }
+            return Attention.verdict(commands, what: "matmul2d int8 × int8 \(m)×\(k)×\(n)")
+        }
+        // Refused (no pipeline for this k): the fp32 activation, rotated in the room the codes had — a row of fp32 takes four times
+        // a row of codes, so the chunk is a quarter or less.
+        var rotation = rotation
+        if let quantizing, let r = rotation {
+            rotation = (r.group, r.scratch, r.offset, max(1, quantizing.rows * (k + 4) / (4 * k)))
+        }
         let commands = submit(a: a, int8: w, scales: scales, scalesOffset: scalesOffset, perColumn: perColumn,
                               block: block, rotation: rotation, rounding: rounding, c: c, m: m, k: k, n: n, columns: n)
         commands.waitUntilCompleted()

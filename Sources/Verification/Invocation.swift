@@ -4,7 +4,8 @@ import Siliconed
 // **One check's arguments, the same grammar for every stage**:
 //
 //     siliconed check <model> <stage> [--size 512|1024|WxH] [--edit N] [--goldens DIR] [--map PATH] [--profile]
-//                                     [--neural-engine] [--bf16-activations] [--bf16-attention | --fp16-attention] [--long]
+//                                     [--neural-engine] [--bf16-activations] [--bf16-attention | --fp16-attention] [--int8-activations]
+//                                     [--long]
 //
 // Named options only, no positional magic: `--size` is the only thing that names a size, so a number
 // meant for something else is never taken for one. An option a stage does not accept is a usage
@@ -31,6 +32,9 @@ package struct Invocation: Sendable {
     /// `--fp16-attention`: the DiT's attention on fp16 operands, fused (`FP16AttentionRun`) — the `tiles16` a render takes where the map
     /// chooses it, at every version.
     package let fp16Attention: Bool
+    /// `--int8-activations`: the DiT's products on a Compact's int8 weights take an int8 activation (W8A8, `W8A8Run`), judged against
+    /// the publisher's own recipe (ComfyUI's `int8_linear`, `witness-w8a8-…`) instead of the bf16 reference.
+    package let int8Activations: Bool
     /// Some half-precision flag is given: the stage is judged against the reference run in bf16.
     package var halfPrecision: Bool { neuralEngine || bf16Activations || bf16Attention || fp16Attention }
     /// `--no-accelerators`: this Mac's map (`SILICONED_MAP`) with the « Accelerators » switch off — fp32 throughout (`FP32Run`).
@@ -46,7 +50,9 @@ package struct Invocation: Sendable {
 
     /// Parses `arguments` (what follows `check <model> <stage>`), refusing any option outside `accepted`
     /// and `common`. `defaultSize`: the stage's own, when `--size` is absent.
-    package init(_ arguments: [String], accepted: Set<String>, defaultSize: String) throws {
+    /// `designates`: the flags' plans designated for the engine (`HalfPrecisionRun`, `W8A8Run`, `FP32Run`) — off for a test of the
+    /// parsing alone, in a process whose engine settings another test has read.
+    package init(_ arguments: [String], accepted: Set<String>, defaultSize: String, designates: Bool = true) throws {
         var values: [String: [String]] = [:]
         var flags: Set<String> = []
         var i = 0
@@ -79,17 +85,25 @@ package struct Invocation: Sendable {
         bf16Attention = flags.contains("--bf16-attention")
         fp16Attention = flags.contains("--fp16-attention")
         noAccelerators = flags.contains("--no-accelerators")
+        int8Activations = flags.contains("--int8-activations")
         if bf16Attention && fp16Attention {
             throw UsageError("--bf16-attention and --fp16-attention: one precision of the attention at a time")
         }
         if noAccelerators && (neuralEngine || bf16Activations || bf16Attention || fp16Attention) {
             throw UsageError("--no-accelerators is fp32 throughout: not with --neural-engine, --bf16-activations, --bf16-attention or --fp16-attention")
         }
-        if neuralEngine || bf16Activations || bf16Attention || fp16Attention {
+        if designates && (neuralEngine || bf16Activations || bf16Attention || fp16Attention) {
             try HalfPrecisionRun.enable(neuralEngine: neuralEngine, bf16Activations: bf16Activations, bf16Attention: bf16Attention,
                                         fp16Attention: fp16Attention)
         }
-        if noAccelerators { try FP32Run.enable() }
+        if noAccelerators && int8Activations {
+            throw UsageError("--no-accelerators is fp32 throughout: not with --int8-activations")
+        }
+        if designates && int8Activations {
+            try W8A8Run.enable(neuralEngine: neuralEngine, bf16Activations: bf16Activations, bf16Attention: bf16Attention,
+                               fp16Attention: fp16Attention)
+        }
+        if designates && noAccelerators { try FP32Run.enable() }
         long = flags.contains("--long")
         goldens = Goldens(directory: values["--goldens"]?.last)
         extras = values.compactMapValues(\.last).filter { !Self.known.contains($0.key) }
@@ -97,7 +111,7 @@ package struct Invocation: Sendable {
 
     /// The options that take no value.
     private static let flags: Set<String> = ["--profile", "--neural-engine", "--bf16-activations", "--bf16-attention", "--fp16-attention",
-                                             "--no-accelerators", "--long"]
+                                             "--int8-activations", "--no-accelerators", "--long"]
 
     /// The options parsed above; any other accepted option lands in `extras`.
     private static let known: Set<String> = ["--size", "--goldens", "--edit", "--map"]
@@ -116,6 +130,17 @@ package struct Invocation: Sendable {
         let half = HalfPrecisionReference(goldens: goldens, file: file)
         if halfPrecision, half == nil { throw Skip("bf16 reference missing beside \(file) — \(script)") }
         return half
+    }
+
+    /// The bar beside `file`: under `--int8-activations` the W8A8 reference (`witness-w8a8-…`, required: `w8a8Script` writes it),
+    /// which replaces the bf16 one — its arithmetic is the bf16 reference's with ComfyUI's int8 products in the int8 layers, so it
+    /// holds for the half-precision flags given with it —; otherwise `halfReference`.
+    package func reference(_ file: String, script: String, w8a8Script: String) throws -> HalfPrecisionReference? {
+        guard int8Activations else { return try halfReference(file, script: script) }
+        guard let w8a8 = HalfPrecisionReference(w8a8: goldens, file: file) else {
+            throw Skip("W8A8 reference missing beside \(file) — \(w8a8Script)")
+        }
+        return w8a8
     }
 
     /// A stage's own integer option, `fallback` when absent.

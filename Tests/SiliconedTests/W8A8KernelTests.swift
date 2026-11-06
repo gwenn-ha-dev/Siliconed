@@ -1,0 +1,88 @@
+import Metal
+import XCTest
+@testable import Siliconed
+
+/// **W8A8 on the GPU against ComfyUI's recipe on the CPU, to the bit** (`QuantizedKernels`, `TensorGEMM.submitQuantized`): the activation
+/// rotated by groups (the regular Hadamard, `rotate_groups`'s butterflies) and quantized per row (`W8A8.quantize`: max|y| / 127, `rint` of the
+/// correctly rounded quotient, clamp), the int8 × int8 product exact in int32, then `float(acc) · (s_x · s_w)` — every step a single rounding the
+/// CPU makes the same, so the output is compared for equality, not to a bar. Rows cut in chunks with a remainder, a row of 40 chunks of 256
+/// (two per simdgroup), a group of 64, no rotation on a `k` that is no whole chunk, a scale per column and one for the tensor, a row of zeros
+/// (its scale the recipe's floor, 1e-30), a massive column. Skipped without the Metal 4 tensor kernels.
+final class W8A8KernelTests: XCTestCase {
+    private struct Case { let m, k, n: Int; let group: Int?; let perColumn: Bool; let chunk: Int }
+
+    private func run(_ t: Case) throws {
+        let device = try XCTUnwrap(MTLCreateSystemDefaultDevice()), queue = try XCTUnwrap(device.makeCommandQueue())
+        guard let gemm = TensorGEMM(device: device, queue: queue, quantizingActivations: true), gemm.quantizesActivations else {
+            throw XCTSkip("no Metal 4 tensor kernels for W8A8 on this device")
+        }
+        let (m, k, n) = (t.m, t.k, t.n)
+        var state: UInt64 = 0x5EED ^ UInt64(m * 131 + k * 7 + n)
+        func next() -> Float {
+            state = state &* 6364136223846793005 &+ 1442695040888963407
+            return Float(UInt32(truncatingIfNeeded: state >> 32)) / Float(UInt32.max) - 0.5
+        }
+        var a = (0..<(m * k)).map { _ in next() * 6 }
+        for i in 0..<k { a[3 * k + i] = 0 }                        // a row of zeros
+        for r in 0..<m { a[r * k + k / 3] *= 300 }                 // a massive column
+        let q = (0..<(k * n)).map { _ in Int8(Int((next() * 254).rounded())) }
+        let sw = (0..<(t.perColumn ? n : 1)).map { _ in (abs(next()) + 0.01) / 64 }
+        // The reserve as `WeightProducts.int8Plan` lays it: the integers, their scales, the codes and the activation's scales.
+        func page(_ b: Int) -> Int { (b + 16383) / 16384 * 16384 }
+        let scalesOffset = page(k * n), codesOffset = page(scalesOffset + sw.count * 4), activationScales = page(codesOffset + t.chunk * k)
+        let reserve = try XCTUnwrap(device.makeBuffer(length: activationScales + page(t.chunk * 4), options: .storageModeShared))
+        q.withUnsafeBytes { reserve.contents().copyMemory(from: $0.baseAddress!, byteCount: q.count) }
+        sw.withUnsafeBytes { (reserve.contents() + scalesOffset).copyMemory(from: $0.baseAddress!, byteCount: $0.count) }
+        let input = try XCTUnwrap(device.makeBuffer(bytes: a, length: 4 * a.count, options: .storageModeShared))
+        let output = try XCTUnwrap(device.makeBuffer(length: 4 * m * n, options: .storageModeShared))
+        let commands = try XCTUnwrap(gemm.submitQuantized(a: input, int8: reserve, scales: reserve, scalesOffset: scalesOffset,
+                                                          perColumn: t.perColumn, group: t.group,
+                                                          quantizing: (reserve, codesOffset, activationScales, t.chunk),
+                                                          c: output, m: m, k: k, n: n))
+        commands.waitUntilCompleted()
+        XCTAssertNil(commands.error)
+        let c = output.contents().assumingMemoryBound(to: Float.self)
+        let codes = (reserve.contents() + codesOffset).assumingMemoryBound(to: Int8.self)
+        let scales = (reserve.contents() + activationScales).assumingMemoryBound(to: Float.self)
+        let lastChunk = (m - 1) / t.chunk * t.chunk
+        var unequal = 0, codesOff = 0
+        for r in 0..<m {
+            let (x, sx) = a.withUnsafeBufferPointer { W8A8.quantize($0.baseAddress! + r * k, k: k, group: t.group) }
+            if r == 3 { XCTAssertEqual(sx, 1e-30, "a row of zeros keeps the recipe's floor") }
+            // The slot holds the last chunk's codes and scales.
+            if r >= lastChunk {
+                XCTAssertEqual(scales[r - lastChunk], sx, "row \(r): the activation's scale")
+                for i in 0..<k where codes[(r - lastChunk) * k + i] != x[i] { codesOff += 1 }
+            }
+            for j in 0..<n {
+                var acc: Int32 = 0
+                for i in 0..<k { acc &+= Int32(x[i]) * Int32(q[i * n + j]) }
+                let expected = Float(acc) * (sx * sw[t.perColumn ? j : 0])
+                if c[r * n + j].bitPattern != expected.bitPattern { unequal += 1 }
+            }
+        }
+        XCTAssertEqual(codesOff, 0, "codes unlike the CPU's recipe")
+        XCTAssertEqual(unequal, 0, "outputs unlike the CPU's recipe, of \(m * n)")
+    }
+
+    func testRotatedRowsInChunksAgainstTheRecipe() throws { try run(Case(m: 150, k: 768, n: 96, group: 256, perColumn: true, chunk: 64)) }
+    func testALongRowTwoChunksASimdgroup() throws { try run(Case(m: 70, k: 10240, n: 72, group: 256, perColumn: true, chunk: 64)) }
+    func testAGroupOf64AndATensorScale() throws { try run(Case(m: 65, k: 448, n: 130, group: 64, perColumn: false, chunk: 128)) }
+    func testNoRotationOnAPartialChunk() throws { try run(Case(m: 33, k: 520, n: 40, group: nil, perColumn: true, chunk: 64)) }
+
+    /// The route's own plan: the codes and their scales past the integers, in the reserve a model holds, chunked by what is left.
+    func testThePlanLaysTheQuantizedActivationInTheReserve() throws {
+        let plan = try XCTUnwrap(WeightProducts.int8Plan(k: 3840, n: 11520, capacity: 3840 * 11520, perColumn: true, group: 256,
+                                                         amxColumns: 0, quantized: true))
+        XCTAssertGreaterThan(plan.quantizedOffset, 0)
+        XCTAssertGreaterThanOrEqual(plan.quantizedOffset, plan.scalesOffset + 11520 * 4)
+        XCTAssertGreaterThanOrEqual(plan.quantizedScalesOffset, plan.quantizedOffset + plan.chunk * 3840)
+        XCTAssertLessThanOrEqual(plan.quantizedScalesOffset + plan.chunk * 4, 3840 * 11520 * 4)
+        XCTAssertGreaterThanOrEqual(plan.chunk, 4128, "Z-Image's 1024² rows in one chunk")
+        XCTAssertEqual(plan.roundedOffset, 0)
+        XCTAssertNil(WeightProducts.int8Plan(k: 3840, n: 3840, capacity: 3840 * 3840, perColumn: true, group: 512, amxColumns: 0, quantized: true),
+                     "a rotation group the kernel does not take")
+        XCTAssertNil(WeightProducts.int8Plan(k: 4096, n: 64, capacity: 4096 * 64, perColumn: false, group: nil, amxColumns: 0, block: 32,
+                                             quantized: true), "Q8_0's blocks cut the integers' sum")
+    }
+}

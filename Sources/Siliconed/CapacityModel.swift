@@ -69,8 +69,9 @@ package struct CapacityModel: Codable, Sendable, Equatable {
         /// rotation, `bfloat × int8`, the scale after the sums; `gpu/q8act`: a GGUF Q8_0, each block's scale applied in fp32
         /// to its partial sums) — the integers are exact in bf16, so only the operand is rounded, as for `bf16act`; a K-quant
         /// (`gpu/q4kact`: Q4_K, Q5_K's `sc·q` exact in fp16, `bfloat × half` per super-block, its `d` in fp32 on the partial sums,
-        /// the mins apart — `KQuantKernels`).
-        case fp32, bf16, bf16act, int8, q8, fp16, int8act, q8act, q4kact
+        /// the mins apart — `KQuantKernels`); the int8 weight as published beside the activation quantized to int8 (`gpu/int8x8`: W8A8,
+        /// ComfyUI's `int8_linear` — after its rotation, per row, `int8 × int8 → int32`, `s_x · s_w` after the sums: `QuantizedKernels`).
+        case fp32, bf16, bf16act, int8, q8, fp16, int8act, q8act, q4kact, int8x8
         /// Attentions: the MPSGraph graph, the flash kernel, a share of the heads on the CPU, the three stages by tiles of query rows
         /// (`tiles`: fp32 throughout; `tiles16`: fp16 operands, fp32 sums; `tilesbf16`: bf16 operands, fp32 sums) — the last two in
         /// the form their map chose (`attentionTiles`).
@@ -79,7 +80,7 @@ package struct CapacityModel: Codable, Sendable, Equatable {
         /// A product's form (its seconds a line of `k`, `n` and rows), not an attention's.
         package var isProduct: Bool {
             switch self {
-            case .fp32, .bf16, .bf16act, .int8, .q8, .fp16, .int8act, .q8act, .q4kact: return true
+            case .fp32, .bf16, .bf16act, .int8, .q8, .fp16, .int8act, .q8act, .q4kact, .int8x8: return true
             case .graph, .flash, .heads, .tiles, .tiles16, .tilesbf16: return false
             }
         }
@@ -549,6 +550,9 @@ package struct CapacityModel: Codable, Sendable, Equatable {
         case .q8act: return (1 + 4.0 / 64, 8)
         // The blocks (0.56 B), unpacked into `sc·q` (half: written, then read) and the mins; the activation's rounded copy and sums.
         case .q4kact: return (0.5625 + 4 + 4.0 / 32, 9)
+        // The activation read once in fp32 and written in int8, read again in int8; the sums written in int32, then read and written
+        // in fp32 by the scales' pass.
+        case .int8x8: return (1, 18)
         default: return (4, 4)
         }
     }

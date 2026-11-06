@@ -169,6 +169,11 @@ package final class GEMM {
     /// The products may take their activation rounded to bf16 (`BFloatKernels`): the
     /// library compiled. Which products do is the plan's to say.
     package let bf16Activations: Bool
+    /// The products on a published int8 weight may take their activation quantized to int8 (W8A8, `QuantizedKernels`): the library
+    /// compiled. Which products do is the plan's to say.
+    package let int8Activations: Bool
+    /// Products that went through the W8A8 path in this process: a check says what ran.
+    package static let quantizedProducts = Mutex<Int>(0)
     /// Products that went through the bf16 activation path in this process: a check says what ran.
     package static let roundedProducts = Mutex<Int>(0)
     /// ... of which read the operand its producer had already rounded (`WeightProducts.RoundedOperand`): no pass of their own.
@@ -198,12 +203,14 @@ package final class GEMM {
         let r = plan.resources
         if r.amx { conductor = Conductor(queue: queue) }
         if r.usesTensor {
-            tensor = TensorGEMM(device: device, queue: queue, roundingActivations: r.roundedActivations)
+            tensor = TensorGEMM(device: device, queue: queue, roundingActivations: r.roundedActivations,
+                                quantizingActivations: r.quantizedActivations)
             // The tile each matmul2d kernel runs is the map's (`MatmulTile`); none measured: the standard ones.
             for (kernel, tile) in plan.model?.tiles ?? [:] { tensor?.tiles.use(tile, for: kernel) }
             for (kernel, tile) in plan.model?.thinTiles ?? [:] { tensor?.tiles.use(tile, for: kernel, thin: true) }
         }
         self.bf16Activations = tensor?.roundsActivations == true
+        self.int8Activations = tensor?.quantizesActivations == true && r.int8Weights
         tensorBF16 = tensor != nil && r.bf16Weights
         tensorInt8 = tensor != nil && r.int8Weights
         tensorQ8 = tensor?.readsBlocks == true && r.q8Weights

@@ -106,6 +106,10 @@ package enum CapacitySolver {
         /// weight, as a GPU in bf16 computes them, the sums fp32 — at every version, the Standard's included (decided 2/11/2026: the fp32
         /// operand was the M1 Pro's choice of speed, not a rule). The map says where it is faster; an encoder never.
         package var allowsRounding: Bool
+        /// **The activation may be quantized to int8 beside a published int8 weight** (W8A8, `gpu/int8x8`): the quant's author's own
+        /// forward (ComfyUI's `int8_linear`), the multiplication in the weight's format — under the rounding's permission (the
+        /// accelerators on) and the plan's W8A8 switch (`CapacityPlan.allowsQuantizing`); an encoder never.
+        package var allowsQuantizing: Bool
 
         /// **fp16 may be asked for** — the attention on fp16 operands (`tiles16`: Q, K, V and P rounded to half, fp32 sums). Derived,
         /// never set: `allowsHalf(ane:rounding:)` is the one rule, which the plan's resources and the app's sentence read too.
@@ -118,9 +122,10 @@ package enum CapacitySolver {
         package static func allowsHalf(ane: Bool, rounding: Bool) -> Bool { ane && rounding }
 
         package init(limits: Limits = .init(), sustained: Bool = true, excluded: Set<CapacityModel.Kernel> = [],
-                     allowsANE: Bool = true, allowsRounding: Bool = true) {
+                     allowsANE: Bool = true, allowsRounding: Bool = true, allowsQuantizing: Bool? = nil) {
             self.limits = limits; self.sustained = sustained; self.excluded = excluded; self.allowsANE = allowsANE
             self.allowsRounding = allowsRounding
+            self.allowsQuantizing = allowsQuantizing ?? allowsRounding
         }
 
         /// The constraints of a request, as a render takes them: the version restricts nothing (the ANE, the rounding and fp16 at every
@@ -425,6 +430,10 @@ private struct ProductSolver {
     /// rounding's floor): the GPU's rounded kernel alone (`gpu/int8act`, `gpu/q8act`) or beside the ANE's integers
     /// (`[gpu/int8act, ane/int8]`) — that pair only where the probes measured its own sharing: the rounded kernel runs on the tensor
     /// units, and the fp32 pair's κ is not its κ. No AMX beside it: the AMX reads the fp32 activation.
+    ///
+    /// **Then on the activation quantized to int8** (W8A8, `gpu/int8x8`), an int8 weight only, where it may be (`allowsQuantizing`, the
+    /// denoiser, from the rounding's floor): the GPU's whole product, alone — no AMX (the fp32 activation), no ANE (its int8 × int8 is
+    /// not built: the pair `[gpu/int8act, ane/int8]` stays the integers' only one).
     func native(_ key: ProductKey) -> [Option] {
         let (k, n, m) = (key.k, key.n, key.m)
         let int8 = key.weight == .int8
@@ -464,6 +473,13 @@ private struct ProductSolver {
                 out.append(Option(assignment: assignment, rows: [gpu: m], seconds: t))
             }
             if let ane, model.sharing[CapacityModel.key([gpu, ane])] != nil { withANE(gpu, rounds: true, alone: false) }
+        }
+        // On the activation quantized to int8.
+        if int8, key.phase == .denoising, c.allowsQuantizing, m >= c.limits.roundingRows, let gpu = line(.gpu, .int8x8) {
+            let assignment = ProductAssignment(path: .native, quantizesActivation: true, gpu: m)
+            if assignment.isRunnable(for: key), let t = seconds([gpu: m], m: m, k: k, n: n) {
+                out.append(Option(assignment: assignment, rows: [gpu: m], seconds: t))
+            }
         }
         return out
     }
@@ -640,7 +656,7 @@ private struct ProductSolver {
             switch a.path {
             case .widened: return 0
             case .bf16: return a.roundsActivation ? 2 : 1
-            case .native: return a.roundsActivation ? 4 : 3
+            case .native: return a.quantizesActivation ? 5 : a.roundsActivation ? 4 : 3
             }
         }
         return options.enumerated().sorted { x, y in
@@ -675,6 +691,11 @@ private struct ProductSolver {
             let int8 = key.weight == .int8
             if key.weight == .q4k {
                 guard a.isRunnable(for: key), let g = line(.gpu, .q4kact) else { return nil }
+                rows[g] = a.gpu
+                break
+            }
+            if a.quantizesActivation {
+                guard a.isRunnable(for: key), let g = line(.gpu, .int8x8) else { return nil }
                 rows[g] = a.gpu
                 break
             }

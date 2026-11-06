@@ -206,6 +206,39 @@ package struct Int8Route {
     }
 }
 
+/// **`--int8-activations`: the W8A8 route of a Compact** — an int8 activation (rotated by the weight's Hadamard blocks, quantized per
+/// row) times the published int8 weight, int32 sums, times both scales. Permitted on a weight published in 8 bits only;
+/// judged against the quant's author's own recipe, ComfyUI's `int8_linear` (`HalfPrecisionReference(w8a8:)`), at the fp64
+/// witness, + 25 %.
+package enum W8A8Run {
+    /// The engine's int8 × int8 route (`gpu/int8x8`), designated before anything reads the engine's settings — with the invocation's
+    /// other half-precision flags, as `HalfPrecisionRun.enable` designates its plan, which this one replaces: every denoiser product on a
+    /// published int8 weight the route takes, the rest as those flags say.
+    package static func enable(neuralEngine: Bool, bf16Activations: Bool, bf16Attention: Bool, fp16Attention: Bool) throws {
+        do {
+            try EngineSettings.designate(plan: .forcing(neuralEngine: neuralEngine, bf16Activations: bf16Activations,
+                                                        tiles16: fp16Attention, tilesbf16: bf16Attention,
+                                                        fused: bf16Attention || fp16Attention, int8Activations: true))
+        } catch {
+            throw UsageError("--int8-activations: the engine's settings were read before it")
+        }
+        before = (GEMM.quantizedProducts.withLock { $0 }, GEMM.int8Products.withLock { $0 })
+    }
+
+    nonisolated(unsafe) private static var before = (quantized: 0, int8: 0)
+
+    /// How many products ran int8 × int8 since `enable` (`GEMM.quantizedProducts`), of those on the published integers
+    /// (`GEMM.int8Products`): every one, as ComfyUI quantizes every int8 layer, else the route was not crossed whole. None: skipped,
+    /// since what would be judged is another route against the W8A8 bar.
+    package static func account(_ report: Report) throws {
+        let products = GEMM.quantizedProducts.withLock { $0 } - before.quantized, int8 = GEMM.int8Products.withLock { $0 } - before.int8
+        guard products > 0 else {
+            throw Skip("--int8-activations: no product ran int8 × int8 (no int8 weight, or no Metal 4 int8 tensor kernels on this GPU)")
+        }
+        report.add(Judge.holds("int8 × int8", products == int8, note: "\(products) of the \(int8) products on the integers on an int8 activation"))
+    }
+}
+
 package enum NeuralEngineRun {
     /// How many of the DiT's products the ANE computed. None (no ANE on this Mac, every product refused):
     /// skipped, since what would be judged is the GPU's fp32 against a looser bar.
@@ -282,6 +315,14 @@ package struct HalfPrecisionReference {
             print("a half-precision path is on and no bf16 reference beside \(file): the fp32 rule applies")
             return nil
         }
+        tensors = found
+    }
+
+    /// The W8A8 reference beside `file` (`goldens-X` → `witness-w8a8-X`): a Compact's evaluation as ComfyUI computes it by default,
+    /// each int8 layer an int8 activation (rotated, quantized per row) times the published integers, the rest in bf16
+    /// (`tools/oracle/z-image.py w8a8 --variant compact`). `nil` when absent.
+    package init?(w8a8 goldens: Goldens, file: String) {
+        guard let found = goldens.optional(file.replacingOccurrences(of: "goldens-", with: "witness-w8a8-")) else { return nil }
         tensors = found
     }
 

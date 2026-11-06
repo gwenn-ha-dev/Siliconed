@@ -4,7 +4,9 @@
   "commit": "b0b743566f65daafc423b4fea8a2fbda94b3384a",
   "files": [
    "comfy/quant_ops.py",
-   "comfy/ops.py"
+   "comfy/ops.py",
+   "comfy/supported_models.py",
+   "comfy/ldm/lumina/model.py"
   ]
  },
  "kitchen": {
@@ -15,7 +17,12 @@
   "files": [
    "comfy_kitchen/tensor/int8.py",
    "comfy_kitchen/tensor/int8_utils.py",
-   "comfy_kitchen/backends/eager/quantization.py"
+   "comfy_kitchen/backends/eager/quantization.py",
+   "comfy_kitchen/backends/_activations.py",
+   "comfy_kitchen/tensor/base.py",
+   "comfy_kitchen/backends/triton/quantization.py",
+   "comfy_kitchen/backends/triton/__init__.py",
+   "comfy_kitchen/backends/eager/__init__.py"
   ]
  },
  "sdcpp": {
@@ -36,6 +43,16 @@
    "bytes": 85792,
    "sha256": "bf063b4a1b6517e017e3e73e8948caa494177025d71366ae712aaca73f6b9dff"
   },
+  "comfyui/comfy/supported_models.py": {
+   "origin": "https://raw.githubusercontent.com/Comfy-Org/ComfyUI/b0b743566f65daafc423b4fea8a2fbda94b3384a/comfy/supported_models.py",
+   "bytes": 88459,
+   "sha256": "5943d81bc0257b9b72b065a4ecb2f57c51c826e91f86c333b98fbe8a830e0cef"
+  },
+  "comfyui/comfy/ldm/lumina/model.py": {
+   "origin": "https://raw.githubusercontent.com/Comfy-Org/ComfyUI/b0b743566f65daafc423b4fea8a2fbda94b3384a/comfy/ldm/lumina/model.py",
+   "bytes": 49370,
+   "sha256": "a3178998f03a33789d492ed6997cc58fe4123d3157b7e13b940790628a1558cb"
+  },
   "sdcpp/docs/int8_convrot.md": {
    "origin": "https://raw.githubusercontent.com/leejet/stable-diffusion.cpp/3f8527a46c54ecf4cb4ed6003da8e8982283c73c/docs/int8_convrot.md",
    "bytes": 5514,
@@ -55,6 +72,31 @@
    "origin": "comfy_kitchen-0.2.37-py3-none-any.whl!comfy_kitchen/backends/eager/quantization.py",
    "bytes": 45748,
    "sha256": "0c90a8510419409306dd1975bc9c34c9225ed4493718e1df2c30d5cddcf2017e"
+  },
+  "kitchen/comfy_kitchen/backends/_activations.py": {
+   "origin": "comfy_kitchen-0.2.37-py3-none-any.whl!comfy_kitchen/backends/_activations.py",
+   "bytes": 3065,
+   "sha256": "3b9642ade6e2e19102ce1b21894df1792296f0b9401b5701348a0c29c1b5be44"
+  },
+  "kitchen/comfy_kitchen/tensor/base.py": {
+   "origin": "comfy_kitchen-0.2.37-py3-none-any.whl!comfy_kitchen/tensor/base.py",
+   "bytes": 18126,
+   "sha256": "1779b95ec16d2f3db1adcdbf448b931104ad6f609849afec7d03c999cfc819eb"
+  },
+  "kitchen/comfy_kitchen/backends/triton/quantization.py": {
+   "origin": "comfy_kitchen-0.2.37-py3-none-any.whl!comfy_kitchen/backends/triton/quantization.py",
+   "bytes": 38111,
+   "sha256": "fd7045ab8afaf7f92f6d7123a4483cdb6149ff1890defb709c6849af422e08ed"
+  },
+  "kitchen/comfy_kitchen/backends/triton/__init__.py": {
+   "origin": "comfy_kitchen-0.2.37-py3-none-any.whl!comfy_kitchen/backends/triton/__init__.py",
+   "bytes": 13718,
+   "sha256": "9dd763c1688725d8d7cb4461e1e97687e4ca9e60ab19c6d369e47b175b59b8fa"
+  },
+  "kitchen/comfy_kitchen/backends/eager/__init__.py": {
+   "origin": "comfy_kitchen-0.2.37-py3-none-any.whl!comfy_kitchen/backends/eager/__init__.py",
+   "bytes": 26603,
+   "sha256": "e283e6d83c975d37fae30e44f92967eb7e52f04cd95ab24d4506424e8cd557c3"
   }
  }
 }

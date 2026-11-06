@@ -65,7 +65,10 @@ import Metal
 /// (`EngineSettings.adopt(map:)`), never during one. The command line, the checks and the close-out
 /// never designate one unless a developer names it (`SILICONED_MAP`): today's defaults.
 package enum Diagnostic {
-    /// The JSON's version: the script that aggregates the reports reads it. **23** (5/11/2026): a stage's projection counts the tiles'
+    /// The JSON's version: the script that aggregates the reports reads it. **24** (6/11/2026): W8A8 on an 8-bit weight — the activation
+    /// rotated and quantized per row, the int8 × int8 product in int32 (`gpu/int8x8`, its tile among candidates) — is measured on the
+    /// rounded kernels' eight shapes and the thin ones, judged against the exact product of its own codes; a map without its line would
+    /// never offer it. **23** (5/11/2026): a stage's projection counts the tiles'
     /// trials and a pulse per step (`StageTime.projected`; under 23 it priced the figures alone, and the runs took 1.7 to 2.1 times it),
     /// the pulse it counted is written (`Regime.pulseSeconds`), and the thin tiles are chosen on two rounds (`MatmulTile.thinRounds`).
     /// **22** (3/11/2026): each stage names the bias its seconds
@@ -83,8 +86,8 @@ package enum Diagnostic {
     /// effect on the plan, replace the green flag and the defects, and the fit's aberrant figures are bounded; 15 (30/10/2026) was the
     /// capacity model — inventory, the probes' raw measurements, the model they fit, the judge per kernel, the memory, the stages and
     /// a verdict of defects; 14 and before were a table of routes timed against each other (grid of classes, pairs A B A B), which the
-    /// engine no longer reads. A report of a schema under 23 is not a map: the app measures again (`isCurrent`).
-    package static let schema = 23
+    /// engine no longer reads. A report of a schema under 24 is not a map: the app measures again (`isCurrent`).
+    package static let schema = 24
     package static let repository = "https://github.com/gwenn-ha-dev/Siliconed"
     /// **Wall seconds the whole diagnostic may take, inventory and witnesses included, on any Mac: a ceiling, not a target** (the
     /// user, 1/11/2026: a Mac pays once per version rather than a few percent at every render). The duration is a result: about forty

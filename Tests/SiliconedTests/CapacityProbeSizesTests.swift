@@ -57,6 +57,7 @@ import Testing
         // The tiles' trials came after these runs too (2/11/2026); the pulses are not counted here (`m1Pro.pulse` is 0).
         let untimed = Sizes.full.roundedEightBitSeconds(Self.m1Pro).merging(Sizes.full.roundedPairSeconds(Self.m1Pro)) { $0 + $1 }
             .merging(Sizes.full.roundedProductSeconds(Self.m1Pro)) { $0 + $1 }.merging(Sizes.full.tileTrialSeconds(Self.m1Pro)) { $0 + $1 }
+            .merging(Sizes.full.quantizedSeconds(Self.m1Pro)) { $0 + $1 }
         #expect(Set(p.keys) == Set(Self.measured.keys))
         for (stage, seconds) in Self.measured.sorted(by: { $0.key < $1.key }) {
             // The attention's 4.0 s were measured before the half-precision kernels chose their form (2/11/2026), the 8-bit stages before
@@ -122,15 +123,17 @@ import Testing
 
     /// **What a stage does beside its figures, counted as the probes do it**: the steps through the guard are those of an M5 Pro's map at
     /// the first tier (schema 22: its first measures, tiles' trials and attention's forms, 427 pulses once the thin trials' third round is
-    /// taken off) and of a Neo's at the second (378); the trials are each candidate's rounds on the shapes its kernel takes — the
+    /// taken off) and of a Neo's at the second (378), W8A8's added since schema 24 (no map has counted them yet); the trials are each candidate's rounds on the shapes its kernel takes — the
     /// 8-bit weights leave out a k under a group, the rounded one a reserve too small for 64 rows —; a pulse is counted once per step.
     @Test func theTrialsAndThePulsesAreCountedAsTheProbesRunThem() {
         let r = Rates(gpu: 5.8e12, amx: 1.8e12, ane: 7.1e12, cpu: 1.9e12, pulse: 0.018)
-        #expect(Sizes.full.steps(r) == ["solos fp32": 87, "stairs": 8, "attention": 39, "sharing": 12, "solos 8-bit and rounded": 213,
-                                        "thin products": 59, "sharing int8": 6, "sharing rounded": 3])
-        #expect(Sizes.tiers[1].steps(r).values.reduce(0, +) == 378)
+        // W8A8 (schema 24) adds its eight shapes and its tiles' 60 trials to the 8-bit stage, six thin shapes to the thin one.
+        #expect(Sizes.full.steps(r) == ["solos fp32": 87, "stairs": 8, "attention": 39, "sharing": 12, "solos 8-bit and rounded": 213 + 8 + 60,
+                                        "thin products": 59 + 6, "sharing int8": 6, "sharing rounded": 3])
+        #expect(Sizes.tiers[1].steps(r).values.reduce(0, +) == 442)
         let trials = MatmulTile.kernels.map { Sizes.full.tileTrials($0).count }
-        #expect(trials == [4 * (3 + 2 * 7), 4 * (3 + 2 * 7), 4 * (3 + 2 * 6), 4 * (3 + 2 * 5)], "bf16, bf16act, int8, int8act")
+        #expect(trials == [4 * (3 + 2 * 7), 4 * (3 + 2 * 7), 4 * (3 + 2 * 6), 4 * (3 + 2 * 5), 4 * (3 + 2 * 6)],
+                "bf16, bf16act, int8, int8act, int8x8")
         var silent = r; silent.pulse = 0
         let with = Sizes.full.projection(r), without = Sizes.full.projection(silent)
         for (stage, n) in Sizes.full.steps(r) { #expect(abs(with[stage]! - without[stage]! - Double(n) * 0.018) < 1e-9, "\(stage)") }

@@ -66,15 +66,21 @@ package final class CapacityPlan: Sendable {
         /// (`CapacityModel.Convolution.prefersHalf`), or a check's forcing. Never under `restricted(accelerators: false)`. Not in
         /// `halfPrecision`: the denoiser's checks are not the decoder's (each decoder stage asks `VAEPrecision` itself).
         package var halfDecoder = false
+        /// **A published int8 weight may be multiplied by the activation quantized to int8** (W8A8, `gpu/int8x8`, `QuantizedKernels`): the
+        /// quant's author's own forward. Never under `restricted(accelerators: false)`, nor where the W8A8 switch is off
+        /// (`CapacityPlan.allowsW8A8`). Not in `halfPrecision`: its checks judge against Comfy's forward, not the reference in bf16.
+        package var quantizedActivations = false
         package init(amx: Bool = false, ane: Bool = false, bf16Weights: Bool = false, int8Weights: Bool = false,
-                     q8Weights: Bool = false, roundedActivations: Bool = false, aneInt8: Bool = false, halfAttention: Bool = false) {
+                     q8Weights: Bool = false, roundedActivations: Bool = false, aneInt8: Bool = false, halfAttention: Bool = false,
+                     quantizedActivations: Bool = false) {
             self.halfAttention = halfAttention
+            self.quantizedActivations = quantizedActivations && int8Weights
             self.amx = amx; self.ane = ane; self.bf16Weights = bf16Weights; self.int8Weights = int8Weights
             self.q8Weights = q8Weights; self.roundedActivations = roundedActivations
             self.aneInt8 = aneInt8 && ane && int8Weights
         }
         private enum CodingKeys: String, CodingKey {
-            case amx, ane, bf16Weights, int8Weights, q8Weights, roundedActivations, aneInt8, halfAttention, halfDecoder
+            case amx, ane, bf16Weights, int8Weights, q8Weights, roundedActivations, aneInt8, halfAttention, halfDecoder, quantizedActivations
         }
         package init(from decoder: any Decoder) throws {
             let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -82,9 +88,10 @@ package final class CapacityPlan: Sendable {
             amx = try flag(.amx); ane = try flag(.ane); bf16Weights = try flag(.bf16Weights); int8Weights = try flag(.int8Weights)
             q8Weights = try flag(.q8Weights); roundedActivations = try flag(.roundedActivations); aneInt8 = try flag(.aneInt8)
             halfAttention = try flag(.halfAttention); halfDecoder = try flag(.halfDecoder)
+            quantizedActivations = try flag(.quantizedActivations)
         }
         /// `TensorGEMM` is built when any native form is.
-        package var usesTensor: Bool { bf16Weights || int8Weights || q8Weights || roundedActivations }
+        package var usesTensor: Bool { bf16Weights || int8Weights || q8Weights || roundedActivations || quantizedActivations }
         /// Some product may compute in half precision (the ANE's fp16, the activation rounded to bf16): the checks then
         /// judge against the reference run in bf16 (`HalfPrecisionReference`). False under `restricted(accelerators: false)`.
         package var halfPrecision: Bool { ane || roundedActivations || halfAttention }
@@ -104,6 +111,11 @@ package final class CapacityPlan: Sendable {
     /// bf16 operands (`tiles16`, `tilesbf16`) — the GPU's tensor units in half precision. False: fp32 throughout on the GPU
     /// (`restricted(accelerators: false)`).
     package let allowsHalfPrecision: Bool
+    /// **The W8A8 switch** (`allowsW8A8`, the activation quantized to int8 beside a published int8 weight, `gpu/int8x8`): on, the map may
+    /// choose it wherever it is faster; off, the integers are read as before it (`gpu/int8act`, `gpu/int8`), the same bits as then.
+    package let allowsQuantizing: Bool
+    /// **The process's W8A8 switch**: on, unless `SILICONED_W8A8=0` (a judge of the route before it, on a map that has its line).
+    package static let allowsW8A8 = ProcessInfo.processInfo.environment["SILICONED_W8A8"] != "0"
     package var usesAMX: Bool { resources.amx }
     package var usesANE: Bool { resources.ane }
     /// **The height under which no product has a row on the AMX or the ANE**: the model's domain (`CapacitySolver.Limits`) for a
@@ -119,7 +131,7 @@ package final class CapacityPlan: Sendable {
     /// times the plan's answers with too (`RenderLoop.predictions`).
     package var constraints: CapacitySolver.Constraints {
         CapacitySolver.Constraints(limits: limits, sustained: sustained, excluded: excluded, allowsANE: allowsANE,
-                                   allowsRounding: allowsHalfPrecision)
+                                   allowsRounding: allowsHalfPrecision, allowsQuantizing: allowsHalfPrecision && allowsQuantizing)
     }
 
     /// fp16 operands may be asked for under this plan: the one rule (`Constraints.allowsHalf(ane:rounding:)`).
@@ -134,10 +146,11 @@ package final class CapacityPlan: Sendable {
             let k = CapacityModel.Kernel(.gpu, f)
             return (model?.lines[k]?.rate ?? 0) > 0 && !excluded.contains(k)
         }
-        guard model != nil else { return resources.roundedActivations ? ["bf16"] : [] }
+        guard model != nil else { return (resources.roundedActivations ? ["bf16"] : []) + (resources.quantizedActivations ? ["int8"] : []) }
         var out: [String] = []
         if resources.roundedActivations || has(.tilesbf16) { out.append("bf16") }
         if allowsHalf && has(.tiles16) { out.append("fp16") }
+        if resources.quantizedActivations { out.append("int8") }
         return out
     }
 
@@ -169,20 +182,21 @@ package final class CapacityPlan: Sendable {
     package static let defaults = CapacityPlan()
 
     private init() {
-        resources = Resources(); identity = "default"; model = nil; allowsANE = false; allowsHalfPrecision = true
+        resources = Resources(); identity = "default"; model = nil; allowsANE = false; allowsHalfPrecision = true; allowsQuantizing = true
         limits = CapacitySolver.Limits(); sustained = true; excluded = []; override = nil; attentionOverride = nil
     }
 
     /// **The plan of a Mac whose model was measured**: the solver answers from it. The engines it brings up are those the model
     /// has a line for; the ANE only if `allowsANE`, the rounded operands only if `allowsHalfPrecision`.
     package init(model: CapacityModel, limits: CapacitySolver.Limits = .init(), sustained: Bool = true,
-                 excluded: Set<CapacityModel.Kernel> = [], allowsANE: Bool = true, allowsHalfPrecision: Bool = true) {
+                 excluded: Set<CapacityModel.Kernel> = [], allowsANE: Bool = true, allowsHalfPrecision: Bool = true,
+                 allowsQuantizing: Bool = CapacityPlan.allowsW8A8) {
         func has(_ e: CapacityModel.Engine, _ f: CapacityModel.Form) -> Bool {
             let k = CapacityModel.Kernel(e, f)
             return (model.lines[k]?.rate ?? 0) > 0 && !excluded.contains(k)
         }
         self.model = model; self.limits = limits; self.sustained = sustained; self.excluded = excluded
-        self.allowsANE = allowsANE; self.allowsHalfPrecision = allowsHalfPrecision
+        self.allowsANE = allowsANE; self.allowsHalfPrecision = allowsHalfPrecision; self.allowsQuantizing = allowsQuantizing
         // An 8-bit weight is read as published by the GPU's kernel on the fp32 activation or, where operands may be rounded, on the
         // activation rounded to bf16 (`int8act`, `q8act`): either line brings the integers' kernels up.
         // A K-quant read as published (`q4kact`) rounds its activation too: its line brings the rounding's library up, the K-quants' with it.
@@ -195,9 +209,13 @@ package final class CapacityPlan: Sendable {
                               halfAttention: (CapacitySolver.Constraints.allowsHalf(ane: allowsANE, rounding: allowsHalfPrecision) && has(.gpu, .tiles16))
                                   || (allowsHalfPrecision && has(.gpu, .tilesbf16)))
         resources.halfDecoder = allowsHalfPrecision && (model.convolution?.prefersHalf ?? false)
+        // W8A8 (`gpu/int8x8`): its own library, where the activation may be quantized and the map measured the kernel.
+        resources.quantizedActivations = allowsHalfPrecision && allowsQuantizing && resources.int8Weights && has(.gpu, .int8x8)
         self.resources = resources
         override = nil; attentionOverride = nil
+        // The switch off names itself only where it changes something: a map without the W8A8 line keeps its identity either way.
         identity = "model " + Self.fingerprint(model) + (allowsANE ? "" : " no-ane") + (allowsHalfPrecision ? "" : " fp32")
+            + (!allowsQuantizing && has(.gpu, .int8x8) ? " no-w8a8" : "")
     }
 
     /// **A plan that forces its answers**: a check's strictest case, a probe's route. `resources` are the engines it brings up;
@@ -205,9 +223,12 @@ package final class CapacityPlan: Sendable {
     package init(resources: Resources, label: String, allowsANE: Bool = true, allowsHalfPrecision: Bool = true,
                  override: Override? = nil, attentionOverride: AttentionOverride? = nil) {
         var resources = resources
-        if !allowsHalfPrecision { resources.roundedActivations = false; resources.halfAttention = false; resources.halfDecoder = false }
+        if !allowsHalfPrecision {
+            resources.roundedActivations = false; resources.halfAttention = false; resources.halfDecoder = false
+            resources.quantizedActivations = false
+        }
         self.resources = resources; identity = label; model = nil; self.allowsANE = allowsANE && resources.ane
-        self.allowsHalfPrecision = allowsHalfPrecision
+        self.allowsHalfPrecision = allowsHalfPrecision; allowsQuantizing = resources.quantizedActivations
         limits = CapacitySolver.Limits(); sustained = true; excluded = []; self.override = override
         self.attentionOverride = attentionOverride
     }
@@ -215,9 +236,10 @@ package final class CapacityPlan: Sendable {
     /// **A probe's plan** (a probe's solos, a bench's solos): the engines it builds, every product on the GPU alone
     /// until a key is `pin`ned to the exact rows to measure.
     package static func probing(amx: Bool = false, ane: Bool = false, bf16Weights: Bool = false, int8Weights: Bool = false,
-                                q8Weights: Bool = false, roundedActivations: Bool = false) -> CapacityPlan {
+                                q8Weights: Bool = false, roundedActivations: Bool = false, quantizedActivations: Bool = false) -> CapacityPlan {
         CapacityPlan(resources: Resources(amx: amx, ane: ane, bf16Weights: bf16Weights, int8Weights: int8Weights,
-                                          q8Weights: q8Weights, roundedActivations: roundedActivations), label: "probing")
+                                          q8Weights: q8Weights, roundedActivations: roundedActivations,
+                                          quantizedActivations: quantizedActivations), label: "probing")
     }
 
     /// The same model and rules for a process that may not bring up the ANE (`allowingANE: false`): its own answers, its own memo.
@@ -229,7 +251,7 @@ package final class CapacityPlan: Sendable {
             let made: CapacityPlan
             if let model {
                 made = CapacityPlan(model: model, limits: limits, sustained: sustained, excluded: excluded, allowsANE: false,
-                                    allowsHalfPrecision: allowsHalfPrecision)
+                                    allowsHalfPrecision: allowsHalfPrecision, allowsQuantizing: allowsQuantizing)
             } else {
                 made = CapacityPlan(resources: r, label: identity + " no-ane", allowsANE: false,
                                     allowsHalfPrecision: allowsHalfPrecision, override: override, attentionOverride: attentionOverride)
@@ -250,7 +272,7 @@ package final class CapacityPlan: Sendable {
             let made: CapacityPlan
             if let model {
                 made = CapacityPlan(model: model, limits: limits, sustained: sustained, excluded: excluded, allowsANE: false,
-                                    allowsHalfPrecision: false)
+                                    allowsHalfPrecision: false, allowsQuantizing: allowsQuantizing)
             } else {
                 made = CapacityPlan(resources: r, label: identity + (allowsANE ? " no-ane" : "") + " fp32", allowsANE: false,
                                     allowsHalfPrecision: false, override: override, attentionOverride: attentionOverride)
@@ -321,6 +343,8 @@ package final class CapacityPlan: Sendable {
         }
         // A forcing that rounds the activation, in a plan computed in fp32: the same weight read as published, the operand fp32.
         if a.roundsActivation && !allowsHalfPrecision { a.roundsActivation = false }
+        // ... or quantizes it where this plan may not: the same weight read as published, on the fp32 operand.
+        if a.quantizesActivation && !(allowsHalfPrecision && resources.quantizedActivations) { a.quantizesActivation = false }
         let kept = a
         state.withLock { $0.products[key] = kept }
         return kept
@@ -477,6 +501,9 @@ package struct ProductAssignment: Equatable, Sendable, Codable, CustomStringConv
     /// The activation is rounded to bf16 before the product (`gemm_bf16_act`): beside a bf16 weight read as published (`gpu/bf16act`),
     /// or the GPU's rows beside an 8-bit one (`gpu/int8act`, `gpu/q8act`).
     package var roundsActivation: Bool
+    /// **The activation is quantized to int8 for the product** (W8A8, `gpu/int8x8`): beside a published int8 weight read as published,
+    /// the GPU's whole product — ComfyUI's `int8_linear`. Never with `roundsActivation`.
+    package var quantizesActivation: Bool
     package var gpu: Int
     package var amx: Int
     package var ane: Int
@@ -484,10 +511,22 @@ package struct ProductAssignment: Equatable, Sendable, Codable, CustomStringConv
     /// columns it takes, 0 for none. Its widening is done for them alone.
     package var amxColumns: Int
 
-    package init(path: WeightPath = .widened, roundsActivation: Bool = false, gpu: Int, amx: Int = 0, ane: Int = 0,
-                 amxColumns: Int = 0) {
-        self.path = path; self.roundsActivation = roundsActivation; self.gpu = gpu; self.amx = amx; self.ane = ane
+    package init(path: WeightPath = .widened, roundsActivation: Bool = false, quantizesActivation: Bool = false, gpu: Int, amx: Int = 0,
+                 ane: Int = 0, amxColumns: Int = 0) {
+        self.path = path; self.roundsActivation = roundsActivation; self.quantizesActivation = quantizesActivation
+        self.gpu = gpu; self.amx = amx; self.ane = ane
         self.amxColumns = amxColumns
+    }
+
+    private enum CodingKeys: String, CodingKey { case path, roundsActivation, quantizesActivation, gpu, amx, ane, amxColumns }
+    /// An assignment written before W8A8 reads as one that does not quantize.
+    package init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        path = try c.decode(WeightPath.self, forKey: .path)
+        roundsActivation = try c.decode(Bool.self, forKey: .roundsActivation)
+        quantizesActivation = try c.decodeIfPresent(Bool.self, forKey: .quantizesActivation) ?? false
+        gpu = try c.decode(Int.self, forKey: .gpu); amx = try c.decode(Int.self, forKey: .amx); ane = try c.decode(Int.self, forKey: .ane)
+        amxColumns = try c.decode(Int.self, forKey: .amxColumns)
     }
 
     /// The default: the whole product on the GPU, the weight widened.
@@ -519,6 +558,7 @@ package struct ProductAssignment: Equatable, Sendable, Codable, CustomStringConv
         case .native:
             // The ANE beside the GPU's int8 kernel reads the integers (`ane > 0`): `gpu+ane/int8`, `ane/int8` alone.
             let engines = amxColumns > 0 ? "gpu+amx" : ane > 0 ? (gpu > 0 ? "gpu+ane" : "ane") : "gpu"
+            if quantizesActivation { return engines + "/int8x8" }
             return engines + "/" + (weight == .int8 ? "int8" : weight == .q4k ? "q4k" : "q8") + (roundsActivation ? "act" : "")
         }
     }
@@ -537,6 +577,13 @@ package struct ProductAssignment: Equatable, Sendable, Codable, CustomStringConv
             guard ane % NeuralEngine.rowUnit == 0 || ane == key.m, key.phase == .denoising else { return false }
         }
         if roundsActivation && (path == .widened || key.phase == .encoding) { return false }
+        // W8A8: a published int8 weight (a scale per column or for the tensor — `Int8Plan` refuses Q8_0's blocks — and a rotation group
+        // the kernel takes), the denoiser's, the GPU's whole product: no AMX (it reads the fp32 activation), no ANE (its int8 × int8 is
+        // not built), never with the rounding.
+        if quantizesActivation {
+            return path == .native && key.weight == .int8 && key.phase == .denoising && !roundsActivation && gpu == key.m && amx == 0
+                && ane == 0 && amxColumns == 0 && W8A8.stages(group: key.weight.rotationGroup) != nil
+        }
         switch path {
         case .widened:
             return amxColumns == 0
@@ -562,7 +609,7 @@ package struct ProductAssignment: Equatable, Sendable, Codable, CustomStringConv
     }
 
     package var description: String {
-        "\(path.rawValue)\(roundsActivation ? "◐" : "") gpu \(gpu) amx \(amx)\(amxColumns > 0 ? " (+\(amxColumns) columns)" : "") ane \(ane)"
+        "\(path.rawValue)\(roundsActivation ? "◐" : "")\(quantizesActivation ? "◑" : "") gpu \(gpu) amx \(amx)\(amxColumns > 0 ? " (+\(amxColumns) columns)" : "") ane \(ane)"
     }
 }
 
@@ -691,6 +738,9 @@ extension CapacityPlan {
     ///     to a published 8-bit weight), the ANE's integers beside them under `aneInt8`;
     ///   - `int8`, `q8`: a published int8 (Q8_0) weight is read as published by the GPU's kernel wherever no other rule speaks of it, in
     ///     every phase — on the fp32 activation, or the rounded one where `bf16Activations` says;
+    ///   - `int8Activations` (`--int8-activations`, `int8x8`): every product of the denoiser on a published int8 weight, whatever its
+    ///     height, multiplies the activation quantized to int8 (W8A8, `gpu/int8x8`) — as ComfyUI's `int8_linear` runs every quantized
+    ///     linear, the modulation's included: the forward the check compares to Comfy's. It has the last word on those products;
     ///   - `amx`: the AMX beside the GPU on every widened product of 512 rows or more, the GPU keeping 0.631 of the rows on 256-row
     ///     tiles — **the split the judges' md5s were taken with**;
     ///   - `flash`: the flash kernel for every attention whose caller tries it (it falls back by itself on a length it does not
@@ -704,18 +754,22 @@ extension CapacityPlan {
     ///     half-precision one in the fused form, at the first candidate tile (`AttentionTile.candidates`) — a developer's forcing, the
     ///     map choosing otherwise.
     package static func forcing(neuralEngine: Bool = false, bf16Activations: Bool = false, amx: Bool = false, flash: Bool = false,
-                                tiles: Bool = false, tiles16: Bool = false, tilesbf16: Bool = false, fused: Bool = false, cut: Bool = false, aneInt8: Bool = false, int8: Bool = false, q8: Bool = false, normRope: Bool = false, decoderBF16: Bool = false, aneMinimumRows: Int = 2 * NeuralEngine.rowUnit,
+                                tiles: Bool = false, tiles16: Bool = false, tilesbf16: Bool = false, fused: Bool = false, cut: Bool = false, aneInt8: Bool = false, int8: Bool = false, q8: Bool = false, normRope: Bool = false, decoderBF16: Bool = false,
+                                int8Activations: Bool = false, aneMinimumRows: Int = 2 * NeuralEngine.rowUnit,
                                 roundingMinimumRows: Int = 256) -> CapacityPlan {
         let neuralEngine = neuralEngine || aneInt8
-        var resources = Resources(amx: amx, ane: neuralEngine, bf16Weights: bf16Activations, int8Weights: aneInt8 || int8 || bf16Activations,
+        var resources = Resources(amx: amx, ane: neuralEngine, bf16Weights: bf16Activations,
+                                  int8Weights: aneInt8 || int8 || bf16Activations || int8Activations,
                                   q8Weights: q8 || bf16Activations,
-                                  roundedActivations: bf16Activations, aneInt8: aneInt8, halfAttention: tiles16 || tilesbf16)
+                                  roundedActivations: bf16Activations, aneInt8: aneInt8, halfAttention: tiles16 || tilesbf16,
+                                  quantizedActivations: int8Activations)
         resources.halfDecoder = decoderBF16
         let label = "forcing" + (neuralEngine ? " ane≥\(aneMinimumRows)" : "") + (aneInt8 ? " aneint8" : "") + (int8 ? " int8" : "") + (q8 ? " q8" : "")
             + (bf16Activations ? " bf16act≥\(roundingMinimumRows)" : "")
             + (amx ? " amx 0.631" : "") + (flash ? " flash" : "")
             + (tiles16 ? " tiles16" : tilesbf16 ? " tilesbf16" : tiles ? " tiles" : "") + (fused && (tiles16 || tilesbf16) ? " fused" : "")
             + (cut && (tiles || tiles16 || tilesbf16) ? " cut" : "") + (normRope ? " normrope" : "") + (decoderBF16 ? " vaebf16" : "")
+            + (int8Activations ? " int8x8" : "")
         var attention: AttentionOverride?
         if tiles16 || tilesbf16 || tiles {
             // Every attention the plan speaks of (the encoders', which no caller asks it, stay the graph's); a flash caller takes tiles too.
@@ -744,6 +798,11 @@ extension CapacityPlan {
             }
         }
         return CapacityPlan(resources: resources, label: label, override: { (key: ProductKey) -> ProductAssignment? in
+            // W8A8 on every int8 product of the denoiser it can run (Comfy's forward has no floor of rows).
+            if int8Activations, key.weight == .int8, key.phase == .denoising {
+                let quantized = ProductAssignment(path: .native, quantizesActivation: true, gpu: key.m)
+                if quantized.isRunnable(for: key) { return quantized }
+            }
             // The activation rounded where the request rounds it: the denoiser's products of enough rows.
             let rounds = bf16Activations && key.phase == .denoising && key.m >= roundingMinimumRows
             let eightBit = key.weight == .int8 || key.weight == .q8
@@ -789,7 +848,7 @@ extension CapacityPlan {
     }
 
     /// **The forcing a developer names** (`SILICONED_PLAN`, a comma list of `amx`, `flash`, `tiles`, `tiles16`, `tilesbf16`, `fused`, `ane`,
-    /// `aneint8`, `int8`, `q8`, `bf16act`, `normrope`; `tiles16` before `tilesbf16` before `tiles` when several are named; `fused` with a half-precision one; `cut` with one of them: the default cut by heads, its GPU heads on that kernel): the
+    /// `aneint8`, `int8`, `q8`, `bf16act`, `normrope`, `vaebf16`, `int8x8`; `tiles16` before `tilesbf16` before `tiles` when several are named; `fused` with a half-precision one; `cut` with one of them: the default cut by heads, its GPU heads on that kernel): the
     /// previous switches of the checks and the judges, in one place. `aneint8` is `ane` with the published int8 weights read as they
     /// are by the ANE's int8 program beside the GPU's int8 kernel; `int8` reads them as published by the GPU's kernel everywhere
     /// else (`aneint8,int8` is the integers' route at every height, as the former `gemm_int8` + `gemm_ane` + `ane_int8` ran it).
@@ -797,11 +856,11 @@ extension CapacityPlan {
     package static func forcing(named list: String) -> CapacityPlan? {
         let words = Set(list.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces).lowercased() }.filter { !$0.isEmpty })
         guard !words.isEmpty, words.isSubset(of: ["amx", "flash", "tiles", "tiles16", "tilesbf16", "fused", "cut", "ane", "aneint8", "int8", "q8", "bf16act", "normrope",
-                                                "vaebf16"]) else { return nil }
+                                                "vaebf16", "int8x8"]) else { return nil }
         return forcing(neuralEngine: words.contains("ane"), bf16Activations: words.contains("bf16act"),
                        amx: words.contains("amx"), flash: words.contains("flash"), tiles: words.contains("tiles"),
                        tiles16: words.contains("tiles16"), tilesbf16: words.contains("tilesbf16"), fused: words.contains("fused"), cut: words.contains("cut"), aneInt8: words.contains("aneint8"),
                        int8: words.contains("int8"), q8: words.contains("q8"), normRope: words.contains("normrope"),
-                       decoderBF16: words.contains("vaebf16"))
+                       decoderBF16: words.contains("vaebf16"), int8Activations: words.contains("int8x8"))
     }
 }

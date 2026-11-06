@@ -52,6 +52,9 @@ package final class ProductLedger: Sendable {
         /// A K-quant's blocks, planned as published (`gpu/q4kact`), are of a type the kernels do not read (Q6_K, a legacy one), or the
         /// route cannot run here (no kernel, a reserve too small, a caller that does not round): the plan's answer without that route.
         case kquantUnread = "k-quant unread"
+        /// The activation quantized to int8 (W8A8), planned, cannot be quantized here (no kernel, a rotation group or a row it does not
+        /// take, a reserve too small, a caller that does not quantize): the integers read on the fp32 activation.
+        case quantizingUnavailable = "quantizing unavailable"
         /// The ANE's rows, planned, not handed to it (no ANE in this process, a shape it does not accept): the GPU took them.
         case aneNotAccepted = "ane not accepted"
         /// The ANE's rows refused or not finite after the call: the whole product again on the GPU.

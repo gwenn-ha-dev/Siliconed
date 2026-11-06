@@ -91,6 +91,8 @@ import Testing
         case .graph, .flash, .heads, .tiles: operand = .fp32
         case .tiles16: operand = .fp16
         case .tilesbf16: operand = .bf16
+        // W8A8: the activation rotated and quantized per row, the int8 × int8 product in int32.
+        case .int8x8: operand = .int8
         }
         return Lane(k.engine, operand)
     }
@@ -173,10 +175,26 @@ import Testing
                     .gpuAlone(1024, path: .bf16, rounds: true), false)) { c in
             c.subject.phase == .encoding && c.lanes.contains { $0.operand != .fp32 }
         },
-        // W8A8 and the ANE's int8 × int8 (R7, P20 to settle).
-        Gap("w8a8", .open,
-            "R7: an activation quantized to int8 beside a published 8- or 4-bit weight (W8A8, P20 to settle) and the ANE's int8 × int8 "
-                + "(M3/M4): no kernel") { c in c.lanes.contains { $0.operand == .int8 } },
+        // W8A8 off the GPU, on a weight in blocks, beside another engine. The GPU's on an int8 weight is a route (`gpu/int8x8`, 6/11/2026).
+        Gap("w8a8-off-gpu", .open,
+            "an activation quantized to int8 on the ANE (its int8 × int8, M3/M4, not built: its int8 program takes the integers as an "
+                + "fp16 input) or the AMX (BNNS reads the fp32 activation): only the GPU's `gpu/int8x8`") { c in
+            c.lanes.contains { $0.operand == .int8 && $0.engine != .gpu }
+        },
+        Gap("w8a8-blocks", .open,
+            "W8A8 on a weight in blocks (Q8_0's 32 rows, a K-quant's super-blocks): a scale per block cuts the integers' sum along K, so "
+                + "the product is no single int32 accumulation and `Int8Plan` refuses it; the GPU's rounded kernels take them",
+            probe: (ProductKey(k: 3072, n: 3072, m: 4096, weight: .q4k),
+                    ProductAssignment(path: .native, quantizesActivation: true, gpu: 4096), false)) { c in
+            isProduct(c, [.q8, .q4k]) && has(c, .gpu, .int8)
+        },
+        Gap("w8a8-sets", .open,
+            "W8A8 beside another engine: the ANE's rows read the fp32 activation, and no probe measures the pair's sharing — the GPU "
+                + "takes the whole product (`ProductAssignment.isRunnable`)",
+            probe: (ProductKey(k: 3072, n: 3072, m: 4096, weight: .int8),
+                    ProductAssignment(path: .native, quantizesActivation: true, gpu: 2048, ane: 2048), false)) { c in
+            isProduct(c, [.int8]) && has(c, .gpu, .int8) && c.lanes.count >= 2
+        },
         Gap("amx-bf16", .open,
             "no AMX kernel on bf16 operands (BFMMLA/SME): the probes measure `amx/fp32` alone, so the map cannot say whether it pays") { c in
             c.lanes.contains { $0.engine == .amx && $0.operand == .bf16 }
@@ -429,7 +447,7 @@ import Testing
         // Every attention form is one the probes time: none is read by a route the map never measures.
         let attentionForms: Set<M.Form> = [.graph, .flash, .heads, .tiles, .tiles16, .tilesbf16]
         #expect(attentionForms.isSubset(of: Set(Self.probed.map(\.form))))
-        #expect(Set(M.Form.allCases).subtracting(attentionForms) == [.fp32, .bf16, .bf16act, .int8, .q8, .fp16, .int8act, .q8act, .q4kact],
+        #expect(Set(M.Form.allCases).subtracting(attentionForms) == [.fp32, .bf16, .bf16act, .int8, .q8, .fp16, .int8act, .q8act, .q4kact, .int8x8],
                 "a new form of kernel: say whether it is a product's or an attention's")
         #expect(M.Form.allCases.allSatisfy { $0.isProduct != attentionForms.contains($0) })
     }
@@ -455,6 +473,7 @@ import Testing
                 #expect(key.weight == .int8 ? r.int8Weights : key.weight == .q4k ? r.roundedActivations : r.q8Weights, "\(key) \(s.route)")
             }
             if a.roundsActivation { #expect(r.roundedActivations, "\(key) \(s.route)") }
+            if a.quantizesActivation { #expect(r.quantizedActivations && key.weight == .int8, "\(key) \(s.route)") }
         }
         for a in o.attentions where a.assignment.usesTiles && a.assignment.tilePrecision != .fp32 || a.assignment.gpuUsesTiles && a.assignment.gpuTilePrecision != .fp32 {
             #expect(r.halfAttention, "\(a.route)")
@@ -462,6 +481,21 @@ import Testing
         let off = Self.offer(model, plan: { $0.restricted(accelerators: false) })
         let below = off.routed.filter { $0.lanes.contains { $0.operand != .fp32 } }
         #expect(below.isEmpty, "the accelerators off offer a precision below fp32: \(below.map(\.description))")
+    }
+
+    /// **W8A8 on the Compact's int8 weights** (6/11/2026): the GPU's int8 × int8 alone on a denoiser's int8 product, never in the
+    /// encoder; the switch off (`allowsQuantizing`) takes it away and leaves the routes it had.
+    @Test func theW8A8IsARouteOnInt8AndTheSwitchTakesItAway() {
+        let model = Self.model(lines: Self.probed)
+        let quantized = Lane(.gpu, .int8), subject = Subject.product(.denoising, .int8)
+        let on = Self.offer(model).routed
+        #expect(on.contains { $0.subject == subject && $0.lanes == [quantized] }, "gpu/int8x8 on the Compact")
+        #expect(!on.contains { $0.subject.phase == .encoding && $0.lanes.contains(quantized) })
+        let off = Self.offer(model, plan: { _ in
+            CapacityPlan(model: model, sustained: false, allowsQuantizing: false).forDenoiser(.on(neuralEngine: true))
+        }).routed
+        #expect(!off.contains { $0.lanes.contains(quantized) })
+        #expect(on.subtracting(off).allSatisfy { $0.lanes.contains(quantized) }, "the switch takes W8A8 away, nothing else")
     }
 
     /// The phases are the plan's: a new one is a new row of the table, and the VAE stays outside it.

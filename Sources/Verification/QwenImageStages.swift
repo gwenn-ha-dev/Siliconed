@@ -213,9 +213,9 @@ enum QwenImageStages {
     static let dit = Stage(
         model: model, name: "dit",
         proves: "one evaluation three ways — prefill of the conditions, the step from their K/V cache, the full pass under the block-causal mask — plus the layout and the modulation; on published int8 weights, along the int8 kernel a render's map may pick (gemm_int8), and the step once on the widened weights",
-        options: ["--edit", "--map", "--neural-engine", "--bf16-activations", "--bf16-attention", "--fp16-attention", "--no-accelerators", "--variant"], variants: edits,
-        oracle: "tools/oracle/qwen-image-2.1.py dit [--edit N]; witness; with --neural-engine, --bf16-activations, --bf16-attention or --fp16-attention, bf16 [--edit N]; with --variant compact or light (no --edit), dit and bf16 with --variant \(Wording.publishers)", weights: ["DiT"],
-        rule: "layout bit for bit; the rule, floor 5e-4, at the fp64 witness where one exists; cache and full pass ≤ 1e-5 apart; a second step the same bits; \(Wording.halfPrecision), cache and full pass too; on int8 weights, every route by the same rule"
+        options: ["--edit", "--map", "--neural-engine", "--bf16-activations", "--bf16-attention", "--fp16-attention", "--int8-activations", "--no-accelerators", "--variant"], variants: edits,
+        oracle: "tools/oracle/qwen-image-2.1.py dit [--edit N]; witness; with --neural-engine, --bf16-activations, --bf16-attention or --fp16-attention, bf16 [--edit N]; with --variant compact or light (no --edit), dit and bf16 with --variant \(Wording.publishers); with --int8-activations, w8a8 --variant compact (ComfyUI's own int8 products)", weights: ["DiT"],
+        rule: "layout bit for bit; the rule, floor 5e-4, at the fp64 witness where one exists; cache and full pass ≤ 1e-5 apart; a second step the same bits; \(Wording.halfPrecision), cache and full pass too; with --int8-activations, against ComfyUI's W8A8 error + 25 %; on int8 weights, every route by the same rule"
     ) { invocation in
         let n = invocation.edit ?? 0
         let tag = n > 0 ? "-edit\(n)" : ""
@@ -276,7 +276,8 @@ enum QwenImageStages {
                                      accelerators: .on(neuralEngine: int8?.neuralEngine ?? EngineSettings.effective.plan.usesANE), plan: int8?.plan)
         dit.recordBoundaries = true
         let d = config.dim
-        let half = try invocation.halfReference(file + ".safetensors", script: "tools/oracle/qwen-image-2.1.py bf16\(version.map { " --variant " + $0.rawValue } ?? "")")
+        let half = try invocation.reference(file + ".safetensors", script: "tools/oracle/qwen-image-2.1.py bf16\(version.map { " --variant " + $0.rawValue } ?? "")",
+                                            w8a8Script: "tools/oracle/qwen-image-2.1.py w8a8 --variant compact")
         let probe = try dit.probeModulation(sigma: sigma)
         report.add(goldens, "temb", probe.temb, witness: witness("temb"), columns: d)
         report.add(goldens, "modulation", probe.modulation, witness: witness("modulation"), columns: 4 * d)
@@ -339,6 +340,7 @@ enum QwenImageStages {
         if invocation.bf16Activations { try BF16ActivationRun.account(report) }
         if invocation.bf16Attention { try BF16AttentionRun.account(report) }
         if invocation.fp16Attention { try FP16AttentionRun.account(report) }
+        if invocation.int8Activations { try W8A8Run.account(report) }
         return report
     }
 

@@ -157,8 +157,10 @@ extension Diagnostic.CapacityProbes {
         /// What a kernel's rate is to the GPU's fp32 product (M1 Pro, three runs: bf16 0.62, bf16 rounded 0.49, int8 0.97, Q8_0 0.31). The
         /// 8-bit ones on a rounded activation were never run on a GPU without bf16 in hardware: priced as the rounded bf16 kernel (the same
         /// bfloat operand) and as Q8_0's (the same fill of threadgroup memory); the K-quant's as the rounded bf16 kernel (its operands' rate).
+        /// W8A8 (`int8x8`) as the int8 kernel: the same integers, an int8 operand in place of the fp32 one — never timed on an M1 Pro; on
+        /// an M5 Pro the int8 × int8 product ran twice the bf16 one (6/11/2026).
         static let formRatio: [String: Double] = ["bf16": 0.62, "bf16act": 0.49, "int8": 0.97, "q8": 0.31, "int8act": 0.49, "q8act": 0.31,
-                                                     "q4kact": 0.49]
+                                                     "q4kact": 0.49, "int8x8": 0.97]
         /// Attention kernels' rates to the GPU's product (M1 Pro: the system graph 0.40, the flash kernel 0.46).
         static let graphRatio = 0.40, flashRatio = 0.46
         /// The three stages by tiles, fp32 and fp16 operands (M1 Pro: 0.43 and 0.49 of the GPU's product; the matrix units of a bigger GPU
@@ -194,6 +196,19 @@ extension Diagnostic.CapacityProbes {
             return p
         }
 
+        /// **The seconds W8A8 adds** (`gpu/int8x8`: its solos on the eight shapes of the rounded kernels, its thin runs, one truth of its
+        /// own codes per shape), inside `projection`. No M1 Pro has timed it: the check against its stages leaves it out.
+        package func quantizedSeconds(_ rates: Rates) -> [String: Double] {
+            func flop(_ s: Shape) -> Double { 2 * Double(s.m) * Double(s.k) * Double(s.n) }
+            func truth(_ shapes: [Shape]) -> Double {
+                Set(shapes.map { [$0.k, $0.n] }).reduce(0.0) { $0 + Double($1[0]) * Double($1[1]) } * Self.truthPerValue
+            }
+            let rate = rates.gpu * Self.formRatio["int8x8"]!
+            let big = (solo + product).filter { Self.takes(.int8x8, $0) }, small = thin.filter { Self.takes(.int8x8, $0) }
+            return ["solos 8-bit and rounded": Self.runs * big.reduce(0) { $0 + flop($1) } / rate + truth(big),
+                    "thin products": Self.runs * small.reduce(0) { $0 + flop($1) } / rate + truth(small)]
+        }
+
         /// **The seconds the rounded bf16 pair adds** (`gpu/bf16act+ane/fp16`, its own stage `sharing rounded`), inside `projection`: the chain
         /// passes of the fp32 sets at the pair's rate; its truths and floors are the fp32 sets' (the same shapes, kept). No M1 Pro has timed it.
         package func roundedPairSeconds(_ rates: Rates) -> [String: Double] {
@@ -226,6 +241,10 @@ extension Diagnostic.CapacityProbes {
         static func takes(_ form: CapacityModel.Form, _ s: Shape) -> Bool {
             switch form {
             case .bf16act: return WeightProducts.roundingPlan(k: s.k, n: s.n, capacity: s.k * s.n) != nil
+            case .int8x8:
+                return (s.k * s.n) % 2 == 0 && s.k % Diagnostic.int8Group == 0
+                    && WeightProducts.int8Plan(k: s.k, n: s.n, capacity: s.k * s.n, perColumn: false, group: Diagnostic.int8Group,
+                                               amxColumns: 0, quantized: true) != nil
             case .int8, .int8act, .q8, .q8act:
                 let int8 = form == .int8 || form == .int8act
                 return (s.k * s.n) % 2 == 0 && s.k % (int8 ? Diagnostic.int8Group : Diagnostic.q8Block) == 0
@@ -282,11 +301,12 @@ extension Diagnostic.CapacityProbes {
                 + 2 * (1 + AttentionTile.candidates.count) * AttentionTile.rounds
             let sets = amx + ane + amx * ane * 2
             s["sharing"] = sets * pairPasses.count
-            // The rounded kernels on eight shapes, the other four 8-bit ones on the solos, the ANE's integers.
-            s["solos 8-bit and rounded"] = 2 * (solo.count + product.count) + 4 * solo.count + ane * (integers.count + small.count)
+            // The rounded kernels and W8A8 on eight shapes (W8A8 on those it takes), the other four 8-bit ones on the solos, the ANE's integers.
+            s["solos 8-bit and rounded"] = 2 * (solo.count + product.count) + (solo + product).filter { Self.takes(.int8x8, $0) }.count
+                + 4 * solo.count + ane * (integers.count + small.count)
                 + trials("solos 8-bit and rounded")
-            // Nine kernels on each thin shape they take (`thinSolos`), the ANE on those of a whole unit of rows.
-            let forms: [CapacityModel.Form] = [.fp32, .bf16, .bf16act, .int8, .q8, .int8act, .q8act]
+            // Ten kernels on each thin shape they take (`thinSolos`), the ANE on those of a whole unit of rows.
+            let forms: [CapacityModel.Form] = [.fp32, .bf16, .bf16act, .int8, .q8, .int8act, .int8x8, .q8act]
             s["thin products"] = forms.reduce(0) { sum, form in sum + thin.filter { Self.takes(form, $0) }.count } + amx * thin.count
                 + ane * thin.filter { $0.m >= NeuralEngine.rowUnit }.count
             s["sharing int8"] = ane * Diagnostic.CapacityProbes.Context.integerPairs.count * pairPasses.count
@@ -370,6 +390,7 @@ extension Diagnostic.CapacityProbes {
             }
             p.merge(roundedPairSeconds(rates)) { $1 }
             p.merge(roundedProductSeconds(rates)) { $0 + $1 }
+            p.merge(quantizedSeconds(rates)) { $0 + $1 }
             p.merge(tileTrialSeconds(rates)) { $0 + $1 }
             p.merge(pulseSeconds(rates)) { $0 + $1 }
             return p

@@ -319,7 +319,7 @@ extension Diagnostic {
 
         // MARK: - The context
 
-        enum Truth: Hashable { case fp32, rounded, int8, roundedInt8, q8, roundedQ8, q4k, roundedQ4k }
+        enum Truth: Hashable { case fp32, rounded, int8, roundedInt8, quantizedInt8, q8, roundedQ8, q4k, roundedQ4k }
         struct TruthKey: Hashable { let truth: Truth; let m, k, n: Int }
 
         struct Buffers { let a, b, c: MTLBuffer }
@@ -444,7 +444,8 @@ extension Diagnostic {
                 self.validating = validating
                 let all = sizes.products + (validating ? CapacityProbes.validationShapes : [])
                 operands = Operands(Operands.sizes(products: all.map { ($0.m, $0.k, $0.n, WeightKind.q8) }))
-                alone = try GEMM(plan: .probing(bf16Weights: true, int8Weights: true, q8Weights: true, roundedActivations: true))
+                alone = try GEMM(plan: .probing(bf16Weights: true, int8Weights: true, q8Weights: true, roundedActivations: true,
+                                                 quantizedActivations: true))
                 both = try GEMM(plan: .probing(amx: true, int8Weights: true, q8Weights: true))
                 neural = try GEMM(plan: .probing(ane: true))
                 three = try GEMM(plan: .probing(amx: true, ane: true))
@@ -502,6 +503,9 @@ extension Diagnostic {
                         Diagnostic.exactRows(Array(0..<rows.count), a: $0.baseAddress!, q: operands.q.base.assumingMemoryBound(to: Int8.self),
                                              scale: Double(Diagnostic.int8Scale), group: Diagnostic.int8Group, k: k, n: n)
                     }
+                case .quantizedInt8:
+                    result = Diagnostic.exactQuantizedRows(rows, a: a, q: operands.q.base.assumingMemoryBound(to: Int8.self),
+                                                           scale: Double(Diagnostic.int8Scale), group: Diagnostic.int8Group, k: k, n: n)
                 case .q8:
                     result = Diagnostic.exactRows(rows, a: a, q: operands.q.base.assumingMemoryBound(to: Int8.self),
                                                   blockScales: operands.q8Scales.floats(), block: Diagnostic.q8Block, k: k, n: n)
@@ -536,7 +540,7 @@ extension Diagnostic {
             /// product it is the floor of — the widened weight's (`fp32`), the integers' with their rotation (`int8`), a Q8_0's (`q8`).
             func aneThreshold(_ truthKind: Truth, m: Int, k: Int, n: Int) -> Double {
                 let (exact, witnessKind, code): (Truth, Truth, Int) = switch truthKind {
-                case .int8, .roundedInt8: (.int8, .roundedInt8, 1)
+                case .int8, .roundedInt8, .quantizedInt8: (.int8, .roundedInt8, 1)
                 case .q8, .roundedQ8: (.q8, .roundedQ8, 2)
                 case .q4k, .roundedQ4k: (.q4k, .roundedQ4k, 3)
                 case .fp32, .rounded: (.fp32, .rounded, 0)
@@ -725,10 +729,11 @@ extension Diagnostic {
                 try stage("attention") { try attention(&m) }
                 try stage("sharing") { sharing(&m) }
                 try stage("solos 8-bit and rounded") {
-                    chooseTiles(.gpu_bf16act, &m); chooseTiles(.gpu_int8, &m); chooseTiles(.gpu_int8act, &m)
+                    chooseTiles(.gpu_bf16act, &m); chooseTiles(.gpu_int8, &m); chooseTiles(.gpu_int8act, &m); chooseTiles(.gpu_int8x8, &m)
                     // The rounded kernels the Standard and the Compact run on every large class take the fp32 solos' shapes too: eight points,
-                    // so that a figure the Mac disturbed is told from the line and left out (`CapacityFit.kept`) — of three, none can be.
-                    solos([.gpu_bf16act, .gpu_int8act], &m, shapes: sizes.solo + sizes.product)
+                    // so that a figure the Mac disturbed is told from the line and left out (`CapacityFit.kept`) — of three, none can be. The
+                    // Compact's W8A8 likewise.
+                    solos([.gpu_bf16act, .gpu_int8act, .gpu_int8x8], &m, shapes: sizes.solo + sizes.product)
                     solos([.gpu_int8, .gpu_q8, .gpu_q8act, .gpu_q4kact], &m)
                     solos([.ane_int8], &m, shapes: sizes.integers + sizes.small, chained: true)
                 }

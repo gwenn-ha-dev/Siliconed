@@ -19,6 +19,8 @@ import Metal
 ///              │                                computes the others
 ///              │     + the ANE's last rows      the same integers and scales, read in place ─▶ the ANE's int8 program,
 ///              │                                (`ProductAssignment.ane` on a native weight)   beside the GPU's rows
+///              │     or W8A8                    the activation rotated and quantized to   ─▶ matmul2d int8 × int8 → int32,
+///              │                                int8 per row in the reserve's tail          × s_x · s_w after (`QuantizedKernels`)
 ///              │     or a K-quant (Q4_K, Q5_K)  its blocks copied as stored, unpacked on  ─▶ matmul2d bfloat × half per
 ///              │                                the GPU into sc·q, d, dmin·m (`KQuantKernels`)  super-block, the activation rounded
 ///              └─ path widened                 widened on the CPU (`Artifact.materialize`) ─▶ MPS (+ AMX, + ANE rows)
@@ -70,7 +72,8 @@ package final class WeightProducts {
     private let mid: UnsafeMutablePointer<Float>?
     private let midFloats: Int
     private let mergesLoRA: Bool
-    /// The operand of a product is rounded to bf16 where the settings and the machine allow it (`gemm_bf16_act`).
+    /// The operand of a product is rounded to bf16 — or quantized to int8 beside an int8 weight (W8A8) — where the plan, the settings and
+    /// the machine allow it (`gemm_bf16_act`, `QuantizedKernels`): the DiT's products, never an encoder's.
     private let roundsActivations: Bool
     /// Every write into the reserve this module makes (a staging, a widening, a rounding pass, a LoRA's scratch), counted: an
     /// operand a producer rounded into it (`RoundedOperand`) is read only while nothing has written over it since.
@@ -335,6 +338,7 @@ package final class WeightProducts {
         case .bf16(let rounding): return (.bf16, rounding == nil ? "gpu/bf16" : aneTook ? "gpu+ane/bf16act" : "gpu/bf16act")
         case .int8(let plan):
             let weight: CapacityClasses.WeightFormat = plan.block == nil ? .int8 : .q8
+            if plan.quantizedOffset > 0 { return (weight, "gpu/int8x8") }
             let act = plan.roundedOffset > 0 ? "act" : ""
             if aneTook { return (weight, aneAlone ? "ane/" + weight.rawValue : "gpu+ane/" + weight.rawValue + act) }
             return (weight, (plan.amxColumns > 0 && gemm.conductor != nil ? "gpu+amx/" : "gpu/") + weight.rawValue + act)
@@ -391,6 +395,9 @@ package final class WeightProducts {
         package var block: Int? = nil
         /// The activation rounded to bf16 (`gemm_bf16_act`) at this offset, `chunk` rows at a time; 0: fp32.
         package var roundedOffset = 0
+        /// The activation quantized to int8 (W8A8, `QuantizedKernels`): its codes at this offset, `chunk` rows at a time, their scales
+        /// at `quantizedScalesOffset`; 0: not quantized.
+        package var quantizedOffset = 0, quantizedScalesOffset = 0
         package var layout: Widen.ScaleLayout {
             if let block { return .blocks(columns: 0, rows: block) }
             return perColumn ? .columns(0) : .tensor
@@ -400,13 +407,29 @@ package final class WeightProducts {
     /// Where an int8 `[k, n]` weight, the AMX's widened columns and the rotated activation fit in
     /// `capacity` floats, or `nil` when fewer than 64 rows would: the reserve is the model's, never
     /// grown for this path.
+    ///
+    /// `quantized` (W8A8): the activation's int8 codes (`k` bytes a row) then their fp32 scales (4 bytes a row) past the weight's scales —
+    /// no fp32 scratch, the kernel rotates in registers —, never beside the AMX's columns or Q8_0's blocks, for a rotation group the kernel
+    /// takes. All of it lies in the reserve the model's memory need already holds (the largest weight in fp32: `4 k n` bytes, of which the
+    /// integers take `k n`): nothing is charged for it, and a reserve that leaves fewer than 64 rows refuses the route.
     package static func int8Plan(k: Int, n: Int, capacity: Int, perColumn: Bool, group: Int?, amxColumns: Int,
-                                 block: Int? = nil, rounded: Bool = false) -> Int8Plan? {
+                                 block: Int? = nil, rounded: Bool = false, quantized: Bool = false) -> Int8Plan? {
         func page(_ bytes: Int) -> Int { (bytes + 16383) / 16384 * 16384 }
         let scales = block.map { (k + $0 - 1) / $0 * n } ?? (perColumn ? n : 1)
         let scalesOffset = page(k * n), sliceOffset = page(scalesOffset + scales * 4)
         let rotatedOffset = page(sliceOffset + k * amxColumns * 4)
         guard rotatedOffset <= capacity * 4 else { return nil }
+        if quantized {
+            guard block == nil, amxColumns == 0, W8A8.stages(group: group) != nil else { return nil }
+            // The codes, then a page boundary at most, then the scales.
+            let rows = (capacity * 4 - rotatedOffset - 16384) / (k + 4) / 64 * 64
+            guard rows >= 64 else { return nil }
+            let scalesAt = page(rotatedOffset + rows * k)
+            guard scalesAt + rows * 4 <= capacity * 4 else { return nil }
+            return Int8Plan(scalesOffset: scalesOffset, sliceOffset: sliceOffset, rotatedOffset: rotatedOffset, chunk: rows,
+                            amxColumns: 0, perColumn: perColumn, group: group, block: nil,
+                            quantizedOffset: rotatedOffset, quantizedScalesOffset: scalesAt)
+        }
         if rounded {
             // The rotated rows (fp32, only under a rotation) then the same rows rounded (bf16): 6 k bytes a row.
             guard k % 2 == 0 else { return nil }
@@ -432,10 +455,12 @@ package final class WeightProducts {
                                     m: Int, k: Int, n: Int) -> (gpu: Double, widening: Double, status: Int32) {
         let rotation = plan.group.map { (group: $0, scratch: w, offset: plan.rotatedOffset, chunk: plan.chunk) }
         let rounding = plan.roundedOffset > 0 ? (buffer: w, offset: plan.roundedOffset, rows: plan.chunk) : nil
+        let quantizing = plan.quantizedOffset > 0
+            ? (buffer: w, codesOffset: plan.quantizedOffset, scalesOffset: plan.quantizedScalesOffset, rows: plan.chunk) : nil
         if rounding != nil { GEMM.roundedProducts.withLock { $0 += 1 } }
         guard plan.amxColumns > 0, let conductor = gemm.conductor else {
             return (gemm.tensor!.linear(a: a, int8: w, scales: w, scalesOffset: plan.scalesOffset, perColumn: plan.perColumn,
-                                        block: plan.block, rotation: rotation, rounding: rounding,
+                                        block: plan.block, rotation: rotation, rounding: rounding, quantizing: quantizing,
                                         c: c, m: m, k: k, n: n), 0, 0)
         }
         let g = n - plan.amxColumns
@@ -642,10 +667,16 @@ package final class WeightProducts {
             let (perColumn, group) = (scale.shape.count == 1, tensor.rotation?.group)
             let roundsHere = planned.roundsActivation && roundsActivations && gemm.bf16Activations
                 && (scale.block == nil || gemm.tensor?.roundsBlocks == true)
+            // W8A8: the activation quantized where the plan says, this caller quantizes (the DiT's), the kernels are built and take
+            // the row; else the integers on the fp32 activation, said in the record.
+            let quantizesHere = planned.quantizesActivation && roundsActivations && gemm.int8Activations && scale.block == nil
+                && gemm.tensor?.quantized?.simdgroups(k: k) != nil
             // The AMX's columns the plan gave: widened alone beside the GPU's. Rounded, the GPU alone: the AMX reads the fp32
             // activation, one rounding for some columns only.
             let amxColumns = gemm.conductor == nil ? 0 : planned.amxColumns
-            guard let plan = (roundsHere ? Self.int8Plan(k: k, n: n, capacity: capacity, perColumn: perColumn, group: group,
+            guard let plan = (quantizesHere ? Self.int8Plan(k: k, n: n, capacity: capacity, perColumn: perColumn, group: group,
+                                                            amxColumns: 0, quantized: true) : nil)
+                    ?? (roundsHere ? Self.int8Plan(k: k, n: n, capacity: capacity, perColumn: perColumn, group: group,
                                                          amxColumns: 0, block: scale.block, rounded: true) : nil)
                     ?? Self.int8Plan(k: k, n: n, capacity: capacity, perColumn: perColumn, group: group,
                                      amxColumns: roundsHere ? 0 : amxColumns, block: scale.block)
@@ -655,7 +686,9 @@ package final class WeightProducts {
             try expect(tensor.count)
             try timed("staging") { try artifact.stageInt8(name, into: UnsafeMutableRawPointer(reserve),
                                                           scalesAt: plan.scalesOffset) }
-            return (.int8(plan), planned, planned.roundsActivation && plan.roundedOffset == 0 ? .roundingUnavailable : nil)
+            let unavailable: ProductLedger.Reason? = planned.quantizesActivation && plan.quantizedOffset == 0 ? .quantizingUnavailable
+                : planned.roundsActivation && plan.roundedOffset == 0 ? .roundingUnavailable : nil
+            return (.int8(plan), planned, unavailable)
         }
         if planned.path == .native, planned.roundsActivation, let tensor = artifact.tensors[name], tensor.dtype.isPacked {
             // A K-quant's blocks as published, where this process reads their type (Q4_K, Q5_K) on a rounded activation and the

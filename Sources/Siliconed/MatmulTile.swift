@@ -4,9 +4,9 @@ import Synchronization
 
 /// **The tile of a `matmul2d` product: chosen by this Mac's map, never by a chip's name.** One threadgroup computes `rows × columns`
 /// of C on `simdgroups` simdgroups, K read from device memory. The kernels `gpu/bf16` (fp32 activation × bf16 weight, `TensorGEMM`),
-/// `gpu/bf16act` (rounded activation × bf16 weight, `BFloatKernels`), `gpu/int8` (fp32 activation × int8 weight) and `gpu/int8act`
-/// (rounded activation × int8 weight) each take the fastest of `candidates(for:)`, measured by the map's probes on this Mac and judged
-/// like every route (`CapacityModel.tiles`).
+/// `gpu/bf16act` (rounded activation × bf16 weight, `BFloatKernels`), `gpu/int8` (fp32 activation × int8 weight), `gpu/int8act`
+/// (rounded activation × int8 weight) and `gpu/int8x8` (quantized activation × int8 weight, int32 sums: `QuantizedKernels`) each take the
+/// fastest of `candidates(for:)`, measured by the map's probes on this Mac and judged like every route (`CapacityModel.tiles`).
 ///
 ///     map:    for each kernel, each candidate on the largest solo product, three alternated rounds, the fastest → `choose` → `tiles`
 ///             and on the thin products (`CapacityModel.isThin`), two rounds, each shape's fastest summed → `choose` → `thinTiles`
@@ -27,7 +27,8 @@ import Synchronization
 ///     or `n` leaves the large tile's threadgroups idle (`bf16act` on an M5 Pro: ×1.8 on 1 024 × 3 840², ×0.4 on 2 048 × 256 × 8 192). The
 ///     class boundary is the model's own (`isThin`), so a tile and the line that times it always speak of the same products;
 ///   - **a tile changes the order of the sums, not their precision**: the destination is fp32 and accumulated in fp32 in every
-///     candidate (`relaxed_precision` false); the probe judges each before timing it, and a refused compilation is skipped.
+///     candidate (`relaxed_precision` false); the probe judges each before timing it, and a refused compilation is skipped. The integers'
+///     product (`int8x8`) sums in int32, exactly: its tile changes no bit at all.
 package struct MatmulTile: Hashable, Sendable, Codable, CustomStringConvertible {
     package var rows: Int
     package var columns: Int
@@ -57,11 +58,12 @@ package struct MatmulTile: Hashable, Sendable, Codable, CustomStringConvertible 
     }
 
     /// The kernels whose tile the map chooses.
-    package static let kernels: [CapacityModel.Kernel] = [.init(.gpu, .bf16), .init(.gpu, .bf16act), .init(.gpu, .int8), .init(.gpu, .int8act)]
+    package static let kernels: [CapacityModel.Kernel] = [.init(.gpu, .bf16), .init(.gpu, .bf16act), .init(.gpu, .int8), .init(.gpu, .int8act),
+                                                          .init(.gpu, .int8x8)]
 
     /// **The tile a kernel runs when the map says nothing**: the one the source carried before tiles were measured.
     package static func standard(for kernel: CapacityModel.Kernel) -> MatmulTile {
-        kernel.form == .int8 || kernel.form == .int8act ? MatmulTile(64, 64, simdgroups: 4) : MatmulTile(64, 32, simdgroups: 4)
+        kernel.form == .int8 || kernel.form == .int8act || kernel.form == .int8x8 ? MatmulTile(64, 64, simdgroups: 4) : MatmulTile(64, 32, simdgroups: 4)
     }
 
     /// **What the map measures for a kernel**, the standard first. The same list on every Mac.
@@ -70,7 +72,7 @@ package struct MatmulTile: Hashable, Sendable, Codable, CustomStringConvertible 
         case .int8:
             return [MatmulTile(64, 64, simdgroups: 4), MatmulTile(128, 64, simdgroups: 4), MatmulTile(128, 64, simdgroups: 8),
                     MatmulTile(256, 64, simdgroups: 8)]
-        case .int8act:
+        case .int8act, .int8x8:
             return [MatmulTile(64, 64, simdgroups: 4), MatmulTile(128, 64, simdgroups: 4), MatmulTile(128, 128, simdgroups: 8),
                     MatmulTile(64, 32, simdgroups: 4)]
         default:
@@ -164,6 +166,17 @@ package struct MatmulTile: Hashable, Sendable, Codable, CustomStringConvertible 
     /// `gpu/bf16act`), `linear_int8` for the int8 ones (`A` fp32 for `gpu/int8`, bfloat for `gpu/int8act`) — the default library's
     /// kernels with the tile as a parameter.
     func source(for kernel: CapacityModel.Kernel) -> String {
+        if kernel.form == .int8x8 {
+            return """
+            #include <metal_stdlib>
+            #include <metal_tensor>
+            #include <MetalPerformancePrimitives/MetalPerformancePrimitives.h>
+            using namespace metal;
+            using namespace mpp::tensor_ops;
+
+            \(Self.integerProduct(rows: rows, columns: columns, simdgroups: simdgroups))
+            """
+        }
         let a = kernel.form == .bf16act || kernel.form == .int8act ? "bfloat" : "float"
         let head = """
         #include <metal_stdlib>
@@ -199,6 +212,31 @@ package struct MatmulTile: Hashable, Sendable, Codable, CustomStringConvertible 
         }
         if kernel.form == .int8 || kernel.form == .int8act { return head + product("linear_int8", weight: "int8_t", transposed: false) }
         return head + product("linear_kn", weight: "bfloat", transposed: false) + product("linear_nk", weight: "bfloat", transposed: true)
+    }
+}
+
+extension MatmulTile {
+    /// **`linear_i8i8` at a tile** (`gpu/int8x8`): the quantized activation `[M, K]` int8 × the published int8 `[K, N]` (the forge's layout)
+    /// → `C [M, N]` int32, one tile of C a threadgroup, its cooperative destination int32 — the sums exact. The library's headers and
+    /// namespaces are the caller's (`QuantizedKernels`, `source(for:)`).
+    static func integerProduct(rows: Int, columns: Int, simdgroups: Int) -> String {
+        """
+        kernel void linear_i8i8(device int8_t *a [[buffer(0)]], device int8_t *w [[buffer(1)]], device int32_t *c [[buffer(2)]],
+                                constant uint3 &mkn [[buffer(3)]], uint2 g [[threadgroup_position_in_grid]]) {
+            const int M = mkn.x, K = mkn.y, N = mkn.z;
+            tensor<device int8_t, dextents<int32_t, 2>, tensor_inline> A(a, dextents<int32_t, 2>(K, M));
+            tensor<device int8_t, dextents<int32_t, 2>, tensor_inline> B(w, dextents<int32_t, 2>(N, K));
+            tensor<device int32_t, dextents<int32_t, 2>, tensor_inline> C(c, dextents<int32_t, 2>(N, M));
+            constexpr auto d = matmul2d_descriptor(\(rows), \(columns), static_cast<int>(dynamic_extent), false, false, false);
+            matmul2d<d, execution_simdgroups<\(simdgroups)>> op;
+            const int x = g.x * \(columns), y = g.y * \(rows);
+            auto sa = A.slice(0, y); auto sb = B.slice(x, 0); auto sc = C.slice(x, y);
+            auto t = op.template get_destination_cooperative_tensor<decltype(sa), decltype(sb), int32_t>();
+            for (uint16_t i = 0; i < t.get_capacity(); ++i) { if (t.is_valid_element(i)) t[i] = 0; }
+            op.run(sa, sb, t);
+            t.store(sc);
+        }
+        """
     }
 }
 
@@ -246,7 +284,10 @@ final class TileTable: @unchecked Sendable {
             library.makeFunction(name: name).flatMap { MetalCompile.pipeline(device, $0, what: "matmul2d \(kernel) \(tile) \(name)") }
         }
         let products: TiledProducts
-        if kernel.form == .int8 || kernel.form == .int8act {
+        if kernel.form == .int8x8 {
+            guard let p = pipeline("linear_i8i8"), p.maxTotalThreadsPerThreadgroup >= p.threadExecutionWidth * tile.simdgroups else { return false }
+            products = TiledProducts(tile: tile, byColumns: nil, byRows: nil, int8: p)
+        } else if kernel.form == .int8 || kernel.form == .int8act {
             guard let p = pipeline("linear_int8"), p.maxTotalThreadsPerThreadgroup >= p.threadExecutionWidth * tile.simdgroups else { return false }
             products = TiledProducts(tile: tile, byColumns: nil, byRows: nil, int8: p)
         } else {

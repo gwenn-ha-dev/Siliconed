@@ -878,13 +878,17 @@ def build_gguf(slug, rows):
 
 COMFY = dict(
     comfyui=dict(repo='Comfy-Org/ComfyUI', commit='b0b743566f65daafc423b4fea8a2fbda94b3384a',
-                 files=['comfy/quant_ops.py', 'comfy/ops.py']),
+                 files=['comfy/quant_ops.py', 'comfy/ops.py', 'comfy/supported_models.py', 'comfy/ldm/lumina/model.py']),
     kitchen=dict(version='0.2.37', wheel='comfy_kitchen-0.2.37-py3-none-any.whl',
                  url='https://files.pythonhosted.org/packages/9e/08/0a904ae1a1b82f57e7990eee8d93d48466a185934aa585cc625cdb27761e/'
                      'comfy_kitchen-0.2.37-py3-none-any.whl',
                  sha256='b626bd51ff45937f1446accf078ccea9d11c3686ffa0c89b0c1305d66d765afe',
                  files=['comfy_kitchen/tensor/int8.py', 'comfy_kitchen/tensor/int8_utils.py',
-                        'comfy_kitchen/backends/eager/quantization.py']),
+                        'comfy_kitchen/backends/eager/quantization.py',
+                        # The W8A8 bar's (`quantized.Int8Products`): what int8_linear calls, and what it cites.
+                        'comfy_kitchen/backends/_activations.py', 'comfy_kitchen/tensor/base.py',
+                        'comfy_kitchen/backends/triton/quantization.py', 'comfy_kitchen/backends/triton/__init__.py',
+                        'comfy_kitchen/backends/eager/__init__.py']),
     sdcpp=dict(repo='leejet/stable-diffusion.cpp', commit='3f8527a46c54ecf4cb4ed6003da8e8982283c73c',
                files=['docs/int8_convrot.md']),
 )

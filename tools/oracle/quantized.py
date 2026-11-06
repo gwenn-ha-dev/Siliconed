@@ -20,6 +20,10 @@ has them). Nothing is held whole: `Variant` has `Checkpoint`'s interface (`keys`
 
 The bf16 bar (`--variant X bf16`) is this same dequantization rounded to bf16 once, the nearest bf16 can be to
 the published weights: diffusers in bf16 on those weights.
+
+The W8A8 bar (`w8a8 --variant compact`, a Compact's int8 convrot only) is the publisher's own forward, never a
+dequantization: diffusers in bf16 as for the bf16 bar, every linear the file quantizes computed by ComfyUI's default
+int8 product (`Int8Products`, below, where the recipe is read line by line).
 """
 import hashlib
 import json
@@ -135,6 +139,7 @@ class Variant:
             self._open_convrot()
         self.keys = list(self._where)
         self._cache: tuple[str, dict] | None = None
+        self._int8_cache: tuple[str, dict, dict, int] | None = None
 
     # ------------------------------------------------------------------------------ the index
 
@@ -205,6 +210,26 @@ class Variant:
         self._cache = (name, converted)
         return converted
 
+    def is_int8(self, key: str) -> bool:
+        """The map tensor `key` (a `….weight`) comes from a weight the file publishes in int8 convrot."""
+        return self.source["format"] == "convrot" and self._where.get(key) in self._quantized
+
+    def int8(self, key: str) -> tuple[torch.Tensor, torch.Tensor, int]:
+        """The published integers of the map weight `key`, as stored: `weight` I8 [n, K], `weight_scale` F32 [n, 1] and the
+        rotation's group, the rows of a fused tensor (`qkv`) split as the weight is (by the same converter: a split by
+        output rows leaves each row's integers and scale whole). The last published tensor is kept: q, k, v read it once."""
+        name = self._where[key]
+        if not (self._int8_cache and self._int8_cache[0] == name):
+            layer = name[:-len(".weight")]
+            config = json.loads(bytes(self._file.get_tensor(layer + ".comfy_quant").tolist()).decode())
+            assert config.get("format") == "int8_tensorwise" and config.get("convrot") is True, config
+            q, s = self._file.get_tensor(name), self._file.get_tensor(layer + ".weight_scale")
+            assert q.dtype == torch.int8 and s.dtype == torch.float32 and s.shape == (q.shape[0], 1), (name, q.dtype, s.shape)
+            self._int8_cache = (name, to_map_names(self.family, {name: q}), to_map_names(self.family, {name: s}),
+                                int(config.get("convrot_groupsize", 256)))
+        _, qs, ss, group = self._int8_cache
+        return qs[key], ss[key], group
+
     def tensor(self, key: str, dtype: torch.dtype) -> torch.Tensor:
         t = self.published(self._where[key])[key]
         # Rounded once from the float32 dequantization (the bf16 bar), or widened: a fresh tensor either way.
@@ -220,3 +245,144 @@ class Variant:
                 "dequantized_by": "gguf-py (gguf.quants.dequantize)" if self.source["format"] == "gguf"
                 else "comfy_kitchen dequantize_int8_convrot_weight",
                 "dropped": self.dropped}
+
+
+# ================================================================================== the W8A8 bar
+#
+# What ComfyUI computes for a layer of a Compact (`comfy_quant` = {"format": "int8_tensorwise", "convrot": true,
+# "convrot_groupsize": 256}), read at the frozen revisions of `quant_fixtures.COMFY` (ComfyUI b0b74356, comfy_kitchen
+# 0.2.37), the files `fetch_comfy` downloads and hashes:
+#
+#   comfy/quant_ops.py:238    QUANT_ALGOS["int8_tensorwise"] has "quantize_input": False: the input is not turned into a
+#                             QuantizedTensor before the call (the fp8 formats do that, not this one).
+#   comfy/ops.py:1360         mixed_precision_ops(compute_dtype=torch.bfloat16); a layer without `comfy_quant` is cast to
+#                             it at load (ops.py:1200) — every plain F32 tensor of a Compact runs in bf16. The model's
+#                             dtype is bf16 first (comfy/supported_models.py, ZImage: [bfloat16, float32]).
+#   comfy/ops.py:1485, 1418–1430  `weight_only_quant`: the bias cast to the input's dtype, the weight kept quantized
+#                             (`.to(input.dtype)` only relabels its `orig_dtype`, comfy_kitchen tensor/base.py `_handle_to`),
+#                             then `F.linear(input, weight, bias)`.
+#   comfy_kitchen tensor/int8.py:265–296  the `aten.linear` handler: `int8_linear(x.contiguous(), q, s, bias,
+#                             out_dtype = x.dtype, convrot, convrot_groupsize)`. No dequantization on this path.
+#   comfy_kitchen backends/eager/quantization.py:985 `int8_linear` — the backend of the CPU and of MPS (a Mac's
+#                             ComfyUI runs this one; Triton's, on CUDA and XPU, is discussed below):
+#     :1041  h = _build_hadamard(256, dtype=x.dtype) — the regular Hadamard (Kronecker powers of H4, tensor/int8_utils.py:24)
+#            / 16, its entries ±1/16 exact in bf16;
+#     :1042  x = _rotate_activation(x, h, 256) — int8_utils.py:70–72, `x.reshape(-1, K/256, 256) @ h` IN x's DTYPE: a bf16
+#            matmul (fp32 sums, the result rounded to bf16 once);
+#     :1048  quantize_int8_rowwise(x) — :873 `abs_max = x.abs().amax(-1)` (bf16, exact), :874 `scale = (abs_max.float()
+#            / 127).clamp(min=1e-30)` (fp32), :875 `x / _int8_scale_for_math(scale, x)`: :817 the scale CAST TO bf16 for the
+#            division, the quotient rounded to bf16, then :827 `.round_()` (half to even) `.clamp_(-128, 127)` — so −128
+#            occurs (a quotient of −127.5 rounds to −128) and the row's scale used to multiply back (fp32) is not the one
+#            divided by (bf16): a per-row relative bias up to 2⁻⁹, part of the recipe;
+#     :1052  _int8_matmul_accumulate(x_8, q.T) — torch._int_mm, int32 sums, exact (|Σ| ≤ 128·127·K < 2³¹ for K < 132 000);
+#     :1065–1072  per chunk of rows: `result.float()` (int32 → fp32, round to nearest even past 2²⁴), times
+#            `(s_x · s_w)` computed in fp32, the product rounded to fp32, then `.to(out_dtype)`: bf16;
+#     :1078  `result + bias.to(bf16)`: a bf16 addition; ends in `_apply_residual` (none here).
+#   The ZImage graph (comfy/ldm/lumina/model.py, JointAttention, FeedForward, JointTransformerBlock) calls these layers as
+#   plain `Linear`s: no input activation or residual folded in (`linear_input_act` is not used there), `qkv` fused
+#   (one quantization of x for the three: the same integers as three products on the same x).
+#
+# Which layers: the 202 layers carrying `comfy_quant` (every block's qkv, out, w1, w2, w3 and adaLN_modulation, the
+# refiners' likewise); the embedders, the final layer, the norms and the pad tokens are F32 in the file and run in bf16.
+#
+# The Triton backend (backends/triton/quantization.py:1020, backends/triton/__init__.py:239) differs in rounding only: its quantizer (:801–812) divides
+# by the bf16 scale too and rounds with `rint` (half to even), but its epilogue (:1007–1012) keeps `acc · s_x · s_w +
+# bias` in fp32 and rounds once to bf16 — one bf16 rounding fewer than the eager path. This bar is the eager path.
+#
+# Everything else is diffusers in bf16, the bf16 bar's arithmetic (`--variant compact bf16`): the bar measures the
+# int8 activations, not ComfyUI's attention or norms.
+
+def comfy_int8_linear():
+    """comfy_kitchen's eager `int8_linear` and the helpers it calls, their source taken verbatim from the downloaded
+    `backends/eager/quantization.py` (`ast`: the module imports half of comfy_kitchen), the rotation from
+    `tensor/int8_utils.py` and the input activation from `backends/_activations.py` (both imported whole: torch only).
+    Returns (`int8_linear`, Comfy's own `_int8_matmul_accumulate`); the integer product inside `int8_linear` is
+    `exact_int8_product`, equal bit for bit (checked on the first layer by `Int8Products`)."""
+    import ast
+    import importlib.util
+    base = Path(qf.COMFY_DIR) / "kitchen" / "comfy_kitchen"
+    if not (base / "backends" / "_activations.py").exists():
+        qf.fetch_comfy()
+
+    def module(name, path):
+        spec = importlib.util.spec_from_file_location(name, str(path))
+        m = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(m)
+        return m
+    utils = module("comfy_int8_utils", base / "tensor" / "int8_utils.py")
+    activations = module("comfy_activations", base / "backends" / "_activations.py")
+    source = (base / "backends" / "eager" / "quantization.py").read_text()
+    wanted = {"int8_linear", "quantize_int8_rowwise", "_round_int8", "_int8_scale_for_math", "_int8_stochastic_rng",
+              "_int8_matmul_accumulate", "_round_up", "_int8_mm_n_alignment", "_cuda_device_is_turing"}
+    nodes = [n for n in ast.parse(source).body if isinstance(n, ast.FunctionDef) and n.name in wanted]
+    assert {n.name for n in nodes} == wanted, wanted - {n.name for n in nodes}
+    ns = dict(torch=torch, _build_hadamard=utils._build_hadamard, _rotate_activation=utils._rotate_activation,
+              _apply_input_act=activations.apply_input_act, _apply_residual=activations.apply_residual,
+              _turing_device_cache={})
+    exec(compile(ast.Module(body=nodes, type_ignores=[]), "quantization.py", "exec"), ns)
+    comfy_product = ns["_int8_matmul_accumulate"]
+    ns["_int8_matmul_accumulate"] = exact_int8_product
+    return ns["int8_linear"], comfy_product
+
+
+def exact_int8_product(a: torch.Tensor, b: torch.Tensor) -> torch.Tensor:
+    """int8 [M, K] × int8 [K, N] → int32 [M, N], in fp64: every product (|·| ≤ 2¹⁴) and every partial sum is an integer
+    below 2⁵³, so the result is exact in any order, and below 2³¹ it is the int32 GEMM's to the bit."""
+    assert a.dtype == torch.int8 and b.dtype == torch.int8
+    out = a.double() @ b.double()
+    assert out.abs().max() < 2 ** 31
+    return out.to(torch.int32)
+
+
+class Int8Forward:
+    """One linear's forward replaced by ComfyUI's: `int8_linear` on the published integers of its weight (read at the
+    call, dropped after), its bias as the module holds it (bf16, as ComfyUI casts it). A callable object, not a lambda."""
+
+    def __init__(self, products: "Int8Products", module: torch.nn.Linear, key: str):
+        self.products, self.module, self.key = products, module, key
+
+    def __call__(self, x: torch.Tensor) -> torch.Tensor:
+        assert x.dtype == torch.bfloat16, (self.key, x.dtype)       # the recipe's precondition in this bar
+        q, s, group = self.products.variant.int8(self.key)
+        bias = self.module.bias
+        self.products.check_product(x, q, group)
+        out = self.products.linear(x.contiguous(), q.contiguous(), s, None if bias is None else bias.to(x.dtype),
+                                   x.dtype, convrot=True, convrot_groupsize=group)
+        self.products.calls += 1
+        return out
+
+
+class Int8Products:
+    """Every `nn.Linear` of `model` whose weight the Variant publishes in int8 convrot computes as ComfyUI does by default
+    (`comfy_int8_linear`); the others are untouched. `model` is built in bf16 on the Variant (`Streamed` still brings in
+    the dequantized weights of these layers; they are never read)."""
+
+    def __init__(self, model: torch.nn.Module, variant: Variant):
+        assert variant.source["format"] == "convrot", "the W8A8 bar is a Compact's (int8 convrot)"
+        self.variant = variant
+        self.linear, self._comfy_product = comfy_int8_linear()
+        self.calls, self.checked = 0, False
+        self.layers = []
+        for name, m in model.named_modules():
+            if isinstance(m, torch.nn.Linear) and variant.is_int8(f"{name}.weight"):
+                m.forward = Int8Forward(self, m, f"{name}.weight")
+                self.layers.append(name)
+        published = {variant._where[k] for k in variant.keys if variant.is_int8(k)}
+        mapped = {variant._where[f"{n}.weight"] for n in self.layers}
+        assert mapped == published, f"int8 layers without a module: {sorted(published - mapped)[:4]}"
+
+    def check_product(self, x: torch.Tensor, q: torch.Tensor, group: int) -> None:
+        """Once: the exact fp64 product against Comfy's own (`torch._int_mm`), on the integers of the first layer."""
+        if self.checked:
+            return
+        h = self.linear.__globals__["_build_hadamard"](group, device=x.device, dtype=x.dtype)
+        rotated = self.linear.__globals__["_rotate_activation"](x.reshape(-1, x.shape[-1]), h, group)
+        x8, _ = self.linear.__globals__["quantize_int8_rowwise"](rotated)
+        assert torch.equal(exact_int8_product(x8, q.T.contiguous()), self._comfy_product(x8, q.T.contiguous())), \
+            "the exact integer product differs from torch._int_mm"
+        self.checked = True
+
+    def describe(self) -> dict:
+        return {"products": "comfy_kitchen 0.2.37 eager int8_linear (activation rotated by the regular Hadamard 256 in "
+                            "bf16, quantized to int8 per row, int8 x int8 -> int32 exact, times s_x * s_w, bf16 out)",
+                "layers": len(self.layers), "calls": self.calls, "rest": "diffusers in bf16"}

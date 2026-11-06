@@ -9,11 +9,12 @@ import MetalPerformanceShadersGraph
 extension Diagnostic.CapacityProbes.Context {
     // MARK: Solos
 
-    enum Probe: String, CaseIterable { case gpu_fp32, amx_fp32, ane_fp16, ane_int8, gpu_bf16, gpu_bf16act, gpu_int8, gpu_q8, gpu_int8act, gpu_q8act, gpu_q4kact
+    enum Probe: String, CaseIterable { case gpu_fp32, amx_fp32, ane_fp16, ane_int8, gpu_bf16, gpu_bf16act, gpu_int8, gpu_q8, gpu_int8act, gpu_int8x8, gpu_q8act, gpu_q4kact
         var kernel: Kernel {
             switch self {
             case .gpu_q4kact: return Kernel(.gpu, .q4kact)
             case .gpu_int8act: return Kernel(.gpu, .int8act)
+            case .gpu_int8x8: return Kernel(.gpu, .int8x8)
             case .gpu_q8act: return Kernel(.gpu, .q8act)
             case .gpu_fp32: return Kernel(.gpu, .fp32)
             case .amx_fp32: return Kernel(.amx, .fp32)
@@ -171,7 +172,7 @@ extension Diagnostic.CapacityProbes.Context {
     func thinSolos(_ m: inout Fit.Measurements) {
         guard !sizes.thin.isEmpty else { return }
         var kept: [Fit.Measurements.Solo] = []
-        for probe in [Probe.gpu_fp32, .amx_fp32, .ane_fp16, .gpu_bf16, .gpu_bf16act, .gpu_int8, .gpu_q8, .gpu_int8act, .gpu_q8act] {
+        for probe in [Probe.gpu_fp32, .amx_fp32, .ane_fp16, .gpu_bf16, .gpu_bf16act, .gpu_int8, .gpu_q8, .gpu_int8act, .gpu_int8x8, .gpu_q8act] {
             for (rows, k, n) in sizes.thin.map({ ($0.m, $0.k, $0.n) }) {
                 if probe == .ane_fp16, rows < NeuralEngine.rowUnit { continue }
                 guard let s = solo(probe, m: rows, k: k, n: n) else { continue }
@@ -252,6 +253,17 @@ extension Diagnostic.CapacityProbes.Context {
                 dirty = max(dirty, k * n)
             }
             run = { WeightProducts.int8Product(gemm: gemm, plan: plan, reserve: buffers.b, a: buffers.a, c: buffers.c, m: m, k: k, n: n).status == 0 }
+        case .gpu_int8x8:
+            // W8A8 (`QuantizedKernels`): the integers staged as an int8 product's, the activation rotated and quantized by the route
+            // itself, judged against the exact product of its own codes (`Diagnostic.exactQuantizedRows`) at the fp32 bar — the codes are
+            // the CPU's to the bit, the sums exact in int32, one rounding in the epilogue.
+            guard alone.int8Activations, alone.tensor?.quantized?.simdgroups(k: k) != nil, (k * n) % 2 == 0, k % Diagnostic.int8Group == 0,
+                  let plan = WeightProducts.int8Plan(k: k, n: n, capacity: k * n, perColumn: false, group: Diagnostic.int8Group,
+                                                     amxColumns: 0, quantized: true) else { return nil }
+            truthKind = .quantizedInt8
+            staged = { [self] in stageInt8(plan, k: k, n: n) }
+            run = { WeightProducts.int8Product(gemm: self.alone, plan: plan, reserve: self.aloneB.b, a: self.aloneB.a, c: self.aloneB.c,
+                                               m: m, k: k, n: n).status == 0 }
         case .gpu_q4kact:
             // Q4_K's blocks as a map stores them, in the reserve's head; the route's own function on them (`TensorGEMM.linear(a:kquant:…)`).
             guard alone.bf16Activations, alone.tensor?.readsKQuants == true,

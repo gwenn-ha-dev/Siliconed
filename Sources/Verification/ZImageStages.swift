@@ -133,9 +133,9 @@ enum ZImageStages {
     static let dit = Stage(
         model: "z-image", name: "dit",
         proves: "one evaluation of the DiT, latent to velocity: embedders, refiners, 30 blocks, head, unpatchify",
-        sizes: ["512", "1024", "768x512", "832x1216"], options: ["--map", "--neural-engine", "--bf16-activations", "--bf16-attention", "--fp16-attention", "--no-accelerators", "--variant"],
-        oracle: "tools/oracle/z-image.py dit --size {size}; witness --size {size}; with --neural-engine, --bf16-activations, --bf16-attention or --fp16-attention, bf16 --size {size}; with --variant compact or light, the same three with --variant, at 512 \(Wording.publishers)", weights: ["DiT"],
-        rule: "the rule, floor 5e-4; \(Wording.rectangle); \(Wording.halfPrecision)"
+        sizes: ["512", "1024", "768x512", "832x1216"], options: ["--map", "--neural-engine", "--bf16-activations", "--bf16-attention", "--fp16-attention", "--int8-activations", "--no-accelerators", "--variant"],
+        oracle: "tools/oracle/z-image.py dit --size {size}; witness --size {size}; with --neural-engine, --bf16-activations, --bf16-attention or --fp16-attention, bf16 --size {size}; with --variant compact or light, the same three with --variant, at 512 \(Wording.publishers); with --int8-activations, w8a8 --size {size} --variant compact (ComfyUI's own int8 products)", weights: ["DiT"],
+        rule: "the rule, floor 5e-4; \(Wording.rectangle); \(Wording.halfPrecision); with --int8-activations, against ComfyUI's W8A8 error + 25 %"
     ) { invocation in
         let version = try invocation.quantizedVariant()
         let report = Report(title: "z-image dit\(version.map { " " + $0.rawValue } ?? "") \(invocation.size)")
@@ -158,7 +158,8 @@ enum ZImageStages {
 
         var produced = dit.boundaries
         produced["model_out"] = out
-        let half = try invocation.halfReference(file, script: "tools/oracle/z-image.py bf16 --size \(invocation.size)\(version.map { " --variant " + $0.rawValue } ?? "")")
+        let half = try invocation.reference(file, script: "tools/oracle/z-image.py bf16 --size \(invocation.size)\(version.map { " --variant " + $0.rawValue } ?? "")",
+                                            w8a8Script: "tools/oracle/z-image.py w8a8 --size \(invocation.size) --variant compact")
         let widths: [String: Int] = ["t_embedder_out": dit.config.adalnDim, "block_freqs_cis": 2,
                                      "final_layer_out": dit.config.patch * dit.config.patch * dit.config.channels,
                                      "model_out": height * width]
@@ -177,6 +178,7 @@ enum ZImageStages {
         if invocation.bf16Activations { try BF16ActivationRun.account(report) }
         if invocation.bf16Attention { try BF16AttentionRun.account(report) }
         if invocation.fp16Attention { try FP16AttentionRun.account(report) }
+        if invocation.int8Activations { try W8A8Run.account(report) }
         return report
     }
 

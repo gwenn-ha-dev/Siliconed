@@ -93,6 +93,27 @@ extension Diagnostic {
         }.map { $0 * scale }
     }
 
+    /// **The exact rows of a W8A8 product** (`gpu/int8x8`): each row rotated and quantized as the route does it (`W8A8.quantize`, the
+    /// same fp32 arithmetic, so the codes are the route's to the bit), the codes times the integers exact in fp64, then `s_x · scale`.
+    /// The truth of the integers, not of the activation: what the quantization loses is the recipe's, judged against its own reference
+    /// (`--int8-activations`), not the kernel's. Laid out `[n, rows]`.
+    package static func exactQuantizedRows(_ rows: [Int], a: UnsafePointer<Float>, q: UnsafePointer<Int8>, scale: Double,
+                                           group: Int?, k: Int, n: Int) -> [Double] {
+        var codes = [Float](repeating: 0, count: rows.count * k), scales = [Double](repeating: 0, count: rows.count)
+        for (i, row) in rows.enumerated() {
+            let (x, s) = W8A8.quantize(a + row * k, k: k, group: group)
+            for j in 0..<k { codes[i * k + j] = Float(x[j]) }
+            scales[i] = Double(s) * scale
+        }
+        var product = codes.withUnsafeBufferPointer {
+            exactRows(Array(0..<rows.count), a: $0.baseAddress!, k: k, n: n, rotation: nil) { k0, count, into in
+                vDSP_vflt8D(q + k0 * n, 1, into, 1, vDSP_Length(count))
+            }
+        }
+        for j in 0..<n { for i in 0..<rows.count { product[j * rows.count + i] *= scales[i] } }
+        return product
+    }
+
     /// **The exact rows of a Q8_0 product**: `rows` of `A · W`, `W[r, j] = q[r, j] · s[r / block, j]`, in fp64
     /// (`Float(q) · s` is exact in both). Laid out `[n, rows]`.
     package static func exactRows(_ rows: [Int], a: UnsafePointer<Float>, q: UnsafePointer<Int8>,

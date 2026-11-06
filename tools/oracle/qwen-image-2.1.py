@@ -9,6 +9,8 @@
     qwen-image-2.1.py bf16 [--edit N]       that evaluation in bfloat16                    -> witness-bf16-qwen21-dit[-editN]-512
     qwen-image-2.1.py dit|bf16 --variant compact|light   generation on the Compact's (Comfy-Org int8 convrot) or the
                                             Light's (GGUF Q4_K_M) published DiT -> goldens-qwen21-dit-<variant>-512
+    qwen-image-2.1.py w8a8 --variant compact   `bf16 --variant compact` with ComfyUI's default int8 products in the
+                                            int8 layers (the W8A8 bar)                    -> witness-w8a8-qwen21-dit-compact-512
     qwen-image-2.1.py witness               that evaluation in float64                     -> witness-qwen21-f64-512
     qwen-image-2.1.py trajectory [--edit N] the 8-step sampler                             -> goldens-qwen21-trajectory[-editN]-512
     qwen-image-2.1.py vae [--edit N]        the decoder on the trajectory's final latent   -> goldens-qwen21-vae[-editN]-512
@@ -703,6 +705,38 @@ def stage_bf16(n: int = 0, variant: str | None = None):
     print(f"  {time.time() - t0:.0f} s")
 
 
+def stage_w8a8(variant: str):
+    """`bf16 --variant compact` with every linear the Compact publishes in int8 convrot computed by comfy_kitchen's own
+    `int8_linear` on the published integers (`quantized.Int8Products`, the recipe cited there): the bar of the engine's
+    W8A8 route. ComfyUI's QwenImage21 (comfy/ldm/qwen_image21/model.py at the frozen commit) calls its linears plainly,
+    except the MLP's down projection, `linear_input_act(self.out, self.gate_up(x), "swiglu")`: on the eager backend
+    the swiglu runs in bf16 before the quantization (`_apply_input_act`), the arithmetic diffusers does in bf16 here, then
+    the same `int8_linear`. Writes `witness-w8a8-qwen21-dit-compact-512`, the bf16 bar's keys."""
+    if variant != "compact":
+        raise SystemExit("w8a8: the Compact only (--variant compact)")
+    t0 = time.time()
+    half = torch.bfloat16
+    name = f"goldens-qwen21-dit-{RESOLUTION}"
+    golden = read(name, "qwen-image-2.1.py dit")
+    text = read(text_golden(0), "qwen-image-2.1.py text")
+    info = json.loads((OUT / f"{name}.json").read_text())
+    model, _ = load_transformer(half, variant)
+    products = quantized.Int8Products(model, model.published)
+    taps, _ = dit_taps(model)
+    out = model(hidden_states=golden["hidden_states"][None].to(half),
+                encoder_hidden_states=text["prompt_embeds"][None].to(half),
+                timestep=golden["timestep"].to(half), img_shapes=[[tuple(s) for s in info["img_shapes"]]],
+                img_mask=golden["img_mask"][None].bool(), return_dict=False)[0][0]
+    assert products.calls >= len(products.layers), (products.calls, len(products.layers))
+    kept = ("img_in_out", "txt_in_out", "temb", "modulation", "norm_out", "joint_in",
+            "layer0_out", "layer1_out", "layer_last_out")
+    payload = {"model_out": out[-info["target"]:].float(), **{k: taps[k].float() for k in kept}}
+    report = {"w8a8_vs_fp32_model_out": gap("w8a8 vs fp32, model_out", payload["model_out"], golden["model_out"])}
+    write(quantized.stem(f"witness-w8a8-qwen21-dit-{RESOLUTION}", variant), payload,
+          {"dtype": "bfloat16", "inputs": name, **report, "int8": products.describe(), "weights": model.published.describe()})
+    print(f"  {time.time() - t0:.0f} s")
+
+
 # ------------------------------------------------------------------ the trajectory
 
 def stage_trajectory(n: int = 0):
@@ -989,18 +1023,21 @@ def main() -> None:
     global OUT, INPUTS
     common.unbuffered()
     p = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    p.add_argument("stage", choices=["text", "vision", "references", "dit", "bf16", "witness", "trajectory", "vae",
+    p.add_argument("stage", choices=["text", "vision", "references", "dit", "bf16", "w8a8", "witness", "trajectory", "vae",
                                      "vae-encode", "vae-witness", "vae-bf16", "all"])
     p.add_argument("--edit", type=int, choices=[0, 1, 2], default=0,
                    help="editing with N pictures (text, dit, bf16, trajectory, vae); 0 is generation")
     p.add_argument("--long", action="store_true", help="text only, generation: the long prompt, past 512 tokens")
     p.add_argument("--side", type=int, default=512, help="references only: the prepared side (512, 443)")
     p.add_argument("--variant", choices=quantized.VARIANTS,
-                   help="dit and bf16 (generation): the Compact's or the Light's published DiT instead of the Standard's")
+                   help="dit and bf16 (generation): the Compact's or the Light's published DiT instead of the Standard's;"
+                        " w8a8: compact, required")
     p.add_argument("--goldens", help="output folder (default: $SILICONED_GOLDENS, else ./goldens)")
     args = p.parse_args()
-    if args.variant and (args.stage not in ("dit", "bf16") or args.edit):
-        p.error("--variant goes with dit or bf16, generation (no --edit)")
+    if args.variant and (args.stage not in ("dit", "bf16", "w8a8") or args.edit):
+        p.error("--variant goes with dit, bf16 or w8a8, generation (no --edit)")
+    if args.stage == "w8a8" and args.variant != "compact":
+        p.error("w8a8 takes --variant compact: the Compact's int8 convrot is what ComfyUI computes in W8A8")
     global CONFIG_ONLY
     CONFIG_ONLY = bool(args.variant)
     goldens = common.goldens_directory(args.goldens)
@@ -1022,6 +1059,8 @@ def main() -> None:
         stage_dit_variant(args.variant) if args.variant else stage_dit(n)
     elif args.stage == "bf16":
         stage_bf16(n, args.variant)
+    elif args.stage == "w8a8":
+        stage_w8a8(args.variant)
     elif args.stage == "witness":
         stage_witness()
     elif args.stage == "trajectory":
