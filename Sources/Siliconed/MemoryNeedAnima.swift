@@ -199,5 +199,6 @@ extension MemoryNeed {
 
         return MemoryNeed(phases: [textPhase] + references + [denoising, decoding], crossing: crossing, base: request.base)
             .keeping(request, encoder: maps.encoderKeptBytes)
+            .carryingSurfaces()
     }
 }

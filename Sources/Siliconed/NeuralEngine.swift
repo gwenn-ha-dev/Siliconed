@@ -194,26 +194,13 @@ package final class NeuralEngine: @unchecked Sendable {
             .appendingPathComponent("siliconed-ane-\(ProcessInfo.processInfo.processIdentifier)-\(UUID().uuidString)", isDirectory: true)
     }
 
-    /// **Released, it waits for Core ML to let go of its surfaces**: Core ML keeps a program and its
-    /// operands ~0.5 s after its last prediction, then frees them on its own queue (0.51 s, measured 22/10/2026) — the
-    /// phase after the engine's (the decoder) would find them held, above its need. The surfaces are
-    /// looked up by identifier until none exists (`IOSurfaceLookup`: an object's existence, not the
-    /// footprint), at most `releaseWait`.
+    /// **Released, it does not wait for Core ML to let go of its surfaces**: Core ML keeps a program and its operands ~0.5 s after
+    /// its last prediction, then frees them on its own queue (0.51 s, measured 22/10/2026, whatever is done to them). The phase after
+    /// the engine's (the decoder) runs beside them, and its need carries them (`MemoryNeed.carryingSurfaces`).
     deinit {
-        let identifiers = bindings.values.flatMap { [$0.x, $0.w, $0.y] }
-            .compactMap { CVPixelBufferGetIOSurface($0)?.takeUnretainedValue() }.map(IOSurfaceGetID)
         bindings.removeAll()
-        let started = DispatchTime.now().uptimeNanoseconds
-        while identifiers.contains(where: { IOSurfaceLookup($0) != nil }),
-              Double(DispatchTime.now().uptimeNanoseconds - started) * 1e-9 < NeuralEngine.releaseWait {
-            usleep(2_000)
-        }
         try? FileManager.default.removeItem(at: directory)
     }
-
-    /// The longest a released engine waits for its surfaces; beyond it, the render's memory check reports
-    /// what is left.
-    package static let releaseWait = 2.0
 
     /// `false` once a program of the product's was refused (a surface Core ML cannot read dense, a shape
     /// it does not compile): the GPU then takes the whole product from the start, not after its share.
