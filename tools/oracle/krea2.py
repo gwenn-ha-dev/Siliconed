@@ -5,7 +5,7 @@
     krea2.py dit --size 512 [1024 768x512]     one DiT evaluation at the first sigma         -> goldens-krea2-dit-<size>
     krea2.py bf16 --size 512 [1024 768x512]    the same evaluation in bfloat16               -> witness-bf16-krea2-dit-<size>
     krea2.py dit|bf16|witness|witness-step --size 512 --variant compact|light   the same, for the Compact's (Comfy-Org int8 convrot) or the
-                                               Light's (GGUF Q4_K_M) published DiT -> goldens-krea2-dit-<variant>-<size>
+                                               Light's (our SQ file) published DiT -> goldens-krea2-dit-<variant>-<size>
     krea2.py w8a8 --size 512 --variant compact   `bf16 --variant compact` with ComfyUI's default int8 products in the
                                                int8 layers (the W8A8 bar)    -> witness-w8a8-krea2-dit-compact-<size>
     krea2.py trajectory --size 512 [1024]      the 8-step Euler loop                         -> goldens-krea2-trajectory-<size>
@@ -227,7 +227,7 @@ def stage_text(prompt: str = PROMPT, length: int = MAX_SEQUENCE_LENGTH, stem: st
 
 def load_transformer(dtype: torch.dtype = torch.float32, variant: str | None = None, streamed: bool = True):
     """The DiT, its blocks streamed. With a `variant`, from the Compact's or the Light's published file,
-    dequantized by its publisher's code (`quantized.Variant`, the two tensors Krea hid in its GGUF left out).
+    as `quantized.Variant` reads it (the Light's our SQ file, decoded by `quantized.sq_decode`; the two tensors Krea hid in its checkpoint left out).
     `streamed=False`: the blocks stay on `meta`, for a caller that loads them itself (`model.published`)."""
     from diffusers import Krea2Transformer2DModel
     config = Krea2Transformer2DModel.load_config(snap() / "transformer")

@@ -19,6 +19,8 @@ import Siliconed
 //     permuted **by whole groups**: R is the same Hadamard in every group, so a permutation of groups commutes with
 //     it, and nothing finer does. The group family is the only one an int8 map can draw; `PermutedMap` refuses any
 //     other on a rotated weight rather than write a different model;
+//   - an SQ weight (the Light) is stored by output, codes then group bytes, and obeys the same rule: its input side moves by
+//     whole blocks of 256 inputs (16 groups of 16, copied as stored), its output side by whole stored rows;
 //   - the per-column scale of an int8 weight travels with its column when the output side is permuted, and stays put
 //     when the input side is;
 //   - the map's `Linear`s are transposed (`[input, output]`): the oracle's "rows" (torch's output axis) are the
@@ -232,6 +234,7 @@ package enum Krea2PermutedMap {
             }
             if let rows, rows.count != height { throw Artifact.Failure.badHeader("\(name): \(height) rows, \(rows.count) permuted") }
             if let columns, columns.count != width { throw Artifact.Failure.badHeader("\(name): \(width) columns, \(columns.count) permuted") }
+            if t.dtype.sqBits != nil, t.rotation == nil { throw Artifact.Failure.badHeader("\(name): an SQ weight without its rotation") }
             if let rows, let rotation = t.rotation, !ResidualPermutation.movesWholeGroups(rows, group: rotation.group) {
                 throw Artifact.Failure.badHeader("\(name): rotated by groups of \(rotation.group) — only whole groups may move")
             }
@@ -252,10 +255,14 @@ package enum Krea2PermutedMap {
                             }
                         }
                     }
-                    switch t.dtype.size {
-                    case 1: move(UInt8.self)
-                    case 2: move(UInt16.self)
-                    default: move(UInt32.self)
+                    if let bits = t.dtype.sqBits {
+                        moveSQ(from: from, to: to, bits: bits, k: height, n: width, rows: rows, columns: columns)
+                    } else {
+                        switch t.dtype.size {
+                        case 1: move(UInt8.self)
+                        case 2: move(UInt16.self)
+                        default: move(UInt32.self)
+                        }
                     }
                     // A scale per column travels with its column; per tensor, or on the input side, it stays.
                     if let scale = t.scale, scale.shape.count == 1, let columns {
@@ -271,6 +278,24 @@ package enum Krea2PermutedMap {
             written += t.bytes
         }
         return written
+    }
+
+    /// **An SQ weight's integers permuted** without decoding them. It is stored by output (`SQ`): for each of the `n` outputs, its
+    /// `k` inputs' codes then their group bytes. The input side moves whole blocks of the rotation (256 inputs: `256 · bits / 8`
+    /// code bytes and 16 group bytes, each group of 16 inputs inside a block staying whole, so that nothing is re-encoded); the output
+    /// side moves whole stored rows. `rows` is the input permutation, already checked to move whole blocks.
+    private static func moveSQ(from: UnsafeRawBufferPointer, to: UnsafeMutableRawBufferPointer, bits: Int, k: Int, n: Int,
+                               rows: [Int]?, columns: [Int]?) {
+        let block = ResidualPermutation.group, stride = SQ.rowBytes(k: k, bits: bits)
+        let codeBytes = block * bits / 8, groupBytes = block / SQ.group, groupsAt = k * bits / 8
+        for output in 0..<n {
+            let source = (columns?[output] ?? output) * stride, target = output * stride
+            for j in 0..<(k / block) {
+                let sj = (rows?[j * block] ?? j * block) / block
+                memcpy(to.baseAddress! + target + j * codeBytes, from.baseAddress! + source + sj * codeBytes, codeBytes)
+                memcpy(to.baseAddress! + target + groupsAt + j * groupBytes, from.baseAddress! + source + groupsAt + sj * groupBytes, groupBytes)
+            }
+        }
     }
 
     private static func readFully(_ fd: Int32, _ buffer: UnsafeMutableRawBufferPointer, at offset: Int, _ name: String) throws {

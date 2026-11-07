@@ -3,7 +3,7 @@ import Siliconed
 
 // **Which map a check judges, and whether it is the one the golden was made for.** The goldens come
 // from the reference's published weights; a map forged from other weights (a Compact's int8, a
-// Light's GGUF blocks) rounds differently by construction, and judged against that golden it fails
+// Light's SQ 4- and 5-bit tensors) rounds differently by construction, and judged against that golden it fails
 // for what it is, not for a fault. So every stage names its map in its first line and a map of
 // another variant than its golden's is skipped, with what to do.
 //
@@ -15,12 +15,13 @@ package enum MapVariant: String, Sendable {
     case standard
     /// At least one 8-bit tensor (`int8`, `float8_e4m3`) and no GGUF block.
     case eightBit = "8-bit"
-    /// At least one GGUF block tensor (`q4_0` … `q6_k`).
+    /// At least one packed tensor: our SQ 4- or 5-bit (`sq4`, `sq5`: the Light), or a GGUF block (`q4_0` … `q6_k`: a Light until 0.21,
+    /// still readable by the forge).
     case packed
 
     /// The variant of a map whose tensors have these dtypes (`Artifact.DType` raw values).
     package static func of(dtypes: Set<String>) -> MapVariant {
-        if dtypes.contains(where: { Artifact.DType(rawValue: $0)?.isPacked == true }) { return .packed }
+        if dtypes.contains(where: { Artifact.DType(rawValue: $0).map { $0.isPacked || $0.sqBits != nil } == true }) { return .packed }
         if dtypes.contains(where: { Artifact.DType(rawValue: $0)?.isQuantized == true }) { return .eightBit }
         return .standard
     }

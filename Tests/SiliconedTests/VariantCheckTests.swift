@@ -25,6 +25,11 @@ struct VariantCheckTests {
         // A Light has GGUF blocks, whatever 8-bit tensors Q4_K_M files also hold (Qwen's Q8_0).
         #expect(summary(["q4_k": 100, "q6_k": 3, "int8": 20, "float32": 1]).quantizedVersion == .light)
         #expect(summary(["q5_k": 1]).quantizedVersion == .light)
+        // Our own Light: SQ 4- and 5-bit linears, with the SQ8 ones kept as int8 beside them — never the Compact, whose int8 it shares.
+        #expect(summary(["sq4": 196, "sq5": 52, "int8": 13, "float32": 169]).quantizedVersion == .light)
+        #expect(summary(["sq5": 1]).quantizedVersion == .light)
+        #expect(summary(["sq4": 196, "int8": 13]).mismatch(version: .compact) != nil)
+        #expect(summary(["int8": 200, "bfloat16": 20]).mismatch(version: .light) != nil)
     }
 
     @Test func aLightIsNotJudgedAgainstACompactsGoldenNorTheReverse() throws {

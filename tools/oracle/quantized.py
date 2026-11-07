@@ -1,13 +1,17 @@
-"""The Compact and Light DiTs as their publishers' own code reads them: the oracle's weights for `--variant`.
+"""The Compact and Light DiTs as the oracle reads them: the oracle's weights for `--variant`.
 
-The Compact (8 bits) and the Light (4 to 6 bits) are third parties' files, pinned below as the app pins
-them (`Forge/Installation.swift`: repository, revision, sha256). A variant's oracle is the reference
-DiT of diffusers, in float32 on the CPU, with **those published weights, dequantized by the publisher's
-library**, never by ours:
+The Compact (8 bits) is a third party's file; the Light (4 to 8 bits per linear) is our own, in the format SQ
+published with it. Both are pinned below as the app pins them (`Forge/Installation.swift`: repository, revision,
+sha256). A variant's oracle is the reference DiT of diffusers, in float32 on the CPU, with **those published
+weights, decoded by code that is not the engine's**:
 
-* GGUF (the Lights: unsloth's Z-Image and Qwen-Image-2.1, vanes430's Anima, vantagewithai's Krea 2): `gguf-py`, llama.cpp's
-  own reader, `gguf.quants.dequantize` on the stored blocks. diffusers' GGUF loader, asked for float32,
-  gives the same bits on every tensor (`quant_fixtures.py` counts the differing bits and stops at one).
+* SQ (the Lights: `gwenn-ha-dev/<model>-Siliconed-SQ4`, one safetensors file per family): the format is specified in
+  each repository's card ("The format") and decoded here by `sq_decode`, written from that specification alone, in
+  numpy, sharing nothing with the engine's decoder (`SQ.swift`). A quantized linear holds `<l>.sq.codes`, `<l>.sq.groups`
+  and `<l>.sq.scale`, and its tier (SQ4, SQ5, SQ8) is in the metadata's `tiers`. The codes become exact integers
+  (int8), times the row's float32 scale in float64, rotated back by R256 (symmetric, its own inverse) in float64, rounded
+  once to float32: the reference of the quantization's judge, "every SQ linear decoded in float64 then rounded once".
+  A linear the file keeps as published (tier BF16) and every other tensor are read as stored.
 * ComfyUI's int8 convrot (the Compacts: Comfy-Org's Z-Image, Qwen-Image-2.1, Krea 2 and MOSS-Image, Bedovyy's Anima):
   `dequantize_int8_convrot_weight` of
   comfy_kitchen at the frozen version `quant_fixtures.py` downloads and hashes (`(q * scale)` rotated back
@@ -15,10 +19,11 @@ library**, never by ours:
 
 Tensors the file does not quantize (norms, embedders, the F32/F16/BF16 ones) are read as stored. Names go from
 the publisher's to diffusers' by the tables of `quant_fixtures.py` (diffusers' own converters where it
-has them). Nothing is held whole: `Variant` has `Checkpoint`'s interface (`keys`, `tensor`, `under`), so
+has them); our SQ files are written under diffusers' names already, except that Anima's tensors left as published keep
+ComfyUI's, converted by the same table. Nothing is held whole: `Variant` has `Checkpoint`'s interface (`keys`, `tensor`, `under`), so
 `common.Streamed` brings one block in, dequantized, and drops it, as for the published bf16 weights.
 
-The bf16 bar (`--variant X bf16`) is this same dequantization rounded to bf16 once, the nearest bf16 can be to
+The bf16 bar (`--variant X bf16`) is the float32 weights rounded to bf16 once, the nearest bf16 can be to
 the published weights: diffusers in bf16 on those weights.
 
 The W8A8 bar (`w8a8 --variant compact`, a Compact's int8 convrot only) is the publisher's own forward, never a
@@ -42,33 +47,33 @@ SOURCES = {
         "compact": dict(repo="Comfy-Org/Z-Image-Turbo", revision="6fc90a3b1b653e935a0d175e260736de25b84df5",
                         file="split_files/diffusion_models/z_image_turbo_int8_convrot.safetensors", format="convrot",
                         sha256="be517ebd47c912a5626a588e1aeea43e6be4a43c0cdcd2b48a2a780d9f358635"),
-        "light": dict(repo="unsloth/Z-Image-Turbo-GGUF", revision="6c80814333b7b6a70a2e5b469a7c6437ce65de0f",
-                      file="z-image-turbo-Q4_K_M.gguf", format="gguf",
-                      sha256="e6494f87de6abaf6a561924f50317a5f271fc34bb4222aabbd801197df8f7daa"),
+        "light": dict(repo="gwenn-ha-dev/Z-Image-Turbo-Siliconed-SQ4", revision="03534ae084f0cbd1d363a31d2ed6e7d460438c83",
+                      file="z-image-turbo-sq4.safetensors", format="sq",
+                      sha256="01a392e0cfedcb79f3574fffe841aba02f9e3933d5ead64f326b6e1377fa0bed"),
     },
     "qwen-image-2.1": {
         "compact": dict(repo="Comfy-Org/Qwen-Image-2.1", revision="df94239739eef7205973a145ffa6f441f7b64e84",
                         file="diffusion_models/qwen_image_2.1_turbo_int8_convrot.safetensors", format="convrot",
                         sha256="8144a0182964aa8403ad6dbc011db837304167d235161b9aabaa8532e967314c"),
-        "light": dict(repo="unsloth/Qwen-Image-2.1-Turbo-GGUF", revision="5d1f9f759ea877ae556cda88dbec958b62ad3809",
-                      file="qwen-image-2.1-turbo-Q4_K_M.gguf", format="gguf",
-                      sha256="8940e8b522af886e0c0f5afddf720e82dd223cb9a43580b5f61c4d740452ac20"),
+        "light": dict(repo="gwenn-ha-dev/Qwen-Image-2.1-Turbo-Siliconed-SQ4", revision="9a1adc7c8751a235b82ef2c18a09b47a5f6fff8c",
+                      file="qwen-image-2.1-turbo-sq4.safetensors", format="sq",
+                      sha256="d289920998192edc414b447f26e83230de1afd820bcad5bce559b7e4ec666e57"),
     },
     "anima": {
         "compact": dict(repo="Bedovyy/Anima-INT8", revision="d7ba6686f161e9a829373106eb4b881327247ba9",
                         file="anima-turbo-v1.1-int8convrot.safetensors", format="convrot",
                         sha256="c462bea054de87ea03000e83f2b60e6d58fbcb6b925d9f607f8a470eeaad52b4"),
-        "light": dict(repo="vanes430/Anima-Turbo-V1.1-GGUF", revision="efdf070de980a52fc03027d2f6ed543cc1d87a8f",
-                      file="anima-turbo-v1.1-Q4_K_M.gguf", format="gguf",
-                      sha256="709fceeec6b4f0eb155330c83fd2539406e86c01e431407276a1f31095484782"),
+        "light": dict(repo="gwenn-ha-dev/Anima-Turbo-Siliconed-SQ4", revision="2191e2962bcddcb8158cd7c9abb4cc2bfdcaf9b3",
+                      file="anima-turbo-v1.1-sq4.safetensors", format="sq",
+                      sha256="c79582c9f8807bf17f6ec019ba368f06ed7edce29351706ea832866e8f9d6a44"),
     },
     "krea2": {
         "compact": dict(repo="Comfy-Org/Krea-2", revision="1171f4dc7e325bf3734586942e737872506c73e1",
                         file="diffusion_models/krea2_turbo_int8_convrot.safetensors", format="convrot",
                         sha256="8e4eeda70dd5037ab1ba2bef6b417f9f901e26093117cf397f741fc1fdaaf3f1"),
-        "light": dict(repo="vantagewithai/Krea-2-Turbo-GGUF", revision="390847e2835c16bdf82303731e3d35b874760d89",
-                      file="krea2_turbo-Q4_K_M.gguf", format="gguf",
-                      sha256="bc12f539de7a7a6ddf9bac17ec6e5bfecd42c3517190f491131d8464a1034b40"),
+        "light": dict(repo="gwenn-ha-dev/Krea-2-Turbo-Siliconed-SQ4", revision="5dd8e5d5d4d6cb1e25747302343a6efc61b44dc3",
+                      file="krea-2-turbo-sq4.safetensors", format="sq",
+                      sha256="8b0f96a6649a695ae349189fa4d82b3a45e172cdcccc227c8f61c343122bc4ba"),
     },
     "moss-image": {
         "compact": dict(repo="Comfy-Org/MOSS-Image", revision="530a4c94f92c35ef6818b1b035a983fe9dcf5f54",
@@ -126,6 +131,59 @@ def to_map_names(family: str, tensors: dict) -> dict:
     return qf.to_map_names(family, tensors)
 
 
+# ================================================================================== the SQ decoder
+
+def _rotation_256() -> np.ndarray:
+    """R256 = (H4 ⊗ H4 ⊗ H4 ⊗ H4) / 16 with H4 = [[1,1,1,-1],[1,1,-1,1],[1,-1,1,1],[-1,1,1,1]]: symmetric, R·R = I."""
+    h4 = np.array([[1, 1, 1, -1], [1, 1, -1, 1], [1, -1, 1, 1], [-1, 1, 1, 1]], dtype=np.float64)
+    r = h4
+    for _ in range(3):
+        r = np.kron(r, h4)
+    r = r / 16
+    assert (r == r.T).all() and np.abs(r @ r - np.eye(256)).max() < 1e-15
+    return r
+
+
+R256 = _rotation_256()
+
+# (code bits, bits of the group byte's offset field B, unit of b, zero of B): the card's table
+#   SQ4  group byte (M << 4) | B,  m = M + 1, b = 4 (B - 8),  v = m (q - 8)  + b
+#   SQ5  group byte (M << 5) | B,  m = M + 1, b = 2 (B - 16), v = m (q - 16) + b
+SQ_CODECS = {4: (4, 4, 8), 5: (5, 2, 16)}
+
+
+def sq_integers(codes: np.ndarray, groups: np.ndarray | None, bits: int) -> np.ndarray:
+    """The exact integers v [N, K] (int16, in [-128, 127]) of one SQ linear, from its stored arrays.
+    SQ8: `codes` are the int8 values themselves. SQ4/SQ5: each group of 16 codes is a little-endian bit string of
+    16 * bits bits, code j at bits j * bits ... j * bits + bits - 1, stored in 2 * bits bytes."""
+    if bits == 8:
+        assert codes.dtype == np.int8 and groups is None, (codes.dtype, groups)
+        return codes.astype(np.int16)
+    assert codes.dtype == np.uint8 and groups is not None and groups.dtype == np.uint8
+    n, nbytes = codes.shape
+    k = nbytes * 8 // bits
+    assert k * bits == nbytes * 8 and k % 256 == 0 and groups.shape == (n, k // 16), (codes.shape, groups.shape, bits)
+    # Bits of the whole row, least significant first, then every `bits` of them one code (bit t of code j is bit j * bits + t).
+    stream = np.unpackbits(codes, axis=1, bitorder="little").reshape(n, k, bits)
+    q = (stream.astype(np.int16) << np.arange(bits, dtype=np.int16)).sum(-1)
+    offset_bits, unit, zero = SQ_CODECS[bits]
+    m = (groups >> offset_bits).astype(np.int16) + 1
+    b = ((groups & ((1 << offset_bits) - 1)).astype(np.int16) - zero) * unit
+    v = m.repeat(16, axis=1) * (q - (1 << (bits - 1))) + b.repeat(16, axis=1)
+    assert v.min() >= -128 and v.max() <= 127, "an SQ group decodes outside int8"
+    return v
+
+
+def sq_decode(codes: np.ndarray, groups: np.ndarray | None, scale: np.ndarray, bits: int) -> np.ndarray:
+    """One SQ linear's weight, W = (s * v) . R_K, in float64: the integers times the row's float32 scale (exact in float64),
+    each contiguous 256 block of a row rotated back by R256. The caller rounds it once to float32."""
+    v = sq_integers(codes, groups, bits)
+    assert scale.dtype == np.float32 and scale.shape == (v.shape[0],), (scale.dtype, scale.shape)
+    rows = v.astype(np.float64) * scale.astype(np.float64)[:, None]
+    n, k = rows.shape
+    return (rows.reshape(n, k // 256, 256) @ R256).reshape(n, k)
+
+
 class Variant:
     """A published quantized DiT read like a `common.Checkpoint`: map (diffusers) names, one tensor at a time."""
 
@@ -133,8 +191,8 @@ class Variant:
         self.family, self.variant = family, variant
         self.path, self.source = published_file(family, variant)
         self.dropped: list[str] = []
-        if self.source["format"] == "gguf":
-            self._open_gguf()
+        if self.source["format"] == "sq":
+            self._open_sq()
         else:
             self._open_convrot()
         self.keys = list(self._where)
@@ -153,12 +211,32 @@ class Variant:
             for mapped in to_map_names(self.family, {name: torch.empty(shape, device="meta")}):
                 self._where[mapped] = name
 
-    def _open_gguf(self):
-        from gguf import GGUFReader
-        self._reader = GGUFReader(str(self.path))
-        self._tensors = {t.name: t for t in self._reader.tensors}
-        # `shape` is ggml's `ne`, fastest axis first: torch's shape is its reverse.
-        self._index({n: [int(x) for x in reversed(t.shape)] for n, t in self._tensors.items()})
+    def _open_sq(self):
+        from safetensors import safe_open
+        self._file = safe_open(str(self.path), framework="pt")
+        meta = self._file.metadata() or {}
+        assert meta.get("format") == "siliconed-sq" and meta.get("format_version") == "1", meta.get("format")
+        assert meta.get("family") == self.family, (meta.get("family"), self.family)
+        self._tiers = json.loads(meta["tiers"])      # linear (no `.weight`) -> SQ4, SQ5, SQ8 or BF16
+        keys = list(self._file.keys())
+        self._sq_layers = {k[:-len(".sq.codes")] for k in keys if k.endswith(".sq.codes")}
+        for layer in self._sq_layers:
+            assert self._tiers.get(layer, "?") in ("SQ4", "SQ5", "SQ8"), (layer, self._tiers.get(layer))
+        assert all(t == "BF16" for l, t in self._tiers.items() if l not in self._sq_layers)
+        # A quantized linear is `<l>.weight` in the map, under the name the file gives it (diffusers'); every other tensor is
+        # named as the publisher's source (diffusers', but for Anima's ComfyUI).
+        self._where: dict[str, str] = {}
+        for k in keys:
+            if ".sq." in k:
+                if k.endswith(".sq.codes"):
+                    self._where[k[:-len(".sq.codes")] + ".weight"] = k
+                continue
+            if k.startswith(OUTSIDE):
+                self.dropped.append(k)
+                continue
+            mapped = (to_map_names(self.family, {k: torch.empty(0)}) if self.family == "anima" else {k: None})
+            assert len(mapped) == 1, (k, list(mapped))
+            self._where[next(iter(mapped))] = k
 
     def _open_convrot(self):
         from safetensors import safe_open
@@ -178,19 +256,16 @@ class Variant:
 
     # ----------------------------------------------------------------------------- one tensor
 
-    def _gguf(self, name: str) -> torch.Tensor:
-        from gguf import GGMLQuantizationType as T
-        from gguf.quants import dequantize
-        t = self._tensors[name]
-        shape = [int(x) for x in reversed(t.shape)]
-        if t.tensor_type == T.F32:
-            return torch.from_numpy(np.array(t.data, dtype=np.float32)).reshape(shape)
-        if t.tensor_type == T.F16:
-            return torch.from_numpy(np.array(t.data, dtype=np.float16)).reshape(shape).float()
-        if t.tensor_type == T.BF16:
-            raw = np.array(t.data).view(np.int16)
-            return torch.from_numpy(raw).view(torch.bfloat16).reshape(shape).float()
-        return torch.from_numpy(np.ascontiguousarray(dequantize(t.data, t.tensor_type))).reshape(shape)
+    def _sq(self, name: str) -> torch.Tensor:
+        """A tensor of the SQ file: a quantized linear decoded (`sq_decode`), float64 then rounded once to float32;
+        any other as stored, widened to float32 (bf16 and fp32 to fp32 are exact)."""
+        if not name.endswith(".sq.codes"):
+            return self._file.get_tensor(name).float()
+        layer = name[:-len(".sq.codes")]
+        bits = int(self._tiers[layer][2:])
+        groups = self._file.get_tensor(layer + ".sq.groups").numpy() if bits != 8 else None
+        w = sq_decode(self._file.get_tensor(name).numpy(), groups, self._file.get_tensor(layer + ".sq.scale").numpy(), bits)
+        return torch.from_numpy(w.astype(np.float32))
 
     def _convrot(self, name: str) -> torch.Tensor:
         if name not in self._quantized:
@@ -205,7 +280,13 @@ class Variant:
         """The map tensors of one published tensor (a fused one yields several), float32, the last one kept."""
         if self._cache and self._cache[0] == name:
             return self._cache[1]
-        value = self._gguf(name) if self.source["format"] == "gguf" else self._convrot(name)
+        if self.source["format"] == "sq":
+            logical = name[:-len(".sq.codes")] + ".weight" if name.endswith(".sq.codes") else name
+            converted = (to_map_names(self.family, {name: self._sq(name)}) if self.family == "anima" and logical == name
+                         else {logical: self._sq(name)})
+            self._cache = (name, converted)
+            return converted
+        value = self._convrot(name)
         converted = to_map_names(self.family, {name: value})
         self._cache = (name, converted)
         return converted
@@ -242,8 +323,8 @@ class Variant:
     def describe(self) -> dict:
         return {"variant": self.variant, "repository": self.source["repo"], "revision": self.source["revision"],
                 "file": self.source["file"], "sha256": self.source["sha256"], "format": self.source["format"],
-                "dequantized_by": "gguf-py (gguf.quants.dequantize)" if self.source["format"] == "gguf"
-                else "comfy_kitchen dequantize_int8_convrot_weight",
+                "dequantized_by": "quantized.sq_decode, from the published format (float64, rounded once to float32)"
+                if self.source["format"] == "sq" else "comfy_kitchen dequantize_int8_convrot_weight",
                 "dropped": self.dropped}
 
 

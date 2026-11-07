@@ -8,7 +8,7 @@
     qwen-image-2.1.py dit [--edit N]        one DiT evaluation, three ways                 -> goldens-qwen21-dit[-editN]-512
     qwen-image-2.1.py bf16 [--edit N]       that evaluation in bfloat16                    -> witness-bf16-qwen21-dit[-editN]-512
     qwen-image-2.1.py dit|bf16 --variant compact|light   generation on the Compact's (Comfy-Org int8 convrot) or the
-                                            Light's (GGUF Q4_K_M) published DiT -> goldens-qwen21-dit-<variant>-512
+                                            Light's (our SQ file) published DiT -> goldens-qwen21-dit-<variant>-512
     qwen-image-2.1.py w8a8 --variant compact   `bf16 --variant compact` with ComfyUI's default int8 products in the
                                             int8 layers (the W8A8 bar)                    -> witness-w8a8-qwen21-dit-compact-512
     qwen-image-2.1.py witness               that evaluation in float64                     -> witness-qwen21-f64-512

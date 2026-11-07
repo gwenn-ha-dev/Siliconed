@@ -4,12 +4,13 @@ import Siliconed
 // **The Compact and the Light, judged from outside.** `siliconed check <model> dit --variant compact|light`
 // runs the engine on the map of that version (`Family.ditMap(_:)`, or `--map`) against a golden the oracle
 // wrote from the same inputs as the Standard's: the reference DiT in float32, with the weights the third
-// party published (8-bit or GGUF blocks) dequantized by its own library (`tools/oracle/quantized.py`). The
+// party published (the Compact's 8-bit) dequantized by its own library, or our own SQ file (the Light's 4 and 5 bits)
+// decoded by the oracle's reference decoder of the published format (`tools/oracle/quantized.py`). The
 // goldens are `goldens-…-<variant>-<size>` beside the Standard's, the bf16 bar `witness-bf16-…-<variant>-<size>`.
 //
 // A map is of a version when its tensor table says so (`MapSummary.quantizedVersion`): the Compact holds
-// 8-bit tensors (a GGUF Q8_0 is kept as int8 with its block scales) and no GGUF block, the Light at least
-// one (Q4_K…). `MapVariant` already separates them (`.eightBit`, `.packed`); the version is the name the
+// 8-bit tensors (a GGUF Q8_0 is kept as int8 with its block scales) and no packed one, the Light at least
+// one (`sq4`, `sq5`; a GGUF block before 0.21). `MapVariant` already separates them (`.eightBit`, `.packed`); the version is the name the
 // golden carries, so that a Light is never judged against a Compact's golden, nor the reverse.
 
 extension MapSummary {

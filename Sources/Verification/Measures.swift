@@ -283,9 +283,9 @@ package enum FP16AttentionRun {
 }
 
 package enum BF16ActivationRun {
-    /// How many products rounded their activation, and how many read a published 8-bit weight (a Compact's or a Light's: under
-    /// `--bf16-activations` they are read as published on the rounded activation, `gpu/int8act` or `gpu/q8act`, and a Light's Q4_K and
-    /// Q5_K blocks `gpu/q4kact` (its Q6_K widened) — a rounded activation
+    /// How many products rounded their activation, and how many read a published 8-bit weight (a Compact's int8, or a Light's SQ
+    /// linears, integers with a row scale: under `--bf16-activations` they are read as published on the rounded activation,
+    /// `gpu/int8act`; a GGUF's blocks, `gpu/q8act` / `gpu/q4kact` — a rounded activation
     /// has no widened route). None rounded (no Metal 4, a refused compiler): skipped, since what would be judged is the fp32 path against
     /// a looser bar.
     package static func account(_ report: Report) throws {

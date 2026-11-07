@@ -13,7 +13,7 @@
                                           sampler (steps 3-7)              -> goldens-img2img-<size>
     z-image.py all                        every stage at every size the check reads (not `bf16`)
     z-image.py dit|bf16|witness --variant compact|light   the same, for the Compact's or the Light's published
-                                          DiT, dequantized by its publisher's code (`quantized.py`)
+                                          DiT: the Compact's by its publisher's code, the Light's (our SQ file) by `quantized.sq_decode`
     z-image.py w8a8 --size 512 --variant compact   the Compact's evaluation as ComfyUI computes it by default: bf16,
                                           every int8 layer an int8 activation times the int8 weight
                                                                            -> witness-w8a8-dit-compact-<size>
@@ -162,7 +162,7 @@ def build_dit(root: Path, dtype: torch.dtype = torch.float32, variant: str | Non
     """The reference `ZImageTransformer2DModel`, on `meta`, with the blocks streamed.
 
     The 11.6 M parameters outside the blocks (embedders, final layer) stay resident. With a `variant`, the
-    weights are the Compact's or the Light's published file, dequantized by its publisher's code
+    weights are the Compact's or the Light's published file, dequantized by its publisher's code (the Light's: decoded by `quantized.sq_decode`)
     (`quantized.Variant`); only `transformer/config.json` is read from `root`."""
     from diffusers import ZImageTransformer2DModel
     directory = root / "transformer"

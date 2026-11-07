@@ -6,7 +6,7 @@
     anima.py dit --size 512 [1024 768x512 1536]  one DiT evaluation at the first sigma  -> goldens-anima-dit-<size>
     anima.py bf16 --size 1024 [1536]        the same evaluation in bfloat16             -> witness-bf16-anima-dit-<size>
     anima.py dit|bf16 --size 512 --variant compact|light   the same, for the Compact's or the Light's published DiT
-                                            (GGUF), dequantized by gguf-py -> goldens-anima-dit-<variant>-<size>
+                                            (the Light's: our SQ file, decoded by `quantized.sq_decode`) -> goldens-anima-dit-<variant>-<size>
     anima.py w8a8 --size 512 --variant compact   `bf16 --variant compact` with ComfyUI's default int8 products in the
                                             int8 layers (the W8A8 bar)      -> witness-w8a8-anima-dit-compact-<size>
     anima.py trajectory --size 512 [1024 1536]  the 8-step Euler loop                   -> goldens-anima-trajectory-<size>
@@ -154,8 +154,8 @@ def turbo_state_dicts() -> tuple[dict, dict]:
 
 
 def load_transformer(variant: str | None = None):
-    """The fp32 DiT. With a `variant`, the weights are the Compact's or the Light's published GGUF, dequantized
-    by gguf-py (`quantized.Variant`); only `transformer/config.json` is read from the base repository, and the
+    """The fp32 DiT. With a `variant`, the weights are the Compact's or the Light's published file (the Light's: our SQ,
+    decoded by `quantized.sq_decode`; `quantized.Variant`); only `transformer/config.json` is read from the base repository, and the
     text adapter the file also holds is left out."""
     from diffusers import CosmosTransformer3DModel
     if variant:
