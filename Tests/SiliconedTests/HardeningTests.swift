@@ -202,4 +202,16 @@ final class HardeningTests: XCTestCase {
         XCTAssertEqual(c.phases[1].bytes("DiT rotation scratch"), anima.ditRotationScratch)
         XCTAssertEqual(c.phases[1].bytes - d.phases[1].bytes, anima.ditRotationScratch)
     }
+
+    /// **An SQ weight's widened route also holds the integers it decodes to** (`K · N` bytes, outside every arena): the same
+    /// header with `sq5` charges that on top of the int8 convrot's scratch.
+    func testAnSQWeightChargesItsIntegersBesideTheRotationScratch() {
+        func header(_ dtype: String) -> [String: Any] {
+            ["tensors": ["w": ["dtype": dtype, "shape": [3840, 10240], "rotation": ["group": 256]]]]
+        }
+        let int8 = Widen.rotationScratchBytes(header: header("int8"))
+        XCTAssertGreaterThan(int8, 0)
+        XCTAssertEqual(Widen.rotationScratchBytes(header: header("sq5")), int8 + Arena.capacity(for: 3840 * 10240))
+        XCTAssertEqual(Widen.rotationScratchBytes(header: header("sq4")), int8 + Arena.capacity(for: 3840 * 10240))
+    }
 }

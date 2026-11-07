@@ -474,7 +474,8 @@ extension Widen {
 
     /// The largest of `rotationScratchBytes` over a map's rotated tensors whose names start with one of
     /// `prefixes` (all of them when `nil`), read from its header's tensor table — 0 for a map with none
-    /// (bf16, GGUF, an unrotated int8): what widening that map's layers adds to a phase's peak.
+    /// (bf16, GGUF, an unrotated int8): what widening that map's layers adds to a phase's peak — for an SQ tensor, with the integers
+    /// it is decoded to first.
     package static func rotationScratchBytes(header: [String: Any], prefixes: [String]? = nil,
                                              workers: Int = widenWorkers) -> Int {
         guard let table = header["tensors"] as? [String: [String: Any]] else { return 0 }
@@ -483,7 +484,11 @@ extension Widen {
             guard let rotation = entry["rotation"] as? [String: Any], let group = rotation["group"] as? Int,
                   let shape = entry["shape"] as? [Int], shape.count == 2 else { continue }
             if let prefixes, !prefixes.contains(where: { name.hasPrefix($0) }) { continue }
-            largest = max(largest, rotationScratchBytes(rows: shape[0], columns: shape[1], group: group, workers: workers))
+            // An SQ tensor is first decoded to its `K × N` integers in a buffer of its own (`Artifact.materialize`), outside every
+            // arena as well: the widened route of a plan that does not give it the int8 product.
+            let integers = (entry["dtype"] as? String).flatMap(Artifact.DType.init(rawValue:))?.sqBits == nil
+                ? 0 : Arena.capacity(for: shape[0] * shape[1])
+            largest = max(largest, integers + rotationScratchBytes(rows: shape[0], columns: shape[1], group: group, workers: workers))
         }
         return largest
     }
