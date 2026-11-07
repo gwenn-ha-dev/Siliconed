@@ -87,17 +87,18 @@ package enum Family: String, CaseIterable, Sendable, Codable {
 
     /// The DiT map of a version, in `store/`. The Standard's is `ditMap`; the others have their own
     /// name, so that two are never taken for each other (one is removed when another installs). Z-Image's
-    /// and Anima's Compacts are `v1`: int8 convrot after 0.20, the GGUF Q8_0 `v0` until then (`supersededCompactMap`).
+    /// and Anima's Compacts are `v1`: int8 convrot after 0.20, the GGUF Q8_0 `v0` until then; every Light is `v1`
+    /// (our SQ 4-bit after 0.21, a third party's GGUF Q4_K_M `v0` until then) — see `supersededVersionMaps`.
     package func ditMap(_ v: Variant) -> String {
         switch (self, v) {
         case (.zImage, .compact): return "z-image-turbo-dit.compact.v1.silicon"
         case (.qwenImage21, .compact): return "qwen-image-2.1-turbo-dit.compact.v0.silicon"
-        case (.zImage, .light): return "z-image-turbo-dit.light.v0.silicon"
-        case (.qwenImage21, .light): return "qwen-image-2.1-turbo-dit.light.v0.silicon"
+        case (.zImage, .light): return "z-image-turbo-dit.light.v1.silicon"
+        case (.qwenImage21, .light): return "qwen-image-2.1-turbo-dit.light.v1.silicon"
         case (.anima, .compact): return "anima-turbo-dit.compact.v1.silicon"
-        case (.anima, .light): return "anima-turbo-dit.light.v0.silicon"
+        case (.anima, .light): return "anima-turbo-dit.light.v1.silicon"
         case (.krea2, .compact): return "krea2-turbo-dit.compact.v0.silicon"
-        case (.krea2, .light): return "krea2-turbo-dit.light.v0.silicon"
+        case (.krea2, .light): return "krea2-turbo-dit.light.v1.silicon"
         case (.mossImage, .compact): return "moss-image-sft-dit.compact.v0.silicon"
         default: return ditMap
         }
@@ -130,24 +131,34 @@ package enum Family: String, CaseIterable, Sendable, Codable {
     package static let supersededQwenImage21Maps = ["qwen-image-2.1-dit.v0.silicon", "qwen-image-2.1-dit.compact.v0.silicon",
                                                     "qwen-image-2.1-dit.light.v0.silicon"]
 
-    /// **The Compact's DiT map until 0.20**, in `store/`: a third party's GGUF Q8_0 (unsloth's for Z-Image, vanes430's for
-    /// Anima, beside its text adapter in fp32), replaced by an int8 convrot of the same model (`ditMap(.compact)`, `v1`) — other
-    /// published weights, another image. Removed by the next installation before its first byte (`Installer.supersededFiles`),
-    /// never read: one version lives. `nil` for the families whose Compact never changed.
-    package var supersededCompactMap: String? {
+    /// **The DiT maps of versions that were replaced by other weights of the same model**, in `store/`, each with the
+    /// version it was: other published weights, another image, so the map is never read — the next installation
+    /// removes it before its first byte (`Installer.supersededFiles`), keeping the version it was in
+    /// (`Installer.supersededVariant`), and an uninstallation removes it too. One version lives.
+    /// - Z-Image's and Anima's **Compact until 0.20**: a third party's GGUF Q8_0, replaced by an int8 convrot (`.compact.v1`).
+    /// - Every family's **Light until 0.21** (but MOSS-Image's, which has none): a third party's GGUF Q4_K_M, replaced by our
+    ///   SQ 4-bit (`.light.v1`).
+    package var supersededVersionMaps: [(map: String, variant: Variant)] {
+        let compact: [(map: String, variant: Variant)]
         switch self {
-        case .zImage: return "z-image-turbo-dit.compact.v0.silicon"
-        case .anima: return "anima-turbo-dit.compact.v0.silicon"
-        default: return nil
+        case .zImage: compact = [("z-image-turbo-dit.compact.v0.silicon", .compact)]
+        case .anima: compact = [("anima-turbo-dit.compact.v0.silicon", .compact)]
+        default: compact = []
+        }
+        switch self {
+        case .zImage: return compact + [("z-image-turbo-dit.light.v0.silicon", .light)]
+        case .anima: return compact + [("anima-turbo-dit.light.v0.silicon", .light)]
+        case .qwenImage21: return [("qwen-image-2.1-turbo-dit.light.v0.silicon", .light)]
+        case .krea2: return [("krea2-turbo-dit.light.v0.silicon", .light)]
+        case .mossImage: return []
         }
     }
 
     /// Every superseded DiT map of the family that may lie in `store/`, by name (with an Anima map's adapter beside it): what the
-    /// disk's occupancy counts and an installation or an uninstallation removes.
+    /// disk's occupancy counts and an installation or an uninstallation removes. Qwen-Image-2.1's include the base model's.
     package var supersededMaps: [String] {
-        if self == .qwenImage21 { return Self.supersededQwenImage21Maps }
-        guard let map = supersededCompactMap else { return [] }
-        return self == .anima ? [map, adapterPath(fromMap: map)] : [map]
+        let versions = supersededVersionMaps.flatMap { self == .anima ? [$0.map, adapterPath(fromMap: $0.map)] : [$0.map] }
+        return (self == .qwenImage21 ? Self.supersededQwenImage21Maps : []) + versions
     }
 
     /// **The language head of the family's writer** (`PromptWriter`): the final norm and `lm_head` its encoder

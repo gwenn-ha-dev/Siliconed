@@ -4,6 +4,10 @@
 
 ## 0.21
 
+### Les Légères, dans notre propre 4 bits
+
+- **Les Légères de Z-Image, de Qwen-Image-2.1, d'Anima et de Krea 2 passent à notre propre 4 bits (SQ)**, à la place des GGUF Q4_K_M de tiers : plus fidèles au modèle de l'éditeur que le Q4_K_M qu'elles remplacent, à peu près à la vitesse de la Compact et avec moins de mémoire. Un fichier par famille, publié sur Hugging Face (`gwenn-ha-dev/…-Siliconed-SQ4`). Une Légère installée prend ses nouveaux poids à sa prochaine installation, qui retire les anciens (le modèle d'image pèse 5,0 Go pour Z-Image, 4,4 Go pour Qwen-Image-2.1, 1,7 Go pour Anima, 7,6 Go pour Krea 2).
+
 ### Les Compact de Z-Image et d'Anima
 
 - **Les Compact de Z-Image et d'Anima passent en int8 convrot**, comme celle de Qwen-Image-2.1 : le modèle d'image de Z-Image vient de Comfy-Org, celui d'Anima de Bedovyy, à la place des GGUF Q8_0 d'unsloth et de vanes430. Leurs encodeurs de texte ne changent pas, et les deux sont contrôlées contre diffusers (`siliconed check`). Une Compact installée prend son nouveau modèle d'image à sa prochaine installation (6,2 Go pour Z-Image, 2,6 Go pour Anima), qui retire l'ancien.

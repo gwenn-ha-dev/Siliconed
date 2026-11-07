@@ -4,6 +4,10 @@ English · [Français](RELEASE-NOTES.fr.md)
 
 ## 0.21
 
+### The Lights, in our own 4 bits
+
+- **The Lights of Z-Image, Qwen-Image-2.1, Anima and Krea 2 are now our own 4-bit (SQ)**, in place of the third-party GGUF Q4_K_M: more faithful to the publisher's model than the Q4_K_M it replaces, at about the Compact's speed and with less memory. One file per family, published on Hugging Face (`gwenn-ha-dev/…-Siliconed-SQ4`). An installed Light takes the new weights at its next installation, which removes the old ones (the image model weighs 5.0 GB for Z-Image, 4.4 GB for Qwen-Image-2.1, 1.7 GB for Anima, 7.6 GB for Krea 2).
+
 ### The Compacts of Z-Image and Anima
 
 - **Z-Image's and Anima's Compacts are now int8 convrot**, like Qwen-Image-2.1's: Z-Image's image model from Comfy-Org, Anima's from Bedovyy, in place of unsloth's and vanes430's GGUF Q8_0. Their text encoders do not change, and both are checked against diffusers (`siliconed check`). An installed Compact takes its new image model at its next installation (6.2 GB for Z-Image, 2.6 GB for Anima), which removes the old one.

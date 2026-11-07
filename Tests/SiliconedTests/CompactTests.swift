@@ -28,12 +28,11 @@ final class CompactTests: XCTestCase {
 
     /// **Krea 2 installs without a byte of Krea's gated repository**: its three versions read
     /// Comfy-Org's files (the Standard's bf16 DiT and encoder, the Compact's int8 convrot), Qwen's
-    /// tokenizer and VAE, vantagewithai's GGUF for the Light — all pinned (revision, sha256); no
-    /// `config.json` is downloaded (`Krea2Published`). The Compact's and the Light's files are the
-    /// judged ones (their fixtures); the Light carries nothing under 4 bits, and two tensors outside
-    /// the model, Krea's easter egg, which the recipe sets aside. Its license: Krea's `LICENSE.pdf` (from
+    /// tokenizer and VAE, our SQ 4-bit file for the Light — all pinned (revision, sha256); no
+    /// `config.json` is downloaded (`Krea2Published`). The Compact's files are the
+    /// judged ones (their fixtures); the Light is our own file, pinned like the others. Its license: Krea's `LICENSE.pdf` (from
     /// Comfy-Org's copy) and Comfy-Org's card, the cards of the two Qwen repositories its VAE and its
-    /// tokenizer come from, then the GGUF's card for the Light.
+    /// tokenizer come from, then our repository's card, NOTICE and license for the Light.
     func testKrea2VersionsReadNoGatedFileAndAreTheJudgedOnes() throws {
         let hex = try NSRegularExpression(pattern: "^[0-9a-f]+$")
         func isHex(_ s: String) -> Bool { hex.firstMatch(in: s, range: NSRange(s.startIndex..., in: s)) != nil }
@@ -61,22 +60,19 @@ final class CompactTests: XCTestCase {
         XCTAssertEqual(Family.krea2.encoderMap(.light), Family.krea2.encoderMap(.compact))
         XCTAssertNotEqual(Family.krea2.encoderMap(.compact), Family.krea2.encoderMap)
 
-        // The judged files: Comfy-Org's convrot DiT and encoder, vantagewithai's Q4_K_M.
-        let floor: Set<String> = ["F32", "F16", "BF16", "Q8_0", "Q6_K", "Q5_K", "Q4_K"]
-        for (x, format) in [(Installer.dit(.krea2, .compact)[0], "convrot"), (Installer.encoder(.krea2, .compact)[0], "encoder"),
-                            (Installer.dit(.krea2, .light)[0], "gguf")] {
+        // The judged files: Comfy-Org's convrot DiT and encoder.
+        for (x, format) in [(Installer.dit(.krea2, .compact)[0], "convrot"), (Installer.encoder(.krea2, .compact)[0], "encoder")] {
             let d = try fixture(x)
             XCTAssertEqual(d.manifest["family"] as? String, "krea2", x.path)
             XCTAssertEqual(d.manifest["format"] as? String, format, x.path)
-            guard format == "gguf" else { continue }
-            let header = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: d.folder + "/header.json"))) as? [String: Any])
-            let tensors = try XCTUnwrap(header["tensors"] as? [String: [String: Any]])
-            XCTAssertEqual(tensors.count, 432)
-            let types = Set(tensors.values.compactMap { $0["type"] as? String })
-            XCTAssertTrue(types.isSubset(of: floor), "\(types.subtracting(floor)) under the floor")
-            XCTAssertTrue(types.contains("Q4_K"))
-            XCTAssertEqual(Set(tensors.keys).intersection(Recipes.kreaEasterEgg), Recipes.kreaEasterEgg)
         }
+        // The Light: our repository's three files after the Standard's, the weights pinned with their size.
+        let light = Installer.dit(.krea2, .light)[0]
+        XCTAssertEqual(light.repository.name, "gwenn-ha-dev/Krea-2-Turbo-Siliconed-SQ4")
+        XCTAssertEqual(Installer.licenseFiles(.krea2, .light).suffix(3).map(\.path), ["README.md", "NOTICE", "LICENSE.pdf"])
+        XCTAssertEqual(light.path, "krea-2-turbo-sq4.safetensors")
+        XCTAssertEqual(light.size, 7_567_580_968)
+        XCTAssertEqual(light.sha256, "8b0f96a6649a695ae349189fa4d82b3a45e172cdcccc227c8f61c343122bc4ba")
 
         // Sizes: the Compact under the Standard, the Light under the Compact; the encoder shared.
         let s = Family.krea2.installedSize(.standard), c = Family.krea2.installedSize(.compact), l = Family.krea2.installedSize(.light)
@@ -85,8 +81,8 @@ final class CompactTests: XCTestCase {
         XCTAssertLessThan(c.encoder, s.encoder)
         XCTAssertEqual(l.encoder, c.encoder)
         XCTAssertEqual(Set([s.components, c.components, l.components]).count, 1)
-        let gguf = try XCTUnwrap(try fixture(Installer.dit(.krea2, .light)[0]).manifest["file_bytes"] as? Int)
-        XCTAssertEqual(Double(l.dit), Double(gguf), accuracy: 0.02 * Double(gguf))
+        let sq4 = try XCTUnwrap(light.size)
+        XCTAssertEqual(Double(l.dit), Double(sq4), accuracy: 0.02 * Double(sq4))
         let convrot = try XCTUnwrap(try fixture(Installer.dit(.krea2, .compact)[0]).manifest["file_bytes"] as? Int)
         // Above the file by the bf16 tensors the forge writes in fp32 (44 of them, `quant-weights`
         // counts them; 0.65 GB measured), never under it.
@@ -156,84 +152,58 @@ final class CompactTests: XCTestCase {
         XCTAssertLessThan(size.dit, standard.dit)
     }
 
-    /// **Anima's Light**: vanes430's GGUF Q4_K_M of Turbo v1.1, pinned (revision, sha256), the very file judged (its fixture),
-    /// nothing under 4 bits; it reads the Standard's encoder and components; its license links the publisher's files, then
-    /// vanes430's card. **Its size is the file's plus the text adapter widened**: the adapter's quantized tensors are written in
-    /// fp32 (`ForgeDiT.writeAdapter`), counted here from the published header alone — within 2 % of `installedSize`.
-    func testAnimaLightIsTheJudgedGGUF() throws {
+    /// **Anima's Light is our own 4-bit file** (SQ): one safetensors in our repository, pinned (revision, sha256, size); it reads
+    /// the Standard's encoder and components; its license links the publisher's files, then our card, NOTICE and `LICENSE.md`.
+    /// Its size is the map's plus the publisher's text adapter beside it.
+    func testAnimaLightIsOurSQ4() throws {
         let hex = try NSRegularExpression(pattern: "^[0-9a-f]+$")
         func isHex(_ s: String) -> Bool { hex.firstMatch(in: s, range: NSRange(s.startIndex..., in: s)) != nil }
-        let blocks: [String: (values: Int, bytes: Int)] = ["Q8_0": (32, 34), "Q4_K": (256, 144), "Q5_K": (256, 176), "Q6_K": (256, 210)]
-        let floor: Set<String> = ["F32", "F16", "BF16", "Q8_0", "Q6_K", "Q5_K", "Q4_K"]
         let standard = Family.anima.installedSize(.standard)
         let dit = Installer.dit(.anima, .light)
         XCTAssertEqual(dit.count, 1)
         let x = dit[0]
-        XCTAssertTrue(x.path.hasSuffix("Q4_K_M.gguf"), x.path)
-        XCTAssertEqual(x.repository.name, "vanes430/Anima-Turbo-V1.1-GGUF")
+        XCTAssertEqual(x.path, "anima-turbo-v1.1-sq4.safetensors")
+        XCTAssertEqual(x.repository.name, "gwenn-ha-dev/Anima-Turbo-Siliconed-SQ4")
         XCTAssertTrue(x.repository.revision.count == 40 && isHex(x.repository.revision))
         let sha = try XCTUnwrap(x.sha256)
         XCTAssertTrue(sha.count == 64 && isHex(sha))
-        let d = try fixture(x)
-        XCTAssertEqual(d.manifest["family"] as? String, "anima")
-        XCTAssertEqual(d.manifest["format"] as? String, "gguf")
-        let header = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: d.folder + "/header.json"))) as? [String: Any])
-        let tensors = try XCTUnwrap(header["tensors"] as? [String: [String: Any]])
-        XCTAssertEqual(tensors.count, 685)
-        let types = Set(tensors.values.compactMap { $0["type"] as? String })
-        XCTAssertTrue(types.isSubset(of: floor), "\(types.subtracting(floor)) under the floor")
-        XCTAssertTrue(types.contains("Q4_K"))
+        XCTAssertEqual(x.size, 1_678_437_032)
 
         XCTAssertEqual(Installer.encoder(.anima, .light).map(\.path), Installer.encoder(.anima).map(\.path))
         XCTAssertEqual(Installer.encoder(.anima, .light).map(\.repository.name), Installer.encoder(.anima).map(\.repository.name))
         XCTAssertEqual(Family.anima.encoderMap(.light), Family.anima.encoderMap)
         let licenses = Installer.licenseFiles(.anima, .light), publisher = Installer.licenseFiles(.anima)
         XCTAssertEqual(licenses.prefix(publisher.count).map(\.repository.name), publisher.map(\.repository.name))
-        XCTAssertEqual(licenses.dropFirst(publisher.count).map(\.repository.name), [x.repository.name])
-        XCTAssertEqual(licenses.dropFirst(publisher.count).map(\.path), ["README.md"])
+        XCTAssertEqual(licenses.dropFirst(publisher.count).map(\.repository.name), Array(repeating: x.repository.name, count: 3))
+        XCTAssertEqual(licenses.dropFirst(publisher.count).map(\.path), ["README.md", "NOTICE", "LICENSE.md"])
 
-        // The adapter's quantized tensors, fp32 in place of their blocks.
-        var widened = 0
-        for (name, t) in tensors where name.hasPrefix("llm_adapter.") {
-            guard let type = t["type"] as? String, let b = blocks[type], let ne = t["ne"] as? [Int] else { continue }
-            let n = ne.reduce(1, *)
-            widened += 4 * n - n / b.values * b.bytes
-        }
-        XCTAssertGreaterThan(widened, 0)
         let size = Family.anima.installedSize(.light)
-        let bytes = try XCTUnwrap(d.manifest["file_bytes"] as? Int)
-        XCTAssertEqual(Double(size.dit), Double(bytes + widened), accuracy: 0.02 * Double(bytes + widened))
+        XCTAssertGreaterThan(size.dit, x.size!, "the map and the adapter written beside it")
+        XCTAssertLessThan(size.dit, Family.anima.installedSize(.compact).dit)
         XCTAssertEqual(size.encoder, standard.encoder)
         XCTAssertEqual(size.components, standard.components)
     }
 
-    /// **The Light**: one DiT file, a third party's, pinned (revision, sha256), the
-    /// very file that was surveyed (its fixture: same repository, revision, path); **no tensor under 4 bits**
-    /// in its published header (`header.json`, every tensor's type); its encoder is the Compact's,
-    /// file for file; its license links the publisher's files, then the DiT's and the encoder's
-    /// third-party cards; its DiT within 2 % of the published bytes, and the smallest of the three.
-    func testTheLightIsTheJudgedQ4KMAndCarriesNothingUnderFourBits() throws {
+    /// **The Light**: one DiT file, ours (the SQ 4-bit, `SQ.swift`), pinned (repository, revision, sha256, size) in a repository of
+    /// ours, none of the publisher's; its encoder is the Compact's, file for file; its license links the publisher's files, then our
+    /// card, NOTICE and license file, and the encoder's third-party card; its DiT the smallest of the three.
+    func testTheLightIsOurSQ4() throws {
         let hex = try NSRegularExpression(pattern: "^[0-9a-f]+$")
         func isHex(_ s: String) -> Bool { hex.firstMatch(in: s, range: NSRange(s.startIndex..., in: s)) != nil }
-        let allowed: Set<String> = ["F32", "F16", "BF16", "Q8_0", "Q6_K", "Q5_K", "Q4_K", "Q5_1", "Q5_0", "Q4_1", "Q4_0"]
+        let expected: [Family: (name: String, file: String, license: String)] = [
+            .zImage: ("gwenn-ha-dev/Z-Image-Turbo-Siliconed-SQ4", "z-image-turbo-sq4.safetensors", "LICENSE"),
+            .qwenImage21: ("gwenn-ha-dev/Qwen-Image-2.1-Turbo-Siliconed-SQ4", "qwen-image-2.1-turbo-sq4.safetensors", "LICENSE")]
         for f in Self.compactFamilies {
             let dit = Installer.dit(f, .light)
             XCTAssertEqual(dit.count, 1)
-            let x = dit[0]
-            XCTAssertTrue(x.path.hasSuffix("Q4_K_M.gguf"), x.path)
+            let x = dit[0], e = try XCTUnwrap(expected[f])
+            XCTAssertEqual(x.repository.name, e.name)
+            XCTAssertEqual(x.path, e.file)
             XCTAssertFalse(Set(Installer.dit(f).map(\.repository.name)).contains(x.repository.name))
             XCTAssertTrue(x.repository.revision.count == 40 && isHex(x.repository.revision))
             let sha = try XCTUnwrap(x.sha256)
             XCTAssertTrue(sha.count == 64 && isHex(sha))
-            let d = try fixture(x)
-            XCTAssertEqual(d.manifest["family"] as? String, f.rawValue)
-            XCTAssertEqual(d.manifest["format"] as? String, "gguf")
-            let header = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: d.folder + "/header.json"))) as? [String: Any])
-            let tensors = try XCTUnwrap(header["tensors"] as? [String: [String: Any]])
-            XCTAssertGreaterThan(tensors.count, 200)
-            let types = Set(tensors.values.compactMap { $0["type"] as? String })
-            XCTAssertTrue(types.isSubset(of: allowed), "\(f.name): \(types.subtracting(allowed)) under the floor")
-            XCTAssertTrue(types.contains("Q4_K"), f.name)
+            XCTAssertGreaterThan(try XCTUnwrap(x.size), 1_000_000_000)
 
             XCTAssertEqual(Installer.encoder(f, .light).map(\.path), Installer.encoder(f, .compact).map(\.path))
             XCTAssertEqual(Installer.encoder(f, .light).map(\.sha256), Installer.encoder(f, .compact).map(\.sha256))
@@ -241,13 +211,14 @@ final class CompactTests: XCTestCase {
 
             let standard = Installer.licenseFiles(f), light = Installer.licenseFiles(f, .light)
             XCTAssertEqual(light.prefix(standard.count).map(\.repository.name), standard.map(\.repository.name))
-            XCTAssertEqual(Set(light.dropFirst(standard.count).map(\.repository.name)),
-                           Set([x.repository.name, Installer.encoder(f, .light)[1].repository.name]))
-            XCTAssertTrue(light.dropFirst(standard.count).allSatisfy { $0.path == "README.md" })
+            let own = light.dropFirst(standard.count)
+            XCTAssertEqual(own.prefix(3).map(\.repository.name), Array(repeating: x.repository.name, count: 3))
+            XCTAssertEqual(own.prefix(3).map(\.path), ["README.md", "NOTICE", e.license])
+            XCTAssertEqual(own.dropFirst(3).map(\.repository.name), [Installer.encoder(f, .light)[1].repository.name])
+            XCTAssertEqual(own.dropFirst(3).map(\.path), ["README.md"])
 
             let size = f.installedSize(.light), compact = f.installedSize(.compact)
-            let bytes = try XCTUnwrap(d.manifest["file_bytes"] as? Int)
-            XCTAssertEqual(Double(size.dit), Double(bytes), accuracy: 0.02 * Double(bytes), "\(f.name) DiT")
+            XCTAssertEqual(Double(size.dit), Double(x.size!), accuracy: 0.02 * Double(x.size!), "\(f.name) DiT")
             XCTAssertEqual(size.encoder, compact.encoder)
             XCTAssertEqual(size.components, compact.components)
             XCTAssertLessThan(size.dit, compact.dit, "\(f.name): the Light is the smallest")
@@ -297,8 +268,8 @@ final class CompactTests: XCTestCase {
         }
         XCTAssertEqual(Installer.dit(.qwenImage21, .compact).map(\.path), ["diffusion_models/qwen_image_2.1_turbo_int8_convrot.safetensors"])
         XCTAssertEqual(Installer.dit(.qwenImage21, .compact).compactMap(\.sha256), ["8144a0182964aa8403ad6dbc011db837304167d235161b9aabaa8532e967314c"])
-        XCTAssertEqual(Installer.dit(.qwenImage21, .light).map(\.path), ["qwen-image-2.1-turbo-Q4_K_M.gguf"])
-        XCTAssertEqual(Installer.dit(.qwenImage21, .light).compactMap(\.sha256), ["8940e8b522af886e0c0f5afddf720e82dd223cb9a43580b5f61c4d740452ac20"])
+        XCTAssertEqual(Installer.dit(.qwenImage21, .light).map(\.path), ["qwen-image-2.1-turbo-sq4.safetensors"])
+        XCTAssertEqual(Installer.dit(.qwenImage21, .light).compactMap(\.sha256), ["d289920998192edc414b447f26e83230de1afd820bcad5bce559b7e4ec666e57"])
         XCTAssertEqual(Installer.encoder(.qwenImage21, .light).compactMap(\.sha256),
                        ["0cb5ed0653e2ec8065f25a6cfb2ab6a89b6c8f143a500acea19f0e36214814b7"], "the 8-bit encoder is unchanged")
     }

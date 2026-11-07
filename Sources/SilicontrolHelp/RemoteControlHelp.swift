@@ -223,7 +223,7 @@ package enum RemoteControlHelp {
         variants    → the versions a publisher's model installs in, with their space on disk:
                       "standard" (the publisher's weights), "compact" (the default; 8-bit weights
                       published by third parties: smaller on disk, an image slightly different) and
-                      "light" (the image model in 4 to 6 bits as a third party publishes it: the
+                      "light" (the image model in 4 to 8 bits, Siliconed's own 4-bit format (SQ): the
                       smallest; another set of weights, an image that may compose differently).
                       Z-Image's, Qwen-Image-2.1's and Krea 2's Compact and Light read an 8-bit text
                       encoder; Anima's three versions read the publisher's (bf16), only the image

@@ -31599,82 +31599,82 @@
         }
       }
     },
-    "Siliconed ships no weights. The Light version is the publisher’s model republished in 4 to 8 bits by third parties, and downloaded from them; the publisher’s license applies, and each third party’s model card says what it changed." : {
+    "Siliconed ships no weights. The Light version’s image model is the publisher’s, requantized to 4 to 8 bits by Siliconed and downloaded from its Hugging Face repository; everything else comes from the publisher. The publisher’s license applies, and Siliconed’s model card says what it changed." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Siliconed enthält keine Gewichte. Die Version Leicht ist das Modell des Herausgebers, von Dritten in 4 bis 8 Bit neu veröffentlicht und von ihnen geladen; es gilt die Lizenz des Herausgebers, und die Modellkarte jedes Dritten nennt, was er geändert hat."
+            "value" : "Siliconed enthält keine Gewichte. Das Bildmodell der Version Leicht ist das des Herausgebers, von Siliconed auf 4 bis 8 Bit neu quantisiert und aus dessen Hugging-Face-Repository geladen; alles andere stammt vom Herausgeber. Es gilt die Lizenz des Herausgebers, und die Modellkarte von Siliconed sagt, was geändert wurde."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Siliconed no incluye ningún peso. La versión Ligera es el modelo del editor republicado en 4 a 8 bits por terceros, y se descarga de ellos; se aplica la licencia del editor, y la ficha del modelo de cada tercero indica qué ha cambiado."
+            "value" : "Siliconed no incluye ningún peso. El modelo de imagen de la versión Ligera es el del editor, recuantizado a 4–8 bits por Siliconed y descargado de su repositorio de Hugging Face; todo lo demás viene del editor. Se aplica la licencia del editor, y la ficha del modelo de Siliconed explica qué cambió."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Siliconed ne livre aucun poids. La version Légère est le modèle de l’éditeur republié en 4 à 8 bits par des tiers, et téléchargé chez eux ; la licence de l’éditeur s’applique, et la fiche de chaque tiers dit ce qu’il a changé."
+            "value" : "Siliconed ne livre aucun poids. Le modèle d’image de la version Légère est celui de l’éditeur, requantifié en 4 à 8 bits par Siliconed et téléchargé depuis son dépôt Hugging Face ; tout le reste vient de l’éditeur. La licence de l’éditeur s’applique, et la fiche du modèle de Siliconed dit ce qui a changé."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Siliconed non include alcun peso. La versione Leggera è il modello dell’editore ripubblicato a 4–8 bit da terzi, e scaricato da loro; si applica la licenza dell’editore, e la scheda di ciascun terzo indica cosa ha cambiato."
+            "value" : "Siliconed non include alcun peso. Il modello d’immagine della versione Leggera è quello dell’editore, riquantizzato a 4–8 bit da Siliconed e scaricato dal suo repository Hugging Face; tutto il resto viene dall’editore. Si applica la licenza dell’editore, e la scheda del modello di Siliconed dice che cosa è cambiato."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Siliconedは重みを同梱していません。ライトバージョンは、公開元のモデルを第三者が4〜8ビットで再公開したもので、そこからダウンロードされます。公開元のライセンスが適用され、変更内容は各第三者のモデルカードに記載されています。"
+            "value" : "Siliconedは重みを同梱していません。ライトバージョンの画像モデルは、公開元のモデルをSiliconedが4〜8ビットに量子化し直したもので、SiliconedのHugging Faceリポジトリからダウンロードされます。それ以外はすべて公開元のものです。公開元のライセンスが適用され、変更内容はSiliconedのモデルカードに記載されています。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Siliconed 不附带权重。轻量版是发布方的模型，由第三方重新发布为 4 至 8 位版本并从第三方下载；适用发布方的许可证，各第三方的模型卡片会说明其改动了什么。"
+            "value" : "Siliconed 不附带权重。轻量版的图像模型是发布方的，由 Siliconed 重新量化为 4 至 8 位并从其 Hugging Face 仓库下载；其余一切均来自发布方。适用发布方的许可证，Siliconed 的模型卡片会说明其改动了什么。"
           }
         }
       }
     },
-    "Siliconed ships no weights. The Light version’s image model is the publisher’s, republished in 4 to 6 bits by vanes430 and downloaded from there; everything else comes from the publisher. The publisher’s license applies, and vanes430’s model card says what it changed." : {
+    "Siliconed ships no weights. The Light version’s image model is the publisher’s, requantized to 4 to 8 bits by Siliconed and downloaded from its Hugging Face repository; its text encoder comes from a third party. The publisher’s license applies, and each model card says what it changed." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Siliconed enthält keine Gewichte. Das Bildmodell der Version Leicht ist das des Herausgebers, von vanes430 in 4 bis 6 Bit neu veröffentlicht und von dort geladen; alles andere stammt vom Herausgeber. Es gilt die Lizenz des Herausgebers, und die Modellkarte von vanes430 nennt, was geändert wurde."
+            "value" : "Siliconed enthält keine Gewichte. Das Bildmodell der Version Leicht ist das des Herausgebers, von Siliconed auf 4 bis 8 Bit neu quantisiert und aus dessen Hugging-Face-Repository geladen; der Text-Encoder stammt von einem Dritten. Es gilt die Lizenz des Herausgebers, und jede Modellkarte sagt, was geändert wurde."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Siliconed no incluye ningún peso. El modelo de imagen de la versión Ligera es el del editor, republicado en 4 a 6 bits por vanes430 y descargado de allí; todo lo demás viene del editor. Se aplica la licencia del editor, y la ficha del modelo de vanes430 indica qué ha cambiado."
+            "value" : "Siliconed no incluye ningún peso. El modelo de imagen de la versión Ligera es el del editor, recuantizado a 4–8 bits por Siliconed y descargado de su repositorio de Hugging Face; el codificador de texto viene de un tercero. Se aplica la licencia del editor, y cada ficha de modelo explica qué cambió."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Siliconed ne livre aucun poids. Le modèle d’image de la version Légère est celui de l’éditeur, republié en 4 à 6 bits par vanes430 et téléchargé chez lui ; tout le reste vient de l’éditeur. La licence de l’éditeur s’applique, et la fiche de vanes430 dit ce qu’il a changé."
+            "value" : "Siliconed ne livre aucun poids. Le modèle d’image de la version Légère est celui de l’éditeur, requantifié en 4 à 8 bits par Siliconed et téléchargé depuis son dépôt Hugging Face ; son encodeur de texte vient d’un tiers. La licence de l’éditeur s’applique, et chaque fiche de modèle dit ce qu’elle a changé."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Siliconed non include alcun peso. Il modello d’immagine della versione Leggera è quello dell’editore, ripubblicato a 4–6 bit da vanes430 e scaricato da lì; tutto il resto viene dall’editore. Si applica la licenza dell’editore, e la scheda di vanes430 indica cosa ha cambiato."
+            "value" : "Siliconed non include alcun peso. Il modello d’immagine della versione Leggera è quello dell’editore, riquantizzato a 4–8 bit da Siliconed e scaricato dal suo repository Hugging Face; l’encoder di testo viene da una terza parte. Si applica la licenza dell’editore, e ogni scheda del modello dice che cosa è cambiato."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Siliconedは重みを同梱していません。ライトバージョンの画像モデルは、公開元のモデルをvanes430が4〜6ビットで再公開したもので、そこからダウンロードされます。それ以外はすべて公開元のものです。公開元のライセンスが適用され、変更内容はvanes430のモデルカードに記載されています。"
+            "value" : "Siliconedは重みを同梱していません。ライトバージョンの画像モデルは、公開元のモデルをSiliconedが4〜8ビットに量子化し直したもので、SiliconedのHugging Faceリポジトリからダウンロードされます。テキストエンコーダーは第三者のものです。公開元のライセンスが適用され、変更内容は各モデルカードに記載されています。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Siliconed 不附带权重。轻量版的图像模型是发布方的，由 vanes430 重新发布为 4 至 6 位版本并从那里下载；其余一切均来自发布方。适用发布方的许可证，vanes430 的模型卡片会说明其改动了什么。"
+            "value" : "Siliconed 不附带权重。轻量版的图像模型是发布方的，由 Siliconed 重新量化为 4 至 8 位并从其 Hugging Face 仓库下载；文本编码器来自第三方。适用发布方的许可证，各模型卡片会说明其改动了什么。"
           }
         }
       }
@@ -35700,162 +35700,162 @@
         }
       }
     },
-    "The image model in 4 to 5 bits, published by vantagewithai (GGUF Q4_K_M); the Compact’s 8-bit text encoder, from Comfy-Org (int8 convrot). VAE and tokenizer as in the Standard version." : {
+    "The image model in 4 to 8 bits, quantized by Siliconed (SQ). The text encoder (bf16), tokenizers and VAE are the publisher’s." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Das Bildmodell in 4 bis 5 Bit, veröffentlicht von vantagewithai (GGUF Q4_K_M); der 8-Bit-Text-Encoder der Compact, von Comfy-Org (int8 convrot). VAE und Tokenizer wie in der Standard-Version."
+            "value" : "Das Bildmodell in 4 bis 8 Bit, von Siliconed quantisiert (SQ). Text-Encoder (bf16), Tokenizer und VAE stammen vom Herausgeber."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "El modelo de imagen en 4 a 5 bits, publicado por vantagewithai (GGUF Q4_K_M); el codificador de texto de 8 bits de la Compacta, de Comfy-Org (int8 convrot). El VAE y el tokenizador, como en la versión Estándar."
+            "value" : "El modelo de imagen en 4 a 8 bits, cuantizado por Siliconed (SQ). El codificador de texto (bf16), los tokenizadores y el VAE son los del editor."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Le modèle d’image en 4 à 5 bits, publié par vantagewithai (GGUF Q4_K_M) ; l’encodeur de texte 8 bits de la Compact, de Comfy-Org (int8 convrot). VAE et tokenizer comme dans la version Standard."
+            "value" : "Le modèle d’image en 4 à 8 bits, quantifié par Siliconed (SQ). L’encodeur de texte (bf16), les tokenizers et le VAE sont ceux de l’éditeur."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Il modello d’immagine a 4–5 bit, pubblicato da vantagewithai (GGUF Q4_K_M); l’encoder di testo a 8 bit della Compact, da Comfy-Org (int8 convrot). VAE e tokenizer come nella versione Standard."
+            "value" : "Il modello d’immagine a 4–8 bit, quantizzato da Siliconed (SQ). Encoder di testo (bf16), tokenizer e VAE sono quelli dell’editore."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "画像モデルは4〜5ビットでvantagewithaiが公開（GGUF Q4_K_M）。テキストエンコーダーはコンパクトと同じ8ビットで、Comfy-Org（int8 convrot）のものです。VAEとトークナイザーは標準バージョンと同じです。"
+            "value" : "画像モデルは4〜8ビットで、Siliconedが量子化したもの（SQ）です。テキストエンコーダー（bf16）、トークナイザー、VAEは公開元のものです。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "图像模型为 4 至 5 位，由 vantagewithai 发布（GGUF Q4_K_M）；紧凑版的 8 位文本编码器，来自 Comfy-Org（int8 convrot）。VAE 和分词器与标准版相同。"
+            "value" : "图像模型为 4 至 8 位，由 Siliconed 量化（SQ）。文本编码器（bf16）、分词器和 VAE 来自发布方。"
           }
         }
       }
     },
-    "The image model in 4 to 6 bits, published by unsloth (GGUF Q4_K_M); the Compact’s 8-bit text encoder, from Disty0 (SDNQ int8). Tokenizer and VAE are the publisher’s." : {
+    "The image model in 4 to 8 bits, quantized by Siliconed (SQ); the Compact’s 8-bit text encoder, from Comfy-Org (int8 convrot). VAE and tokenizer as in the Standard version." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Das Bildmodell in 4 bis 6 Bit, veröffentlicht von unsloth (GGUF Q4_K_M); der 8-Bit-Text-Encoder der Compact, von Disty0 (SDNQ int8). Tokenizer und VAE stammen vom Herausgeber."
+            "value" : "Das Bildmodell in 4 bis 8 Bit, von Siliconed quantisiert (SQ); der 8-Bit-Text-Encoder der Compact, von Comfy-Org (int8 convrot). VAE und Tokenizer wie in der Version Standard."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "El modelo de imagen en 4 a 6 bits, publicado por unsloth (GGUF Q4_K_M); el codificador de texto de 8 bits de la Compacta, de Disty0 (SDNQ int8). El tokenizador y el VAE son los del editor."
+            "value" : "El modelo de imagen en 4 a 8 bits, cuantizado por Siliconed (SQ); el codificador de texto de 8 bits de la Compacta, de Comfy-Org (int8 convrot). El VAE y el tokenizador, como en la versión Estándar."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Le modèle d’image en 4 à 6 bits, publié par unsloth (GGUF Q4_K_M) ; l’encodeur de texte 8 bits de la Compact, de Disty0 (SDNQ int8). Tokenizer et VAE sont ceux de l’éditeur."
+            "value" : "Le modèle d’image en 4 à 8 bits, quantifié par Siliconed (SQ) ; l’encodeur de texte 8 bits de la Compact, de Comfy-Org (int8 convrot). VAE et tokenizer comme dans la version Standard."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Il modello d’immagine a 4–6 bit, pubblicato da unsloth (GGUF Q4_K_M); l’encoder di testo a 8 bit della Compact, da Disty0 (SDNQ int8). Tokenizer e VAE sono quelli dell’editore."
+            "value" : "Il modello d’immagine a 4–8 bit, quantizzato da Siliconed (SQ); l’encoder di testo a 8 bit della Compact, da Comfy-Org (int8 convrot). VAE e tokenizer come nella versione Standard."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "画像モデルは4〜6ビットでunslothが公開（GGUF Q4_K_M）。テキストエンコーダーはコンパクトと同じ8ビットで、Disty0（SDNQ int8）のものです。トークナイザーとVAEは公開元のものです。"
+            "value" : "画像モデルは4〜8ビットで、Siliconedが量子化したもの（SQ）。テキストエンコーダーはコンパクトと同じ8ビットで、Comfy-Org（int8 convrot）のものです。VAEとトークナイザーはスタンダードバージョンと同じです。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "图像模型为 4 至 6 位，由 unsloth 发布（GGUF Q4_K_M）；紧凑版的 8 位文本编码器，来自 Disty0（SDNQ int8）。分词器和 VAE 来自发布方。"
+            "value" : "图像模型为 4 至 8 位，由 Siliconed 量化（SQ）；紧凑版的 8 位文本编码器，来自 Comfy-Org（int8 convrot）。VAE 和分词器与标准版相同。"
           }
         }
       }
     },
-    "The image model in 4 to 6 bits, published by vanes430 (GGUF Q4_K_M). The text encoder (bf16), tokenizers and VAE are the publisher’s." : {
+    "The image model in 4 to 8 bits, quantized by Siliconed (SQ); the Compact’s 8-bit text encoder, from Disty0 (SDNQ int8). Tokenizer and VAE are the publisher’s." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Das Bildmodell in 4 bis 6 Bit, veröffentlicht von vanes430 (GGUF Q4_K_M). Text-Encoder (bf16), Tokenizer und VAE stammen vom Herausgeber."
+            "value" : "Das Bildmodell in 4 bis 8 Bit, von Siliconed quantisiert (SQ); der 8-Bit-Text-Encoder der Compact, von Disty0 (SDNQ int8). Tokenizer und VAE stammen vom Herausgeber."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "El modelo de imagen en 4 a 6 bits, publicado por vanes430 (GGUF Q4_K_M). El codificador de texto (bf16), los tokenizadores y el VAE son los del editor."
+            "value" : "El modelo de imagen en 4 a 8 bits, cuantizado por Siliconed (SQ); el codificador de texto de 8 bits de la Compacta, de Disty0 (SDNQ int8). El tokenizador y el VAE son los del editor."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Le modèle d’image en 4 à 6 bits, publié par vanes430 (GGUF Q4_K_M). L’encodeur de texte (bf16), les tokenizers et le VAE sont ceux de l’éditeur."
+            "value" : "Le modèle d’image en 4 à 8 bits, quantifié par Siliconed (SQ) ; l’encodeur de texte 8 bits de la Compact, de Disty0 (SDNQ int8). Tokenizer et VAE sont ceux de l’éditeur."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Il modello d’immagine a 4–6 bit, pubblicato da vanes430 (GGUF Q4_K_M). Encoder di testo (bf16), tokenizer e VAE sono quelli dell’editore."
+            "value" : "Il modello d’immagine a 4–8 bit, quantizzato da Siliconed (SQ); l’encoder di testo a 8 bit della Compact, da Disty0 (SDNQ int8). Tokenizer e VAE sono quelli dell’editore."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "画像モデルは4〜6ビットでvanes430が公開（GGUF Q4_K_M）。テキストエンコーダー（bf16）、トークナイザー、VAEは公開元のものです。"
+            "value" : "画像モデルは4〜8ビットで、Siliconedが量子化したもの（SQ）。テキストエンコーダーはコンパクトと同じ8ビットで、Disty0（SDNQ int8）のものです。トークナイザーとVAEは公開元のものです。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "图像模型为 4 至 6 位，由 vanes430 发布（GGUF Q4_K_M）。文本编码器（bf16）、分词器和 VAE 来自发布方。"
+            "value" : "图像模型为 4 至 8 位，由 Siliconed 量化（SQ）；紧凑版的 8 位文本编码器，来自 Disty0（SDNQ int8）。分词器和 VAE 来自发布方。"
           }
         }
       }
     },
-    "The image model in 4 to 8 bits, published by unsloth (GGUF Q4_K_M); the Compact’s 8-bit text encoder, from unsloth (int8 convrot). Processor and VAE are the publisher’s." : {
+    "The image model in 4 to 8 bits, quantized by Siliconed (SQ); the Compact’s 8-bit text encoder, from unsloth (int8 convrot). Processor and VAE are the publisher’s." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Das Bildmodell in 4 bis 8 Bit, veröffentlicht von unsloth (GGUF Q4_K_M); der 8-Bit-Text-Encoder der Compact, von unsloth (int8 convrot). Prozessor und VAE stammen vom Herausgeber."
+            "value" : "Das Bildmodell in 4 bis 8 Bit, von Siliconed quantisiert (SQ); der 8-Bit-Text-Encoder der Compact, von unsloth (int8 convrot). Prozessor und VAE stammen vom Herausgeber."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "El modelo de imagen en 4 a 8 bits, publicado por unsloth (GGUF Q4_K_M); el codificador de texto de 8 bits de la Compacta, de unsloth (int8 convrot). El procesador y el VAE son los del editor."
+            "value" : "El modelo de imagen en 4 a 8 bits, cuantizado por Siliconed (SQ); el codificador de texto de 8 bits de la Compacta, de unsloth (int8 convrot). El procesador y el VAE son los del editor."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Le modèle d’image en 4 à 8 bits, publié par unsloth (GGUF Q4_K_M) ; l’encodeur de texte 8 bits de la Compact, d’unsloth (int8 convrot). Processeur et VAE sont ceux de l’éditeur."
+            "value" : "Le modèle d’image en 4 à 8 bits, quantifié par Siliconed (SQ) ; l’encodeur de texte 8 bits de la Compact, d’unsloth (int8 convrot). Processeur et VAE sont ceux de l’éditeur."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Il modello d’immagine a 4–8 bit, pubblicato da unsloth (GGUF Q4_K_M); l’encoder di testo a 8 bit della Compact, da unsloth (int8 convrot). Processore e VAE sono quelli dell’editore."
+            "value" : "Il modello d’immagine a 4–8 bit, quantizzato da Siliconed (SQ); l’encoder di testo a 8 bit della Compact, da unsloth (int8 convrot). Processore e VAE sono quelli dell’editore."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "画像モデルは4〜8ビットでunslothが公開（GGUF Q4_K_M）。テキストエンコーダーはコンパクトと同じ8ビットで、unsloth（int8 convrot）のものです。プロセッサーとVAEは公開元のものです。"
+            "value" : "画像モデルは4〜8ビットで、Siliconedが量子化したもの（SQ）。テキストエンコーダーはコンパクトと同じ8ビットで、unsloth（int8 convrot）のものです。プロセッサーとVAEは公開元のものです。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "图像模型为 4 至 8 位，由 unsloth 发布（GGUF Q4_K_M）；紧凑版的 8 位文本编码器，来自 unsloth（int8 convrot）。处理器和 VAE 来自发布方。"
+            "value" : "图像模型为 4 至 8 位，由 Siliconed 量化（SQ）；紧凑版的 8 位文本编码器，来自 unsloth（int8 convrot）。处理器和 VAE 来自发布方。"
           }
         }
       }
@@ -38266,42 +38266,42 @@
         }
       }
     },
-    "The smallest on disk: the image model in 4 to 6 bits, the publisher’s text encoder; another set of weights, so an image may come out composed differently." : {
+    "The smallest on disk: the image model in 4 to 8 bits, the publisher’s text encoder; another set of weights, so an image may come out composed differently." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Die kleinste auf dem Volume: das Bildmodell in 4 bis 6 Bit, der Text-Encoder des Herausgebers; ein anderer Satz Gewichte, ein Bild kann daher anders komponiert ausfallen."
+            "value" : "Am kleinsten auf der Festplatte: das Bildmodell in 4 bis 8 Bit, der Text-Encoder des Herausgebers; andere Gewichte, daher kann ein Bild anders komponiert ausfallen."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "La más pequeña en el disco: el modelo de imagen en 4 a 6 bits, el codificador de texto del editor; otro juego de pesos, así que una imagen puede componerse de otra forma."
+            "value" : "La más pequeña en disco: el modelo de imagen en 4 a 8 bits, el codificador de texto del editor; otro conjunto de pesos, así que una imagen puede salir compuesta de otra manera."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "La plus petite sur le disque : le modèle d’image en 4 à 6 bits, l’encodeur de texte de l’éditeur ; un autre jeu de poids, donc une image qui peut se composer autrement."
+            "value" : "Le plus petit sur le disque : le modèle d’image en 4 à 8 bits, l’encodeur de texte de l’éditeur ; un autre jeu de poids, donc une image peut se composer autrement."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "La più piccola sul disco: il modello d’immagine a 4–6 bit, l’encoder di testo dell’editore; un altro insieme di pesi, quindi un’immagine può venire composta diversamente."
+            "value" : "La più piccola su disco: il modello d’immagine a 4–8 bit, l’encoder di testo dell’editore; un altro insieme di pesi, quindi un’immagine può risultare composta in modo diverso."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ディスク使用量が最小：画像モデルは4〜6ビット、テキストエンコーダーは公開元のものです。重みが別のものなので、構図が異なる画像になることがあります。"
+            "value" : "ディスク上で最も小さい：画像モデルは4〜8ビット、テキストエンコーダーは公開元のもの。重みが別物なので、画像の構図が変わることがあります。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "磁盘占用最小：图像模型为 4 至 6 位，文本编码器为发布方的；这是另一套权重，因此图像的构图可能不同。"
+            "value" : "磁盘占用最小：图像模型为 4 至 8 位，文本编码器为发布方的；权重不同，因此图像的构图可能有所不同。"
           }
         }
       }
