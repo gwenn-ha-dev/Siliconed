@@ -487,4 +487,20 @@ final class MemoryNeedTests: XCTestCase {
         XCTAssertEqual(cold, hot)
         XCTAssertLessThan(each, 0.005, String(format: "a need: %.2f ms", each * 1000))
     }
+
+    /// The decoding carries the denoiser's Neural Engine surfaces (released late by Core ML), exactly the denoising's term; with no
+    /// Neural Engine term in the denoising, the need is unchanged.
+    func testDecodingCarriesTheDenoisersSurfaces() {
+        let surfaces = NeuralEngine.bytes(products: [(512, 3840, 3840)])
+        XCTAssertGreaterThan(surfaces, 0)
+        let decoder = MemoryNeed.Term("decoder", 1000)
+        func need(_ terms: [MemoryNeed.Term]) -> MemoryNeed {
+            MemoryNeed(phases: [.init(kind: .denoising, terms: terms), .init(kind: .decoding, terms: [decoder])], crossing: 0, base: 0)
+        }
+        let with = need([.init(MemoryNeed.ditSurfacesTerm, surfaces), .init("other", 5)]).carryingSurfaces()
+        XCTAssertEqual(with.need(of: .decoding), 1000 + surfaces)
+        XCTAssertEqual(with.need(of: .denoising), surfaces + 5)
+        let without = need([.init("other", 5)])
+        XCTAssertEqual(without.carryingSurfaces(), without)
+    }
 }
