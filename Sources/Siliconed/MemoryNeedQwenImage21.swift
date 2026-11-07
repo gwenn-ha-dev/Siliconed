@@ -408,6 +408,7 @@ package struct QwenImage21Need {
         MemoryNeed(phases: [visionPhase, textPhase, referencesPhase, denoisingPhase, decodingPhase].compactMap { $0 },
                    crossing: crossing, base: request.base)
             .keeping(request, encoder: maps.encoderKeptBytes)
+            .carryingSurfaces()
     }
 
     // ── the pieces ───────────────────────────────────────────────────────────────────────────

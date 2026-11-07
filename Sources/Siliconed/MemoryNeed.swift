@@ -282,6 +282,22 @@ package struct MemoryNeed: Sendable, Equatable {
         return need
     }
 
+    /// The name of the term the DiT's Neural Engine surfaces are charged under (`gemm("DiT", …)`).
+    package static let ditSurfacesTerm = "DiT Neural Engine"
+    /// **This need with the denoiser's Neural Engine surfaces carried into the decoding**: `NeuralEngine.deinit` no longer waits for
+    /// them (Core ML gives its IOSurfaces back only ~0.5 s after the last prediction, whatever is done), so they are still alive
+    /// when the decoder starts, and the decoding is charged what the denoising was (the same `NeuralEngine.bytes`). No such
+    /// term in the denoising — no Neural Engine rows — adds nothing.
+    func carryingSurfaces() -> MemoryNeed {
+        let surfaces = phases.filter { $0.kind == .denoising }.map { $0.bytes(Self.ditSurfacesTerm) }.max() ?? 0
+        guard surfaces > 0 else { return self }
+        var need = self
+        need.phases = phases.map {
+            $0.kind == .decoding ? Phase(kind: .decoding, terms: $0.terms + [Term(Self.ditSurfacesTerm + " (released late)", surfaces)]) : $0
+        }
+        return need
+    }
+
     /// **The DiT's map, all of it** (`Artifact.mapBytes`, from the family's maps): what the page cache's room beside the denoising
     /// must hold for the map to leave the stream (`MemoryPlan.released`). The plan keeps the encoder only where the map stays whole
     /// beside it, or is read in place (`MemoryPlan.choose`). `nil`: the maps cannot be read.
