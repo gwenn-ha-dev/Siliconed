@@ -45,13 +45,16 @@ package enum ForgeDiT {
             var l = ["naming recognized: \(naming)",
                      "dtypes read: " + dtypesSource.sorted { $0.key < $1.key }.map { "\($0.key) ×\($0.value)" }.joined(separator: ", ")]
             if !quantizedFormats.isEmpty {
-                l.append((quantizedFormats.keys.allSatisfy { $0.hasSuffix("Q8_0") || !$0.hasPrefix("GGUF") } ? "8-bit weights read: " : "quantized weights read: ") + quantizedFormats.sorted { $0.key < $1.key }.map { "\($0.key) ×\($0.value)" }
+                // Our own 4-bit map (SQ: 4, 5 and 8 bits by layer) is not a GGUF: its packed tensors are said by their name.
+                let isSQ = quantizedFormats.keys.contains { $0.hasPrefix("Siliconed SQ") }
+                l.append((isSQ ? "SQ weights read: " : quantizedFormats.keys.allSatisfy { $0.hasSuffix("Q8_0") || !$0.hasPrefix("GGUF") } ? "8-bit weights read: " : "quantized weights read: ") + quantizedFormats.sorted { $0.key < $1.key }.map { "\($0.key) ×\($0.value)" }
                     .joined(separator: ", "))
                 if kept8bit > 0 || keptPacked == 0 {
                     l.append("8-bit kept as published (bytes and scales copied, rows moved or transposed only): \(kept8bit) tensors")
                 }
                 if keptPacked > 0 {
-                    l.append("GGUF 4–6-bit kept as published (blocks copied whole, rows moved only): \(keptPacked) tensors")
+                    l.append(isSQ ? "SQ 4–5-bit kept as published (rows with their group bytes and fp32 row scale, copied whole): \(keptPacked) tensors"
+                                  : "GGUF 4–6-bit kept as published (blocks copied whole, rows moved only): \(keptPacked) tensors")
                 }
             }
             if !dequantized.isEmpty {

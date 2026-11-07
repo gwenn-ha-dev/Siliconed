@@ -621,8 +621,10 @@ final class AppState {
     /// **Checks a finished render against the model it ran under**: its note is shown by the report and kept beside it.
     /// Never changes the plan itself: a new measure, taken by the user, does — from the next render.
     func checkMap(_ render: Engine.Render, model: Model, references: Int) {
+        // The classes follow the installed tensors, not the name of the version (our 4-bit Light is int8 products).
+        let format = model.library.flatMap { try? Artifact.header($0.map($0.ditMap(model.family))) }.map { Artifact.weightFormat(header: $0) }
         guard let map = mapInUse,
-              let check = RenderLoop.check(render, variant: model.library?.variant(of: model.family) ?? .standard,
+              let check = RenderLoop.check(render, variant: model.library?.variant(of: model.family) ?? .standard, weightFormat: format,
                                            references: references, plan: EngineSettings.effective.plan, mapDate: map.date,
                                            thresholds: .init(uncertainty: map)) else { return }
         renderNote = check.note

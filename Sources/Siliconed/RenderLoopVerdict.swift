@@ -155,11 +155,11 @@ extension RenderLoop {
     /// exist, a render with references or a LoRA: classes the catalogue does not carry).
     ///
     /// `mapDate`: the report whose model `plan` was made of (`Report.date`), written in the note.
-    package static func check(_ render: Engine.Render, variant: Variant, references: Int = 0, plan: CapacityPlan = EngineSettings.effective.plan,
+    package static func check(_ render: Engine.Render, variant: Variant, weightFormat: CapacityClasses.WeightFormat? = nil, references: Int = 0, plan: CapacityPlan = EngineSettings.effective.plan,
                               mapDate: String = "", thresholds: Thresholds = Thresholds())
         -> (comparison: Comparison, verdict: Verdict, note: Note)? {
         guard !render.classes.isEmpty, render.loras.isEmpty, references == 0,
-              let request = request(of: render, variant: variant),
+              let request = request(of: render, variant: variant, weightFormat: weightFormat),
               CapacityClasses.classes(for: request) != nil else { return nil }
         let predicted = predictions(for: request, plan: plan, aneBroughtUp: render.neuralEngine,
                                     accelerators: render.accelerators) ?? []

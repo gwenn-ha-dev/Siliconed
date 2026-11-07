@@ -35,6 +35,15 @@ import Testing
         #expect(WeightFormat.read(mapHeader: header(["a": tensor("q4_k", [256, 256])])) == .q4_k)
     }
 
+    @Test func ourFourBitMapIsSQWhateverItsInt8Layers() {
+        let h = header(["a": tensor("sq5", [4096, 4096]), "b": tensor("sq4", [4096, 4096]),
+                        "c": tensor("int8", [4096, 512], scale: ["dtype": "float32", "shape": [512], "offset": 16]),
+                        "r": tensor("bfloat16", [4096, 4096])])
+        #expect(WeightFormat.read(mapHeader: h) == .sq)
+        #expect(WeightFormat.sq.label == "SQ")
+        #expect(Artifact.weightFormat(header: h) == .int8)
+    }
+
     @Test func aPublishedBf16MapIsBf16EvenWithAnFp32Embedding() {
         let h = header(["l.weight": tensor("bfloat16", [4096, 4096]), "l2.weight": tensor("bfloat16", [4096, 4096]),
                         "embed.weight": tensor("float32", [1000, 4096])])

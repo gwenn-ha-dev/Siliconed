@@ -56,13 +56,18 @@ package enum RenderLoop {
     /// **The render's request, as the catalogue sees it**: the family and the version it ran with, its pixels, the
     /// half-grid evaluations it did (`Render.spectral`), its evaluations as the steps (an img2img did fewer),
     /// the text encoder left out (the ledger is of the denoising). `nil` for a model that is not one of the five families.
-    package static func request(of render: Engine.Render, variant: Variant) -> CapacityClasses.Request? {
+    ///
+    /// `weightFormat`: the format the installed DiT map holds (`Artifact.weightFormat(header:)`); the classes follow it, not the
+    /// version's name (our 4-bit Light is int8 products). `nil`: the version's own.
+    package static func request(of render: Engine.Render, variant: Variant, weightFormat: CapacityClasses.WeightFormat? = nil)
+        -> CapacityClasses.Request? {
         guard let family = Family(rawValue: render.model) else { return nil }
         return CapacityClasses.Request(family: family, variant: variant, width: render.image.width, height: render.image.height,
                                        fasterRendering: render.spectral > 0,
                                        promptTokens: CapacityClasses.promptTokens(family, renderTokens: render.tokens),
                                        steps: render.evaluations, includesEncoder: false,
-                                       halfSteps: render.spectral > 0 ? render.spectral : nil, loraRank: render.loraRank)
+                                       halfSteps: render.spectral > 0 ? render.spectral : nil, loraRank: render.loraRank,
+                                       ditFormat: weightFormat)
     }
 
     /// **The prediction, class by class**, for the denoising of `request` under `plan`: the assignment the plan gives each class, timed by

@@ -7,6 +7,21 @@ import XCTest
 final class CapacityClassesTests: XCTestCase {
     typealias CC = CapacityClasses
 
+    /// **The classes follow the tensors, not the name of the version**: our 4-bit Light (SQ, int8 products) is the Compact's
+    /// classes, the GGUF Light's Q4_K stays its own, and nothing given means the version's.
+    func testTheClassesFollowTheInstalledFormatNotTheVersionsName() {
+        for family in [Family.zImage, .qwenImage21, .anima, .krea2] {
+            func ids(_ variant: Variant, _ format: CC.WeightFormat?) -> [String] {
+                CC.classes(for: .init(family: family, variant: variant, includesEncoder: true, ditFormat: format))!.map(\.id)
+            }
+            XCTAssertEqual(ids(.light, .int8), ids(.compact, nil), "\(family)")
+            XCTAssertEqual(ids(.light, .q4k), ids(.light, nil), "\(family)")
+            XCTAssertEqual(ids(.compact, .int8), ids(.compact, nil), "\(family)")
+            XCTAssertEqual(ids(.standard, .bf16), ids(.standard, nil), "\(family)")
+            XCTAssertNotEqual(ids(.light, .int8), ids(.light, nil), "\(family)")
+        }
+    }
+
     // MARK: helpers
 
     private func classes(_ family: Family, _ variant: Variant = .standard, w: Int = 1024, h: Int = 1024, faster: Bool = true,

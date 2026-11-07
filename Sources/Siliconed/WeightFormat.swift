@@ -9,6 +9,8 @@ import Foundation
 /// values of the matrices, and the label is its exact name (`int8`, `Q8_0`, `Q4_K_M`, `bf16`…), the same in every language.
 package enum WeightFormat: String, Codable, Sendable, CaseIterable {
     case int8, q8_0, fp8, q4_0, q4_1, q5_0, q5_1, q4_k, q5_k, q4_k_m, q5_k_m, q6_k, bf16, fp16, fp32
+    /// Siliconed's own 4-bit weights (4, 5 and 8 bits by layer, `tools/quant4`), decoded to int8 at each product.
+    case sq
 
     /// The exact name, verbatim.
     package var label: String {
@@ -37,6 +39,7 @@ package enum WeightFormat: String, Codable, Sendable, CaseIterable {
             guard let shape = entry["shape"] as? [Int], shape.count >= 2, let dtype = entry["dtype"] as? String,
                   let count = Artifact.elementCount(shape) else { continue }
             var key = dtype
+            if dtype == "sq4" || dtype == "sq5" { key = "sq" }
             if dtype == "int8", let scale = entry["scale"] as? [String: Any], scale["block"] != nil { key = "q8_0" }
             values[key, default: 0] += count
         }
@@ -68,6 +71,7 @@ package enum WeightFormat: String, Codable, Sendable, CaseIterable {
         switch top {
         case "int8": return .int8
         case "q8_0": return .q8_0
+        case "sq": return .sq
         case "float8_e4m3": return .fp8
         case "bfloat16": return .bf16
         case "float16": return .fp16

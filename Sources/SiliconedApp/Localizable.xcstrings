@@ -38546,6 +38546,46 @@
         }
       }
     },
+    "The weights are stored in 4 to 5 bits (SQ, Siliconed’s own format) and decoded to 8 bits at each product." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Gewichte sind mit 4 bis 5 Bit gespeichert (SQ, das eigene Format von Siliconed) und werden bei jedem Produkt auf 8 Bit dekodiert."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Los pesos se almacenan en 4 a 5 bits (SQ, el formato propio de Siliconed) y se decodifican a 8 bits en cada producto."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les poids sont stockés sur 4 à 5 bits (SQ, le format propre à Siliconed) et décodés sur 8 bits à chaque produit."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I pesi sono memorizzati con 4-5 bit (SQ, il formato proprio di Siliconed) e decodificati a 8 bit a ogni prodotto."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重みは4〜5ビット(SQ、Siliconed独自の形式)で保存され、積のたびに8ビットへデコードされます。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "权重以4到5位存储(SQ,Siliconed自有格式),并在每次乘积时解码为8位。"
+          }
+        }
+      }
+    },
     "The weights are stored in 5 to 6 bits (GGUF %@), as published." : {
       "localizations" : {
         "de" : {

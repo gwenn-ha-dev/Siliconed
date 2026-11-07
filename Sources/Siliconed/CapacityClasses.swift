@@ -135,13 +135,33 @@ package enum CapacityClasses {
         /// **The cumulative rank of the LoRAs the request adds** to the family's own (MOSS-Image's DMD is always there, `mossTurboRank`):
         /// each layer projection then carries the two products of the stack at this rank (`loraDown`, `loraUp`). 0: none.
         package var loraRank: Int
+        /// **The format the installed DiT map really holds** (`Artifact.weightFormat(header:)`), when it is known; `nil`: the version's
+        /// own (`weightFormat(_:_:)`). The classes follow the tensors, never the name of the version: our 4-bit Light (SQ) is
+        /// decoded to int8 at each product and is the Compact's classes, the GGUF Light's Q4_K is its own.
+        package var ditFormat: WeightFormat?
 
         package init(family: Family, variant: Variant = .standard, width: Int = 1024, height: Int = 1024,
                      fasterRendering: Bool = true, promptTokens: Int = 11, steps: Int = 8, includesEncoder: Bool = true,
-                     halfSteps: Int? = nil, loraRank: Int = 0) {
+                     halfSteps: Int? = nil, loraRank: Int = 0, ditFormat: WeightFormat? = nil) {
+            self.ditFormat = ditFormat
             self.family = family; self.variant = variant; self.width = width; self.height = height
             self.fasterRendering = fasterRendering; self.promptTokens = promptTokens; self.steps = steps
             self.includesEncoder = includesEncoder; self.halfSteps = halfSteps; self.loraRank = loraRank
+        }
+
+        /// The request with the version the installed tensors make (`ditFormat`): the variant is what the classes are written by
+        /// (the refiners left as published, the encoder's form), so a map that is not its version's usual form is read as the
+        /// version that has its form. A family without that version stays as it is.
+        fileprivate var byTensors: Request {
+            guard let ditFormat else { return self }
+            var r = self
+            switch ditFormat {
+            case .bf16: r.variant = .standard
+            case .q4k: r.variant = .light
+            case .int8, .q8: r.variant = .compact
+            case .loraDown, .loraUp: break
+            }
+            return r
         }
     }
 
@@ -475,7 +495,8 @@ package enum CapacityClasses {
 
     /// **The classes of one render**, `nil` when the version does not exist for the family (MOSS-Image has no Light).
     /// Sorted: encoding first, then by decreasing FLOP of the render, then by name — deterministic.
-    package static func classes(for r: Request) -> [Class]? {
+    package static func classes(for original: Request) -> [Class]? {
+        let r = original.byTensors
         guard let format = weightFormat(r.family, r.variant), let encoderFormat = encoderFormat(r.family, r.variant) else { return nil }
         var b = Builder()
         if r.includesEncoder { encoding(&b, r, encoderFormat) }
@@ -488,7 +509,8 @@ package enum CapacityClasses {
     /// **The classes of one pass of the render alone** (`passes(r)[index]`: the half grid's, the full grid's): the denoising's evaluations at
     /// that pass's rows, without the encoder and without what is computed once — what the weight stream's read runs beside, evaluation by
     /// evaluation (`CapacityStream`). `nil` for a version that does not exist or a pass that does not.
-    package static func classes(for r: Request, pass index: Int) -> [Class]? {
+    package static func classes(for original: Request, pass index: Int) -> [Class]? {
+        let r = original.byTensors
         guard let format = weightFormat(r.family, r.variant) else { return nil }
         let all = passes(r)
         guard all.indices.contains(index) else { return nil }

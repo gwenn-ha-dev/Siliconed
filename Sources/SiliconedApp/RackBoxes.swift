@@ -203,6 +203,7 @@ struct WeightsTag: View {
         case .fp8: String(localized: "The weights are stored in 8 bits (fp8), as published.")
         case .q4_k_m, .q4_k, .q4_0, .q4_1: String(localized: "The weights are stored in about 4 bits (GGUF \(f.label)), as published: an eighth of fp32’s size.")
         case .q5_k_m, .q5_k, .q5_0, .q5_1, .q6_k: String(localized: "The weights are stored in 5 to 6 bits (GGUF \(f.label)), as published.")
+        case .sq: String(localized: "The weights are stored in 4 to 5 bits (SQ, Siliconed’s own format) and decoded to 8 bits at each product.")
         case .bf16: String(localized: "The weights are stored in bf16, as the publisher released them: half of fp32’s size.")
         case .fp16: String(localized: "The weights are stored in fp16: half of fp32’s size.")
         case .fp32: String(localized: "The weights are stored in fp32.")
