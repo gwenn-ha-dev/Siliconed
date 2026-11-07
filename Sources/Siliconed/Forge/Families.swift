@@ -418,10 +418,15 @@ package enum Recipes {
         case .anima:
             let origin = keys.contains { $0.name.hasPrefix("blocks.") || $0.name.hasPrefix("x_embedder.") || $0.name.hasPrefix("llm_adapter.") }
             r.naming = origin ? "original Anima (ComfyUI / Cosmos)" : "diffusers"
+            // Siliconed's SQ file names its linears the diffusers way (`transformer_blocks.N.attn1.to_q`) over the ComfyUI file:
+            // each replaces the ComfyUI tensor that maps to its name, which is then not placed twice.
+            let replaced = Set(keys.map(\.name).filter { $0.hasPrefix("transformer_blocks.") })
             for (published, raw) in keys {
                 if raw.hasPrefix("llm_adapter.") { r.adapter.append(published); continue }
-                guard origin else { try place(raw, asPublished(source, published)); continue }
-                try place(try anima(raw), asPublished(source, published))
+                guard origin, !raw.hasPrefix("transformer_blocks.") else { try place(raw, asPublished(source, published)); continue }
+                let name = try anima(raw)
+                if replaced.contains(name) { continue }
+                try place(name, asPublished(source, published))
             }
         }
         return r
