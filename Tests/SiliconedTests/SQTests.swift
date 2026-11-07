@@ -218,4 +218,41 @@ final class SQTests: XCTestCase {
             XCTAssertTrue("\(error)".contains("row 1"), "\(error)")
         }
     }
+
+    /// Anima's publisher file is ComfyUI's (`blocks.N.self_attn.q_proj`), the SQ file names its linears the diffusers way: the SQ
+    /// tensor replaces the one that maps to its name (once, not twice), and the RoPE permutation of `to_q` moves its stored rows.
+    func testAnimaSQReplacesTheComfyTensorAndPermutesItsRows() throws {
+        let (n, k) = (256, 256), head = ForgeDiT.animaHeadSize
+        let bf16 = [UInt8](repeating: 0x3F, count: 2 * n * k)
+        let base = try write([Piece(name: "blocks.0.self_attn.q_proj.weight", dtype: "BF16", shape: [n, k], bytes: bf16),
+                              Piece(name: "blocks.0.self_attn.k_proj.weight", dtype: "BF16", shape: [n, k], bytes: bf16)],
+                             as: "comfy.safetensors")
+        let s = (0..<n).map { _ in Float.random(in: 1e-4...3e-3, using: &generator) }
+        let rows = (0..<n).map { _ in row(k: k, bits: 4) }
+        let codeBytes = k / 2
+        let sq = try write([Piece(name: "transformer_blocks.0.attn1.to_q.sq.codes", dtype: "U8", shape: [n, codeBytes], bytes: rows.flatMap { $0.stored.prefix(codeBytes) }),
+                            Piece(name: "transformer_blocks.0.attn1.to_q.sq.groups", dtype: "U8", shape: [n, k / 16], bytes: rows.flatMap { $0.stored.suffix(k / 16) }),
+                            Piece(name: "transformer_blocks.0.attn1.to_q.sq.scale", dtype: "F32", shape: [n], bytes: s.withUnsafeBytes { Array($0) })],
+                           metadata: ["format": "SQ", "tiers": "{\"transformer_blocks.0.attn1.to_q\": \"SQ4\"}"], as: "sq.safetensors")
+        let source = try TensorSource(paths: [base, sq])
+        let normalized = try Recipes.normalize(source, family: .anima)
+        XCTAssertEqual(Set(normalized.dit.keys), ["transformer_blocks.0.attn1.to_q.weight", "transformer_blocks.0.attn1.to_k.weight"])
+        let q = try XCTUnwrap(normalized.dit["transformer_blocks.0.attn1.to_q.weight"])
+        XCTAssertEqual(q.quantization?.kind, .sq4, "the SQ tensor stands in for the ComfyUI one")
+        XCTAssertNil(normalized.dit["transformer_blocks.0.attn1.to_k.weight"]?.quantization)
+        // The forged tensor is the SQ rows moved by the interleave, and its widened weight the published one's permuted.
+        let (tensor, outcome) = try ForgeDiT.tensor("transformer_blocks.0.attn1.to_q.weight", q, family: .anima)
+        XCTAssertEqual(outcome, .keptPacked)
+        XCTAssertEqual(tensor.dtype, .sq4)
+        let path = root.appendingPathComponent("anima.silicon").path
+        _ = try MapWriter.write(to: path, tensors: [tensor], header: { _ in
+            [.init("format", 1), .init("page", .integer(MapWriter.page)), .init("linear_weights_transposed", true)]
+        })
+        let map = try Artifact(path: path)
+        var widened = [Float](repeating: .nan, count: k * n)
+        try widened.withUnsafeMutableBufferPointer { _ = try map.materialize("transformer_blocks.0.attn1.to_q.weight", into: $0) }
+        let published = try XCTUnwrap(source.quantization("transformer_blocks.0.attn1.to_q.weight")).map { _ in try source.readQuantized("transformer_blocks.0.attn1.to_q.weight") }
+        let expected = try XCTUnwrap(published).selectingRows(ForgeDiT.interleaveOrder(rows: n, head: head)).dequantized()   // [N, K]
+        for r in 0..<n { for c in 0..<k where widened[c * n + r] != expected[r * k + c] { return XCTFail("(\(r), \(c))") } }
+    }
 }
