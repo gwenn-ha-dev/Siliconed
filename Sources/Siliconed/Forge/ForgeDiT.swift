@@ -391,6 +391,8 @@ package enum ForgeDiT {
                 // A packed type's blocks keep their published rows: the map says `[K, N]`, the bytes
                 // stay `[N][K/b]` (`Artifact.DType.q4_k`).
                 if packed != nil { return .init(values: t.values, scale: [], absMax: measuring ? t.absMax() : 0) }
+                // SQ likewise (`Artifact.DType.sq4`): its rows as the quantizer wrote them, its fp32 scale per row after them.
+                if t.kind.sqBits != nil { return .init(values: t.values, scale: t.scale, absMax: measuring ? t.absMax() : 0) }
                 let values = tr ? t.transposedValues() : t.values
                 // convrot: the rotation mixes a group's inputs, so its largest |w| is only known
                 // dequantized — done on the map's `[K, N]` bytes just transposed, not on a second copy.
@@ -400,7 +402,7 @@ package enum ForgeDiT {
             // ComfyUI's convrot: `q` and its scale as published, the rotation said in the entry
             // (`Artifact.Rotation`); the engine undoes it when it widens (`Widen.dequantizeRotated`).
             t.rotation = q.rotation
-            return (t, packed != nil ? .keptPacked : .kept8bit)
+            return (t, packed != nil || q.kind.sqBits != nil ? .keptPacked : .kept8bit)
         }
 
         // ── Everything else goes through fp32, where every published value fits exactly ──

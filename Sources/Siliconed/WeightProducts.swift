@@ -461,6 +461,7 @@ package final class WeightProducts {
     private func format(of name: String) -> CapacityClasses.WeightFormat {
         guard let tensor = artifact.tensors[name] else { return .bf16 }
         if tensor.dtype == .int8 { return tensor.scale?.block == nil ? .int8 : .q8 }
+        if tensor.dtype.sqBits != nil { return .int8 }          // decoded to int8 for its product (`prepareSQ`)
         return tensor.dtype.isPacked ? .q4k : .bf16
     }
 
@@ -772,8 +773,8 @@ package final class WeightProducts {
     /// **The int8 plan the assignment asks for, its weight copied into the reserve**: W8A8, the rounded activation, the fp32 one
     /// beside the AMX's columns, the GPU alone — the first the reserve holds —, and the reason a route asked for is not the one
     /// taken; `nil` when none fits.
-    private func plannedInt8(_ tensor: Artifact.Tensor, _ scale: Artifact.Scale, planned: ProductAssignment, k: Int, n: Int)
-        -> (plan: Int8Plan, unavailable: ProductLedger.Reason?)? {
+    private func plannedInt8(_ tensor: Artifact.Tensor, _ scale: Artifact.Scale, planned: ProductAssignment, k: Int, n: Int,
+                             amx: Bool = true) -> (plan: Int8Plan, unavailable: ProductLedger.Reason?)? {
         let (perColumn, group) = (scale.shape.count == 1, tensor.rotation?.group)
         let roundsHere = planned.roundsActivation && roundsActivations && gemm.bf16Activations
             && (scale.block == nil || gemm.tensor?.roundsBlocks == true)
@@ -783,7 +784,7 @@ package final class WeightProducts {
             && gemm.tensor?.quantized?.simdgroups(k: k) != nil
         // The AMX's columns the plan gave: widened alone beside the GPU's. Rounded, the GPU alone: the AMX reads the fp32
         // activation, one rounding for some columns only.
-        let amxColumns = gemm.conductor == nil ? 0 : planned.amxColumns
+        let amxColumns = gemm.conductor == nil || !amx ? 0 : planned.amxColumns
         guard let plan = (quantizesHere ? Self.int8Plan(k: k, n: n, capacity: capacity, perColumn: perColumn, group: group,
                                                         amxColumns: 0, quantized: true) : nil)
                 ?? (roundsHere ? Self.int8Plan(k: k, n: n, capacity: capacity, perColumn: perColumn, group: group,
@@ -826,8 +827,9 @@ package final class WeightProducts {
     /// DiT's), the kernels are built and take the row. `nil`: another path.
     private func quantizedPlan(_ name: String, k: Int, n: Int, planned: ProductAssignment) -> Int8Plan? {
         guard planned.path == .native, planned.quantizesActivation, roundsActivations, gemm.int8Activations, transposed,
-              let tensor = artifact.tensors[name], tensor.dtype == .int8, let scale = tensor.scale, scale.block == nil,
-              scale.shape.count <= 1, tensor.shape == [k, n], gemm.tensorInt8, gemm.tensor?.quantized?.simdgroups(k: k) != nil
+              let tensor = artifact.tensors[name], tensor.dtype == .int8 || tensor.dtype.sqBits != nil, let scale = tensor.scale,
+              scale.block == nil, scale.shape.count <= 1, tensor.shape == [k, n], gemm.tensorInt8,
+              gemm.tensor?.quantized?.simdgroups(k: k) != nil
         else { return nil }
         return Self.int8Plan(k: k, n: n, capacity: capacity, perColumn: scale.shape.count == 1, group: tensor.rotation?.group,
                              amxColumns: 0, quantized: true)
@@ -858,6 +860,10 @@ package final class WeightProducts {
             int8InPlace = source
             if plan.quantizedOffset > 0 { reserveWrites &+= 1 } else { wroteReserve() }
             return (.int8(plan), planned, unavailable)
+        }
+        // An SQ weight: decoded into the reserve, then the int8 product (`prepareSQ`).
+        if let tensor = artifact.tensors[name], tensor.dtype.sqBits != nil {
+            return try prepareSQ(name, tensor, count: count, k: k, m: m, n: n, planned: planned)
         }
         // Anything else writes the reserve on the CPU: the queued work that reads it first. An int8 operand's codes survive an int8
         // weight staged below them (`quantizedSlot`).
@@ -907,6 +913,46 @@ package final class WeightProducts {
         case .native: .int8Unavailable
         }
         return (try widen(name, count: count), planned.path == .widened ? planned : .gpuAlone(m), skipped)
+    }
+
+    /// **An SQ weight's product** (`SQ`): its integers and scales decoded where the Compact's int8 copy lies in the reserve
+    /// (`Int8Plan`, the weight in the reserve), then the Compact's int8 product on them — `float × int8` or W8A8, as the plan asks —,
+    /// the GPU's whole (no AMX columns, no ANE rows: both would read the map's bytes as integers). The decoding runs on the GPU from
+    /// the wrapped map, queued behind the work in flight (the reserve is one tracked buffer), where the render's plan charges the map
+    /// (`MemoryPlan.mapInPlace`); else on the CPU, after a drain, from the map's pages (`Artifact.stageSQ`): the same bytes either
+    /// way. The product reads the reserve as a weight read in place (`int8InPlace`): queued on the stream. A plan that does not give
+    /// the int8 route, or a reserve that does not hold it: widened on the CPU.
+    private func prepareSQ(_ name: String, _ tensor: Artifact.Tensor, count: Int, k: Int, m: Int, n: Int,
+                           planned: ProductAssignment) throws -> (Path, ProductAssignment, skipped: ProductLedger.Reason?) {
+        let stream = gemm.queue.stream
+        guard planned.path == .native, transposed, let bits = tensor.dtype.sqBits, let scale = tensor.scale, scale.dtype == .float32,
+              scale.shape == [n], tensor.shape == [k, n], gemm.tensor != nil, gemm.tensorInt8,
+              let (plan, unavailable) = plannedInt8(tensor, scale, planned: planned, k: k, n: n, amx: false), plan.amxColumns == 0
+        else {
+            wroteReserve()
+            stream.drain()
+            return (try widen(name, count: count), planned.path == .widened ? planned : .gpuAlone(m),
+                    planned.path == .native ? .int8Unavailable : nil)
+        }
+        let slot = quantizedSlot
+        wroteReserve()
+        let w = try gemm.wrap(UnsafeMutableRawPointer(reserve), bytes: capacity * 4, name: "w")
+        if MemoryPlan.mapInPlace, let kernels = SQKernels.of(gemm.device), let offset = artifact.mappedOffset(name), offset % 16 == 0,
+           let map = artifact.wrappedMap(on: gemm.device) {
+            let commands = gemm.queue.checkedCommandBuffer()
+            kernels.encode(commands, source: map, offset: offset, scalesOffset: offset + scale.offset, into: w,
+                           scalesAt: plan.scalesOffset, k: k, n: n, bits: bits)
+            commands.commit()
+            SQKernels.decodes.withLock { $0 += 1 }
+            timings["gemm GPU", default: 0] += stream.settle(commands, label: "sq decode") { "SQ\(bits) decoding \(k)×\(n)" }
+        } else {
+            stream.drain()
+            try timed("staging") { try artifact.stageSQ(name, into: UnsafeMutableRawPointer(reserve), scalesAt: plan.scalesOffset) }
+        }
+        // The decoding writes below `rotatedOffset`: an int8 operand's codes past it are whole, as after a staging.
+        if let slot { quantizedSlot = (slot.generation, max(slot.reach, plan.rotatedOffset), slot.filled) }
+        int8InPlace = Int8Source(buffer: w, offset: 0, scalesOffset: plan.scalesOffset)
+        return (.int8(plan), planned, unavailable)
     }
 
     /// The weight widened to fp32 into the reserve, on the CPU.
