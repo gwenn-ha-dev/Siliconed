@@ -115,6 +115,9 @@ extension Artifact {
     /// (`ProductKey.weight`) before any tensor is read by name.
     package static func weightFormat(header: [String: Any]) -> CapacityClasses.WeightFormat {
         guard let table = header["tensors"] as? [String: [String: Any]] else { return .bf16 }
+        // An SQ map's products are int8 products (`SQ`: decoded into the reserve), whatever tensor is the largest in bytes (its bf16
+        // refiners are).
+        if table.values.contains(where: { ($0["dtype"] as? String).flatMap(DType.init(rawValue:))?.sqBits != nil }) { return .int8 }
         let largest = table.values.filter { ($0["shape"] as? [Int])?.count == 2 }
             .max { ($0["bytes"] as? Int ?? 0) < ($1["bytes"] as? Int ?? 0) }
         guard let entry = largest, let raw = entry["dtype"] as? String, let dtype = DType(rawValue: raw) else { return .bf16 }

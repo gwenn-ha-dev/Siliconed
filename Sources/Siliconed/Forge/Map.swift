@@ -60,6 +60,11 @@ package final class TensorSource {
 
     /// A diffusers folder (`transformer/`, `text_encoder/`): its shards, or its single file.
     package convenience init(folder: String) throws {
+        try self.init(paths: try Self.shards(folder: folder))
+    }
+
+    /// The files of a diffusers folder: its index's shards, or its single files.
+    package static func shards(folder: String) throws -> [String] {
         let fm = FileManager.default
         let content = try fm.contentsOfDirectory(atPath: folder)
         if let idx = content.first(where: { $0.hasSuffix(".safetensors.index.json") }) {
@@ -68,19 +73,19 @@ package final class TensorSource {
             for p in json["weight_map"]?.pairs ?? [] {
                 if let f = p.value.text, !fragments.contains(f) { fragments.append(f) }
             }
-            try self.init(paths: fragments.sorted().map { folder + "/" + $0 })
-        } else {
-            let singleFiles = content.filter { $0.hasSuffix(".safetensors") }.sorted()
-            guard !singleFiles.isEmpty else { throw MissingFile(folder + "/*.safetensors", .published) }
-            try self.init(paths: singleFiles.map { folder + "/" + $0 })
+            return fragments.sorted().map { folder + "/" + $0 }
         }
+        let singleFiles = content.filter { $0.hasSuffix(".safetensors") }.sorted()
+        guard !singleFiles.isEmpty else { throw MissingFile(folder + "/*.safetensors", .published) }
+        return singleFiles.map { folder + "/" + $0 }
     }
 
     package var metadata: [String: String] {
         files.reduce(into: [:]) { $0.merge($1.metadata) { a, _ in a } }
     }
 
-    package func shape(_ name: String) -> [Int]? { index[name]?.entry.shape }
+    /// An SQ weight's is the `[N, K]` its codes stand for (`QuantizedGroup.sqShape`).
+    package func shape(_ name: String) -> [Int]? { groups[name]?.sqShape ?? index[name]?.entry.shape }
 
     package func dtype(_ name: String) -> String? { index[name]?.entry.dtype }
 
@@ -160,8 +165,9 @@ package enum MapWriter {
     /// 8-bit values, written as they came. `q4_0`…`q5_1`, `q4_k`…`q6_k`: GGUF's packed
     /// blocks, written as they came, by output rows (`Artifact.DType.q4_k`).
     package enum DType: String, Sendable {
-        case bfloat16, float16, float32, int8, float8_e4m3, q4_0, q4_1, q5_0, q5_1, q4_k, q5_k, q6_k
+        case bfloat16, float16, float32, int8, float8_e4m3, q4_0, q4_1, q5_0, q5_1, q4_k, q5_k, q6_k, sq4, sq5
         var packedBlock: (values: Int, bytes: Int)? { Artifact.DType(rawValue: rawValue)?.packedBlock }
+        var sqBits: Int? { Artifact.DType(rawValue: rawValue)?.sqBits }
     }
 
     /// **An 8-bit tensor's scale** (`Artifact.Scale`): stored after the values, on the next 16-byte
@@ -225,7 +231,8 @@ package enum MapWriter {
 
         package init(name: String, shape: [Int], dtype: DType, scale: Scale?, transposed: Bool?,
                      produce: @escaping () throws -> QuantizedPayload) {
-            precondition(dtype == .int8 || dtype == .float8_e4m3 || dtype.packedBlock != nil && scale == nil)
+            precondition(dtype == .int8 || dtype == .float8_e4m3 || dtype.packedBlock != nil && scale == nil
+                         || dtype.sqBits != nil && scale != nil)
             self.name = name; self.shape = shape; self.dtype = dtype; self.transposed = transposed
             self.produce = { [] }; self.scale = scale; self.produceQuantized = produce
         }
@@ -243,15 +250,16 @@ package enum MapWriter {
         }
         /// The bytes of the values alone: one per 8-bit value, or a packed type's blocks.
         var valueBytes: Int {
-            dtype.packedBlock.map { count / $0.values * $0.bytes } ?? count
+            if let bits = dtype.sqBits { return shape[1] * SQ.rowBytes(k: shape[0], bits: bits) }
+            return dtype.packedBlock.map { count / $0.values * $0.bytes } ?? count
         }
         /// Where the scale starts, from the tensor's start.
-        var scaleOffset: Int { (count + 15) / 16 * 16 }
+        var scaleOffset: Int { (valueBytes + 15) / 16 * 16 }
         var bytes: Int {
             switch dtype {
             case .float32: return count * 4
             case .bfloat16, .float16: return count * 2
-            case .int8, .float8_e4m3: return scale.map { scaleOffset + $0.bytes } ?? count
+            case .int8, .float8_e4m3, .sq4, .sq5: return scale.map { scaleOffset + $0.bytes } ?? count
             case .q4_0, .q4_1, .q5_0, .q5_1, .q4_k, .q5_k, .q6_k: return valueBytes
             }
         }
@@ -446,7 +454,7 @@ package enum MapWriter {
         }
         let m = values.withUnsafeBufferPointer { Numerics.absMax($0.baseAddress!, count: $0.count) }
         switch t.dtype {
-        case .int8, .float8_e4m3, .q4_0, .q4_1, .q5_0, .q5_1, .q4_k, .q5_k, .q6_k:
+        case .int8, .float8_e4m3, .q4_0, .q4_1, .q5_0, .q5_1, .q4_k, .q5_k, .q6_k, .sq4, .sq5:
             throw Numerics.Failure(description: "\(t.name) : a quantized tensor without its bytes")
         case .float32:
             return Produced(parts: [(.f32(values), 0)], absMax: m)

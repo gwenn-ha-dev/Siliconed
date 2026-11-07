@@ -73,6 +73,11 @@ package final class Artifact {
         /// layout: `N` rows (outputs), each `K / values` blocks in file order. The engine transposes
         /// while it dequantizes. No `scale` entry: the scales are inside the blocks.
         case q4_0, q4_1, q5_0, q5_1, q4_k, q5_k, q6_k
+        /// **Siliconed's own 4 and 5 bits** (`SQ`): groups of 16 that decode to an exact int8 under one fp32 scale per output. The
+        /// map's shape is `[K, N]`, the bytes stay by output row as the quantizer wrote them (`SQ.rowBytes`: the row's codes, then
+        /// its group bytes), then the fp32 scale `[N]` (`scale`) and the convrot rotation of 256 (`rotation`) — the int8 convrot of a
+        /// Compact once decoded (`SQ.decodeTransposed`), never widened in the map.
+        case sq4, sq5
         /// Bytes per value — **not for a packed type**, whose values have no size of their own
         /// (`packedBlock`); every caller branches on that first.
         package var size: Int {
@@ -82,8 +87,12 @@ package final class Artifact {
             case .int8, .float8_e4m3: return 1
             case .q4_0, .q4_1, .q5_0, .q5_1, .q4_k, .q5_k, .q6_k:
                 preconditionFailure("\(self): packed blocks, no size per value")
+            case .sq4, .sq5:
+                preconditionFailure("\(self): SQ groups, no size per value")
             }
         }
+        /// The bits of an SQ code (4 or 5); `nil`: not SQ.
+        package var sqBits: Int? { self == .sq4 ? 4 : self == .sq5 ? 5 : nil }
         /// An 8-bit type, with a `scale` beside its values. Not the packed GGUF types.
         package var isQuantized: Bool { self == .int8 || self == .float8_e4m3 }
         /// One ggml block: its values along a row and its bytes (`ggml-common.h`: `block_q4_0`…
@@ -323,6 +332,16 @@ package final class Artifact {
                 }
                 let total = (count / block.values).multipliedReportingOverflow(by: block.bytes)
                 expected = (total.partialValue, total.overflow)
+            } else if let bits = dtype.sqBits {
+                // `[K, N]`, stored as N rows of `SQ.rowBytes(K)`, then the fp32 scale `[N]`, rotated by 256.
+                guard shape.count == 2, shape[0] % SQ.rotationGroup == 0, let scale, scale.dtype == .float32,
+                      scale.shape == [shape[1]], scale.offset >= shape[1] * SQ.rowBytes(k: shape[0], bits: bits),
+                      entry["rotation"] != nil else {
+                    throw Failure.badHeader("\(name): \(raw) on \(shape) — only a `[K, N]` whose K is a multiple of 256, with its "
+                                            + "fp32 scale per column after its rows and a rotation")
+                }
+                let total = scale.offset.addingReportingOverflow(4 * shape[1])
+                expected = (total.partialValue, total.overflow)
             } else if let scale {
                 let (scaleBytes, overflow) = scale.count.multipliedReportingOverflow(by: scale.dtype.size)
                 let total = scale.offset.addingReportingOverflow(scaleBytes)
@@ -349,7 +368,7 @@ package final class Artifact {
     /// An 8-bit tensor's `scale` entry, checked against its shape: a scale read with the wrong
     /// period would give every weight a plausible, wrong factor.
     private static func scale(_ raw: Any, of name: String, shape: [Int], dtype: DType) throws -> Scale {
-        guard dtype.isQuantized, let s = raw as? [String: Any], let offset = s["offset"] as? Int,
+        guard dtype.isQuantized || dtype.sqBits != nil, let s = raw as? [String: Any], let offset = s["offset"] as? Int,
               let t = s["dtype"] as? String, let scaleType = DType(rawValue: t),
               [.bfloat16, .float16, .float32].contains(scaleType),
               let scaleShape = s["shape"] as? [Int] else {
@@ -367,7 +386,8 @@ package final class Artifact {
                     && elementCount([scaleShape[0], block!]) == shape[0]
         default: fits = false
         }
-        guard fits, offset >= count, offset % 16 == 0 else {
+        // An SQ tensor's values are fewer bytes than values: its own check, in `parse`, places the scale after its rows.
+        guard fits, offset >= (dtype.sqBits == nil ? count : 0), offset % 16 == 0 else {
             throw Failure.badHeader("\(name): a scale \(scaleShape) (block \(block.map(String.init) ?? "-")) "
                                     + "at \(offset) does not fit \(shape)")
         }
@@ -383,8 +403,8 @@ package final class Artifact {
         guard kind == "convrot" else {
             throw Failure.badHeader("\(name): rotation \"\(kind)\" unknown — refused rather than read without it")
         }
-        guard dtype == .int8, shape.count == 2, let scale, scale.block == nil, scale.shape.count <= 1,
-              Widen.isRotationGroup(group), shape[0] % group == 0 else {
+        guard dtype == .int8 || dtype.sqBits != nil && group == SQ.rotationGroup, shape.count == 2, let scale, scale.block == nil,
+              scale.shape.count <= 1, Widen.isRotationGroup(group), shape[0] % group == 0 else {
             throw Failure.badHeader("\(name): rotation convrot of group \(group) on \(dtype.rawValue) \(shape) — not read")
         }
         return Rotation(kind: kind, group: group)
@@ -668,6 +688,16 @@ package final class Artifact {
         case .q4_0, .q4_1, .q5_0, .q5_1, .q4_k, .q5_k, .q6_k:
             Widen.dequantizePacked(source, kind: tensor.dtype, rows: tensor.shape[1], columns: tensor.shape[0],
                                         transposing: true, into: destination)
+        case .sq4, .sq5:
+            // Decoded to the int8 `[K, N]` it is, then widened as the Compact's convrot. The integers' buffer (`K · N` bytes) is
+            // outside every arena: the widened route is the fallback of a test version, the products decode into the reserve.
+            guard let scale = tensor.scale, let rotation = tensor.rotation else { throw Failure.badHeader("\(name): SQ without its scale") }
+            let (k, n) = (tensor.shape[0], tensor.shape[1])
+            let integers = UnsafeMutablePointer<Int8>.allocate(capacity: k * n)
+            defer { integers.deallocate() }
+            SQ.decodeTransposed(source, rows: n, columns: k, bits: tensor.dtype.sqBits!, into: integers)
+            Widen.dequantizeRotated(UnsafeRawPointer(integers), rows: k, columns: n, group: rotation.group,
+                                    scale: source + scale.offset, scaleType: .float32, layout: scale.layout, into: destination)
         case .int8, .float8_e4m3:
             if let rotation = tensor.rotation, let scale = tensor.scale {
                 Widen.dequantizeRotated(source, rows: tensor.shape[0], columns: tensor.shape[1], group: rotation.group,
@@ -743,6 +773,19 @@ package final class Artifact {
         }
     }
 
+    /// **An SQ weight decoded on the CPU into the int8 it is** (`SQ.decodeTransposed`): the integers `[K, N]` at `destination`, the
+    /// fp32 scales at `destination + scalesAt` — what `stageInt8` writes for the Compact's convrot, the product after it the same.
+    /// The caller checked the dtype and that both fit.
+    package func stageSQ(_ name: String, into destination: UnsafeMutableRawPointer, scalesAt: Int) throws {
+        guard let tensor = tensors[name], let source = pointer(name), let bits = tensor.dtype.sqBits, let scale = tensor.scale else {
+            throw Failure.badHeader("\(name): not an SQ tensor")
+        }
+        defer { spent(name) }
+        SQ.decodeTransposed(source, rows: tensor.shape[1], columns: tensor.shape[0], bits: bits,
+                            into: destination.assumingMemoryBound(to: Int8.self))
+        (destination + scalesAt).copyMemory(from: source + scale.offset, byteCount: 4 * scale.count)
+    }
+
     /// `materialize` into a whole buffer: its count is the capacity.
     @discardableResult
     package func materialize(_ name: String, into buffer: UnsafeMutableBufferPointer<Float>) throws -> Int {
@@ -782,7 +825,7 @@ package final class Artifact {
             destination.update(from: (source + 4 * start).assumingMemoryBound(to: Float.self), count: n)
         case .float16:
             Widen.float16ToFloat32(source + 2 * start, count: n, into: destination)
-        case .q4_0, .q4_1, .q5_0, .q5_1, .q4_k, .q5_k, .q6_k:
+        case .q4_0, .q4_1, .q5_0, .q5_1, .q4_k, .q5_k, .q6_k, .sq4, .sq5:
             preconditionFailure("refused above")
         case .int8, .float8_e4m3:
             Widen.dequantize(source + start, kind: tensor.dtype, count: n,

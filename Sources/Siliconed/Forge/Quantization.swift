@@ -43,7 +43,7 @@ package struct QuantizedTensor {
     var scalesPerRow: Int { block.map { columns / $0 } ?? (perRow ? 1 : 0) }
     /// The bytes of one row of `values`: `columns`, or a packed type's blocks.
     package var rowBytes: Int {
-        kind.packedBlock.map { columns / $0.values * $0.bytes } ?? columns
+        kind.sqBits.map { SQ.rowBytes(k: columns, bits: $0) } ?? kind.packedBlock.map { columns / $0.values * $0.bytes } ?? columns
     }
 
     /// `w = Float(q) · s`, published layout — `Widen.dequantize`, the very routine the engine runs.
@@ -51,6 +51,16 @@ package struct QuantizedTensor {
     /// scale one by one — int8 × fp16 is exact in fp32, so there is no rounding to agree on.
     package func dequantized() -> [Float] {
         let n = rows * columns
+        if let bits = kind.sqBits {
+            // SQ (`SQ`): its rows decoded to the int8 they are, widened as the convrot they then are.
+            precondition(scaleType == .float32 && perRow && rotation == SQ.rotationGroup)
+            return values.withUnsafeBytes { v in
+                scale.withUnsafeBytes { s in
+                    SQ.dequantized(v.baseAddress!, scales: s.baseAddress!.assumingMemoryBound(to: Float.self), rows: rows,
+                                   columns: columns, bits: bits)
+                }
+            }
+        }
         if kind.isPacked {
             // ggml's arithmetic, the engine's own routine, in the published layout.
             return [Float](unsafeUninitializedCapacity: n) { b, c in
@@ -148,7 +158,7 @@ package struct QuantizedTensor {
     /// The map's layout: values `[columns, rows]` (`[K, N]`), the scales untouched — a per-row
     /// scale of `[N, K]` is the per-column scale `[N]` of `[K, N]`.
     package func transposedValues() -> [UInt8] {
-        precondition(!kind.isPacked, "a packed GGUF type's blocks keep their rows")
+        precondition(!kind.isPacked && kind.sqBits == nil, "a packed GGUF type's blocks, an SQ weight's rows, keep their rows")
         let (n, k) = (rows, columns)
         return [UInt8](unsafeUninitializedCapacity: n * k) { b, c in
             c = n * k
@@ -241,11 +251,15 @@ struct QuantizedGroup {
     var block: Int? = nil
     /// ComfyUI's convrot group (`QuantizedTensor.rotation`); `nil`: none.
     var rotation: Int? = nil
+    /// **SQ** (`SQ`, `kind` `.sq4` or `.sq5`): the group bytes `[N, K/16]` beside the codes `values` `[N, K · bits / 8]`, and the
+    /// logical `[N, K]` the codes stand for. `nil`: not SQ.
+    var sqGroups: (file: Safetensors, entry: Safetensors.Entry)? = nil
+    var sqShape: [Int]? = nil
 
     /// By block (Q8_0, a packed type), a row is the last dimension (`ne[0]`, the input): a 1-D
     /// GGUF tensor is one row.
-    var rows: Int { byRow ? values.entry.count / max(columns, 1) : values.entry.shape.first ?? 1 }
-    var columns: Int { byRow ? values.entry.shape.last ?? 1 : values.entry.count / max(rows, 1) }
+    var rows: Int { sqShape?[0] ?? (byRow ? values.entry.count / max(columns, 1) : values.entry.shape.first ?? 1) }
+    var columns: Int { sqShape?[1] ?? (byRow ? values.entry.shape.last ?? 1 : values.entry.count / max(rows, 1)) }
     private var byRow: Bool { block != nil || kind.isPacked }
     var scaleType: Artifact.DType? {
         block != nil ? .float16 : scale.flatMap { QuantizedGroup.scaleType($0.entry.dtype) }
@@ -255,6 +269,30 @@ struct QuantizedGroup {
     func read() throws -> QuantizedTensor {
         let (file, entry) = values
         let raw = try file.bytes(entry)
+        if let bits = kind.sqBits, let groups = sqGroups, let scale {
+            // Each row's codes then its group bytes (`SQ.rowBytes`), the bytes as the quantizer wrote them; every group checked.
+            let (n, k) = (rows, columns), codeBytes = k * bits / 8, width = SQ.rowBytes(k: k, bits: bits)
+            let g = try groups.file.bytes(groups.entry)
+            guard raw.count == n * codeBytes, g.count == n * k / SQ.group else {
+                throw QuantizedLayouts.refuse("\(entry.name): SQ\(bits) codes \(entry.shape), groups \(groups.entry.shape) for [\(n), \(k)]")
+            }
+            let rowsBytes = [UInt8](unsafeUninitializedCapacity: n * width) { b, c in
+                c = n * width
+                raw.withUnsafeBufferPointer { cs in
+                    g.withUnsafeBufferPointer { gs in
+                        for r in 0..<n {
+                            (b.baseAddress! + r * width).update(from: cs.baseAddress! + r * codeBytes, count: codeBytes)
+                            (b.baseAddress! + r * width + codeBytes).update(from: gs.baseAddress! + r * (k / SQ.group), count: k / SQ.group)
+                        }
+                    }
+                }
+            }
+            if let bad = rowsBytes.withUnsafeBytes({ SQ.firstInvalidRow($0.baseAddress!, rows: n, columns: k, bits: bits) }) {
+                throw QuantizedLayouts.refuse("\(entry.name): SQ\(bits) row \(bad) decodes outside int8 — not a map the quantizer wrote")
+            }
+            return QuantizedTensor(kind: kind, rows: n, columns: k, values: rowsBytes, scale: try scale.file.bytes(scale.entry),
+                                   scaleType: .float32, perRow: true, rotation: SQ.rotationGroup)
+        }
         if kind.isPacked {
             // A packed type: the blocks as published, nothing taken apart. Their scales are checked
             // here, where the bytes are read anyway, not at recognition: blocks of 18–210 bytes put a
@@ -404,6 +442,49 @@ enum QuantizedLayouts {
             guard let k = GGUF.packedTypes.values.first(where: { $0.name == raw[name]!.1.dtype }) else { continue }
             r.groups[name] = QuantizedGroup(values: raw[name]!, kind: k.dtype, scale: nil, perRow: false,
                                             format: "GGUF \(k.name)")
+        }
+
+        // ── Siliconed's SQ (`SQ`): `<l>.sq.codes`, `.sq.groups`, `.sq.scale` and the tier of each layer in the metadata ──────
+        // Its file holds the quantized linears alone: beside the publisher's own files, each one replaces the `<l>.weight` there.
+        // (Its `format` metadata, "SQ", is lost in the merge with the publisher's "pt": the tiers table and the names say it.)
+        if order.contains(where: { $0.hasSuffix(".sq.codes") }), let text = metadata["tiers"], let data = text.data(using: .utf8),
+           let tiers = try? JSONSerialization.jsonObject(with: data) as? [String: String] {
+            for name in order where name.hasSuffix(".sq.codes") {
+                let layer = String(name.dropLast(".sq.codes".count)), logical = layer + ".weight"
+                guard let tier = tiers[layer], tier.hasPrefix("SQ"), let bits = Int(tier.dropFirst(2)), [4, 5, 8].contains(bits) else {
+                    throw refuse("\(name): SQ codes without a tier SQ4, SQ5 or SQ8 in the metadata")
+                }
+                let codes = raw[name]!
+                guard let scale = raw[layer + ".sq.scale"], scale.1.dtype == "F32", scale.1.shape.count == 1,
+                      codes.1.shape.count == 2, codes.1.shape[0] == scale.1.shape[0] else {
+                    throw refuse("\(name): SQ\(bits) without its fp32 scale per row")
+                }
+                let n = codes.1.shape[0]
+                var group: QuantizedGroup
+                if bits == 8 {
+                    // Comfy's convrot recipe: int8 per row of the rotated weight, no group byte.
+                    let k = codes.1.shape[1]
+                    guard codes.1.dtype == "I8", k % SQ.rotationGroup == 0 else { throw refuse("\(name): SQ8 \(codes.1.dtype) \(codes.1.shape)") }
+                    group = QuantizedGroup(values: codes, kind: .int8, scale: scale, perRow: true, format: "Siliconed SQ8")
+                } else {
+                    let k = codes.1.shape[1] * 8 / bits
+                    guard codes.1.dtype == "U8", codes.1.shape[1] * 8 % bits == 0, k % SQ.rotationGroup == 0,
+                          let groups = raw[layer + ".sq.groups"], groups.1.dtype == "U8", groups.1.shape == [n, k / SQ.group] else {
+                        throw refuse("\(name): SQ\(bits) codes \(codes.1.shape) without their group bytes [\(n), K/16]")
+                    }
+                    group = QuantizedGroup(values: codes, kind: bits == 4 ? .sq4 : .sq5, scale: scale, perRow: true,
+                                           format: "Siliconed SQ\(bits)")
+                    group.sqGroups = groups
+                    group.sqShape = [n, k]
+                    r.consumed.insert(groups.1.name)
+                }
+                group.rotation = SQ.rotationGroup
+                try checkSubnormal(scale, kind: .int8, rotation: SQ.rotationGroup)
+                r.consumed.formUnion([name, scale.1.name])
+                r.groups[logical] = group
+                // The publisher's weight it stands for, in the other file: replaced.
+                if raw[logical] != nil { r.consumed.insert(logical) }
+            }
         }
 
         // ── ComfyUI's per-layer formats: `comfy_quant` tensors, or the metadata's table ─────
