@@ -175,7 +175,8 @@ final class SQTests: XCTestCase {
             for r in 0..<n {
                 for c in 0..<k {
                     let block = c / 256 * 256
-                    let exact = Double(s[r]) * (0..<256).reduce(0.0) { $0 + Double(v[r * k + block + $1]) * r256[$1 * 256 + c - block] }
+                    let dot = (0..<256).reduce(0.0) { (sum: Double, j: Int) -> Double in sum + Double(v[r * k + block + j]) * r256[j * 256 + c - block] }
+                    let exact = Double(s[r]) * dot
                     worst = max(worst, abs(Double(w[c * n + r]) - exact) / max(abs(exact), 1e-30))
                 }
             }

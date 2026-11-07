@@ -103,7 +103,8 @@ package final class GPUStream: @unchecked Sendable {   // its state under `lock`
         guard let last = queued.last else { return }
         let began = DispatchTime.now().uptimeNanoseconds
         last.commands.waitUntilCompleted()
-        Self.tally.withLock { $0.drains += 1; $0.waited += Double(DispatchTime.now().uptimeNanoseconds - began) * 1e-9; $0.buffers += queued.count }
+        let waited: Double = Double(DispatchTime.now().uptimeNanoseconds - began) * 1e-9
+        Self.tally.withLock { $0.drains += 1; $0.waited += waited; $0.buffers += queued.count }
         var added: [String: Double] = [:]
         var charges: [ProductLedger.Charge] = []
         lock.lock(); var end = lastEnd; let ends = aneEnds; aneEnds = [:]; waits = [:]; lock.unlock()
