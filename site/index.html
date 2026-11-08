@@ -204,7 +204,7 @@
       <path d="M 40 830 L 560 830 A 310 310 0 0 0 560 210 A 310 310 0 0 0 250 520"/>
     </g>
   </svg>
-  <p class="eyebrow h-fade">v0.18 · free · open source · Apple silicon</p>
+  <p class="eyebrow h-fade">v0.21 · free · open source · Apple silicon</p>
   <h1 class="h-fade d1"><span class="grad">Your Mac, mapped.</span><span class="sub">Every computation planned for <em>this</em> chip.</span></h1>
   <p class="lead h-fade d2">Siliconed starts by asking your Mac what it is good at, then spreads five image models over the answer:
     GPU, CPU matrix unit, Neural Engine. Full fp32, checked against the reference, inside a memory
@@ -234,9 +234,9 @@
       <p>Standard, Compact or Light, from open copies proven identical to Krea's files. No account, no
         sign-in. Krea 2 Community license: commercial use under $1M of annual revenue, a content filter when deployed.</p>
       <ul class="stats">
-        <li><b>140.9 s</b>1024² on an M1 Pro, Compact</li>
-        <li><b>213.3 s</b>the same, in full precision</li>
-        <li><b>2.6·10⁻⁴</b>from the fp32 reference</li>
+        <li><b>32.0 s</b>1024² on an M5 Pro, Compact</li>
+        <li><b>45.4 s</b>the same, the publisher's bf16</li>
+        <li><b>32.5 s</b>in the Light, our 4 bits, in 11 GiB</li>
       </ul>
     </div>
     <figure class="shot reveal">
@@ -270,7 +270,7 @@
       <tr><td><a href="https://huggingface.co/circlestone-labs/Anima">Anima Turbo</a></td><td>text-to-image (illustration, painting, anime), LoRA</td><td>CircleStone Labs Non-Commercial (the images may be used commercially)</td></tr>
       <tr><td><a href="https://huggingface.co/OpenMOSS-Team/MOSS-Image-SFT">MOSS-Image</a></td><td>text-to-image, LoRA; beta, under the community's 8-step LoRA</td><td>Apache 2.0</td></tr>
     </table></div>
-    <p class="times">1024², 8 steps, seed 42, on an M1 Pro with 16 GB, app 0.18, every evaluation at full size. Compact, the default version: Krea 2 Turbo 140.9 s, Z-Image Turbo 101.9 s, Qwen-Image-2.1 Turbo 85.8 s, Anima Turbo 40.1 s, MOSS-Image 85.0 s. Standard, the publisher's bf16 in fp32: 213.3 s, 113.1 s, 135.6 s, 40.9 s, 111.7 s. With Faster Rendering (a Beta option, off by default): 97.0 s, 80.8 s, 71.4 s, 32.4 s, 78.9 s.</p>
+    <p class="times">1024², 8 steps, seed 42, on a Mac mini M5 Pro with 64 GB, app 0.21, every evaluation at full size. Compact, the default version: Krea 2 Turbo 32.0 s, Z-Image Turbo 18.8 s, Qwen-Image-2.1 Turbo 21.3 s, Anima Turbo 8.9 s, MOSS-Image 22.3 s. Standard, the publisher's bf16: 45.4 s, 24.8 s, 29.2 s, 10.9 s, 27.9 s. Light, our 4 bits: 32.5 s, 19.4 s, 21.4 s, 8.6 s (MOSS-Image has none).</p>
   </div>
   <div class="split rev" id="moss" style="margin-top:clamp(64px, 9vw, 112px)">
     <div class="text reveal">
@@ -285,9 +285,9 @@
         composition, the strength says how far the render moves away. Here, the Krea 2 photo, the surfer turned
         into her grandmother.</p>
       <ul class="stats">
-        <li><b>85.0 s</b>1024² on an M1 Pro, Compact</li>
-        <li><b>111.7 s</b>the same, in full precision</li>
-        <li><b>2.4 GiB</b>peak memory of the app at 1024²</li>
+        <li><b>22.3 s</b>1024² on an M5 Pro, Compact</li>
+        <li><b>27.9 s</b>the same, the publisher's bf16</li>
+        <li><b>13.1 GiB</b>peak of the app at 1024², of a 46 GB budget</li>
       </ul>
     </div>
     <figure class="shot reveal">
@@ -341,15 +341,17 @@
         The speed changes; the picture does not move beyond the arithmetic it checked. Help › Measure This
         Mac… shows it.</p>
     </div>
-    <div class="map reveal" role="img" aria-label="The capacity map of an M1 Pro, 31 October 2026: GPU fp32 products 3.5 TFLOP/s; CPU matrix unit 2.2 TFLOP/s, plus or minus 1.1 %; Neural Engine fp16 9.2 TFLOP/s, plus or minus 1.7 %; Neural Engine on int8 weights 10.5 TFLOP/s, plus or minus 2.7 %; the GPU beside the Neural Engine keeps 86 % and the Neural Engine 67 % of their speeds, plus or minus 1.0 %; the GPU beside the AMX keeps 92 % and the AMX 81 %, plus or minus 2.0 %">
-      <p class="head">map · MacBook Pro M1 Pro · 31/10/2026</p>
-      <div class="row"><span>GPU · fp32 products</span><span class="on">3.5 TFLOP/s</span><span class="gain"></span></div>
-      <div class="row"><span>CPU matrix unit · fp32</span><span class="on">2.2 TFLOP/s</span><span class="gain">±1.1 %</span></div>
-      <div class="row"><span>Neural Engine · fp16</span><span class="on">9.2 TFLOP/s</span><span class="gain">±1.7 %</span></div>
-      <div class="row"><span>Neural Engine · int8 weights</span><span class="on">10.5 TFLOP/s</span><span class="gain">±2.7 %</span></div>
-      <div class="row"><span>GPU beside the Neural Engine</span><span class="off">keeps 86 % · 67 %</span><span class="gain">±1.0 %</span></div>
-      <div class="row"><span>GPU beside the AMX</span><span class="off">keeps 92 % · 81 %</span><span class="gain">±2.0 %</span></div>
-      <p class="note">Measured in the app in 31.8 s. One Mac's map; yours measures itself.</p>
+    <div class="map reveal" role="img" aria-label="The capacity map of a Mac mini M5 Pro, 8 November 2026: GPU fp32 products 5.9 TFLOP/s; GPU bf16 products on its tensor units 22.1 TFLOP/s; GPU int8 × int8 products 35.3 TFLOP/s; CPU matrix unit 1.8 TFLOP/s, plus or minus 1.1 %; Neural Engine fp16 10.9 TFLOP/s, plus or minus 15 %; Neural Engine on int8 weights 15.7 TFLOP/s, plus or minus 17 %; the GPU beside the Neural Engine keeps 98 % and the Neural Engine 95 % of their speeds, plus or minus 2.2 %; the GPU beside the AMX keeps 100 % and the AMX 94 %, plus or minus 0.4 %">
+      <p class="head">map · Mac mini M5 Pro · 8/11/2026</p>
+      <div class="row"><span>GPU · fp32 products</span><span class="on">5.9 TFLOP/s</span><span class="gain"></span></div>
+      <div class="row"><span>GPU · bf16, tensor units</span><span class="on">22.1 TFLOP/s</span><span class="gain"></span></div>
+      <div class="row"><span>GPU · int8 × int8</span><span class="on">35.3 TFLOP/s</span><span class="gain"></span></div>
+      <div class="row"><span>CPU matrix unit · fp32</span><span class="on">1.8 TFLOP/s</span><span class="gain">±1.1 %</span></div>
+      <div class="row"><span>Neural Engine · fp16</span><span class="on">10.9 TFLOP/s</span><span class="gain">±15 %</span></div>
+      <div class="row"><span>Neural Engine · int8 weights</span><span class="on">15.7 TFLOP/s</span><span class="gain">±17 %</span></div>
+      <div class="row"><span>GPU beside the Neural Engine</span><span class="off">keeps 98 % · 95 %</span><span class="gain">±2.2 %</span></div>
+      <div class="row"><span>GPU beside the AMX</span><span class="off">keeps 100 % · 94 %</span><span class="gain">±0.4 %</span></div>
+      <p class="note">Measured in the app in 78.1 s. One Mac's map; yours measures itself.</p>
     </div>
   </div>
   <div class="wrap" style="margin-top:clamp(56px, 8vw, 96px)">
@@ -365,8 +367,8 @@
     </div>
     <ul class="stats reveal">
       <li><b>−16 to −26 %</b>energy per image, M1 Pro, 1024², Standard (app 0.14)</li>
-      <li><b>140.9 s</b>Krea 2, Compact, against 213.3 s for the Standard</li>
-      <li><b>85.8 s</b>Qwen-Image-2.1, Compact, against 135.6 s for the Standard</li>
+      <li><b>32.0 s</b>Krea 2, Compact, against 45.4 s for the Standard (M5 Pro)</li>
+      <li><b>21.3 s</b>Qwen-Image-2.1, Compact, against 29.2 s for the Standard (M5 Pro)</li>
     </ul>
   </div>
 </section>
@@ -502,7 +504,7 @@
       <h2>Pick your size.</h2>
       <p class="punch">Standard, Compact or Light.</p>
       <p>The publisher's weights, 8-bit versions, or a 4-to-6-bit transformer. The 8-bit Compact is
-        preselected: as fast or faster on an M1 Pro, half the disk. Every file is pinned to a
+        preselected: 19 to 30 % faster than the Standard on an M5 Pro, half the disk. Every file is pinned to a
         revision and checked by sha256, and downloads resume where they stopped. The next file downloads
         while the previous one is prepared.</p>
     </div>
