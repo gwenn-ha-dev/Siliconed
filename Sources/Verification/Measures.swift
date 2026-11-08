@@ -194,9 +194,12 @@ package struct Int8Route {
         if EngineSettings.effective.plan.resources.int8Weights { return nil }
         if let named = ProcessInfo.processInfo.environment["SILICONED_PLAN"], !named.isEmpty,
            let forced = CapacityPlan.forcing(named: named + ",int8") { return forced }
+        // Under `--neural-engine`, the ANE's rows of a shared product read the integers too (`aneint8`): a render's map may give the
+        // ANE a published int8 weight's rows beside the GPU's int8 kernel, and without it every product shared on a large model is on
+        // the widened weight — Krea 2's 224 int8 linears on an M5 Pro, where the route was then never crossed.
         return .forcing(neuralEngine: invocation.neuralEngine, bf16Activations: invocation.bf16Activations,
                         tiles16: invocation.fp16Attention, tilesbf16: invocation.bf16Attention,
-                        fused: invocation.bf16Attention || invocation.fp16Attention, int8: true)
+                        fused: invocation.bf16Attention || invocation.fp16Attention, aneInt8: invocation.neuralEngine, int8: true)
     }
 
     /// The products that read the published integers since the route was taken: none fails, the route was not crossed.
