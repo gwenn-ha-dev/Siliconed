@@ -299,19 +299,21 @@ The Compact's oracle also needs its publisher's library: `oracle-env/bin/pip ins
 
 The Compact and the Light run on the Neural Engine by default (fp16 products), so `--neural-engine` is the bar that matters for them, judged like the Standard's: against the reference in bf16 on the same weights (dequantized or decoded), the engine allowed bf16's own error plus 25 %. Those goldens need the Standard's `dit` golden at 512 first (they read its inputs); they are not part of `all` or of `siliconed check <model>`.
 
-`dit --size 512` of the Compacts and of MOSS-Image was run on our MacBook Pro M1 Pro, in fp32 then with `--neural-engine`: 10 runs, all passing. The four Lights were run again on our Mac mini M5 Pro, on the files the app installs (`siliconed install <model> --light`), against goldens rebuilt from the same files: 8 runs, all passing. Below, the gap of `model_out` to the reference (for Qwen-Image-2.1, `model_out (full)`; for Krea 2 and MOSS-Image, `model_out per plane`) in each run, and the bar the Neural Engine run is judged against.
+`dit --size 512` of the five Compacts and the four Lights was run on our Mac mini M5 Pro, in fp32 then with `--neural-engine`, on the files the app installs (`siliconed install <model>`, with `--light` for a Light; the Lights against goldens rebuilt from the same files): 18 runs, 17 passing. The red one is MOSS-Image's Compact in fp32, said under the table. Below, the gap of `model_out` to the reference (for Qwen-Image-2.1, `model_out (full)`; for Krea 2 and MOSS-Image, `model_out per plane`) in each run, and the bar the Neural Engine run is judged against.
 
 | Variant | `model_out` in fp32, against the reference | Under the Neural Engine, against the reference | Its bar (bf16's own error + 25 %) |
 |---|---|---|---|
-| Z-Image, Compact | 7.833e-06 | 9.906e-03 | 5.89e-02 |
+| Z-Image, Compact | 1.058e-05 | 3.982e-03 | 6.79e-02 |
 | Z-Image, Light | 9.065e-06 | 2.708e-03 | 6.61e-02 |
-| Qwen-Image-2.1, Compact | 4.301e-06 | 4.562e-03 | 1.59e-02 |
+| Qwen-Image-2.1, Compact | 3.942e-06 | 3.502e-04 | 1.59e-02 |
 | Qwen-Image-2.1, Light | 2.647e-06 | 2.804e-04 | 1.82e-02 |
-| Anima, Compact | 6.233e-06 | 6.133e-03 | 8.57e-02 |
+| Anima, Compact | 5.916e-06 | 1.017e-03 | 6.01e-02 |
 | Anima, Light | 5.725e-06 | 1.145e-03 | 6.24e-02 |
-| Krea 2, Compact | 7.070e-05 | 4.861e-03 | 4.24e-02 |
+| Krea 2, Compact | 4.008e-05 | 2.433e-04 | 1.67e-02 |
 | Krea 2, Light | 6.222e-05 | 2.198e-04 | 2.05e-02 |
-| MOSS-Image, Compact | 1.296e-06 | 4.171e-03 | 2.89e-02 |
+| MOSS-Image, Compact | 1.871e-06 ✗ (2.142e-06 at the fp64 witness, for 1.91e-06) | 3.214e-04 | 2.89e-02 |
+
+**MOSS-Image's Compact in fp32 is 12 % over its bar.** Judged at the fp64 witness, its `model_out per plane` is 2.142e-06 from the exact value, where the reference in fp32 is 1.53e-06 from it (bar 1.91e-06). The route that crosses it is the GPU's int8 kernel on the published integers (252 products, `matmul2d float × int8 → float`, the scale after the sum); the same run on the widened weights passes (1.638e-06), and the kernel alone is as close to the exact product as an fp32 product is (1.1–2.1e-6, as MPS in fp32): what moves is a summation order, at the scale of 1e-6. On our MacBook Pro M1 Pro, where that kernel did not take the products, the same run passed (1.470e-06). Krea 2 settles such a boundary by clouds of summation orders (below); MOSS-Image has no draws yet, so the line stays red until it does. The app renders MOSS-Image on the Neural Engine by default, and that run passes (3.214e-04 for 2.89e-02).
 
 With `--bf16-activations` (the activation rounded to bf16, the weights read as published), the Lights' `model_out` is 3.690e-02 for Z-Image (bar 6.61e-02), 2.436e-03 for Qwen-Image-2.1 (1.82e-02), 8.109e-03 for Anima (6.24e-02) and 7.326e-04 for Krea 2, per plane (2.05e-02): all four pass.
 
@@ -322,23 +324,23 @@ The fp32 column is the plain gap to the reference; Z-Image, Krea 2 and MOSS-Imag
 
 ```
 $ siliconed check z-image dit --size 512 --variant compact
-map ~/Library/Application Support/Siliconed/store/z-image-turbo-dit.compact.v0.silicon · 7.2 GB · bfloat16 ×274, int8 ×240, float32 ×7 (8-bit weights)
-✓ z-image dit compact 512 · 11 measures · nearest its threshold: t_embedder_out 3.73e-04 of 5.00e-04
+map ~/Library/Application Support/Siliconed/store/z-image-turbo-dit.compact.v1.silicon · 6.2 GB · int8 ×270, bfloat16 ×244, float32 ×7 (8-bit weights)
+✓ z-image dit compact 512 · 11 measures · nearest its threshold: t_embedder_out 2.95e-04 of 5.00e-04
 $ siliconed check z-image dit --size 512 --variant compact --neural-engine
-map ~/Library/Application Support/Siliconed/store/z-image-turbo-dit.compact.v0.silicon · 7.2 GB · bfloat16 ×274, int8 ×240, float32 ×7 (8-bit weights)
-✓ z-image dit compact 512 · 12 measures · nearest its threshold: x_embedder_out 1.03e-03 of 3.21e-03
+map ~/Library/Application Support/Siliconed/store/z-image-turbo-dit.compact.v1.silicon · 6.2 GB · int8 ×270, bfloat16 ×244, float32 ×7 (8-bit weights)
+✓ z-image dit compact 512 · 12 measures · nearest its threshold: x_embedder_out 2.39e-04 of 3.21e-03
 $ siliconed check z-image dit --size 512 --variant light
 map ~/Library/Application Support/Siliconed/store/z-image-turbo-dit.light.v1.silicon · 5.0 GB · bfloat16 ×274, sq5 ×148, sq4 ×56, int8 ×36, float32 ×7 (packed weights)
 ✓ z-image dit light 512 · 11 measures · nearest its threshold: t_embedder_out 2.95e-04 of 5.00e-04
 $ siliconed check z-image dit --size 512 --variant light --neural-engine
 map ~/Library/Application Support/Siliconed/store/z-image-turbo-dit.light.v1.silicon · 5.0 GB · bfloat16 ×274, sq5 ×148, sq4 ×56, int8 ×36, float32 ×7 (packed weights)
 ✓ z-image dit light 512 · 12 measures · nearest its threshold: x_embedder_out 2.39e-04 of 3.21e-03
-$ siliconed check qwen-image-2.1 dit --variant compact
+$ siliconed check qwen-image-2.1 dit --size 512 --variant compact
 map ~/Library/Application Support/Siliconed/store/qwen-image-2.1-turbo-dit.compact.v0.silicon · 7.3 GB · int8 ×224, bfloat16 ×72, float32 ×1 (8-bit weights)
-✓ qwen-image-2.1 dit compact 512 · 24 measures · nearest its threshold: temb 2.11e-04 of 5.00e-04
-$ siliconed check qwen-image-2.1 dit --variant compact --neural-engine
+✓ qwen-image-2.1 dit compact 512 · 26 measures · nearest its threshold: temb 2.11e-04 of 5.00e-04
+$ siliconed check qwen-image-2.1 dit --size 512 --variant compact --neural-engine
 map ~/Library/Application Support/Siliconed/store/qwen-image-2.1-turbo-dit.compact.v0.silicon · 7.3 GB · int8 ×224, bfloat16 ×72, float32 ×1 (8-bit weights)
-✓ qwen-image-2.1 dit compact 512 · 25 measures · nearest its threshold: temb 2.11e-04 of 5.00e-04
+✓ qwen-image-2.1 dit compact 512 · 27 measures · nearest its threshold: temb 2.11e-04 of 5.00e-04
 $ siliconed check qwen-image-2.1 dit --variant light
 map ~/Library/Application Support/Siliconed/store/qwen-image-2.1-turbo-dit.light.v1.silicon · 4.4 GB · sq4 ×184, bfloat16 ×73, sq5 ×32, int8 ×7, float32 ×1 (packed weights)
 ✓ qwen-image-2.1 dit light 512 · 26 measures · nearest its threshold: temb 2.11e-04 of 5.00e-04
@@ -346,11 +348,11 @@ $ siliconed check qwen-image-2.1 dit --variant light --neural-engine
 map ~/Library/Application Support/Siliconed/store/qwen-image-2.1-turbo-dit.light.v1.silicon · 4.4 GB · sq4 ×184, bfloat16 ×73, sq5 ×32, int8 ×7, float32 ×1 (packed weights)
 ✓ qwen-image-2.1 dit light 512 · 27 measures · nearest its threshold: temb 2.11e-04 of 5.00e-04
 $ siliconed check anima dit --size 512 --variant compact
-map ~/Library/Application Support/Siliconed/store/anima-turbo-dit.compact.v0.silicon · 2.1 GB · int8 ×448, bfloat16 ×119 (8-bit weights)
-✓ anima dit compact 512 · 11 measures · nearest its threshold: temb 4.14e-05 of 5.00e-04
+map ~/Library/Application Support/Siliconed/store/anima-turbo-dit.compact.v1.silicon · 2.4 GB · bfloat16 ×313, int8 ×254 (8-bit weights)
+✓ anima dit compact 512 · 11 measures · nearest its threshold: block27_out 2.04e-05 of 5.00e-04
 $ siliconed check anima dit --size 512 --variant compact --neural-engine
-map ~/Library/Application Support/Siliconed/store/anima-turbo-dit.compact.v0.silicon · 2.1 GB · int8 ×448, bfloat16 ×119 (8-bit weights)
-✓ anima dit compact 512 · 12 measures · nearest its threshold: model_out 6.13e-03 of 8.57e-02
+map ~/Library/Application Support/Siliconed/store/anima-turbo-dit.compact.v1.silicon · 2.4 GB · bfloat16 ×313, int8 ×254 (8-bit weights)
+✓ anima dit compact 512 · 12 measures · nearest its threshold: block13_out 1.44e-03 of 5.81e-02
 $ siliconed check anima dit --size 512 --variant light
 map ~/Library/Application Support/Siliconed/store/anima-turbo-dit.light.v1.silicon · 1.4 GB · int8 ×188, bfloat16 ×152, sq4 ×148, sq5 ×79 (packed weights)
 ✓ anima dit light 512 · 11 measures · nearest its threshold: block27_out 1.85e-05 of 5.00e-04
@@ -359,12 +361,16 @@ map ~/Library/Application Support/Siliconed/store/anima-turbo-dit.light.v1.silic
 ✓ anima dit light 512 · 12 measures · nearest its threshold: block27_out 6.53e-03 of 2.21e-01
 $ siliconed check krea2 dit --size 512 --variant compact
 map ~/Library/Application Support/Siliconed/store/krea2-turbo-dit.compact.v0.silicon · 14.1 GB · int8 ×224, float32 ×174, bfloat16 ×32 (8-bit weights)
-model_out per plane         2.999e-05   1.94e-05       15   1.042e-04    1.19e-04  ✓  oracle at fp64 9.48e-05
-✓ krea2 dit compact 512 · 11 measures · nearest its threshold: block27_out 5.36e-04 of 5.74e-04
+model_out per plane         4.008e-05   1.89e-05       15   1.072e-04    1.19e-04  ✓  oracle at fp64 9.48e-05
+gemm_int8                   ✓  2016 products on the published integers
+model_out per plane (widened)  3.016e-05   2.10e-05       15   1.032e-04    1.19e-04  ✓  oracle at fp64 9.48e-05
+✓ krea2 dit compact 512 · 13 measures · nearest its threshold: model_out per plane 1.07e-04 of 1.19e-04
 $ siliconed check krea2 dit --size 512 --variant compact --neural-engine
 map ~/Library/Application Support/Siliconed/store/krea2-turbo-dit.compact.v0.silicon · 14.1 GB · int8 ×224, float32 ×174, bfloat16 ×32 (8-bit weights)
-model_out per plane         1.716e-03   1.51e-03        0   1.716e-03    1.67e-02  ✓  oracle at fp64 1.34e-02
-✓ krea2 dit compact 512 · 12 measures · nearest its threshold: img_in_out 1.09e-03 of 3.19e-03
+model_out per plane         2.433e-04   2.22e-04        2   2.486e-04    1.67e-02  ✓  oracle at fp64 1.34e-02
+gemm_int8                   ✓  224 products on the published integers
+model_out per plane (widened)  2.661e-04   2.50e-04       15   2.637e-04    1.67e-02  ✓  oracle at fp64 1.34e-02
+✓ krea2 dit compact 512 · 14 measures · nearest its threshold: img_in_out 2.32e-04 of 3.19e-03
 $ siliconed check krea2 dit --size 512 --variant light
 map ~/Library/Application Support/Siliconed/store/krea2-turbo-dit.light.v1.silicon · 7.6 GB · sq4 ×196, float32 ×169, sq5 ×52, int8 ×13 (packed weights)
 model_out per plane         6.222e-05   2.41e-05       13   8.839e-05    1.22e-04  ✓  clouds of summation orders: engine median of 9 (nominal + 8 orders), oracle worst of 12 (nominal + 3 ulp + 8 orders)
@@ -376,21 +382,25 @@ model_out per plane         2.198e-04   2.09e-04        0   2.246e-04    2.05e-0
 gemm_int8                   ✓  224 products on the published integers
 model_out per plane (widened)  2.735e-04   2.60e-04       11   2.785e-04    2.05e-02  ✓  oracle at fp64 1.64e-02
 ✓ krea2 dit light 512 · 14 measures · nearest its threshold: img_in_out 2.32e-04 of 4.54e-03
-$ siliconed check moss-image dit --variant compact
+$ siliconed check moss-image dit --size 512 --variant compact
 map ~/Library/Application Support/Siliconed/store/moss-image-sft-dit.compact.v0.silicon · 5.4 GB · int8 ×252, bfloat16 ×210 (8-bit weights)
-model_out per plane         1.296e-06   1.02e-06       82   1.470e-06    1.91e-06  ✓  oracle at fp64 1.53e-06
-✓ moss-image dit compact 512 · 22 measures · nearest its threshold: model_out per plane 1.47e-06 of 1.91e-06
-$ siliconed check moss-image dit --variant compact --neural-engine
+model_out per plane         1.871e-06   1.29e-06       23   2.142e-06    1.91e-06  ✗  oracle at fp64 1.53e-06
+gemm_int8                   ✓  252 products on the published integers
+model_out per plane (widened)  1.240e-06   9.84e-07       82   1.638e-06    1.91e-06  ✓  oracle at fp64 1.53e-06
+✗ moss-image dit compact 512 · 1 of 24 failing: model_out per plane
+$ siliconed check moss-image dit --size 512 --variant compact --neural-engine
 map ~/Library/Application Support/Siliconed/store/moss-image-sft-dit.compact.v0.silicon · 5.4 GB · int8 ×252, bfloat16 ×210 (8-bit weights)
-model_out per plane         4.171e-03   3.51e-03      120   4.171e-03    2.89e-02  ✓  oracle at fp64 2.31e-02
-✓ moss-image dit compact 512 · 23 measures · nearest its threshold: video_embed 1.43e-03 of 3.20e-03
+model_out per plane         3.214e-04   2.86e-04      116   3.214e-04    2.89e-02  ✓  oracle at fp64 2.31e-02
+gemm_int8                   ✓  252 products on the published integers
+model_out per plane (widened)  3.314e-04   2.97e-04      120   3.314e-04    2.89e-02  ✓  oracle at fp64 2.31e-02
+✓ moss-image dit compact 512 · 25 measures · nearest its threshold: video_embed 2.36e-04 of 3.20e-03
 ```
 
 </details>
 
 Krea 2's variants are judged by clouds like its Standard, and the Light's `model_out per plane` is judged by them: the engine's median over nine summation orders (the nominal one and eight drawn by the same seeds as the oracle's, on a map whose residual stream is permuted, `Krea2PermutedMap`: an SQ weight moves by whole blocks of 256 inputs, its integers copied as stored) is 6.222e-05 against an allowance of 1.22e-04, the oracle's worst of twelve draws (nominal, three one-ulp moves, eight orders) plus 25 %. The draws of a variant are `krea2.py draw --size 512 --step 0 --jitter 1 2 3 --variant compact|light` and, for the summation orders, `krea2.py draw --size 512 --step 0 --permute 1 2 3 4 5 6 7 8 --permute-kind group --variant light` (step 0 only: the later latents belong to the Standard's trajectory). The Light's `temb` and `block0_attn_out` are two boundaries where the reference in fp32 is itself far from the exact value (1.92e-03 and 2.56e-03 at the fp64 witness); the engine is 1.16e-05 and 2.17e-03 from the witness, inside the allowance the rule gives them (2.41e-03 and 3.20e-03): in fp32 against the oracle alone they would read 1.93e-03 and 2.81e-03 for 5.00e-4.
 
-**Under `--neural-engine`, the int8 route reads the published integers on the Neural Engine too.** Where the Neural Engine shares a product with the GPU, its rows read the integers beside the GPU's int8 kernel, as a render's map may assign them; without that, every shared product of a large model stayed on the widened weight, and `gemm_int8`, which asks that the products on the published integers be taken at least once, counted 0 for Krea 2 (its Light and its Compact) and MOSS-Image on our Mac mini M5 Pro, every precision line passing. Krea 2's Light now reads 224 products on the integers (`model_out per plane` 2.198e-04 for 2.05e-02), and the widened route is judged too (2.735e-04). The Compact runs above, made on the M1 Pro before this change, read the integers on the GPU alone.
+**Under `--neural-engine`, the int8 route reads the published integers on the Neural Engine too.** Where the Neural Engine shares a product with the GPU, its rows read the integers beside the GPU's int8 kernel, as a render's map may assign them; without that, every shared product of a large model stayed on the widened weight, and `gemm_int8`, which asks that the products on the published integers be taken at least once, counted 0 for Krea 2 (its Light and its Compact) and MOSS-Image on our Mac mini M5 Pro, every precision line passing. Krea 2's Light now reads 224 products on the integers (`model_out per plane` 2.198e-04 for 2.05e-02), and the widened route is judged too (2.735e-04). The Compact runs above read them too: 891 products for Qwen-Image-2.1, 224 for Krea 2, 252 for MOSS-Image.
 
 LoRAs are not covered here: they are files you choose, not part of what Siliconed ships.
 
