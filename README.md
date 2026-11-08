@@ -43,12 +43,11 @@ The tour of the app: [docs/APP.md](docs/APP.md).
 - **Even on an 8 GB MacBook Neo.** The one with an iPhone chip (A18 Pro): with 0.19, Anima Turbo makes a 1024² square in under a minute on it, in the Compact, every evaluation at full size. We no longer have a Neo to time it properly: if you have one, or a Mac we have never seen, [send us your numbers](docs/ENGINE.md#on-a-macbook-neo).
 - **Checked against the original models, a bit obsessively.** Every stage is compared, channel by channel, with the reference implementation (diffusers / transformers in fp32 on CPU), and what cannot be checked does not ship. Run the checks yourself: [VERIFY.md](docs/VERIFY.md). The CI runs the kernels' CPU stages each time the engine changes; its GPU is virtual, so the GPU stages run on your Mac.
 - **Knows your Mac.** Before the first render, in about a minute (five at most) and without any model, it measures what each engine of your Mac — the GPU, the CPU's matrix unit, the Neural Engine — computes, alone and together, and checks every result against the exact one; it then works out, for every product and every attention of a render, how to share the rows among the engines that computed right. [How](docs/ENGINE.md#an-engine-measured-on-your-mac).
-- **Measured next to Draw Things' engine**, on the same Mac. The method and every figure are in [Next to Draw Things](docs/ENGINE.md#next-to-draw-things).
 
 ## Documentation
 
 - [docs/APP.md](docs/APP.md): the app in detail: creating, editing, writing prompts, series, managing models, settings, privacy.
-- [docs/ENGINE.md](docs/ENGINE.md): the engine: measuring the Mac, the Neural Engine, numbers, Faster Rendering, Draw Things, memory, the community diagnostic, verification, building from source.
+- [docs/ENGINE.md](docs/ENGINE.md): the engine: measuring the Mac, the Neural Engine, numbers, Faster Rendering, memory, the community diagnostic, verification, building from source.
 - [docs/VERIFY.md](docs/VERIFY.md): checking the results against the reference on your Mac.
 - [docs/REMOTE-CONTROL.md](docs/REMOTE-CONTROL.md): `silicontrol`, protocol and internals.
 - [docs/RELEASE-NOTES.md](docs/RELEASE-NOTES.md): what changed in each version.

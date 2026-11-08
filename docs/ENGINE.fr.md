@@ -73,29 +73,6 @@ La petite grille reçoit l'état moyenné plus la basse bande du bruit de dépar
 
 Il donne une autre image que la recette en pleine taille à la même graine (la composition se décide dans les premiers pas : la même scène, parfois une autre personne), pas une copie dégradée. Pas avec une LoRA, Détail, une édition, un autre nombre de pas ni un autre calendrier. Éteint, toutes les évaluations sont en pleine taille et l'image est la même, au bit près, qu'avant : celle qui est vérifiée contre diffusers ; les écarts ci-dessus valent pour elle.
 
-### À côté de Draw Things
-
-[Draw Things](https://drawthings.ai) est la référence sur Mac ; ici, son moteur communautaire, [draw-things-community](https://github.com/drawthingsai/draw-things-community) à `bc3970c`, avec les réglages par défaut du modèle (UniPC trailing, CFG 1). La même machine, tout juste redémarrée, un seul moteur chargé à la fois ; Z-Image Turbo, 1024², 8 pas (8 évaluations de chaque côté), graine 42, trois rendus de chaque côté sur trois variantes du même prompt. Draw Things a été mesuré le 13/10/2026 (une séance de 70 minutes) et rien n'a changé de son côté depuis ; Siliconed en pleine taille le 14/10/2026, après le correctif, et avec le rendu plus rapide le 19/10/2026 (app 0.12, trois rendus du prompt de la bibliothèque chacun, chacun dans une app tout juste ouverte). Les pics de Siliconed dans ce tableau sont ceux de la 0.12 ; ils sont plus bas depuis ([Les chiffres](#les-chiffres)).
-
-| | poids | temps | pic mémoire (Gio) | lu sur le disque par rendu |
-|---|---|---|---|---|
-| Siliconed, Standard | les bf16 de l'éditeur, calculés en fp32 | 113–119 s | 2,6 | 51–58 Go |
-| Siliconed, Légère | GGUF Q4_K_M | 118–120 s | 2,0 | 3,5–8,7 Go |
-| Siliconed, Standard, rendu plus rapide allumé | les bf16 de l'éditeur, calculés en fp32 | 85–86 s | 2,8 | 51–58 Go |
-| Siliconed, Légère, rendu plus rapide allumé | GGUF Q4_K_M | 90–91 s | 2,1 | 3,5–8,7 Go |
-| Draw Things, Exact | f16 | 167–179 s | 5,3 | 99 Go |
-| Draw Things, par défaut | 8 bits (`q8p`) | 142–164 s | 3,5–4,3 | 11 Go |
-| Draw Things, 6 bits | 6 bits (`q6p`) | 136–138 s | 3,5 | 6–14 Go |
-
-La comparaison porte sur le temps écoulé, pas sur une arithmétique identique : les solveurs et les poids diffèrent, les images aussi. Le pic mémoire ne compte pas les poids projetés depuis le disque, d'un côté comme de l'autre. Siliconed fait chauffer davantage la machine, ce qui découle du calcul en fp32. Les deux premières lignes de Siliconed sont en pleine taille, comme celles de Draw Things ; avec le rendu plus rapide, les 3 premières de ses 8 évaluations passent sur une grille de demi-taille, ce que Draw Things ne fait pas : moins de travail, une autre image ([comment](#rendu-plus-rapide)).
-
-Huit bits contre huit bits, le 23/10/2026 (app 0.14) : la Compact de Siliconed (le GGUF Q8_0 du tiers, gardé tel que publié) contre le `q8p` par défaut de Draw Things, dans son moteur communautaire, mis à jour depuis à `6c1dd09` ; Z-Image Turbo, 1024², 8 pas, graine 42, le prompt de la bibliothèque ; chaque rendu dans un processus tout juste lancé de chaque côté (l'app, le serveur du moteur), trois de chaque côté, puis Siliconed encore en témoin.
-
-| | poids | temps | pic mémoire (Gio) | lu sur le disque par rendu |
-|---|---|---|---|---|
-| Siliconed, Compact, rendu plus rapide et Neural Engine (tous deux allumés pour ces séries) | GGUF Q8_0 | 81,1–83,2 s (témoin 81,3 s) | 2,6 | 3,7–11 Go |
-| Draw Things, par défaut | 8 bits (`q8p`) | 135,0–144,2 s | 4,3 | 10–18 Go |
-
 ## La mémoire et le budget
 
 Le plus gros modèle, Krea 2 Turbo en Standard (tailles : [La gestion des modèles](APP.fr.md#la-gestion-des-modèles)), tourne sur un Mac de 16 Go dans un budget fixe. Les poids sont lus depuis le disque au moment où ils servent. Siliconed ne prend jamais plus que les ¾ de la mémoire du Mac moins 2 Go (4 Go sur un Mac de 8 Go, 10 Go sur 16 Go, 22 Go sur 32 Go) : chaque rendu calcule ce qu'il lui faut avant de commencer, prend le plan le plus rapide qui y tient, et compare son propre pic à ce chiffre. Ce que les autres applications occupent leur appartient.
@@ -104,7 +81,6 @@ Le plus gros modèle, Krea 2 Turbo en Standard (tailles : [La gestion des modè
 
 ## Face aux autres outils
 
-- **[Draw Things](https://drawthings.ai)**, l'app native de référence sur Mac : son moteur est [mesuré plus haut](#à-côté-de-draw-things) sur la même machine. Siliconed calcule en fp32 — accélérateurs allumés, une part du DiT sur le Neural Engine et les unités tensorielles du GPU là où la mesure de ce Mac la trouve plus rapide — et il est vérifié étage par étage contre l'implémentation de référence, en fp32, et en bf16 pour les accélérateurs.
 - **[ComfyUI](https://github.com/comfyanonymous/ComfyUI) ou [diffusers](https://github.com/huggingface/diffusers) en Python** : les mêmes modèles, sans environnement Python ni graphe de nœuds à câbler. Siliconed les implémente en natif et se vérifie contre diffusers et [transformers](https://github.com/huggingface/transformers) ; `silicontrol` couvre les scripts et l'automatisation.
 
 ## Le diagnostic communautaire

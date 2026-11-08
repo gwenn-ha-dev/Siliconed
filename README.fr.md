@@ -43,12 +43,11 @@ Le tour de l'app : [docs/APP.fr.md](docs/APP.fr.md).
 - **Même sur un MacBook Neo de 8 Go.** Celui à puce d'iPhone (A18 Pro) : avec la 0.19, Anima Turbo y fait un carré de 1024² en moins d'une minute, en Compact, toutes les évaluations en pleine taille. Nous n'avons plus de Neo pour le chronométrer en règle : si vous en avez un, ou un Mac que nous n'avons jamais vu, [envoyez-nous vos chiffres](docs/ENGINE.fr.md#sur-un-macbook-neo).
 - **Vérifié contre les modèles d'origine, avec un brin de manie.** Chaque étage est comparé, canal par canal, à l'implémentation de référence (diffusers / transformers en fp32 sur CPU), et ce qui ne se vérifie pas n'est pas livré. Refaites les contrôles chez vous : [VERIFY.fr.md](docs/VERIFY.fr.md). La CI passe les étages CPU des noyaux chaque fois que le moteur change ; son GPU est virtuel, les étages GPU se jugent sur votre Mac.
 - **Connaît votre Mac.** Avant le premier rendu, en une minute environ (cinq au plus) et sans aucun modèle, il mesure ce que calcule chaque moteur de votre Mac — le GPU, l'unité matricielle du CPU, le Neural Engine —, seul et avec les autres, et vérifie chaque résultat contre le résultat exact ; il calcule ensuite, pour chaque produit et chaque attention d'un rendu, comment répartir les lignes entre les moteurs qui ont calculé juste. [Comment](docs/ENGINE.fr.md#un-moteur-mesuré-sur-votre-mac).
-- **Mesuré à côté du moteur de Draw Things** sur le même Mac, avec la méthode et tous les chiffres : [À côté de Draw Things](docs/ENGINE.fr.md#à-côté-de-draw-things).
 
 ## Documentation
 
 - [docs/APP.fr.md](docs/APP.fr.md) : l'app en détail : créer, éditer, écrire des prompts, séries, gérer les modèles, réglages, vie privée.
-- [docs/ENGINE.fr.md](docs/ENGINE.fr.md) : le moteur : la mesure du Mac, le Neural Engine, les chiffres, le rendu plus rapide, Draw Things, la mémoire, le diagnostic communautaire, la vérification, la construction depuis les sources.
+- [docs/ENGINE.fr.md](docs/ENGINE.fr.md) : le moteur : la mesure du Mac, le Neural Engine, les chiffres, le rendu plus rapide, la mémoire, le diagnostic communautaire, la vérification, la construction depuis les sources.
 - [docs/VERIFY.fr.md](docs/VERIFY.fr.md) : vérifier les résultats contre la référence sur votre Mac.
 - [docs/REMOTE-CONTROL.fr.md](docs/REMOTE-CONTROL.fr.md) : `silicontrol`, protocole et fonctionnement interne.
 - [docs/RELEASE-NOTES.fr.md](docs/RELEASE-NOTES.fr.md) : ce qui change à chaque version.

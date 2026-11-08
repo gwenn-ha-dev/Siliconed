@@ -4,6 +4,19 @@
 
 ## 0.21
 
+### Plus rapide sur les grands Mac
+
+- **Le débruiteur tourne en un seul flux de travail GPU**, pour les cinq modèles : le travail d'un bloc part sur le GPU sans attente entre les opérations, les rangées du Neural Engine à côté, et là où le budget mémoire tient les poids du modèle, ils sont lus sur place au lieu d'être relus en flux. La carte des capacités mesure ce couple comme un rendu le fait tourner. Les temps sur la machine de référence : [Les chiffres](ENGINE.fr.md#les-chiffres).
+- **Les Compact calculent en int8 × int8 (W8A8)** sur les unités tensorielles du GPU là où la mesure de ce Mac les trouve plus rapides, comme leurs éditeurs les calculent : l'activation tournée et quantifiée en int8 par ligne par l'opération qui la produit, les poids lus sur place. Contrôlé contre la recette de ComfyUI sur les entiers publiés (`siliconed check <modèle> dit --variant compact --int8-activations`).
+- **Les décodeurs tournent en bf16** là où la carte les trouve plus rapides, et la fin de chaque phase n'attend plus que ce que Metal tient encore.
+
+### L'app
+
+- **Un ✕ sur les vignettes de l'historique** : au survol, un clic sur le ✕ retire l'image de l'historique ; ⌘Z la rend.
+- **L'atelier dans une fenêtre à lui** : un bouton dans son en-tête détache la plaque dépliée dans une fenêtre aussi grande qu'on la veut, son texte grandissant avec elle ; fermer la fenêtre replie l'atelier sur sa ligne sous l'image (`silicontrol lab detach`, `lab attach`).
+- **Choisir les pas**, une option Bêta (Réglages › Avancé › Bêta), éteinte par défaut : allumée, la boîte du débruiteur propose le nombre de pas, pour une LoRA distillée en moins de pas (Krea 2 en 4) ; éteinte, chaque rendu reprend le nombre du modèle.
+- **L'atelier s'ouvre replié tant qu'aucun modèle n'est installé**, pour laisser voir les modèles à télécharger ; il se déplie quand le premier est prêt.
+
 ### Les Légères, dans notre propre 4 bits
 
 - **Les Légères de Z-Image, de Qwen-Image-2.1, d'Anima et de Krea 2 passent à notre propre 4 bits (SQ)**, à la place des GGUF Q4_K_M de tiers : plus fidèles au modèle de l'éditeur que le Q4_K_M qu'elles remplacent, à peu près à la vitesse de la Compact et avec moins de mémoire. Un fichier par famille, publié sur Hugging Face (`gwenn-ha-dev/…-Siliconed-SQ4`). Une Légère installée prend ses nouveaux poids à sa prochaine installation, qui retire les anciens (le modèle d'image pèse 5,0 Go pour Z-Image, 4,4 Go pour Qwen-Image-2.1, 1,7 Go pour Anima, 7,6 Go pour Krea 2).
@@ -417,7 +430,7 @@
   et ses plus fins détails bougent. Tous les chiffres : [Le Neural Engine](ENGINE.fr.md#le-neural-engine).
 - **Huit bits contre huit bits** : Z-Image Compact en 1024², avec le rendu plus rapide et le Neural
   Engine (tous deux par défaut), rend en 81,1–83,2 s ; le `q8p` 8 bits par défaut de Draw Things,
-  en 135,0–144,2 s sur le même Mac ([À côté de Draw Things](ENGINE.fr.md#à-côté-de-draw-things)).
+  en 135,0–144,2 s sur le même Mac.
 - **Ce Mac est mesuré à nouveau** avant le premier rendu après la mise à jour, environ une minute,
   comme après chaque version : la mesure comprend désormais le Neural Engine, sur les produits
   propres à chaque modèle.

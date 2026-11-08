@@ -4,6 +4,19 @@ English · [Français](RELEASE-NOTES.fr.md)
 
 ## 0.21
 
+### Faster on large Macs
+
+- **The denoiser runs as one stream of GPU work**, for the five models: a block's work is queued on the GPU without a wait between operations, the Neural Engine's rows beside it, and where the memory budget holds the model's weights they are read in place instead of streamed. The capacity map measures that pairing as a render runs it. Render times on the reference machine: [Numbers](ENGINE.md#numbers).
+- **The Compacts compute in int8 × int8 (W8A8)** on the GPU's tensor units where this Mac's measure finds it faster, the way their publishers compute them: the activation rotated and quantized to int8 per row by the operation that makes it, the weights read in place. Checked against ComfyUI's own recipe on the published integers (`siliconed check <model> dit --variant compact --int8-activations`).
+- **The decoders run in bf16** where the map finds it faster, and the end of each phase waits only for what Metal still holds.
+
+### The app
+
+- **A ✕ on the history's thumbnails**: hover one, click the ✕, and that image leaves the history; ⌘Z brings it back.
+- **The Prompt Lab in a window of its own**: a button in its header detaches the unfolded plate into a window as large as you make it, its text growing with it; closing the window folds the lab back to its line under the image (`silicontrol lab detach`, `lab attach`).
+- **Choose Steps**, a Beta option (Settings › Advanced › Beta), off by default: on, the denoiser's box offers the step count, for a LoRA distilled to fewer steps (Krea 2 at 4); off, every render takes the model's own count again.
+- **The Prompt Lab opens folded while no model is installed**, so that the models to download are what is seen; it unfolds when the first one is ready.
+
 ### The Lights, in our own 4 bits
 
 - **The Lights of Z-Image, Qwen-Image-2.1, Anima and Krea 2 are now our own 4-bit (SQ)**, in place of the third-party GGUF Q4_K_M: more faithful to the publisher's model than the Q4_K_M it replaces, at about the Compact's speed and with less memory. One file per family, published on Hugging Face (`gwenn-ha-dev/…-Siliconed-SQ4`). An installed Light takes the new weights at its next installation, which removes the old ones (the image model weighs 5.0 GB for Z-Image, 4.4 GB for Qwen-Image-2.1, 1.7 GB for Anima, 7.6 GB for Krea 2).
@@ -408,7 +421,7 @@ English · [Français](RELEASE-NOTES.fr.md)
   finest details move. Every figure: [The Neural Engine](ENGINE.md#the-neural-engine).
 - **Eight bits against eight bits**: Z-Image Compact at 1024², with Faster Rendering and the Neural
   Engine (both by default), renders in 81.1–83.2 s; Draw Things' default 8-bit `q8p`, 135.0–144.2 s
-  on the same Mac ([Next to Draw Things](ENGINE.md#next-to-draw-things)).
+  on the same Mac.
 - **This Mac is measured again** before the first render after the update, about a minute, as after
   every version: the measure now includes the Neural Engine, on each model's own products.
 - **The remote control**: `silicontrol add --ane` or `--no-ane`, like a click on the tag;

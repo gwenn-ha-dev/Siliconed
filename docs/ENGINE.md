@@ -73,29 +73,6 @@ The small grid is fed the averaged state plus the low band of the starting noise
 
 It produces a different image from the full-size recipe with the same seed (the composition is decided in the first steps: the same scene, sometimes another person), not a degraded copy of it. It does not apply with a LoRA, Detail, an edit, another number of steps or another schedule. Off, every evaluation is at full size and the image is the same, to the bit, as before: the one checked against diffusers, to which the deviations above apply.
 
-### Next to Draw Things
-
-[Draw Things](https://drawthings.ai) is the reference on the Mac; here, its community engine, [draw-things-community](https://github.com/drawthingsai/draw-things-community) at `bc3970c`, with the model's defaults (UniPC trailing, CFG 1). The same machine, freshly restarted, one engine loaded at a time; Z-Image Turbo, 1024², 8 steps (8 evaluations on each side), seed 42, three renders on each side over three variants of the same prompt. Draw Things was measured on 13/10/2026 (a 70-minute session) and nothing changed on its side since; Siliconed at full size on 14/10/2026, after the fix, and with Faster Rendering on 19/10/2026 (app 0.12, three renders of the library prompt each, every one in a freshly opened app). Siliconed's peaks in this table are 0.12's; they are lower since ([Numbers](#numbers)).
-
-| | weights | time | peak memory (GiB) | read from disk per render |
-|---|---|---|---|---|
-| Siliconed, Standard | the publisher's bf16, computed in fp32 | 113–119 s | 2.6 | 51–58 GB |
-| Siliconed, Light | GGUF Q4_K_M | 118–120 s | 2.0 | 3.5–8.7 GB |
-| Siliconed, Standard, Faster Rendering on | the publisher's bf16, computed in fp32 | 85–86 s | 2.8 | 51–58 GB |
-| Siliconed, Light, Faster Rendering on | GGUF Q4_K_M | 90–91 s | 2.1 | 3.5–8.7 GB |
-| Draw Things, Exact | f16 | 167–179 s | 5.3 | 99 GB |
-| Draw Things, default | 8 bits (`q8p`) | 142–164 s | 3.5–4.3 | 11 GB |
-| Draw Things, 6-bit | 6 bits (`q6p`) | 136–138 s | 3.5 | 6–14 GB |
-
-The comparison is about wall-clock time, not identical arithmetic: the samplers and the weights differ, so do the images. Peak memory does not count the weights mapped from disk, on either side. Siliconed makes the machine run hotter, which follows from computing in fp32. Siliconed's first two lines are every evaluation at full size, like Draw Things'; with Faster Rendering, the first 3 of its 8 evaluations run on a half-size grid, which Draw Things does not do: less work, a different image ([how](#faster-rendering)).
-
-8-bit against 8-bit, on 23/10/2026 (app 0.14): Siliconed's Compact (the third party's GGUF Q8_0, kept as published) against Draw Things' default `q8p`, in its community engine, updated since to `6c1dd09`; Z-Image Turbo, 1024², 8 steps, seed 42, the library prompt; each render in a freshly started process on each side (the app, the engine's server), three on each side, then Siliconed again as the control.
-
-| | weights | time | peak memory (GiB) | read from disk per render |
-|---|---|---|---|---|
-| Siliconed, Compact, Faster Rendering and the Neural Engine (both on for these series) | GGUF Q8_0 | 81.1–83.2 s (control 81.3 s) | 2.6 | 3.7–11 GB |
-| Draw Things, default | 8 bits (`q8p`) | 135.0–144.2 s | 4.3 | 10–18 GB |
-
 ## Memory and the budget
 
 The largest model, Krea 2 Turbo in Standard (sizes: [Model management](APP.md#model-management)), runs on a 16 GB Mac within a fixed budget. Weights are read from disk as they are needed. Siliconed never takes more than ¾ of the Mac's memory minus 2 GB (4 GB on an 8 GB Mac, 10 GB on 16 GB, 22 GB on 32 GB): each render computes what it needs before it starts, takes the fastest plan that fits, and checks its own peak against that figure. What other applications hold stays theirs.
@@ -104,7 +81,6 @@ The largest model, Krea 2 Turbo in Standard (sizes: [Model management](APP.md#mo
 
 ## How it compares
 
-- **[Draw Things](https://drawthings.ai)**, the reference native app on the Mac: its engine is [measured above](#next-to-draw-things) on the same machine. Siliconed computes in fp32 — with the accelerators on, part of the DiT on the Neural Engine and the GPU's tensor units where this Mac's measure finds it faster — and is checked stage by stage against the reference implementation, in fp32, and in bf16 for the accelerators.
 - **[ComfyUI](https://github.com/comfyanonymous/ComfyUI) or [diffusers](https://github.com/huggingface/diffusers) in Python**: the same models, without a Python environment or a node graph to wire. Siliconed implements them natively and checks itself against diffusers and [transformers](https://github.com/huggingface/transformers); `silicontrol` covers scripting and automation.
 
 ## Community diagnostic
