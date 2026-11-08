@@ -496,7 +496,7 @@ package final class MossImageDiT: BoundaryRecording, PhaseTiming {
             _ = try w.withUnsafeMutableBufferPointer { try artifact.materialize(name, into: $0) }
             weights.append(w)
         }
-        let queued = tiled != nil && stream.isOn
+        let queued = tiled != nil && pass != nil && stream.isOn
         if !queued { stream.drain() }                        // the graph and the cut by heads wait on their own; the CPU's pass reads Q, K
         let clock = ProductLedger.pass(sequence: n, heads: heads, headDim: dh)
         // Where the tiled attention follows, Q and K written rounded straight into its copies, the fp32 left unwritten: it reads

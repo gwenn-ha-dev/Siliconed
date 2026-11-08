@@ -442,7 +442,7 @@ package final class Artifact {
 
     /// **The whole mapping as one GPU buffer, not copied** (`newBuffer(bytesNoCopy:)` over the read-only file pages, rounded to the
     /// page): made on first use for `device`, `nil` where Metal refuses it or the map is larger than a buffer may be. The map's pages
-    /// then stay clean and file-backed, never swapped (`DÉCISIONS`: the map in B); what the GPU's first read of each page costs is paid
+    /// then stay clean and file-backed, never swapped (the map counts in the memory budget); what the GPU's first read of each page costs is paid
     /// once per load.
     package func wrappedMap(on device: MTLDevice) -> MTLBuffer? {
         wrapLock.lock(); defer { wrapLock.unlock() }

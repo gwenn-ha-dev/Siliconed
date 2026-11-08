@@ -287,7 +287,7 @@
       <ul class="stats">
         <li><b>22.3 s</b>1024² on an M5 Pro, Compact</li>
         <li><b>27.9 s</b>the same, the publisher's bf16</li>
-        <li><b>13.1 GiB</b>peak of the app at 1024², of a 46 GB budget</li>
+        <li><b>13.1 GiB</b>peak of the app at 1024², of a 46 GiB budget</li>
       </ul>
     </div>
     <figure class="shot reveal">
@@ -480,7 +480,7 @@
     <div class="card reveal"><h3>Scriptable, agents included</h3><p><code>silicontrol</code> drives the running app from a terminal, with JSON lines out; <code>silicontrol help</code> is all a script or a coding agent needs.</p></div>
     <div class="card reveal"><h3>Reproducible to the bit</h3><p>Same prompt, seed, settings and version on the same Mac: the same image, byte for byte.</p></div>
     <div class="card reveal" style="grid-column:1/-1"><h3>Render on another Mac</h3><p>The MacBook in the living room computes on the Mac mini next door: Render › Compute On moves the whole window there. Paired once with a six-digit code, TLS with a key per Mac.</p></div>
-    <div class="card reveal" style="grid-column:1/-1"><h3>Faster Rendering, the honest trick</h3><p>A Beta option, off by default; turned on, it is a choice per model. From 1024 px on each side, the first steps run on a half-size grid, the rest at full size: 17 to 31 % off the clock at 1024² (7 % on MOSS-Image), still all 8 evaluations of the recipe. The trick is in the noise: the small grid gets the averaged picture plus the low band of the noise, and the step brought back to full size clears the fine noise exactly as a full step would, so no grain, no cracks; freckles and book spines survive. Another picture than the full-size one, not a blurrier one. Switch it off and you get the full-size recipe, bit for bit, the one checked against diffusers. The choice travels with the image, so Render Again gives the same one.</p></div>
+    <div class="card reveal" style="grid-column:1/-1"><h3>Faster Rendering, the honest trick</h3><p>A Beta option, off by default; turned on, it is a choice per model. From 1024 px on each side, the first steps run on a half-size grid, the rest at full size: 17 to 31 % off the clock at 1024² (7 % on MOSS-Image; a MacBook Pro M1 Pro, app 0.18), still all 8 evaluations of the recipe. The trick is in the noise: the small grid gets the averaged picture plus the low band of the noise, and the step brought back to full size clears the fine noise exactly as a full step would, so no grain, no cracks; freckles and book spines survive. Another picture than the full-size one, not a blurrier one. Switch it off and you get the full-size recipe, bit for bit, the one checked against diffusers. The choice travels with the image, so Render Again gives the same one.</p></div>
   </div>
 </section>
 
@@ -503,7 +503,7 @@
       <p class="kicker">Install</p>
       <h2>Pick your size.</h2>
       <p class="punch">Standard, Compact or Light.</p>
-      <p>The publisher's weights, 8-bit versions, or a 4-to-6-bit transformer. The 8-bit Compact is
+      <p>The publisher's weights, 8-bit versions, or our own 4-bit transformer. The 8-bit Compact is
         preselected: 19 to 30 % faster than the Standard on an M5 Pro, half the disk. Every file is pinned to a
         revision and checked by sha256, and downloads resume where they stopped. The next file downloads
         while the previous one is prepared.</p>

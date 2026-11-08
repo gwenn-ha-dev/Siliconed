@@ -16,7 +16,7 @@ English · [Français](RELEASE-NOTES.fr.md)
 - **The Prompt Lab in a window of its own**: a button in its header detaches the unfolded plate into a window as large as you make it, its text growing with it; closing the window folds the lab back to its line under the image (`silicontrol lab detach`, `lab attach`).
 - **Choose Steps**, a Beta option (Settings › Advanced › Beta), off by default: on, the denoiser's box offers the step count, for a LoRA distilled to fewer steps (Krea 2 at 4); off, every render takes the model's own count again.
 - **The Prompt Lab opens folded while no model is installed**, so that the models to download are what is seen; it unfolds when the first one is ready.
-- **After the update**, a model whose weights changed in 0.21 (the Compacts of Z-Image and Anima, every Light) no longer renders until it takes them: the welcome says which, with the version you had chosen, and offers **Update…**.
+- **After the update**, a model whose weights changed in 0.21 (the Compacts of Z-Image and Anima, every Light) no longer renders until it takes them: the welcome says which, with the version you had chosen, and offers **Update…**; so does the Models window when another model is ready.
 
 ### The Lights, in our own 4 bits
 

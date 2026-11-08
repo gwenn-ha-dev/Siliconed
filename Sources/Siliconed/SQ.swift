@@ -2,7 +2,7 @@ import Foundation
 import Metal
 import Synchronization
 
-/// **SQ, Siliconed's own 4 and 5 bits** (the quantizer: the private `tools/quant4/sq4.py`): read as it is stored, decoded to the
+/// **SQ, Siliconed's own 4 and 5 bits** (the format: the card of each `gwenn-ha-dev/<model>-Siliconed-SQ4` repository): read as it is stored, decoded to the
 /// int8 it is, multiplied by the Compact's int8 route.
 ///
 ///     one linear W [N, K], K a multiple of 256

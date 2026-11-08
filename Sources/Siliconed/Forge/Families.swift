@@ -188,8 +188,8 @@ package enum Variant: String, CaseIterable, Sendable, Codable {
     /// are the Standard's. Every Compact DiT is an int8 convrot (Comfy-Org's; Bedovyy's for Anima);
     /// Anima's Compact is its DiT alone: its encoder stays the Standard's.
     case compact
-    /// **The DiT in 4 to 6 bits as a third party publishes it** (a GGUF Q4_K_M — unsloth's, vanes430's
-    /// for Anima, vantagewithai's for Krea 2 — its blocks kept whole), the Compact's text encoder, the Standard's tokenizers and VAE: the smallest
+    /// **The DiT in Siliconed's own 4 bits** (SQ, 4 to 8 bits by layer: `SQ`, published as
+    /// `gwenn-ha-dev/<model>-Siliconed-SQ4`; MOSS-Image has none), the Compact's text encoder, the Standard's tokenizers and VAE: the smallest
     /// on disk and the least read from it at each step — another set of weights, an image that may
     /// compose differently. Preselected on a Mac of 8 GB (`Family.preselectedVariant`).
     case light

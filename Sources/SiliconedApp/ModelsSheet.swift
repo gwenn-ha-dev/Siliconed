@@ -288,6 +288,11 @@ struct ModelManagement: View {
         if installed {
             Button("Use") { app.identifier = card.id; shutDown() }
                 .disabled(app.identifier == card.id)
+        } else if let old = app.outdatedVariant(of: p.family) {
+            // A version this release gave new weights (the welcome says it only while no other model is ready).
+            Button("Update…") { app.offerInstall(p.family, variant: old) }
+                .disabled(!app.libraryManageable || app.installOffer?.family == p.family)
+                .help(String(localized: "Shows the license and the space it takes; nothing is downloaded before you accept"))
         } else {
             Button(p.present ? "Finish Installing…" : "Install…") { app.offerInstall(p.family) }
                 .disabled(!app.libraryManageable || app.installOffer?.family == p.family)
@@ -322,6 +327,7 @@ struct ModelManagement: View {
                 : String(localized: "\(card.licenseName) · license not accepted yet: asked at the first render")
         }
         if p.isReady { return String(localized: "Encoder and VAE only — enough to render with an imported model") }
+        if let old = app.outdatedVariant(of: p.family) { return String(localized: "Your \(VersionChoice.name(old)) takes new weights") }
         if p.present { return String(localized: "Incomplete installation — it will resume where it stopped") }
         return String(localized: "≈ \(Figures.disk(toDownload(p))) once installed · \(card.licenseName)")
     }
