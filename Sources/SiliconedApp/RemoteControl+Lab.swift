@@ -34,6 +34,10 @@ extension RemoteControl {
             lab.unfold()
         case .fold:
             lab.fold()
+        case .detach:
+            lab.detached = true
+        case .attach:
+            lab.detached = false
         case .add(let words):
             var images: [(ReferenceImage, Data?)] = []
             for word in words {
@@ -163,7 +167,7 @@ extension RemoteControl {
             if let id = lab.describing, let n = rack.inputs.firstIndex(where: { $0.id == id }) { w["image"] = n + 1 }
             writing = w
         }
-        return ["unfolded": lab.unfolded, "model": rack.identifier, "text": rack.prompt, "images": images,
+        return ["unfolded": lab.unfolded, "detached": lab.detached, "model": rack.identifier, "text": rack.prompt, "images": images,
                 "unused": rack.unusedInputs, "writing": writing]
     }
 }

@@ -81,6 +81,18 @@ final class AppState {
             }
         }
     }
+    private static let stepsBetaKey = "stepsBeta"
+    /// **Choose Steps** (Settings ▸ Advanced ▸ Beta, issue 16): off by default, the steps are the model's recipe — the five are
+    /// distilled for 8, and another count only costs. On, the DiT box offers them, for a step-distilled LoRA (Krea 2 at 4)
+    /// that brings a recipe of its own. Off again, the form goes back to the recipe, as More Solvers off goes back to Euler.
+    /// `silicontrol add --steps` is not gated by it: the command line always could, and a PNG's settings reused still bring theirs.
+    var stepsBeta = UserDefaults.standard.bool(forKey: AppState.stepsBetaKey) {
+        didSet {
+            guard stepsBeta != oldValue else { return }
+            UserDefaults.standard.set(stepsBeta, forKey: Self.stepsBetaKey)
+            if !stepsBeta { steps = card?.defaultSteps ?? 8 }
+        }
+    }
     private static let negativeLoRAKey = "negativeLoRAStrengths"
     /// **Negative LoRA strengths** (Experimental): W + s·ΔW with s < 0 pushes the image away from what
     /// the LoRA learned — meant for « slider » LoRAs, trained as a difference to be used from −x to +x;

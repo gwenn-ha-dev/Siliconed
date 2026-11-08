@@ -82,6 +82,19 @@ private struct Thumbnail: View {
                 .strokeBorder(marked ? Palette.live : hover ? Color.secondary : Palette.hairline,
                               lineWidth: marked ? (shown ? 3.5 : 2.5) : 1))
             .opacity(marked || hover ? 1 : 0.88)
+            // **The ✕ of the hovered tile** (issue 16): the lab's own, on this image alone even among several marked —
+            // the menu acts on the group, the ✕ on what it sits on. No question asked: ⌘Z brings it back.
+            .overlay(alignment: .topTrailing) {
+                if hover {
+                    Button { app.delete(entry) } label: {
+                        Image(systemName: "xmark.circle.fill").symbolRenderingMode(.palette)
+                            .foregroundStyle(.white, .black.opacity(0.55))
+                    }
+                    .buttonStyle(.plain).padding(3)
+                    .help("Remove from History (⌘Z brings it back)")
+                    .accessibilityLabel(Text("Remove from History"))
+                }
+            }
             .frame(height: side + 4)
             .contentShape(Rectangle())
             .onHover { hover = $0 }

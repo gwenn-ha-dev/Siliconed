@@ -336,7 +336,7 @@ extension RemoteControl {
         }
     }
 
-    /// The four Beta options as the window's switches hold them (this Mac's preferences, shown by Settings whichever Mac computes).
+    /// The five Beta options as the window's switches hold them (this Mac's preferences, shown by Settings whichever Mac computes).
     func betaState() -> [String: Any] {
         var o: [String: Any] = [:]
         // JSON keys are snake_case; the name typed after `set beta` keeps its hyphens.

@@ -135,13 +135,17 @@ private struct GraphCanvas: View {
             .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
             .clipped()
             // A click on the image folds the bar — not while the writer writes, which folding would stop.
-            .simultaneousGesture(TapGesture().onEnded { if lab.unfolded, !lab.isWriting { lab.fold() } })
+            // Detached, the plate is not over the image: a click there leaves it be.
+            .simultaneousGesture(TapGesture().onEnded { if lab.unfolded, !lab.isWriting, !lab.detached { lab.fold() } })
             // The folded line's room: it never covers the image. Unfolded, the bar rises over the image from there — in the
             // layout, it summed its height to the image's, and the window grew past the screen, the rack cut at both ends.
             Color.clear.frame(height: LabView.foldedRoom)
         }
         .overlay(alignment: .bottom) {
-            LabView(model: lab).padding(.horizontal, 16).padding(.bottom, 12)
+            // Unfolded and detached, the plate is in its own window (`LabWindow`); the line's room stays, the image does not jump.
+            if !(lab.detached && lab.unfolded) {
+                LabView(model: lab).padding(.horizontal, 16).padding(.bottom, 12)
+            }
         }
         .animation(Motion.pick(.spring(duration: 0.3)), value: lab.unfolded)
         .onAppear { lab.opening() }

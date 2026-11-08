@@ -172,6 +172,7 @@ package struct InstructionOrder: Equatable, Sendable {
 /// **The four switches of Settings › Advanced › Beta**, by the name `silicontrol set beta` gives them.
 package enum BetaOption: String, CaseIterable, Sendable {
     case moreSolvers = "more-solvers"
+    case steps = "steps"
     case fasterRendering = "faster-rendering"
     case sizeScales = "size-scales"
     case negativeLoRA = "negative-lora"
@@ -182,6 +183,7 @@ package enum BetaOption: String, CaseIterable, Sendable {
         switch word {
         case "size-in-two-scales": self = .sizeScales
         case "negative-lora-strengths": self = .negativeLoRA
+        case "choose-steps": self = .steps
         default: self.init(rawValue: word)
         }
     }

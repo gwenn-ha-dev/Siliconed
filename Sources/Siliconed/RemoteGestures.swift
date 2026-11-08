@@ -124,6 +124,8 @@ package enum GestureOrder: Equatable, Sendable {
     package enum LabAction: Equatable, Sendable {
         case status
         case unfold, fold
+        /// The unfolded plate in a window of its own (`detach`), or back over the image (`attach`).
+        case detach, attach
         /// Files, or `i7` of the history: each takes the role a newcomer takes.
         case add([String])
         case role(image: Int, LabInputs.Role)
@@ -319,6 +321,8 @@ package enum GestureOrder: Equatable, Sendable {
             case nil: return .success(.lab(.status))
             case "open"?: return rest.isEmpty ? .success(.lab(.unfold)) : .failure(.usage(line))
             case "close"?: return rest.isEmpty ? .success(.lab(.fold)) : .failure(.usage(line))
+            case "detach"?: return rest.isEmpty ? .success(.lab(.detach)) : .failure(.usage(line))
+            case "attach"?: return rest.isEmpty ? .success(.lab(.attach)) : .failure(.usage(line))
             case "add"?: return rest.isEmpty ? .failure(.usage(line)) : .success(.lab(.add(rest)))
             case "role"?:
                 guard rest.count == 2 else { return .failure(.usage(line)) }

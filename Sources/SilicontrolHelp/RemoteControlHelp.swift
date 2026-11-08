@@ -115,7 +115,7 @@ package enum RemoteControlHelp {
       clear                                    empties the queue and stops the running render
       set faster-rendering on|off [--model ID] a model's Faster Rendering, as a click (queue empty)
       set accelerators on|off [--model ID]     a model's accelerators, as a click (queue empty)
-      set beta [OPTION on|off]                 the four Beta options of Settings, as a click; alone, reads them
+      set beta [OPTION on|off]                 the five Beta options of Settings, as a click; alone, reads them
       set save-images [FOLDER|off]             Save Every Image To… of Settings: each new image as a PNG there; alone, reads it
       history [N]                              the session's images (most recent first)
       save i7 [i8 …] DEST [--format F]         writes images (.png/.jpg/.heic file, or folder in png|jpeg|heic)
@@ -600,7 +600,7 @@ package enum RemoteControlHelp {
 
         faster_rendering   : Faster Rendering of the model in the rack (help set).
         accelerators       : the « Accelerators » choice of the model in the rack (help set); only on a Mac whose measure offers one.
-        beta               : the four Beta options of Settings (help set): more_solvers, faster_rendering, size_scales, negative_lora.
+        beta               : the five Beta options of Settings (help set): more_solvers, steps, faster_rendering, size_scales, negative_lora.
         writer             : the Prompt Lab's writer (help rewrite): "state" is "ready", or the code rewrite would refuse with
                              (writer_absent, writer_head with "download_bytes", writer_memory with "gigabytes", writer_preparing);
                              "installing" while the head comes (help install); "failure" the sentence of an install that failed.
@@ -685,14 +685,17 @@ package enum RemoteControlHelp {
         one value and finished under the other would mix two recipes): else "busy". « models » tells each model's
         values, « status » the rack's.
 
-        BETA is the four switches of Settings ▸ Advanced ▸ Beta, off by default:
+        BETA is the five switches of Settings ▸ Advanced ▸ Beta, off by default:
           more-solvers      the solvers Euler a, DPM++ 2M and UniPC (--solver of « add »)
+          steps             Choose Steps: the step count in the DiT box, for step-distilled LoRAs (--steps of « add »
+                            takes any count the model has a schedule for, on or off)
           faster-rendering  the Faster Rendering switch in the DiT box — the master of the per-model choices above
           size-scales       Size in Two Scales: the Size menu as a proportion, then 1K or 2K (3:4@2K, help add)
           negative-lora     LoRA strengths from −1.5 to 1.5, for "slider" LoRAs (--lora NAME:-0.5)
         "set beta" alone reads them; "set beta OPTION on|off" sets one (the setting's own name works too:
-        size-in-two-scales, negative-lora-strengths). The effects are the switch's: turning More Solvers off puts
-        a solver back to Euler; turning Negative LoRA Strengths off brings the strengths already set back to 0.
+        size-in-two-scales, negative-lora-strengths, choose-steps). The effects are the switch's: turning More Solvers
+        off puts a solver back to Euler; turning Choose Steps off puts the rack's steps back to the model's recipe;
+        turning Negative LoRA Strengths off brings the strengths already set back to 0.
         Like the switches, they wait for nothing and apply to what is queued next. They are this Mac's preferences; when
         the window computes on another Mac, its copy is set too. « status » gives them as "beta".
 
@@ -892,7 +895,7 @@ package enum RemoteControlHelp {
         """,
 
         "lab": """
-        silicontrol lab [open|close]
+        silicontrol lab [open|close|detach|attach]
         silicontrol lab add <image|i7> …
         silicontrol lab role <n> edited|reference|start|none
         silicontrol lab remove <n>
@@ -907,6 +910,8 @@ package enum RemoteControlHelp {
           lab                          what it holds: folded or not, the text, the images and their roles
           lab open · lab close         unfolds or folds the bar (⌥⌘L); folding stops a Rewrite or a Describe
                                        under way and gives the writer's memory back
+          lab detach · lab attach      unfolded, the bar in a window of its own, resizable — or back over the image;
+                                       folded, it is the line under the image either way ("detached")
           lab add IMAGE|i7 …           files, or images of the history: each takes the role a newcomer
                                        takes — the next place under Qwen-Image-2.1 (edited, then references,
                                        three at most with the subjects the text cites), none elsewhere
@@ -937,7 +942,7 @@ package enum RemoteControlHelp {
         what the next render will not read, as the line beside Generate does.
 
         ANSWER
-          {"ok": true, "lab": {"unfolded": false, "model": "qwen-image-2.1", "text": "@alice on the quay",
+          {"ok": true, "lab": {"unfolded": false, "detached": false, "model": "qwen-image-2.1", "text": "@alice on the quay",
             "images": [{"n": 1, "name": "quay.jpg", "width": 1536, "height": 1024, "role": "edited",
                         "used": true}], "unused": 0, "writing": null}}
         FAILURES: usage, image (no image N), role (a role the rack's model lacks), ref (image N cannot be read);
@@ -1425,7 +1430,7 @@ package enum RemoteControlHelp {
       clear                                    vide la file et arrête le rendu en cours
       set faster-rendering on|off [--model ID] le rendu plus rapide d'un modèle, comme un clic (file vide)
       set accelerators on|off [--model ID]     les accélérateurs d'un modèle, comme un clic (file vide)
-      set beta [OPTION on|off]                 les quatre options Bêta des Réglages, comme un clic ; seul, les lit
+      set beta [OPTION on|off]                 les cinq options Bêta des Réglages, comme un clic ; seul, les lit
       set save-images [FOLDER|off]             Enregistrer chaque image dans… des Réglages : chaque image nouvelle en PNG ; seul, le lit
       history [N]                              les images de la session (la plus récente d'abord)
       save i7 [i8 …] DEST [--format F]         écrit des images (fichier .png/.jpg/.heic, ou dossier en png|jpeg|heic)
@@ -1918,7 +1923,7 @@ package enum RemoteControlHelp {
 
         faster_rendering   : le rendu plus rapide du modèle du rack (help set).
         accelerators       : le choix des « Accélérateurs » du modèle du rack (help set) ; seulement sur un Mac dont la mesure en offre un.
-        beta               : les quatre options Bêta des Réglages (help set) : more_solvers, faster_rendering, size_scales, negative_lora.
+        beta               : les cinq options Bêta des Réglages (help set) : more_solvers, steps, faster_rendering, size_scales, negative_lora.
         writer             : le rédacteur de l'Atelier (help rewrite) : "state" vaut "ready", ou le code dont rewrite refuserait
                              (writer_absent, writer_head avec "download_bytes", writer_memory avec "gigabytes", writer_preparing) ;
                              "installing" tant que la tête arrive (help install) ; "failure" la phrase d'une installation qui a échoué.
@@ -2006,14 +2011,17 @@ package enum RemoteControlHelp {
         une valeur et fini sous l'autre mélangerait deux recettes) : sinon « busy ». « models » donne les valeurs de chaque
         modèle, « status » celles du rack.
 
-        BETA, ce sont les quatre interrupteurs de Réglages ▸ Avancé ▸ Bêta, éteints par défaut :
+        BETA, ce sont les cinq interrupteurs de Réglages ▸ Avancé ▸ Bêta, éteints par défaut :
           more-solvers      les solveurs Euler a, DPM++ 2M et UniPC (--solver de « add »)
+          steps             Choisir les pas : le nombre de pas dans la boîte DiT, pour les LoRA distillées en moins de
+                            pas (--steps de « add » prend tout nombre que le modèle sait faire, allumé ou non)
           faster-rendering  l'interrupteur du rendu plus rapide dans la boîte DiT — le maître des choix par modèle ci-dessus
           size-scales       Taille en deux échelles : le menu Taille en proportion, puis 1K ou 2K (3:4@2K, help add)
           negative-lora     forces de LoRA de −1,5 à 1,5, pour les LoRA « curseur » (--lora NOM:-0.5)
         « set beta » seul les lit ; « set beta OPTION on|off » en règle une (le nom du réglage marche aussi :
-        size-in-two-scales, negative-lora-strengths). Les effets sont ceux de l'interrupteur : éteindre More Solvers remet un
-        solveur sur Euler ; éteindre Negative LoRA Strengths ramène à 0 les forces déjà réglées. Comme les interrupteurs, elles
+        size-in-two-scales, negative-lora-strengths, choose-steps). Les effets sont ceux de l'interrupteur : éteindre More
+        Solvers remet un solveur sur Euler ; éteindre Choose Steps remet les pas du rack à la recette du modèle ; éteindre
+        Negative LoRA Strengths ramène à 0 les forces déjà réglées. Comme les interrupteurs, elles
         n'attendent rien et valent pour ce qui se met en file ensuite. Ce sont les préférences de ce Mac ; quand la fenêtre
         calcule sur un autre, sa copie est réglée aussi. « status » les donne sous "beta".
 
@@ -2221,7 +2229,7 @@ package enum RemoteControlHelp {
         """,
 
         "lab": """
-        silicontrol lab [open|close]
+        silicontrol lab [open|close|detach|attach]
         silicontrol lab add <image|i7> …
         silicontrol lab role <n> edited|reference|start|none
         silicontrol lab remove <n>
@@ -2236,6 +2244,8 @@ package enum RemoteControlHelp {
           lab                          ce qu'il tient : replié ou non, le texte, les images et leurs rôles
           lab open · lab close         déplie ou replie la barre (⌥⌘L) ; replier arrête un Réécrire ou un
                                        Décrire en cours et rend la mémoire du rédacteur
+          lab detach · lab attach      dépliée, la barre dans une fenêtre à elle, redimensionnable — ou de nouveau sur
+                                       l'image ; repliée, c'est la ligne sous l'image dans les deux cas ("detached")
           lab add IMAGE|i7 …           des fichiers, ou des images de l'historique : chacune prend le rôle
                                        d'une arrivante — la place suivante sous Qwen-Image-2.1 (éditée, puis
                                        références, trois au plus avec les sujets que cite le texte), aucun
@@ -2267,7 +2277,7 @@ package enum RemoteControlHelp {
         "unused" compte ce que le prochain rendu ne lira pas, comme la ligne à côté de Générer.
 
         RÉPONSE
-          {"ok": true, "lab": {"unfolded": false, "model": "qwen-image-2.1", "text": "@alice on the quay",
+          {"ok": true, "lab": {"unfolded": false, "detached": false, "model": "qwen-image-2.1", "text": "@alice on the quay",
             "images": [{"n": 1, "name": "quai.jpg", "width": 1536, "height": 1024, "role": "edited",
                         "used": true}], "unused": 0, "writing": null}}
         ÉCHECS : usage, image (pas d'image N), role (un rôle que le modèle du rack n'a pas), ref (l'image N ne se lit

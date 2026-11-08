@@ -243,8 +243,22 @@ struct DiTBox: View {
         // **The steps, only off the recipe**: the five models are distilled for 8, and fewer is softer, more is longer and no
         // better — a choice that only costs. The line comes when something else set them (a PNG's settings reused,
         // `silicontrol`), as the variation's does, with its way back.
+        // With Choose Steps on (Beta), the line is always there and the count is the hand's; a count the model has no schedule
+        // for greys Generate with the counts it has (`blocker`), as for any other source.
         let recipe = app.card?.defaultSteps ?? 8
-        if app.steps != recipe {
+        if app.stepsBeta {
+            Field(title: "Steps") {
+                Stepper(value: $app.steps, in: 1...Request.maximumSteps) { Text(verbatim: "\(app.steps)").monospacedDigit() }
+                    .fixedSize()
+                if app.steps != recipe {
+                    Button { app.steps = recipe } label: { Image(systemName: "xmark.circle.fill").frame(width: 24, height: 24).contentShape(Rectangle()) }
+                        .buttonStyle(.borderless).foregroundStyle(.secondary)
+                        .help(String(localized: "Back to \(recipe) steps, the count this model is distilled for"))
+                        .accessibilityLabel(Text("Back to \(recipe) steps, the count this model is distilled for"))
+                }
+            }
+            .help(String(localized: "\(recipe) steps: the count this Turbo model is distilled for. Fewer for a LoRA distilled to fewer steps"))
+        } else if app.steps != recipe {
             Field(title: "Steps") {
                 Text(verbatim: "\(app.steps)").monospacedDigit()
                 Button { app.steps = recipe } label: { Image(systemName: "xmark.circle.fill").frame(width: 24, height: 24).contentShape(Rectangle()) }

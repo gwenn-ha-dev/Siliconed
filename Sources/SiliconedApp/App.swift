@@ -611,8 +611,8 @@ final class MainWindow: NSObject, NSWindowDelegate {
         case 53 where mods.isEmpty:                                                     // Esc
             if app.showsOriginal { app.comparesOriginal = false; return true }
             if app.marked.count > 1 { app.unmark(); return true }
-            // Nothing else to leave: the bar, unfolded over the image, folds.
-            guard LabModel.shared.unfolded else { return false }
+            // Nothing else to leave: the bar, unfolded over the image, folds — not the detached one, which is not over it.
+            guard LabModel.shared.unfolded, !LabModel.shared.detached else { return false }
             LabModel.shared.fold()
         // ⌘A by its character, not its key code: code 0 is A on a QWERTY keyboard but Q on an AZERTY
         // one — read as a position, it took ⌘Q from the menu.

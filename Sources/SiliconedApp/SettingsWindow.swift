@@ -27,7 +27,7 @@
 //               the other Macs: lend this one, compute on another (`OtherMacsView.swift`).
 //     Prompt Lab the writer's ten instructions, each the user's to rewrite (`SettingsLab.swift`).
 //     Advanced  kept out of the way: Command Line (silicontrol, linked into /usr/local/bin), Beta (More
-//               Solvers, Faster Rendering, Size in Two Scales, Negative LoRA Strengths: off by default).
+//               Solvers, Choose Steps, Faster Rendering, Size in Two Scales, Negative LoRA Strengths: off by default).
 //
 // - **Incognito**: an NSWindow of ours, as `MainWindow` — not SwiftUI's `Settings` scene, which would
 //   keep its frame; not restorable. The pane last shown is kept for the session only. What it sets are
@@ -342,6 +342,9 @@ struct SettingsView: View {
             beta("More Solvers", "Euler a, DPM++ 2M and UniPC, beside Euler.", symbol: "function", color: Palette.peach,
                  detail: "Adds the solvers Euler a, DPM++ 2M and UniPC to the DiT’s box and to the series. The default, Euler, is the one the models were distilled for.",
                  isOn: $app.developerMode)
+            beta("Choose Steps", "The step count, for step-distilled LoRAs.", symbol: "stairs", color: Palette.live,
+                 detail: "Adds the steps to the DiT’s box. The models are distilled for 8; fewer suits a LoRA distilled to fewer steps, such as a 4-step one. Off, every render takes the model’s own count.",
+                 isOn: $app.stepsBeta)
             beta("Faster Rendering", "From 1024², the first steps at half size.", symbol: "hare.fill", color: Palette.sky,
                  detail: "Adds a Faster Rendering switch to the DiT’s box: from 1024² up, the first steps at half size, faster, a slightly different image. Not with a LoRA, Detail or an edit. Off, no render is a faster one.",
                  isOn: $app.fasterRenderingBeta)

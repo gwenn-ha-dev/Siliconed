@@ -125,12 +125,13 @@ final class RemoteWritingTests: XCTestCase {
         guard case .failure(.usage) = SetOrder.parse(["save-images", "on", "~/Pictures"]) else { return XCTFail() }
     }
 
-    /// The four options of Settings › Advanced › Beta, no more: a fifth has to be added here, in the app's `AppState.beta`
+    /// The five options of Settings › Advanced › Beta, no more: a sixth has to be added here, in the app's `AppState.beta`
     /// (a `switch` the compiler checks) and in the help.
-    func testTheBetaOptionsAreTheSettingsFour() {
-        XCTAssertEqual(BetaOption.allCases.map(\.rawValue), ["more-solvers", "faster-rendering", "size-scales", "negative-lora"])
-        XCTAssertEqual(BetaOption.allCases.map(\.key), ["more_solvers", "faster_rendering", "size_scales", "negative_lora"])
-        XCTAssertEqual(BetaOption.names, "more-solvers, faster-rendering, size-scales, negative-lora")
+    func testTheBetaOptionsAreTheSettingsFive() {
+        XCTAssertEqual(BetaOption.allCases.map(\.rawValue), ["more-solvers", "steps", "faster-rendering", "size-scales", "negative-lora"])
+        XCTAssertEqual(BetaOption.allCases.map(\.key), ["more_solvers", "steps", "faster_rendering", "size_scales", "negative_lora"])
+        XCTAssertEqual(BetaOption.names, "more-solvers, steps, faster-rendering, size-scales, negative-lora")
+        XCTAssertEqual(BetaOption(argument: "choose-steps"), .steps)
     }
 
     /// The Neural Engine is offered or not by the map, whichever the version: `set neural-engine` refuses on the same rule as the switch.

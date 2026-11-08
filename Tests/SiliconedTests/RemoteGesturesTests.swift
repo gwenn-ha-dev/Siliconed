@@ -16,6 +16,8 @@ final class RemoteGesturesTests: XCTestCase {
         XCTAssertEqual(parse("lab", []), .lab(.status))
         XCTAssertEqual(parse("lab", ["open"]), .lab(.unfold))
         XCTAssertEqual(parse("lab", ["close"]), .lab(.fold))
+        XCTAssertEqual(parse("lab", ["detach"]), .lab(.detach))
+        XCTAssertEqual(parse("lab", ["attach"]), .lab(.attach))
         XCTAssertEqual(parse("lab", ["add", "a.jpg", "i7"]), .lab(.add(["a.jpg", "i7"])))
         XCTAssertEqual(parse("lab", ["role", "2", "reference"]), .lab(.role(image: 2, .reference)))
         XCTAssertEqual(parse("lab", ["role", "1", "none"]), .lab(.role(image: 1, .neutral)))

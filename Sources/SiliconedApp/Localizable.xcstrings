@@ -3915,6 +3915,46 @@
         }
       }
     },
+    "%lld steps: the count this Turbo model is distilled for. Fewer for a LoRA distilled to fewer steps" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld Schritte: die Anzahl, auf die dieses Turbo-Modell destilliert ist. Weniger für eine LoRA, die auf weniger Schritte destilliert ist"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld pasos: el número para el que está destilado este modelo Turbo. Menos para una LoRA destilada a menos pasos"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld pas : le nombre pour lequel ce modèle Turbo est distillé. Moins pour une LoRA distillée en moins de pas"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld passi: il numero per cui questo modello Turbo è distillato. Meno per una LoRA distillata in meno passi"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lldステップ：このTurboモデルが蒸留されたステップ数です。より少ないステップに蒸留されたLoRAでは少なくします"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 步：此 Turbo 模型蒸馏所对应的步数。蒸馏为更少步数的 LoRA 可用更少的步数"
+          }
+        }
+      }
+    },
     "%lld tokens · %@" : {
       "localizations" : {
         "de" : {
@@ -7099,6 +7139,46 @@
         }
       }
     },
+    "Adds the steps to the DiT’s box. The models are distilled for 8; fewer suits a LoRA distilled to fewer steps, such as a 4-step one. Off, every render takes the model’s own count." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fügt die Schritte zur Box des DiT hinzu. Die Modelle sind auf 8 destilliert; weniger passt zu einer LoRA, die auf weniger Schritte destilliert ist, etwa einer 4-Schritt-LoRA. Aus: Jedes Rendering nimmt die Anzahl des Modells."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Añade los pasos a la caja del DiT. Los modelos están destilados para 8; menos conviene a una LoRA destilada a menos pasos, como una de 4 pasos. Desactivado, cada render toma el número del modelo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajoute les pas à la boîte du DiT. Les modèles sont distillés pour 8 ; moins convient à une LoRA distillée en moins de pas, comme une LoRA en 4 pas. Éteint, chaque rendu prend le nombre du modèle."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aggiunge i passi al riquadro del DiT. I modelli sono distillati per 8; meno si addice a una LoRA distillata in meno passi, come una da 4 passi. Disattivato, ogni render prende il numero del modello."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "DiT のボックスにステップ数を追加します。モデルは 8 ステップに蒸留されています。4 ステップ版のように、より少ないステップに蒸留された LoRA には少ない数が合います。オフにすると、どの生成もモデル自身のステップ数を使います。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在 DiT 的方框中添加步数。这些模型蒸馏为 8 步；蒸馏为更少步数的 LoRA（例如 4 步的）适合更少的步数。关闭时，每次渲染都使用模型自己的步数。"
+          }
+        }
+      }
+    },
     "Advanced" : {
       "localizations" : {
         "de" : {
@@ -9895,6 +9975,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "请选择“正常”。"
+          }
+        }
+      }
+    },
+    "Choose Steps" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Schritte wählen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Elegir los pasos"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choisir les pas"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scegli i passi"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ステップ数を選ぶ"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选择步数"
           }
         }
       }
@@ -25640,6 +25760,46 @@
         }
       }
     },
+    "Open the Prompt Lab in a window of its own" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prompt-Labor in einem eigenen Fenster öffnen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abrir el laboratorio de prompts en su propia ventana"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvrir l’atelier dans une fenêtre à part"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apri il laboratorio dei prompt in una finestra a sé"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "プロンプトラボを別ウインドウで開く"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在单独的窗口中打开提示词实验室"
+          }
+        }
+      }
+    },
     "Optional" : {
       "localizations" : {
         "de" : {
@@ -27002,6 +27162,46 @@
         }
       }
     },
+    "Put the Prompt Lab back under the image" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prompt-Labor wieder unter das Bild setzen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Devolver el laboratorio de prompts bajo la imagen"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remettre l’atelier sous l’image"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rimetti il laboratorio dei prompt sotto l’immagine"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "プロンプトラボを画像の下に戻す"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "将提示词实验室放回图像下方"
+          }
+        }
+      }
+    },
     "Queue" : {
       "localizations" : {
         "de" : {
@@ -28245,6 +28445,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "从历史记录中移除"
+          }
+        }
+      }
+    },
+    "Remove from History (⌘Z brings it back)" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aus dem Verlauf entfernen (⌘Z holt es zurück)"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quitar del historial (⌘Z la recupera)"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Retirer de l’historique (⌘Z la rend)"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rimuovi dalla cronologia (⌘Z la ripristina)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "履歴から削除（⌘Zで戻せます）"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "从历史记录中移除（⌘Z 可恢复）"
           }
         }
       }
@@ -38342,6 +38582,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "安装后在磁盘上占用的空间"
+          }
+        }
+      }
+    },
+    "The step count, for step-distilled LoRAs." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Anzahl der Schritte, für auf weniger Schritte destillierte LoRAs."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El número de pasos, para LoRA destiladas a menos pasos."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le nombre de pas, pour les LoRA distillées en moins de pas."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il numero di passi, per le LoRA distillate in meno passi."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ステップ数。少ないステップに蒸留された LoRA 向け。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "步数，适用于蒸馏为更少步数的 LoRA。"
           }
         }
       }

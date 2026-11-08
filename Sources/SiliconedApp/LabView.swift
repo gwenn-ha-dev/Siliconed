@@ -17,6 +17,8 @@ import SwiftUI
 
 struct LabView: View {
     @Bindable var model: LabModel
+    /// In its own window (`LabWindow`): the plate alone, as large as the window, its text taking the height left.
+    var inWindow = false
     @State private var typing = false
     @State private var targeted = false
 
@@ -26,16 +28,25 @@ struct LabView: View {
 
     var body: some View {
         Group {
-            if model.unfolded {
-                // Its own height, whatever the canvas offers: it lies over the image, which keeps its size.
-                unfoldedBar.padding(.horizontal, 12).padding(.vertical, 10).fixedSize(horizontal: false, vertical: true)
+            if inWindow {
+                unfoldedBar.padding(16).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                    .background(Palette.column)
             } else {
-                foldedBar.padding(.horizontal, 12).frame(height: Self.foldedHeight)
+                Group {
+                    if model.unfolded {
+                        // Its own height, whatever the canvas offers: it lies over the image, which keeps its size.
+                        unfoldedBar.padding(.horizontal, 12).padding(.vertical, 10).fixedSize(horizontal: false, vertical: true)
+                    } else {
+                        foldedBar.padding(.horizontal, 12).frame(height: Self.foldedHeight)
+                    }
+                }
+                .vapour(cornerRadius: 16)
             }
         }
-        .vapour(cornerRadius: 16)
         .overlay {
-            if targeted { RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Palette.live, lineWidth: 2) }
+            if targeted {
+                RoundedRectangle(cornerRadius: inWindow ? 0 : 16, style: .continuous).strokeBorder(Palette.live, lineWidth: 2)
+            }
         }
         .dropDestination(for: DroppedImage.self) { items, _ in
             guard !items.isEmpty else { return false }
@@ -158,8 +169,20 @@ struct LabView: View {
                 .disabled(!model.canRewrite)
                 .help(model.writerPause.map { Text(verbatim: $0.sentence) } ?? Text("Rewrite"))
             }
+            detachButton
             chevron
         }
+    }
+
+    /// **The plate in a window of its own, or back over the image** (issue 16).
+    private var detachButton: some View {
+        Button { model.detached.toggle() } label: {
+            Image(systemName: model.detached ? "arrow.down.left.square" : "arrow.up.right.square")
+                .font(.system(size: 12, weight: .semibold)).frame(width: 18, height: 18)
+        }
+        .buttonStyle(.bordered).controlSize(.small)
+        .help(model.detached ? "Put the Prompt Lab back under the image" : "Open the Prompt Lab in a window of its own")
+        .accessibilityLabel(Text(model.detached ? "Put the Prompt Lab back under the image" : "Open the Prompt Lab in a window of its own"))
     }
 
     /// **The writer follows the user's instruction** for this model (Settings › Prompt Lab): said where it acts, a click
@@ -210,7 +233,7 @@ struct LabView: View {
         // The series' column, as in the rack: at the text's right, the ✕ that clears it and, under it, its ± (`PromptBracketMark`).
         .padding(.trailing, 18)
         .padding(6)
-        .frame(height: 96)
+        .frame(minHeight: 96, idealHeight: 96, maxHeight: inWindow ? .infinity : 96)
         .background(card)
         .overlay(alignment: .topTrailing) {
             VStack(spacing: 6) {

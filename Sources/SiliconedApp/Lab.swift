@@ -62,6 +62,17 @@ final class LabModel {
     private(set) var changes: Changes?
     /// **The bar unfolded**: it pushes the image up. Folded, one line.
     private(set) var unfolded = false
+    /// **Detached** (issue 16): unfolded, the plate is a window of its own, resizable (`LabWindow`), not a plate over the image;
+    /// folded, the line stays under the image. One of this Mac's preferences; the window's frame is the session's only.
+    var detached = UserDefaults.standard.bool(forKey: LabModel.detachedKey) {
+        didSet {
+            guard detached != oldValue else { return }
+            UserDefaults.standard.set(detached, forKey: Self.detachedKey)
+            guard unfolded else { return }
+            if detached { LabWindow.shared.show(self) } else { LabWindow.shared.hide() }
+        }
+    }
+    static let detachedKey = "labDetached"
 
     private(set) var phase = Phase.idle
     /// The gesture under way, and the image it describes.
@@ -438,11 +449,13 @@ final class LabModel {
         watchRender()
         refresh()
         unfolded = true
+        if detached { LabWindow.shared.show(self) }
     }
 
     /// **Folded**: a gesture under way is stopped and the writer gives its memory back — a command's gesture excepted.
     func fold() {
         unfolded = false
+        if detached { LabWindow.shared.hide() }
         if phase != .idle { stop() }
         // A command's gesture is not the bar's: folding it does not take its writer away.
         guard remote == nil else { return }
