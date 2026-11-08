@@ -149,6 +149,7 @@ private struct GraphCanvas: View {
         }
         .animation(Motion.pick(.spring(duration: 0.3)), value: lab.unfolded)
         .onAppear { lab.opening() }
+        .onChange(of: app.welcomes) { _, welcomes in if !welcomes { lab.welcomeEnded() } }
         .background(canvasBackground)
         .overlay(alignment: .top) {
             if let toast = app.toast {

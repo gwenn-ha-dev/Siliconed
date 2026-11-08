@@ -446,6 +446,7 @@ final class LabModel {
     // MARK: Folding
 
     func unfold() {
+        awaitsWelcomeEnd = false
         watchRender()
         refresh()
         unfolded = true
@@ -454,6 +455,7 @@ final class LabModel {
 
     /// **Folded**: a gesture under way is stopped and the writer gives its memory back — a command's gesture excepted.
     func fold() {
+        awaitsWelcomeEnd = false
         unfolded = false
         if detached { LabWindow.shared.hide() }
         if phase != .idle { stop() }
@@ -487,12 +489,23 @@ final class LabModel {
 
     /// **Unfolded when the window opens** (4/11): where the idea is written is the first thing seen — folded, the eye went to
     /// the rack's text port and looked for a field there. Once per launch: a fold after it is the hand's, and stays.
+    /// **Folded while the canvas welcomes** (8/11): with no model installed, the canvas is the list of models to download, and
+    /// the plate would cover it; it unfolds when the welcome ends (`welcomeEnded`: the first model ready), unless the hand has
+    /// folded or unfolded it meanwhile.
     func opening() {
         guard !opened else { return }
         opened = true
-        unfold()
+        if rack.welcomes { awaitsWelcomeEnd = true } else { unfold() }
     }
     @ObservationIgnored private var opened = false
+    @ObservationIgnored private var awaitsWelcomeEnd = false
+
+    /// The canvas no longer welcomes: the opening's unfolding, if nothing has folded or unfolded the bar since.
+    func welcomeEnded() {
+        guard awaitsWelcomeEnd else { return }
+        awaitsWelcomeEnd = false
+        unfold()
+    }
 
     /// **« Send to the Prompt Lab »**: a history image comes in with the role a newcomer takes, and the bar unfolds on it.
     func send(_ entry: Entry) {

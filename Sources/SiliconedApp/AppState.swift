@@ -247,6 +247,9 @@ final class AppState {
     var visibleCards: [ModelCard] { Self.inDisplayOrder(cards, family: \.family) }
     /// The visible models ready to render — empty at first launch: the canvas welcomes (`Welcome`).
     var visibleReady: [ModelCard] { visibleCards.filter { readySet.contains($0.id) } }
+    /// **The canvas welcomes** (`SceneView.empty`): no image shown, the library there, no model ready — the canvas is the list of
+    /// models to download.
+    var welcomes: Bool { selectedEntry == nil && libraryBlocker == nil && visibleReady.isEmpty }
     /// Z-Image first (Apache 2.0); a non-commercial model is never the default unless it is the only one.
     private var defaultIdentifier: String { visibleReady.first?.id ?? ModelCard.zImage.id }
 
