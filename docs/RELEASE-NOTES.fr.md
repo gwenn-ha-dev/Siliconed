@@ -16,6 +16,7 @@
 - **L'atelier dans une fenêtre à lui** : un bouton dans son en-tête détache la plaque dépliée dans une fenêtre aussi grande qu'on la veut, son texte grandissant avec elle ; fermer la fenêtre replie l'atelier sur sa ligne sous l'image (`silicontrol lab detach`, `lab attach`).
 - **Choisir les pas**, une option Bêta (Réglages › Avancé › Bêta), éteinte par défaut : allumée, la boîte du débruiteur propose le nombre de pas, pour une LoRA distillée en moins de pas (Krea 2 en 4) ; éteinte, chaque rendu reprend le nombre du modèle.
 - **L'atelier s'ouvre replié tant qu'aucun modèle n'est installé**, pour laisser voir les modèles à télécharger ; il se déplie quand le premier est prêt.
+- **Après la mise à jour**, un modèle dont les poids changent dans la 0.21 (les Compact de Z-Image et d'Anima, toutes les Légères) ne rend plus avant de les prendre : l'accueil dit lesquels, avec la version choisie, et propose **Mettre à jour…**.
 
 ### Les Légères, dans notre propre 4 bits
 
