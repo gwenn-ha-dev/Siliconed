@@ -133,7 +133,8 @@ package final class WeightProducts {
     /// again (`TensorGEMM.linear(…rounded:)`): the reserve's head, as `round_bf16` would have written it — the operand of a bf16 weight
     /// read in place on the stream, all its `m` rows in one chunk. The producer writes the fp32 operand too (the ANE's rows, the
     /// LoRA stack and any product that does not take this path read it), so a product that finds the reserve written since
-    /// (`reserveWrites`) or another path rounds it again from there: the same bits either way.
+    /// (`reserveWrites`) or another path rounds it again from there: the same bits either way — **unless the plan says no reader
+    /// reads it** (`writesFP32`, `roundedOperand(…readers:)`): then the producer writes the rounded copy alone.
     ///
     /// **Or quantized to int8, for W8A8** (`int8`): the codes and the rows' scales where the product's plan puts them
     /// (`Int8Plan.quantizedOffset`), all `m` rows in one chunk, as `quantize_rows` writes them. A producer that holds the whole row
@@ -146,6 +147,9 @@ package final class WeightProducts {
         /// The int8 slot, `nil` for a bf16 operand.
         package let int8: Quantized?
         fileprivate let k: Int, rows: Int, generation: UInt64
+        /// The producer writes the fp32 operand beside the bf16 copy. `false` only where its caller named every product that reads
+        /// the buffer and the plan has each of them read the copy alone (`roundedOperand(…readers:)`): the fp32 write would be dead.
+        package let writesFP32: Bool
         /// The operand's row length: its product's `k`.
         package var columns: Int { k }
 
@@ -176,8 +180,10 @@ package final class WeightProducts {
             self.init(bf16: nil, int8: q, k: k, rows: rows, generation: 0)
         }
 
-        fileprivate init(bf16: (buffer: MTLBuffer, offset: Int)?, int8: Quantized?, k: Int, rows: Int, generation: UInt64) {
+        fileprivate init(bf16: (buffer: MTLBuffer, offset: Int)?, int8: Quantized?, k: Int, rows: Int, generation: UInt64,
+                         writesFP32: Bool = true) {
             self.bf16 = bf16; self.int8 = int8; self.k = k; self.rows = rows; self.generation = generation
+            self.writesFP32 = writesFP32
         }
 
         /// The same operand from its row `first` on: a product over a slice of the rows (a chunk of an MLP), a producer by bands.
@@ -186,7 +192,7 @@ package final class WeightProducts {
                            int8: int8.map { Quantized(buffer: $0.buffer, codesOffset: $0.codesOffset + first * k,
                                                       scalesOffset: $0.scalesOffset + first * 4, group: $0.group, stages: $0.stages,
                                                       byProducer: $0.byProducer) },
-                           k: k, rows: rows - first, generation: generation)
+                           k: k, rows: rows - first, generation: generation, writesFP32: writesFP32)
         }
     }
 
@@ -194,15 +200,21 @@ package final class WeightProducts {
     /// chunks, the stream off for a bf16 one, `SILICONED_ROUND_FUSED=0`). Asked just before the producer is encoded: nothing but the
     /// products that read the operand may write the reserve until they are encoded. `quantizes`: the producer can write an int8
     /// operand too, a row of up to `holding` columns (`ElementwiseGPU.normScale`'s `quantizedColumns`, `swiglu`'s
-    /// `swigluQuantizedColumns`); else it is the first product's.
+    /// `swigluQuantizedColumns`); else it is the first product's. `readers`: every product that reads the buffer the producer writes
+    /// (`name`'s among them), each weight with its `n`, where nothing else reads it before it is written again — the caller's
+    /// knowledge; the plan says the rest (`fp32Unread`). `nil`: not said, the fp32 operand written.
     package func roundedOperand(_ name: String, m: Int, k: Int, n: Int, quantizes: Bool = false,
-                                holding: Int = ElementwiseGPU.quantizedColumns) throws -> RoundedOperand? {
+                                holding: Int = ElementwiseGPU.quantizedColumns,
+                                readers: [(name: String, n: Int)]? = nil) throws -> RoundedOperand? {
         guard Self.fusesRounding else { return nil }
         let planned = gemm.assignment(k: k, n: n, m: m, weight: format(of: name))
         let w = try gemm.wrap(UnsafeMutableRawPointer(reserve), bytes: capacity * 4, name: "w")
         if let (_, _, rounding) = inPlaceRounding(name, k: k, n: n, planned: planned), rounding.rows >= m {
+            let writesFP32 = readers.map { !fp32Unread(by: $0, m: m, k: k) } ?? true
+            if !writesFP32 { GEMM.fp32Unwritten.withLock { $0 += 1 } }
             wroteReserve()                         // the producer writes the slot: any operand rounded there before is gone
-            return RoundedOperand(bf16: (w, rounding.offset), int8: nil, k: k, rows: m, generation: reserveWrites)
+            return RoundedOperand(bf16: (w, rounding.offset), int8: nil, k: k, rows: m, generation: reserveWrites,
+                                  writesFP32: writesFP32)
         }
         // The slot where the product will look for it: the in-place plan's (the whole reserve to the codes) or the copy's.
         let inPlacePlan = inPlaceInt8(name, k: k, n: n, m: m, planned: planned).flatMap { $0.plan.quantizedOffset > 0 ? $0.plan : nil }
@@ -214,6 +226,25 @@ package final class WeightProducts {
         return RoundedOperand(bf16: nil, int8: .init(buffer: w, codesOffset: plan.quantizedOffset, scalesOffset: plan.quantizedScalesOffset,
                                                      group: plan.group, stages: stages, byProducer: byProducer),
                               k: k, rows: m, generation: reserveWrites)
+    }
+
+    /// **No reader reads the fp32 operand**: each product of `readers` (`[m, k]` on its weight) takes the in-place path on the rounded
+    /// copy its producer wrote — `linear`'s reuse, one chunk at the reserve's head —, with no ANE rows (they read the fp32 operand,
+    /// `aneRowsBesideRounded`) and no LoRA stack (it reads it too: any stack keeps it, whether or not it has the module). Read in place,
+    /// a product writes nothing into the reserve (`prepare`), so the copy is still whole for the next reader. `linear` checks it holds.
+    private func fp32Unread(by readers: [(name: String, n: Int)], m: Int, k: Int) -> Bool {
+        guard lora == nil, !readers.isEmpty else { return false }
+        return readers.allSatisfy { reader in
+            let planned = gemm.assignment(k: k, n: reader.n, m: m, weight: format(of: reader.name))
+            guard let (_, _, rounding) = inPlaceRounding(reader.name, k: k, n: reader.n, planned: planned),
+                  rounding.offset == 0, rounding.rows >= m else { return false }
+            return aneRowsBesideRounded(planned, m: m) == 0
+        }
+    }
+
+    /// The ANE's rows beside the GPU's rounded ones on a bf16 weight (`linear`): the plan's last rows, where it gives some but not all.
+    private func aneRowsBesideRounded(_ planned: ProductAssignment, m: Int) -> Int {
+        planned.path == .bf16 && planned.ane > 0 && planned.ane < m && transposed ? planned.ane : 0
     }
 
     /// `SILICONED_ROUND_FUSED=0`: every product rounds or quantizes its own operand again, as before the producers wrote it (a forcing
@@ -250,6 +281,9 @@ package final class WeightProducts {
         let (path, planned, skipped) = try prepare(name, count: k * n, m: m, n: n)
         let staged = path != .widened
         let target = target ?? String(name.dropLast(".weight".count))
+        // An operand whose fp32 the producer did not write (`RoundedOperand.writesFP32`): only the in-place rounded path reads it.
+        let fp32Written = operand?.writesFP32 ?? true
+        precondition(fp32Written || (inPlace != nil && lora == nil), "\(name): reads an fp32 operand its producer did not write")
         var stack: (down: MTLBuffer, up: MTLBuffer, rank: Int)?
         if let lora, let module = try timed("lora weights", { try lora.module(target, k: k, n: n) }) {
             stack = (try gemm.wrap(UnsafeMutableRawPointer(module.down), bytes: k * module.rank * 4, name: "loraDown"),
@@ -280,7 +314,7 @@ package final class WeightProducts {
             case .bf16(let rounding?):
                 // The ANE beside the GPU's rounded rows: the plan's last rows, read from the bf16 copy (`bf16Product`), where the process
                 // can run them.
-                let aneRows = planned.path == .bf16 && planned.ane > 0 && planned.ane < m && transposed ? planned.ane : 0
+                let aneRows = aneRowsBesideRounded(planned, m: m)
                 if let (map, offset) = inPlace {
                     // The operand its producer rounded, where nothing wrote over it since; else this product's own pass writes the
                     // reserve.
@@ -288,6 +322,8 @@ package final class WeightProducts {
                     let reuse = operand.map { $0.generation == reserveWrites && $0.k == k && $0.rows >= m && slot?.buffer === w
                                               && rounding.offset == 0 && rounding.rows >= m } ?? false
                     if reuse { GEMM.producerRounded.withLock { $0 += 1 } } else { wroteReserve() }
+                    // Its producer left the fp32 operand unwritten (`fp32Unread`): this product must read the copy alone, all its rows.
+                    precondition(fp32Written || (reuse && aneRows == 0), "\(name): reads an fp32 operand its producer did not write")
                     let rounding = reuse ? Rounding(offset: slot!.offset, rows: rounding.rows) : rounding
                     // On the stream: the ANE's rows beside the queued GPU work, waited for on the GPU (`GPUStream.neuralEngine`).
                     if aneRows > 0, GPUStream.policy == .on, let ane = gemm.neuralEngine, ane.accepts(rows: aneRows, k: k, n: n),

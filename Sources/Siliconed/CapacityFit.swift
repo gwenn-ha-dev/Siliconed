@@ -560,7 +560,7 @@ package enum CapacityFit {
         var byK: [Int: [CapacityModel.Engine: [Double]]] = [:]
         var keeps: [[Double?]] = [], overheads: [Double] = [], residuals: [Double] = []
         for trial in used {
-            let (m, k, n) = (trial.shape[0], trial.shape[1], trial.shape[2])
+            let (k, n) = (trial.shape[1], trial.shape[2])
             var sides: [(kernel: Kernel, solo: Double, within: Double)] = []
             for side in trial.sides {
                 guard let kernel = Kernel(side.kernel), let s = model.alone(kernel, rows: side.rows, k: k, n: n) else { continue }

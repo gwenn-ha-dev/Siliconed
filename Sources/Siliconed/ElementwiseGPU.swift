@@ -74,6 +74,10 @@ package final class ElementwiseGPU {
 
     \(BFloatKernels.roundingSource)
 
+    // The `_rounded` kernels write the fp32 value beside the bf16 copy only where a reader reads it (`RoundedOperand.writesFP32`):
+    // two pipelines of one source, the values computed alike — the same bits in the copy either way.
+    constant bool keeps_fp32 [[function_constant(0)]];
+
     // The same, and the value rounded to bf16 where the next product reads its operand (`WeightProducts.RoundedOperand`): two
     // values per thread, one 32-bit store, as `round_bf16` writes them. `n` is the count of pairs.
     kernel void swiglu_rounded(device float2 *a [[buffer(0)]], device const float2 *b [[buffer(1)]], device uint *r [[buffer(2)]],
@@ -83,7 +87,7 @@ package final class ElementwiseGPU {
         float2 p = v * w;
         float2 y = float2(over_one_plus_exp(float2(p.x, fma(v.x, w.x, -p.x)), v.x),
                           over_one_plus_exp(float2(p.y, fma(v.y, w.y, -p.y)), v.y));
-        a[i] = y;
+        if (keeps_fp32) a[i] = y;
         r[i] = rounded(y.x) | (rounded(y.y) << 16);
     }
 
@@ -93,7 +97,7 @@ package final class ElementwiseGPU {
         if (i >= n) return;
         float2 v = x[i], w = g[i];
         float2 y = float2(over_one_plus_exp(float2(v.x, 0.0f), w.x), over_one_plus_exp(float2(v.y, 0.0f), w.y));
-        x[i] = y;
+        if (keeps_fp32) x[i] = y;
         r[i] = rounded(y.x) | (rounded(y.y) << 16);
     }
 
@@ -171,7 +175,7 @@ package final class ElementwiseGPU {
             float v0 = source[i] * r, v1 = source[i + 1] * r;
             v0 = v0 * w[i]; v1 = v1 * w[i + 1];
             if (p.scaled != 0) { v0 = v0 * scale[i]; v1 = v1 * scale[i + 1]; }
-            destination[i] = v0; destination[i + 1] = v1;
+            if (keeps_fp32) { destination[i] = v0; destination[i + 1] = v1; }
             pairs[j] = rounded(v0) | (rounded(v1) << 16);
         }
     }
@@ -286,7 +290,9 @@ package final class ElementwiseGPU {
 
     private let queue: MTLCommandQueue
     private let swigluPipeline, carriesPipeline, residualPipeline, normScalePipeline, normResidualPipeline: MTLComputePipelineState
-    private let swigluRoundedPipeline, normScaleRoundedPipeline, carriesRoundedPipeline: MTLComputePipelineState
+    /// Each `_rounded` kernel twice: the fp32 written beside the copy (`kept`), and the copy alone (`alone`).
+    private let swigluRoundedPipeline, normScaleRoundedPipeline, carriesRoundedPipeline: (kept: MTLComputePipelineState,
+                                                                                           alone: MTLComputePipelineState)
     private let normScaleQuantizedPipeline, swigluQuantizedPipeline: MTLComputePipelineState
     /// The longest row `norm_scale_quantized` holds: eight simdgroups of `QuantizedKernels.maxChunks` chunks of 256.
     package static let quantizedColumns = 8 * QuantizedKernels.maxChunks * 256
@@ -300,11 +306,20 @@ package final class ElementwiseGPU {
             guard let f = library.makeFunction(name: name) else { throw GEMM.Failure.noDevice }
             return try device.makeComputePipelineState(function: f)
         }
+        func rounded(_ name: String) throws -> (kept: MTLComputePipelineState, alone: MTLComputePipelineState) {
+            func built(_ keeps: Bool) throws -> MTLComputePipelineState {
+                let values = MTLFunctionConstantValues()
+                var value = keeps
+                values.setConstantValue(&value, type: .bool, index: 0)
+                return try device.makeComputePipelineState(function: try library.makeFunction(name: name, constantValues: values))
+            }
+            return (try built(true), try built(false))
+        }
         swigluPipeline = try pipeline("swiglu"); carriesPipeline = try pipeline("sigmoid_gate")
         residualPipeline = try pipeline("residual")
         normScalePipeline = try pipeline("norm_scale"); normResidualPipeline = try pipeline("norm_residual")
-        swigluRoundedPipeline = try pipeline("swiglu_rounded"); normScaleRoundedPipeline = try pipeline("norm_scale_rounded")
-        carriesRoundedPipeline = try pipeline("sigmoid_gate_rounded")
+        swigluRoundedPipeline = try rounded("swiglu_rounded"); normScaleRoundedPipeline = try rounded("norm_scale_rounded")
+        carriesRoundedPipeline = try rounded("sigmoid_gate_rounded")
         normScaleQuantizedPipeline = try pipeline("norm_scale_quantized")
         swigluQuantizedPipeline = try pipeline("swiglu_quantized")
         let most = min(32, swigluQuantizedPipeline.maxTotalThreadsPerThreadgroup / 32)
@@ -344,18 +359,20 @@ package final class ElementwiseGPU {
     }
 
     /// `a ← silu(a) · b` over `count` elements. Returns the GPU time. `rounded`: the result also written rounded to bf16 there,
-    /// as the next product reads its operand (`WeightProducts.roundedOperand`; `count` even) — or, an int8 operand its producer
-    /// writes (`byProducer`), the result quantized there and nowhere else (`a` keeps its input).
+    /// as the next product reads its operand (`WeightProducts.roundedOperand`; `count` even), and there alone where no reader reads
+    /// the fp32 (`writesFP32`: `a` keeps its input) — or, an int8 operand its producer writes (`byProducer`), the result quantized
+    /// there and nowhere else (`a` keeps its input).
     @discardableResult
     package func swiglu(_ a: BufferSlice, _ b: BufferSlice, count: Int, rounded: WeightProducts.RoundedOperand? = nil) -> Double {
         if let operand = rounded, let q = operand.int8, q.byProducer {
             return swiglu(a, b, rows: count / operand.columns, columns: operand.columns, quantized: q)
         }
-        if let rounded = rounded?.bf16 {                   // an int8 operand not the producer's is its first product's to quantize
+        if let operand = rounded, let rounded = operand.bf16 {  // an int8 operand not the producer's is its first product's to quantize
             precondition(count % 2 == 0 && a.offset % 2 == 0 && b.offset % 2 == 0 && rounded.offset % 4 == 0)
             var n = UInt32(count / 2)
             let (g, t) = linear(count / 2)
-            return launch(swigluRoundedPipeline, [a, b, (rounded.buffer, rounded.offset / 4)],
+            return launch(operand.writesFP32 ? swigluRoundedPipeline.kept : swigluRoundedPipeline.alone,
+                          [a, b, (rounded.buffer, rounded.offset / 4)],
                           constants: { $0.setBytes(&n, length: 4, index: $1) }, grid: g, group: t)
         }
         var n = UInt32(count)
@@ -386,11 +403,12 @@ package final class ElementwiseGPU {
     /// `x ← x · σ(g)`. `rounded`: as `swiglu`'s.
     @discardableResult
     package func carries(_ x: BufferSlice, _ g: BufferSlice, count: Int, rounded: WeightProducts.RoundedOperand? = nil) -> Double {
-        if let rounded = rounded?.bf16 {                   // an int8 operand is its first product's to quantize
+        if let operand = rounded, let rounded = operand.bf16 {  // an int8 operand is its first product's to quantize
             precondition(count % 2 == 0 && x.offset % 2 == 0 && g.offset % 2 == 0 && rounded.offset % 4 == 0)
             var n = UInt32(count / 2)
             let (grid, t) = linear(count / 2)
-            return launch(carriesRoundedPipeline, [x, g, (rounded.buffer, rounded.offset / 4)],
+            return launch(operand.writesFP32 ? carriesRoundedPipeline.kept : carriesRoundedPipeline.alone,
+                          [x, g, (rounded.buffer, rounded.offset / 4)],
                           constants: { $0.setBytes(&n, length: 4, index: $1) }, grid: grid, group: t)
         }
         var n = UInt32(count)
@@ -411,7 +429,8 @@ package final class ElementwiseGPU {
     private struct NormParams { var cols: UInt32; var eps: Float; var scaled: UInt32 }
 
     /// `out[s, :] ← (RMSNorm(x[s, :]) · w) · scale` (`scale` nil: the norm alone), one threadgroup per row. `rounded`: `out` also
-    /// written rounded to bf16 there, as the next product reads its operand (`WeightProducts.roundedOperand`; `columns` even) — or
+    /// written rounded to bf16 there, as the next product reads its operand (`WeightProducts.roundedOperand`; `columns` even), and
+    /// there alone where no reader reads the fp32 (`writesFP32`: `out` left as it was) — or
     /// quantized to int8 for W8A8, where the operand says the producer writes it (`byProducer`, `columns` ≤ `quantizedColumns`).
     @discardableResult
     package func normScale(_ x: BufferSlice, weight: BufferSlice, scale: BufferSlice?, into out: BufferSlice,
@@ -420,9 +439,10 @@ package final class ElementwiseGPU {
             return normScale(x, weight: weight, scale: scale, into: out, rows: rows, columns: columns, eps: eps, quantized: q)
         }
         var p = NormParams(cols: UInt32(columns), eps: eps, scaled: scale == nil ? 0 : 1)
-        if let rounded = operand?.bf16 {
+        if let operand, let rounded = operand.bf16 {
             precondition(columns % 2 == 0 && rounded.offset % 4 == 0)
-            return launch(normScaleRoundedPipeline, [x, weight, scale ?? weight, out, (rounded.buffer, rounded.offset / 4)],
+            return launch(operand.writesFP32 ? normScaleRoundedPipeline.kept : normScaleRoundedPipeline.alone,
+                          [x, weight, scale ?? weight, out, (rounded.buffer, rounded.offset / 4)],
                           constants: { $0.setBytes(&p, length: MemoryLayout<NormParams>.stride, index: $1) },
                           grid: MTLSize(width: rows, height: 1, depth: 1), group: MTLSize(width: 256, height: 1, depth: 1), byGroups: true)
         }

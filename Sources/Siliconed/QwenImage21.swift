@@ -823,8 +823,9 @@ package final class QwenImage21DiT: BoundaryRecording, PhaseTiming {
             let begin = chunk * n / chunks, rows = (chunk + 1) * n / chunks - begin
             try linearGPU(prefix + "img_mlp.gate_layer.weight", a: normed + begin * d, into: h1, m: rows, k: d, n: hh, rounded: normed2)
             try linearGPU(prefix + "img_mlp.proj.weight", a: normed + begin * d, into: h2, m: rows, k: d, n: hh, rounded: normed2)
+            // `h1` is read by `out` alone, the chunk's: where it reads the copy alone, the SwiGLU writes no fp32 (`readers`).
             let gated = try products.roundedOperand(prefix + "img_mlp.out.weight", m: rows, k: hh, n: d, quantizes: true,
-                                                    holding: elementwise.swigluQuantizedColumns)
+                                                    holding: elementwise.swigluQuantizedColumns, readers: [(prefix + "img_mlp.out.weight", d)])
             timed("swiglu") {
                 ownTimings["elementwise GPU", default: 0] += elementwise.swiglu((h1b, 0), (h2b, 0), count: rows * hh, rounded: gated)
             }

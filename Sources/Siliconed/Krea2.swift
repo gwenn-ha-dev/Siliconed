@@ -385,7 +385,6 @@ package final class Krea2DiT: BoundaryRecording, PhaseTiming {
     /// A single-stream block.
     private func block(_ layer: Int, rows n: Int, tembMod: UnsafePointer<Float>) throws {
         let d = config.dim, hh = config.hidden, kv = config.kvWidth
-        let heads = config.heads, dh = config.headDim
         let prefix = "transformer_blocks.\(layer)."
         let tag = layer == 0 ? "block0_" : nil
         if try blockStreamed(layer, rows: n, tembMod: tembMod) { return }
@@ -539,7 +538,9 @@ package final class Krea2DiT: BoundaryRecording, PhaseTiming {
             try attend(rows: n)
         }
         let (mergedb, gateb) = (try slice(merged), try slice(gate))
-        let gated = try products.roundedOperand(prefix + "attn.to_out.0.weight", m: n, k: d, n: d)
+        // `merged` and `h1` are read by `to_out` and `ff.down` alone: where each reads the copy alone, no fp32 is written (`readers`).
+        let gated = try products.roundedOperand(prefix + "attn.to_out.0.weight", m: n, k: d, n: d,
+                                                readers: [(prefix + "attn.to_out.0.weight", d)])
         timed("gate") {
             ownTimings["elementwise GPU", default: 0] += elementwise.carries((mergedb, 0), (gateb, 0), count: n * d, rounded: gated)
         }
@@ -555,7 +556,7 @@ package final class Krea2DiT: BoundaryRecording, PhaseTiming {
         try linearGPU(prefix + "ff.gate.weight", a: normed, into: h1, m: n, k: d, n: hh, rounded: normed2)
         try linearGPU(prefix + "ff.up.weight", a: normed, into: h2, m: n, k: d, n: hh, rounded: normed2)
         let (h1b, h2b) = (try slice(h1, floats: maxRows * hh), try slice(h2))
-        let swiglued = try products.roundedOperand(prefix + "ff.down.weight", m: n, k: hh, n: d)
+        let swiglued = try products.roundedOperand(prefix + "ff.down.weight", m: n, k: hh, n: d, readers: [(prefix + "ff.down.weight", d)])
         timed("swiglu") {
             ownTimings["elementwise GPU", default: 0] += elementwise.swiglu((h1b, 0), (h2b, 0), count: n * hh, rounded: swiglued)
         }

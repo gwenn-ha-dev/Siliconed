@@ -178,6 +178,8 @@ package final class GEMM {
     package static let roundedProducts = Mutex<Int>(0)
     /// ... of which read the operand its producer had already rounded (`WeightProducts.RoundedOperand`): no pass of their own.
     package static let producerRounded = Mutex<Int>(0)
+    /// Operands rounded by their producer whose fp32 it did not write, no reader reading it (`RoundedOperand.writesFP32`).
+    package static let fp32Unwritten = Mutex<Int>(0)
     /// The W8A8 activation passes encoded (`quantize_rows`, one per chunk of rows) in this process.
     package static let quantizePasses = Mutex<Int>(0)
     /// W8A8 products that read an operand already quantized (`WeightProducts.RoundedOperand`): by its producer, or by the product

@@ -390,7 +390,7 @@ package final class MossImageDiT: BoundaryRecording, PhaseTiming {
     /// A main block: attention then SITU feed-forward, modulated by the shared vectors.
     private func block(_ layer: Int, rows n: Int, text t: Int) throws {
         if try blockStreamed(layer, rows: n) { return }
-        let d = config.dim, f = config.hidden, heads = config.heads, dh = config.headDim
+        let d = config.dim, f = config.hidden
         let prefix = MossImageDiT.layerPrefix(layer)
         let tag: String? = recordBoundaries && layer == 0 ? "block0_" : nil
         let m = modulationSlot
@@ -543,7 +543,7 @@ package final class MossImageDiT: BoundaryRecording, PhaseTiming {
 
     /// A text block: plain pre-norm transformer block with biases, over the text rows `[0, T)` alone.
     private func textBlock(_ index: Int, rows t: Int) throws {
-        let d = config.dim, f = config.hidden, heads = config.heads
+        let d = config.dim, f = config.hidden
         let prefix = "text_embedder.blocks.\(index)."
         // ── attention: the fused QKV, split row by row into q, k, v ─────────────────────────
         try plainNorm(prefix + "norm1.weight", x, rows: t)

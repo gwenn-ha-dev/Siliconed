@@ -193,7 +193,7 @@ package final class Qwen3VLGenerator {
         progress?(1)
         guard decodesOnGPU else { decoderNote = "GPU decoding switched off"; return }
         do {
-            let tail: Qwen3VLDecoder.Tail? = try tailFrom < config.layers
+            let tail: Qwen3VLDecoder.Tail? = tailFrom < config.layers
                 ? .init(path: encoder.path, first: tailFrom, runs: try Qwen3VLDecoder.runs(of: encoder, layers: tailFrom..<config.layers),
                         slots: Self.stagingSlots)
                 : nil

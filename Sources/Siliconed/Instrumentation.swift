@@ -24,6 +24,8 @@ protocol PhaseTiming: AnyObject {
 }
 
 extension PhaseTiming {
+    /// The body's result, which a caller timing a GPU launch for its phase alone may drop (the launch's own seconds).
+    @discardableResult
     func timed<T>(_ phase: String, _ body: () throws -> T) rethrows -> T {
         let started = DispatchTime.now().uptimeNanoseconds
         defer { ownTimings[phase, default: 0] += Double(DispatchTime.now().uptimeNanoseconds - started) * 1e-9 }
