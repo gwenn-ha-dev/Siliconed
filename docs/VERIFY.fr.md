@@ -299,18 +299,18 @@ L'oracle de la Compact demande aussi la bibliothèque de son éditeur : `oracle-
 
 La Compact et la Légère calculent par défaut sur le Neural Engine (produits en fp16) : `--neural-engine` est donc la barre qui compte pour elles, jugée comme celle de la Standard : contre la référence en bf16 sur les mêmes poids (déquantés ou décodés), le moteur ayant droit à l'erreur propre du bf16 plus 25 %. Ces goldens demandent d'abord le golden `dit` de la Standard à 512 (ils en lisent les entrées) ; ils ne font partie ni de `all` ni de `siliconed check <modèle>`.
 
-`dit --size 512` des Compact et de MOSS-Image a été lancé sur notre MacBook Pro M1 Pro, en fp32 puis avec `--neural-engine` : 10 exécutions, toutes passantes. Les quatre Légères ont été relancées sur notre Mac mini M5 Pro, sur les fichiers que l'app installe (`siliconed install <modèle> --light`), contre des goldens refaits depuis les mêmes fichiers : 8 exécutions, 7 passantes ; la huitième est celle de Krea 2 sous le Neural Engine, expliquée plus bas. Ci-dessous, l'écart de `model_out` à la référence (pour Qwen-Image-2.1, `model_out (full)` ; pour Krea 2 et MOSS-Image, `model_out per plane`) dans chaque exécution, et la barre contre laquelle l'exécution sous le Neural Engine est jugée.
+`dit --size 512` des Compact et de MOSS-Image a été lancé sur notre MacBook Pro M1 Pro, en fp32 puis avec `--neural-engine` : 10 exécutions, toutes passantes. Les quatre Légères ont été relancées sur notre Mac mini M5 Pro, sur les fichiers que l'app installe (`siliconed install <modèle> --light`), contre des goldens refaits depuis les mêmes fichiers : 8 exécutions, toutes passantes. Ci-dessous, l'écart de `model_out` à la référence (pour Qwen-Image-2.1, `model_out (full)` ; pour Krea 2 et MOSS-Image, `model_out per plane`) dans chaque exécution, et la barre contre laquelle l'exécution sous le Neural Engine est jugée.
 
 | Variante | `model_out` en fp32, contre la référence | Sous le Neural Engine, contre la référence | Sa barre (l'écart propre au bf16 + 25 %) |
 |---|---|---|---|
 | Z-Image, Compact | 7,833e-06 | 9,906e-03 | 5,89e-02 |
 | Z-Image, Légère | 9,065e-06 | 2,708e-03 | 6,61e-02 |
 | Qwen-Image-2,1, Compact | 4,301e-06 | 4,562e-03 | 1,59e-02 |
-| Qwen-Image-2,1, Légère | 2,647e-06 | 2,891e-04 | 1,82e-02 |
+| Qwen-Image-2,1, Légère | 2,647e-06 | 2,804e-04 | 1,82e-02 |
 | Anima, Compact | 6,233e-06 | 6,133e-03 | 8,57e-02 |
 | Anima, Légère | 5,725e-06 | 1,145e-03 | 6,24e-02 |
 | Krea 2, Compact | 7,070e-05 | 4,861e-03 | 4,24e-02 |
-| Krea 2, Légère | 6,222e-05 | 2,735e-04 (l'exécution est rouge, voir plus bas) | 2,05e-02 |
+| Krea 2, Légère | 6,222e-05 | 2,198e-04 | 2,05e-02 |
 | MOSS-Image, Compact | 1,296e-06 | 4,171e-03 | 2,89e-02 |
 
 Avec `--bf16-activations` (l'activation arrondie en bf16, les poids lus tels que publiés), le `model_out` des Légères vaut 3,690e-02 pour Z-Image (barre 6,61e-02), 2,436e-03 pour Qwen-Image-2.1 (1,82e-02), 8,109e-03 pour Anima (6,24e-02) et 7,326e-04 pour Krea 2, par plan (2,05e-02) : les quatre passent.
@@ -372,9 +372,10 @@ gemm_int8                   ✓  2016 products on the published integers
 ✓ krea2 dit light 512 · 13 measures · nearest its threshold: block27_out 4.53e-04 of 5.00e-04
 $ siliconed check krea2 dit --size 512 --variant light --neural-engine
 map ~/Library/Application Support/Siliconed/store/krea2-turbo-dit.light.v1.silicon · 7.6 GB · sq4 ×196, float32 ×169, sq5 ×52, int8 ×13 (packed weights)
-model_out per plane         2.735e-04   2.60e-04       11   2.785e-04    2.05e-02  ✓  oracle at fp64 1.64e-02
-gemm_int8                   ✗  0 products on the published integers
-✗ krea2 dit light 512 · 1 of 14 failing: gemm_int8
+model_out per plane         2.198e-04   2.09e-04        0   2.246e-04    2.05e-02  ✓  oracle at fp64 1.64e-02
+gemm_int8                   ✓  224 products on the published integers
+model_out per plane (widened)  2.735e-04   2.60e-04       11   2.785e-04    2.05e-02  ✓  oracle at fp64 1.64e-02
+✓ krea2 dit light 512 · 14 measures · nearest its threshold: img_in_out 2.32e-04 of 4.54e-03
 $ siliconed check moss-image dit --variant compact
 map ~/Library/Application Support/Siliconed/store/moss-image-sft-dit.compact.v0.silicon · 5.4 GB · int8 ×252, bfloat16 ×210 (8-bit weights)
 model_out per plane         1.296e-06   1.02e-06       82   1.470e-06    1.91e-06  ✓  oracle at fp64 1.53e-06
@@ -389,7 +390,7 @@ model_out per plane         4.171e-03   3.51e-03      120   4.171e-03    2.89e-0
 
 Les variantes de Krea 2 se jugent par nuages comme sa Standard, et le `model_out per plane` de la Légère se juge par eux : la médiane du moteur sur neuf ordres de sommation (le nominal et huit tirés des mêmes graines que ceux de l'oracle, sur une carte dont le flux résiduel est permuté, `Krea2PermutedMap` : un poids SQ se déplace par blocs entiers de 256 entrées, ses entiers copiés tels que stockés) vaut 6,222e-05 pour une tolérance de 1,22e-04, le pire des douze tirages de l'oracle (le nominal, trois déplacements d'un ulp, huit ordres) plus 25 %. Les tirages d'une variante sont `krea2.py draw --size 512 --step 0 --jitter 1 2 3 --variant compact|light` et, pour les ordres de sommation, `krea2.py draw --size 512 --step 0 --permute 1 2 3 4 5 6 7 8 --permute-kind group --variant light` (le pas 0 seul : les latents suivants appartiennent à la trajectoire de la Standard). `temb` et `block0_attn_out` de la Légère sont deux frontières où la référence en fp32 est elle-même loin de la valeur exacte (1,92e-03 et 2,56e-03 au témoin fp64) ; le moteur est à 1,16e-05 et 2,17e-03 du témoin, dans la tolérance que la règle leur donne (2,41e-03 et 3,20e-03) : en fp32 contre le seul oracle, elles vaudraient 1,93e-03 et 2,81e-03 pour 5,00e-4.
 
-**La Légère de Krea 2 sous `--neural-engine` est rouge, pour une raison de comptage, pas de précision.** Toutes les lignes de précision passent (`model_out per plane` 2,735e-04 pour 2,05e-02). La ligne en échec est `gemm_int8`, qui exige que les produits sur les entiers publiés soient pris au moins une fois : avec le Neural Engine allumé et les défauts d'un Mac sans carte mesurée, le plan envoie tous les produits entiers de Krea 2 ailleurs, et le compte est 0 là où fp32 et `--bf16-activations` comptent 2016 et 224. La Compact de Krea 2 (un fichier de Comfy-Org, inchangé) donne le même 0 sous `--neural-engine` sur ce Mac : la cause est donc le plan, pas le format SQ ; elle n'est pas tranchée ici.
+**Sous `--neural-engine`, la route int8 lit les entiers publiés sur le Neural Engine aussi.** Là où le Neural Engine partage un produit avec le GPU, ses rangées lisent les entiers à côté du noyau int8 du GPU, comme la carte d'un rendu peut les lui donner ; sans cela, tout produit partagé d'un grand modèle restait sur le poids élargi, et `gemm_int8`, qui exige que les produits sur les entiers publiés soient pris au moins une fois, comptait 0 pour Krea 2 (sa Légère et sa Compact) et MOSS-Image sur notre Mac mini M5 Pro, toutes les lignes de précision passant. La Légère de Krea 2 lit maintenant 224 produits sur les entiers (`model_out per plane` 2,198e-04 pour 2,05e-02), et la route élargie est jugée aussi (2,735e-04). Les exécutions des Compact ci-dessus, faites sur le M1 Pro avant ce changement, lisent les entiers sur le GPU seul.
 
 Les LoRA ne sont pas couvertes ici : ce sont des fichiers que vous choisissez, pas une part de ce que Siliconed livre.
 

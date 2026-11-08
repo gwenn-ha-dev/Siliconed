@@ -299,18 +299,18 @@ The Compact's oracle also needs its publisher's library: `oracle-env/bin/pip ins
 
 The Compact and the Light run on the Neural Engine by default (fp16 products), so `--neural-engine` is the bar that matters for them, judged like the Standard's: against the reference in bf16 on the same weights (dequantized or decoded), the engine allowed bf16's own error plus 25 %. Those goldens need the Standard's `dit` golden at 512 first (they read its inputs); they are not part of `all` or of `siliconed check <model>`.
 
-`dit --size 512` of the Compacts and of MOSS-Image was run on our MacBook Pro M1 Pro, in fp32 then with `--neural-engine`: 10 runs, all passing. The four Lights were run again on our Mac mini M5 Pro, on the files the app installs (`siliconed install <model> --light`), against goldens rebuilt from the same files: 8 runs, 7 passing; the eighth is Krea 2's under the Neural Engine, explained below. Below, the gap of `model_out` to the reference (for Qwen-Image-2.1, `model_out (full)`; for Krea 2 and MOSS-Image, `model_out per plane`) in each run, and the bar the Neural Engine run is judged against.
+`dit --size 512` of the Compacts and of MOSS-Image was run on our MacBook Pro M1 Pro, in fp32 then with `--neural-engine`: 10 runs, all passing. The four Lights were run again on our Mac mini M5 Pro, on the files the app installs (`siliconed install <model> --light`), against goldens rebuilt from the same files: 8 runs, all passing. Below, the gap of `model_out` to the reference (for Qwen-Image-2.1, `model_out (full)`; for Krea 2 and MOSS-Image, `model_out per plane`) in each run, and the bar the Neural Engine run is judged against.
 
 | Variant | `model_out` in fp32, against the reference | Under the Neural Engine, against the reference | Its bar (bf16's own error + 25 %) |
 |---|---|---|---|
 | Z-Image, Compact | 7.833e-06 | 9.906e-03 | 5.89e-02 |
 | Z-Image, Light | 9.065e-06 | 2.708e-03 | 6.61e-02 |
 | Qwen-Image-2.1, Compact | 4.301e-06 | 4.562e-03 | 1.59e-02 |
-| Qwen-Image-2.1, Light | 2.647e-06 | 2.891e-04 | 1.82e-02 |
+| Qwen-Image-2.1, Light | 2.647e-06 | 2.804e-04 | 1.82e-02 |
 | Anima, Compact | 6.233e-06 | 6.133e-03 | 8.57e-02 |
 | Anima, Light | 5.725e-06 | 1.145e-03 | 6.24e-02 |
 | Krea 2, Compact | 7.070e-05 | 4.861e-03 | 4.24e-02 |
-| Krea 2, Light | 6.222e-05 | 2.735e-04 (the run is red, see below) | 2.05e-02 |
+| Krea 2, Light | 6.222e-05 | 2.198e-04 | 2.05e-02 |
 | MOSS-Image, Compact | 1.296e-06 | 4.171e-03 | 2.89e-02 |
 
 With `--bf16-activations` (the activation rounded to bf16, the weights read as published), the Lights' `model_out` is 3.690e-02 for Z-Image (bar 6.61e-02), 2.436e-03 for Qwen-Image-2.1 (1.82e-02), 8.109e-03 for Anima (6.24e-02) and 7.326e-04 for Krea 2, per plane (2.05e-02): all four pass.
@@ -372,9 +372,10 @@ gemm_int8                   ✓  2016 products on the published integers
 ✓ krea2 dit light 512 · 13 measures · nearest its threshold: block27_out 4.53e-04 of 5.00e-04
 $ siliconed check krea2 dit --size 512 --variant light --neural-engine
 map ~/Library/Application Support/Siliconed/store/krea2-turbo-dit.light.v1.silicon · 7.6 GB · sq4 ×196, float32 ×169, sq5 ×52, int8 ×13 (packed weights)
-model_out per plane         2.735e-04   2.60e-04       11   2.785e-04    2.05e-02  ✓  oracle at fp64 1.64e-02
-gemm_int8                   ✗  0 products on the published integers
-✗ krea2 dit light 512 · 1 of 14 failing: gemm_int8
+model_out per plane         2.198e-04   2.09e-04        0   2.246e-04    2.05e-02  ✓  oracle at fp64 1.64e-02
+gemm_int8                   ✓  224 products on the published integers
+model_out per plane (widened)  2.735e-04   2.60e-04       11   2.785e-04    2.05e-02  ✓  oracle at fp64 1.64e-02
+✓ krea2 dit light 512 · 14 measures · nearest its threshold: img_in_out 2.32e-04 of 4.54e-03
 $ siliconed check moss-image dit --variant compact
 map ~/Library/Application Support/Siliconed/store/moss-image-sft-dit.compact.v0.silicon · 5.4 GB · int8 ×252, bfloat16 ×210 (8-bit weights)
 model_out per plane         1.296e-06   1.02e-06       82   1.470e-06    1.91e-06  ✓  oracle at fp64 1.53e-06
@@ -389,7 +390,7 @@ model_out per plane         4.171e-03   3.51e-03      120   4.171e-03    2.89e-0
 
 Krea 2's variants are judged by clouds like its Standard, and the Light's `model_out per plane` is judged by them: the engine's median over nine summation orders (the nominal one and eight drawn by the same seeds as the oracle's, on a map whose residual stream is permuted, `Krea2PermutedMap`: an SQ weight moves by whole blocks of 256 inputs, its integers copied as stored) is 6.222e-05 against an allowance of 1.22e-04, the oracle's worst of twelve draws (nominal, three one-ulp moves, eight orders) plus 25 %. The draws of a variant are `krea2.py draw --size 512 --step 0 --jitter 1 2 3 --variant compact|light` and, for the summation orders, `krea2.py draw --size 512 --step 0 --permute 1 2 3 4 5 6 7 8 --permute-kind group --variant light` (step 0 only: the later latents belong to the Standard's trajectory). The Light's `temb` and `block0_attn_out` are two boundaries where the reference in fp32 is itself far from the exact value (1.92e-03 and 2.56e-03 at the fp64 witness); the engine is 1.16e-05 and 2.17e-03 from the witness, inside the allowance the rule gives them (2.41e-03 and 3.20e-03): in fp32 against the oracle alone they would read 1.93e-03 and 2.81e-03 for 5.00e-4.
 
-**Krea 2's Light under `--neural-engine` is red, and for an accounting reason, not a precision one.** Every precision line passes (`model_out per plane` 2.735e-04 for 2.05e-02). The failing line is `gemm_int8`, which asks that the products on the published integers be taken at least once: with the Neural Engine on and the defaults of a Mac with no measured map, the plan sends all of Krea 2's integer products elsewhere, and the count is 0 where fp32 and `--bf16-activations` count 2016 and 224. The Compact of Krea 2 (a file of Comfy-Org's, unchanged) gives the same 0 under `--neural-engine` on this Mac, so the cause is the plan, not the SQ format; it is not settled here.
+**Under `--neural-engine`, the int8 route reads the published integers on the Neural Engine too.** Where the Neural Engine shares a product with the GPU, its rows read the integers beside the GPU's int8 kernel, as a render's map may assign them; without that, every shared product of a large model stayed on the widened weight, and `gemm_int8`, which asks that the products on the published integers be taken at least once, counted 0 for Krea 2 (its Light and its Compact) and MOSS-Image on our Mac mini M5 Pro, every precision line passing. Krea 2's Light now reads 224 products on the integers (`model_out per plane` 2.198e-04 for 2.05e-02), and the widened route is judged too (2.735e-04). The Compact runs above, made on the M1 Pro before this change, read the integers on the GPU alone.
 
 LoRAs are not covered here: they are files you choose, not part of what Siliconed ships.
 
