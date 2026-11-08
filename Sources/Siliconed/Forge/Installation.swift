@@ -499,7 +499,7 @@ package struct Installer {
     /// The version a superseded installation of the family was in, read from its DiT map — what its
     /// reinstallation keeps when none is asked (`install`): the `variant` file goes with the folder,
     /// and the Compact's encoder alone would make a Light look like a Compact.
-    func supersededVariant(_ f: Family) -> Variant? {
+    package func supersededVariant(_ f: Family) -> Variant? {
         if let old = f.supersededVersionMaps.first(where: { Library.exists(library.map($0.map)) }) { return old.variant }
         guard f == .qwenImage21 else { return nil }
         let names = Family.supersededQwenImage21Maps

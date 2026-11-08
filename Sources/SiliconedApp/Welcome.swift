@@ -16,13 +16,24 @@ struct Welcome: View {
     /// Standard, Light on a Mac of 8 GB).
     @State private var choice: [Family: Variant] = [:]
 
+    /// **The models an update left without their weights** (`AppState.outdatedVariant`): installed before, they no longer
+    /// render until they take the new ones — said as an update, not as a first launch.
+    private var outdated: [Family] { AppState.frontFamilies.filter { app.outdatedVariant(of: $0) != nil } }
+
     var body: some View {
         VStack(spacing: 22) {
             VStack(spacing: 8) {
-                Text("Welcome to Siliconed").font(.largeTitle.weight(.semibold))
-                Text("Choose a model to begin. Its license and the space it takes are shown before anything is downloaded.")
-                    .font(.callout).foregroundStyle(.secondary)
-                    .frame(maxWidth: 460)
+                if outdated.isEmpty {
+                    Text("Welcome to Siliconed").font(.largeTitle.weight(.semibold))
+                    Text("Choose a model to begin. Its license and the space it takes are shown before anything is downloaded.")
+                        .font(.callout).foregroundStyle(.secondary)
+                        .frame(maxWidth: 460)
+                } else {
+                    Text("New Weights for Your Models").font(.largeTitle.weight(.semibold))
+                    Text("This version of Siliconed brings new weights for the models marked below: update them to render again. The space they take is shown before anything is downloaded.")
+                        .font(.callout).foregroundStyle(.secondary)
+                        .frame(maxWidth: 460)
+                }
             }
             // Side by side when the canvas holds them, else two by two.
             ViewThatFits(in: .horizontal) {
@@ -46,7 +57,8 @@ struct Welcome: View {
 
     private func card(_ family: Family) -> some View {
         let model = ModelCard.of(family)
-        let variant = choice[family] ?? family.preselectedVariant()
+        let old = app.outdatedVariant(of: family)
+        let variant = choice[family] ?? old ?? family.preselectedVariant()
         let size = family.installedSize(variant)
         return VStack(alignment: .leading, spacing: 10) {
             HStack {
@@ -63,6 +75,10 @@ struct Welcome: View {
             Text(Self.blurb(family))
                 .font(.callout).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
+            if let old {
+                Label(String(localized: "Your \(VersionChoice.name(old)) takes new weights"), systemImage: "arrow.down.circle")
+                    .font(.caption.weight(.medium)).foregroundStyle(Palette.live)
+            }
             Spacer(minLength: 0)
             // Standard, Compact or Light, each with its space on disk (`Family.installedSize`): the rack
             // shows another figure, the memory a render needs (`ModelCard.memoryNeed`).
@@ -77,7 +93,7 @@ struct Welcome: View {
                         .help("The space it takes on disk once installed")
                 }
                 Spacer()
-                Button("Install…") { app.offerInstall(family, variant: variant) }
+                Button(old == nil ? "Install…" : "Update…") { app.offerInstall(family, variant: variant) }
                     .buttonStyle(.prominent)
                     .disabled(!app.managementPossible)
             }

@@ -40,6 +40,12 @@ extension AppState {
         mirror != nil ? remoteLibrary?.part(f)?.installed : library.installedVariant(of: f)
     }
 
+    /// **The version whose weights this version of the app replaced** (`Installer.supersededVariant`): installed before an
+    /// update, it no longer renders until it takes its new weights (the welcome says so). This Mac's own; a lender's is not told.
+    func outdatedVariant(of f: Family) -> Variant? {
+        mirror != nil ? nil : Installer(library: library).supersededVariant(f)
+    }
+
     /// Compact, Light on a lender of 8 GB: the lender's memory decides.
     func preselectedVariant(of f: Family) -> Variant {
         mirror != nil ? remoteLibrary?.part(f)?.preselected ?? f.preselectedVariant() : f.preselectedVariant()

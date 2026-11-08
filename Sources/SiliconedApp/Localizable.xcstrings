@@ -23025,6 +23025,46 @@
         }
       }
     },
+    "New Weights for Your Models" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Neue Gewichte für Ihre Modelle"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nuevos pesos para tus modelos"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "De nouveaux poids pour vos modèles"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nuovi pesi per i tuoi modelli"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "モデルの新しい重み"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "模型有新的权重"
+          }
+        }
+      }
+    },
     "New versions:" : {
       "localizations" : {
         "de" : {
@@ -41554,6 +41594,46 @@
         }
       }
     },
+    "This version of Siliconed brings new weights for the models marked below: update them to render again. The space they take is shown before anything is downloaded." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diese Version von Siliconed bringt neue Gewichte für die unten markierten Modelle: Aktualisieren Sie sie, um wieder zu rendern. Ihr Platzbedarf wird angezeigt, bevor etwas geladen wird."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esta versión de Siliconed trae nuevos pesos para los modelos marcados abajo: actualízalos para volver a generar. El espacio que ocupan se muestra antes de descargar nada."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette version de Siliconed apporte de nouveaux poids pour les modèles signalés ci-dessous : mettez-les à jour pour rendre de nouveau. La place qu’ils prennent s’affiche avant tout téléchargement."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Questa versione di Siliconed porta nuovi pesi per i modelli segnalati qui sotto: aggiornali per tornare a generare. Lo spazio che occupano viene mostrato prima di scaricare qualsiasi cosa."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このバージョンのSiliconedでは、下に印のあるモデルに新しい重みがあります。再び生成するにはアップデートしてください。ダウンロードの前に、必要な容量が表示されます。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此版本的 Siliconed 为下方标出的模型带来了新的权重：请更新后再继续生成。下载任何内容之前，会先显示所占空间。"
+          }
+        }
+      }
+    },
     "Thumbnail size" : {
       "localizations" : {
         "de" : {
@@ -42602,6 +42682,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "文件中无法读取：%@。"
+          }
+        }
+      }
+    },
+    "Update…" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aktualisieren …"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Actualizar…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mettre à jour…"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aggiorna…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アップデート…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更新…"
           }
         }
       }
@@ -44340,6 +44460,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "你当前的版本是 %@。新版本将从其页面下载，并附有说明。"
+          }
+        }
+      }
+    },
+    "Your %@ takes new weights" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Neue Gewichte für Ihre Version %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nuevos pesos para tu versión %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nouveaux poids pour votre version %@"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nuovi pesi per la tua versione %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@版に新しい重みがあります"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你的%@版本有新的权重"
           }
         }
       }
