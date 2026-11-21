@@ -204,11 +204,14 @@ package enum ModelImport {
 }
 
 extension LoRAFile {
-    /// Why no family applies the file: the closest one's modules it does not reach.
+    /// Why no family applies the file: the closest one's modules it does not reach — a family reaching none of them is
+    /// not close (all missing all, the first one would be named: issue 17, a LoRA of one family refused as another's).
     func refusal() -> String {
         let closest = Family.allCases.map { ($0, unapplied(by: LoRAStack.modules(of: $0))) }.min { $0.1.count < $1.1.count }
-        return closest.map { "\($0.1.count) of its \(modules.count) modules are not \($0.0.rawValue)'s, e.g. \($0.1.prefix(2).joined(separator: ", "))" }
-            ?? "no family applies it"
+        guard let closest, closest.1.count < modules.count else {
+            return "none of its \(modules.count) modules is one a family adapts, e.g. \(modules.keys.sorted().prefix(2).joined(separator: ", "))"
+        }
+        return "\(closest.1.count) of its \(modules.count) modules are not \(closest.0.rawValue)'s, e.g. \(closest.1.prefix(2).joined(separator: ", "))"
     }
 }
 

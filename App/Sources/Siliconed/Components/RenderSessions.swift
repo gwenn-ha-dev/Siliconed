@@ -47,8 +47,8 @@ package final class DecoderSession<Decoder: LatentDecoder> {
 /// user's language (`AppState.journalLine`): more calls of smaller bands, the same image, a longer decoding.
 package let bandDecodingNotice = "Decoding by bands to stay within this Mac's memory limit: the same image, a longer decoding"
 
-/// A latent or an image with a non-finite value is not delivered: the image is skipped, and a batch left with none
-/// fails (`EngineError.nonFiniteImage`).
+/// A latent or an image with a non-finite value is not delivered: the image is lost (`Engine.Event.unusable`), and a
+/// batch left with none fails (`EngineError.nonFiniteImage`).
 enum FiniteImage {
     static func isFinite(_ values: [Float]) -> Bool { values.allSatisfy(\.isFinite) }
 }

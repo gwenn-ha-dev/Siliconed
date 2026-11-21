@@ -134,7 +134,16 @@ private final class Server: @unchecked Sendable {
         CoreAI.place(order.library.library)
         do {
             let request = try order.request(blobs)
-            let model = try Model.named(order.model, in: order.library.library)
+            let library = order.library.library
+            // The shared files an older app left are hashed once, before a render reads them. Silent: this process's
+            // standard output is the app's pipe.
+            if let card = library.card(order.model) {
+                var installer = Installer(library: library)
+                installer.journal = { _ in }
+                installer.cancellation = call.token
+                try installer.checkShared(card.family)
+            }
+            let model = try Model.named(order.model, in: library)
             _ = try Engine().renderBatch(request, seeds: order.seeds, model: model, cancellation: call.token) { event in
                 let (e, data) = WorkerEvent.of(event, blob: self.nextBlob())
                 self.out.send(WorkerReply.event(id: id, e), blobs: data.map { [(e.blob!, $0)] } ?? [])

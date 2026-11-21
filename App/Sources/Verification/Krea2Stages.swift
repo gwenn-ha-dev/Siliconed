@@ -26,11 +26,30 @@ enum Krea2Stages {
 
     // MARK: - The DiT under a LoRA
 
-    /// The bars, written before the first run (19/11): the fusion's change computed on the same bf16 weights in both
-    /// files, its low rank the engine's own (`LowRankRun`), within its bf16 rounding; block 0's, the Compact's int8
-    /// products and f16 forms against the Standard's bf16 at the first block, where no chaos has grown — a wrong factor,
-    /// basis or row gives an error of order 1.
-    static let loraBars = (fusion: 1e-2, block: 5e-2)
+    /// The fused text's bar, written before the first run (19/11): the fusion's change computed on the same bf16 weights in
+    /// both files, its low rank the engine's own (`LowRankRun`), within its bf16 rounding.
+    static let fusionBar = 1e-2
+
+    /// **The floor a change is judged against** (21/11). Block 0 is not where "no chaos has grown": the reference's own bf16
+    /// run lies 6 % from its f32 at block 0's attention (1.1 % at its feed-forward, 0.9 % at its output, 1.1 % at the
+    /// velocity), and a LoRA moves that boundary by 3 % of its rms. Two runs whose inputs differ by far more than an ulp
+    /// round independently, so a path's change (with − without) carries √2 · ε · rms(out), ε its own reference's deviation
+    /// (bf16 for the Standard, W8A8 for the Compact); the two paths' changes differ by √(2 (ε_s² + ε_c²)) · rms(out). The
+    /// first bar (5e-2 of the change) sat under that floor wherever the change is small: 0.2 – 0.9 measured with two
+    /// LoRAs, int8 and q64 alike, the velocity's 0.06. A wrong factor, basis or row gives an error of the change's own
+    /// size: seen where the change stands above the floor (block 0's feed-forward, the velocity, which 28 blocks build),
+    /// said where it does not.
+    static func changeFloor(_ name: String, standard: Safetensors, bf16: Safetensors, compact: Safetensors, w8a8: Safetensors) -> Double? {
+        func rms(_ a: UnsafeBufferPointer<Float>) -> Double { (a.reduce(0) { $0 + Double($1) * Double($1) } / Double(a.count)).squareRoot() }
+        func deviation(_ run: Safetensors, _ reference: Safetensors) -> Double? {
+            guard let r = run.float32(name), let f = reference.float32(name), r.count == f.count else { return nil }
+            var e = 0.0, m = 0.0
+            for i in f.indices { let x = Double(r[i] - f[i]); e += x * x; m += Double(f[i]) * Double(f[i]) }
+            return (e / max(m, .leastNormalMagnitude)).squareRoot()
+        }
+        guard let es = deviation(bf16, standard), let ec = deviation(w8a8, compact), let out = standard.float32(name) else { return nil }
+        return (2 * (es * es + ec * ec)).squareRoot() * rms(out)
+    }
 
     /// The boundaries' buffers, made and written before the DiT is planned, so that its floor counts them, and judged once
     /// its stage is closed (Z-Image's).
@@ -47,7 +66,7 @@ enum Krea2Stages {
         proves: "one evaluation of the DiT at σ = 1 under a user's LoRA read in its published file (strength 1, every module applied: the 28 blocks' and the text fusion's), the Compact's change against the Standard's: what the LoRA moves in the fused text, in block 0's attention, feed-forward and output, and in the velocity",
         sizes: ["512"], options: ["--map", "--lora"],
         oracle: nil, weights: ["DiT", "the Compact's DiT", "the LoRA"],
-        rule: "no reference of Krea 2 under a LoRA: the change each brings (with − without) on the Compact (its shared forms, the ANE's share under --neural-engine on) against the Standard's (bf16, the engine's low rank checked against the CPU by LowRankRun); text_fused within 1e-2, block 0's boundaries within 5e-2; the velocity's said, not judged (28 blocks of int8 against bf16)"
+        rule: "no reference of Krea 2 under a LoRA: the change each brings (with − without) on the Compact (its shared forms, the ANE's share under --neural-engine on) against the Standard's (bf16, the engine's low rank checked against the CPU by LowRankRun); text_fused within 1e-2 of its change; block 0's boundaries and the velocity within the floor two rounded runs leave, √(2 (ε_bf16² + ε_W8A8²)) · rms(out), each ε its reference's own deviation at that boundary; a boundary whose change stands under that floor is said, not judged"
     ) { invocation in
         let report = Report(title: "\(model) dit-lora \(invocation.size)")
         let compactPath = try invocation.ditMap(compactMap, golden: .eightBit)
@@ -60,6 +79,9 @@ enum Krea2Stages {
         let loras = try LoRAStack([LoRAEntry(lora)], on: .krea2)
         report.add(Judge.holds("the LoRA recognized, every module applied", true, note: (lora as NSString).lastPathComponent))
         let goldens = try invocation.goldens.open("krea2/goldens-krea2-dit-512.safetensors")
+        let bf16 = try invocation.goldens.half("krea2/witness-bf16-krea2-dit-512.safetensors", script: "tools/oracle/krea2.py bf16 --size 512")
+        let compactGoldens = try invocation.goldens.open("krea2/goldens-krea2-dit-compact-512.safetensors")
+        let w8a8 = try invocation.goldens.int8("krea2/witness-w8a8-krea2-dit-compact-512.safetensors", script: "tools/oracle/krea2.py w8a8 --size 512 --variant compact")
         let text = try invocation.goldens.open("krea2/goldens-krea2-text.safetensors")
         guard let latentEntry = goldens.entries["latent_in"], let latent = goldens.float32("latent_in"), let sigma = goldens.float32("timestep"),
               let tapsEntry = text.entries["hidden_valid"], let taps = text.float32("hidden_valid") else {
@@ -98,11 +120,22 @@ enum Krea2Stages {
             for i in s.indices { let x = Double(c[i] - s[i]); e += x * x; m += Double(s[i]) * Double(s[i]) }
             let error = (e / max(m, .leastNormalMagnitude)).squareRoot()
             let size = (m / Double(s.count)).squareRoot()
-            let note = String(format: "the change's rms %.3g on the Standard", size)
-            switch n {
-            case "model_out": report.add(Judge.bound(n + " change, said", error, .infinity, unit: "relative", note: note))
-            case "text_fused": report.add(Judge.bound(n + " change", error, loraBars.fusion, unit: "relative", note: note))
-            default: report.add(Judge.bound(n + " change", error, loraBars.block, unit: "relative", note: note))
+            if n == "text_fused" {
+                report.add(Judge.bound(n + " change", error, fusionBar, unit: "relative",
+                                       note: String(format: "the change's rms %.3g on the Standard", size)))
+                continue
+            }
+            guard let floor = changeFloor(n, standard: goldens, bf16: bf16, compact: compactGoldens, w8a8: w8a8) else {
+                throw Skip("\(n): missing from the DiT's references")
+            }
+            // In the change's own units: a wrong factor gives about 1, the floor's share of the change is the bar.
+            let bar = floor / max(size, .leastNormalMagnitude)
+            if size <= floor {
+                report.add(Judge.bound(n + " change, said", error, .infinity, unit: "relative",
+                                       note: String(format: "the change's rms %.3g under the rounding floor %.3g: a wrong factor would not show", size, floor)))
+            } else {
+                report.add(Judge.bound(n + " change", error, bar, unit: "relative",
+                                       note: String(format: "the change's rms %.3g on the Standard, the rounding floor %.3g", size, floor)))
             }
         }
         return report

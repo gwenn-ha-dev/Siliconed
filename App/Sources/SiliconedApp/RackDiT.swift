@@ -202,23 +202,34 @@ struct DiTBox: View {
         }
         // The lot is the series' seed axis: its ± on the Seed's line, choosing how many seeds and where they go — the same count
         // as the Seeds stepper under.
+        // **Fixed, a box** (issue 17): two states, one click. Off, the field shows the seed the last render drew (`render`),
+        // greyed with the dice, a text that selects and copies (a disabled field does neither); on, that seed stays — the
+        // same image again.
         Field(title: "Seed", app: app, bracket: .seeds) {
             if app.fixedSeed {
                 TextField("Seed", value: $app.seed, format: .number.grouping(.never))
                     .labelsHidden()
                     .multilineTextAlignment(.trailing)
                     .frame(width: 100)
-                Button { app.seed = UInt64.random(in: 0...UInt64(UInt32.max)) } label: { Image(systemName: "dice") }
-                    .buttonStyle(.borderless)
-                    .help("Draw a seed")
-                    .accessibilityLabel(Text("Draw a seed"))
+            } else {
+                Text(verbatim: String(app.seed))
+                    .monospacedDigit()
+                    .foregroundStyle(Palette.secondary)
+                    .textSelection(.enabled)
+                    .lineLimit(1)
+                    .padding(.horizontal, 4)
+                    .frame(width: 100, height: 22, alignment: .trailing)
+                    .background(RoundedRectangle(cornerRadius: 5).fill(Color.primary.opacity(0.05)))
+                    .help("The seed the last render drew: select it to copy it, check Fixed to keep it")
             }
-            Picker("Seed", selection: $app.fixedSeed) {
-                Text("Random").tag(false)
-                Text("Fixed").tag(true)
-            }
-            .labelsHidden().fixedSize()
-            .help("Random: a new seed for every render. Fixed: the same image again")
+            Button { app.seed = UInt64.random(in: 0...UInt64(UInt32.max)) } label: { Image(systemName: "dice") }
+                .buttonStyle(.borderless)
+                .disabled(!app.fixedSeed)
+                .help("Draw a seed")
+                .accessibilityLabel(Text("Draw a seed"))
+            Toggle("Fixed", isOn: $app.fixedSeed)
+                .toggleStyle(.checkbox).fixedSize()
+                .help("Random: a new seed for every render. Fixed: the same image again")
         }
         if !app.variations.isEmpty {
             Field(title: "Variation") {

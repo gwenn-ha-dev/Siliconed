@@ -49,8 +49,10 @@ enum Krea2Shared {
         case "embed":
             return [("patches", [rows, Krea2Functions.patch], .f32), ("first", [d, Krea2Functions.patch], .bf16), ("first_bias", [d], .bf16)]
         case "final":
+            let patch = Krea2Functions.patch
             return x + [("temb", [1, d], .bf16), ("last_mod", [2, d], .bf16), ("last_norm", [d], .f32),
-                        ("last_linear", [Krea2Functions.patch, d], .bf16), ("last_linear_bias", [Krea2Functions.patch], .bf16)]
+                        ("last_linear", [patch, d], .bf16), ("last_linear_bias", [patch], .bf16)]
+                + (ranks["last_linear"].map { [("last_linear_down", [d, $0], .bf16), ("last_linear_up", [$0, patch], .bf16)] } ?? [])
         case "modulation":
             return [("temb_mod", [6, d], .bf16), ("mod", [6, d], .bf16)]
         case "pre":
@@ -115,8 +117,10 @@ enum Krea2Shared {
             let mod = b.binary(.add, a("last_mod"), a("temb"))
             let scale = b.slice(mod, axis: 0, start: 0, size: 1), shift = b.slice(mod, axis: 0, start: 1, size: 1)
             let h = b.binary(.add, b.binary(.mul, b.scale("add", scale, 1), b.cast(n, to: .bf16)), shift)
-            let y = b.binary(.add, b.matmul(h, b.transpose(a("last_linear"), [1, 0]), result: Aicode.tensor([rows, Krea2Functions.patch], .bf16)),
-                             a("last_linear_bias"))
+            // In bf16 as the Standard's, its LoRA beside (`Krea2Functions.edgeProducts`).
+            var p = b.matmul(h, b.transpose(a("last_linear"), [1, 0]), result: Aicode.tensor([rows, Krea2Functions.patch], .bf16))
+            if ranks["last_linear"] != nil { p = b.lowRank(p, h, down: a("last_linear_down"), up: a("last_linear_up")) }
+            let y = b.binary(.add, p, a("last_linear_bias"))
             m.outputs = [("velocity", b.cast(y, to: .f32))]
 
         case "modulation":

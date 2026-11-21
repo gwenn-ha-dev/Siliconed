@@ -207,8 +207,10 @@ struct Problem: Equatable, Sendable {
             return String(localized: "The engine stopped answering for \(seconds / 60) minutes and was stopped.")
         case .cancelled:                                             // cancelled
             return String(localized: "Stopped.")
-        case .nonFiniteImage:                                        // non_finite_image
-            return String(localized: "This render went wrong and its image is unusable: it wasn’t kept.")
+        case .nonFiniteImage(.decoding):                             // non_finite_image
+            return String(localized: "This render went wrong in the VAE and its image is unusable: it wasn’t kept.")
+        case .nonFiniteImage:
+            return String(localized: "This render went wrong in the DiT and its image is unusable: it wasn’t kept.")
         case .internalFailure(let component, _):                     // internal_failure
             return String(localized: "The engine failed (\(component)).")
         }

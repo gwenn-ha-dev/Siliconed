@@ -90,12 +90,36 @@ package enum Krea2Transformer {
         return all
     }
 
-    /// **Every module a LoRA may adapt**: the products of the DiT's 28 blocks and of the text fusion's four, by their
-    /// published names — what the trainers adapt (two published LoRAs read 19/11: these 288 modules, no other), and what
-    /// the functions add a low rank beside (`Krea2Functions`, `Krea2Shared`). A file naming the projector, `txtmlp` or an
-    /// embedder is refused by name, never computed without it.
+    /// **Every module a LoRA may adapt**: the products of the DiT's 28 blocks and of the text fusion's four, the
+    /// timestep's three and the final layer's (`edges`), by their published names and by diffusers' (landing on the
+    /// product of the published name) — what the trainers adapt, and what the functions add a low rank beside
+    /// (`Krea2Functions`, `Krea2Shared`). Read 21/11: a distillation LoRA (lvladikov's 4-step, rank 64) adapts the 224
+    /// products of the blocks and the four edges, in either naming; two style LoRAs read 19/11, the 288 products of the
+    /// blocks and of the fusion. A file naming the projector, `txtmlp` or `first` is refused by name, never computed
+    /// without it.
     package static func loraModules() -> [String: LoRAStack.Shape] {
-        products().filter { $0.key.hasPrefix("blocks.") || $0.key.hasPrefix("txtfusion.layerwise_blocks.") || $0.key.hasPrefix("txtfusion.refiner_blocks.") }
+        let adapted = products().filter { name, _ in
+            ["blocks.", "txtfusion.layerwise_blocks.", "txtfusion.refiner_blocks."].contains(where: name.hasPrefix) || edges.contains(name)
+        }
+        var all = adapted
+        for (name, s) in adapted { all[diffusersName(name)] = LoRAStack.Shape(out: s.out, inn: s.inn, product: name) }
+        return all
+    }
+
+    /// The products besides the blocks' a LoRA reaches, computed once an evaluation: the timestep's and the final layer's.
+    static let edges = ["tmlp.0", "tmlp.2", "tproj.1", "last.linear"]
+
+    /// **A product's name in diffusers' `Krea2Transformer2DModel`**, what a trainer on diffusers writes: the block
+    /// `transformer_blocks.<i>.` (the fusion's `text_fusion.`), the attention's `to_q` `to_k` `to_v` `to_out.0` `to_gate`,
+    /// the feed-forward `ff.`; the edges by their own names (the former engine's table, v0.21 `Recipes.krea2`).
+    static func diffusersName(_ name: String) -> String {
+        let edges = ["tmlp.0": "time_embed.linear_1", "tmlp.2": "time_embed.linear_2", "tproj.1": "time_mod_proj", "last.linear": "final_layer.linear"]
+        if let e = edges[name] { return e }
+        var n = name.hasPrefix("blocks.") ? "transformer_blocks." + name.dropFirst("blocks.".count) : "text_fusion." + name.dropFirst("txtfusion.".count)
+        for (comfy, diffusers) in [("wq", "to_q"), ("wk", "to_k"), ("wv", "to_v"), ("wo", "to_out.0"), ("gate", "to_gate")] where n.hasSuffix(".attn." + comfy) {
+            n = String(n.dropLast(comfy.count)) + diffusers
+        }
+        return n.replacingOccurrences(of: ".mlp.", with: ".ff.")
     }
 
     // MARK: - The CPU's tables

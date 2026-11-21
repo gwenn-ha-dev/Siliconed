@@ -90,7 +90,7 @@ package enum RenderLoop {
         let told = request.detail.modelSigmas(schedule, start: start, bell: denoising.detailBell,
                                               scale: Detail.scale(width: request.width, height: request.height))
         let count = space.channels * height * width
-        var pending: [(latent: [Float], timings: Engine.Timings, elapsed: TimeInterval)] = []
+        var pending: [(index: Int, latent: [Float], timings: Engine.Timings, elapsed: TimeInterval)] = []
         var imageStart = totalStart
         for (n, seed) in seeds.enumerated() {
             try cancellation.check()
@@ -126,32 +126,35 @@ package enum RenderLoop {
                 }
             }
             timings.denoising = Date().timeIntervalSince(denoisingStart)
-            pending.append((latent, timings, Date().timeIntervalSince(imageStart)))
+            // A non-finite latent is the DiT's (or what it read), said here: decoded, it would fail at the VAE's stage.
+            guard FiniteImage.isFinite(latent) else { emit(.unusable(image: n, stage: .denoising)); continue }
+            pending.append((n, latent, timings, Date().timeIntervalSince(imageStart)))
         }
         // The DiT leaves before the decoder comes (`DecoderSession`).
         dit = nil
+        guard let first = pending.first else { throw EngineError.nonFiniteImage(stage: .denoising) }
 
         // ── the decoding, image by image, one decoder session ──
         // Announced before its session is planned: the plan's seconds are the first image's decoding.
         try cancellation.check()
-        emit(.stage(.decoding, image: 0))
+        emit(.stage(.decoding, image: first.index))
         var decodingStart = Date()
         let decoder = try DecoderSession<Parts.Decoder>(path: parts.decoderPath, latentHeight: height, latentWidth: width)
         if let warning = decoder.warning { emit(.warning(warning)) }
         var renders: [Engine.Render] = []
-        for (n, image) in pending.enumerated() {
-            if n > 0 {
+        for (k, image) in pending.enumerated() {
+            let n = image.index
+            if k > 0 {
                 try cancellation.check()
                 emit(.stage(.decoding, image: n))
                 decodingStart = Date()
             }
-            guard FiniteImage.isFinite(image.latent) else { continue }
             let pixels = parts.picture(try decoder.pixels(parts.decoderInput(image.latent)))
             var t = image.timings
             t.decoding = Date().timeIntervalSince(decodingStart)
             t.total = image.elapsed + t.decoding
             emit(.decoding(seconds: t.decoding))
-            guard FiniteImage.isFinite(pixels) else { continue }
+            guard FiniteImage.isFinite(pixels) else { emit(.unusable(image: n, stage: .decoding)); continue }
             let render = Engine.Render(
                 model: denoising.model, prompt: request.prompt, seed: seeds[n], steps: steps, loras: request.loras,
                 image: ImageRGB(pixels: pixels, height: space.factor * height, width: space.factor * width),
@@ -162,7 +165,7 @@ package enum RenderLoop {
             emit(.image(index: n, render))
             renders.append(render)
         }
-        if renders.isEmpty { throw EngineError.nonFiniteImage }
+        if renders.isEmpty { throw EngineError.nonFiniteImage(stage: .decoding) }
         return renders
     }
 }

@@ -289,8 +289,9 @@ extension RemoteControl {
         // The starting image too, or none: « Generate » would queue the same request.
         app.setStart(start)
         if let strength { app.startStrength = strength }
-        // A seed drawn here is a Random render, as after a click: the rack must not keep showing an old Fixed one.
-        if let seed = d.seed { app.fixedSeed = true; app.seed = seed } else { app.fixedSeed = false }
+        // A seed drawn here is a Random render, as after a click: the rack shows the seed drawn, greyed, not an old Fixed one.
+        app.fixedSeed = d.seed != nil
+        app.seed = firstNumber
 
         let added = zip(jobs, variants).map { job, v -> [String: Any] in
             var o = queued(job)

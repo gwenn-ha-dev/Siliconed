@@ -148,7 +148,7 @@ package enum Krea2Render {
             velocities = [Float](repeating: 0, count: 16 * latentHeight * latentWidth)
             let geometry = Krea2Session.Geometry(latentHeight: latentHeight, latentWidth: latentWidth, text: taps.shape[0])
             let rows = fused.rows
-            let ranks = Krea2Functions.ranks(loras, blocks: Krea2Session.blocks.map { $0 + "." })
+            let ranks = Krea2Session.ranks(loras)
             guard let device = MTLCreateSystemDefaultDevice() else { throw ProgramError("no Metal device") }
             let offered = try blocking { try await Arithmetic.offered(codes: codes, device) }
             let arithmetic = try Arithmetic.opened(codes: codes, neuralEngine: CoreAI.neuralEngineInForce, offered: offered) {

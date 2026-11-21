@@ -389,4 +389,28 @@ final class InstallationTests: XCTestCase {
         run.add(100)
         XCTAssertEqual(told.withLock { $0 }.last, size)
     }
+
+    /// The shared files an older app left are taken on their size: hashed once before a render (`checkShared`), one
+    /// that is not the pinned bytes is removed and refused, and the family is no longer installed. A version's own DiT
+    /// and encoder are never among them (Z-Image's text encoder, 8 GB, is the Standard's).
+    func testASharedFileOfTheRightSizeButWrongBytesIsRemoved() throws {
+        let z = Family.zImage
+        XCTAssertEqual(Set(Installer(library: library).shared(z).map(\.place)),
+                       ["composants/z-image/tokenizer/tokenizer.json", "composants/z-image/vae.safetensors"])
+        try lay(z, .compact)
+        var installer = Installer(library: library)
+        installer.journal = { _ in }
+        XCTAssertTrue(installer.isInstalled(z, .compact))
+        var refused: [String] = []
+        for _ in 0..<3 {
+            do { try installer.checkShared(z) } catch {
+                guard case .corruptMap(let file?) = error else { return XCTFail("\(error)") }
+                refused.append((file as NSString).lastPathComponent)
+            }
+        }
+        XCTAssertEqual(refused.sorted(), ["tokenizer.json", "vae.safetensors"])
+        XCTAssertFalse(installer.isInstalled(z, .compact))
+        XCTAssertEqual(installer.missing(z, .compact).map(\.place).sorted(),
+                       ["composants/z-image/tokenizer/tokenizer.json", "composants/z-image/vae.safetensors"])
+    }
 }

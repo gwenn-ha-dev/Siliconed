@@ -118,15 +118,33 @@ final class Krea2FamilyTests: XCTestCase {
         XCTAssertEqual(Krea2Functions.named(["wq": 32, "down": 64]), "-lora-down64-wq32")
     }
 
-    /// The published names: the blocks' and the fusion's blocks' products are adapted; a norm, a block past the 28th,
-    /// the projector and the embedders, which no function adapts, are not.
+    /// The published names: the blocks' and the fusion's blocks' products are adapted, the timestep's and the final
+    /// layer's too; a norm, a block past the 28th, the projector, `txtmlp` and `first`, which no function adapts, are not.
+    /// **Under diffusers' names as well** (issue 17: lvladikov's 4-step LoRA, refused by 0.30), each landing on the
+    /// published product, its shape the same.
     func testWhatALoRAAdapts() {
         let modules = Krea2Transformer.loraModules()
-        for name in ["blocks.0.attn.wq", "blocks.27.attn.gate", "blocks.0.mlp.up", "txtfusion.refiner_blocks.0.attn.wo", "txtfusion.layerwise_blocks.1.mlp.down"] {
+        for name in ["blocks.0.attn.wq", "blocks.27.attn.gate", "blocks.0.mlp.up", "txtfusion.refiner_blocks.0.attn.wo", "txtfusion.layerwise_blocks.1.mlp.down",
+                     "tmlp.0", "tmlp.2", "tproj.1", "last.linear"] {
             XCTAssertNotNil(modules[name], name)
+            XCTAssertNil(modules[name]?.product, name)
         }
-        for name in ["blocks.28.attn.wq", "blocks.0.prenorm", "txtfusion.projector", "txtmlp.1", "first"] { XCTAssertNil(modules[name], name) }
-        XCTAssertEqual(modules.count, 28 * 8 + 4 * 8)
+        for name in ["blocks.28.attn.wq", "blocks.0.prenorm", "txtfusion.projector", "text_fusion.projector", "txtmlp.1", "first", "img_in"] {
+            XCTAssertNil(modules[name], name)
+        }
+        let diffusers = ["transformer_blocks.3.attn.to_q": "blocks.3.attn.wq", "transformer_blocks.27.attn.to_out.0": "blocks.27.attn.wo",
+                         "transformer_blocks.0.attn.to_gate": "blocks.0.attn.gate", "transformer_blocks.5.ff.gate": "blocks.5.mlp.gate",
+                         "text_fusion.refiner_blocks.1.ff.down": "txtfusion.refiner_blocks.1.mlp.down",
+                         "text_fusion.layerwise_blocks.0.attn.to_k": "txtfusion.layerwise_blocks.0.attn.wk",
+                         "time_embed.linear_1": "tmlp.0", "time_embed.linear_2": "tmlp.2", "time_mod_proj": "tproj.1", "final_layer.linear": "last.linear"]
+        for (alias, product) in diffusers {
+            XCTAssertEqual(modules[alias]?.product, product, alias)
+            XCTAssertEqual(modules[alias].map { [$0.out, $0.inn] }, modules[product].map { [$0.out, $0.inn] }, alias)
+        }
+        // 28 blocks × 8 and 4 fusion blocks × 8, the 4 edges, each under two names.
+        XCTAssertEqual(modules.count, 2 * (28 * 8 + 4 * 8 + 4))
+        XCTAssertEqual(modules["tproj.1"].map { [$0.out, $0.inn] }, [6 * d, d])
+        XCTAssertEqual(modules["last.linear"].map { [$0.out, $0.inn] }, [64, d])
         XCTAssertEqual(modules["blocks.0.attn.wk"].map { [$0.out, $0.inn] }, [1536, d])
         XCTAssertEqual(modules["blocks.0.mlp.down"].map { [$0.out, $0.inn] }, [d, 16384])
         XCTAssertEqual(Krea2Transformer.tensors()["blocks.0.attn.wq.weight"], [d, d])

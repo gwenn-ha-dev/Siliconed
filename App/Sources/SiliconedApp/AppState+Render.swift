@@ -17,6 +17,8 @@ extension AppState {
         guard canRender else { return }
         // Everything that reads the state is taken here: the job no longer depends on the form.
         let firstNumber = imposedSeed ?? (fixedSeed ? seed : UInt64.random(in: 0...UInt64(UInt32.max)))
+        // The seed drawn shown in the rack's field, greyed: Fixed then keeps it.
+        if imposedSeed == nil, !fixedSeed { seed = firstNumber }
         let format = imposedFormat ?? outputFormat
         guard let prompts = try? alternatives.get().prompts, (try? carried.get()) != nil else { return }
         if case .success(let g?) = seriesGrid(seed: firstNumber) {
@@ -216,14 +218,16 @@ extension AppState {
     /// **A train's call ended**: the jobs whose image came have ended already (`execute`); the others, by how it ended.
     /// - stopped: « Stop » stops the running render and the queue continues — the cells not decoded yet with it;
     /// - refused or failed: one request, one answer — every job still open ends with it, none is tried again alone;
-    /// - finished: a job still open is one whose image the engine gave up (not finite).
+    /// - finished: a job still open is one the engine neither gave an image nor said lost (`Event.unusable`), a fault.
     private func settle(_ riders: [Job], last: Job?, _ issue: Issue) {
         if case .stopped = issue {
             if let last, !delivered.contains(last.id) { complete(last, .stopped, warnings: journal) }
             return
         }
         var verdict = issue
-        if case .finished = issue { verdict = .failed(Problem(EngineError.nonFiniteImage)) }
+        if case .finished = issue {
+            verdict = .failed(Problem(EngineError.internalFailure(component: "engine", detail: "the render ended without this job's image")))
+        }
         for rider in riders where !delivered.contains(rider.id) {
             guard rider.id == last?.id || file.contains(where: { $0.id == rider.id }) else { continue }
             file.removeAll { $0.id == rider.id }
@@ -368,6 +372,14 @@ extension AppState {
                         delivered.insert(job.id)
                         complete(job, .finished, images: [entry.ordinal], warnings: journal)
                     }
+                case let .unusable(image, lost):
+                    // In a train, a job whose image is lost ends with it: the call goes on for the others. Alone, its
+                    // call ends in `nonFiniteImage`, below.
+                    guard together, let job = turn(to: image) else { break }
+                    delivered.insert(job.id)
+                    let p = Problem(EngineError.nonFiniteImage(stage: lost))
+                    problem = p
+                    complete(job, .failed(p), warnings: journal)
                 case .warning(let message):
                     journal.append(message)
                 default:

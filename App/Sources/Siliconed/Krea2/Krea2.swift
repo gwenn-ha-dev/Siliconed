@@ -40,8 +40,9 @@ import Foundation
 ///     leave a sixth of it, and a random error of rounding size on them, in any direction, as much as the
 ///     engine's or more. The engine and the fp32 reference are two draws of that ill-conditioning; one draw
 ///     against one draw does not judge a pass, the latent planes do;
-///   - **a LoRA reaches the products of the 28 blocks and of the fusion's four** (`Krea2Transformer.loraModules`);
-///     one naming the projector, `txtmlp` or an embedder is refused.
+///   - **a LoRA reaches the products of the 28 blocks and of the fusion's four, the timestep's and the final layer's**
+///     (`Krea2Transformer.loraModules`), under Comfy's names or diffusers'; one naming the projector, `txtmlp` or `first`
+///     is refused.
 ///
 /// For a port of the undistilled Krea-2-Raw, two things this Turbo port does not need: μ then depends on
 /// the image's length (`calculate_shift`, `max_image_seq_len` 6400, not Flux's 4096), and the guidance is

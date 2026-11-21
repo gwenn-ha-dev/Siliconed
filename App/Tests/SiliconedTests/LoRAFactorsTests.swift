@@ -98,4 +98,16 @@ final class LoRAFactorsTests: XCTestCase {
         XCTAssertThrowsError(try LoRAStack(entries: [(a, 1)]).write(products, modules: ["m": .init(out: 4, inn: 4)], ranks: ["m": 32],
                                                                    element: .float32) { arena.pointer(at[$0]!) })
     }
+
+    /// **A file no family recognizes is refused by its own modules**, no family named (issue 17: every family missing
+    /// every module, the first one was named, "228 of its 228 modules are not z-image's").
+    func testRefusalOfAnUnknownFileNamesNoFamily() throws {
+        let lora = try LoRAFile(try file("unknown.safetensors", [
+            ("nowhere.proj.lora_A.weight", [1, 4], [1, 2, 3, 4]), ("nowhere.proj.lora_B.weight", [4, 1], [1, 2, 3, 4]),
+        ]))
+        XCTAssertNil(lora.family())
+        let said = lora.refusal()
+        for family in Family.allCases { XCTAssertFalse(said.contains(family.rawValue), said) }
+        XCTAssertTrue(said.contains("nowhere.proj"), said)
+    }
 }

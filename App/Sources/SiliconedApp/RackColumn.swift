@@ -141,6 +141,15 @@ final class RackPanel: NSObject, NSWindowDelegate {
         RackColumnModel.shared.setDetached(false)
     }
 
+    /// **The smallest the panel gets**: the column's narrowest, and the rack's head with a few of its rows. Held here
+    /// (`MinimumContent`): the hosting controller sets `contentMinSize` back to zero, and the panel could be dragged up to
+    /// its buttons (issue 17; the main window's issue #7).
+    static let minimumContent = NSSize(width: RackColumnModel.widths.lowerBound, height: 480)
+
+    func windowWillResize(_ sender: NSWindow, to frameSize: NSSize) -> NSSize {
+        MinimumContent.clamp(frameSize, of: sender, to: Self.minimumContent)
+    }
+
     private func make() -> NSPanel {
         let p = NSPanel(contentRect: NSRect(x: 0, y: 0, width: RackColumnModel.ideal, height: 760),
                         styleMask: [.titled, .closable, .resizable, .fullSizeContentView],
@@ -156,7 +165,6 @@ final class RackPanel: NSObject, NSWindowDelegate {
         let host = NSHostingController(rootView: RackPanelRoot(carrier: carrier, local: local))
         host.sizingOptions = []
         p.contentViewController = host
-        p.contentMinSize = NSSize(width: RackColumnModel.widths.lowerBound, height: 480)
         p.setContentSize(NSSize(width: RackColumnModel.shared.width, height: 760))
         // Where the column was: along the main window's left edge, outside it when the screen has the room.
         p.setFrameAutosaveName("RackPanel")

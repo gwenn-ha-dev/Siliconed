@@ -536,10 +536,10 @@ package enum RemoteControlHelp {
                  the engine's sentence in the app's language, and "code", its stable key:
                  "license_not_accepted", "insufficient_memory", "disk_full"…). An image whose
                  pixels came out unusable (black or blank) is never "done": "error", code
-                 "non_finite_image". A render whose engine stopped (past this Mac's budget B, or a
-                 crash) is "error", code "engine_stopped"; one silent for ten minutes, "engine_silent";
-                 one of another build than the app, "engine_mismatch". The jobs waiting behind it go on,
-                 in a new engine.
+                 "non_finite_image", its message naming where (the DiT or the VAE). A render whose
+                 engine stopped (past this Mac's budget B, or a crash) is "error", code
+                 "engine_stopped"; one silent for ten minutes, "engine_silent"; one of another build
+                 than the app, "engine_mismatch". The jobs waiting behind it go on, in a new engine.
           "warnings": the engine's own lines during the job's render (English), when it wrote any.
           If a job is not "done": "ok": false, "error": "render", exit 1.
 
@@ -1901,10 +1901,11 @@ package enum RemoteControlHelp {
                   phrase du moteur dans la langue de l'app, et "code", sa clé stable :
                   "license_not_accepted", "insufficient_memory", "disk_full"…). Une image dont
                   les pixels sont sortis inutilisables (noire ou vide) n'est jamais "done" :
-                  "error", code "non_finite_image". Un rendu dont le moteur s'est arrêté (au-delà
-                  du budget B de ce Mac, ou un plantage) est "error", code "engine_stopped" ; muet dix
-                  minutes, "engine_silent" ; d'une autre version que l'app, "engine_mismatch". Les
-                  travaux qui attendaient derrière lui sont retirés.
+                  "error", code "non_finite_image", son message disant où (le DiT ou le VAE). Un
+                  rendu dont le moteur s'est arrêté (au-delà du budget B de ce Mac, ou un plantage)
+                  est "error", code "engine_stopped" ; muet dix minutes, "engine_silent" ; d'une
+                  autre version que l'app, "engine_mismatch". Les travaux qui attendaient derrière
+                  lui sont retirés.
           "warnings" : les lignes du moteur pendant le rendu du travail (en anglais), s'il en a écrit.
           Si un travail n'est pas "done" : "ok": false, "error": "render", sortie 1.
 

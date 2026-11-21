@@ -147,11 +147,13 @@ package enum EngineError: Error, Equatable, Sendable, Codable, LocalizedError, C
     case engineSilent(seconds: Int)
     /// The render, the installation or the download was cancelled.
     case cancelled
-    /// **The render went wrong and its image is unusable**: the final latent, or the decoded image, carries a
-    /// non-finite value (NaN, ±∞) — an image of that kind comes out black or blank. Thrown instead of
-    /// delivering it as done; nothing of it is kept. Not a misuse: the same request rendered again is the
-    /// remedy, and an issue if it comes back.
-    case nonFiniteImage
+    /// **The render went wrong and its image is unusable**: a non-finite value (NaN, ±∞) in the final latent
+    /// (`stage` `.denoising`: the DiT, or what it read) or in the decoded image (`.decoding`: the VAE) — an image of
+    /// that kind comes out black or blank. Thrown instead of delivering it as done; nothing of it is kept. Not a
+    /// misuse: the same request rendered again is the remedy, and an issue if it comes back. The stage is said
+    /// because the user sees it: a NaN latent once showed as the VAE's failure (issue 17), the decoding having
+    /// been announced before the latent was checked.
+    case nonFiniteImage(stage: Engine.Stage)
     /// A breakdown deep in the engine's numerics: not a misuse.
     /// `component` names where, `detail` is the technical message.
     case internalFailure(component: String, detail: String)
@@ -409,7 +411,8 @@ package enum EngineError: Error, Equatable, Sendable, Codable, LocalizedError, C
             return "The engine is from another build than the app (protocol \(engine.map(String.init) ?? "none"), the app's \(app))."
         case .engineSilent(let seconds): return "The engine stopped answering for \(seconds / 60) minutes and was stopped."
         case .cancelled: return "Cancelled."
-        case .nonFiniteImage: return "This render went wrong and its image is unusable: it was not kept."
+        case .nonFiniteImage(.decoding): return "This render went wrong in the VAE and its image is unusable: it was not kept."
+        case .nonFiniteImage: return "This render went wrong in the DiT and its image is unusable: it was not kept."
         case let .internalFailure(component, detail): return "Internal engine failure (\(component)): \(detail)"
         }
     }
@@ -608,7 +611,7 @@ package enum EngineError: Error, Equatable, Sendable, Codable, LocalizedError, C
         .insufficientMemory(needed: 7_800_000_000, budget: 8_589_934_592), 
         .renderAlreadyRunning, .engineStopped(budget: 4 << 30, detail: "silicore-worker held 4.12 GiB, past B = 4.00 GiB"),
         .engineMismatch(app: 2, engine: 1), .engineSilent(seconds: 600),
-        .cancelled, .nonFiniteImage,
+        .cancelled, .nonFiniteImage(stage: .decoding),
         .internalFailure(component: "engine", detail: "plan refused"),
     ]
 }

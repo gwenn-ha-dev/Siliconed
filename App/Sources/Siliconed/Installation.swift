@@ -7,6 +7,7 @@ import Foundation
 ///     store/<published name>              a DiT, an encoder: one file each, as published
 ///     store/composants/<family>/…         tokenizers, VAE, shards behind their index, the family's own LoRA
 ///     store/composants/<family>/variant   the version the last installation aimed at (`Library.variant(of:)`)
+///     store/composants/<family>/hashed    the shared files hashed in this library, and their digests (`checkShared`)
 ///
 /// A download cut short keeps what it had (`….partiel` and its ledger, beside the final name) and resumes; a file
 /// already there with the pinned size is not downloaded again (`verify` hashes what is there). A family's two versions
@@ -153,6 +154,7 @@ package struct Installer {
                                      received: told(file, index: k + 1, count: files.count, before: before, total: total),
                                      journal: journal)
                 before += file.bytes
+                if shared(f).contains(file) { try record(f, file) }
             }
         }
         journal(files.isEmpty ? "  already installed" : String(format: "  installed: %d file%@, %.2f GB", files.count, files.count == 1 ? "" : "s", Double(total) / 1e9))
@@ -180,6 +182,50 @@ package struct Installer {
         return damaged
     }
 
+    // MARK: - The shared files, hashed once
+
+    /// **The files every version of a family reads**: its tokenizers, its VAE, its own LoRA — 0.2 to 1.5 GB a family,
+    /// against gigabytes for a DiT or an encoder, which each version has its own.
+    func shared(_ f: Family) -> [PublishedFile] {
+        let versions = f.variants.map { Set(f.files($0)) }
+        return f.files(f.variants[0]).filter { file in versions.allSatisfy { $0.contains(file) } }
+    }
+
+    /// The record of the shared files hashed in this library: a line `<place>\t<digest>` each.
+    private func hashedPath(_ f: Family) -> String { library.map("composants/\(f.rawValue)/hashed") }
+
+    private func hashed(_ f: Family) -> Set<String> {
+        guard let text = try? String(contentsOfFile: hashedPath(f), encoding: .utf8) else { return [] }
+        return Set(text.split(separator: "\n").map(String.init))
+    }
+
+    private func line(_ file: PublishedFile) -> String { "\(file.place)\t\(file.digest.text)" }
+
+    private func record(_ f: Family, _ file: PublishedFile) throws {
+        let lines = hashed(f).union([line(file)]).sorted()
+        try (lines.joined(separator: "\n") + "\n").write(toFile: hashedPath(f), atomically: true, encoding: .utf8)
+    }
+
+    /// **Hashes once the shared files of `f` this library never hashed** — those an older version of the app left,
+    /// which this one takes on their size alone (`isPresent`). One whose bytes are not the pinned ones is removed and
+    /// refused (`corruptMap`): the family is then not installed, and installing it again downloads that file alone.
+    /// Under a second a family; afterwards, the read of a few lines. Issue 17: a Qwen whose renders all came out
+    /// non-finite after the update from 0.21 was cured by removing its `composants/` folder, whose files are these.
+    package func checkShared(_ f: Family) throws(EngineError) {
+        let done = hashed(f)
+        for file in shared(f) where !done.contains(line(file)) && isPresent(file) {
+            try cancellation.check()
+            try EngineError.boundary {
+                guard try file.digest(of: path(file)) == file.digest else {
+                    journal("✗ \(file.place): not the pinned bytes, removed")
+                    try FileManager.default.removeItem(atPath: path(file))
+                    throw EngineError.corruptMap(file: path(file))
+                }
+                try record(f, file)
+            }
+        }
+    }
+
     // MARK: - Removing
 
     /// **Removes a version of a family** — or the whole family (`variant: nil`): its files, what an interrupted
@@ -200,7 +246,10 @@ package struct Installer {
                     try fm.removeItem(atPath: p)
                 }
             }
-            if installed(f).isEmpty { try? fm.removeItem(atPath: library.intendedVariantPath(f)) }
+            if installed(f).isEmpty {
+                try? fm.removeItem(atPath: library.intendedVariantPath(f))
+                try? fm.removeItem(atPath: hashedPath(f))
+            }
             // The folders the files leave empty, deepest first; never one that still holds something.
             let folder = library.map("composants/\(f.rawValue)")
             let folders = (fm.enumerator(atPath: folder)?.allObjects as? [String] ?? []).filter { Library.isFolder(folder + "/" + $0) }

@@ -259,7 +259,8 @@ package final class Engine: Sendable {
     ///
     /// The order of a successful render: `start`, then `stage(.text)` … `text`, [`stage(.image)`
     /// … `encoding`], then for each image of the batch `stage(.denoising)` and its `step`s (and
-    /// `preview`s if requested), then for each `stage(.decoding)`, `decoding`, `image`. A stage is
+    /// `preview`s if requested), then for each `stage(.decoding)`, `decoding`, `image`; an image lost
+    /// ends in `unusable` instead (one whose latent is not finite, right after its steps, never decoded). A stage is
     /// announced before its sessions are planned: what a plan takes is its stage's. The `warning`s
     /// can fall anywhere. The closure is called **on the render thread**, synchronously: it must
     /// return quickly (the engine's process writes each event to the app's pipe there, `WorkerServer`).
@@ -285,6 +286,11 @@ package final class Engine: Sendable {
         case decoding(seconds: Double)
         /// **An image of the batch is ready** — the last event of each image.
         case image(index: Int, Render)
+        /// **An image of the batch is lost** — the last event of that image, in place of `image`: a non-finite value
+        /// in its latent (`stage` `.denoising`, said before any decoding is announced) or in its pixels (`.decoding`).
+        /// A batch that loses them all ends in `EngineError.nonFiniteImage`: `.denoising` when no latent was finite,
+        /// `.decoding` otherwise.
+        case unusable(image: Int, stage: Stage)
         /// What the library would otherwise write to standard error: a fallback, a non-finite value…
         case warning(String)
         /// **What the stages held so far**, read in the engine's ledger: after each stage's start, each step and each
@@ -348,7 +354,7 @@ package final class Engine: Sendable {
             case .decoding(let seconds):
                 done += Progress.decodingWeights
                 decoding = seconds; decodingsDone += 1
-            case .stage, .preview, .image, .warning, .held, .memory: break
+            case .stage, .preview, .image, .unusable, .warning, .held, .memory: break
             }
         }
     }

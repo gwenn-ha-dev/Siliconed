@@ -30,6 +30,14 @@ package struct PublishedFile: Sendable, Hashable {
         case sha256(String)
         /// A file kept in git itself (a small JSON): its blob id, the SHA-1 of `blob <n>\0` and its bytes.
         case gitBlob(String)
+
+        /// `sha256:<hex>` or `git:<hex>`: what a record keeps of it.
+        package var text: String {
+            switch self {
+            case .sha256(let h): "sha256:\(h)"
+            case .gitBlob(let h): "git:\(h)"
+            }
+        }
     }
     package let repository: Repository
     package let path: String

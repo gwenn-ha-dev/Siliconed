@@ -21,7 +21,8 @@ import SiliCore
 /// runs them; once a step or once a prompt, their cost is nothing.
 ///
 /// **A LoRA beside a product** (`ranks`, by argument: `LoRA.swift`): `<name>_down` `[in, R]` and `<name>_up` `[R, out]` in
-/// bf16, `y + (x · down) · up` on x as the product reads it (`Aicode.Block.lowRank`).
+/// bf16, `y + (x · down) · up` on x as the product reads it (`Aicode.Block.lowRank`) — a block's, the fusion's, the
+/// timestep's and the final layer's (`edgeProducts`).
 ///
 /// What a port by analogy would miss:
 ///   - **GQA 48/12 without a repetition**: the four query heads of a key head lie next to each other (`repeat_interleave`),
@@ -47,13 +48,13 @@ package enum Krea2Functions {
         let modulation: [Argument] = [("temb_mod", [6, d], .bf16), ("mod", [6, d], .bf16), ("prenorm", [d], .f32)]
         switch function {
         case "timestep":
-            return [("t_freq", [1, timeDim], .f32), ("tmlp0", [d, timeDim], .bf16), ("tmlp0_bias", [d], .bf16),
-                    ("tmlp2", [d, d], .bf16), ("tmlp2_bias", [d], .bf16), ("tproj", [6 * d, d], .bf16), ("tproj_bias", [6 * d], .bf16)]
+            return [("t_freq", [1, timeDim], .f32)] + product("tmlp0", timeDim, d) + [("tmlp0_bias", [d], .bf16)]
+                + product("tmlp2", d, d) + [("tmlp2_bias", [d], .bf16)] + product("tproj", d, 6 * d) + [("tproj_bias", [6 * d], .bf16)]
         case "embed":
             return [("patches", [rows, patch], .f32), ("first", [d, patch], .bf16), ("first_bias", [d], .bf16)]
         case "final":
-            return x + [("temb", [1, d], .bf16), ("last_mod", [2, d], .bf16), ("last_norm", [d], .f32),
-                        ("last_linear", [patch, d], .bf16), ("last_linear_bias", [patch], .bf16)]
+            return x + [("temb", [1, d], .bf16), ("last_mod", [2, d], .bf16), ("last_norm", [d], .f32)]
+                + product("last_linear", d, patch) + [("last_linear_bias", [patch], .bf16)]
         case "pre":
             return x + modulation + product("wq", d, d) + product("wk", d, kvHeads * hd) + product("wv", d, kvHeads * hd)
                 + [("qnorm", [hd], .f32), ("knorm", [hd], .f32), ("cos", [rows, 1, hd], .f32), ("sin", [rows, 1, hd], .f32)]
@@ -213,6 +214,30 @@ package enum Krea2Functions {
     /// A block's products: (argument, module), the module as the file and a LoRA name it.
     static let products = [("wq", "attn.wq"), ("wk", "attn.wk"), ("wv", "attn.wv"), ("gate", "attn.gate"), ("wo", "attn.wo"),
                            ("up", "mlp.up"), ("mgate", "mlp.gate"), ("down", "mlp.down")]
+
+    /// **The edges' products a LoRA reaches** (`Krea2Transformer.edges`), by the function computing each: the timestep's
+    /// three, the final layer's. Their factors bf16 in both forms: the Compact computes these in bf16 too.
+    static let edgeProducts: [(function: String, products: [LoRAProduct])] = {
+        let shapes = Krea2Transformer.products()
+        func p(_ name: String, _ key: String) -> LoRAProduct { LoRAProduct(name: name, key: key, inn: shapes[key]!.inn, out: shapes[key]!.out) }
+        return [("timestep", [p("tmlp0", "tmlp.0"), p("tmlp2", "tmlp.2"), p("tproj", "tproj.1")]), ("final", [p("last_linear", "last.linear")])]
+    }()
+
+    /// Each edge product's rank, its own (one function, one layer), none where nothing lands.
+    static func edgeRanks(_ loras: LoRAStack) -> [String: Int] {
+        var ranks: [String: Int] = [:]
+        for p in edgeProducts.flatMap(\.products) {
+            let r = loras.rank(of: [p.key], on: .krea2)
+            if r > 0 { ranks[p.name] = r }
+        }
+        return ranks
+    }
+
+    /// The ranks of what edge `function` computes.
+    static func edgeRanks(_ function: String, _ ranks: [String: Int]) -> [String: Int] {
+        let own = Set((edgeProducts.first { $0.function == function }?.products ?? []).map(\.name))
+        return ranks.filter { own.contains($0.key) }
+    }
 
     /// A block of the text fusion, `txtfusion.layerwise_blocks.<i>.` or `txtfusion.refiner_blocks.<i>.`: bf16 in both files.
     static func fusionBlock(_ prefix: String) -> [Weights.Entry] {

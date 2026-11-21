@@ -196,6 +196,7 @@ package enum WorkerEvent: Codable, Sendable {
     case preview(image: Int, index: Int, total: Int, height: Int, width: Int, blob: UInt32)
     case decoding(seconds: Double)
     case image(index: Int, WorkerRender)
+    case unusable(image: Int, stage: Engine.Stage)
     case warning(String)
     case held([Engine.Held])
     case memory(Engine.MemorySeries)
@@ -219,6 +220,7 @@ package enum WorkerEvent: Codable, Sendable {
         case .decoding(let s): return (.decoding(seconds: s), nil)
         case let .image(index, r):
             return (.image(index: index, WorkerRender(r, blob: id)), WorkerImage.bytes(r.image))
+        case let .unusable(image, stage): return (.unusable(image: image, stage: stage), nil)
         case .warning(let w): return (.warning(w), nil)
         case .held(let h): return (.held(h), nil)
         case .memory(let m): return (.memory(m), nil)
@@ -251,6 +253,7 @@ package enum WorkerEvent: Codable, Sendable {
             return .preview(Engine.Preview(image: image, index: index, total: total, height: height, width: width, rgba: rgba))
         case .decoding(let s): return .decoding(seconds: s)
         case let .image(index, r): return .image(index: index, try r.render(try blob(r.image.blob)))
+        case let .unusable(image, stage): return .unusable(image: image, stage: stage)
         case .warning(let w): return .warning(w)
         case .held(let h): return .held(h)
         case .memory(let m): return .memory(m)

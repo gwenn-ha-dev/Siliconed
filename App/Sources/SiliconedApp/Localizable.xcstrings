@@ -26530,46 +26530,6 @@
         }
       }
     },
-    "Random" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Zufällig"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Aleatoria"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Au hasard"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Casuale"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ランダム"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "随机"
-          }
-        }
-      }
-    },
     "Random: a new seed for every render. Fixed: the same image again" : {
       "localizations" : {
         "de" : {
@@ -36779,6 +36739,46 @@
         }
       }
     },
+    "The seed the last render drew: select it to copy it, check Fixed to keep it" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Der Seed, den das letzte Rendering gezogen hat: zum Kopieren markieren, Fest ankreuzen, um ihn zu behalten"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La semilla que sacó el último renderizado: selecciónala para copiarla, marca Fija para conservarla"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La graine tirée par le dernier rendu : sélectionnez-la pour la copier, cochez Fixe pour la garder"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il seme estratto dall’ultimo rendering: selezionalo per copiarlo, spunta Fisso per tenerlo"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "直前のレンダリングで引いたシード：選択してコピー、固定にチェックで保持"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "上次渲染抽取的种子：选中即可复制，勾选“固定”即可保留"
+          }
+        }
+      }
+    },
     "The seeds that follow the rack’s seed: drawn at the click, or the fixed one" : {
       "localizations" : {
         "de" : {
@@ -39413,42 +39413,82 @@
         }
       }
     },
-    "This render went wrong and its image is unusable: it wasn’t kept." : {
+    "This render went wrong in the DiT and its image is unusable: it wasn’t kept." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Dieses Rendering ist schiefgegangen und sein Bild ist unbrauchbar: Es wurde nicht behalten."
+            "value" : "Dieses Rendering ist im DiT schiefgegangen und sein Bild ist unbrauchbar: Es wurde nicht behalten."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Este renderizado ha salido mal y su imagen no se puede usar: no se ha conservado."
+            "value" : "Este renderizado ha salido mal en el DiT y su imagen no se puede usar: no se ha conservado."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ce rendu a mal tourné et son image est inutilisable : elle n’a pas été gardée."
+            "value" : "Ce rendu a mal tourné dans le DiT et son image est inutilisable : elle n’a pas été gardée."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Questo rendering non è riuscito e la sua immagine è inutilizzabile: non è stata conservata."
+            "value" : "Questo rendering non è riuscito nel DiT e la sua immagine è inutilizzabile: non è stata conservata."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "この生成は失敗し、画像が使えません：保持されませんでした。"
+            "value" : "この生成はDiTで失敗し、画像が使えません：保持されませんでした。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "此次生成出错，其图像无法使用：未予保留。"
+            "value" : "此次生成在 DiT 中出错，其图像无法使用：未予保留。"
+          }
+        }
+      }
+    },
+    "This render went wrong in the VAE and its image is unusable: it wasn’t kept." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dieses Rendering ist im VAE schiefgegangen und sein Bild ist unbrauchbar: Es wurde nicht behalten."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Este renderizado ha salido mal en el VAE y su imagen no se puede usar: no se ha conservado."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce rendu a mal tourné dans le VAE et son image est inutilisable : elle n’a pas été gardée."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Questo rendering non è riuscito nel VAE e la sua immagine è inutilizzabile: non è stata conservata."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この生成はVAEで失敗し、画像が使えません：保持されませんでした。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此次生成在 VAE 中出错，其图像无法使用：未予保留。"
           }
         }
       }

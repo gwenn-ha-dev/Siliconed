@@ -19,7 +19,8 @@ import SiliCore
 /// f16 beside a power of two a row (`x_factor`, the Compact's shared forms, the GPU's and the ANE's).
 ///
 /// **A LoRA** lands on each block's products (`ranks`, the same in every block): its factors held all along, block i's
-/// `blocks.<i>.<argument>_down` and `_up` (`Block`: the group's own tensors), written once the block is open.
+/// `blocks.<i>.<argument>_down` and `_up` (`Block`: the group's own tensors), written once the block is open; and on the
+/// timestep's and the final layer's products, their factors `<argument>_down` and `_up`, bf16 in both forms.
 ///
 /// **A check listening inside block 0** (`taps`): its attention and feed-forward values, written by the steps that tap
 /// (`Block.Step.taps`) in a run the GPU alone makes (`Block.run`'s `tapped`).
@@ -48,12 +49,18 @@ final class Krea2Session {
     let g: Geometry
     let arithmetic: Arithmetic
     let block: Block
-    /// The LoRAs' ranks by product (`Krea2Functions.ranks`): none, the functions as they are.
+    /// The LoRAs' ranks by product (`ranks(_:)`): none, the functions as they are.
     let ranks: [String: Int]
     var shared: Bool { arithmetic.shared }
     var stage: SiliCore.Stage { block.stage }
 
     // MARK: - What the DiT needs
+
+    /// **The LoRAs' ranks by product**: a block's (`Krea2Functions.ranks`, the same in every block) and the edges' (their
+    /// names apart from the blocks'), none where nothing lands.
+    static func ranks(_ loras: LoRAStack) -> [String: Int] {
+        Krea2Functions.ranks(loras, blocks: blocks.map { $0 + "." }).merging(Krea2Functions.edgeRanks(loras)) { a, _ in a }
+    }
 
     /// The ranks of what step `kind` computes: a block's products only.
     static func ranks(_ kind: String, _ ranks: [String: Int]) -> [String: Int] {
@@ -68,9 +75,11 @@ final class Krea2Session {
     }
 
     /// An edge's function: the timestep's is the bf16 one in both forms; the Compact's others are the shared forms'.
-    static func module(_ f: String, _ g: Geometry, _ a: Arithmetic) -> Aicode.Module {
-        if a.shared && f != "timestep" { return Krea2Shared.module(f, rows: g.image, keys: g.keys, weights: a.weights) }
-        return Krea2Functions.module(f, rows: g.image, keys: g.keys)
+    /// `ranks`: the stack's (`ranks(_:)`), the edge taking its own.
+    static func module(_ f: String, _ g: Geometry, _ a: Arithmetic, ranks: [String: Int] = [:]) -> Aicode.Module {
+        let own = Krea2Functions.edgeRanks(f, ranks)
+        if a.shared && f != "timestep" { return Krea2Shared.module(f, rows: g.image, keys: g.keys, weights: a.weights, ranks: own) }
+        return Krea2Functions.module(f, rows: g.image, keys: g.keys, ranks: own)
     }
 
     /// **The DiT's declaration**: its per-row tensors (the stream, q k v, the RoPE tables; in the shared forms the steps'
@@ -99,6 +108,7 @@ final class Krea2Session {
         for (i, b) in blocks.enumerated() {
             d.tensors += LoRAStack.tensors(loraProducts(i), ranks: ranks, element: element, prefix: b + ".")
         }
+        d.tensors += LoRAStack.tensors(Krea2Functions.edgeProducts.flatMap(\.products), ranks: ranks, element: .bfloat16)
         d.residents = Krea2Functions.others
         d.groups = blocks.map { Block.Group($0, form: form, weights: a.shared ? Krea2Shared.block($0 + ".", weights: a.weights) : Krea2Functions.block($0 + ".")) }
         d.cycle = blocks
@@ -118,7 +128,7 @@ final class Krea2Session {
         }
         d.passes = [Block.Pass("sequence", rows: 0..<g.sequence, shareable: 0..<n)]
         for f in ["timestep", "embed", "final"] + (a.shared ? ["modulation"] : []) {
-            d.edges[f] = { _ in module(f, g, a) }
+            d.edges[f] = { _ in module(f, g, a, ranks: ranks) }
         }
         return d
     }
@@ -142,7 +152,7 @@ final class Krea2Session {
     static func open(file: SafeTensors, geometry: Geometry, arithmetic: Arithmetic, loras: LoRAStack = .none, taps: Bool = false,
                      budget: Int) async throws -> Krea2Session {
         guard let device = MTLCreateSystemDefaultDevice() else { throw Failure("no Metal device") }
-        let ranks = Krea2Functions.ranks(loras, blocks: blocks.map { $0 + "." })
+        let ranks = Self.ranks(loras)
         let declaration = declaration(geometry, arithmetic, ranks: ranks, taps: taps)
         let block = try await Block.open(device, declaration, files: [file], budget: budget, share: arithmetic.share)
         let session = Krea2Session(block, geometry: geometry, arithmetic: arithmetic, ranks: ranks)
@@ -155,11 +165,13 @@ final class Krea2Session {
         (self.block, g, self.arithmetic, self.ranks) = (block, geometry, arithmetic, ranks)
     }
 
-    /// **The LoRAs' factors written** into every block's tensors (`LoRAStack.write`), at the ranks the block was opened with.
+    /// **The LoRAs' factors written** into every block's tensors and the edges' (`LoRAStack.write`), at the ranks the
+    /// block was opened with.
     func writeLowRank(_ loras: LoRAStack) throws {
         for (i, b) in Self.blocks.enumerated() {
             try loras.write(Self.loraProducts(i), on: .krea2, ranks: ranks, element: shared ? .float16 : .bfloat16, prefix: b + ".", into: stage.pointer)
         }
+        try loras.write(Krea2Functions.edgeProducts.flatMap(\.products), on: .krea2, ranks: ranks, element: .bfloat16, into: stage.pointer)
     }
 
     /// Everything let go, and the footprint waited for (`Stage.close`).
