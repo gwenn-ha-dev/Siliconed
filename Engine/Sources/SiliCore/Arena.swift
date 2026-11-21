@@ -202,7 +202,11 @@ public final class Arena: @unchecked Sendable {
         case 2: kCVPixelFormatType_OneComponent16Half
         default: kCVPixelFormatType_OneComponent32Float
         }
-        guard let s = IOSurface(properties: [.width: width, .height: height, .bytesPerElement: element, .bytesPerRow: width * element, .pixelFormat: format]) else {
+        // The allocation asked whole, a page multiple: the buffer over it is made without a copy at that length. A Mac
+        // rounds a surface to its page by itself; a virtual one (GitHub's macOS 27 runner, 21/11) gave 384 B for 384,
+        // and the buffer over it would have run past its end.
+        guard let s = IOSurface(properties: [.width: width, .height: height, .bytesPerElement: element, .bytesPerRow: width * element,
+                                             .allocSize: Self.aligned(n), .pixelFormat: format]) else {
             preconditionFailure("no surface of \(shape) × \(element) B")
         }
         precondition(IOSurfaceGetBytesPerRow(s) == width * element && IOSurfaceGetAllocSize(s) == Self.aligned(n),
