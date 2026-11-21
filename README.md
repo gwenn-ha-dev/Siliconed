@@ -29,14 +29,12 @@ English · [Français](README.fr.md)
 <p align="center">
   <a href="docs/APP.md#models"><img src="https://img.shields.io/badge/models-5-FF5E7A" alt="5 models"></a>
   <img src="https://img.shields.io/badge/largest%20DiT-12.8%20billion%20parameters-FFB38A" alt="Largest DiT: 12.8 billion parameters">
-  <a href="docs/ENGINE.md#memory-and-the-budget"><img src="https://img.shields.io/badge/memory%20limit-never%20crossed-2B1438" alt="Memory limit: never crossed"></a>
-  <a href="docs/VERIFY.md"><img src="https://img.shields.io/badge/checked%20against-the%20original%20code-14183A" alt="Checked against the original code"></a>
   <img src="https://img.shields.io/badge/languages-7-lightgrey" alt="7 languages">
 </p>
 
 ![A Krea 2 Turbo photo — a laughing young Welsh woman in a black winter wetsuit wading out of the sea at Rhossili, a yellow surfboard under her arm — and its 1930s railway poster edit by Qwen-Image-2.1, under a sliding curtain](docs/images/curtain.gif)
 
-*A photo from Krea 2 Turbo, turned into a railway poster by Qwen-Image-2.1 with one sentence, compared under the curtain. Edition 0.30 · Rhossili.*
+*A photo from Krea 2 Turbo, repainted as a 1930s railway poster by Qwen-Image-2.1 with one sentence, compared under the curtain: nothing moved but the style. The name is ours, set on top. Edition 0.30 · Rhossili.*
 
 ## Core AI does the heavy lifting
 

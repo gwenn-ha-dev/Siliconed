@@ -29,14 +29,12 @@
 <p align="center">
   <a href="docs/APP.fr.md#les-modèles"><img src="https://img.shields.io/badge/mod%C3%A8les-5-FF5E7A" alt="5 modèles"></a>
   <img src="https://img.shields.io/badge/plus%20gros%20DiT-12%2C8%20milliards%20de%20param%C3%A8tres-FFB38A" alt="Plus gros DiT : 12,8 milliards de paramètres">
-  <a href="docs/ENGINE.fr.md#la-mémoire-et-le-budget"><img src="https://img.shields.io/badge/limite%20de%20m%C3%A9moire-jamais%20franchie-2B1438" alt="Limite de mémoire : jamais franchie"></a>
-  <a href="docs/VERIFY.fr.md"><img src="https://img.shields.io/badge/v%C3%A9rifi%C3%A9%20contre-le%20code%20d'origine-14183A" alt="Vérifié contre le code d'origine"></a>
   <img src="https://img.shields.io/badge/langues-7-lightgrey" alt="7 langues">
 </p>
 
 ![Une photo de Krea 2 Turbo — une jeune Galloise qui rit, en combinaison d'hiver noire, sort de la mer à Rhossili, une planche de surf jaune sous le bras — et sa retouche en affiche ferroviaire des années 1930 par Qwen-Image-2.1, sous un rideau qui glisse](docs/images/curtain.gif)
 
-*Une photo de Krea 2 Turbo, changée en affiche ferroviaire par Qwen-Image-2.1 en une phrase, comparée sous le rideau. Édition 0.30 · Rhossili.*
+*Une photo de Krea 2 Turbo, repeinte en affiche ferroviaire des années 1930 par Qwen-Image-2.1 en une phrase, comparée sous le rideau : rien n'a bougé que le style. Le nom est de nous, posé par-dessus. Édition 0.30 · Rhossili.*
 
 ## Core AI porte le plus lourd
 

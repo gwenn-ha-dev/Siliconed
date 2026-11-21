@@ -107,6 +107,15 @@
   .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 40px; }
   .trio { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-top: 40px; }
   .trio figcaption { grid-column: 1 / -1; margin-top: 0; }
+  .shot img, .stage img { cursor: zoom-in; }
+  .viewer { position: fixed; inset: 0; z-index: 100; display: none; overflow: auto; background: rgba(9, 11, 30, 0.94);
+            backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); cursor: zoom-out; }
+  .viewer.open { display: grid; place-items: center; }
+  .viewer img { max-width: 96vw; max-height: 94vh; border-radius: 10px; box-shadow: 0 30px 90px -30px #000; cursor: zoom-in; }
+  .viewer.full { place-items: start; }
+  .viewer.full img { max-width: none; max-height: none; border-radius: 0; cursor: zoom-out; }
+  .viewer button { position: fixed; top: 14px; right: 16px; width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--line);
+                   background: var(--panel); color: var(--text); font: 600 22px/1 var(--display); cursor: pointer; }
   .stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 26px 0 0;
            padding: 0; list-style: none; }
   .stats li { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px;
@@ -217,8 +226,8 @@
   </div>
   <p class="req">Apache 2.0 · macOS 27 or later · Apple silicon · signed and notarized · also <a href="https://huggingface.co/gwenn-ha-dev/Siliconed/resolve/main/Siliconed.dmg?download=true">from Hugging Face</a></p>
   <figure class="stage h-fade d3">
-    <div class="glow"><img src="images/curtain.gif" width="800" height="533" alt="Under a sliding curtain: on one side, a Krea 2 Turbo photo of a laughing young Welsh woman in a black winter wetsuit with teal trim wading out of the sea at Rhossili, a yellow surfboard under her arm, the headland of Worms Head behind her; on the other, the same picture turned into a 1930s railway poster with RHOSSILI in large capitals"></div>
-    <figcaption>A photo by Krea 2 Turbo. Then Qwen-Image-2.1, after one sentence: &ldquo;Turn this photo into a 1930s railway travel poster…&rdquo;</figcaption>
+    <div class="glow"><img src="images/curtain.gif" width="800" height="533" alt="Under a sliding curtain: on one side, a Krea 2 Turbo photo of a laughing young Welsh woman in a black winter wetsuit with teal trim wading out of the sea at Rhossili, a yellow surfboard under her arm, the headland of Worms Head behind her; on the other, the same picture repainted as a 1930s railway poster in flat colours, nothing moved, with RHOSSILI set in the sky"></div>
+    <figcaption>A photo by Krea 2 Turbo. Then Qwen-Image-2.1, after one sentence: &ldquo;Repaint this photo in the style of a 1930s railway travel poster… nothing is moved.&rdquo; Not a pixel out of place. (The lettering is ours.)</figcaption>
   </figure>
   <div class="strip" aria-label="Models and principles">
     <span>Krea 2 Turbo</span><span>Qwen-Image-2.1</span><span>Z-Image Turbo</span><span>Anima Turbo</span><span>MOSS-Image</span><span>Core AI</span><span>Neural Engine</span><span>published files</span><span>offline</span>
@@ -247,16 +256,10 @@
     <img src="images/window.jpg" width="1600" height="905" alt="The Siliconed window: the image from edge to edge, the Krea 2 Turbo surf photo of Angharad at Rhossili; on the left the chain from the idea to Generate, Krea 2 Turbo at 1248 × 832, seed 3405, each stage with its settings and its time; on the right the history, the edition's name above it" loading="lazy">
     <figcaption>One window, the whole chain in view: from the idea to Generate on the left, each stage with its settings and its time; the image from edge to edge; the history on the right.</figcaption>
   </figure>
-  <div class="pair">
-    <figure class="shot reveal">
-      <img src="images/live.jpg" width="1600" height="905" alt="A Krea 2 Turbo render under way: the DiT lit in mint at step 5 of 8, 15 seconds left, the surf photo still blurred as it forms" loading="lazy">
-      <figcaption>A render under way: the stage at work lit, its steps and the time left; the image forms in place.</figcaption>
-    </figure>
-    <figure class="shot reveal">
-      <img src="images/window-light.jpg" width="1600" height="905" alt="The window in the light appearance: the prompt in the Text box, and a Z-Image Turbo photo of Angharad in a coral red poncho and a red beanie, a steaming mug in her hands, Mot the border collie at her feet, among yellow gorse above Rhossili Bay" loading="lazy">
-      <figcaption>Light or dark, as macOS is. Z-Image Turbo, Standard, 832 × 1248, seed 7403, on Rhossili Down.</figcaption>
-    </figure>
-  </div>
+  <figure class="shot reveal" style="margin-top:40px">
+    <img src="images/window-light.jpg" width="1600" height="905" alt="The window in the light appearance: the prompt in the Text box, and a Z-Image Turbo photo of Angharad in a coral red poncho and a red beanie, a steaming mug in her hands, Mot the border collie at her feet, among yellow gorse above Rhossili Bay" loading="lazy">
+    <figcaption>Light or dark, as macOS is. Z-Image Turbo, Standard, 832 × 1248, seed 7403, on Rhossili Down.</figcaption>
+  </figure>
   <figure class="shot trio reveal">
     <img src="images/glass-1.jpg" width="1600" height="905" alt="The Krea 2 Turbo photo zoomed in: Angharad's laughing face, her wetsuit and her yellow surfboard fill the window and slide under the chain and the history, which let the picture show through their glass" loading="lazy">
     <img src="images/glass-2.jpg" width="1600" height="905" alt="A Z-Image Turbo photo zoomed in: Angharad in a yellow raincoat hugging Mot the border collie against the black ribs of a shipwreck, the picture showing through the glass of both columns" loading="lazy">
@@ -290,8 +293,8 @@
         turned into a winter storm.</p>
     </div>
     <figure class="shot reveal">
-      <img src="images/start.jpg" width="1600" height="905" alt="MOSS-Image starting from the Krea 2 photo: the Images box holds it as Starting image at strength 85 %, the storm prompt in the Text box, and the canvas shows the same shot in a winter storm, Angharad soaked and laughing, dark breaking waves and rain behind her" loading="lazy">
-      <figcaption>MOSS-Image, Standard, from the Krea 2 photo (Start From This Image, strength 85 %), 1216 × 832, 8 steps, seed 6603: &ldquo;Dramatic surf photograph in a violent winter storm at Rhossili Bay…&rdquo;</figcaption>
+      <img src="images/start.gif" width="800" height="533" alt="A curtain sweeping across two pictures of the same shot: the Krea 2 Turbo photo of Angharad wading out of the sea with her yellow surfboard on a grey spring morning, and MOSS-Image&rsquo;s render started from it, the same woman and board in a winter storm, dark breaking waves and rain behind her" loading="lazy">
+      <figcaption>The Krea 2 photo, then MOSS-Image started from it (Start From This Image, strength 75 %), Standard, 1216 × 832, 8 steps, seed 6603: &ldquo;Dramatic surf photograph in a violent winter storm at Rhossili Bay…&rdquo; Same shot, worse weather.</figcaption>
     </figure>
   </div>
 </section>
@@ -510,5 +513,25 @@
   <a href="https://github.com/gwenn-ha-dev/Siliconed/blob/main/docs/ENGINE.md">The engine</a> ·
   <a href="https://github.com/gwenn-ha-dev/Siliconed/blob/main/docs/RELEASE-NOTES.md">Release notes</a>
 </footer>
+<div class="viewer" id="viewer" role="dialog" aria-modal="true" aria-label="Picture, full size" hidden>
+  <button type="button" aria-label="Close">×</button>
+  <img alt="">
+</div>
+<script>
+// A click on a picture opens it as large as the screen; a click on it shows it pixel for pixel; anywhere else, Esc or ×
+// closes. Nothing loads until a picture is opened: the one already on the page is reused.
+(() => {
+  const v = document.getElementById('viewer'), big = v.querySelector('img');
+  const close = () => { v.classList.remove('open', 'full'); v.hidden = true; big.removeAttribute('src'); document.body.style.overflow = ''; };
+  document.querySelectorAll('.shot img, .stage img').forEach(img => img.addEventListener('click', () => {
+    big.src = img.currentSrc || img.src; big.alt = img.alt;
+    v.hidden = false; v.classList.add('open'); document.body.style.overflow = 'hidden'; v.querySelector('button').focus();
+  }));
+  big.addEventListener('click', e => { e.stopPropagation(); v.classList.toggle('full'); });
+  v.addEventListener('click', close);
+  v.querySelector('button').addEventListener('click', e => { e.stopPropagation(); close(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && !v.hidden) close(); });
+})();
+</script>
 </body>
 </html>
