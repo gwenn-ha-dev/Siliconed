@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 470" width="900" height="470" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif">
+  <title>Siliconed: a stage under the memory budget, and a block's rows shared between the GPU and the Neural Engine</title>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#14183A"/><stop offset="0.55" stop-color="#0D1028"/><stop offset="1" stop-color="#2B1438"/></linearGradient>
+    <pattern id="ring" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="8" height="8" fill="#FFB38A"/><rect width="3" height="8" fill="#E8956C"/></pattern>
+    <pattern id="other" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="8" height="8" fill="#1E2248"/><rect width="2" height="8" fill="#2C3160"/></pattern>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M 0,0 L 10,5 L 0,10 z" fill="#FFB38A"/></marker>
+  </defs>
+  <rect width="900" height="470" rx="18" fill="url(#bg)"/>
+
+  <!-- Part 1: the budget. A 16 GB Mac, 51.25 px a GB from x = 40. -->
+  <text x="40" y="44" font-size="19" font-weight="700" fill="#F3F1F8">A stage, planned under the budget</text>
+  <text x="40" y="66" font-size="13" fill="#BDB8D3">A 16 GB Mac: B = ¾ of its memory − 2 GB = 10 GB. What lies past B belongs to macOS and the other apps.</text>
+
+  <rect x="40" y="88" width="51" height="56" fill="#5B5680"/>
+  <rect x="91" y="88" width="102" height="56" fill="#FFB38A"/>
+  <rect x="193" y="88" width="56" height="56" fill="url(#ring)"/>
+  <rect x="249" y="88" width="215" height="56" fill="#FF5E7A"/>
+  <rect x="464" y="88" width="62" height="56" fill="#6FF0E0"/>
+  <rect x="552" y="88" width="308" height="56" fill="url(#other)"/>
+  <rect x="40" y="88" width="820" height="56" fill="none" stroke="rgba(255,255,255,0.18)"/>
+
+  <line x1="552" y1="78" x2="552" y2="156" stroke="#F3F1F8" stroke-width="2.5"/>
+  <text x="558" y="80" font-size="13" font-weight="700" fill="#F3F1F8">B</text>
+  <text x="706" y="121" font-size="13" fill="#BDB8D3" text-anchor="middle">macOS, other apps</text>
+
+  <g font-size="12.5" fill="#F3F1F8">
+    <line x1="65" y1="144" x2="65" y2="176" stroke="#5B5680"/><text x="40" y="190">the floor</text>
+    <text x="40" y="206" fill="#BDB8D3">the process</text>
+    <text x="40" y="221" fill="#BDB8D3">before it</text>
+    <line x1="142" y1="144" x2="142" y2="176" stroke="#FFB38A"/><text x="124" y="190">the arena</text>
+    <text x="124" y="206" fill="#BDB8D3">its tensors,</text>
+    <text x="124" y="221" fill="#BDB8D3">its residents</text>
+    <line x1="221" y1="144" x2="221" y2="246" stroke="#FFB38A"/><text x="215" y="260">the ring</text>
+    <text x="215" y="276" fill="#BDB8D3">slots the loop's</text>
+    <text x="215" y="291" fill="#BDB8D3">weights are read into</text>
+    <line x1="356" y1="144" x2="356" y2="176" stroke="#FF5E7A"/><text x="318" y="190">weights kept</text>
+    <text x="318" y="206" fill="#BDB8D3">wired, as many as</text>
+    <text x="318" y="221" fill="#BDB8D3">the budget holds</text>
+    <line x1="495" y1="144" x2="495" y2="246" stroke="#6FF0E0"/><text x="440" y="260">Core AI's share</text>
+    <text x="440" y="276" fill="#BDB8D3">read in flight, every</text>
+    <text x="440" y="291" fill="#BDB8D3">millisecond</text>
+  </g>
+
+  <!-- The disk, feeding the ring ahead of the loop. -->
+  <rect x="40" y="244" width="150" height="52" rx="8" fill="none" stroke="#FFB38A" stroke-dasharray="4 3"/>
+  <text x="115" y="266" font-size="12.5" fill="#F3F1F8" text-anchor="middle">the published files</text>
+  <text x="115" y="283" font-size="12" fill="#BDB8D3" text-anchor="middle">the weights not kept</text>
+  <path d="M 190,262 C 205,262 205,170 214,150" fill="none" stroke="#FFB38A" stroke-width="1.6" marker-end="url(#arrow)"/>
+  <text x="620" y="190" font-size="12.5" fill="#BDB8D3">P, the sum, is known before anything</text>
+  <text x="620" y="206" font-size="12.5" fill="#BDB8D3">is allocated; what cannot fit under B</text>
+  <text x="620" y="222" font-size="12.5" fill="#BDB8D3">is refused up front.</text>
+
+  <line x1="40" y1="322" x2="860" y2="322" stroke="rgba(255,255,255,0.11)"/>
+
+  <!-- Part 2: a block's rows, GPU and Neural Engine. -->
+  <text x="40" y="354" font-size="19" font-weight="700" fill="#F3F1F8">A block's rows, shared</text>
+  <text x="40" y="376" font-size="13" fill="#BDB8D3">The steps that compute each row alone split the rows; the share moves, step after step, to whichever finishes first.</text>
+
+  <text x="40" y="408" font-size="12.5" fill="#BDB8D3">row by row</text>
+  <rect x="190" y="394" width="250" height="22" rx="4" fill="#6FF0E0"/>
+  <text x="315" y="410" font-size="12.5" font-weight="600" fill="#0D1028" text-anchor="middle">Neural Engine</text>
+  <rect x="444" y="394" width="416" height="22" rx="4" fill="#FF5E7A"/>
+  <text x="652" y="410" font-size="12.5" font-weight="600" fill="#0D1028" text-anchor="middle">GPU</text>
+
+  <text x="40" y="442" font-size="12.5" fill="#BDB8D3">across rows</text>
+  <rect x="190" y="428" width="670" height="22" rx="4" fill="#FF5E7A"/>
+  <text x="525" y="444" font-size="12.5" font-weight="600" fill="#0D1028" text-anchor="middle">GPU, every row (an attention)</text>
+</svg>

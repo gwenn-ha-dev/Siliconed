@@ -1,61 +1,106 @@
 English · [Français](README.fr.md)
 
-# Siliconed
+<p align="center">
+  <img src="site/images/icon.svg" width="128" height="128" alt="Siliconed's icon">
+</p>
 
-**Generate and edit images on your Mac, locally, with recent open-weight models: computed in full precision, checked against the original code, and never using more memory than a fixed budget.**
+<h1 align="center">Siliconed</h1>
 
-Siliconed is a free, open-source macOS app for **local text-to-image generation and image editing** on Apple silicon Macs (M1 and later). It runs recent diffusion models — [Krea 2 Turbo](https://huggingface.co/krea/Krea-2-Turbo), [Z-Image Turbo](https://huggingface.co/Tongyi-MAI/Z-Image-Turbo), [Qwen-Image-2.1 Turbo](https://huggingface.co/Qwen/Qwen-Image-2.1-Turbo), [Anima Turbo](https://huggingface.co/circlestone-labs/Anima) and [MOSS-Image](https://huggingface.co/OpenMOSS-Team/MOSS-Image-SFT) (beta: its 8-step recipe is the community's) — natively in Swift and Metal: no Python, no server, no cloud, nothing leaves your Mac. It works offline once a model is installed.
+<p align="center">
+  <b>Big image models, small Mac, and Apple's Core AI doing the heavy lifting.</b><br>
+  Five recent open-weight models, generating and editing images on your Mac, with no Python, no server and no cloud.
+</p>
 
-One developer, one MacBook Pro with 16 GB, and a stubborn rule: if a result cannot be checked against the original code, it does not ship. The rest is the plain joy of watching a 12.9-billion-parameter model run on a laptop that, on paper, has no business doing it.
+<p align="center">
+  <a href="https://github.com/gwenn-ha-dev/Siliconed/releases/latest"><img src="https://img.shields.io/github/v/release/gwenn-ha-dev/Siliconed?label=release&color=FF5E7A" alt="Latest release"></a>
+  <a href="https://github.com/gwenn-ha-dev/Siliconed/releases"><img src="https://img.shields.io/github/downloads/gwenn-ha-dev/Siliconed/total?label=downloads&color=FFB38A" alt="Downloads"></a>
+  <a href="https://huggingface.co/gwenn-ha-dev/Siliconed"><img src="https://img.shields.io/badge/mirror-Hugging%20Face-FFD21E?logo=huggingface&logoColor=black" alt="Mirrored on Hugging Face"></a>
+  <a href="https://github.com/gwenn-ha-dev/Siliconed/actions/workflows/test.yml"><img src="https://img.shields.io/github/actions/workflow/status/gwenn-ha-dev/Siliconed/test.yml?branch=main&label=unit%20tests" alt="Unit tests"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue" alt="License: Apache 2.0"></a>
+</p>
 
-![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue)
-![macOS 26+](https://img.shields.io/badge/macOS-26%2B-black)
-![Apple silicon](https://img.shields.io/badge/Apple%20silicon-M1%20and%20later-black)
-[![unit tests](https://img.shields.io/github/actions/workflow/status/gwenn-ha-dev/Siliconed/test.yml?branch=main&label=unit%20tests)](https://github.com/gwenn-ha-dev/Siliconed/actions/workflows/test.yml)
-[![kernels checked, CPU stages](https://img.shields.io/github/actions/workflow/status/gwenn-ha-dev/Siliconed/kernels.yml?branch=main&label=kernels%20checked%2C%20CPU%20stages)](https://github.com/gwenn-ha-dev/Siliconed/actions/workflows/kernels.yml)
+<p align="center">
+  <a href="docs/ENGINE.md#core-ai"><img src="https://img.shields.io/badge/engine-Core%20AI-6FF0E0?logo=apple&logoColor=black" alt="Engine: Core AI"></a>
+  <a href="docs/ENGINE.md#memory-and-the-budget"><img src="https://img.shields.io/badge/Neural%20Engine-pitching%20in-6FF0E0" alt="Neural Engine: pitching in"></a>
+  <img src="https://img.shields.io/badge/macOS-27%2B-black?logo=apple" alt="macOS 27+">
+  <img src="https://img.shields.io/badge/Swift-6-F05138?logo=swift&logoColor=white" alt="Swift 6">
+</p>
 
-![A sunny Krea 2 Turbo photo — a laughing red-haired Irish woman in a shorty wetsuit wading out of the shore break, her surfboard under her arm, backlit by a low sun — and its cel-shaded western comic-book edit by Qwen-Image-2.1, under a sliding curtain](docs/images/curtain.gif)
+<p align="center">
+  <a href="docs/APP.md#models"><img src="https://img.shields.io/badge/models-5-FF5E7A" alt="5 models"></a>
+  <img src="https://img.shields.io/badge/largest%20DiT-12.8%20billion%20parameters-FFB38A" alt="Largest DiT: 12.8 billion parameters">
+  <a href="docs/ENGINE.md#memory-and-the-budget"><img src="https://img.shields.io/badge/memory%20limit-never%20crossed-2B1438" alt="Memory limit: never crossed"></a>
+  <a href="docs/VERIFY.md"><img src="https://img.shields.io/badge/checked%20against-the%20original%20code-14183A" alt="Checked against the original code"></a>
+  <img src="https://img.shields.io/badge/languages-7-lightgrey" alt="7 languages">
+</p>
 
-*A photo from Krea 2 Turbo, edited by Qwen-Image-2.1 with one sentence (“Convert this photo to a western comic book style with cel shading”, seed 42), compared under the curtain.*
+![A Krea 2 Turbo photo — a laughing young Welsh woman in a black winter wetsuit wading out of the sea at Rhossili, a yellow surfboard under her arm — and its 1930s railway poster edit by Qwen-Image-2.1, under a sliding curtain](docs/images/curtain.gif)
 
-## Download (it is a .dmg, nothing exotic)
+*A photo from Krea 2 Turbo, turned into a railway poster by Qwen-Image-2.1 with one sentence, compared under the curtain. Edition 0.30 · Rhossili.*
 
-The app ships as a `.dmg` on the [Releases](https://github.com/gwenn-ha-dev/Siliconed/releases) page; the same image, byte for byte, is mirrored on [Hugging Face](https://huggingface.co/gwenn-ha-dev/Siliconed). Requirements: macOS 26 or later, Apple silicon. Nothing comes preinstalled: you pick the models from inside the app, read each license, and only then does a byte download. To build it yourself: [Build from source](docs/ENGINE.md#build-from-source); Xcode 26 or later is required (the Command Line Tools alone cannot build the app).
+## Core AI does the heavy lifting
+
+Siliconed used to carry its own Metal kernels, tuned chip by chip. Since 0.30 it computes on **Core AI**, the runtime Apple ships with macOS 27: Apple writes and tunes the kernels for every chip, the GPU and the Neural Engine alike, and Siliconed keeps what is its own — the models, their memory, their proof.
+
+- **Apple writes the kernels; Siliconed writes the models.** Each model is a few Core AI functions written in Swift and the loop that calls them. No kernel of ours to maintain, no table of chips, nothing to measure before the first render: a new Mac or a new macOS, and Core AI brings what suits it. [The engine](docs/ENGINE.md#core-ai).
+- **The Neural Engine pitches in, on all five models.** Its share of each block is found while the image renders, step after step, and moves to whichever unit finishes first. The Standard uses it too, its bf16 weights rounded once to f16 — the engine times both ways on your Mac and keeps the faster.
+- **The publishers' files, read as they are.** The publisher's bf16 for the Standard, published int8 for the Compact, at half the disk. An installation is a download; there is nothing to convert, ever.
+- **Compiled once, then off it goes.** Core AI compiles a function for its shapes: the first render at a new size pays for it once, and the Chain says so. Z-Image on a 16 GB M1 Pro: 93 s the first time, 76 s after that.
+- **LoRAs beside the weights, never melted into them**, so their small touches survive the int8 codes.
+
+## Big models, small Mac
+
+A 12.8-billion-parameter model on a 16 GB Mac sounds like a bad idea. Siliconed never grants itself more than ¾ of the Mac's memory minus 2 GB (adjustable): every render is planned under that limit before a byte is allocated. A model too large for it keeps the weights that fit and reads the others from disk while it computes; what Core AI holds for its functions is read in flight, every millisecond; a large image is decoded in bands; and what truly does not fit is politely refused up front. [How](docs/ENGINE.md#memory-and-the-budget).
+
+<p align="center"><img src="docs/images/budget.svg" width="900" alt="A stage under the memory limit: the floor, the arena, the ring fed from the published files, the weights kept, Core AI's share read in flight; a block's rows shared between the Neural Engine and the GPU."></p>
+
+| 1024², 8 steps | Mac mini M5 Pro, 64 GB | M1 Pro, 16 GB · Compact |
+|---|---:|---:|
+| Z-Image Turbo | 23.8 s | 75.9 s |
+| Anima Turbo | 7.9 s | 33.6 s |
+| Krea 2 Turbo | 43.2 s | 128.1 s |
+| MOSS-Image | 25.7 s | 76.4 s |
+| Qwen-Image-2.1 Turbo | 29.7 s | 97.7 s |
+
+*The Mac mini in Standard, the M1 Pro in Compact under its 10 GB limit; the model loaded, compilation done. Both versions, the first renders and how to take your own: [Numbers](docs/ENGINE.md#numbers).*
 
 ## What it does
 
+![The Siliconed window: the image from edge to edge, the chain from the idea to the button on the left, the history on the right](docs/images/window.jpg)
+
 - **Draws from text, and edits by instruction.** Qwen-Image-2.1 Turbo takes 1 to 3 images and a sentence (“replace the cloudy sky with a blue sky”) and changes only what you named. Which model for what, with licenses and sizes: [Models](docs/APP.md#models).
-- **Brackets, like a camera.** Vary a word, the seed, a LoRA's strength, LoRAs, Detail or the starting image: one finished image per cell, side by side on the canvas, each the very image a single render gives.
-- **Writes your prompts, if you ask** (beta). The Prompt Lab rewrites a short prompt in the style each model likes, or describes an image you drop on it. It uses a model you already have installed, and never while an image is rendering.
-- **Takes your own models.** Import LoRAs and fine-tunes from Civitai or Hugging Face.
-- **Local and private.** Rendering happens on your Mac, with no content filter added by the app and no history sent anywhere. It follows the system language (English, French, German, Spanish, Italian, Japanese or Simplified Chinese).
+- **Names your subjects.** Point at a coat, a dog or a face in an image, give it a name, and write “she wears @raincoat” (Qwen-Image-2.1).
+- **Starts from an image.** Z-Image, Anima, Krea 2 and MOSS-Image take a starting image and a strength.
+- **Brackets, like a camera.** Vary a word, the seed, a LoRA's strength, LoRAs, Detail or the starting image: one finished image per cell, side by side on the canvas.
+- **Writes your prompts, if you ask** (beta). The Prompt Lab rewrites a short idea in the style each model likes, or describes an image you drop on it, with a model you already have.
+- **Takes your own models.** Drop a LoRA or a fine-tune from Civitai or Hugging Face onto the window: recognized by what it holds, read as it is.
+- **Shows its work.** The Chain panel draws the render's memory in time, against the limit, stage by stage, with the GPU's and the Neural Engine's shares.
+- **Local and private.** Rendering happens on your Mac, with no content filter added by the app and no history sent anywhere. It speaks English, French, German, Spanish, Italian, Japanese and Simplified Chinese.
 - **Renders on another Mac.** A MacBook computes on the Mac mini of the next room, paired once with a code, encrypted ([how](docs/APP.md#render-on-another-mac)).
 - **Scriptable.** `silicontrol` drives the running app from a terminal, for scripts and coding agents ([details](docs/REMOTE-CONTROL.md)).
 
-![The Siliconed window: the rack on the left (text, text encoder, DiT, VAE decoder, each with its settings and time), the Krea 2 Turbo surf photo in the middle, the Prompt Lab folded to one line beneath it, the history on the right](docs/images/window.jpg)
-
 The tour of the app: [docs/APP.md](docs/APP.md).
 
-## Why bother, then
+## Checked against the original models, a bit obsessively
 
-- **Fast, without cutting corners.** On a Mac mini M5 Pro with 64 GB, at 1024², with all 8 evaluations (passes of the model) their recipes call for at full size: Z-Image Turbo in 18.8 s, Qwen-Image-2.1 Turbo in 21.3 s, Krea 2 Turbo in 32.0 s, in the Compact the app recommends (the model in 8-bit weights, half the disk; [the three versions](docs/APP.md#model-management)). Each computation goes to the GPU, the CPU's matrix unit or the Neural Engine as this Mac measured them. With the publisher's bf16 weights: 24.8 s, 29.2 s and 45.4 s. [All the numbers](docs/ENGINE.md#numbers).
-- **Big models, small Mac.** 34 GB of model on a 16 GB Mac sounds like a bad idea. Weights are read from disk as they are needed, and Siliconed never takes more than ¾ of the Mac's memory minus 2 GB, a budget it does not exceed, ever. Each render works out what it needs before it starts; one beyond the budget is politely refused up front. [How it is measured](docs/ENGINE.md#memory-and-the-budget).
-- **Even on an 8 GB MacBook Neo.** The one with an iPhone chip (A18 Pro): with 0.19, Anima Turbo makes a 1024² square in under a minute on it, in the Compact, every evaluation at full size. We no longer have a Neo to time it properly: if you have one, or a Mac we have never seen, [send us your numbers](docs/ENGINE.md#on-a-macbook-neo).
-- **Checked against the original models, a bit obsessively.** Every stage is compared, channel by channel, with the reference implementation (diffusers / transformers in fp32 on CPU), and what cannot be checked does not ship. Run the checks yourself: [VERIFY.md](docs/VERIFY.md). The CI runs the kernels' CPU stages each time the engine changes; its GPU is virtual, so the GPU stages run on your Mac.
-- **Knows your Mac.** Before the first render, in about a minute (five at most) and without any model, it measures what each engine of your Mac — the GPU, the CPU's matrix unit, the Neural Engine — computes, alone and together, and checks every result against the exact one; it then works out, for every product and every attention of a render, how to share the rows among the engines that computed right. [How](docs/ENGINE.md#an-engine-measured-on-your-mac).
+One developer and a stubborn rule: if a result cannot be checked against the original code, it does not ship. Every stage is compared, channel by channel, with the reference implementation (diffusers / transformers) in the arithmetic of the weights, and the Compact with ComfyUI's int8 products. Bars are set before the measurement and do not move. Run the checks yourself: [VERIFY.md](docs/VERIFY.md).
+
+## Download (it is a .dmg, nothing exotic)
+
+The app ships as a `.dmg` on the [Releases](https://github.com/gwenn-ha-dev/Siliconed/releases) page; the same image, byte for byte, is mirrored on [Hugging Face](https://huggingface.co/gwenn-ha-dev/Siliconed). Requirements: macOS 27 or later, Apple silicon. Nothing comes preinstalled: you pick the models from inside the app, read each license, and only then does a byte download. To build it yourself: [Building from source](docs/ENGINE.md#building-from-source); Xcode 27 or later is required.
 
 ## Documentation
 
 - [docs/APP.md](docs/APP.md): the app in detail: creating, editing, writing prompts, series, managing models, settings, privacy.
-- [docs/ENGINE.md](docs/ENGINE.md): the engine: measuring the Mac, the Neural Engine, numbers, Faster Rendering, memory, the community diagnostic, verification, building from source.
+- [docs/ENGINE.md](docs/ENGINE.md): the engine: Core AI, memory and its limit, the numbers, verification, building from source.
 - [docs/VERIFY.md](docs/VERIFY.md): checking the results against the reference on your Mac.
 - [docs/REMOTE-CONTROL.md](docs/REMOTE-CONTROL.md): `silicontrol`, protocol and internals.
 - [docs/RELEASE-NOTES.md](docs/RELEASE-NOTES.md): what changed in each version.
-- Issues: [diagnostic report, bug, idea](https://github.com/gwenn-ha-dev/Siliconed/issues/new/choose).
+- Issues: [bug, idea](https://github.com/gwenn-ha-dev/Siliconed/issues/new/choose). Times from your Mac are welcome, the 8 GB ones first.
 
 ## Credits
 
-The models belong to their publishers (listed under [Models](docs/APP.md#models)), each under its own license. The reference implementations are [diffusers](https://github.com/huggingface/diffusers) and [transformers](https://github.com/huggingface/transformers) by Hugging Face; the image resampling reproduces [Pillow](https://github.com/python-pillow/Pillow)'s Lanczos to the bit. LoRAs and fine-tunes come from the community, on [Civitai](https://civitai.com) and [Hugging Face](https://huggingface.co); MOSS-Image's 8-step recipe is lodestones' [DMD LoRA](https://huggingface.co/lodestones/MOSS-Image-SFT-8-steps-dmd).
+The models belong to their publishers (listed under [Models](docs/APP.md#models)), each under its own license. The reference implementations are [diffusers](https://github.com/huggingface/diffusers) and [transformers](https://github.com/huggingface/transformers) by Hugging Face, and [ComfyUI](https://github.com/comfyanonymous/ComfyUI) for the int8 products; the Compacts' int8 weights are those of [Comfy-Org](https://huggingface.co/Comfy-Org), [Bedovyy](https://huggingface.co/Bedovyy/Anima-INT8) and [Disty0](https://huggingface.co/Disty0/Z-Image-Turbo-SDNQ-int8); the image resampling reproduces [Pillow](https://github.com/python-pillow/Pillow)'s Lanczos to the bit. LoRAs and fine-tunes come from the community, on [Civitai](https://civitai.com) and [Hugging Face](https://huggingface.co); MOSS-Image's 8-step recipe is lodestones' [DMD LoRA](https://huggingface.co/lodestones/MOSS-Image-SFT-8-steps-dmd).
 
 ## License
 

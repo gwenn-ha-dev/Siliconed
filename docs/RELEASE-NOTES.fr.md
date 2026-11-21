@@ -2,6 +2,53 @@
 
 # Siliconed — notes de version
 
+## 0.30 · Rhossili
+
+La première édition qui porte un nom de plage : Rhossili, cinq kilomètres de sable au bout de la péninsule de Gower, au pays de Galles. Chaque version aura désormais la sienne, quelque part sur la côte atlantique entre l’Irlande et la Galice ; le nom s’affiche à droite de la barre de la fenêtre et dans « À propos ». De la 0.21 à la 0.30, le saut dit la rupture : un moteur neuf, et une fenêtre neuve.
+
+### Core AI
+
+Siliconed portait ses propres noyaux Metal, réglés puce par puce et mesurés sur chaque Mac avant son premier rendu. Depuis la 0.30, il calcule sur **Core AI**, le runtime qu’Apple livre avec macOS 27 : Apple écrit et règle les noyaux pour chaque puce, le GPU comme le Neural Engine, et Siliconed garde ce qui est à lui — les modèles, leur mémoire, leur preuve. **macOS 27 est requis** ; sur macOS 26, la 0.21 reste la dernière version.
+
+- **Les noyaux d’Apple, sur chaque puce.** Chaque modèle est quelques fonctions Core AI écrites en Swift et la boucle qui les appelle : aucun noyau à nous à entretenir, aucune table de puces, rien à mesurer avant le premier rendu. Un Mac neuf, un macOS neuf, et Core AI apporte ce qui leur va ([Le moteur](ENGINE.fr.md#core-ai)).
+- **Le Neural Engine travaille sur tous les modèles.** Sa part de chaque bloc se trouve pendant le rendu, pas après pas, et passe à l’unité qui finit la première ; le rendu suivant repart d’où le dernier s’est arrêté. La Standard peut s’en servir aussi, ses poids bf16 arrondis une fois en f16 ; le moteur chronomètre une fois les deux façons sur ce Mac et garde la plus rapide. Précision › Exacte garde le GPU seul, dans l’arithmétique propre du modèle.
+- **Les fichiers publiés, tels quels** : les bf16 de l’éditeur pour la Standard, des int8 publiés pour la Compact, déquantifiés dans les fonctions de Core AI. Une installation est un téléchargement, sans préparation après lui, et les deux versions d’un modèle vivent côte à côte.
+- **Sous la limite de mémoire, dès le premier rendu.** Chaque étage se planifie à l’octet avant toute allocation ; un modèle plus gros que la limite garde les poids qui tiennent et lit les autres du disque pendant qu’il calcule ; ce que Core AI tient pour ses fonctions se lit en vol, chaque milliseconde ; une grande image se décode par bandes ; ce qui ne peut pas tenir est refusé d’emblée. La limite (¾ de la mémoire du Mac moins 2 Go par défaut) se règle de 4 Go à la mémoire moins 4 Go, dans Réglages › Mac ([La mémoire](ENGINE.fr.md#la-mémoire-et-le-budget)).
+- **Les LoRA calculées à côté du produit qu’elles adaptent**, jamais fondues dans les poids, sur les deux versions : fondue, la petite retouche d’une LoRA se perdait dans les codes int8, et en partie en bf16.
+- **Compilé une fois.** Core AI compile une fonction pour ses formes : le premier rendu à une taille neuve, dans une version pas encore lancée ou avec une LoRA d’un rang neuf compile d’abord, et la Chaîne le dit (« Préparation pour ce Mac, une fois… »). Chaque rendu suivant démarre aussitôt. Réglages › Mac pèse ce qui a été compilé et l’efface (« Compilé pour ce Mac ») ; une mise à jour de l’app l’efface d’elle-même.
+- **Vérifié dans l’arithmétique des poids** : la Standard contre diffusers et transformers en bf16, la Compact contre les produits int8 de ComfyUI, la mémoire de chaque session contre son plan ([VERIFY.fr.md](VERIFY.fr.md)).
+- **Les bits appartiennent au système** : une même graine redonne la même image à l’œil, plus forcément le même fichier à l’octet près d’un macOS à l’autre.
+- **Les temps** : [Les chiffres](ENGINE.fr.md#les-chiffres). Sur le Mac mini M5 Pro, la Standard va aussi vite qu’en 0.21 ou plus vite ; la Compact est plus lente (1,1 à 1,5 ×) : les noyaux int8 de la 0.21 étaient les nôtres, et sur un GPU qui calcule le bf16 aussi vite que le f16, la Compact achète désormais de la mémoire, pas du temps.
+
+### L’app
+
+- **Une nouvelle fenêtre, en trois plans.** L’image est le fond de la fenêtre, d’un bord à l’autre. À gauche, une seule colonne, la chaîne de l’idée au bouton : les boîtes Texte et Images (l’Atelier de prompts), les encodeurs, le DiT et ses réglages, le VAE, et Générer épinglé à son pied ; elle se replie (⌥⌘R, ou le bouton de la barre d’outils) et son bord se tire. À droite, le temps : la file en tuiles fantômes au-dessus du rendu en cours, puis l’historique, qui s’élargit en grille par-dessus l’image (⌥⌘G) ([La fenêtre](APP.fr.md#la-fenêtre)).
+- **Le verre** : les deux colonnes sont en verre au-dessus de l’image. Ajustée, l’image tient entière dans la place qu’elles laissent ; zoomée, elle glisse sous elles jusqu’aux bords de la fenêtre, et le rideau et la grille d’une série de même. Réglages › Général › Fenêtre › Verre les rend opaques.
+- **La chaîne se détache** dans une fenêtre flottante à elle (le deuxième bouton de la barre d’outils) ; la fermer la ramène à sa place.
+- **Le panneau Chaîne dessine la mémoire du rendu dans le temps** : une courbe sur tout le rendu, la limite de mémoire en travers, une marque où chaque étage commence, ses poids gardés au survol ; un rendu sur un autre Mac arrive avec sa courbe aussi. Les détails de l’image (⌘I) sont un popover du ⓘ sous l’image, chaque étage avec son temps, sa mémoire et son unité ; l’inspecteur Chaîne (⌥⌘I) donne une ligne par étage, avec les parts du GPU et du Neural Engine de son arithmétique.
+- **Importer un modèle ou une LoRA** : par le menu, le bouton « Importer… » de la fenêtre Modèles ou en déposant un `.safetensors` sur la fenêtre. Le fichier est reconnu à ses tenseurs, copié tel quel et lu dans le format de son auteur ; un modèle de base non distillé est refusé, et l’app dit pourquoi. Depuis un Mac qui calcule sur un autre, le fichier est envoyé à celui-ci (`silicontrol import`).
+- **Les LoRA montrent leurs mots clefs** quand le fichier les donne : sous la LoRA, un clic les met dans le prompt.
+- **L’Atelier de prompts n’a plus rien à télécharger** : le rédacteur est l’encodeur de Qwen-Image-2.1 tel qu’il est publié. Quand la Standard ne tient pas dans la limite de mémoire, l’app propose la Compact pour écrire sur ce Mac.
+- **Le Détail sur les cinq modèles** : Anima, Krea 2 et MOSS-Image offrent à leur tour « Détail : Normal · Plus · Maximum », chacun au réglage trouvé pour lui.
+- **MOSS-Image lit les longs prompts**, jusqu’à 1 024 jetons comme les autres, et part d’une image lui aussi.
+- **Précision remplace l’interrupteur Accélérateurs** (Réglages › Général) : Exacte garde le GPU seul, dans l’arithmétique propre du modèle ; ANE, le défaut, laisse le Neural Engine prendre le travail qu’il fait plus vite sur ce Mac.
+- **L’historique en grille sélectionne au lasso**, et sa tête exporte, copie ou retire la sélection. Toutes les séries de la session se gardent : leurs cases sont des images ordinaires de l’historique, sous une tuile de série qui se replie. La planche est un export (Exporter la planche…, Copier la planche), et Graines est lui aussi une série, ses cases toujours rendues en une passe.
+- **Le zoom se borne en pixels de l’image** : jusqu’à 16 points par pixel, dessinés en carrés au-delà d’un point par pixel.
+- **Espace écarte les composants** (Image › Écarter les composants, ⌥⌘F) : les colonnes et la barre sous l’image s’en vont ; Espace ou Échap les ramènent.
+- **Une nouvelle version se dit au lancement** : l’app demande à GitHub le dernier numéro, et une version plus récente s’affiche dans un petit panneau, avec un bouton qui télécharge son image disque. Réglages › Général › Mises à jour l’éteint.
+- **Les téléchargements ne portent aucun jeton** : tous les dépôts que l’app lit sont ouverts. Un dépôt à accès restreint lié depuis Hugging Face ne propose aucun fichier ; sa fiche dit de le télécharger depuis sa page et de l’importer.
+- La fenêtre fait au moins 1140 × 680.
+- **`silicontrol`** : `set glass [on|off]` ; `set updates [on|off]` ; `set memory` ; `compiled [erase]` ; `sheet g2 <fichier|dossier>` ; `grid --wait --out D` y écrit la planche (`--no-sheet` s’en passe) ; `rack fold|unfold|top|dit|detach|dock` ; `remove g2` et `reuse g2` ; `uninstall legacy` ; `set preview [on|off]`. `siliconed uninstall` n’agit qu’avec `--yes`.
+
+### Ce qui part
+
+- **Les versions Légères** (4 bits) et la lecture des GGUF : le lien « Ouvrir dans Siliconed » d’une page Hugging Face ne propose plus que des fichiers `.safetensors`.
+- **Le Rendu plus rapide** (Bêta) : chaque évaluation se fait en pleine taille, la recette vérifiée contre la référence.
+- **« Mesurer ce Mac… »**, la carte des capacités et le rapport de diagnostic : Core AI choisit pour la puce, et ce dont le moteur a besoin, il le lit pendant le rendu.
+- **La fenêtre à part de l’Atelier de prompts**, et son pli (⌥⌘L) : une seule colonne de l’idée au bouton désormais. `silicontrol lab open|close|detach|attach` partent avec elle.
+- **Le plein écran**, remplacé par Espace ; **les Statistiques** et la bulle des détails, remplacées par l’inspecteur Chaîne et les détails de l’image ; **Ajouter la planche à l’historique**, remplacé par l’export.
+- **L’ancienne bibliothèque n’est pas reprise** : les modèles se réinstallent depuis l’app, et la fenêtre Modèles propose de libérer la place que tenaient les fichiers de la 0.21 (**Libérer…**).
+
 ## 0.21
 
 ### Plus rapide sur les grands Mac
@@ -121,7 +168,7 @@
 
 - **Chaque moteur, forme de poids et opérande que les règles permettent a sa route**, et un test le dit : un trou est listé avec sa raison, jamais découvert sur le Mac d'un utilisateur.
 - **Les contrôles de Krea 2** jugent leurs frontières mal conditionnées par des nuages d'ordres de sommation, à chaque pas de la trajectoire ; les contrôles Compact de Krea 2 et de MOSS-Image suivent la route int8 que prend le rendu.
-- **Des chiffres sur un MacBook Neo 8 Go** ([ENGINE.fr.md](ENGINE.fr.md#sur-un-macbook-neo)) : Anima Turbo 91,5 s, Z-Image Turbo 246,5 s en 1024², Compact.
+- **Des chiffres sur un MacBook Neo 8 Go** (ENGINE.fr.md) : Anima Turbo 91,5 s, Z-Image Turbo 246,5 s en 1024², Compact.
 - **Compiler demande Xcode** : le README et `app.sh` le disent (les Command Line Tools seuls n'ont pas les macros de SwiftUI). Repris du fork de mrdereksutton.
 
 ## 0.18
@@ -428,7 +475,7 @@
   et aussi vite ou plus — Krea 2 135,4–137,4 s au lieu de 144,6–144,9 s, Z-Image 83,4–84,0 s au lieu
   de 86,8–93,9 s, Qwen-Image-2.1 99,9–100,2 s au lieu de 103,6 s. L’image bouge d’un dixième de
   niveau en moyenne sur Z-Image et Qwen-Image-2.1 ; Krea 2 garde sa scène, son visage et sa lumière,
-  et ses plus fins détails bougent. Tous les chiffres : [Le Neural Engine](ENGINE.fr.md#le-neural-engine).
+  et ses plus fins détails bougent. Tous les chiffres : Le Neural Engine.
 - **Huit bits contre huit bits** : Z-Image Compact en 1024², avec le rendu plus rapide et le Neural
   Engine (tous deux par défaut), rend en 81,1–83,2 s ; le `q8p` 8 bits par défaut de Draw Things,
   en 135,0–144,2 s sur le même Mac.

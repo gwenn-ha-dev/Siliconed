@@ -1,0 +1,963 @@
+#!/usr/bin/env python3
+"""Anima Turbo v1.1's goldens: what `siliconed check anima <stage>` judges the engine against.
+
+    anima.py tokenizer                      the T5 tokenizer on a corpus of edge cases -> anima/t5-corpus.json
+    anima.py text [--long]                  both tokenizers, Qwen3-0.6B, the conditioner -> goldens-anima-text[-long]
+    anima.py dit --size 512 [1024 768x512 1536]  one DiT evaluation at the first sigma  -> goldens-anima-dit-<size>
+    anima.py bf16 --size 1024 [1536]        the same evaluation in bfloat16             -> witness-bf16-anima-dit-<size>
+    anima.py text-bf16                      both stages of the text in bfloat16, on the text golden's identifiers -> witness-bf16-anima-text
+    anima.py block-bf16 --size 512          block 0 alone in bfloat16, on the dit golden's inputs -> witness-bf16-anima-block-<size>
+    anima.py trajectory-bf16 --size 512     each step's velocity in bfloat16, from the trajectory's own latent -> witness-bf16-anima-trajectory-<size>
+    anima.py render-bf16 --size 512 [--variant compact]  the whole render in bfloat16 as the modular pipeline runs it (free loop, then the decoder) -> witness-bf16-anima-render-<size>
+    anima.py dit|bf16 --size 512 --variant compact   the same, for the Compact's published DiT -> goldens-anima-dit-compact-<size>
+    anima.py w8a8 --size 512 --variant compact   `bf16 --variant compact` with ComfyUI's default int8 products in the
+                                            int8 layers (the W8A8 bar)      -> witness-w8a8-anima-dit-compact-<size>
+    anima.py lora --size 512 --lora FILE    `dit` with a kohya LoRA merged into the fp32 weights as ComfyUI merges it
+                                                                            -> goldens-anima-dit-lora-<size>
+    anima.py witness --size 512 --lora FILE its float64 witness, the delta computed and merged in double
+                                                                            -> witness-anima-f64-lora-<size>-step0
+    anima.py lora-bf16 --size 512 --lora FILE   the DiT in bfloat16 under that LoRA kept apart, on the LoRA golden's
+                                            inputs                          -> witness-bf16-anima-dit-lora-<size>
+    anima.py trajectory --size 512 [1024 1536]  the 8-step Euler loop                   -> goldens-anima-trajectory-<size>
+    anima.py vae --size 512 [1024 768x512]  the decoder on the final latent             -> goldens-anima-vae-<size>
+    anima.py witness --size 512 --step 0    one guided evaluation in float64            -> witness-anima-f64-<size>-step<n>
+    anima.py vae-witness --size 512         the decoder in float64                      -> witness-anima-vae-f64-<size>
+    anima.py vae-bf16 --size 512            the decoder in bfloat16, as the pipeline runs it -> witness-bf16-anima-vae-<size>
+    anima.py img2img --size 512             img2img at strength 0.6: the picture encoded, the start, the
+                                            truncated loop (steps 3-7)                  -> goldens-anima-img2img-<size>
+    anima.py img2img-bf16 --size 512        that picture encoded in bfloat16, as the pipeline runs it -> witness-bf16-anima-img2img-<size>
+    anima.py all [--size 512 1024 768x512] [1536]  all of the above, in an order that satisfies their dependencies
+
+`bf16` is the bar of a half-precision path (the ANE's fp16 products): the `dit` evaluation with the
+reference in bfloat16, on the `dit` golden's inputs. It is not part of `all` (costly, and only that path reads it).
+`w8a8` is the bar of the Compact's DiT (`check anima dit --variant compact`): the same bf16
+evaluation with every int8 layer computed as ComfyUI does by default (`quantized.Int8Products`); not part of `all` either.
+
+Goldens go in `<goldens>/anima/`; `--goldens DIR`, else `SILICONED_GOLDENS`, else `./goldens`. Each stage
+rereads what an earlier one wrote (`dit` the text, `trajectory` the text, `vae` the trajectory, a rectangle's
+`vae` the 1024 trajectory), so run them in the order above. `all` without `--size` writes 512, 1024 and
+768x512: about two minutes on an M1 Pro with `--size 512`, about ten without. 1536 is asked for by name
+(`--size 1536`, alone or with the others): only the DiT's evaluation, trajectory and witness exist there (the
+decoder's goldens stop at 1024), and its fp32 trajectory is long; without its goldens, `siliconed check anima`
+skips the 1536 stages. The witness of the DiT is the first step's (the only one the check reads) and exists
+for the squares: a rectangle has no trajectory to take its starting latent from.
+
+The reference is diffusers' `CosmosTransformer3DModel`, `AnimaTextConditioner` and
+`AutoencoderKLQwenImage`, with transformers' Qwen3 and T5 tokenizer, in float32 on the CPU. The Turbo
+weights are only published in ComfyUI format (one file, DiT and conditioner mixed): `turbo_state_dicts` renames
+them to diffusers' names, and loading is **strict**: a missing or extra tensor makes the oracle fail rather
+than skew it. The published weights are bf16 and are WIDENED to fp32 before loading, otherwise the module
+would silently become bf16 and the oracle would be a bf16 oracle.
+
+What the reference does that a port by analogy would miss:
+  - the text is not one encoder: Qwen3-0.6B's `last_hidden_state` (final norm INCLUDED, unlike Z-Image) and
+    the T5 token identifiers both enter a conditioner, which maps the first onto the second's vocabulary;
+    its output is padded to 512 with zeros. No chat template, "longest" padding (hence none for one prompt).
+  - the step is `x += (sigma[i+1] - sigma[i]) * v`, with no negation (Z-Image's pipeline negates).
+  - the schedule is `linspace(1, 1/N, N)` through a static shift of 3.
+  - diffusers forces RoPE to float32 (`x.float()` in `apply_rotary_emb`, `dtype=torch.float32` in
+    `CosmosRotaryPosEmbed`): the witness replaces both by their transcription in double, otherwise it would be
+    no more precise than what it judges.
+
+Setup:  in a fresh virtual environment, pip install -r tools/oracle/requirements.txt
+"""
+import argparse
+import json
+import random
+import re
+import sys
+from pathlib import Path
+
+import numpy as np
+import torch
+from safetensors import safe_open
+from safetensors.torch import load_file, save_file
+
+sys.dont_write_bytecode = True      # the repository carries no caches
+import common  # noqa: E402
+import quantized  # noqa: E402
+
+BASE_REPOSITORY = "circlestone-labs/Anima-Base-v1.0-Diffusers"
+TURBO_REPOSITORY = "circlestone-labs/Anima"
+TURBO_FILE = "split_files/diffusion_models/anima-turbo-v1.1.safetensors"
+PROMPT = "a 30 year old woman posing in a library"      # the reference prompt
+SEED = 42
+STEPS = 8            # the Turbo card: "CFG 1, 8-12 steps"; the low end
+SHIFT = 3.0          # scheduler_config.json
+MAX_SEQUENCE_LENGTH = 512
+
+torch.set_grad_enabled(False)
+
+OUT: Path
+_ROOTS: dict = {}
+
+
+def base() -> Path:
+    if "base" not in _ROOTS:
+        # The base repository's transformer and conditioner weights are not read (the Turbo file has both,
+        # in ComfyUI's format): only their configurations.
+        _ROOTS["base"] = common.snapshot(BASE_REPOSITORY, ["tokenizer", "t5_tokenizer", "text_encoder",
+                                                           "scheduler", "vae"],
+                                         files=["transformer/config.json", "text_conditioner/config.json"])
+    return _ROOTS["base"]
+
+
+def turbo() -> Path:
+    if "turbo" not in _ROOTS:
+        _ROOTS["turbo"] = common.snapshot(TURBO_REPOSITORY, [], files=[TURBO_FILE]) / TURBO_FILE
+    return _ROOTS["turbo"]
+
+
+# ------------------------------------------------------------------ ComfyUI -> diffusers, strict
+
+BLOCK_RULES = [
+    (r"adaln_modulation_self_attn\.1\.", "norm1.linear_1."),
+    (r"adaln_modulation_self_attn\.2\.", "norm1.linear_2."),
+    (r"adaln_modulation_cross_attn\.1\.", "norm2.linear_1."),
+    (r"adaln_modulation_cross_attn\.2\.", "norm2.linear_2."),
+    (r"adaln_modulation_mlp\.1\.", "norm3.linear_1."),
+    (r"adaln_modulation_mlp\.2\.", "norm3.linear_2."),
+    (r"self_attn\.q_proj\.", "attn1.to_q."), (r"self_attn\.k_proj\.", "attn1.to_k."),
+    (r"self_attn\.v_proj\.", "attn1.to_v."), (r"self_attn\.output_proj\.", "attn1.to_out.0."),
+    (r"self_attn\.q_norm\.", "attn1.norm_q."), (r"self_attn\.k_norm\.", "attn1.norm_k."),
+    (r"cross_attn\.q_proj\.", "attn2.to_q."), (r"cross_attn\.k_proj\.", "attn2.to_k."),
+    (r"cross_attn\.v_proj\.", "attn2.to_v."), (r"cross_attn\.output_proj\.", "attn2.to_out.0."),
+    (r"cross_attn\.q_norm\.", "attn2.norm_q."), (r"cross_attn\.k_norm\.", "attn2.norm_k."),
+    (r"mlp\.layer1\.", "ff.net.0.proj."), (r"mlp\.layer2\.", "ff.net.2."),
+]
+TOP_RULES = {
+    "x_embedder.proj.1.weight": "patch_embed.proj.weight",
+    "t_embedder.1.linear_1.weight": "time_embed.t_embedder.linear_1.weight",
+    "t_embedder.1.linear_2.weight": "time_embed.t_embedder.linear_2.weight",
+    "t_embedding_norm.weight": "time_embed.norm.weight",
+    "final_layer.adaln_modulation.1.weight": "norm_out.linear_1.weight",
+    "final_layer.adaln_modulation.2.weight": "norm_out.linear_2.weight",
+    "final_layer.linear.weight": "proj_out.weight",
+}
+
+
+def diffusers_name(name: str) -> str:
+    """A DiT name of the ComfyUI file (`blocks.3.self_attn.q_proj.weight`) -> its diffusers name."""
+    if name in TOP_RULES:
+        return TOP_RULES[name]
+    if m := re.match(r"blocks\.(\d+)\.(.*)", name):
+        rest = m.group(2)
+        for pattern, target in BLOCK_RULES:
+            if re.match(pattern, rest):
+                return f"transformer_blocks.{m.group(1)}." + re.sub(pattern, target, rest, count=1)
+        raise SystemExit(f"block key without a rule: {name}")
+    raise SystemExit(f"key without a rule: {name}")
+
+
+def turbo_state_dicts() -> tuple[dict, dict]:
+    """The Turbo file, renamed and WIDENED to fp32: (DiT, conditioner)."""
+    dit, adapter = {}, {}
+    with safe_open(str(turbo()), framework="pt") as f:
+        for key in f.keys():
+            name = key.removeprefix("model.diffusion_model.")
+            tensor = f.get_tensor(key).float()
+            if name.startswith("llm_adapter."):
+                adapter[name.removeprefix("llm_adapter.")] = tensor
+            else:
+                dit[diffusers_name(name)] = tensor
+    return dit, adapter
+
+
+def load_transformer(variant: str | None = None):
+    """The fp32 DiT. With a `variant`, the weights are the Compact's published file (`quantized.Variant`); only
+    `transformer/config.json` is read from the base repository, and the text adapter the file also holds is left out."""
+    from diffusers import CosmosTransformer3DModel
+    if variant:
+        root = common.snapshot(BASE_REPOSITORY, [], files=["transformer/config.json"])
+        config = CosmosTransformer3DModel.load_config(root / "transformer")
+    else:
+        config = CosmosTransformer3DModel.load_config(base() / "transformer")
+    with torch.device("meta"):
+        model = CosmosTransformer3DModel.from_config(config)
+    if variant:
+        published = quantized.Variant("anima", variant)
+        dit = {k: published.tensor(k, torch.float32) for k in published.keys}
+        model.published = published
+    else:
+        dit, _ = turbo_state_dicts()
+    model.load_state_dict(dit, strict=True, assign=True)
+    # `rope` has no weights: its possible buffers remain to be materialized on the CPU.
+    model = model.to(torch.float32)
+    return model.eval()
+
+
+def load_conditioner():
+    from diffusers import AnimaTextConditioner
+    config = AnimaTextConditioner.load_config(base() / "text_conditioner")
+    model = AnimaTextConditioner.from_config(config).to(torch.float32)
+    _, adapter = turbo_state_dicts()
+    model.load_state_dict(adapter, strict=True)
+    return model.eval()
+
+
+def write(stem: str, payload: dict, extra: dict | None = None):
+    common.write_golden(OUT, stem, payload,
+                        {"prompt": PROMPT, "seed": SEED, "steps": STEPS, "shift": SHIFT,
+                         "turbo": f"{TURBO_REPOSITORY}@{common.REVISIONS[TURBO_REPOSITORY]}:{TURBO_FILE}",
+                         **(extra or {})})
+
+
+def read(stem: str, producer: str) -> dict:
+    return common.read_golden(OUT, stem, producer)
+
+
+# ------------------------------------------------------------------------------------ stages
+
+#: The T5 tokenizer's edge cases. The reference prompt only touches ASCII: the `Precompiled` normalizer
+#: (nmt_nfkc), the merging of unknowns, a `▁` typed by the user, special tokens in the text and the
+#: truncation at 512 only show up here.
+CASES = [
+    "", " ", "   ", "a", "masterpiece, best quality, 1girl",
+    "  leading and trailing  ", "tab\tand\nnewline\r\nmixed", "multiple    spaces",
+    "Ｆｕｌｌｗｉｄｔｈ ＡＢＣ １２３", "ﬁ ligature ﬂ", "café naïve résumé", "cafe\u0301 combining",
+    "①②③ ⅳ ㎏ ℃", "日本語のテキスト", "한국어 텍스트", "中文提示词，逗号。", "emoji 😀 👩‍👩‍👧 🇫🇷",
+    "zero\u200bwidth", "nbsp\u00a0space", "ideographic\u3000space", "soft\u00adhyphen",
+    "▁already▁marked", "▁", "a▁▁b", "</s> inside", "<pad><unk></s>", "<extra_id_0> sentinel <extra_id_99>",
+    "score_9, score_8_up, rating:safe, (masterpiece:1.2)", "Ω≈ç√∫˜µ≤≥÷", "\u0000control\u0007chars",
+    "tilde ~ caret ^ backtick ` pipe |", "UPPER lower MiXeD", "numbers 3.14159 2,718 1e-10",
+    "Ⅻ Ⓐ ⒜ ㊙", "ｶﾀｶﾅ half-width", "ß ẞ ǅ ǆ", "Ǆemo", "\ufeffBOM", "‘quotes’ “double” «guillemets»",
+    "— – ‑ dashes", "…ellipsis", "x" * 40, "long " * 700,
+]
+
+
+def stage_tokenizer():
+    """Each case through `T5TokenizerFast` (truncated at 512), plus 300 random strings drawn from the
+    alphabets that matter (Latin, combining marks, punctuation, CJK, full-width forms). No weights."""
+    from transformers import T5TokenizerFast
+    tokenizer = T5TokenizerFast.from_pretrained(base() / "t5_tokenizer")
+    rng = random.Random(0)
+    alphabet = [chr(c) for c in list(range(32, 127)) + list(range(0xA0, 0x250)) + list(range(0x300, 0x370))
+                + list(range(0x2000, 0x2070)) + list(range(0x3000, 0x3100)) + list(range(0xFF00, 0xFFF0))]
+    cases = list(CASES)
+    for _ in range(300):
+        cases.append("".join(rng.choice(alphabet) for _ in range(rng.randint(1, 40))))
+    out = []
+    for text in cases:
+        ids = tokenizer([text], max_length=512, truncation=True).input_ids[0]
+        out.append({"text": text, "ids": ids})
+    (OUT / "t5-corpus.json").write_text(json.dumps(out, ensure_ascii=False))
+    print(f"-> {OUT / 't5-corpus.json'} ({len(out)} cases)")
+
+
+def stage_text(prompt: str = PROMPT, length: int = MAX_SEQUENCE_LENGTH, stem: str = "goldens-anima-text"):
+    """Reproduces `AnimaTextEncoderStep` + `AnimaConditionStep`: no chat template, "longest" padding (hence
+    none for a single prompt), `last_hidden_state` (final norm INCLUDED, unlike Z-Image), then the
+    conditioner, padded to 512 with zeros (a minimum: a longer text keeps its rows). `--long`:
+    `common.LONG_PROMPT`, `max_sequence_length` raised for both tokenizers."""
+    from transformers import AutoTokenizer, Qwen3Model
+    from transformers import T5TokenizerFast
+    tokenizer = AutoTokenizer.from_pretrained(base() / "tokenizer")
+    t5 = T5TokenizerFast.from_pretrained(base() / "t5_tokenizer")
+    qwen_inputs = tokenizer([prompt], padding="longest", max_length=length,
+                            truncation=True, return_tensors="pt")
+    t5_inputs = t5([prompt], padding="longest", max_length=length,
+                   truncation=True, return_tensors="pt")
+
+    encoder = Qwen3Model.from_pretrained(base() / "text_encoder", torch_dtype=torch.float32).eval()
+    assert next(encoder.parameters()).dtype == torch.float32
+    out = encoder(input_ids=qwen_inputs.input_ids, attention_mask=qwen_inputs.attention_mask,
+                  output_hidden_states=True)
+    qwen = out.last_hidden_state * qwen_inputs.attention_mask.unsqueeze(-1).float()
+    probes = {f"qwen_layer{i}_out": out.hidden_states[i + 1][0] for i in (0, 13, 26)}
+    del encoder
+
+    conditioner = load_conditioner()
+    taps = {}
+    for i in (0, 5):
+        conditioner.blocks[i].register_forward_hook(common.tap(taps, f"cond_block{i}_out"))
+    embeds = conditioner(source_hidden_states=qwen, target_input_ids=t5_inputs.input_ids,
+                         target_attention_mask=t5_inputs.attention_mask,
+                         source_attention_mask=qwen_inputs.attention_mask)
+    payload = {"qwen_ids": qwen_inputs.input_ids[0].to(torch.int32),
+               "t5_ids": t5_inputs.input_ids[0].to(torch.int32),
+               "qwen_last_hidden": qwen[0], "prompt_embeds": embeds[0], **probes, **taps}
+    for inputs in (qwen_inputs, t5_inputs):
+        assert inputs.input_ids.shape[1] < length, f"{inputs.input_ids.shape[1]} tokens: the prompt was cut at {length}"
+    write(stem, payload, {
+        "prompt": prompt, "max_sequence_length": length,
+        "qwen_tokens": int(qwen_inputs.input_ids.shape[1]),
+        "t5_tokens": int(t5_inputs.input_ids.shape[1])})
+
+
+def schedule(steps: int = STEPS):
+    """`FlowMatchEulerDiscreteScheduler` under `sigmas = linspace(1, 1/N, N)`, static shift 3."""
+    from diffusers import FlowMatchEulerDiscreteScheduler
+    scheduler = FlowMatchEulerDiscreteScheduler.from_pretrained(base() / "scheduler")
+    scheduler.set_timesteps(sigmas=np.linspace(1.0, 1 / steps, steps), device="cpu")
+    return scheduler
+
+
+def initial_latent(height: int, width: int) -> torch.Tensor:
+    from diffusers.utils.torch_utils import randn_tensor
+    generator = torch.Generator("cpu").manual_seed(SEED)
+    return randn_tensor((1, 16, 1, height // 8, width // 8), generator=generator,
+                        device=torch.device("cpu"), dtype=torch.float32)
+
+
+def probe_dit(model) -> dict:
+    """The boundaries the engine is judged at: patch embedding, time embedding, blocks 0, 1, 13, 27 and
+    block 0's three branches. Returns the dict the hooks fill during the forward pass."""
+    taps = {}
+    model.patch_embed.register_forward_hook(common.tap(taps, "patch_embed_out", lambda o: o[0].flatten(0, 2)))
+
+    def time_hook(_m, _a, o):
+        taps["temb"], taps["embedded_timestep"] = o[0][0].clone(), o[1][0].clone()
+    model.time_embed.register_forward_hook(time_hook)
+    for i in (0, 1, 13, 27):
+        model.transformer_blocks[i].register_forward_hook(common.tap(taps, f"block{i}_out"))
+    block0 = model.transformer_blocks[0]
+    block0.attn1.register_forward_hook(common.tap(taps, "block0_attn1_out"))
+    block0.attn2.register_forward_hook(common.tap(taps, "block0_attn2_out"))
+    block0.ff.register_forward_hook(common.tap(taps, "block0_ff_out"))
+    return taps
+
+
+def stage_dit_variant(size: str, variant: str):
+    """`dit` on the Compact's published weights: the Standard's golden inputs (same latent, same
+    text, same timestep), the same probes. Writes `goldens-anima-dit-<variant>-<size>`."""
+    height, width, name = common.parse_size(size)
+    standard = read(f"goldens-anima-dit-{name}", f"anima.py dit --size {name}")
+    model = load_transformer(variant)
+    taps = probe_dit(model)
+    timestep = standard["timestep"]
+    out = model(hidden_states=standard["latent_in"][None, :, None], timestep=timestep,
+                encoder_hidden_states=standard["prompt_embeds"][None], padding_mask=torch.zeros(1, 1, height, width),
+                return_dict=False)[0]
+    payload = {"latent_in": standard["latent_in"], "timestep": timestep, "prompt_embeds": standard["prompt_embeds"],
+               "model_out": out[0, :, 0], **taps}
+    write(quantized.stem(f"goldens-anima-dit-{name}", variant), payload,
+          {"inputs": f"goldens-anima-dit-{name}", "weights": model.published.describe()})
+
+
+def stage_dit(size: str):
+    height, width, name = common.parse_size(size)
+    embeds = read("goldens-anima-text", "anima.py text")["prompt_embeds"][None]
+    model = load_transformer()
+    scheduler = schedule()
+    latent = initial_latent(height, width)
+    t = scheduler.timesteps[0]
+    timestep = (t / scheduler.config.num_train_timesteps).expand(1).float()
+    padding = torch.zeros(1, 1, height, width)
+
+    taps = probe_dit(model)
+
+    out = model(hidden_states=latent, timestep=timestep, encoder_hidden_states=embeds,
+                padding_mask=padding, return_dict=False)[0]
+    payload = {"latent_in": latent[0, :, 0], "timestep": timestep, "prompt_embeds": embeds[0],
+               "model_out": out[0, :, 0], **taps}
+    write(f"goldens-anima-dit-{name}", payload, {"sigma": float(scheduler.sigmas[0])})
+
+
+def stage_bf16(size: str, variant: str | None = None):
+    """`dit` with diffusers in bfloat16, as `from_pretrained(torch_dtype=torch.bfloat16)` runs it: weights,
+    latent, text and timestep in bf16 (the published weights are bf16, so the cast is exact). The inputs are
+    the dit golden's own; the boundaries are widened to float32 (exact) under the golden's keys, minus its
+    inputs. Writes `witness-bf16-anima-dit-<size>`."""
+    height, width, name = common.parse_size(size)
+    golden = read(f"goldens-anima-dit-{name}", f"anima.py dit --size {name}")
+    half = torch.bfloat16
+    model = load_transformer(variant).to(half)
+    taps = probe_dit(model)
+    out = model(hidden_states=golden["latent_in"][:, None][None].to(half), timestep=golden["timestep"].to(half),
+                encoder_hidden_states=golden["prompt_embeds"][None].to(half),
+                padding_mask=torch.zeros(1, 1, height, width, dtype=half), return_dict=False)[0]
+    taps["model_out"] = out[0, :, 0]
+    write(quantized.stem(f"witness-bf16-anima-dit-{name}", variant), {k: v.float() for k, v in taps.items()},
+          {"dtype": "bfloat16", "inputs": f"goldens-anima-dit-{name}",
+           **({"weights": model.published.describe()} if variant else {})})
+
+
+def lora_factors(path: Path) -> dict[str, tuple[torch.Tensor, torch.Tensor, float]]:
+    """A kohya LoRA (`ss_network_module: networks.lora_anima`) -> {diffusers weight: (up, down, alpha / rank)}.
+
+    **The reference is ComfyUI** (`comfy/lora.py`, `comfy/weight_adapter/lora.py` at comfyanonymous/ComfyUI@6da3d1a5):
+    diffusers 0.41's `AnimaLoraLoaderMixin` only converts `diffusion_model.*` keys and would hand `lora_unet_*` to PEFT
+    unrenamed. ComfyUI names a module `lora_unet_` + its native name with every `.` made `_`, reads `{x}.lora_up.weight`,
+    `{x}.lora_down.weight`, `{x}.alpha`, and scales by `alpha / down.shape[0]`. Strict, like the rest of the oracle: a
+    module of the file that names no DiT weight fails, and so does a tensor left unread."""
+    natives = {}
+    with safe_open(str(turbo()), framework="pt") as f:
+        for key in f.keys():
+            name = key.removeprefix("model.diffusion_model.")
+            if name.endswith(".weight") and not name.startswith("llm_adapter."):
+                natives["lora_unet_" + name[: -len(".weight")].replace(".", "_")] = name
+    factors = {}
+    with safe_open(str(path), framework="pt") as f:
+        keys = set(f.keys())
+        for up_key in sorted(k for k in keys if k.endswith(".lora_up.weight")):
+            module = up_key[: -len(".lora_up.weight")]
+            if module not in natives:
+                raise SystemExit(f"LoRA module without a DiT weight: {module}")
+            up, down = f.get_tensor(up_key), f.get_tensor(module + ".lora_down.weight")
+            alpha = float(f.get_tensor(module + ".alpha")) if module + ".alpha" in keys else None
+            factors[diffusers_name(natives[module])] = (up, down, (alpha / down.shape[0]) if alpha is not None else 1.0)
+            keys -= {up_key, module + ".lora_down.weight", module + ".alpha"}
+    if keys:
+        raise SystemExit(f"{len(keys)} LoRA tensors not read, e.g. {sorted(keys)[:3]}")
+    return factors
+
+
+def lora_delta(factor, dtype) -> torch.Tensor:
+    """ΔW = (alpha / rank) · up @ down at strength 1, the bf16 factors widened to `dtype` first."""
+    up, down, scale = factor
+    return scale * (up.to(dtype) @ down.to(dtype))
+
+
+def stage_lora(size: str, lora: str):
+    """`dit` with a LoRA merged into the fp32 weights **as ComfyUI does** (`W += (alpha / rank) · up @ down`, strength 1):
+    the same input (initial latent, σ = 1, the reference prompt), `model_out` and four block outputs. The LoRA the
+    references were written with is `inCase.safetensors` (kohya, 448 modules). Its fp64 witness is `witness --lora`."""
+    height, width, name = common.parse_size(size)
+    factors = lora_factors(Path(lora))
+    print(f"  {Path(lora).name}: {len(factors)} modules merged")
+    embeds = read("goldens-anima-text", "anima.py text")["prompt_embeds"][None]
+    model = load_transformer()
+    state = model.state_dict()
+    for weight, factor in factors.items():
+        state[weight] += lora_delta(factor, torch.float32)
+    scheduler = schedule()
+    latent = initial_latent(height, width)
+    timestep = (scheduler.timesteps[0] / scheduler.config.num_train_timesteps).expand(1).float()
+    taps = {}
+    for i in (0, 1, 13, 27):
+        model.transformer_blocks[i].register_forward_hook(common.tap(taps, f"block{i}_out"))
+    out = model(hidden_states=latent, timestep=timestep, encoder_hidden_states=embeds,
+                padding_mask=torch.zeros(1, 1, height, width), return_dict=False)[0]
+    write(f"goldens-anima-dit-lora-{name}", {"latent_in": latent[0, :, 0], "timestep": timestep, "prompt_embeds": embeds[0],
+                                             "model_out": out[0, :, 0], **taps},
+          {"lora": Path(lora).name, "modules": len(factors), "strength": 1.0,
+           "merge": "ComfyUI: W += strength · (alpha/rank) · up @ down (comfyanonymous/ComfyUI@6da3d1a5)"})
+
+
+def stage_lora_bf16(size: str, lora: str):
+    """The bar of the engine's LoRA path (`check anima dit-lora`): the DiT in bfloat16 with the LoRA **kept apart**, as a
+    PEFT user runs it — `y = base(x) + (alpha / rank) * up(down(x))`, the factors cast to the activation's dtype — at
+    strength 1, on the inputs of `goldens-anima-dit-lora-<size>` (`lora`: the same LoRA merged into the fp32 weights as
+    ComfyUI merges it). Writes `witness-bf16-anima-dit-lora-<size>`."""
+    height, width, name = common.parse_size(size)
+    golden = read(f"goldens-anima-dit-lora-{name}", f"anima.py lora --size {name} --lora FILE")
+    half = torch.bfloat16
+    model = load_transformer().to(half)
+    factors = lora_factors(Path(lora))
+
+    def apart(up, down, scale):
+        def hook(_module, inputs, output):      # returns a value on purpose: it replaces the linear's output
+            x = inputs[0]
+            return output + torch.nn.functional.linear(torch.nn.functional.linear(x, down.to(x.dtype)), up.to(x.dtype)) * scale
+        return hook
+    for weight, (up, down, scale) in factors.items():
+        module = model.get_submodule(weight.removesuffix(".weight"))
+        if not isinstance(module, torch.nn.Linear):
+            raise SystemExit(f"{weight}: a LoRA on a module that is not a Linear is not carried apart here")
+        module.register_forward_hook(apart(up, down, scale))
+    print(f"  {Path(lora).name}: {len(factors)} modules kept apart")
+    taps = probe_dit(model)
+    out = model(hidden_states=golden["latent_in"][:, None][None].to(half), timestep=golden["timestep"].to(half),
+                encoder_hidden_states=golden["prompt_embeds"][None].to(half),
+                padding_mask=torch.zeros(1, 1, height, width, dtype=half), return_dict=False)[0]
+    taps["model_out"] = out[0, :, 0]
+    write(f"witness-bf16-anima-dit-lora-{name}", {k: v.float() for k, v in taps.items()},
+          {"dtype": "bfloat16", "inputs": f"goldens-anima-dit-lora-{name}", "lora": Path(lora).name, "modules": len(factors),
+           "strength": 1.0, "carried": "apart: y = base(x) + (alpha / rank) * up(down(x)), bf16"})
+
+
+def channel_error(got: torch.Tensor, exact: torch.Tensor) -> tuple[float, float]:
+    """The engine's `channelError(got, exact, columns: n)` on `[C, ...]`: one column per position, relative L2 over the
+    channels, floored at 1 % of the median column norm. Returns (worst, median); a printout, never a verdict."""
+    g, e = got.double().reshape(got.shape[0], -1), exact.double().reshape(exact.shape[0], -1)
+    num, den = (g - e).pow(2).sum(dim=0).sqrt(), e.pow(2).sum(dim=0).sqrt()
+    live = den > 0
+    floor = 0.01 * den[live].sort().values[live.sum() // 2]
+    ratio = (num[live] / torch.clamp(den[live], min=floor)).sort().values
+    return float(ratio[-1]), float(ratio[len(ratio) // 2])
+
+
+def stage_text_bf16():
+    """**The text in bfloat16**, as `from_pretrained(torch_dtype=torch.bfloat16)` runs it, on `goldens-anima-text`'s own
+    identifiers: Qwen3-0.6B (`last_hidden_state`, final norm included) then the conditioner, both bf16 (the rotary
+    tables keep their f32 `inv_freq`, as `from_pretrained` leaves a non-persistent buffer). The bar of a bf16 text path
+    (`siliconed check anima text`). Writes `witness-bf16-anima-text` under the golden's keys, widened to float32 (exact)."""
+    from diffusers.models.condition_embedders.condition_embedder_anima import AnimaRotaryEmbedding
+    from transformers import Qwen3Model
+    half = torch.bfloat16
+    golden = read("goldens-anima-text", "anima.py text")
+    qwen_ids, t5_ids = golden["qwen_ids"].long()[None], golden["t5_ids"].long()[None]
+    mask = torch.ones_like(qwen_ids)
+    encoder = Qwen3Model.from_pretrained(base() / "text_encoder", torch_dtype=half).eval()
+    assert next(encoder.parameters()).dtype == half
+    out = encoder(input_ids=qwen_ids, attention_mask=mask, output_hidden_states=True)
+    qwen = out.last_hidden_state * mask.unsqueeze(-1).to(half)
+    payload = {f"qwen_layer{i}_out": out.hidden_states[i + 1][0] for i in (0, 13, 26)}
+    payload["qwen_last_hidden"] = qwen[0]
+    del encoder
+
+    conditioner = load_conditioner().to(half)
+    conditioner.rotary_emb = AnimaRotaryEmbedding(conditioner.config.model_dim // conditioner.config.num_attention_heads)
+    assert conditioner.rotary_emb.inv_freq.dtype == torch.float32
+    taps = {}
+    for i in (0, 5):
+        conditioner.blocks[i].register_forward_hook(common.tap(taps, f"cond_block{i}_out"))
+    embeds = conditioner(source_hidden_states=qwen, target_input_ids=t5_ids,
+                         target_attention_mask=torch.ones_like(t5_ids), source_attention_mask=mask)
+    payload.update(taps)
+    payload["prompt_embeds"] = embeds[0]
+    for name, t in payload.items():
+        exact = golden[name]
+        rows = exact.shape[0]
+        worst, median = channel_error(t[:rows].float().T, exact.float().T)
+        print(f"  {name}: bf16 vs float32 - worst channel {worst:.3e}, median {median:.3e}")
+    write("witness-bf16-anima-text", {k: v.float().contiguous() for k, v in payload.items()},
+          {"inputs": ["goldens-anima-text"], "dtype": "bfloat16", "device": "cpu"})
+
+
+def stage_block_bf16(size: str):
+    """**Block 0 alone in bfloat16**, on `goldens-anima-dit-<size>`'s own inputs (`patch_embed_out`, `embedded_timestep`,
+    `temb`, `prompt_embeds`; the rotary table from `model.rope`): the bar of a bf16 block (`siliconed check anima block`).
+    The whole evaluation's bf16 run (`bf16`) cannot be it: its block 0 reads its own bf16 patch embedding. Writes
+    `witness-bf16-anima-block-<size>`: block 0's output and its three branches under the golden's keys, widened to float32."""
+    height, width, name = common.parse_size(size)
+    golden = read(f"goldens-anima-dit-{name}", f"anima.py dit --size {name}")
+    half = torch.bfloat16
+    model = load_transformer().to(half)
+    taps = {}
+    block = model.transformer_blocks[0]
+    block.attn1.register_forward_hook(common.tap(taps, "block0_attn1_out"))
+    block.attn2.register_forward_hook(common.tap(taps, "block0_attn2_out"))
+    block.ff.register_forward_hook(common.tap(taps, "block0_ff_out"))
+    x = golden["patch_embed_out"].to(half)[None]
+    embedded, temb = golden["embedded_timestep"].to(half)[None], golden["temb"].to(half)[None]
+    rotary = model.rope(torch.zeros(1, 17, 1, height // 8, width // 8))
+    out = block(x, golden["prompt_embeds"].to(half)[None], embedded, temb, rotary)
+    taps["block0_out"] = out[0]
+    write(f"witness-bf16-anima-block-{name}", {k: v.float().contiguous() for k, v in taps.items()},
+          {"inputs": f"goldens-anima-dit-{name}", "dtype": "bfloat16", "device": "cpu"})
+
+
+def stage_trajectory_bf16(size: str):
+    """**Each step's velocity in bfloat16, from the trajectory's own latent at that step**: the DiT as
+    `from_pretrained(torch_dtype=torch.bfloat16)` runs it, told the modular pipeline's timestep (`t.to(bf16) / 1000`, in bf16:
+    `AnimaDenoiserInputStep`), the latent and the context brought to bf16 (`latents.to(dtype)`), the output widened. The bar of each
+    guided step of `siliconed check anima trajectory`. Writes `witness-bf16-anima-trajectory-<size>`: `velocity_0` … `velocity_{N-1}`."""
+    resolution = int(size)
+    reference = read(f"goldens-anima-trajectory-{resolution}", f"anima.py trajectory --size {resolution}")
+    half = torch.bfloat16
+    embeds = read("goldens-anima-text", "anima.py text")["prompt_embeds"][None].to(half)
+    model = load_transformer().to(half)
+    scheduler = schedule()
+    scheduler.set_begin_index(0)
+    padding = torch.zeros(1, 1, resolution, resolution, dtype=half)
+    out = {}
+    for i, t in enumerate(scheduler.timesteps):
+        latent = reference["latent_init" if i == 0 else f"latent_{i}"][None, :, None]
+        timestep = t.expand(1).to(half) / scheduler.config.num_train_timesteps
+        velocity = model(hidden_states=latent.to(half), timestep=timestep, encoder_hidden_states=embeds,
+                         padding_mask=padding, return_dict=False)[0]
+        out[f"velocity_{i}"] = velocity[0, :, 0].float()
+        worst, median = channel_error(out[f"velocity_{i}"], reference[f"velocity_{i}"])
+        print(f"  step {i}: bf16 vs float32 - worst plane {worst:.3e}, median {median:.3e}", flush=True)
+    write(f"witness-bf16-anima-trajectory-{resolution}", out,
+          {"inputs": f"goldens-anima-trajectory-{resolution}", "dtype": "bfloat16", "device": "cpu"})
+
+
+def stage_render_bf16(size: str, variant: str | None = None):
+    """**The whole render in bfloat16**, as `AnimaModularPipeline` runs it with `torch_dtype=torch.bfloat16` from the same prompt
+    and seed as the goldens: the text (`witness-bf16-anima-text`'s embeddings), the free 8-step Euler loop (the latent kept in
+    float32 between steps, the DiT told `t.to(bf16) / 1000`), then the decoder in bf16 on the final latent
+    (`AnimaVaeDecoderStep`; convolutions with fp32 sums, `common.bf16_convolutions_in_fp32`). The bar of `siliconed check anima render`:
+    a bf16 render is no nearer the float32 picture than this. Writes `witness-bf16-anima-render-<size>`: `latent_final`, `image`; with
+    `--variant compact`, the Compact's published DiT (the text is the same: the adapter files are the same bytes) and
+    `witness-bf16-anima-render-compact-<size>`."""
+    from diffusers import AutoencoderKLQwenImage
+    resolution = int(size)
+    half = torch.bfloat16
+    embeds = read("witness-bf16-anima-text", "anima.py text-bf16")["prompt_embeds"][None].to(half)
+    model = load_transformer(variant).to(half)
+    scheduler = schedule()
+    scheduler.set_begin_index(0)
+    latent = initial_latent(resolution, resolution)
+    padding = torch.zeros(1, 1, resolution, resolution, dtype=half)
+    for i, t in enumerate(scheduler.timesteps):
+        timestep = t.expand(1).to(half) / scheduler.config.num_train_timesteps
+        velocity = model(hidden_states=latent.to(half), timestep=timestep, encoder_hidden_states=embeds,
+                         padding_mask=padding, return_dict=False)[0]
+        latent = scheduler.step(velocity, t, latent, return_dict=False)[0]
+        print(f"  step {i}", flush=True)
+    del model
+    common.bf16_convolutions_in_fp32()
+    vae = AutoencoderKLQwenImage.from_pretrained(base() / "vae", torch_dtype=half).eval()
+    z = latent.to(half)
+    mean = torch.tensor(vae.config.latents_mean).view(1, 16, 1, 1, 1).to(half)
+    inv_std = 1.0 / torch.tensor(vae.config.latents_std).view(1, 16, 1, 1, 1).to(half)
+    image = vae.decode(z / inv_std + mean, return_dict=False)[0][0, :, 0].float()
+    exact = read(f"goldens-anima-vae-{resolution}", f"anima.py vae --size {resolution}")["image"]
+    mse = float((image.double() - exact.double()).pow(2).mean())
+    print(f"  bf16 render vs float32 render: PSNR {10 * np.log10(4 / mse):.2f} dB")
+    write(quantized.stem(f"witness-bf16-anima-render-{resolution}", variant), {"latent_final": latent[0, :, 0].float(), "image": image},
+          {"inputs": ["witness-bf16-anima-text", f"goldens-anima-vae-{resolution}"], "dtype": "bfloat16", "device": "cpu"})
+
+
+def stage_w8a8(size: str, variant: str):
+    """`bf16 --variant compact` with every linear the Compact publishes in int8 convrot computed by comfy_kitchen's own
+    `int8_linear` on the published integers (`quantized.Int8Products`, the recipe cited there): the bar of the
+    Compact's DiT. ComfyUI's Anima (comfy/ldm/anima/model.py over comfy/ldm/cosmos/predict2.py, at the frozen commit of
+    `quantized.COMFY`) calls its linears plainly: `GPT2FeedForward` is `layer2(GELU(layer1(x)))`, the attention's
+    q, k, v and output projections and the adaLN-LoRA pairs one `Linear` each, no input activation or residual folded
+    into a product. Bedovyy quantizes 254 of them: the eight attention projections of blocks 1 to 26 and the MLP of
+    blocks 4 to 26. Blocks 0 and 27 whole, the MLPs of blocks 1 to 3, every adaLN, the embedders and the head are BF16 in
+    the file, and run in bf16 here as there: block 0's boundaries are the bf16 bar's to the bit. Inputs: the Standard's
+    dit golden, as `bf16` reads them. Writes `witness-w8a8-anima-dit-compact-<size>`, the bf16 bar's keys."""
+    if variant != "compact":
+        raise SystemExit("w8a8: the Compact only (--variant compact): its int8 convrot is what ComfyUI computes in W8A8")
+    height, width, name = common.parse_size(size)
+    golden = read(f"goldens-anima-dit-{name}", f"anima.py dit --size {name}")
+    half = torch.bfloat16
+    model = load_transformer(variant).to(half)
+    products = quantized.Int8Products(model, model.published)
+    taps = probe_dit(model)
+    out = model(hidden_states=golden["latent_in"][:, None][None].to(half), timestep=golden["timestep"].to(half),
+                encoder_hidden_states=golden["prompt_embeds"][None].to(half),
+                padding_mask=torch.zeros(1, 1, height, width, dtype=half), return_dict=False)[0]
+    taps["model_out"] = out[0, :, 0]
+    assert products.calls == len(products.layers), (products.calls, len(products.layers))
+    write(quantized.stem(f"witness-w8a8-anima-dit-{name}", variant), {k: v.float() for k, v in taps.items()},
+          {"dtype": "bfloat16", "inputs": f"goldens-anima-dit-{name}", "int8": products.describe(),
+           "weights": model.published.describe()})
+
+
+def stage_trajectory(size: str):
+    resolution = int(size)
+    embeds = read("goldens-anima-text", "anima.py text")["prompt_embeds"][None]
+    model = load_transformer()
+    scheduler = schedule()
+    scheduler.set_begin_index(0)
+    latent = initial_latent(resolution, resolution)
+    padding = torch.zeros(1, 1, resolution, resolution)
+    payload = {"latent_init": latent[0, :, 0].clone(), "sigmas": scheduler.sigmas.float()}
+    for i, t in enumerate(scheduler.timesteps):
+        timestep = (t / scheduler.config.num_train_timesteps).expand(1).float()
+        velocity = model(hidden_states=latent, timestep=timestep, encoder_hidden_states=embeds,
+                         padding_mask=padding, return_dict=False)[0]
+        latent = scheduler.step(velocity, t, latent, return_dict=False)[0]
+        payload[f"velocity_{i}"] = velocity[0, :, 0].clone()
+        payload[f"latent_{i + 1}"] = latent[0, :, 0].clone()
+        print(f"  step {i}: sigma = {float(scheduler.sigmas[i]):.4f}", flush=True)
+    payload["latent_final"] = latent[0, :, 0].clone()
+    write(f"goldens-anima-trajectory-{resolution}", payload)
+
+
+def stage_img2img(size: str):
+    """**img2img**, by diffusers' modular Anima blocks (`AnimaImg2ImgVaeEncoderStep`, `AnimaImg2ImgSetTimestepsStep`),
+    each piece their code:
+
+        z0        = encode_vae_image(picture, sample_mode="argmax")   the posterior mean, (z - mean) / std
+        timesteps = get_timesteps(scheduler, N, strength)             the full schedule, then truncated
+        x_s       = scheduler.scale_noise(z0, timesteps[:1], eps)     eps: the txt2img noise of the seed
+        then the trajectory's loop from x_s, steps t_start ... N - 1
+
+    The noise is the txt2img one, so that strength 1 is txt2img bit for bit, as in the engine."""
+    from diffusers import AutoencoderKLQwenImage
+    from diffusers.modular_pipelines.anima.before_denoise import get_timesteps
+    from diffusers.modular_pipelines.anima.encoders import encode_vae_image
+    resolution = int(size)
+    embeds = read("goldens-anima-text", "anima.py text")["prompt_embeds"][None]
+    picture = common.start_picture(resolution, resolution)
+    vae = AutoencoderKLQwenImage.from_pretrained(base() / "vae", torch_dtype=torch.float32).eval()
+    z0 = encode_vae_image(picture[None], vae, None, torch.device("cpu"), torch.float32, sample_mode="argmax")
+    del vae
+    scheduler = schedule()
+    timesteps, t_start, sigma_s = common.img2img_truncation(get_timesteps, scheduler, STEPS, common.IMG2IMG_STRENGTH)
+    eps = initial_latent(resolution, resolution)
+    latent = scheduler.scale_noise(z0, timesteps[:1], eps)
+    model = load_transformer()
+    padding = torch.zeros(1, 1, resolution, resolution)
+    payload = {"image": picture, "z0": z0[0, :, 0].clone(), "eps": eps[0, :, 0].clone(), "x_s": latent[0, :, 0].clone(),
+               "sigmas": scheduler.sigmas.float(), "t_start": torch.tensor([float(t_start)]), "sigma_s": torch.tensor([sigma_s])}
+    print(f"  strength {common.IMG2IMG_STRENGTH}: t_start {t_start}, sigma_s {sigma_s:.6f}, {len(timesteps)} evaluations")
+    for k, t in enumerate(timesteps):
+        i = t_start + k
+        timestep = (t / scheduler.config.num_train_timesteps).expand(1).float()
+        velocity = model(hidden_states=latent, timestep=timestep, encoder_hidden_states=embeds,
+                         padding_mask=padding, return_dict=False)[0]
+        latent = scheduler.step(velocity, t, latent, return_dict=False)[0]
+        payload[f"velocity_{i}"] = velocity[0, :, 0].clone()
+        payload[f"latent_{i + 1}"] = latent[0, :, 0].clone()
+        print(f"  step {i}: sigma = {float(scheduler.sigmas[i]):.4f}", flush=True)
+    payload["latent_final"] = latent[0, :, 0].clone()
+    write(f"goldens-anima-img2img-{resolution}", payload, {
+        "strength": common.IMG2IMG_STRENGTH, "t_start": t_start, "sigma_s": sigma_s, "evaluations": len(timesteps),
+        "picture": f"inputs/{common.START_PICTURE}, covered and center-cropped, LANCZOS",
+        "recipe": "modular Anima: encode_vae_image (argmax), get_timesteps, scale_noise"})
+
+
+def stage_img2img_bf16(size: str):
+    """**img2img's encoding in bfloat16, as the pipeline runs it with `torch_dtype=torch.bfloat16`**, on
+    `goldens-anima-img2img`'s own picture (`encode_vae_image`): the picture brought to bf16, the posterior mean,
+    `(z - mean) / std` in bf16 — `z0`, the bar of the engine's. Its convolutions as the decoder's bar has them
+    (`common.bf16_convolutions_in_fp32`): call it in a process that does nothing else."""
+    from diffusers import AutoencoderKLQwenImage
+    from diffusers.modular_pipelines.anima.encoders import encode_vae_image
+    common.bf16_convolutions_in_fp32()
+    resolution = int(size)
+    golden = read(f"goldens-anima-img2img-{resolution}", "anima.py img2img")
+    vae = AutoencoderKLQwenImage.from_pretrained(base() / "vae", torch_dtype=torch.bfloat16).eval()
+    with torch.no_grad():
+        z0 = encode_vae_image(golden["image"][None], vae, None, torch.device("cpu"), torch.bfloat16, sample_mode="argmax")
+    out = {"z0": z0[0, :, 0].float()}
+    worst, median, plane = common.per_plane(out["z0"], golden["z0"])
+    print(f"  z0: bf16 vs fp32 - worst plane {worst:.3e} (plane {plane}), median {median:.3e}")
+    write(f"witness-bf16-anima-img2img-{resolution}", out, {"dtype": "bfloat16", "inputs": f"goldens-anima-img2img-{resolution}"})
+
+
+def stage_vae(size: str):
+    """Decoding the final latent. For a rectangle (`768x512`), the latent is the **centered crop** of the
+    final 1024 latent: a real latent, and h != w."""
+    from diffusers import AutoencoderKLQwenImage
+    height, width, name = common.parse_size(size)
+    source = name if height == width else "1024"
+    trajectory = read(f"goldens-anima-trajectory-{source}", f"anima.py trajectory --size {source}")
+    if height != width:
+        trajectory["latent_final"] = common.centered_crop(trajectory["latent_final"], height, width)
+    vae = AutoencoderKLQwenImage.from_pretrained(base() / "vae", torch_dtype=torch.float32).eval()
+    latent = trajectory["latent_final"][None, :, None]
+    mean = torch.tensor(vae.config.latents_mean).view(1, 16, 1, 1, 1)
+    std = torch.tensor(vae.config.latents_std).view(1, 16, 1, 1, 1)
+    image = vae.decode(latent * std + mean, return_dict=False)[0][:, :, 0]
+    write(f"goldens-anima-vae-{name}", {"latent_final": trajectory["latent_final"], "image": image[0]})
+    common.save_preview(image[0], OUT / f"reference-anima-{name}.png")
+
+
+# ------------------------------------------------------------------------- the float64 witnesses
+
+def stage_witness(size: str, step: int, lora: str | None = None):
+    """**The float64 reference** of a guided evaluation: same input as the oracle at step `step` (its
+    latent, its sigma), computed in double end to end. It arbitrates an engine/oracle deviation: if the
+    engine is as close to the witness as the fp32 oracle is, the deviation is fp32 rounding.
+
+    The model would weigh 15.6 GB in double: the blocks are loaded one by one (before/after hooks), like
+    the other streamed oracles. And diffusers forces RoPE to float32: both places are replaced by their
+    transcription in double.
+
+    With `lora` (step 0 only: the later latents of the trajectory were computed without it), the witness of `lora`: each
+    block's delta computed and merged in double. Writes `witness-anima-f64-lora-<size>-step0`."""
+    import diffusers.models.embeddings as embeddings
+    from diffusers import CosmosTransformer3DModel
+    if not size.isdigit():
+        raise SystemExit(f"witness --size {size}: squares only, the starting latent is the trajectory's")
+    resolution = int(size)
+
+    def rotary64(x, freqs_cis, use_real=True, use_real_unbind_dim=-2, sequence_dim=2):
+        cos, sin = freqs_cis
+        cos, sin = cos[None, None].to(x.device), sin[None, None].to(x.device)
+        real, imag = x.reshape(*x.shape[:-1], 2, -1).unbind(-2)
+        rotated = torch.cat([-imag, real], dim=-1)
+        return x * cos + rotated * sin
+    embeddings.apply_rotary_emb = rotary64
+
+    trajectory = read(f"goldens-anima-trajectory-{resolution}", f"anima.py trajectory --size {resolution}")
+    text = read("goldens-anima-text", "anima.py text")
+    config = CosmosTransformer3DModel.load_config(base() / "transformer")
+    with torch.device("meta"):
+        model = CosmosTransformer3DModel.from_config(config)
+    dit, _ = turbo_state_dicts()
+    top = {k: v.double() for k, v in dit.items() if not k.startswith("transformer_blocks.")}
+    model.load_state_dict(top, strict=False, assign=True)
+
+    def rope64(hidden_states, fps=None):
+        r = model.rope
+        _, _, frames, height, width = hidden_states.shape
+        size = [frames // r.patch_size[0], height // r.patch_size[1], width // r.patch_size[2]]
+        f64 = torch.float64
+
+        def freqs(dim, factor):
+            theta = 10000.0 * factor
+            return 1.0 / (theta ** (torch.arange(0, dim, 2, dtype=f64)[: dim // 2] / dim))
+        fh, fw, ft = freqs(r.dim_h, r.h_ntk_factor), freqs(r.dim_w, r.w_ntk_factor), freqs(r.dim_t, r.t_ntk_factor)
+        seq = torch.arange(max(r.max_size), dtype=f64)
+        eh = torch.outer(seq[: size[1]], fh)[None, :, None, :].repeat(size[0], 1, size[2], 1)
+        ew = torch.outer(seq[: size[2]], fw)[None, None, :, :].repeat(size[0], size[1], 1, 1)
+        et = torch.outer(seq[: size[0]], ft)[:, None, None, :].repeat(1, size[1], size[2], 1)
+        angles = torch.cat([et, eh, ew] * 2, dim=-1).flatten(0, 2)
+        return torch.cos(angles), torch.sin(angles)
+    model.rope.forward = rope64
+
+    # The same boundaries as `dit`, to localize a deviation and not only measure it.
+    taps = {}
+
+    def keep(name):
+        def hook(_m, _a, o):        # nothing returned: a hook that returns something replaces the output
+            taps[name] = (o[0] if isinstance(o, tuple) else o)[0].clone()
+        return hook
+    model.patch_embed.register_forward_hook(common.tap(taps, "patch_embed_out", lambda o: o[0].flatten(0, 2)))
+
+    def time_hook(_m, _a, o):
+        taps["temb"], taps["embedded_timestep"] = o[0][0].clone(), o[1][0].clone()
+    model.time_embed.register_forward_hook(time_hook)
+    for i in (0, 1, 13, 27):
+        model.transformer_blocks[i].register_forward_hook(keep(f"block{i}_out"))
+    block0 = model.transformer_blocks[0]
+    block0.attn1.register_forward_hook(keep("block0_attn1_out"))
+    block0.attn2.register_forward_hook(keep("block0_attn2_out"))
+    block0.ff.register_forward_hook(keep("block0_ff_out"))
+
+    factors = lora_factors(Path(lora)) if lora else {}
+    if factors and step != 0:
+        raise SystemExit("witness --lora: step 0 only")
+    if any(not k.startswith("transformer_blocks.") for k in factors):
+        raise SystemExit("witness --lora: a LoRA outside the blocks is not merged here")
+
+    def streamed(block, weights, prefix):
+        def load(module, _args):
+            wide = {k: v.double() for k, v in weights.items()}
+            for k in wide:
+                if prefix + k in factors:
+                    wide[k] += lora_delta(factors[prefix + k], torch.float64)
+            module.load_state_dict(wide, strict=True, assign=True)
+
+        def drop(module, _args, _out):
+            module.to_empty(device="meta")
+        block.register_forward_pre_hook(load)
+        block.register_forward_hook(drop)
+    for i, block in enumerate(model.transformer_blocks):
+        prefix = f"transformer_blocks.{i}."
+        streamed(block, {k[len(prefix):]: v for k, v in dit.items() if k.startswith(prefix)}, prefix)
+    del dit
+
+    latent = (trajectory["latent_init"] if step == 0 else trajectory[f"latent_{step}"])[None, :, None].double()
+    sigma = trajectory["sigmas"][step].double()
+    padding = torch.zeros(1, 1, resolution, resolution, dtype=torch.float64)
+    velocity = model(hidden_states=latent, timestep=sigma.expand(1),
+                     encoder_hidden_states=text["prompt_embeds"][None].double(),
+                     padding_mask=padding, return_dict=False)[0]
+    v64 = velocity[0, :, 0]
+    # The fp32 counterpart: the trajectory's velocity, or the LoRA golden's (the same input at step 0).
+    fp32 = (read(f"goldens-anima-dit-lora-{resolution}", f"anima.py lora --size {resolution} --lora FILE")["model_out"] if factors
+            else trajectory[f"velocity_{step}"]).double()
+    print(f"  step {step}: |oracle fp32 - fp64| / |fp64| = {float((fp32 - v64).norm() / v64.norm()):.3e}")
+    # Stored in fp32 (the golden format), computed in double.
+    taps = {k: v.float().contiguous() for k, v in taps.items()}
+    path = OUT / f"witness-anima-f64-{'lora-' if factors else ''}{resolution}-step{step}.safetensors"
+    save_file({"velocity": v64.float().contiguous(), "model_out": v64.float().contiguous(), **taps}, str(path))
+    print(f"-> {path}")
+
+
+def stage_vae_witness(size: str):
+    """**The float64 witness of the Qwen-Image VAE's decoder** on `goldens-anima-vae-<size>`'s latent: the
+    same diffusers module, its weights widened to double, through the real `vae.decode` (see
+    `common.decoder_in_double` for the four replacements that make it fit in 16 GB without changing the
+    arithmetic). Stored in fp32 (about 6e-8 away, far below anything judged)."""
+    from diffusers import AutoencoderKLQwenImage
+    _, _, name = common.parse_size(size)
+    common.decoder_in_double()
+    f64 = torch.float64
+    vae = AutoencoderKLQwenImage.from_pretrained(base() / "vae", torch_dtype=torch.float32).eval().double()
+    mean = torch.tensor(vae.config.latents_mean, dtype=f64).view(1, 16, 1, 1, 1)
+    std = torch.tensor(vae.config.latents_std, dtype=f64).view(1, 16, 1, 1, 1)
+    decoded = read(f"goldens-anima-vae-{name}", f"anima.py vae --size {name}")
+    latent = decoded["latent_final"].double()[None, :, None]
+    image = vae.decode(latent * std + mean, return_dict=False)[0][0, :, 0]
+    rmse = (decoded["image"].double() - image).pow(2).mean().sqrt()
+    worst, median, plane = common.per_plane(decoded["image"], image)
+    psnr = float(20 * torch.log10(2 / rmse))
+    print(f"  decoder {name}: oracle fp32 vs fp64 - worst plane {worst:.3e} (plane {plane}), "
+          f"median {median:.3e}, PSNR {psnr:.2f} dB")
+    path = OUT / f"witness-anima-vae-f64-{name}.safetensors"
+    save_file({"image": image.float().contiguous()}, str(path))
+    (OUT / f"witness-anima-vae-f64-{name}.json").write_text(json.dumps(
+        {"inputs": [f"goldens-anima-vae-{name}"], "oracle_fp32_vs_witness": {
+            "decoder_image": {"worst_plane": worst, "median_plane": median, "plane": plane, "psnr_db": psnr}}},
+        indent=1))
+    print(f"-> {path}")
+
+
+def stage_vae_bf16(size: str):
+    """**The decoder in bfloat16, as the modular pipeline runs it with `torch_dtype=torch.bfloat16`** on
+    `goldens-anima-vae-<size>`'s latent (`anima/decoders.py`): `latents.to(vae.dtype)`, `/ (1 / std) + mean` in bf16, then
+    `vae.decode`. The bar of the engine's bf16 decoder (invariant 3): no further from the fp64 witness than this, + 25 %. Its
+    convolutions on bf16 operands with fp32 sums (`common.bf16_convolutions_in_fp32`): call it in a process that does nothing else."""
+    from diffusers import AutoencoderKLQwenImage
+    _, _, name = common.parse_size(size)
+    common.bf16_convolutions_in_fp32()
+    bf16 = torch.bfloat16
+    decoded = read(f"goldens-anima-vae-{name}", f"anima.py vae --size {name}")
+    exact = read(f"witness-anima-vae-f64-{name}", f"anima.py vae-witness --size {name}")["image"]
+    vae = AutoencoderKLQwenImage.from_pretrained(base() / "vae", torch_dtype=bf16).eval()
+    latent = decoded["latent_final"][None, :, None].to(bf16)
+    mean = torch.tensor(vae.config.latents_mean).view(1, 16, 1, 1, 1).to(bf16)
+    inv_std = 1.0 / torch.tensor(vae.config.latents_std).view(1, 16, 1, 1, 1).to(bf16)
+    with torch.no_grad():
+        image = vae.decode(latent / inv_std + mean, return_dict=False)[0][0, :, 0].float()
+    worst, median, plane = common.per_plane(image, exact)
+    print(f"  decoder {name}: bf16 vs fp64 - worst plane {worst:.3e} (plane {plane}), median {median:.3e}")
+    write(f"witness-bf16-anima-vae-{name}", {"image": image})
+
+
+def everything(goldens: Path, sizes: list[str]) -> None:
+    """Text first, then per size what the check reads: the DiT evaluation, the trajectory and the DiT's
+    witness (squares), the decoder and its witness. A rectangle's decoder crops the 1024 trajectory's final
+    latent, so that trajectory is written too if `sizes` leaves it out."""
+    squares = [s for s in sizes if common.parse_size(s)[0] == common.parse_size(s)[1]]
+    needed = squares + (["1024"] if len(squares) < len(sizes) and "1024" not in squares else [])
+    stages = [["tokenizer"], ["text"]]
+    stages += [["dit", "--size", s] for s in sizes]
+    stages += [["trajectory", "--size", s] for s in needed]
+    stages += [["witness", "--size", s, "--step", "0"] for s in squares]
+    decoded = [s for s in sizes if s != "1536"]   # the decoder's check stops at 1024 (`AnimaStages.vae`)
+    stages += [["vae", "--size", s] for s in decoded]
+    stages += [["vae-witness", "--size", s] for s in decoded]
+    stages += [["vae-bf16", "--size", s] for s in decoded]
+    stages += [["img2img", "--size", "512"]] if "512" in squares else []
+    common.run_stages(__file__, goldens, stages)
+
+
+def main() -> None:
+    global OUT
+    common.unbuffered()
+    p = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    p.add_argument("stage", choices=["tokenizer", "text", "text-bf16", "dit", "bf16", "block-bf16", "trajectory-bf16", "render-bf16", "w8a8", "lora", "lora-bf16", "trajectory", "vae", "witness", "vae-witness",
+                                          "vae-bf16", "img2img", "img2img-bf16", "all"])
+    p.add_argument("--size", nargs="+", default=None,
+                   help="512, 1024 or WIDTHxHEIGHT (dit, vae: a rectangle too; default 512, all: every size)")
+    p.add_argument("--step", type=int, default=0, help="witness only: the step of the trajectory (default 0, the one the check reads)")
+    p.add_argument("--long", action="store_true", help="text only: the long prompt, past 512 tokens -> goldens-anima-text-long")
+    p.add_argument("--variant", choices=quantized.VARIANTS,
+                   help="dit and bf16: the Compact's published DiT instead of the Standard's; w8a8: compact, required")
+    p.add_argument("--lora", help="lora, lora-bf16, witness: the kohya LoRA (the references were written with inCase.safetensors)")
+    p.add_argument("--goldens", help="output folder (default: $SILICONED_GOLDENS, else ./goldens)")
+    args = p.parse_args()
+    if args.variant and args.stage not in ("dit", "bf16", "w8a8", "render-bf16"):
+        p.error("--variant goes with dit, bf16, w8a8 or render-bf16")
+    if args.stage == "w8a8" and args.variant != "compact":
+        p.error("w8a8 takes --variant compact: the Compact's int8 convrot is what ComfyUI computes in W8A8")
+    OUT = common.goldens_directory(args.goldens) / "anima"
+    OUT.mkdir(parents=True, exist_ok=True)
+    if args.stage == "all":
+        everything(common.goldens_directory(args.goldens), args.size or ["512", "1024", "768x512"])
+    elif args.stage == "tokenizer":
+        stage_tokenizer()
+    elif args.stage == "text-bf16":
+        stage_text_bf16()
+    elif args.stage == "text":
+        stage_text(common.LONG_PROMPT, common.LONG_SEQUENCE_LENGTH, "goldens-anima-text-long") if args.long else stage_text()
+    else:
+        for size in args.size or ["512"]:
+            if args.variant:
+                {"dit": stage_dit_variant, "bf16": stage_bf16, "w8a8": stage_w8a8, "render-bf16": stage_render_bf16}[args.stage](size, args.variant)
+            elif args.stage == "witness":
+                stage_witness(size, args.step, args.lora)
+            elif args.stage in ("lora", "lora-bf16"):
+                if not args.lora:
+                    p.error(f"{args.stage} takes --lora FILE")
+                {"lora": stage_lora, "lora-bf16": stage_lora_bf16}[args.stage](size, args.lora)
+            else:
+                {"dit": stage_dit, "bf16": stage_bf16, "block-bf16": stage_block_bf16, "trajectory-bf16": stage_trajectory_bf16, "render-bf16": stage_render_bf16,
+                 "trajectory": stage_trajectory, "vae": stage_vae,
+                 "vae-witness": stage_vae_witness, "vae-bf16": stage_vae_bf16, "img2img": stage_img2img, "img2img-bf16": stage_img2img_bf16}[args.stage](size)
+
+
+if __name__ == "__main__":
+    main()

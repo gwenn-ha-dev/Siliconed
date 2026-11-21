@@ -1,4 +1,4 @@
-# The pure unit tests: no weights are downloaded and nothing touches the GPU.
+# The pure unit tests of the engine and of the app: no weights are downloaded and nothing touches the GPU.
 # A version is tagged only on a commit this run found green.
 name: test
 
@@ -11,23 +11,25 @@ on:
 
 jobs:
   swift-test:
-    # Xcode 26 or later: macOS 26 is the deployment target, which an older SDK does not know.
-    runs-on: macos-26
+    # Xcode 27 or later: macOS 27 is the deployment target (Core AI), which an older SDK does not know.
+    runs-on: macos-27
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
-      # The runner is not an M1 Pro: fewer performance cores, less memory, no AMX exposed. A test that
-      # depends on the machine shows it here first.
+      # The runner is not the reference Mac: fewer cores, less memory. A test that depends on the machine
+      # shows it here first.
       - name: Machine
         run: |
           sw_vers
           sysctl -n machdep.cpu.brand_string || true
-          for k in hw.memsize hw.ncpu hw.perflevel0.physicalcpu hw.perflevel1.physicalcpu \
-                   hw.optional.arm.FEAT_SME hw.optional.arm.FEAT_SME2; do
+          for k in hw.memsize hw.ncpu hw.perflevel0.physicalcpu hw.perflevel1.physicalcpu; do
             printf '%s: %s\n' "$k" "$(sysctl -n "$k" 2>/dev/null || echo absent)"
           done
       - name: Swift version
         run: swift --version
-      - name: swift test
+      - name: Engine
         run: swift test
-
+        working-directory: Engine
+      - name: App
+        run: swift test
+        working-directory: App

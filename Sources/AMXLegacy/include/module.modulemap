@@ -1,4 +1,0 @@
-module AMXLegacy {
-    header "AMXLegacy.h"
-    export *
-}

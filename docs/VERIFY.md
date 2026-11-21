@@ -4,211 +4,80 @@ English · [Français](VERIFY.fr.md)
 
 Siliconed claims that each stage of each model it ships computes what the reference implementation computes. **This page shows how to check that claim yourself**, on your Mac, without trusting our figures.
 
-The reference is the publisher's own: [diffusers](https://github.com/huggingface/diffusers) and [transformers](https://github.com/huggingface/transformers), in float32 on the CPU, with the published weights. Python scripts in this repository run it and freeze its answers into *goldens*. `siliconed check` runs the engine on the same inputs and judges it against them, stage by stage: text encoder, denoiser, sampler, decoder.
+The reference is the publisher's own: [diffusers](https://github.com/huggingface/diffusers) and [transformers](https://github.com/huggingface/transformers), on the CPU, with the published weights. Python scripts in this repository run it and freeze its answers into *goldens*: in float32, in bfloat16 (the precision of the published weights, which the Standard reads), and in float64 where an exact witness decides. `siliconed check` runs the engine on the same inputs and judges it against them, stage by stage: text encoder, denoiser, sampler, decoder, then the whole render.
 
-What is **not** claimed: the same bits as the reference, or as another Mac. The engine computes in another order on another device; it is judged on how close it comes to the exact value (the [rule](#the-rule) below), not on its bits.
+What is **not** claimed: the same bits as the reference, or as another Mac, or as the same Mac after a macOS update. The engine hands its computations to Core AI ([ENGINE](ENGINE.md#core-ai)), whose bits may change with the system: two renders of one seed need not be identical bit for bit. The engine is judged on how close it comes to the exact value (the [rule](#the-rule) below), not on its bits. What stays exact, and is judged as such: the tokenizer's identifiers, a seed's noise, the σ schedule.
 
-The figures here, and the checks, are those of the render at full size, Faster Rendering off. Faster Rendering produces, by construction, another image from the same seed, and nothing compares that image with the reference ([ENGINE](ENGINE.md#faster-rendering)).
+Not everything is green, and this page says so: a few measures come out red by a few percent, from a known behaviour of bfloat16 ([below](#what-comes-out-red-and-why)).
 
 ## Setting up
 
-You need the app (0.18 or later), Python 3.12, and this repository at the app's version (Siliconed → About Siliconed shows it). `siliconed` ships inside the app: it is the very engine the app renders with, and it runs without Xcode.
+You need an Apple silicon Mac on macOS 27, the app (0.30), Python 3.12, and this repository at the app's version (Siliconed → About Siliconed shows it). `siliconed` ships inside the app: it is the very engine the app renders with, and it runs without Xcode.
 
 ```sh
 alias siliconed=/Applications/Siliconed.app/Contents/Helpers/siliconed
-git clone --branch v0.21 https://github.com/gwenn-ha-dev/Siliconed && cd Siliconed
+git clone --branch v0.30 https://github.com/gwenn-ha-dev/Siliconed && cd Siliconed/App
 python3.12 -m venv oracle-env && oracle-env/bin/pip install -r tools/oracle/requirements.txt
 ```
 
-The first run of an oracle script downloads the reference weights from the Hugging Face Hub, at pinned revisions (sizes in [section 3](#3--every-model)); `HF_HOME` or `HF_HUB_CACHE` decides where they go. Krea 2's reference, `krea/Krea-2-Turbo`, is gated: accept its license on the Hub, then `oracle-env/bin/hf auth login`, before `krea2.py`; do the same for any other repository that asks for it. The int8 convrot code that every Compact version needs is fetched, once, at a pinned commit and checked against its sha256.
+Every command on this page runs from `App/`: the oracle is in `App/tools/oracle/`.
 
-To check your own build instead: `swift build -c release --product siliconed` (Xcode 26), then `.build/release/siliconed` in place of the alias.
+The first run of an oracle script downloads the reference weights from the Hugging Face Hub, at pinned revisions; `HF_HOME` or `HF_HUB_CACHE` decides where they go. Krea 2's reference, `krea/Krea-2-Turbo`, is gated: accept its license on the Hub, then `oracle-env/bin/hf auth login`, before `krea2.py`; do the same for any other repository that asks for it. ComfyUI's int8 code that the oracle of the Compact versions needs is fetched, once, at a pinned commit and checked against its sha256.
 
-Each stage prints the map it reads (a `map` line), its measures, then one verdict line: `✓`, `✗`, or `—` (skipped, and why). The exit code says the same: 0 passed, 1 failed, 2 skipped, 64 a usage error. Goldens go to `./goldens`, for the scripts and the checks alike, unless `--goldens DIR` or `SILICONED_GOLDENS` says otherwise.
+`siliconed check` reads the weights of the app's library, never the ones the oracle downloads: a model is installed first, in the app or with `siliconed install <model>` (`--variant compact` for the Compact; `siliconed models` says what is installed). The app reads the published files as they are: bf16 for the Standard, int8 for the Compact.
 
-## 1 · The kernels: five minutes, no weights
+To check your own build instead: `swift build -c release --product siliconed` from `App/` ([ENGINE](ENGINE.md#building-from-source)), then `.build/release/siliconed` in place of the alias.
 
-The numerical kernels (RoPE tables, resampling, the GPU's element-wise operations, attention, the split of a matrix product between GPU and AMX) are checked without any model.
+Each stage prints the weight file it reads (a `map` line: path, size, tensor types), its measures (for a tensor: the error against the float32 reference, its median, the worst channel, the error at the float64 witness, the bar), a `memory` line (the engine stage closest to its P, or furthest past it: the footprint at its most against what its plan counted before it allocated) and a `swap` line (pages swapped out meanwhile, which must be none), then one verdict line: `✓`, `✗` (with the failing measures), or `—` (skipped, and why). The exit code says the same: 0 passed, 1 failed, 2 skipped, 64 a usage error. Goldens go to `./goldens`, for the scripts and the checks alike, unless `--goldens DIR` or `SILICONED_GOLDENS` says otherwise.
 
-```sh
-oracle-env/bin/python tools/oracle/kernels.py all
-siliconed check kernels
-```
+`siliconed check` judges under Exact, the model's own arithmetic on the GPU, unless `--precision exact|ane` is given. `--neural-engine ROWS` (it needs `--precision ane`) forces the rows given to the Neural Engine instead of the engine's own share. A check whose engine stages gave the Neural Engine a share prints one more line, said and not judged: `neural engine · <engine stage> N %, …`.
 
-On our MacBook Pro M1 Pro:
+## 1 · One whole model: Anima
 
-```
-✓ kernels widen · 7 measures
-✓ kernels arena · 6 measures
-✓ kernels elementwise · 7 measures
-✓ kernels gelu · 1 measure
-✓ kernels sdpa S=4128 · 17 measures
-✓ kernels sdpa-tiles S=4128 · 30 measures
-✓ kernels gemm-split · 9 measures
-✓ kernels rope · 13 measures
-✓ kernels resample · 6 measures
-```
-
-The [kernels workflow](https://github.com/gwenn-ha-dev/Siliconed/actions/workflows/kernels.yml) runs these two commands on GitHub's Macs each time the engine or its checks change. Its GPU is virtual, so the GPU stages are skipped there; the CPU ones are judged.
-
-## 2 · One whole model: Anima, ten minutes and 5 GB
-
-Anima is the lightest model to check end to end. Install it in the app first (Standard): `siliconed check` reads the weights the app installed, never the ones the oracle downloads. Then:
+Anima is the lightest model to check end to end. Install it first (Standard), in the app or with `siliconed install anima`. Then, at 512²:
 
 ```sh
-oracle-env/bin/python tools/oracle/anima.py all     # downloads 5 GB of reference weights once, then 7 min
-siliconed check anima                               # every stage at every size: 3 min
+oracle-env/bin/python tools/oracle/anima.py all --size 512              # the reference in float32, its float64 witnesses
+oracle-env/bin/python tools/oracle/anima.py text-bf16                   # the same reference in bfloat16, stage by stage
+oracle-env/bin/python tools/oracle/anima.py block-bf16 --size 512
+oracle-env/bin/python tools/oracle/anima.py bf16 --size 512
+oracle-env/bin/python tools/oracle/anima.py trajectory-bf16 --size 512
+oracle-env/bin/python tools/oracle/anima.py render-bf16 --size 512
+oracle-env/bin/python tools/oracle/anima.py img2img-bf16 --size 512
+siliconed check anima --size 512                                        # every stage at 512²
 ```
 
-On our MacBook Pro M1 Pro (the measures between the `map` line and the verdict line are left out):
+`all` writes the reference in float32 and the float64 witnesses. The references in bfloat16, which the Standard is judged against, are written stage by stage (the decoder's excepted, which `all` writes). A stage that lacks a reference is not half judged: it is skipped, and its line names the missing file and the command that writes it.
 
-```
-✓ anima tokenizer · 1 measure
-map ~/Library/Application Support/Siliconed/store/qwen3-0.6b-encoder.v0.silicon · 1.2 GB · bfloat16 (standard weights)
-✓ anima text · 9 measures · nearest its threshold: prompt_embeds 1.33e-05 of 5.00e-04
-map ~/Library/Application Support/Siliconed/store/anima-turbo-dit.v0.silicon · 3.9 GB · bfloat16 (standard weights)
-✓ anima dit 512 · 12 measures · nearest its threshold: model_out per plane 1.93e-06 of 2.51e-06
-map ~/Library/Application Support/Siliconed/store/anima-turbo-dit.v0.silicon · 3.9 GB · bfloat16 (standard weights)
-✓ anima dit 1024 · 12 measures · nearest its threshold: model_out per plane 3.04e-06 of 4.74e-06
-map ~/Library/Application Support/Siliconed/store/anima-turbo-dit.v0.silicon · 3.9 GB · bfloat16 (standard weights)
-✓ anima dit 768x512 · 12 measures · nearest its threshold: temb 4.14e-05 of 5.00e-04
-map ~/Library/Application Support/Siliconed/store/anima-turbo-dit.v0.silicon · 3.9 GB · bfloat16 (standard weights)
-✓ anima trajectory 512 · 9 measures · nearest its threshold: v_3 9.79e-05 of 5.00e-04
-map ~/Library/Application Support/Siliconed/store/anima-turbo-dit.v0.silicon · 3.9 GB · bfloat16 (standard weights)
-✓ anima trajectory 1024 · 9 measures · nearest its threshold: v_7 2.17e-04 of 5.00e-04
-✓ anima vae 512 · 1 measure · nearest its threshold: image RGB 6.33e-07 of 1.28e-06
-✓ anima vae 1024 · 1 measure · nearest its threshold: image RGB 3.18e-07 of 1.05e-06
-✓ anima vae 768x512 · 2 measures · nearest its threshold: image RGB 3.66e-07 of 1.28e-06
-```
+A stage may come out red by one measure, and `siliconed check anima` then ends on exit code 1: such a red is [told below](#what-comes-out-red-and-why), not a fault.
 
-Your figures will differ in the last digits: the reference itself rounds differently on another CPU. The verdicts should not. A stage can also be run alone, `siliconed check anima dit --size 1024`; `siliconed check list` names them all.
+Your figures will differ: the reference itself rounds differently on another CPU, and Core AI's bits may change with the system. A clear verdict does not move; a measure within a few percent of its bar may change sides. A stage can also be run alone, `siliconed check anima dit --size 1024`; `siliconed check list` names them all, with their sizes. Without `--size`, `siliconed check anima` runs each stage at each of its sizes, and skips those whose goldens are not written.
 
-## 3 · Every model
+## 2 · Every model
 
-The same two commands, for each model: `tools/oracle/<script> all`, then `siliconed check <model>`.
+The same steps for each model: `tools/oracle/<script> all`, then the bfloat16 references `all` does not write, then `siliconed check <model>`.
 
-| Model | Script | Download | Oracle, every stage | Its heaviest stage | Check |
-|---|---|---|---|---|---|
-| Z-Image | `z-image.py` | 31 GB | 39 min | the 1024² trajectory: 14 min, 13.3 GB | 7 min |
-| Qwen-Image-2.1 | `qwen-image-2.1.py` | 30 GB | 27 min | the fp64 decoder witness: 43 s, 15.5 GB | 10 min |
-| Anima | `anima.py` | 5 GB | 7 min | the 1024² decoder: 1 min, 20.8 GB | 3 min |
-| Krea 2 | `krea2.py` | 33 GB | 1 h 45 min | the eight fp64 step witnesses at 1024²: 44 min, 11 GB | 16 min |
-| MOSS-Image | `moss-image.py` | 28 GB | 11 min | the 8-step trajectory: 3.6 min, 10.6 GB | 3 min |
+| Model | Script | After `all`, for the Standard |
+|---|---|---|
+| Z-Image | `z-image.py` | `text-bf16`, `block-bf16`, `bf16`, `trajectory-bf16`, `img2img-bf16` |
+| Anima | `anima.py` | `text-bf16`, `block-bf16`, `bf16`, `trajectory-bf16`, `render-bf16`, `img2img-bf16` |
+| Krea 2 | `krea2.py` | `text-bf16`, `bf16`, `trajectory-bf16`, `img2img-bf16` |
+| MOSS-Image | `moss-image.py` | `text-bf16` (`--long` for the long prompt), `trajectory-bf16` |
+| Qwen-Image-2.1 | `qwen-image-2.1.py` | `text-bf16`, `vision-bf16`, `bf16`, `vae-encode-bf16`, `trajectory-bf16`; for editing, `text-bf16`, `bf16` and `trajectory-bf16` with `--edit 1` then `--edit 2`, and `trajectory-steps-bf16 --edit 1` then `--edit 2` |
 
-On a MacBook Pro M1 Pro, 16 GB, wall time. The download comes on top of the app's own weights. The oracle streams the denoiser block by block in float32 (Krea 2's is 48 GB at that precision), so a 16 GB Mac runs every script; a stage whose peak passes the machine's memory (the 1024² decoders) runs in swap and takes longer.
+The scripts of Z-Image, Anima and Krea 2 take `--size` (512, 1024, a rectangle such as 768x512), `all` included; Qwen-Image-2.1's references are at 512², MOSS-Image's too, its DiT excepted (`--size 1024`). Each stage's line in `siliconed check list` gives the scripts it reads, with their arguments. Qwen-Image-2.1's writer has its own script, `qwen-image-2.1-writer.py`, to run once as it is and once with `--bf16`.
 
-The verdict lines of the other four models on our MacBook Pro M1 Pro, with the `map` line each stage prints (Anima's are in the section above; the measures are left out):
+The download of the reference weights comes on top of the app's own weights. The oracle streams the denoiser and the encoder block by block in float32 rather than loading them whole. A trajectory's bfloat16 reference is long: on an M5 Pro, half an hour for Qwen-Image-2.1's, 35 to 60 minutes for each of the bf16 references of its editing. The other timings and the scripts' peak memory have not been taken yet for this version.
 
-<details>
-<summary>Z-Image</summary>
+### What comes out red, and why
 
-```
-✓ z-image tokenizer · 3 measures
-map ~/Library/Application Support/Siliconed/store/qwen3-4b-encoder.v0.silicon · 7.8 GB · bfloat16 (standard weights)
-✓ z-image text · 3 measures · nearest its threshold: layer34_out 1.45e-05 of 5.00e-04
-map ~/Library/Application Support/Siliconed/store/z-image-turbo-dit.v1.silicon · 12.3 GB · bfloat16 ×514, float32 ×7 (standard weights)
-✓ z-image block 512 · 19 measures · nearest its threshold: layer0_adaln_raw 6.63e-05 of 5.00e-04
-map ~/Library/Application Support/Siliconed/store/z-image-turbo-dit.v1.silicon · 12.3 GB · bfloat16 ×514, float32 ×7 (standard weights)
-✓ z-image block 1024 · 19 measures · nearest its threshold: layer0_adaln_raw 6.63e-05 of 5.00e-04
-map ~/Library/Application Support/Siliconed/store/z-image-turbo-dit.v1.silicon · 12.3 GB · bfloat16 ×514, float32 ×7 (standard weights)
-✓ z-image dit 512 · 11 measures · nearest its threshold: t_embedder_out 3.73e-04 of 5.00e-04
-map ~/Library/Application Support/Siliconed/store/z-image-turbo-dit.v1.silicon · 12.3 GB · bfloat16 ×514, float32 ×7 (standard weights)
-✓ z-image dit 1024 · 11 measures · nearest its threshold: t_embedder_out 3.73e-04 of 5.00e-04
-map ~/Library/Application Support/Siliconed/store/z-image-turbo-dit.v1.silicon · 12.3 GB · bfloat16 ×514, float32 ×7 (standard weights)
-✓ z-image dit 768x512 · 12 measures · nearest its threshold: t_embedder_out 3.73e-04 of 5.00e-04
-map ~/Library/Application Support/Siliconed/store/z-image-turbo-dit.v1.silicon · 12.3 GB · bfloat16 ×514, float32 ×7 (standard weights)
-✓ z-image dit 832x1216 · 12 measures · nearest its threshold: t_embedder_out 3.73e-04 of 5.00e-04
-map ~/Library/Application Support/Siliconed/store/z-image-turbo-dit.v1.silicon · 12.3 GB · bfloat16 ×514, float32 ×7 (standard weights)
-✓ z-image trajectory 512 · 16 measures · nearest its threshold: v_5 7.41e-05 of 5.00e-04
-map ~/Library/Application Support/Siliconed/store/z-image-turbo-dit.v1.silicon · 12.3 GB · bfloat16 ×514, float32 ×7 (standard weights)
-✓ z-image trajectory 1024 · 16 measures · nearest its threshold: v_3 1.65e-04 of 5.00e-04
-✓ z-image vae 768x512 · 2 measures · nearest its threshold: image RGB 2.52e-07 of 8.50e-07
-```
+**A red is not always a fault of the engine, and no bar is moved to make one pass.** These models are published in bfloat16 and behave at a limit there: two faithful computations in bf16 are as far from each other as each is from the float32 reference. And a measure's bar is the error of *one* bf16 computation of the reference, plus 25 %: another bf16 computation, just as faithful, falls on one side or the other. Such a red is the worst channel of a step or of a boundary, a little above its bar.
 
-</details>
+Why the render of Anima and of Qwen-Image-2.1 has another bar than 25 dB: diffusers' render in bf16 is itself far from its float32 image (23.08 dB for Qwen-Image-2.1). So these two renders are judged beside it: their PSNR against the float32 image must not be more than 3 dB under its own.
 
-<details>
-<summary>Qwen-Image-2.1</summary>
+We have no bf16 reference at 1024² for Z-Image's trajectory or for Krea 2's.
 
-```
-map ~/Library/Application Support/Siliconed/store/qwen3-vl-8b-encoder.v0.silicon · 16.3 GB · bfloat16 (standard weights)
-✓ qwen-image-2.1 text · 11 measures · nearest its threshold: prompt_embeds 2.22e-05 of 5.00e-04
-map ~/Library/Application Support/Siliconed/store/qwen3-vl-8b-encoder.v0.silicon · 16.3 GB · bfloat16 (standard weights)
-✓ qwen-image-2.1 text --edit 1 · 16 measures · nearest its threshold: layer0_in 8.42e-05 of 5.00e-04
-map ~/Library/Application Support/Siliconed/store/qwen3-vl-8b-encoder.v0.silicon · 16.3 GB · bfloat16 (standard weights)
-✓ qwen-image-2.1 text --edit 2 · 16 measures · nearest its threshold: layer0_in 1.50e-04 of 5.00e-04
-map ~/Library/Application Support/Siliconed/store/qwen3-vl-8b-encoder.v0.silicon · 16.3 GB · bfloat16 (standard weights)
-✓ qwen-image-2.1 vision · 22 measures · nearest its threshold: vit_out_1 2.13e-04 of 5.00e-04
-✓ qwen-image-2.1 references 512 · 2 measures
-✓ qwen-image-2.1 references 443 · 2 measures
-map ~/Library/Application Support/Siliconed/store/qwen-image-2.1-turbo-dit.v0.silicon · 14.2 GB · bfloat16 ×296, float32 ×1 (standard weights)
-✓ qwen-image-2.1 dit 512 · 24 measures · nearest its threshold: step norm_out 1.74e-04 of 5.00e-04
-map ~/Library/Application Support/Siliconed/store/qwen-image-2.1-turbo-dit.v0.silicon · 14.2 GB · bfloat16 ×296, float32 ×1 (standard weights)
-✓ qwen-image-2.1 dit-edit1 512 · 24 measures · nearest its threshold: temb 2.11e-04 of 5.00e-04
-map ~/Library/Application Support/Siliconed/store/qwen-image-2.1-turbo-dit.v0.silicon · 14.2 GB · bfloat16 ×296, float32 ×1 (standard weights)
-✓ qwen-image-2.1 dit-edit2 512 · 24 measures · nearest its threshold: temb 2.11e-04 of 5.00e-04
-map ~/Library/Application Support/Siliconed/store/qwen-image-2.1-turbo-dit.v0.silicon · 14.2 GB · bfloat16 ×296, float32 ×1 (standard weights)
-✓ qwen-image-2.1 trajectory 512 · 11 measures · nearest its threshold: v_3 6.50e-06 of 5.00e-04
-map ~/Library/Application Support/Siliconed/store/qwen-image-2.1-turbo-dit.v0.silicon · 14.2 GB · bfloat16 ×296, float32 ×1 (standard weights)
-✓ qwen-image-2.1 trajectory-edit1 512 · 13 measures · nearest its threshold: v_1 2.02e-05 of 5.00e-04
-map ~/Library/Application Support/Siliconed/store/qwen-image-2.1-turbo-dit.v0.silicon · 14.2 GB · bfloat16 ×296, float32 ×1 (standard weights)
-✓ qwen-image-2.1 trajectory-edit2 512 · 14 measures · nearest its threshold: v_1 7.68e-06 of 5.00e-04
-✓ qwen-image-2.1 vae 512 · 2 measures · nearest its threshold: image RGBA 4.51e-07 of 1.18e-06
-✓ qwen-image-2.1 vae-edit1 512 · 3 measures · nearest its threshold: image RGBA 1.00e-06 of 5.00e-04
-✓ qwen-image-2.1 vae-edit2 512 · 2 measures · nearest its threshold: image RGBA 9.64e-07 of 5.00e-04
-✓ qwen-image-2.1 vae-encode 512 · 7 measures · nearest its threshold: picture 1 latent 4.27e-06 of 7.16e-06
-```
-
-</details>
-
-<details>
-<summary>Krea 2</summary>
-
-```
-map ~/Library/Application Support/Siliconed/store/qwen3-vl-4b-encoder.v0.silicon · 7.8 GB · bfloat16 (standard weights)
-map ~/Library/Application Support/Siliconed/store/krea2-turbo-dit.v0.silicon · 26.3 GB · bfloat16 ×256, float32 ×174 (standard weights)
-✓ krea2 text · 7 measures · nearest its threshold: tap 35 2.54e-05 of 5.00e-04
-map ~/Library/Application Support/Siliconed/store/krea2-turbo-dit.v0.silicon · 26.3 GB · bfloat16 ×256, float32 ×174 (standard weights)
-✓ krea2 dit 512 · 11 measures · nearest its threshold: model_out per plane 1.04e-04 of 1.14e-04
-map ~/Library/Application Support/Siliconed/store/krea2-turbo-dit.v0.silicon · 26.3 GB · bfloat16 ×256, float32 ×174 (standard weights)
-✓ krea2 dit 1024 · 11 measures · nearest its threshold: block0_attn_out 3.57e-03 of 3.59e-03
-map ~/Library/Application Support/Siliconed/store/krea2-turbo-dit.v0.silicon · 26.3 GB · bfloat16 ×256, float32 ×174 (standard weights)
-✓ krea2 dit 768x512 · 11 measures · nearest its threshold: block0_out 9.44e-04 of 1.20e-03
-map ~/Library/Application Support/Siliconed/store/krea2-turbo-dit.v0.silicon · 26.3 GB · bfloat16 ×256, float32 ×174 (standard weights)
-✓ krea2 trajectory 512 · 9 measures · nearest its threshold: v_2 5.08e-04 of 5.14e-04
-map ~/Library/Application Support/Siliconed/store/krea2-turbo-dit.v0.silicon · 26.3 GB · bfloat16 ×256, float32 ×174 (standard weights)
-✓ krea2 trajectory 1024 · 9 measures · nearest its threshold: v_1 3.43e-03 of 4.80e-03
-✓ krea2 vae 512 · 1 measure · nearest its threshold: image RGB 5.20e-07 of 1.48e-06
-✓ krea2 vae 1024 · 1 measure · nearest its threshold: image RGB 2.89e-07 of 1.03e-06
-✓ krea2 vae 768x512 · 2 measures · nearest its threshold: image RGB 3.23e-07 of 9.63e-07
-```
-
-</details>
-
-Two Krea 2 measures pass with little to spare on our Mac: the velocity `v_2` of the 512² trajectory (5.08e-4 for an allowance of 5.14e-4) and `block0_attn_out` of the 1024² denoiser (3.57e-3 for 3.59e-3, 0.6 % to spare). The allowance is computed from your reference's own error, so it moves with your CPU's rounding, and these two may fail by a hair on another Mac. The rule is not loosened for them. If they fail on yours, an issue with the output of `siliconed check` helps us find which layer carries the gap.
-
-<details>
-<summary>MOSS-Image</summary>
-
-```
-✓ moss-image tokenizer · 11 measures
-map ~/Library/Application Support/Siliconed/store/qwen3.5-9b-encoder.v0.silicon · 15.9 GB · bfloat16 ×249, float32 ×177 (standard weights)
-✓ moss-image text-delta · 8 measures · nearest its threshold: layer 0 out 3.61e-06 of 5.00e-04
-map ~/Library/Application Support/Siliconed/store/qwen3.5-9b-encoder.v0.silicon · 15.9 GB · bfloat16 ×249, float32 ×177 (standard weights)
-✓ moss-image text-full · 15 measures · nearest its threshold: layer3 gated attention 2.39e-05 of 5.00e-04
-map ~/Library/Application Support/Siliconed/store/qwen3.5-9b-encoder.v0.silicon · 15.9 GB · bfloat16 ×249, float32 ×177 (standard weights)
-✓ moss-image text · 44 measures · nearest its threshold: layer3 gated attention 2.39e-05 of 5.00e-04
-✓ moss-image schedule · 25 measures
-map ~/Library/Application Support/Siliconed/store/moss-image-sft-dit.v0.silicon · 10.2 GB · bfloat16 (standard weights)
-✓ moss-image dit 512 · 23 measures · nearest its threshold: model_out per plane 1.35e-06 of 1.75e-06
-map ~/Library/Application Support/Siliconed/store/moss-image-sft-dit.v0.silicon · 10.2 GB · bfloat16 (standard weights)
-✓ moss-image dit-lora 512 · 22 measures · nearest its threshold: model_out per plane 2.72e-06 of 4.17e-06
-map ~/Library/Application Support/Siliconed/store/moss-image-sft-dit.v0.silicon · 10.2 GB · bfloat16 (standard weights)
-✓ moss-image trajectory 512 · 11 measures · nearest its threshold: v_6 per plane 2.97e-05 of 5.00e-04
-✓ moss-image vae 512 · 4 measures · nearest its threshold: image RGB (encoded test image) 2.34e-07 of 7.28e-07
-```
-
-</details>
+**What would be a fault**, and what we would not let through: an overall error clearly above the bf16 reference's, an exact stage red (tokenizer, noise, σ), a wrong image. If you see that, an issue with the output of `siliconed check` helps us find which layer carries the gap.
 
 ## Are your goldens ours?
 
@@ -218,248 +87,149 @@ We do not publish the goldens (several gigabytes, and weights whose licenses for
 oracle-env/bin/python tools/oracle/fingerprints.py compare
 ```
 
-Integers (token identifiers, masks) must match exactly. Floats are compared within a tolerance (1e-3 on norms), not bit for bit: PyTorch on the CPU does not promise the same float32 bits from one machine to another, and two honest runs of the reference differ by rounding. That rounding is far below what the checks judge.
+Integers (token identifiers, masks) must match exactly. Floats are compared within a tolerance (1e-4 on norms, 1e-3 for the trajectories, which chain eight evaluations), not bit for bit: PyTorch on the CPU does not promise the same float32 bits from one machine to another, and two honest runs of the reference differ by rounding. That rounding is far below what the checks judge. A golden you did not write is said, not counted as a failure.
 
 ## The rule
 
 A stage's figure is the **relative error per channel**: for each channel (the last axis of a tensor, or each plane of a latent), the L2 norm of the difference over the L2 norm of the reference. The worst channel is reported, never an average: a fault confined to one channel would vanish in a global figure. The same rule judges every boundary of every model:
 
-    without a witness:   error(engine, reference)  ≤ 5e-4
-    with a witness:      error(engine, witness)    ≤ max(floor, 1.25 · error(reference, witness))
+    without a witness:   error(engine, float32)  ≤ max(5e-4, 1.25 · error(bf16, float32))
+    with a witness:      error(engine, witness)  ≤ max(floor, 1.25 · error(reference, witness))
 
-The *witness* is the same computation in float64. Where it exists, it decides: float32 has its own rounding error, and on an ill-conditioned boundary the reference itself can be 4e-3 away from the exact value; the engine may then be no further from the exact value than the reference is, plus 25 %.
+`float32` is the reference in float32 on the CPU; `bf16`, the same reference run in bfloat16; the *witness*, the same computation in float64. Where the witness exists, it decides, and the `reference` of the second line is the further from it of the two, float32 or bf16: the engine, which computes in bf16, may be as far from the exact value as the reference in bf16 is, plus 25 %. The floor is 5e-4 per channel; per plane of a latent or of an image, at the witness, there is none.
 
-Each stage's line in `check list` gives its own rule. An identity (tokens, schedules) is judged bit for bit. Every model's stages hold the same floor, 5e-4. A rectangle is checked against its transpose, which must fail, so that a swapped height and width cannot pass.
+**So the Standard is judged against the reference in bf16.** The Compact is judged at the DiT, its publisher's int8 reference in place of the bf16 one ([below](#beyond-all)).
 
-Every decoder, Z-Image's included, is judged per plane of the image against a float64 witness of the reference's decoder (`vae-witness`).
+Each stage's line in `check list` gives its own rule. An identity (tokens, a seed's noise, schedules) is judged bit for bit. A rectangle is also checked against its transpose, which must fail, so that a swapped height and width cannot pass.
 
-**The app's diagnostic applies the same rule.** **Measure This Mac** ([ENGINE](ENGINE.md#an-engine-measured-on-your-mac)) checks every route it times against the exact result, computed in double precision on the Mac's own CPU, on synthetic operands that are the same on every Mac, with the same error per channel: an fp32 product or attention may be 10⁻⁵ from it, the Neural Engine's fp16 product 1.25 times bf16's own rounding. A route beyond its threshold is left out of the plan — the engine never offers it — and the report names it and the error seen; no speed buys back a wrong result.
+Every decoder is judged per plane of the image at the float64 witness of the reference's decoder (`vae-witness`): no further from it than diffusers decoding in bf16 (`vae-bf16`), plus 25 %. MOSS-Image's decodes in float32, as its reference does, and is judged against it.
 
-Krea 2's denoiser has a few boundaries so ill-conditioned that a change of one unit in the last place of the input moves the output by more than the rule allows, the reference included. There, a measure that fails at the witness is judged by *clouds*: the reference and the engine are both run on inputs moved by one ulp, and the engine's median error must stay within 1.25 times the reference's worst. These are the stages whose rule says "clouds when the oracle has draws". `SILICONED_CHECK_CLOUDS=1` writes every draw of both clouds on stderr, one tab-separated line each (`cloud`, boundary, `oracle` or `engine`, the kind of draw, its error), then the median and the threshold.
+The whole render (`render`) is judged on the image, by its PSNR against the reference's float32 image: above 25 dB for Z-Image, Krea 2 and MOSS-Image, a bar written before the measure; for Anima and Qwen-Image-2.1, no more than 3 dB under the PSNR of diffusers' render in bf16 against the same image.
 
 ## Beyond `all`
 
-Two checks need goldens that `all` does not write, each from one more script stage. `siliconed check <model>` leaves them out; they run stage by stage.
+`all` writes what most stages read. The rest needs one more script stage, or a file you provide; `siliconed check <model>` skips what is missing, and each check also runs alone.
 
-**Long prompts.** The app reads up to 1,024 tokens of prompt and refuses a longer one; the reference pipelines cut at 512 by default. `text --long` checks the stretch between the two: the script reads `tools/oracle/inputs/long-prompt.txt` (844 tokens for the Qwen tokenizers, 954 for Anima's T5) with the reference's sequence length raised so that none of it is cut, and the check reads the same prompt the way the app admits it.
+**The references in bfloat16.** The Standard is judged against them; `all` writes only the decoder's. Their commands are in the [table of models](#2--every-model).
+
+**Long prompts.** Z-Image admits up to 1,024 tokens of prompt; the reference pipeline cuts at 512 by default. `tokenizer --long` checks the stretch between the two: the script reads `tools/oracle/inputs/long-prompt.txt` (844 tokens for the Qwen tokenizer) with the reference's sequence length raised so that none of it is cut, and the check reads the same prompt the way the app admits it.
 
 ```sh
 oracle-env/bin/python tools/oracle/z-image.py text --long
-siliconed check z-image text --long
+siliconed check z-image tokenizer --long
 ```
 
-**The Neural Engine.** The app can share the denoiser's matrix products with the Mac's Neural Engine, which computes in fp16 ([ENGINE](ENGINE.md#the-neural-engine)). `--neural-engine` checks that path: every widened product of the DiT with 512 rows or more gives half its rows to the ANE, the same split on every Mac and more than any plan gives (a render leaves products under 1,024 rows to the GPU), and the stage is judged against the reference run in bf16 on the same inputs, the engine allowed bf16's own error plus 25 %. The verdict says how many products the ANE computed; on a Mac where it computes none, the stage is skipped. The `dit` stages of the five models take it.
+**Editing.** Qwen-Image-2.1's editing, with one and two reference pictures, is part of its `all` and of `siliconed check qwen-image-2.1`; one stage alone is `siliconed check qwen-image-2.1 dit --edit 2`. Its bf16 references are written with `--edit N` (`qwen-image-2.1.py bf16 --edit 2`). The pictures read are those of `tools/oracle/inputs/`, which the script copies beside the goldens.
+
+**The start image.** `img2img` starts from the oracle's picture at strength 0.6: the VAE's encoder (z₀) against the reference, the first step and its σ exact, the starting latent bit for bit, then the app's render from the picture, whose PSNR is said without being judged. Z-Image's measure is loose: per position, the worst relative error of the bf16 reference itself is 0.75, on a cell that is almost zero. Qwen-Image-2.1 edits by reference and has no such stage.
+
+**The Compact.** Its DiT is its publisher's int8 file (the int8 convrot of Comfy-Org and, for Anima, of Bedovyy), which the app reads as it is and pins by repository, revision and sha256 (`siliconed verify <model> --variant compact` hashes it again). The engine dequantizes those codes inside its functions and computes in f16 (W8A16, [ENGINE](ENGINE.md)). The Compact is judged **at the DiT, against its publisher's own recipe on the same integers**: ComfyUI's default `int8_linear` (comfy_kitchen 0.2.37) computed on the published integers by the `w8a8` script, at the float64 witness where it exists, plus 25 %. Its render is said, not judged: a finite image, and its PSNR against the float32 image shown without a bar.
 
 ```sh
-oracle-env/bin/python tools/oracle/z-image.py bf16 --size 1024
-siliconed check z-image dit --size 1024 --neural-engine
+siliconed install z-image --variant compact
+oracle-env/bin/python tools/oracle/z-image.py dit --size 512 --variant compact
+oracle-env/bin/python tools/oracle/z-image.py witness --size 512 --variant compact
+oracle-env/bin/python tools/oracle/z-image.py w8a8 --size 512 --variant compact
+siliconed check z-image dit --size 512 --variant compact
+siliconed check z-image render --size 512 --variant compact
 ```
 
-**Activations rounded to bf16.** Where this Mac's plan takes it, the DiT's products take their activation rounded to bf16 just before the product (the weights as published, the sums and the output in fp32). `--bf16-activations` checks that path on any Mac, for every product of 256 rows or more, and judges the stage like the Neural Engine's: against the reference run in bf16, the engine allowed bf16's own error plus 25 %. The verdict says how many products rounded their operand. The `dit` stages of the five models take it.
+Those goldens need the Standard's `dit` golden at 512 first (they read its inputs). For the other models the bar is written the same way, by `w8a8 --variant compact`; the `dit` line of `check list` names the other scripts, and a skipped stage says which one is missing.
 
-```sh
-siliconed check z-image dit --size 512 --bf16-activations
-```
+**LoRAs.** A LoRA is read in its author's file and computed beside the product it names, in the function that computes that product; it is never merged into the weights. Three stages judge it against a reference this repository's oracle writes. `moss-image dit-lora` takes the LoRA of the model's recipe (its goldens are in `all`) and `anima dit-lora --lora FILE` a kohya LoRA that you give to the oracle and to the check (`anima.py lora`, `witness`, `lora-bf16`, each with `--size 512 --lora FILE`; 448 modules recognized and applied with ours): both at the float64 witness, against the bf16 reference that carries the LoRA apart. `qwen-image-2.1 dit-lora --lora FILE` takes a LoRA in PEFT's names (`qwen-image-2.1.py dit-lora --lora FILE`; the script names the file of the published golden, its source and its digest: 224 modules, merged into the fp32 weights as diffusers loads them), against the bf16 reference without the LoRA. The other families' stages have no such reference: `z-image block-lora` checks each low-rank path against the CPU, product by product, and `z-image render-lora --lora FILE` that a LoRA reaches the picture; `krea2 dit-lora` judges the change a LoRA brings to the Compact against the one it brings to the Standard. Without `--lora`, a stage that needs one is skipped.
 
-**The attention on half-precision operands.** Where this Mac's plan takes it, at every version, the Standard's included, the DiT's attention rounds Q, K, V and the probabilities once to bf16 or to fp16, the softmax and every sum in fp32. `--bf16-attention` and `--fp16-attention` check each on any Mac, for every attention of the DiT, in the fused form at the first candidate tile (`kernels sdpa-tiles` checks every form against float64), and judge the stage like the Neural Engine's: against the reference run in bf16, the engine allowed bf16's own error plus 25 %. The verdict says how many attentions ran so. The `dit` stages of the five models take them, one at a time.
+**An imported model.** `siliconed check <model> import` places the installed DiT in a trial library, under another name, as a model you would have imported: it must be recognized as its family's and render the published model's image, above 50 dB. No oracle. What the stage does not prove: a real fine-tune, under a checkpoint's prefix or in another arithmetic than the installed version's.
 
-```sh
-siliconed check anima dit --size 512 --fp16-attention
-```
-
-**Int8 activations on a Compact (W8A8).** A Compact's weights are published in int8 with a Hadamard rotation (Comfy-Org's and Bedovyy's int8 convrot), and their author computes them in W8A8: the activation rotated by the same blocks of 256, quantized to int8 per row, an int8 × int8 product with int32 sums, times both scales. `--int8-activations` checks that route against the author's own recipe, ComfyUI's default `int8_linear` (comfy_kitchen 0.2.37), run on the published integers, the rest of the reference in bf16: the engine is allowed that recipe's own error from the float64 witness, plus 25 %. The `dit` stages of Z-Image, Qwen-Image-2.1, Anima, Krea 2 and MOSS-Image take it, with `--variant compact`; until the engine's route is in the build, the stage is skipped rather than judged.
-
-```sh
-siliconed check z-image dit --size 512 --variant compact --int8-activations
-```
-
-**The accelerators off.** A render with the app's **Accelerators** switch off computes its DiT in fp32 throughout under this Mac's map: the engines and kernels the map chooses, the weights read as published beside fp32 activations, but no product on the Neural Engine and no operand rounded below fp32. `--no-accelerators` checks that path: with `SILICONED_MAP` naming this Mac's report (a measure of this Mac and this build), the stage runs under that map's plan with the switch off, judged by the fp32 rule against the fp32 reference; without one, the defaults run, which are fp32 already. The `dit` stages of the five models take it.
-
-```sh
-SILICONED_MAP=<report.json> siliconed check z-image dit --size 512 --no-accelerators
-```
-
-Qwen-Image-2.1's editing, with one and two reference pictures, is part of its `all` and of `siliconed check qwen-image-2.1`; one stage alone is `siliconed check qwen-image-2.1 dit --edit 2`. Its Neural Engine bar is written by `qwen-image-2.1.py bf16 --edit N`.
-
-**The Compact and the Light.** The Compact's DiT is a third party's file (int8 convrot, Comfy-Org's and, for Anima, Bedovyy's); the Light's is our own, in the 4-bit format SQ, one file per family on Hugging Face (`gwenn-ha-dev/<model>-Siliconed-SQ4`, whose card gives the format). The app pins each by repository, revision and sha256. Two things are checked, both from outside.
-
-*The decoding*, value by value. The Compact: `swift test` reads small pieces of each published file (`Tests/SiliconedTests/Fixtures/quant`, rows cut by HTTP `Range` at the pinned revision, bytes identical to the published ones) and compares the engine's widening with the publisher's own library at the bit: ComfyUI's `comfy_kitchen` for the convrot, torchao and SDNQ for the 8-bit float and int8 files (`gguf-py` for the GGUF files the forge still imports). `tools/oracle/quant_fixtures.py` rewrites those fixtures from the published files (`python tools/oracle/quant_fixtures.py [slug ...]`; the manifests hold the sha256 of what it wrote, and a rerun must leave them unchanged). The Light: no library but ours reads SQ, so the oracle carries a second decoder, `sq_decode` in `tools/oracle/quantized.py`, written from the card's specification alone (numpy, nothing shared with the engine's `SQ.swift`): the codes become exact int8, times the row's float32 scale in float64, rotated back by R256 in float64, rounded once to float32. `SQTests` checks the engine's decoder against the same definition, written out again in the test.
-
-*The denoiser*, whole: the reference DiT of diffusers, in float32 on the CPU, with the weights the file holds (the Compact's dequantized by the publisher's library, the Light's decoded by `sq_decode`; `tools/oracle/quantized.py`), on the Standard's own inputs (same latent, same text states, same sigma). The oracle scripts take `--variant compact|light` for `dit` and `bf16`, and, for Z-Image and Krea 2, for `witness` (Krea 2 also for `witness-step --step 0` and `draw`); MOSS-Image has a Compact only, and its script takes `--variant compact` for `dit`, `witness` and `dit-bf16`; the variants of Anima and Qwen-Image-2.1 (generation only, no `--edit`) have no fp64 witness and are judged by the plain rule against the reference. The check takes `--variant` for `dit`, at 512, and reads the map of that version beside the Standard's (`--map` names another). A map of the other version is refused, said: a Light judged against a Compact's golden would be other weights. A map is a Light's when it holds an SQ tensor (`sq4`, `sq5`), a Compact's when it holds int8 and no SQ.
-
-```sh
-oracle-env/bin/python tools/oracle/z-image.py dit --size 512 --variant light      # downloads the 5 GB file once
-oracle-env/bin/python tools/oracle/z-image.py bf16 --size 512 --variant light
-oracle-env/bin/python tools/oracle/z-image.py witness --size 512 --variant light
-siliconed check z-image dit --size 512 --variant light
-siliconed check z-image dit --size 512 --variant light --neural-engine
-```
-
-The Compact's oracle also needs its publisher's library: `oracle-env/bin/pip install -r tools/oracle/requirements-quant.txt` first (it adds `gguf`, and `sdnq` and `torchao` for `quant_fixtures.py`, to the base requirements). The Light's needs nothing more than the base requirements.
-
-The Compact and the Light run on the Neural Engine by default (fp16 products), so `--neural-engine` is the bar that matters for them, judged like the Standard's: against the reference in bf16 on the same weights (dequantized or decoded), the engine allowed bf16's own error plus 25 %. Those goldens need the Standard's `dit` golden at 512 first (they read its inputs); they are not part of `all` or of `siliconed check <model>`.
-
-`dit --size 512` of the five Compacts and the four Lights was run on our Mac mini M5 Pro, in fp32 then with `--neural-engine`, on the files the app installs (`siliconed install <model>`, with `--light` for a Light; the Lights against goldens rebuilt from the same files): 18 runs, 17 passing. The red one is MOSS-Image's Compact in fp32, said under the table. Below, the gap of `model_out` to the reference (for Qwen-Image-2.1, `model_out (full)`; for Krea 2 and MOSS-Image, `model_out per plane`) in each run, and the bar the Neural Engine run is judged against.
-
-| Variant | `model_out` in fp32, against the reference | Under the Neural Engine, against the reference | Its bar (bf16's own error + 25 %) |
-|---|---|---|---|
-| Z-Image, Compact | 1.058e-05 | 3.982e-03 | 6.79e-02 |
-| Z-Image, Light | 9.065e-06 | 2.708e-03 | 6.61e-02 |
-| Qwen-Image-2.1, Compact | 3.942e-06 | 3.502e-04 | 1.59e-02 |
-| Qwen-Image-2.1, Light | 2.647e-06 | 2.804e-04 | 1.82e-02 |
-| Anima, Compact | 5.916e-06 | 1.017e-03 | 6.01e-02 |
-| Anima, Light | 5.725e-06 | 1.145e-03 | 6.24e-02 |
-| Krea 2, Compact | 4.008e-05 | 2.433e-04 | 1.67e-02 |
-| Krea 2, Light | 6.222e-05 | 2.198e-04 | 2.05e-02 |
-| MOSS-Image, Compact | 1.871e-06 ✗ (2.142e-06 at the fp64 witness, for 1.91e-06) | 3.214e-04 | 2.89e-02 |
-
-**MOSS-Image's Compact in fp32 is 12 % over its bar.** Judged at the fp64 witness, its `model_out per plane` is 2.142e-06 from the exact value, where the reference in fp32 is 1.53e-06 from it (bar 1.91e-06). The route that crosses it is the GPU's int8 kernel on the published integers (252 products, `matmul2d float × int8 → float`, the scale after the sum); the same run on the widened weights passes (1.638e-06), and the kernel alone is as close to the exact product as an fp32 product is (1.1–2.1e-6, as MPS in fp32): what moves is a summation order, at the scale of 1e-6. On our MacBook Pro M1 Pro, where that kernel did not take the products, the same run passed (1.470e-06). Krea 2 settles such a boundary by clouds of summation orders (below); MOSS-Image has no draws yet, so the line stays red until it does. The app renders MOSS-Image on the Neural Engine by default, and that run passes (3.214e-04 for 2.89e-02).
-
-With `--bf16-activations` (the activation rounded to bf16, the weights read as published), the Lights' `model_out` is 3.690e-02 for Z-Image (bar 6.61e-02), 2.436e-03 for Qwen-Image-2.1 (1.82e-02), 8.109e-03 for Anima (6.24e-02) and 7.326e-04 for Krea 2, per plane (2.05e-02): all four pass.
-
-The fp32 column is the plain gap to the reference; Z-Image, Krea 2 and MOSS-Image are judged on it at the fp64 witness, as their Standards are. The complete lines:
-
-<details>
-<summary>Compact and Light, the 18 runs</summary>
-
-```
-$ siliconed check z-image dit --size 512 --variant compact
-map ~/Library/Application Support/Siliconed/store/z-image-turbo-dit.compact.v1.silicon · 6.2 GB · int8 ×270, bfloat16 ×244, float32 ×7 (8-bit weights)
-✓ z-image dit compact 512 · 11 measures · nearest its threshold: t_embedder_out 2.95e-04 of 5.00e-04
-$ siliconed check z-image dit --size 512 --variant compact --neural-engine
-map ~/Library/Application Support/Siliconed/store/z-image-turbo-dit.compact.v1.silicon · 6.2 GB · int8 ×270, bfloat16 ×244, float32 ×7 (8-bit weights)
-✓ z-image dit compact 512 · 12 measures · nearest its threshold: x_embedder_out 2.39e-04 of 3.21e-03
-$ siliconed check z-image dit --size 512 --variant light
-map ~/Library/Application Support/Siliconed/store/z-image-turbo-dit.light.v1.silicon · 5.0 GB · bfloat16 ×274, sq5 ×148, sq4 ×56, int8 ×36, float32 ×7 (packed weights)
-✓ z-image dit light 512 · 11 measures · nearest its threshold: t_embedder_out 2.95e-04 of 5.00e-04
-$ siliconed check z-image dit --size 512 --variant light --neural-engine
-map ~/Library/Application Support/Siliconed/store/z-image-turbo-dit.light.v1.silicon · 5.0 GB · bfloat16 ×274, sq5 ×148, sq4 ×56, int8 ×36, float32 ×7 (packed weights)
-✓ z-image dit light 512 · 12 measures · nearest its threshold: x_embedder_out 2.39e-04 of 3.21e-03
-$ siliconed check qwen-image-2.1 dit --size 512 --variant compact
-map ~/Library/Application Support/Siliconed/store/qwen-image-2.1-turbo-dit.compact.v0.silicon · 7.3 GB · int8 ×224, bfloat16 ×72, float32 ×1 (8-bit weights)
-✓ qwen-image-2.1 dit compact 512 · 26 measures · nearest its threshold: temb 2.11e-04 of 5.00e-04
-$ siliconed check qwen-image-2.1 dit --size 512 --variant compact --neural-engine
-map ~/Library/Application Support/Siliconed/store/qwen-image-2.1-turbo-dit.compact.v0.silicon · 7.3 GB · int8 ×224, bfloat16 ×72, float32 ×1 (8-bit weights)
-✓ qwen-image-2.1 dit compact 512 · 27 measures · nearest its threshold: temb 2.11e-04 of 5.00e-04
-$ siliconed check qwen-image-2.1 dit --variant light
-map ~/Library/Application Support/Siliconed/store/qwen-image-2.1-turbo-dit.light.v1.silicon · 4.4 GB · sq4 ×184, bfloat16 ×73, sq5 ×32, int8 ×7, float32 ×1 (packed weights)
-✓ qwen-image-2.1 dit light 512 · 26 measures · nearest its threshold: temb 2.11e-04 of 5.00e-04
-$ siliconed check qwen-image-2.1 dit --variant light --neural-engine
-map ~/Library/Application Support/Siliconed/store/qwen-image-2.1-turbo-dit.light.v1.silicon · 4.4 GB · sq4 ×184, bfloat16 ×73, sq5 ×32, int8 ×7, float32 ×1 (packed weights)
-✓ qwen-image-2.1 dit light 512 · 27 measures · nearest its threshold: temb 2.11e-04 of 5.00e-04
-$ siliconed check anima dit --size 512 --variant compact
-map ~/Library/Application Support/Siliconed/store/anima-turbo-dit.compact.v1.silicon · 2.4 GB · bfloat16 ×313, int8 ×254 (8-bit weights)
-✓ anima dit compact 512 · 11 measures · nearest its threshold: block27_out 2.04e-05 of 5.00e-04
-$ siliconed check anima dit --size 512 --variant compact --neural-engine
-map ~/Library/Application Support/Siliconed/store/anima-turbo-dit.compact.v1.silicon · 2.4 GB · bfloat16 ×313, int8 ×254 (8-bit weights)
-✓ anima dit compact 512 · 12 measures · nearest its threshold: block13_out 1.44e-03 of 5.81e-02
-$ siliconed check anima dit --size 512 --variant light
-map ~/Library/Application Support/Siliconed/store/anima-turbo-dit.light.v1.silicon · 1.4 GB · int8 ×188, bfloat16 ×152, sq4 ×148, sq5 ×79 (packed weights)
-✓ anima dit light 512 · 11 measures · nearest its threshold: block27_out 1.85e-05 of 5.00e-04
-$ siliconed check anima dit --size 512 --variant light --neural-engine
-map ~/Library/Application Support/Siliconed/store/anima-turbo-dit.light.v1.silicon · 1.4 GB · int8 ×188, bfloat16 ×152, sq4 ×148, sq5 ×79 (packed weights)
-✓ anima dit light 512 · 12 measures · nearest its threshold: block27_out 6.53e-03 of 2.21e-01
-$ siliconed check krea2 dit --size 512 --variant compact
-map ~/Library/Application Support/Siliconed/store/krea2-turbo-dit.compact.v0.silicon · 14.1 GB · int8 ×224, float32 ×174, bfloat16 ×32 (8-bit weights)
-model_out per plane         4.008e-05   1.89e-05       15   1.072e-04    1.19e-04  ✓  oracle at fp64 9.48e-05
-gemm_int8                   ✓  2016 products on the published integers
-model_out per plane (widened)  3.016e-05   2.10e-05       15   1.032e-04    1.19e-04  ✓  oracle at fp64 9.48e-05
-✓ krea2 dit compact 512 · 13 measures · nearest its threshold: model_out per plane 1.07e-04 of 1.19e-04
-$ siliconed check krea2 dit --size 512 --variant compact --neural-engine
-map ~/Library/Application Support/Siliconed/store/krea2-turbo-dit.compact.v0.silicon · 14.1 GB · int8 ×224, float32 ×174, bfloat16 ×32 (8-bit weights)
-model_out per plane         2.433e-04   2.22e-04        2   2.486e-04    1.67e-02  ✓  oracle at fp64 1.34e-02
-gemm_int8                   ✓  224 products on the published integers
-model_out per plane (widened)  2.661e-04   2.50e-04       15   2.637e-04    1.67e-02  ✓  oracle at fp64 1.34e-02
-✓ krea2 dit compact 512 · 14 measures · nearest its threshold: img_in_out 2.32e-04 of 3.19e-03
-$ siliconed check krea2 dit --size 512 --variant light
-map ~/Library/Application Support/Siliconed/store/krea2-turbo-dit.light.v1.silicon · 7.6 GB · sq4 ×196, float32 ×169, sq5 ×52, int8 ×13 (packed weights)
-model_out per plane         6.222e-05   2.41e-05       13   8.839e-05    1.22e-04  ✓  clouds of summation orders: engine median of 9 (nominal + 8 orders), oracle worst of 12 (nominal + 3 ulp + 8 orders)
-gemm_int8                   ✓  2016 products on the published integers
-✓ krea2 dit light 512 · 13 measures · nearest its threshold: block27_out 4.53e-04 of 5.00e-04
-$ siliconed check krea2 dit --size 512 --variant light --neural-engine
-map ~/Library/Application Support/Siliconed/store/krea2-turbo-dit.light.v1.silicon · 7.6 GB · sq4 ×196, float32 ×169, sq5 ×52, int8 ×13 (packed weights)
-model_out per plane         2.198e-04   2.09e-04        0   2.246e-04    2.05e-02  ✓  oracle at fp64 1.64e-02
-gemm_int8                   ✓  224 products on the published integers
-model_out per plane (widened)  2.735e-04   2.60e-04       11   2.785e-04    2.05e-02  ✓  oracle at fp64 1.64e-02
-✓ krea2 dit light 512 · 14 measures · nearest its threshold: img_in_out 2.32e-04 of 4.54e-03
-$ siliconed check moss-image dit --size 512 --variant compact
-map ~/Library/Application Support/Siliconed/store/moss-image-sft-dit.compact.v0.silicon · 5.4 GB · int8 ×252, bfloat16 ×210 (8-bit weights)
-model_out per plane         1.871e-06   1.29e-06       23   2.142e-06    1.91e-06  ✗  oracle at fp64 1.53e-06
-gemm_int8                   ✓  252 products on the published integers
-model_out per plane (widened)  1.240e-06   9.84e-07       82   1.638e-06    1.91e-06  ✓  oracle at fp64 1.53e-06
-✗ moss-image dit compact 512 · 1 of 24 failing: model_out per plane
-$ siliconed check moss-image dit --size 512 --variant compact --neural-engine
-map ~/Library/Application Support/Siliconed/store/moss-image-sft-dit.compact.v0.silicon · 5.4 GB · int8 ×252, bfloat16 ×210 (8-bit weights)
-model_out per plane         3.214e-04   2.86e-04      116   3.214e-04    2.89e-02  ✓  oracle at fp64 2.31e-02
-gemm_int8                   ✓  252 products on the published integers
-model_out per plane (widened)  3.314e-04   2.97e-04      120   3.314e-04    2.89e-02  ✓  oracle at fp64 2.31e-02
-✓ moss-image dit compact 512 · 25 measures · nearest its threshold: video_embed 2.36e-04 of 3.20e-03
-```
-
-</details>
-
-Krea 2's variants are judged by clouds like its Standard, and the Light's `model_out per plane` is judged by them: the engine's median over nine summation orders (the nominal one and eight drawn by the same seeds as the oracle's, on a map whose residual stream is permuted, `Krea2PermutedMap`: an SQ weight moves by whole blocks of 256 inputs, its integers copied as stored) is 6.222e-05 against an allowance of 1.22e-04, the oracle's worst of twelve draws (nominal, three one-ulp moves, eight orders) plus 25 %. The draws of a variant are `krea2.py draw --size 512 --step 0 --jitter 1 2 3 --variant compact|light` and, for the summation orders, `krea2.py draw --size 512 --step 0 --permute 1 2 3 4 5 6 7 8 --permute-kind group --variant light` (step 0 only: the later latents belong to the Standard's trajectory). The Light's `temb` and `block0_attn_out` are two boundaries where the reference in fp32 is itself far from the exact value (1.92e-03 and 2.56e-03 at the fp64 witness); the engine is 1.16e-05 and 2.17e-03 from the witness, inside the allowance the rule gives them (2.41e-03 and 3.20e-03): in fp32 against the oracle alone they would read 1.93e-03 and 2.81e-03 for 5.00e-4.
-
-**Under `--neural-engine`, the int8 route reads the published integers on the Neural Engine too.** Where the Neural Engine shares a product with the GPU, its rows read the integers beside the GPU's int8 kernel, as a render's map may assign them; without that, every shared product of a large model stayed on the widened weight, and `gemm_int8`, which asks that the products on the published integers be taken at least once, counted 0 for Krea 2 (its Light and its Compact) and MOSS-Image on our Mac mini M5 Pro, every precision line passing. Krea 2's Light now reads 224 products on the integers (`model_out per plane` 2.198e-04 for 2.05e-02), and the widened route is judged too (2.735e-04). The Compact runs above read them too: 891 products for Qwen-Image-2.1, 224 for Krea 2, 252 for MOSS-Image.
-
-LoRAs are not covered here: they are files you choose, not part of what Siliconed ships.
+**The writer.** `siliconed check qwen-image-2.1 writer` judges Qwen3-VL-8B's prompt writing: identifiers and pixels bit for bit, logits against the reference when its tokens are forced on it, and the greedy decoding with its cache. With `--variant compact`, the tokens are said without being judged.
 
 ## Timings and peak memory
 
-`siliconed check` judges precision and nothing else. Times and peak memory are measured on the app alone: `silicontrol measure` ([REMOTE-CONTROL](REMOTE-CONTROL.md#the-socket-and-the-protocol); `silicontrol help measure` lists the options) renders a series in the app, times each render, samples the app's memory and writes a TSV and its summary. The times and peaks in [ENGINE](ENGINE.md) are taken the same way (renders queued in the app with `silicontrol`), so you can redo them on your Mac with the app alone, without Python or an oracle.
+`siliconed check` judges accuracy, and memory against the engine's plan; it judges no timing (the `render` stage says its own). The times and the peak memory of a render are measured on the app alone: `silicontrol measure` ([REMOTE-CONTROL](REMOTE-CONTROL.md#the-socket-and-the-protocol); `silicontrol help measure` lists the options) renders a series in the app, times each render, samples the app's memory and writes a TSV and its summary. So you can redo the figures of [ENGINE](ENGINE.md#numbers) on your Mac with the app alone, without Python or an oracle.
 
-The same seed gives the same pixels (the same md5) from one render to the next on one Mac, with one version of the app and one measure of that machine. It does not give them from one Mac to another, nor from one measure to another: the plan works out other rows from other numbers, and other rows sum in another order. What carries from Mac to Mac is the rule above, not the bits.
+**Memory has a budget, and it is checked.** The engine plans each of its stages (the text encoder, the DiT, the decoder: each one a few Core AI functions and the memory they work in) under a budget B = ¾ · RAM − 2 GiB, before it allocates anything, and refuses what does not fit ([ENGINE](ENGINE.md#memory-and-the-budget)). What it plans, P, is the process's footprint when the stage opens plus the arena it allocates; what Core AI holds for its functions is read while the stage runs, and the weights it keeps in memory past P are kept only while B holds them with a margin of 64 MiB beside. `siliconed check <model> memory [--size 1024]` renders one image and reads the process's footprint while each stage lives: each must stay under B less that margin, the process under B, and no page may be swapped out. No reference: the stage is judged against the budget's own word. The `memory` and `swap` lines of every other check apply the same rule to the engine stages it opens.
 
-**A seed is diffusers' seed, on all five models.** The starting noise is PyTorch's own: `torch.randn` on the CPU in float32 (`torch.Generator("cpu").manual_seed(seed)`, Mersenne Twister then Box-Muller by blocks of 16), reproduced bit for bit, drawn in the shape each pipeline's `prepare_latents` draws — the latent plane by plane, as the engine stores it. `swift test` holds the first, middle and last values of that noise for each model, at 512² and on a rectangle, read once from diffusers; every model's trajectory stage also compares it to the oracle's `latent_init`, at the seed its manifest names. The same seed and the same prompt therefore start from the noise diffusers starts from; the image that follows is judged by the rules above, stage by stage. A variation turns that noise towards a second seed's, drawn the same way. Faster Rendering and the solvers' fresh noise (Euler a) are not diffusers' recipe and do not claim it.
+`SILICONED_MEMORY_BUDGET_GB` gives B to the process, in GiB: a small Mac's budget, tried on a large one (10 for 16 GB of RAM, 4 for 8).
+
+```sh
+SILICONED_MEMORY_BUDGET_GB=10 siliconed check z-image memory --size 1024
+```
+
+**The decoder by bands.** When the whole decoder does not fit under B, the plan takes it by bands of rows. `siliconed check <model> vae-bands` judges that under a small B (`--budget` gives another); it reads the latent of the `vae` golden. For Anima, Krea 2 and Qwen-Image-2.1, at 1024², every value of the image must be the whole decoder's, bit for bit. The decoders of Z-Image and MOSS-Image take their norms over the whole plane: by bands they do not give the same bits, and are judged by the `vae` stage's rule.
+
+**The writer.** `siliconed check qwen-image-2.1 writer-memory` does the same for a rewrite, and for a description with `--describe <image>`: green at the second run.
+
+**A seed is diffusers' seed, on all five models.** The starting noise is PyTorch's own: `torch.randn` on the CPU in float32 (`torch.Generator("cpu").manual_seed(seed)`, Mersenne Twister then Box-Muller by blocks of 16), reproduced bit for bit, drawn in the shape each pipeline's `prepare_latents` draws — the latent plane by plane, as the engine stores it. `swift test` holds the first, middle and last values of that noise for Z-Image, Anima, Krea 2 and MOSS-Image, at 512² and on a rectangle, read once from diffusers; the trajectory stage of each of the five models also compares it to the oracle's `latent_init`, at the seed its manifest names. The same seed and the same prompt therefore start from the noise diffusers starts from; the image that follows is judged by the rules above, stage by stage, and its bits are promised neither from one Mac to another nor from one version of macOS to the next. A variation turns that noise towards a second seed's, drawn the same way. The solvers' fresh noise (Euler a) is not diffusers' recipe and does not claim it.
 
 ## Every stage
 
-The output of `siliconed check list --markdown`. `{size}` is 512, 1024 or a rectangle such as 768x512; the stages that take no size are checked at the reference's own.
+The output of `siliconed check list --markdown`, as the command writes it. The scripts read from `App/`. `{size}` is 512, 1024 or a rectangle such as 768x512; the stages that take no size are checked at the reference's own.
 
 | Stage | Proves | Rule | Oracle | Weights |
 |---|---|---|---|---|
-| `kernels widen` | bf16 → fp32 widening and its inverse are exact, on the values a naive shift gets wrong | bit for bit | — | — |
-| `kernels arena` | the arena hands out distinct page-aligned slices, refuses duplicates and growth | each property holds | — | — |
-| `kernels elementwise` | the GPU's SwiGLU, gate and gated residual are as close to double precision as the CPU's; the residual rounds twice, as torch | GPU worst ulp ≤ max(CPU's, 1), mean ≤ CPU's + 5 %; residual bit for bit | — | — |
-| `kernels gelu` | the GPU's GELU (erf) is as close to double precision as the CPU's, over one bit pattern in 64 of [−12, 12] | GPU worst deviation ≤ the CPU's, in ulp of the operand | — | — |
-| `kernels sdpa` | the attention cut by heads (GPU + CPU), by query blocks, past maxMatrix and the matrix kernel return the whole graph's result; a head width padded to 128 (the vision tower's 72) returns a float64 witness's | against the whole graph: query blocks ≤ 1e-6 per channel; head cut ≤ 1e-5 with the GPU heads bit for bit; matrix kernel ≤ 1e-5; padded width ≤ 1e-5 against float64 | — | — |
-| `kernels sdpa-tiles` | the attention by tiles (Metal 4 matmul2d) returns the float64 attention — in three stages in fp32, and with fp16 or bf16 operands and fp32 sums in three stages and fused at every candidate tile — on a self-attention, a cross-attention over few keys, grouped k/v heads and a length that tiles nothing | against float64, per channel: fp32 ≤ 1e-5 and ≤ the graph's own error + 25 % on the golden tensors' amplitudes (saturated softmax); fp16 operands ≤ 1.25 × the error of rounding the same exact output to bf16 (invariant 3, the ANE's bar); bf16 operands ≤ 1.25 × bf16's own error (the float64 attention of the operands rounded to bf16, its output rounded too); both on the map's amplitudes | — | — |
-| `kernels gemm-split` | the token-wise split of a GEMM between the GPU and the AMX stitches back cblas_sgemm's product | against cblas_sgemm, per row: the GPU's rows bit for bit, the AMX's ≤ 1e-5 (another summation order over k = 3 840) | — | — |
-| `kernels rope` | every RoPE table of the engine is the reference's, value by value (13 tables, 5 bit for bit) | max \|Δ\| per table within its bound, in units of 2⁻²⁴: 0 where the reference is bit-reproducible, 1 to 64 where torch uses SLEEF's cos, sin, pow | `tools/oracle/kernels.py rope` | — |
-| `kernels resample` | the spectral schedule's nearest-exact decimation and bilinear upsampling are torch's, on a square and a rectangle | decimation bit for bit (and the even decimation, its counter-test, must differ); bilinear within one ulp of the input's scale | `tools/oracle/kernels.py resample` | — |
 | `z-image tokenizer` | the chat template and the tokenizer give transformers' 512 identifiers and mask, padding included, and the app's admission the same real tokens (with --long, past 512: 1024) | bit for bit | `tools/oracle/z-image.py text [--long]` | tokenizer |
-| `z-image text` | the Qwen3-4B encoder gives the reference's hidden states, layer by layer, and its cap_feats (with --long, on a prompt past 512 tokens) | the rule, floor 5e-4 | `tools/oracle/z-image.py text [--long]` | text encoder |
-| `z-image block` | block 0 matches the reference at its 19 internal boundaries: norms, projections, attention, SwiGLU | the rule, floor 5e-4 | `tools/oracle/z-image.py dit --size {size}` | DiT |
-| `z-image dit` | one evaluation of the DiT, latent to velocity: embedders, refiners, 30 blocks, head, unpatchify | the rule, floor 5e-4; on a rectangle, the transposed golden must deviate; with --neural-engine, --bf16-activations, --bf16-attention or --fp16-attention, against bf16's own error + 25 %; with --int8-activations, against ComfyUI's W8A8 error + 25 % | `tools/oracle/z-image.py dit --size {size}; witness --size {size}; with --neural-engine, --bf16-activations, --bf16-attention or --fp16-attention, bf16 --size {size}; with --variant compact or light, the same three with --variant, at 512 (the Compact's published weights, dequantized by their publisher's library; the Light's own SQ file, decoded by the oracle's reference decoder of the published format); with --int8-activations, w8a8 --size {size} --variant compact (ComfyUI's own int8 products)` | DiT |
-| `z-image trajectory` | the seed's noise bit for bit, then the 8-step sampler: each step's velocity and latent, from the reference's own latent at that step | the rule on the guided pass, floor 5e-4; the free pass is shown with its gain, not judged | `tools/oracle/z-image.py trajectory --size {size}` | DiT |
-| `z-image vae` | Flux's decoder on a rectangular latent (the centered crop of the final 1024² latent), plane by plane: what a square cannot see | the rule per plane, floor 5e-4, at the fp64 witness (no floor there); a decoder in bf16 no further from it than the reference in bf16, + 25 %; on a rectangle, the transposed image must deviate | `tools/oracle/z-image.py vae --size {size}; vae-witness --size {size}; vae-bf16 --size {size}` | VAE |
-| `z-image img2img` | the start of an img2img at the oracle's strength (0.6): the seed's noise and the schedule, t_start and σ_s through the product's admission, the start's mix bit for bit, the encoder's z₀ and x_s, each step's velocity from the oracle's latent, then the product's denoiser from its own start over exactly the steps diffusers runs | noise and the mix from the oracle's z₀ bit for bit; t_start equal, σ_s within 1e-6; z₀ and x_s per latent plane, floor 5e-4; each guided velocity by the family's trajectory rule (floor 5e-4, at the step's fp64 witness where it exists; Krea 2: clouds of summation orders when the oracle drew the failing step's); the product's steps exactly σ[t_start] … σ[N − 1]; its free final latent shown, not judged | `tools/oracle/z-image.py img2img --size {size}` | VAE, DiT |
-| `qwen-image-2.1 text` | Qwen3-VL-8B reads the prompt (and with --edit N, the N pictures; with --long, a prompt past 512 tokens): template, identifiers, positions, 36 layers, prompt_embeds | identifiers and masks bit for bit; the rule, floor 5e-4 (with images, the deep layers judged on their text rows) | `tools/oracle/qwen-image-2.1.py text [--edit N]; text --long` | text encoder |
-| `qwen-image-2.1 vision` | the processor (Lanczos, patches, grids), the 3D positions of both edit templates, and the vision tower with its deepstack, image by image | pixels, grids, identifiers and positions bit for bit; the rule, floor 5e-4 | `tools/oracle/qwen-image-2.1.py vision` | text encoder |
-| `qwen-image-2.1 references` | a reference with transparency, prepared as the pipeline does: the VAE's RGBA input and the vision copy over white (at 512, Pillow premultiplies around its Lanczos; at 443 it copies) | bit for bit; the vision copy on its bytes (the Pil and Fast processors differ by 6e-8 in float) | `tools/oracle/qwen-image-2.1.py references [--side 443]` | — |
-| `qwen-image-2.1 dit` | one evaluation three ways — prefill of the conditions, the step from their K/V cache, the full pass under the block-causal mask — plus the layout and the modulation; on published int8 weights, along the int8 kernel a render's map may pick (gemm_int8), and the step once on the widened weights | layout bit for bit; the rule, floor 5e-4, at the fp64 witness where one exists; cache and full pass ≤ 1e-5 apart; a second step the same bits; with --neural-engine, --bf16-activations, --bf16-attention or --fp16-attention, against bf16's own error + 25 %, cache and full pass too; with --int8-activations, against ComfyUI's W8A8 error + 25 %; on int8 weights, every route by the same rule | `tools/oracle/qwen-image-2.1.py dit [--edit N]; witness; with --neural-engine, --bf16-activations, --bf16-attention or --fp16-attention, bf16 [--edit N]; with --variant compact or light (no --edit), dit and bf16 with --variant (the Compact's published weights, dequantized by their publisher's library; the Light's own SQ file, decoded by the oracle's reference decoder of the published format); with --int8-activations, w8a8 --variant compact (ComfyUI's own int8 products)` | DiT |
-| `qwen-image-2.1 trajectory` | the 8 steps: σ, timesteps and noise to the bit, then each step's velocity from the oracle's latent and encoder states; the product's free run from the real inputs is shown | schedule and noise bit for bit; the rule on each guided velocity, floor 5e-4; the free run's final latent and image are shown, not judged | `tools/oracle/qwen-image-2.1.py trajectory [--edit N]` | DiT, text encoder, VAE |
-| `qwen-image-2.1 vae` | the decoder on the trajectory's final latent (with --edit N, the edit's): unpacking and de-normalization to the bit, then the RGBA image plane by plane | vae_in bit for bit; the rule per plane, floor 5e-4, at the fp64 witness where one exists; a decoder in bf16 no further from it than the reference in bf16, + 25 %; on a rectangle, the transposed image must deviate | `tools/oracle/qwen-image-2.1.py vae [--edit N]; vae-witness; vae-bf16` | VAE |
-| `qwen-image-2.1 vae-encode` | the encoder on both edit pictures (RGBA): the raw mean and the normalized latent, plane by plane; the product's module (RGB in, alpha added) gives the same bits | the rule per plane, floor 5e-4, at the fp64 witness where one exists; the module bit for bit | `tools/oracle/qwen-image-2.1.py vae-encode; vae-witness` | VAE |
-| `qwen-image-2.1 writer` | Qwen3-VL-8B writes: the head map is the published lm_head and final norm; the chat prompt (with or without a system turn, with a picture); greedy decoding with a K/V cache, teacher-forced on the reference's tokens — the tokens and the logits at every step | head, identifiers and tokens bit for bit (a step whose gap is within the rule is a tie); the logits by the rule, floor 5e-4, a vocabulary entry a channel | `tools/oracle/qwen-image-2.1-writer.py [CASE]` | text encoder, writer head |
+| `z-image text` | the Qwen3-4B encoder (35 of its 36 layers, bf16) gives the reference's layer 33 and its cap_feats, hidden_states[-2], on the real tokens | the rule against transformers in bf16 (a Compact's: on its SDNQ int8 dequantized) | `tools/oracle/z-image.py text; text-bf16; with --variant compact, text and text-bf16 with --variant compact` | text encoder |
+| `z-image block` | layer 0 alone, from the oracle's own input, at its 19 inner boundaries: modulation, norms, projections, QK-norm, attention, SwiGLU (with --variant compact, the Compact's int8 codes) | the rule against diffusers' layer 0 in bf16 on the same input | `tools/oracle/z-image.py dit --size {size}; block-bf16 --size {size}; with --variant compact, dit and w8a8 with --variant compact at 512` | DiT |
+| `z-image block-lora` | each block function's low-rank path (a LoRA beside each product) against the CPU, product by product, on layer 0 over the oracle's stream; with --variant compact, the Compact's and its shared forms', the ANE's against the GPU's | each change (with its factors less without) against the CPU's x · down · up: ≤ 4 · 2⁻⁸ in bf16, ≤ 4 · 2⁻¹¹ in f16 (the result's and the path's roundings, the change as large as the result); each product's input and each function with every factor zero the same bits as without; on the ANE, the adapted function against the GPU's ≤ 2 × the same without + 2⁻⁹ | `tools/oracle/z-image.py dit --size {size}; with --variant compact, dit --variant compact (the inputs only)` | DiT |
+| `z-image dit` | one evaluation of the DiT, latent to velocity: the embedders, refiners, 30 layers, head and unpatchify (with --variant compact, the Compact's int8 codes) | the rule against the fp64 witness, with diffusers in bf16 beside the oracle (the W8A8 run for a Compact); at h ≠ w, the orientation counter-test | `tools/oracle/z-image.py dit --size {size}; witness --size {size}; bf16 --size {size}; with --variant compact, dit, witness and w8a8 with --variant compact at 512` | DiT |
+| `z-image pace` | the DiT as a render opens it, alone: each render's evaluations on seeded inputs (--renders, 3; --evaluations, 8), the digest of its velocities, each engine stage's footprint against its P, the process against B, no swap (with --variant compact, the Compact's) | each stage's footprint stays under B less 64 MiB; the process's under B (¾ · RAM − 2 GiB); no swap-out | — | DiT |
+| `z-image trajectory` | the seed's noise bit for bit, the 8-step σ schedule, then each step's velocity from the reference's own latent at that step (the render's DiT session, negated as the pipeline does) | the noise and σ exact; each guided step by the rule against diffusers' same step in bf16, against its fp64 witness where one is written | `tools/oracle/z-image.py trajectory --size {size}; trajectory-bf16 --size {size}; trajectory-witness --size {size} --step N for a step at its threshold` | DiT |
+| `z-image vae` | Flux's decoder in bf16 on a rectangular latent (the centered crop of the final 1024² latent), plane by plane: what a square cannot see | per plane, at the fp64 witness: no further from it than diffusers decoding in bf16, + 25 %; on a rectangle, the transposed image must deviate | `tools/oracle/z-image.py vae --size {size}; vae-witness --size {size}; vae-bf16 --size {size}` | VAE |
+| `z-image img2img` | an image to start from: Flux's encoder in bf16 on the oracle's picture (the posterior mean, shifted and scaled), the first step run at strength 0.6 and its σ, the starting latent σ·ε + (1 − σ)·z₀ from the reference's own z₀ and noise, then the app's render from the picture | z₀ per latent plane by the rule against diffusers encoding in bf16; the first step and σ exact; the starting latent bit for bit; the render finite, its PSNR against the reference's final latent decoded here said and not judged (a free loop in bf16) | `tools/oracle/z-image.py text; img2img --size {size}; img2img-bf16 --size {size}` | text encoder, DiT, VAE |
+| `z-image render` | the app's render (Engine.render: tokenizer, encoder, 8 Euler steps, decoder) from the reference prompt and seed: the reference's final latent and picture | the same picture: PSNR past 25 dB against diffusers in fp32 (a bound written before the run, until a bf16 trajectory judges each step); with --variant compact, a finite picture, its PSNR said and not judged: the Compact is judged at the DiT | `tools/oracle/z-image.py trajectory --size {size}` | text encoder, DiT, VAE |
+| `z-image render-lora` | the app's render with a LoRA (--lora FILE, strength 1) from the reference prompt and seed: the LoRA reaches the picture | the picture finite, and apart from the same render without the LoRA: PSNR between them under 40 dB (a counter-test: a LoRA that reached nothing gives the same picture) | `tools/oracle/z-image.py trajectory --size {size} (the prompt and seed only)` | text encoder, DiT, VAE, the LoRA |
 | `anima tokenizer` | the T5 tokenizer against `tokenizers` on a corpus of edge cases: normalization, whitespace, special tokens, truncation | every case bit for bit | `tools/oracle/anima.py tokenizer` | tokenizer |
-| `anima text` | the prompt through both tokenizers, Qwen3-0.6B (final norm included) and the conditioner, to the DiT's [512, 1024] context (with --long, a prompt past 512 tokens: more rows) | identifiers bit for bit; the rule, floor 5e-4 | `tools/oracle/anima.py text [--long]` | text encoder, DiT (the conditioner) |
-| `anima dit` | one evaluation of the DiT at σ = 1, boundary by boundary, and its output per latent plane against the fp64 witness | the rule, floor 5e-4; model_out per latent plane at the fp64 witness; on a rectangle, the transposed golden must deviate; with --neural-engine, --bf16-activations, --bf16-attention or --fp16-attention, against bf16's own error + 25 %; with --int8-activations, against ComfyUI's W8A8 error + 25 % | `tools/oracle/anima.py dit --size {size}; witness --size {size} --step 0; with --neural-engine, --bf16-activations, --bf16-attention or --fp16-attention, bf16 --size {size}; with --variant compact or light, dit and bf16 with --variant, at 512 (the Compact's published weights, dequantized by their publisher's library; the Light's own SQ file, decoded by the oracle's reference decoder of the published format); with --int8-activations, w8a8 --size {size} --variant compact (ComfyUI's own int8 products)` | DiT |
-| `anima trajectory` | the seed's noise bit for bit, the schedule, then the 8 Euler steps: each step's velocity from the oracle's latent at that step | σ within 1e-6; the rule on each guided velocity, floor 5e-4; the free pass is shown with its gain, not judged | `tools/oracle/anima.py trajectory --size {size}` | DiT |
-| `anima vae` | the Qwen-Image decoder on the final latent of the oracle's trajectory, plane by plane | the rule per plane, floor 5e-4, at the fp64 witness (no floor there); a decoder in bf16 no further from it than the reference in bf16, + 25 %; on a rectangle, the transposed image must deviate | `tools/oracle/anima.py vae --size {size}; vae-witness --size {size}; vae-bf16 --size {size}` | VAE |
-| `anima img2img` | the start of an img2img at the oracle's strength (0.6): the seed's noise and the schedule, t_start and σ_s through the product's admission, the start's mix bit for bit, the encoder's z₀ and x_s, each step's velocity from the oracle's latent, then the product's denoiser from its own start over exactly the steps diffusers runs | noise and the mix from the oracle's z₀ bit for bit; t_start equal, σ_s within 1e-6; z₀ and x_s per latent plane, floor 5e-4; each guided velocity by the family's trajectory rule (floor 5e-4, at the step's fp64 witness where it exists; Krea 2: clouds of summation orders when the oracle drew the failing step's); the product's steps exactly σ[t_start] … σ[N − 1]; its free final latent shown, not judged | `tools/oracle/anima.py img2img --size {size}` | VAE, DiT |
-| `krea2 text` | the prompt's identifiers, the 12 Qwen3-VL taps (padding removed, judged against states computed with it), then the fusion and txt_in on the oracle's taps (with --long, a prompt past 512 tokens read whole, as the app admits it: no fusion golden for it) | identifiers bit for bit; the rule, floor 5e-4 | `tools/oracle/krea2.py text [--long]` | text encoder, DiT (the fusion) |
-| `krea2 dit` | one evaluation of the DiT at σ = 1, boundary by boundary, judged at the fp64 witness where it exists | the rule, floor 5e-4, at the fp64 witness where it exists, clouds of summation orders when the oracle has order draws (the same seeds drawn by the engine), of one-ulp moves when it has only those; model_out per latent plane at the witness; on a rectangle, the transposed golden must deviate; with --neural-engine, --bf16-activations, --bf16-attention or --fp16-attention, against bf16's own error + 25 %; with --int8-activations, against ComfyUI's W8A8 error + 25 % | `tools/oracle/krea2.py dit --size {size}; witness --size {size}; witness-step --size {size} --step 0; draw --size {size} --step 0 --jitter 1 2 3; with --neural-engine, --bf16-activations, --bf16-attention or --fp16-attention, bf16 --size {size}; with --variant compact or light, dit, bf16, witness, witness-step --step 0, draw --step 0 --jitter 1 2 3 and draw --size {size} --step 0 --permute 1 2 3 4 5 6 7 8 --permute-kind group with --variant, at 512 (the Compact's published weights, dequantized by their publisher's library; the Light's own SQ file, decoded by the oracle's reference decoder of the published format); with --int8-activations, w8a8 --size {size} --variant compact (ComfyUI's own int8 products)` | DiT |
-| `krea2 trajectory` | the seed's noise bit for bit, the schedule, then the 8 Euler steps: each step's velocity from the oracle's latent at that step, at the step's fp64 witness where it exists | σ within 1e-6; the rule on each guided velocity, floor 5e-4, at the step's fp64 witness where it exists, clouds of summation orders when the oracle has order draws of the step (the same seeds drawn by the engine), of one-ulp moves when it has only those; the free pass is shown, not judged; --free-orders 1,2,3: the free pass again under each seed's summation order (residual stream permuted by groups of 256), shown step by step against the nominal pass and the oracle, beside the oracle's own passes under the same orders where it drew them, not judged | `tools/oracle/krea2.py trajectory --size {size}; witness-step --size {size} --step 0 1 2 3 4 5 6 7; draw --size {size} --step i --permute 1 2 3 4 5 6 7 8 --permute-kind group, one run per step i from 0 to 7; with --free-orders, trajectory --size {size} --permute 0 and the same seeds` | DiT |
-| `krea2 vae` | the Qwen-Image decoder with Krea's weights on the final latent of the oracle's trajectory, plane by plane | the rule per plane, floor 5e-4, at the fp64 witness (no floor there); a decoder in bf16 no further from it than the reference in bf16, + 25 %; on a rectangle, the transposed image must deviate | `tools/oracle/krea2.py vae --size {size}; vae-witness --size {size}; vae-bf16 --size {size}` | VAE |
-| `krea2 img2img` | the start of an img2img at the oracle's strength (0.6): the seed's noise and the schedule, t_start and σ_s through the product's admission, the start's mix bit for bit, the encoder's z₀ and x_s, each step's velocity from the oracle's latent, then the product's denoiser from its own start over exactly the steps diffusers runs | noise and the mix from the oracle's z₀ bit for bit; t_start equal, σ_s within 1e-6; z₀ and x_s per latent plane, floor 5e-4; each guided velocity by the family's trajectory rule (floor 5e-4, at the step's fp64 witness where it exists; Krea 2: clouds of summation orders when the oracle drew the failing step's); the product's steps exactly σ[t_start] … σ[N − 1]; its free final latent shown, not judged; with --variant, the Standard's start through the version's DiT, along the int8 route when it publishes int8 and once widened | `tools/oracle/krea2.py img2img --size {size}; img2img-witness --size {size} --step 3 4 5 6 7; img2img-draw --size {size} --step i --permute 1 2 3 4 5 6 7 8 for a step i failing at its witness; with --variant compact, the same with --variant (the Compact's published weights, dequantized by their publisher's library; the Light's own SQ file, decoded by the oracle's reference decoder of the published format)` | VAE, DiT |
+| `anima text` | the prompt through both tokenizers, Qwen3-0.6B (bf16, final norm included) and the conditioner, to the DiT's [512, 1024] context | identifiers bit for bit; the rule against transformers and diffusers in bf16 | `tools/oracle/anima.py text; text-bf16` | text encoder, DiT (the conditioner) |
+| `anima block` | block 0 alone, from the oracle's own input, at its four boundaries: self-attention, cross-attention, feed-forward, output | the rule against diffusers' block 0 in bf16 on the same input | `tools/oracle/anima.py dit --size {size}; block-bf16 --size {size}` | DiT |
+| `anima dit` | one evaluation of the DiT at σ = 1, boundary by boundary: the embedders, blocks 0, 1, 13 and 27, and the velocity per latent plane (with --variant compact, the Compact's int8 codes) | the rule, floor 5e-4, with diffusers in bf16 beside the oracle (the W8A8 run for a Compact); model_out per latent plane at the fp64 witness; at h ≠ w, the orientation counter-test | `tools/oracle/anima.py dit --size {size}; witness --size {size} --step 0; bf16 --size {size}; with --variant compact, dit and w8a8 with --variant compact at 512` | DiT |
+| `anima dit-lora` | one evaluation of the DiT at σ = 1 under a user's LoRA read in its published file (the oracle's inCase, kohya's flat names, 448 modules, strength 1), the low-rank path added beside each product: the velocity per latent plane | the file recognized as this family's, every module applied; model_out per latent plane at the fp64 witness: no further than the bf16 reference with the LoRA kept apart, + 25 % | `tools/oracle/anima.py lora --size {size} --lora FILE; witness --size {size} --lora FILE; lora-bf16 --size {size} --lora FILE` | DiT, the LoRA |
+| `anima pace` | the DiT as a render opens it, alone: each render's evaluations on seeded inputs (--renders, 3; --evaluations, 8), the digest of its velocities, each engine stage's footprint against its P, the process against B, no swap (with --variant compact, the Compact's) | each stage's footprint stays under B less 64 MiB; the process's under B (¾ · RAM − 2 GiB); no swap-out | — | DiT |
+| `anima trajectory` | the seed's noise bit for bit, the 8-step σ schedule, then each step's velocity from the reference's own latent at that step (the render's DiT session) | the noise and σ exact; each step by the rule against diffusers' same step in bf16, against its fp64 witness where one is written | `tools/oracle/anima.py trajectory --size {size}; trajectory-bf16 --size {size}; witness --size {size} --step N for a step at its threshold` | DiT |
+| `anima vae` | the Qwen-Image decoder in bf16 on the final latent of the oracle's trajectory (a centered crop of the 1024² one at 768x512), plane by plane | per plane, at the fp64 witness: no further from it than diffusers decoding in bf16, + 25 %; on a rectangle, the transposed image must deviate | `tools/oracle/anima.py vae --size {size}; vae-witness --size {size}; vae-bf16 --size {size}` | VAE |
+| `anima img2img` | an image to start from: the VAE's encoder in bf16 on the oracle's picture (the posterior mean, normalized), the first step run at strength 0.6 and its σ, the starting latent σ·ε + (1 − σ)·z₀ from the reference's own z₀ and noise, then the app's render from the picture | z₀ per latent plane by the rule against diffusers encoding in bf16; the first step and σ exact; the starting latent bit for bit; the render finite, its PSNR against the reference's final latent decoded here said and not judged (a free loop in bf16) | `tools/oracle/anima.py text; img2img --size {size}; img2img-bf16 --size {size}` | text encoder, DiT, VAE |
+| `anima render` | the app's render (Engine.render: both tokenizers, encoder, conditioner, 8 Euler steps, decoder) from the reference prompt and seed, against the reference's float32 picture, with diffusers' own bf16 render beside it | the same picture: PSNR against diffusers in fp32 no more than 3 dB under diffusers' own bf16 render's (a free 8-step loop in bf16 is as far from the fp32 picture as it is); with --variant compact, a finite picture, its PSNR said and not judged: the Compact is judged at the DiT | `tools/oracle/anima.py trajectory --size {size}; vae --size {size}; render-bf16 --size {size}` | text encoder, DiT, VAE |
+| `krea2 text` | the prompt's identifiers, then Qwen3-VL-4B's twelve taps (bf16, the real tokens alone, judged against states computed with the reference's padding) | identifiers bit for bit; the rule against transformers in bf16 | `tools/oracle/krea2.py text; text-bf16` | text encoder |
+| `krea2 dit` | one evaluation of the DiT at σ = 1, boundary by boundary: the timestep path, the text fusion and txt_in, img_in, block 0 inside out (attention, feed-forward), blocks 1, 13 and 27, and the velocity per latent plane (with --variant compact, the Compact's int8 codes) | the rule against the fp64 witness where it exists, with diffusers in bf16 beside the oracle (the W8A8 run for a Compact); model_out per latent plane at the witness; at h ≠ w, the orientation counter-test | `tools/oracle/krea2.py dit --size {size}; witness --size {size}; witness-step --size {size} --step 0; bf16 --size {size}; with --variant compact, dit, w8a8, witness and witness-step --step 0 with --variant compact at 512` | DiT |
+| `krea2 dit-lora` | one evaluation of the DiT at σ = 1 under a user's LoRA read in its published file (strength 1, every module applied: the 28 blocks' and the text fusion's), the Compact's change against the Standard's: what the LoRA moves in the fused text, in block 0's attention, feed-forward and output, and in the velocity | no reference of Krea 2 under a LoRA: the change each brings (with − without) on the Compact (its shared forms, the ANE's share under --precision ane) against the Standard's (bf16, the engine's low rank checked against the CPU by LowRankRun); text_fused within 1e-2, block 0's boundaries within 5e-2; the velocity's said, not judged (28 blocks of int8 against bf16) | — | DiT, the Compact's DiT, the LoRA |
+| `krea2 pace` | the DiT as a render opens it, alone: each render's evaluations on seeded inputs (--renders, 3; --evaluations, 8), the digest of its velocities, each engine stage's footprint against its P, the process against B, no swap | each stage's footprint stays under B less 64 MiB; the process's under B (¾ · RAM − 2 GiB); no swap-out | — | DiT |
+| `krea2 trajectory` | the seed's noise bit for bit, the 8-step σ schedule, then each step's velocity from the reference's own latent at that step (the render's DiT session) | the noise and σ exact; each step by the rule against diffusers' same step in bf16, against its fp64 witness where one is written | `tools/oracle/krea2.py trajectory --size {size}; trajectory-bf16 --size {size}; witness-step --size {size} --step N for a step at its threshold` | DiT |
+| `krea2 vae` | the Qwen-Image decoder in bf16 (Krea's weights) on the final latent of the oracle's trajectory (a centered crop of the 1024² one at 768x512), plane by plane | per plane, at the fp64 witness: no further from it than diffusers decoding in bf16, + 25 %; on a rectangle, the transposed image must deviate | `tools/oracle/krea2.py vae --size {size}; vae-witness --size {size}; vae-bf16 --size {size}` | VAE |
+| `krea2 img2img` | an image to start from: the VAE's encoder in bf16 on the oracle's picture (the posterior mean, normalized), the first step run at strength 0.6 and its σ, the starting latent σ·ε + (1 − σ)·z₀ from the reference's own z₀ and noise, then the app's render from the picture | z₀ per latent plane by the rule against diffusers encoding in bf16; the first step and σ exact; the starting latent bit for bit; the render finite, its PSNR against the reference's final latent decoded here said and not judged (a free loop in bf16) | `tools/oracle/krea2.py text; img2img --size {size}; img2img-bf16 --size {size}` | text encoder, DiT, VAE |
+| `krea2 render` | the app's render (Engine.render: tokenizer, encoder, 8 Euler steps, decoder) from the reference prompt and seed: the reference's final picture | the same picture: PSNR past 25 dB against diffusers in fp32 (a bound written before the run, Z-Image's); with --variant compact, a finite picture, its PSNR said and not judged: the Compact is judged at the DiT | `tools/oracle/krea2.py trajectory --size {size}; vae --size {size}` | text encoder, DiT, VAE |
 | `moss-image tokenizer` | the chat template (no system turn, thinking block open) and the Qwen2 tokenizer against `tokenizers` on six prompts: accents, a newline and tab, JSON, digits and punctuation, a long text; cut at 4096 | the template string and every identifier bit for bit | `tools/oracle/moss-image.py tokenizer` | tokenizer |
-| `moss-image text-delta` | the embedding rows and layer 0, a Gated DeltaNet layer, part by part: input norm, fused projection, delta rule, gated norm, mixer, MLP, output | the rule, floor 5e-4 | `tools/oracle/moss-image.py text` | text encoder (layer 0) |
-| `moss-image text-full` | layers 0 to 3: three Gated DeltaNet layers and the first full-attention layer (gated queries, partial RoPE, output gate), part by part | the rule, floor 5e-4 | `tools/oracle/moss-image.py text` | text encoder (layers 0–3) |
-| `moss-image text` | the prompt through Qwen3.5-9B: all 32 layers' outputs and the final state, the DiT's `prompt_embeds` | the rule, floor 5e-4; the layers 0, 3, 15, 31 and the final state at the fp64 witness | `tools/oracle/moss-image.py text; text-witness` | text encoder |
+| `moss-image text` | the Qwen3.5-9B encoder (32 layers, Gated DeltaNet and full attention, bf16) gives the reference's layer outputs and last_hidden_state (the DiT's prompt_embeds) on the real tokens | the rule against transformers in bf16, at the fp64 witness (with --variant compact, the Compact's int8 encoder against the same references) | `tools/oracle/moss-image.py text; text-witness; text-bf16` | text encoder |
+| `moss-image text-long` | the same encoder on the long prompt: the gated delta rule's 64-token chunks and the state carried between them give the reference's layer outputs and last_hidden_state | the rule against transformers in bf16, at the fp64 witness | `tools/oracle/moss-image.py text --long; text-witness --long; text-bf16 --long` | text encoder |
 | `moss-image schedule` | the sigmas of MOSSImageScheduler (shift 5 on the fp32 grid, snapped to the 1000-step training grid) and the timesteps the DiT receives, for 1 to 10, 20 and 50 steps | bit for bit | `tools/oracle/moss-image.py schedule` | — |
-| `moss-image dit` | one evaluation of the DiT at σ = 1, boundary by boundary — time, modulations, RoPE, text path, block 0 inside out, blocks 1, 13, 27, 41, the head —, judged at the fp64 witness | the rule, floor 5e-4, at the fp64 witness where it exists; model_out per latent plane at the witness; with --neural-engine, --bf16-activations, --bf16-attention or --fp16-attention, against bf16's own error + 25 %; with --int8-activations, against ComfyUI's W8A8 error + 25 % | `tools/oracle/moss-image.py dit --size {size}; witness --size {size}; with --neural-engine, --bf16-activations, --bf16-attention or --fp16-attention, dit-bf16 --size {size}; with --variant compact, dit, witness and dit-bf16 with --variant at 512 (the Compact's published weights, dequantized by their publisher's library; the Light's own SQ file, decoded by the oracle's reference decoder of the published format); with --int8-activations, w8a8 --variant compact (ComfyUI's own int8 products)` | DiT |
-| `moss-image dit-lora` | the same evaluation with the DMD 8-step LoRA at strength 1 (kohya `lora.safetensors`, rank 128, fp32), the golden having it merged in fp32 | the rule, floor 5e-4, at the fp64 witness where it exists; model_out per latent plane at the witness | `tools/oracle/moss-image.py dit --lora; witness --lora` | DiT, LoRA |
-| `moss-image trajectory` | the 8 steps of the recipe: the seed's noise bit for bit, the σ, each step's velocity from the oracle's latent at that step (the DMD LoRA at strength 1), then the product's denoiser run free from the noise on the oracle's text — its latents shown against the oracle's, and against the free loop the stage runs itself | noise and σ bit for bit; each guided velocity per latent plane, floor 5e-4; the product's free run against the stage's own loop, 1e-5 (the same arithmetic); the free latents against the oracle's are shown, not judged (eight steps amplify the evaluation's rounding) | `tools/oracle/moss-image.py trajectory` | DiT, LoRA |
-| `moss-image vae` | FLUX.2's decoder: the pipeline's de-normalization and 2×2 de-patchification, then the image, plane by plane — on an encoded test image's latent and on the final latent of the reference pipeline | the de-patchified latent per channel, floor 5e-4; the image per plane, floor 5e-4, at the fp64 witness (no floor there) | `tools/oracle/moss-image.py vae --size {size}; vae-witness --size {size}; vae-final --size {size}` | VAE |
-| `moss-image img2img` | the start of an img2img at the oracle's strength (0.6): the seed's noise and the schedule, t_start and σ_s through the product's admission, the start's mix bit for bit, the encoder's z₀ and x_s, each step's velocity from the oracle's latent, then the product's denoiser from its own start over exactly the steps diffusers runs | noise and the mix from the oracle's z₀ bit for bit; t_start equal, σ_s within 1e-6; z₀ and x_s per latent plane, floor 5e-4; each guided velocity by the family's trajectory rule (floor 5e-4, at the step's fp64 witness where it exists; Krea 2: clouds of summation orders when the oracle drew the failing step's); the product's steps exactly σ[t_start] … σ[N − 1]; its free final latent shown, not judged; with --variant, the Standard's start through the version's DiT, along the int8 route when it publishes int8 and once widened | `tools/oracle/moss-image.py img2img --size {size}; with --variant compact, the same with --variant (the Compact's published weights, dequantized by their publisher's library; the Light's own SQ file, decoded by the oracle's reference decoder of the published format)` | VAE, DiT |
+| `moss-image dit` | one evaluation of the DiT (the base weights, no LoRA) at σ = 1, boundary by boundary: the time path, the embedders, the text blocks, block 0 inside out, blocks 1, 13, 27 and 41, the head, and the velocity per latent plane (with --variant compact, the Compact's int8 codes) | the rule, floor 5e-4, with the model in bf16 beside the oracle (the W8A8 run for a Compact); model_out per latent plane at the fp64 witness | `tools/oracle/moss-image.py dit --size {size}; witness --size {size}; dit-bf16 --size {size}; with --variant compact, dit, witness and w8a8 with --variant compact at 512` | DiT |
+| `moss-image dit-lora` | the DiT under the family's DMD LoRA kept apart (y = base(x) + scale·up(down(x)), the model card's demo), against the reference's LoRA-merged fp32 evaluation, at the fp64 witness, with the bf16 reference carrying the LoRA apart beside it | model_out per latent plane at the fp64 witness: no further than the bf16 reference with the LoRA kept apart, + 25 % | `tools/oracle/moss-image.py dit --lora; witness --lora; bf16 (model_out_apart)` | DiT, LoRA |
+| `moss-image pace` | the DiT as a render opens it, alone: each render's evaluations on seeded inputs (--renders, 3; --evaluations, 8), the digest of its velocities, each engine stage's footprint against its P, the process against B, no swap (the DMD LoRA kept apart, as a render; with --variant compact, the Compact's) | each stage's footprint stays under B less 64 MiB; the process's under B (¾ · RAM − 2 GiB); no swap-out | — | DiT, LoRA |
+| `moss-image trajectory` | the seed's noise bit for bit, the 8-step σ schedule and the timesteps, then each step's velocity (the DMD LoRA kept apart) from the reference's own latent at that step | the noise and σ exact; each step, position by position (the 128 channels of a cell), by the rule against the model in bf16 (LoRA apart), floor 5e-4 | `tools/oracle/moss-image.py trajectory; trajectory-bf16` | DiT, LoRA |
+| `moss-image vae` | the FLUX.2 VAE decoder (f32, as the pipeline decodes) on the reference's latent: batch-norm denormalization, unpatchify, post_quant_conv, the decoder's boundaries and the clamped image | per plane, at the fp64 witness: no further from it than the f32 reference, + 25 % | `tools/oracle/moss-image.py vae; vae-witness` | VAE |
+| `moss-image img2img` | an image to start from: the FLUX.2 VAE's encoder (f32, as the reference encodes) on the oracle's picture — the posterior mean, patchified, batch-norm normalized —, the first step run at strength 0.6 and its σ, the starting latent σ·ε + (1 − σ)·z₀ from the reference's own z₀ and noise, then the app's render from the picture | z₀ per plane against the f32 reference, at the floor; the first step and σ exact; the starting latent bit for bit; the render finite, its PSNR against the reference's final latent decoded here said and not judged (a free loop in bf16) | `tools/oracle/moss-image.py text; img2img --size {size}` | text encoder, DiT, LoRA, VAE |
+| `moss-image render` | the app's render (Engine.render: tokenizer, Qwen3.5-9B, 8 DMD steps, FLUX.2 decoder) from the reference prompt and seed against the reference's fp32 picture | the same picture: PSNR past 25 dB against the fp32 reference (a bound written before the run, as Z-Image's); with --variant compact, a finite picture, its PSNR said and not judged: the Compact is judged at the DiT | `tools/oracle/moss-image.py trajectory; vae-final` | text encoder, DiT, LoRA, VAE |
+| `qwen-image-2.1 references` | a reference picture as both encoders read it, from its file: the size, Pillow's Lanczos, the RGBA the VAE reads and the patches the vision tower reads — an opaque picture (the oracle's two) and one with transparency, at two sizes | bit for bit | `tools/oracle/qwen-image-2.1.py references; references --side 443; text --edit 2; vae-encode` | — |
+| `qwen-image-2.1 vision` | Qwen3-VL-8B's vision tower on the oracle's two reference pictures, each alone: the first block (patch embedding, resampled positions, axial RoPE), the last hidden state, the merged rows the language model reads and the three deepstack rows | the rule against transformers in bf16 | `tools/oracle/qwen-image-2.1.py vision; vision-bf16` | text encoder |
+| `qwen-image-2.1 text` | Qwen3-VL-8B reads the prompt: template and identifiers, then layers 0, 17 and 35 over the real tokens and prompt_embeds, the last layer's output without the system turn (with --edit N, N reference pictures read with it: their slots and three-axis positions, the vision tower's rows at the slots — layer 0's input —, its deepstack rows added after layers 0, 1 and 2) | identifiers and positions bit for bit, the RoPE table within 1e-3; the rule against transformers in bf16 | `tools/oracle/qwen-image-2.1.py text [--edit N]; text-bf16 [--edit N]` | text encoder |
+| `qwen-image-2.1 dit` | one evaluation of the DiT at σ = 1 over the joint sequence, boundary by boundary: the layout (segments, RoPE table), the two timesteps' embedding and the shared modulation, txt_in, img_in, the sequence, layers 0, 1 and 31, norm_out, and the velocity per latent channel (with --edit N, N reference pictures in the sequence; with --variant compact, the Compact's int8 codes) | the layout bit for bit, the RoPE table within 1e-3; the rule against the fp64 witness where it exists, with diffusers in bf16 beside the oracle (the W8A8 run for a Compact); norm_out on the target's rows, the only ones the DiT computes it for | `tools/oracle/qwen-image-2.1.py dit [--edit N]; witness; bf16 [--edit N]; with --variant compact (no --edit), dit and w8a8 with --variant compact` | DiT |
+| `qwen-image-2.1 dit-lora` | one evaluation of the DiT at σ = 1 under a user's LoRA read in its published file (the golden's: PEFT's names, 224 modules, the SwiGLU's input in diffusers' two halves, strength 1), the low-rank path beside each product: the velocity per latent channel (with --variant compact, on the Compact's codes; under the precision ane, in the shared forms) | the file recognized as this family's, every module applied; model_out per latent channel against the fp32 reference under the LoRA: no further than the bf16 reference (the W8A8 run for a Compact) without the LoRA is from the fp32 one, + 25 % — the LoRA alone moves model_out by a quarter on its worst channel | `tools/oracle/qwen-image-2.1.py dit; bf16; w8a8 --variant compact (the references without the LoRA); under it, dit-lora --lora FILE (the reference under it, qwen21/goldens-qwen21-dit-lora-user-{size}, whose manifest names the LoRA's file, its source and its scale)` | DiT, the LoRA |
+| `qwen-image-2.1 pace` | the DiT as a render opens it, alone: each render's evaluations on seeded inputs (--renders, 3; --evaluations, 8), the digest of its velocities, each engine stage's footprint against its P, the process against B, no swap (with --variant compact, the Compact's map in the library whatever is installed) | each stage's footprint stays under B less 64 MiB; the process's under B (¾ · RAM − 2 GiB); no swap-out | — | DiT |
+| `qwen-image-2.1 trajectory` | the seed's noise bit for bit, the published 8-step σ schedule, then each step's velocity from the reference's own latent at that step, by the render's DiT session: the first step the whole sequence, the others the target over the kept keys and values (with --edit N, N reference pictures in the sequence) | the noise and σ exact; each step by the rule against diffusers' same step in bf16 | `tools/oracle/qwen-image-2.1.py trajectory [--edit N]; trajectory-bf16; with --edit N, trajectory-steps-bf16 --edit N` | DiT |
+| `qwen-image-2.1 vae-encode` | the VAE's encoder in bf16 on the oracle's two reference pictures, RGBA: the latent's mean, then the latent normalized in bf16 as the pipeline hands it to the DiT | per latent plane: the rule against diffusers encoding in bf16 | `tools/oracle/qwen-image-2.1.py vae-encode; vae-encode-bf16` | VAE |
+| `qwen-image-2.1 vae` | the decoder in bf16 on the final latent of the oracle's trajectory, de-normalized in bf16 as the pipeline does: the RGBA image plane by plane | per plane, at the fp64 witness: no further from it than diffusers decoding in bf16, + 25 % | `tools/oracle/qwen-image-2.1.py vae; vae-witness; vae-bf16` | VAE |
+| `qwen-image-2.1 render` | the app's render (Engine.render: tokenizer, encoder, 8 Euler steps, decoder) from the reference prompt and seed: the reference's final picture (with --edit N, an edit of the oracle's N reference pictures, read from their files: the vision tower and the VAE's encoder too) | the same picture: PSNR against diffusers in fp32 no more than 3 dB under diffusers' own bf16 render's (a free 8-step loop in bf16 is as far from the fp32 picture as it is); with --variant compact, a finite picture, its PSNR said and not judged: the Compact is judged at the DiT | `tools/oracle/qwen-image-2.1.py trajectory [--edit N]; vae [--edit N]; trajectory-bf16 [--edit N]` | text encoder, DiT, VAE |
+| `qwen-image-2.1 writer` | Qwen3-VL-8B writes: the chat prompt (with or without a system turn, with a picture), the logits teacher-forced on the reference's tokens, and greedy decoding with a K/V cache writing what the whole forward picks | identifiers and pixels bit for bit; the logits by the rule beside the reference's bf16 run; each token the fp32 reference's or the bf16 one's; the decoding's tokens its own whole forward's, the first and nine in ten at least; with --variant compact (the system case), the identifiers and the decoding, the tokens said and not judged | `tools/oracle/qwen-image-2.1-writer.py [CASE]; qwen-image-2.1-writer.py --bf16 [CASE]; qwen-image-2.1-writer.py system --variant compact` | text encoder |
+| `anima vae-bands` | the decoder the plan takes by bands of rows under a B its whole session does not fit: the same picture as the whole decoder's, and what the device held against the plan's need | under the small B the plan cuts; every value of the picture is the whole decoder's, bit for bit; the banded session holds no more than its plan's need | — | VAE |
+| `krea2 vae-bands` | the decoder the plan takes by bands of rows under a B its whole session does not fit: the same picture as the whole decoder's, and what the device held against the plan's need | under the small B the plan cuts; every value of the picture is the whole decoder's, bit for bit; the banded session holds no more than its plan's need | — | VAE |
+| `qwen-image-2.1 vae-bands` | the decoder the plan takes by bands of rows under a B its whole session does not fit: the same picture as the whole decoder's, and what the device held against the plan's need | under the small B the plan cuts; every value of the picture is the whole decoder's, bit for bit; the banded session holds no more than its plan's need | — | VAE |
+| `z-image vae-bands` | the decoder layer by layer and by bands of rows, at bands much shorter than it prefers, on the vae stage's reference: the norms' statistics combined from the bands' parts, the margins masked at the plane's edges; and at a size no reference reaches, what it held against its plan | at the reference's size, per plane, at the fp64 witness: no further from it than the reference in the decoder's precision, + 25 % (the vae stage's rule); at any size, the footprint's peak no higher than the plan's P + 64 MiB, and P under B | — | VAE |
+| `moss-image vae-bands` | the decoder layer by layer and by bands of rows, at bands much shorter than it prefers, on the vae stage's reference: the norms' statistics combined from the bands' parts, the margins masked at the plane's edges; and at a size no reference reaches, what it held against its plan | at the reference's size, per plane, at the fp64 witness: no further from it than the reference in the decoder's precision, + 25 % (the vae stage's rule); at any size, the footprint's peak no higher than the plan's P + 64 MiB, and P under B | — | VAE |
+| `z-image memory` | one render's memory, stage by stage (text, DiT, decoder): the footprint at its most while each lived against B less the margin its stage keeps, the process's footprint against B, no page swapped out | each stage's footprint stays under B less 64 MiB; the process's under B (¾ · RAM − 2 GiB); no swap-out | — | text encoder, DiT, VAE |
+| `anima memory` | one render's memory, stage by stage (text, DiT, decoder): the footprint at its most while each lived against B less the margin its stage keeps, the process's footprint against B, no page swapped out | each stage's footprint stays under B less 64 MiB; the process's under B (¾ · RAM − 2 GiB); no swap-out | — | text encoder, DiT, VAE |
+| `krea2 memory` | one render's memory, stage by stage (text, DiT, decoder): the footprint at its most while each lived against B less the margin its stage keeps, the process's footprint against B, no page swapped out | each stage's footprint stays under B less 64 MiB; the process's under B (¾ · RAM − 2 GiB); no swap-out | — | text encoder, DiT, VAE |
+| `moss-image memory` | one render's memory, stage by stage (text, DiT, decoder): the footprint at its most while each lived against B less the margin its stage keeps, the process's footprint against B, no page swapped out | each stage's footprint stays under B less 64 MiB; the process's under B (¾ · RAM − 2 GiB); no swap-out | — | text encoder, DiT, VAE |
+| `qwen-image-2.1 memory` | one render's memory, stage by stage (text, DiT, decoder): the footprint at its most while each lived against B less the margin its stage keeps, the process's footprint against B, no page swapped out | each stage's footprint stays under B less 64 MiB; the process's under B (¾ · RAM − 2 GiB); no swap-out | — | text encoder, DiT, VAE |
+| `qwen-image-2.1 writer-memory` | one writing's memory (a rewrite; with --describe <image>, a description): the footprint at its most while each of its stages lived against B less the margin, the process's footprint against B, no page swapped out | each stage's footprint stays under B less 64 MiB; the process's under B (¾ · RAM − 2 GiB); no swap-out | — | text encoder |
+| `z-image import` | the installed DiT, placed in the library as an imported model under another name, is recognized as its family's and renders the published model's image | the file is recognized as a model of the family; its image is the published model's, above 50 dB | — | text encoder, DiT, VAE |
+| `anima import` | the installed DiT, placed in the library as an imported model under another name, is recognized as its family's and renders the published model's image | the file is recognized as a model of the family; its image is the published model's, above 50 dB | — | text encoder, DiT, VAE |
+| `krea2 import` | the installed DiT, placed in the library as an imported model under another name, is recognized as its family's and renders the published model's image | the file is recognized as a model of the family; its image is the published model's, above 50 dB | — | text encoder, DiT, VAE |
+| `moss-image import` | the installed DiT, placed in the library as an imported model under another name, is recognized as its family's and renders the published model's image | the file is recognized as a model of the family; its image is the published model's, above 50 dB | — | text encoder, DiT, VAE |
+| `qwen-image-2.1 import` | the installed DiT, placed in the library as an imported model under another name, is recognized as its family's and renders the published model's image | the file is recognized as a model of the family; its image is the published model's, above 50 dB | — | text encoder, DiT, VAE |

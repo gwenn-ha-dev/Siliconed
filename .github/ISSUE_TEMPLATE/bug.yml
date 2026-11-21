@@ -42,14 +42,6 @@ body:
     id: version
     attributes:
       label: App version and machine
-      placeholder: x.y (build), Apple M1 Pro, 16 GB, macOS 27.0.1
+      placeholder: x.y (build), Apple M5 Pro, 64 GB, macOS 27.0.1
     validations:
       required: true
-  - type: textarea
-    id: report
-    attributes:
-      label: Diagnostic JSON
-      description: Optional. From the app's Help → "Measure This Mac…", "Copy JSON"; it tells us the machine and whether the engine is accurate on it.
-      render: json
-    validations:
-      required: false
