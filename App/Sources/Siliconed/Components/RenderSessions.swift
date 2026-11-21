@@ -1,7 +1,7 @@
 import Foundation
 
-// **What every render runs alike**: its decoder, and the check on what it hands back. The render itself stays in its
-// family's folder; these are the pieces it would otherwise copy.
+// **What every render runs alike**: its decoder, and the check on what it hands back — pieces of `RenderLoop`, the
+// decoder's also opened alone by the checks.
 
 /// **A VAE decoder a render runs**: a latent to the picture's planes, on the engine's functions (`FluxVAEDecoder`,
 /// `QwenImageVAEDecoder`, …). It is opened once for a batch — its plan drawn from B, its arena taken,

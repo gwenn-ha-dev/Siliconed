@@ -36,144 +36,85 @@ import Foundation
 package enum QwenImage21Render {
     static func render(_ request: Request, _ admitted: Admission, seeds: [UInt64], model: Model,
                        cancellation: Cancellation?, emit: (Engine.Event) -> Void) throws -> [Engine.Render] {
-        let chain = model.chain
-        guard let text = chain.text as? QwenImage21TextModule, let denoising = chain.denoising as? QwenImage21DenoisingModule,
-              let decoding = chain.decoding as? QwenImage21DecodingModule else { throw EngineError.notOnEngine(model: model.identifier) }
-        let references = try denoising.preparedReferences(request.references)
-        guard references.isEmpty || chain.encoding is QwenImage21EncodingModule else { throw EngineError.notOnEngine(model: model.identifier) }
-        let loras = try LoRAStack(request.loras, on: model.card.family)
-        let plan = admitted.plan
-        let (height, width, steps, start) = (admitted.height, admitted.width, admitted.steps, admitted.start)
-        let space = denoising.space
-        let totalStart = Date()
-        emit(.start(Engine.Plan(denoising: plan, seeds: seeds, stages: references.isEmpty ? [.text, .denoising, .decoding] : [.text, .image, .denoising, .decoding])))
+        try RenderLoop.run(try Parts(request, admitted, model: model), request, admitted, seeds: seeds, model: model,
+                           cancellation: cancellation, emit: emit)
+    }
 
-        // ── the text, once ──
-        try cancellation.check()
-        emit(.stage(.text, image: 0))
-        var timings = Engine.Timings()
-        let textStart = Date()
-        let tokenizer = try Tokenizer(directory: text.tokenizer)
-        // A latent cell is a vision patch: a reference's grid is both, and it takes a quarter of it in slots.
-        let grids = references.map { (height: $0.height / space.factor, width: $0.width / space.factor) }
-        let (ids, rows, dropped, promptTokens) = try QwenImage21Text.identifiers(request.prompt, pictures: grids.map { $0.height * $0.width / 4 },
-                                                                          tokenizer: tokenizer)
-        timings.tokenizer = Date().timeIntervalSince(textStart)
-        try cancellation.check()
-        let slots = Array(rows.dropFirst(dropped))
-        let pictures = try references.map { try Qwen3VLImages.pixels(QwenImage21References.rgb8($0)) }
-        var key = RenderCache.Key("QwenImage21Render.encode")
-        try key.file(text.map)
-        key.integers(ids)
-        key.integers([dropped])
-        for picture in pictures {
-            key.integers([picture.gridHeight, picture.gridWidth])
-            key.floats(picture.values)
-        }
-        let (states, cached) = try RenderCache.conditioning(key, of: model) {
-            try spoken(encode(ids, dropped: dropped, pictures: pictures, slots: rows, map: text.map), slots: slots)
-        }
-        timings.text = Date().timeIntervalSince(textStart)
-        timings.encoder = timings.text - timings.tokenizer
-        emit(.text(tokens: promptTokens, tokenizer: timings.tokenizer, encoder: timings.encoder, cached: cached))
+    /// **Qwen-Image-2.1's part of the render** (`RenderLoop`): the raw template and Qwen3-VL-8B's states, an edit's
+    /// references through the vision tower and the VAE's encoder (their tokens to the DiT, no latent to start from), the
+    /// DiT told `modelTime`, the decoder reading the latent denormalized in bf16, its RGBA's alpha dropped.
+    struct Parts: RenderParts {
+        typealias Decoder = QwenImage21VAEDecoder
+        private let request: Request, model: Model, admitted: Admission
+        private let text: QwenImage21TextModule, denoising: QwenImage21DenoisingModule
+        private let references: [ImageRGB], encoding: QwenImage21EncodingModule?
+        private let loras: LoRAStack
+        let decoderPath: String
+        private var grids: [(height: Int, width: Int)] = [], ids: [Int] = [], rows: [Bool] = [], dropped = 0
+        private var slots: [Bool] = [], states: HostTensor?, referenceTokens: [Float] = []
 
-        // ── an edit's references, once: each picture's latent, its tokens row-major ──
-        var tokens: [Float] = []
-        if let encoding = chain.encoding as? QwenImage21EncodingModule, !references.isEmpty {
-            try cancellation.check()
-            emit(.stage(.image, image: 0))
-            let encodingStart = Date()
-            for reference in references { tokens += try Self.tokens(latent(of: reference, path: encoding.path)) }
-            timings.encoding = Date().timeIntervalSince(encodingStart)
-            emit(.encoding(seconds: timings.encoding))
+        init(_ request: Request, _ admitted: Admission, model: Model) throws {
+            let chain = model.chain
+            guard let text = chain.text as? QwenImage21TextModule, let denoising = chain.denoising as? QwenImage21DenoisingModule,
+                  let decoding = chain.decoding as? QwenImage21DecodingModule else { throw EngineError.notOnEngine(model: model.identifier) }
+            references = try denoising.preparedReferences(request.references)
+            encoding = chain.encoding as? QwenImage21EncodingModule
+            guard references.isEmpty || encoding != nil else { throw EngineError.notOnEngine(model: model.identifier) }
+            loras = try LoRAStack(request.loras, on: model.card.family)
+            (self.request, self.model, self.admitted, self.text, self.denoising) = (request, model, admitted, text, denoising)
+            decoderPath = decoding.path
         }
 
-        // ── the denoising, image by image, one DiT session for the batch ──
-        let sequence = try QwenImage21DiT.Sequence(slots: slots, references: grids, height: height, width: width)
-        // Announced before its DiT is planned: the plan's seconds are the denoising's, not the text's.
-        try cancellation.check()
-        emit(.stage(.denoising, image: 0))
-        let ditStart = Date()
-        var dit: Denoiser? = try Denoiser(map: denoising.map, loras: loras, sequence: sequence, text: states,
-                               references: tokens.isEmpty ? nil : HostTensor([sequence.referenceRows, space.channels], floats: tokens))
-        let schedule = denoising.sigmas(steps: steps)
-        let told = request.detail.modelSigmas(schedule, start: start, bell: denoising.detailBell,
-                                              scale: Detail.scale(width: space.factor * width, height: space.factor * height))
-        let count = space.channels * height * width
-        var pending: [(latent: [Float], timings: Engine.Timings, elapsed: TimeInterval)] = []
-        var imageStart = totalStart
-        for (n, seed) in seeds.enumerated() {
-            try cancellation.check()
-            if n > 0 { timings = Engine.Timings(); imageStart = Date() }
-            var latent = Latent.noise(space, height: height, width: width, seed: seed, variations: request.variations).values
-            if n > 0 { emit(.stage(.denoising, image: n)) }
-            let denoisingStart = n == 0 ? ditStart : Date()
-            let walk = SolverWalk(solver: request.solver, schedule: schedule, start: start, count: count, seed: seed)
-            var done = 0
-            for step in start..<(schedule.count - 1) {
-                try cancellation.check()
-                let stepStart = Date()
-                let velocity = try dit!.velocity(latent, time: modelTime(sigma: told[step], solver: request.solver, first: step == start))
-                latent.withUnsafeMutableBufferPointer { x in
-                    velocity.withUnsafeBufferPointer { walk.step(latent: x.baseAddress!, derivative: $0.baseAddress!) }
-                }
-                done += 1
-                emit(.step(image: n, index: done, total: plan.evaluations, sigma: schedule[step],
-                           seconds: Date().timeIntervalSince(stepStart), latentGridHeight: height, latentGridWidth: width))
-                if request.previews {
-                    let projection = space.preview
-                    let rgba = velocity.withUnsafeBufferPointer { v in
-                        if let estimate = walk.estimate {
-                            return projection.apply(x: estimate, v: v.baseAddress!, sigma: 0, height: height, width: width)
-                        }
-                        return latent.withUnsafeBufferPointer {
-                            projection.apply(x: $0.baseAddress!, v: v.baseAddress!, sigma: schedule[step + 1], height: height, width: width)
-                        }
-                    }
-                    emit(.preview(Engine.Preview(image: n, index: done, total: plan.evaluations, height: height, width: width, rgba: rgba)))
-                }
+        var encodes: Bool { !references.isEmpty }
+
+        mutating func tokens() throws -> Int {
+            let tokenizer = try Tokenizer(directory: text.tokenizer)
+            let factor = denoising.space.factor
+            // A latent cell is a vision patch: a reference's grid is both, and it takes a quarter of it in slots.
+            grids = references.map { (height: $0.height / factor, width: $0.width / factor) }
+            let identified = try QwenImage21Text.identifiers(request.prompt, pictures: grids.map { $0.height * $0.width / 4 },
+                                                             tokenizer: tokenizer)
+            (ids, rows, dropped) = (identified.ids, identified.slots, identified.dropped)
+            return identified.prompt
+        }
+
+        mutating func encode() throws -> Bool {
+            let (ids, rows, dropped, map) = (ids, self.rows, self.dropped, text.map)
+            let slots = Array(rows.dropFirst(dropped))
+            let pictures = try references.map { try Qwen3VLImages.pixels(QwenImage21References.rgb8($0)) }
+            var key = RenderCache.Key("QwenImage21Render.encode")
+            try key.file(map)
+            key.integers(ids)
+            key.integers([dropped])
+            for picture in pictures {
+                key.integers([picture.gridHeight, picture.gridWidth])
+                key.floats(picture.values)
             }
-            timings.denoising = Date().timeIntervalSince(denoisingStart)
-            pending.append((latent, timings, Date().timeIntervalSince(imageStart)))
-        }
-        // The DiT leaves before the decoder comes (`DecoderSession`).
-        dit = nil
-
-        // ── the decoding, image by image, one decoder session ──
-        // Announced before its session is planned: the plan's seconds are the first image's decoding.
-        try cancellation.check()
-        emit(.stage(.decoding, image: 0))
-        var decodingStart = Date()
-        let decoder = try DecoderSession<QwenImage21VAEDecoder>(path: decoding.path, latentHeight: height, latentWidth: width)
-        if let warning = decoder.warning { emit(.warning(warning)) }
-        var renders: [Engine.Render] = []
-        for (n, image) in pending.enumerated() {
-            if n > 0 {
-                try cancellation.check()
-                emit(.stage(.decoding, image: n))
-                decodingStart = Date()
+            let (states, cached) = try RenderCache.conditioning(key, of: model) {
+                try QwenImage21Render.spoken(QwenImage21Render.encode(ids, dropped: dropped, pictures: pictures, slots: rows, map: map), slots: slots)
             }
-            guard FiniteImage.isFinite(image.latent) else { continue }
-            // The decoded RGBA's alpha dropped without compositing: the picture's RGB planes.
-            let rgba = try decoder.pixels(QwenImage21VAEDecoder.denormalized(image.latent))
-            let pixels = Array(rgba.prefix(rgba.count / 4 * 3))
-            var t = image.timings
-            t.decoding = Date().timeIntervalSince(decodingStart)
-            t.total = image.elapsed + t.decoding
-            emit(.decoding(seconds: t.decoding))
-            guard FiniteImage.isFinite(pixels) else { continue }
-            let render = Engine.Render(
-                model: chain.denoising.model, prompt: request.prompt, seed: seeds[n], steps: steps, loras: request.loras,
-                image: ImageRGB(pixels: pixels, height: space.factor * height, width: space.factor * width),
-                evaluations: plan.evaluations, startStep: plan.startStep, startSigma: plan.startSigma,
-                timings: t, footprints: Engine.Footprints(), tokens: promptTokens, detail: request.detail, solver: request.solver,
-                variations: request.variations.filter { $0.effectiveStrength > 0 }, modelName: model.card.name,
-                isImportedModel: model.card.isImported)
-            emit(.image(index: n, render))
-            renders.append(render)
+            (self.slots, self.states) = (slots, states)
+            return cached
         }
-        if renders.isEmpty { throw EngineError.nonFiniteImage }
-        return renders
+
+        /// Each reference's latent, its tokens row-major, kept for the DiT's sequence.
+        mutating func image() throws -> Latent? {
+            guard let encoding else { return nil }
+            for reference in references { referenceTokens += try QwenImage21Render.tokens(QwenImage21Render.latent(of: reference, path: encoding.path)) }
+            return nil
+        }
+
+        func denoiser(height: Int, width: Int) throws -> any RenderDenoiser {
+            guard let states else { preconditionFailure("the text before the DiT") }
+            let sequence = try QwenImage21DiT.Sequence(slots: slots, references: grids, height: height, width: width)
+            return try Denoiser(map: denoising.map, loras: loras, sequence: sequence, text: states,
+                                references: referenceTokens.isEmpty ? nil : HostTensor([sequence.referenceRows, denoising.space.channels], floats: referenceTokens))
+        }
+
+        func decoderInput(_ latent: [Float]) -> [Float] { QwenImage21VAEDecoder.denormalized(latent) }
+
+        /// The decoded RGBA's alpha dropped without compositing: the picture's RGB planes.
+        func picture(_ decoded: [Float]) -> [Float] { Array(decoded.prefix(decoded.count / 4 * 3)) }
     }
 
     // MARK: - The time
@@ -266,5 +207,12 @@ package enum QwenImage21Render {
             nonisolated(unsafe) let loop = loop
             return try blocking { try await loop.evaluate(latent, time: time) }
         }
+    }
+}
+
+extension QwenImage21Render.Denoiser: RenderDenoiser {
+    /// The velocity itself, at the told time (`QwenImage21Render.modelTime`): the step is `x += (σᵢ₊₁ − σᵢ) · v`.
+    package func derivative(_ latent: [Float], sigma: Float, solver: Solver, first: Bool) throws -> [Float] {
+        try velocity(latent, time: QwenImage21Render.modelTime(sigma: sigma, solver: solver, first: first))
     }
 }

@@ -1,4 +1,3 @@
-import Accelerate
 import Foundation
 import SiliCore
 
@@ -22,132 +21,68 @@ import SiliCore
 package enum MossImageRender {
     static func render(_ request: Request, _ admitted: Admission, seeds: [UInt64], model: Model,
                        cancellation: Cancellation?, emit: (Engine.Event) -> Void) throws -> [Engine.Render] {
-        let chain = model.chain
-        guard let text = chain.text as? MossImageTextModule, let denoising = chain.denoising as? MossImageDenoisingModule,
-              let decoding = chain.decoding as? Flux2DecodingModule else { throw EngineError.notOnEngine(model: model.identifier) }
-        // What the engine cannot run yet, before the first computation.
-        let user = try LoRAStack(request.loras, on: model.card.family)
-        guard request.solver == .euler else { throw EngineError.notOnEngine(model: model.identifier) }
-        let plan = admitted.plan
-        let space = denoising.space
-        let (height, width, steps, start) = (admitted.height, admitted.width, admitted.steps, admitted.start)
-        let totalStart = Date()
-        emit(.start(Engine.Plan(denoising: plan, seeds: seeds, stages: request.image == nil ? [.text, .denoising, .decoding] : [.text, .image, .denoising, .decoding])))
+        try RenderLoop.run(try Parts(request, admitted, model: model), request, admitted, seeds: seeds, model: model,
+                           cancellation: cancellation, emit: emit)
+    }
 
-        // ── the text, once ──
-        try cancellation.check()
-        emit(.stage(.text, image: 0))
-        var timings = Engine.Timings()
-        let textStart = Date()
-        let (ids, promptTokens) = try Qwen35Prompt.admitted(request.prompt, tokenizer: try Tokenizer(directory: text.tokenizer))
-        timings.tokenizer = Date().timeIntervalSince(textStart)
-        try cancellation.check()
-        var key = RenderCache.Key("MossImageRender.encode")
-        try key.file(text.map)
-        key.integers(ids)
-        let (caps, cached) = try RenderCache.conditioning(key, of: model) { try encode(ids, map: text.map) }
-        timings.text = Date().timeIntervalSince(textStart)
-        timings.encoder = timings.text - timings.tokenizer
-        emit(.text(tokens: promptTokens, tokenizer: timings.tokenizer, encoder: timings.encoder, cached: cached))
+    /// **MOSS-Image's part of the render** (`RenderLoop`): the chat template and Qwen3.5-9B's states, Flux 2's encoder for
+    /// an image to start from, the DiT with the recipe's LoRA told `σ·1000`, Flux 2's decoder in f32.
+    struct Parts: RenderParts {
+        typealias Decoder = Flux2VAEDecoder
+        private let request: Request, model: Model, admitted: Admission
+        private let text: MossImageTextModule, denoising: MossImageDenoisingModule
+        private let start: (image: ImageRGB, encoding: Flux2EncodingModule)?
+        private let user: LoRAStack
+        let decoderPath: String
+        private var ids: [Int] = [], caps: HostTensor?
 
-        // ── the image to start from, once: its latent, the encoder's session let go before the DiT's comes ──
-        var origin: Latent?
-        if let image = request.image {
-            guard let encoding = chain.encoding as? Flux2EncodingModule else { throw EngineError.notOnEngine(model: model.identifier) }
-            try cancellation.check()
-            emit(.stage(.image, image: 0))
-            let encodingStart = Date()
-            origin = Latent(space: space, height: height, width: width, values: try Flux2VAEEncoder.latent(of: image, path: encoding.path))
-            timings.encoding = Date().timeIntervalSince(encodingStart)
-            emit(.encoding(seconds: timings.encoding))
-        }
-
-        // ── the denoising, image by image, one DiT session for the batch ──
-        // Announced before its DiT is planned: the plan's seconds are the denoising's, not the text's.
-        try cancellation.check()
-        emit(.stage(.denoising, image: 0))
-        let ditStart = Date()
-        var dit: Denoiser? = try Denoiser(map: denoising.map, loras: try MossImageRender.recipe(denoising.turbo, then: user), latentHeight: height, latentWidth: width, textLength: ids.count)
-        dit!.text = caps
-        let sigmas = MossImageSchedule.sigmas(steps: steps)
-        let timesteps = MossImageSchedule.timesteps(request.detail.modelSigmas(
-            sigmas, start: start, bell: denoising.detailBell, scale: Detail.scale(width: request.width, height: request.height)))
-        let count = space.channels * height * width
-        var pending: [(latent: [Float], timings: Engine.Timings, elapsed: TimeInterval)] = []
-        var imageStart = totalStart
-        for (n, seed) in seeds.enumerated() {
-            try cancellation.check()
-            if n > 0 { timings = Engine.Timings(); imageStart = Date() }
-            let noise = Latent.noise(space, height: height, width: width, seed: seed, variations: request.variations)
-            // img2img: σ_s · ε + (1 − σ_s) · z₀ at the first step run, then the txt2img schedule from there, unchanged.
-            var latent = (origin.map { Latent.start(image: $0, noise: noise, sigma: sigmas[start]) } ?? noise).values
-            if n > 0 { emit(.stage(.denoising, image: n)) }
-            let denoisingStart = n == 0 ? ditStart : Date()
-            let walk = SolverWalk(solver: request.solver, schedule: sigmas, start: start, count: count, seed: seed)
-            var done = 0
-            for step in start..<(sigmas.count - 1) {
-                try cancellation.check()
-                let stepStart = Date()
-                let velocity = try dit!.velocity(latent, time: timesteps[step])
-                latent.withUnsafeMutableBufferPointer { x in
-                    velocity.withUnsafeBufferPointer { walk.step(latent: x.baseAddress!, derivative: $0.baseAddress!) }
-                }
-                done += 1
-                emit(.step(image: n, index: done, total: plan.evaluations, sigma: sigmas[step],
-                           seconds: Date().timeIntervalSince(stepStart), latentGridHeight: height, latentGridWidth: width))
-                if request.previews {
-                    let projection = space.preview
-                    let rgba = velocity.withUnsafeBufferPointer { v in
-                        if let estimate = walk.estimate {
-                            return projection.apply(x: estimate, v: v.baseAddress!, sigma: 0, height: height, width: width)
-                        }
-                        return latent.withUnsafeBufferPointer {
-                            projection.apply(x: $0.baseAddress!, v: v.baseAddress!, sigma: sigmas[step + 1],
-                                             height: height, width: width)
-                        }
-                    }
-                    emit(.preview(Engine.Preview(image: n, index: done, total: plan.evaluations, height: height, width: width, rgba: rgba)))
-                }
+        init(_ request: Request, _ admitted: Admission, model: Model) throws {
+            let chain = model.chain
+            guard let text = chain.text as? MossImageTextModule, let denoising = chain.denoising as? MossImageDenoisingModule,
+                  let decoding = chain.decoding as? Flux2DecodingModule else { throw EngineError.notOnEngine(model: model.identifier) }
+            if let image = request.image {
+                guard let encoding = chain.encoding as? Flux2EncodingModule else { throw EngineError.notOnEngine(model: model.identifier) }
+                start = (image, encoding)
+            } else {
+                start = nil
             }
-            timings.denoising = Date().timeIntervalSince(denoisingStart)
-            pending.append((latent, timings, Date().timeIntervalSince(imageStart)))
+            // What the engine cannot run yet, before the first computation.
+            user = try LoRAStack(request.loras, on: model.card.family)
+            guard request.solver == .euler else { throw EngineError.notOnEngine(model: model.identifier) }
+            (self.request, self.model, self.admitted, self.text, self.denoising) = (request, model, admitted, text, denoising)
+            decoderPath = decoding.path
         }
-        // The DiT leaves before the decoder comes (`DecoderSession`).
-        dit = nil
 
-        // ── the decoding, image by image, one decoder session ──
-        // Announced before its session is planned: the plan's seconds are the first image's decoding.
-        try cancellation.check()
-        emit(.stage(.decoding, image: 0))
-        var decodingStart = Date()
-        let decoder = try DecoderSession<Flux2VAEDecoder>(path: decoding.path, latentHeight: height, latentWidth: width)
-        if let warning = decoder.warning { emit(.warning(warning)) }
-        var renders: [Engine.Render] = []
-        for (n, image) in pending.enumerated() {
-            if n > 0 {
-                try cancellation.check()
-                emit(.stage(.decoding, image: n))
-                decodingStart = Date()
-            }
-            guard FiniteImage.isFinite(image.latent) else { continue }
-            let pixels = try decoder.pixels(image.latent)
-            var t = image.timings
-            t.decoding = Date().timeIntervalSince(decodingStart)
-            t.total = image.elapsed + t.decoding
-            emit(.decoding(seconds: t.decoding))
-            guard FiniteImage.isFinite(pixels) else { continue }
-            let render = Engine.Render(
-                model: chain.denoising.model, prompt: request.prompt, seed: seeds[n], steps: steps, loras: request.loras,
-                image: ImageRGB(pixels: pixels, height: space.factor * height, width: space.factor * width),
-                evaluations: plan.evaluations, startStep: plan.startStep, startSigma: plan.startSigma,
-                timings: t, footprints: Engine.Footprints(), tokens: promptTokens, detail: request.detail, solver: request.solver,
-                variations: request.variations.filter { $0.effectiveStrength > 0 }, modelName: model.card.name,
-                isImportedModel: model.card.isImported)
-            emit(.image(index: n, render))
-            renders.append(render)
+        var encodes: Bool { start != nil }
+
+        mutating func tokens() throws -> Int {
+            let (ids, promptTokens) = try Qwen35Prompt.admitted(request.prompt, tokenizer: try Tokenizer(directory: text.tokenizer))
+            self.ids = ids
+            return promptTokens
         }
-        if renders.isEmpty { throw EngineError.nonFiniteImage }
-        return renders
+
+        mutating func encode() throws -> Bool {
+            let (ids, map) = (ids, text.map)
+            var key = RenderCache.Key("MossImageRender.encode")
+            try key.file(map)
+            key.integers(ids)
+            let (caps, cached) = try RenderCache.conditioning(key, of: model) { try MossImageRender.encode(ids, map: map) }
+            self.caps = caps
+            return cached
+        }
+
+        func image() throws -> Latent? {
+            guard let start else { return nil }
+            return Latent(space: denoising.space, height: admitted.height, width: admitted.width,
+                          values: try Flux2VAEEncoder.latent(of: start.image, path: start.encoding.path))
+        }
+
+        func denoiser(height: Int, width: Int) throws -> any RenderDenoiser {
+            let dit = try Denoiser(map: denoising.map, loras: try MossImageRender.recipe(denoising.turbo, then: user),
+                                   latentHeight: height, latentWidth: width, textLength: ids.count)
+            dit.text = caps
+            return dit
+        }
     }
 
     // MARK: - The three sessions
@@ -206,5 +141,13 @@ package enum MossImageRender {
             dit.close()
             return (v, boundaries)
         }
+    }
+}
+
+extension MossImageRender.Denoiser: RenderDenoiser {
+    /// The velocity itself, at the told timestep `σ·1000` (`MossImageSchedule.timesteps`): `scheduler.step` adds
+    /// `(σ_next − σ) · v`. Euler alone, so neither the solver nor the first step changes it.
+    package func derivative(_ latent: [Float], sigma: Float, solver: Solver, first: Bool) throws -> [Float] {
+        try velocity(latent, time: sigma * Float(MossImageSchedule.trainTimesteps))
     }
 }
