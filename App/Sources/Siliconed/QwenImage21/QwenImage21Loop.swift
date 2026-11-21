@@ -58,7 +58,8 @@ package final class QwenImage21Loop {
 
     /// **The path of a DiT's arithmetic** (`Arithmetic`): the Standard's bf16; the Compact's codes on the GPU alone in
     /// W8A16 (`exact`: the stream under the guard of f16); the shared forms beside the ANE (or told 0 rows of it), on
-    /// the Compact's codes or the Standard's weights in f16.
+    /// the Compact's codes or the Standard's weights in f16, and on the GPU alone where its products are int8 × int8
+    /// (`SharedWeights.integer`: the guarded forms read the codes in W8A16 only).
     static func path(_ a: Arithmetic) -> Path {
         switch a {
         case .standard: .bfloat
@@ -135,11 +136,13 @@ package final class QwenImage21Loop {
         n.residents = QwenImage21Functions.others()
         let form = path.rawValue
         n.groups = groups.enumerated().map { Block.Group($1, form: form, weights: QwenImage21Functions.layer($0, path: path, weights: weights)) }
+        if path == .shared { n.codes = weights.layout }
         (n.once, n.cycle) = (groups, groups)
         let (pk, tk) = (g.prefixKeys, g.targetKeys)
         let keys: Set<String> = ["kp", "vp", "kt", "vt"]
         let module: @Sendable (String, Block.Build) -> Aicode.Module = { step, b in
-            QwenImage21Functions.module(step, path: path, weights: weights, codes: b.codes, rows: b.rows, prefix: pk, target: tk, ranks: ranks)
+            QwenImage21Functions.module(step, path: path, weights: weights, codes: b.codes, rows: b.rows, prefix: pk, target: tk, ranks: ranks,
+                                        neural: b.neural)
         }
         if path == .shared {
             n.forms = [Block.Form(form, steps: [.init("pre"), .init("heads", on: .gpu), .init("attention", on: .gpu, whole: keys),
@@ -175,8 +178,9 @@ package final class QwenImage21Loop {
             throw ProgramError("\(map): its products are \(probe.dtype), which no path of the DiT reads")
         }
         let g = Geometry(sequence), ranks = QwenImage21Functions.ranks(loras)
-        let arithmetic = try Arithmetic.opened(codes: probe.dtype == "I8", precision: CoreAI.inForce) { declaration(g, $0, ranks: ranks, tapped: tapped) }
         guard let device = MTLCreateSystemDefaultDevice() else { throw ProgramError("no Metal device") }
+        let codes = probe.dtype == "I8", offered = try await Arithmetic.offered(codes: codes, device)
+        let arithmetic = try Arithmetic.opened(codes: codes, precision: CoreAI.inForce, offered: offered) { declaration(g, $0, ranks: ranks, tapped: tapped) }
         let block = try await Block.open(device, declaration(g, arithmetic, ranks: ranks, tapped: tapped), files: [file], budget: budget, share: arithmetic.share)
         let loop = QwenImage21Loop(block, g, arithmetic, ranks: ranks)
         try loop.write(loras)

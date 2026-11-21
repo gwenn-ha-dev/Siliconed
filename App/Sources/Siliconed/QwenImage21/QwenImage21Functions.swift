@@ -243,10 +243,11 @@ package enum QwenImage21Functions {
     /// `weights`: the shared forms' (`SharedWeights`).
     /// `tapped`: `final` also gives `normed`, the head's norm, which only the check reads (a render left it in P,
     /// `[targetKeys, d]` in f32 written at every step).
+    /// `neural`: the ANE's function of a step both units take (`Block.Build.neural`, `QwenImage21Shared.module`).
     static func module(_ f: String, path: Path, weights: SharedWeights = .codes, codes: CodesLayout, rows: Int, prefix: Int = 0, target: Int = 0,
-                       ranks: Ranks = [:], tapped: Bool = false) -> Aicode.Module {
+                       ranks: Ranks = [:], tapped: Bool = false, neural: Bool = false) -> Aicode.Module {
         if path == .shared, !outer.contains(f) {
-            return QwenImage21Shared.module(f, rows: rows, prefix: prefix, target: target, weights: weights, ranks: ranks)
+            return QwenImage21Shared.module(f, rows: rows, prefix: prefix, target: target, weights: weights, ranks: ranks, neural: neural)
         }
         let arguments = arguments(f, path: path, codes: codes, rows: rows, prefix: prefix, target: target, ranks: ranks)
         var m = Aicode.Module(arguments: arguments.map { ($0.name, Aicode.tensor($0.shape, $0.element)) })

@@ -42,21 +42,29 @@ import Testing
         let (a, b) = (try Block.paceKey(Self.declaration), try Block.paceKey(other))
         #expect(a != b)
         var measured = ThisMac()
-        #expect(try Block.choose([Self.declaration, other], measured: measured) == 0)
+        #expect(try Block.choose([(Self.declaration, .inFlight), (other, .inFlight)], measured: measured) == 0)
         // A declaration that shares the ANE's rows has a pace at its kept unit only: none before its unit is decided, none
         // taken at another.
         let (ua, ub) = (try #require(try Block.unitKey(Self.declaration)), try #require(try Block.unitKey(other)))
         let (pa, pb) = (a + Block.byUnit(512), b + Block.byUnit(512))
         measured.paces = [pa: 2.0, pb: 2.5]
-        #expect(try Block.choose([Self.declaration, other], measured: measured) == 0)       // none decided: the first untimed
+        #expect(try Block.choose([(Self.declaration, .inFlight), (other, .inFlight)], measured: measured) == 0)       // none decided: the first untimed
         measured.neuralUnits = [ua: 1024]; measured.neuralUnits?[ub] = 512
-        #expect(try Block.choose([Self.declaration, other], measured: measured) == 0)       // a's pace was taken at 512, not 1024
+        #expect(try Block.choose([(Self.declaration, .inFlight), (other, .inFlight)], measured: measured) == 0)       // a's pace was taken at 512, not 1024
         measured.neuralUnits = [ua: 512]; measured.neuralUnits?[ub] = 512
-        #expect(try Block.choose([Self.declaration, other], measured: measured) == 0)
+        #expect(try Block.choose([(Self.declaration, .inFlight), (other, .inFlight)], measured: measured) == 0)
         measured.paces = [pa: 2.0, pb: 1.5]
-        #expect(try Block.choose([Self.declaration, other], measured: measured) == 1)
+        #expect(try Block.choose([(Self.declaration, .inFlight), (other, .inFlight)], measured: measured) == 1)
         measured.paces = [pb: 1.5]
-        #expect(try Block.choose([Self.declaration, other], measured: measured) == 0)
+        #expect(try Block.choose([(Self.declaration, .inFlight), (other, .inFlight)], measured: measured) == 0)
+        // One declaration beside the ANE and on the GPU alone: two paces, the GPU's without a unit.
+        let both: [(declaration: Block.Declaration, share: Block.Share)] = [(Self.declaration, .inFlight), (Self.declaration, .gpu)]
+        measured.paces = [pa: 2.0]
+        #expect(try Block.choose(both, measured: measured) == 1)       // the GPU alone never timed
+        measured.paces = [pa: 2.0, a: 1.9]
+        #expect(try Block.choose(both, measured: measured) == 1)
+        measured.paces = [pa: 2.0, a: 2.1]
+        #expect(try Block.choose(both, measured: measured) == 0)
     }
 
     @Test func anArgumentIsBoundByItsNameFirstMatch() {

@@ -53,7 +53,9 @@ package enum ZImageLayerZero {
                                   _ tapped: [ZImageDiT.BlockTap: UnsafeMutableBufferPointer<Float>]) async throws -> String {
         guard let device = MTLCreateSystemDefaultDevice() else { throw Failure("no Metal device") }
         let file = try ZImageDiT.file(path)
-        let arithmetic = Arithmetic.of(codes: file.tensors["layers.0.attention.qkv.weight"]?.dtype == "I8", precision: CoreAI.inForce)
+        var arithmetic = Arithmetic.of(codes: file.tensors["layers.0.attention.qkv.weight"]?.dtype == "I8", precision: CoreAI.inForce)
+        // The Compact's int8 × int8 products where a control asks for them (`--products int8`): the block on the GPU.
+        if case .shared(.codes, let share) = arithmetic, CoreAI.integerProducts == true { arithmetic = .shared(.integer, share) }
         let (form, weights) = (ZImageFunctions.Form(arithmetic), arithmetic.weights)
         let g = try ZImageTransformer.Geometry(latentHeight: h, latentWidth: w, capLength: capLength)
         let (rows, d, c) = (g.sequence, ZImageBlock.d, ZImageDiT.Config.published)
@@ -75,6 +77,7 @@ package enum ZImageLayerZero {
             + Tap.allCases.filter { $0 != .out }.map { SiliCore.Stage.Tensor($0.rawValue, bytes: ($0 == .adaln ? 1 : rows) * width($0) * 4) }
         n.groups = [Block.Group("layers.0", form: "\(form)", weights: ZImageFunctions.entries("layers.0", form: form, weights: weights))]
         n.cycle = ["layers.0"]
+        if shared { n.codes = weights.layout }
         let functions = shared ? ["modulation", "pre", "heads", "attention", "out", "ffn"] : ZImageBlock.functions
         let calls = functions.flatMap { f in Self.taps(form).filter { $0.function == f } + [(f, [])] }
         let steps = calls.filter { $0.function != "modulation" }

@@ -31,7 +31,7 @@ package struct Invocation: Sendable {
     package let extras: [String: String]
 
     /// The options every stage accepts.
-    package static let common: Set<String> = ["--size", "--goldens", "--precision", "--neural-engine"]
+    package static let common: Set<String> = ["--size", "--goldens", "--precision", "--neural-engine", "--products"]
 
     /// Parses `arguments` (what follows `check <model> <stage>`), refusing any option outside `accepted`
     /// and `common`. `defaultSize`: the stage's own, when `--size` is absent.
@@ -72,6 +72,10 @@ package struct Invocation: Sendable {
             guard CoreAI.precision != .exact else { throw UsageError("--neural-engine needs --precision ane: the exact arithmetic is the GPU's") }
             CoreAI.neuralEngineRows = n
         }
+        if let products = values["--products"]?.last {
+            guard products == "int8" || products == "q64" else { throw UsageError("--products \(products): int8 or q64") }
+            CoreAI.integerProducts = products == "int8"
+        }
         long = flags.contains("--long")
         goldens = Goldens(directory: values["--goldens"]?.last)
         extras = values.compactMapValues(\.last).filter { !Self.known.contains($0.key) }
@@ -81,7 +85,7 @@ package struct Invocation: Sendable {
     private static let flags: Set<String> = ["--long"]
 
     /// The options parsed above; any other accepted option lands in `extras`.
-    private static let known: Set<String> = ["--size", "--goldens", "--edit", "--map", "--precision", "--neural-engine"]
+    private static let known: Set<String> = ["--size", "--goldens", "--edit", "--map", "--precision", "--neural-engine", "--products"]
 
     /// The DiT map: `--map`, else the installed one named `standard`; missing or of another variant than the golden's, the stage is skipped.
     /// `golden`: the variant the stage's golden was made for; another one is skipped (`MapCheck`).

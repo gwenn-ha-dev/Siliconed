@@ -66,8 +66,10 @@ enum MossShared {
         }
     }
 
+    /// `neural`: the ANE's function of a step both units take: on `integer` codes, its products q64 where the GPU's
+    /// multiply int8 × int8 (`Aicode.Module.product`).
     static func module(_ f: String, rows: Int, keys: Int, weights: SharedWeights, height h: Int = 0, width w: Int = 0, tapped: Bool = false,
-                       ranks: [String: Int] = [:]) -> Aicode.Module {
+                       ranks: [String: Int] = [:], neural: Bool = false) -> Aicode.Module {
         let arguments = arguments(f, rows: rows, keys: keys, weights: weights, ranks: ranks)
         var m = Aicode.Module(arguments: arguments.map { ($0.name, Aicode.tensor($0.shape, $0.element)) })
         let b = m.body
@@ -75,7 +77,7 @@ enum MossShared {
         func a(_ name: String) -> Int { names.firstIndex(of: name)! }
         var constants = Aicode.ScalingConstants()
         func product(_ x: Int, _ name: String, input: Int) -> Int {
-            m.product(x, name, input: input, adapted: (ranks[name] ?? 0) > 0, constants: &constants)
+            m.product(x, name, input: input, adapted: (ranks[name] ?? 0) > 0, weights: weights, neural: neural, constants: &constants)
         }
         func f32(_ x: Int) -> Int { b.castUnlessSame(x, to: .f32) }
         func bf16(_ x: Int) -> Int { b.castUnlessSame(x, to: .bf16) }

@@ -99,8 +99,11 @@ public final class Block: @unchecked Sendable {
         public let bfloat16: CodesLayout
         /// A tapped run's function of a step that taps (`Step.taps`): the module writes what the check listens to.
         public let tapped: Bool
-        public init(rows: Int, codes: CodesLayout, bfloat16: CodesLayout = .outIn, tapped: Bool = false) {
-            self.rows = rows; self.codes = codes; self.bfloat16 = bfloat16; self.tapped = tapped
+        /// The ANE's function of a step of either unit (`Unit.either`), its unit's rows; false, the GPU's. The two may
+        /// differ where the GPU computes what the ANE cannot (`SharedWeights.integer`'s products).
+        public let neural: Bool
+        public init(rows: Int, codes: CodesLayout, bfloat16: CodesLayout = .outIn, tapped: Bool = false, neural: Bool = false) {
+            self.rows = rows; self.codes = codes; self.bfloat16 = bfloat16; self.tapped = tapped; self.neural = neural
         }
     }
 
@@ -165,6 +168,9 @@ public final class Block: @unchecked Sendable {
         public var cuts = true
         public var forms: [Form] = []
         public var passes: [Pass] = []
+        /// How the plan lays the products' int8 codes, and the functions read them: `[in, out]`, or `[out, in]` as the
+        /// file lays them (`SharedWeights.layout`).
+        public var codes: CodesLayout = .inOut
         public var edges: [String: @Sendable (Build) throws -> Aicode.Module] = [:]
         /// The edges the ANE computes (`call` runs them there, every GPU call before them done): their tensors surfaces
         /// as declared, the weights surfaces.
@@ -323,10 +329,11 @@ public final class Block: @unchecked Sendable {
         let used = Set(d.groups.map(\.form)).sorted().map { forms[$0]! }
         let sharing = used.contains(where: \.shared)
         let surfaces = sharing || !d.neuralEdges.isEmpty
-        // The layouts the functions are written for and the plan lays the weights in: int8 codes `[in, out]`, bf16
-        // weights as the file lies. Measured per Mac until 20/11 on one product: on the mini it chose `[out, in]` for
-        // the codes, which made Z Compacte's whole render 3.5 % slower than this default.
-        let codes: CodesLayout = .inOut, bfloat16: CodesLayout = .outIn
+        // The layouts the functions are written for and the plan lays the weights in: int8 codes as the declaration says
+        // (`[in, out]` unless its products read them as the file lays them), bf16 weights as the file lies. Measured per
+        // Mac until 20/11 on one product: on the mini it chose `[out, in]` for the codes of today's q64, which made Z
+        // Compacte's whole render 3.5 % slower than `[in, out]`.
+        let codes = d.codes, bfloat16: CodesLayout = .outIn
         let shareable = sharing ? d.passes.compactMap(\.shareable).map(\.count).max() ?? 0 : 0
         let began = DispatchTime.now().uptimeNanoseconds
 
@@ -358,7 +365,7 @@ public final class Block: @unchecked Sendable {
         var modules: [String: (module: Aicode.Module, unit: ComputeUnitKind)] = [:]
         for f in used where units > 0 {
             for u in tried {
-                for s in f.steps where s.unit == .either { modules[neural(f.name, s.name, u)] = (try f.module(s.name, Build(rows: u, codes: codes, bfloat16: bfloat16)), .neuralEngine) }
+                for s in f.steps where s.unit == .either { modules[neural(f.name, s.name, u)] = (try f.module(s.name, Build(rows: u, codes: codes, bfloat16: bfloat16, neural: true)), .neuralEngine) }
             }
         }
         for (name, build) in d.edges { modules[edge(name)] = (try build(Build(rows: 0, codes: codes, bfloat16: bfloat16)), d.neuralEdges.contains(name) ? .neuralEngine : .gpu) }
@@ -450,7 +457,7 @@ public final class Block: @unchecked Sendable {
         let forms = Dictionary(uniqueKeysWithValues: d.forms.map { ($0.name, $0) })
         var bytes = Data()
         for f in Set(d.groups.map(\.form)).sorted().map({ forms[$0]! }) {
-            for s in f.steps { bytes += try f.module(s.name, Build(rows: 64, codes: .inOut)).trimmed().bytecode() }
+            for s in f.steps { bytes += try f.module(s.name, Build(rows: 64, codes: d.codes)).trimmed().bytecode() }
         }
         return "pace " + Data(SHA256.hash(data: bytes)).prefix(8).map { String(format: "%02x", $0) }.joined() + " of \(d.rows) rows"
     }
@@ -460,21 +467,25 @@ public final class Block: @unchecked Sendable {
         let forms = Dictionary(uniqueKeysWithValues: d.forms.map { ($0.name, $0) })
         let used = Set(d.groups.map(\.form)).sorted().map { forms[$0]! }
         let shareable = used.contains(where: \.shared) ? d.passes.compactMap(\.shareable).map(\.count).max() ?? 0 : 0
-        return shareable > 0 ? try key(used, codes: .inOut, shareable: shareable) : nil
+        return shareable > 0 ? try key(used, codes: d.codes, shareable: shareable) : nil
     }
 
     /// What a pace key carries once its block shares the ANE's rows: the unit it was taken at.
     static func byUnit(_ unit: Int) -> String { " by \(unit)" }
 
-    /// **Which of `alternatives` a client opens** — declarations of one computation, each its own arithmetic: the first
-    /// never timed on this Mac (`ThisMac.paces`), each in turn, then the fastest. Chosen here, by system (`ThisMac`), at
-    /// the cost of one opening each at its own pace; an alternative's pace is its last block's, a share in flight as far
-    /// as it went.
-    public static func choose(_ alternatives: [Declaration], measured: ThisMac = .current) throws -> Int {
+    /// **Which of `alternatives` a client opens** — declarations of one computation, each its own arithmetic, each with
+    /// the share it would open at: the first never timed on this Mac (`ThisMac.paces`), each in turn, then the fastest.
+    /// Chosen here, by system (`ThisMac`), at the cost of one opening each at its own pace; an alternative's pace is its
+    /// last block's, a share in flight as far as it went. **The GPU alone beside the ANE in flight**: one declaration at
+    /// both shares is two alternatives, the GPU's pace its own (`byUnit` none) — the share of 0 rows, which a cycle's
+    /// calls do not predict: the GPU runs slower a row beside the ANE than alone (a block of int8 × int8 products on the
+    /// M5 Pro, 21/11/2026: its GPU alone predicted from its calls beside the ANE at 4.3 s a cycle, measured at 3.46).
+    public static func choose(_ alternatives: [(declaration: Declaration, share: Share)], measured: ThisMac = .current) throws -> Int {
         // A pace counts at the unit kept (`pace`): a declaration that shares the ANE's rows has none until its unit is decided.
-        let paces = try alternatives.map { d -> Double? in
+        let paces = try alternatives.map { d, share -> Double? in
+            if case .told = share { preconditionFailure("a control's share is not chosen: it is the control's") }
             var key = try paceKey(d)
-            if let block = try unitKey(d) {
+            if share == .inFlight, let block = try unitKey(d) {
                 guard let unit = measured.neuralUnits?[block] else { return nil }
                 key += byUnit(unit)
             }
@@ -488,7 +499,7 @@ public final class Block: @unchecked Sendable {
     /// they share.
     static func key(_ used: [Form], codes: CodesLayout, shareable: Int) throws -> String {
         var bytes = Data()
-        for f in used { for s in f.steps where s.unit == .either { bytes += try f.module(s.name, Build(rows: 64, codes: codes)).trimmed().bytecode() } }
+        for f in used { for s in f.steps where s.unit == .either { bytes += try f.module(s.name, Build(rows: 64, codes: codes, neural: true)).trimmed().bytecode() } }
         return "block " + Data(SHA256.hash(data: bytes)).prefix(8).map { String(format: "%02x", $0) }.joined() + " of \(shareable) rows"
     }
 

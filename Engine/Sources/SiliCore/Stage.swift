@@ -71,7 +71,8 @@ public final class Stage: @unchecked Sendable {
         public var once: [String] = []
         public var cycle: [String] = []
         public var functions: [String: Function] = [:]
-        /// The weights (residents, kept, slots) as surfaces, for the ANE; their codes then `[in, out]` (`CodesLayout`).
+        /// The weights (residents, kept, slots) as surfaces, for the ANE, laid as `codes` says (the ANE reads `[out, in]`
+        /// codes transposed in its function as well, 21/11/2026: `SharedWeights.integer`).
         public var surfaces = false
         /// The layouts the functions are written for, of the products' int8 codes and of their bf16 weights: the plan lays
         /// the weights so and reads no measure of this Mac (`Block` reads it once, as it writes its functions). Read twice,
@@ -120,7 +121,7 @@ public final class Stage: @unchecked Sendable {
     /// how much it passes B. A client with several forms plans each and chooses among those that hold (`choose`).
     public static func plan(_ d: Declaration, files: [SafeTensors], budget: Int, floor: Int, depth: Int = 2) throws -> Plan {
         precondition(depth >= 1, "a ring of a slot at least")
-        let codes: CodesLayout = d.surfaces ? .inOut : d.codes, bfloat16 = d.bfloat16
+        let codes = d.codes, bfloat16 = d.bfloat16
         let sizes = try Sizes(d, files: files, codes: codes, bfloat16: bfloat16)
         func plan(_ kept: [String], _ depth: Int) -> Plan {
             let (heap, apart) = sizes.arena(kept: kept, depth: depth)

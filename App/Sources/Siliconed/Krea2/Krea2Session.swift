@@ -103,11 +103,13 @@ final class Krea2Session {
         d.groups = blocks.map { Block.Group($0, form: form, weights: a.shared ? Krea2Shared.block($0 + ".", weights: a.weights) : Krea2Functions.block($0 + ".")) }
         d.cycle = blocks
         d.tapped = taps
+        if a.shared { d.codes = a.weights.layout }
         if a.shared {
             d.forms = [Block.Form(form, steps: [.init("pre"), .init("heads", on: .gpu), .init("attention", on: .gpu, whole: ["k", "v"]),
                                                 .init("out", bind: ["y": .rows("mid"), "y_factor": .rows("mid_factor")], taps: true),
                                                 .init("ffn", bind: ["x": .rows("mid"), "x_factor": .rows("mid_factor")], taps: true)]) { step, b in
-                Krea2Shared.module(step + (b.tapped ? "-taps" : ""), rows: b.rows, keys: k, weights: a.weights, ranks: Self.ranks(step, ranks))
+                Krea2Shared.module(step + (b.tapped ? "-taps" : ""), rows: b.rows, keys: k, weights: a.weights, ranks: Self.ranks(step, ranks),
+                                   neural: b.neural)
             }]
         } else {
             d.forms = [Block.Form(form, steps: [.init("pre", on: .gpu), .init("post", on: .gpu, whole: ["k", "v"], taps: true)]) { step, b in

@@ -61,7 +61,10 @@ enum QwenImage21Shared {
         }
     }
 
-    static func module(_ f: String, rows: Int, prefix: Int, target: Int, weights: SharedWeights, ranks: QwenImage21Functions.Ranks = [:]) -> Aicode.Module {
+    /// `neural`: the ANE's function of a step both units take: on `integer` codes, its products q64 where the GPU's
+    /// multiply int8 × int8 (`Aicode.Module.product`).
+    static func module(_ f: String, rows: Int, prefix: Int, target: Int, weights: SharedWeights, ranks: QwenImage21Functions.Ranks = [:],
+                       neural: Bool = false) -> Aicode.Module {
         let all = arguments(f, rows: rows, prefix: prefix, target: target, weights: weights) + QwenImage21Functions.factors(f, path: .shared, ranks: ranks)
         var m = Aicode.Module(arguments: all.map { ($0.name, Aicode.tensor($0.shape, $0.element)) })
         let b = m.body
@@ -71,7 +74,7 @@ enum QwenImage21Shared {
         var constants = Aicode.ScalingConstants()
         /// The product `name` on x, the rotation of `unrotated` over its factor, with its LoRA's change when one adapts it.
         func product(_ x: Int, _ name: String, unrotated: Int, columns: Range<Int>? = nil) -> Int {
-            m.product(x, name, input: unrotated, adapted: (ranks[name] ?? 0) > 0, columns: columns, constants: &constants)
+            m.product(x, name, input: unrotated, adapted: (ranks[name] ?? 0) > 0, columns: columns, weights: weights, neural: neural, constants: &constants)
         }
         func layerNorm(_ x: Int, _ xf: Int) -> Int { b.layerNorm16(x, xf, eps: eps) }
         func rotation(_ t: Int) -> Int { b.rotation(t, of: weights) }

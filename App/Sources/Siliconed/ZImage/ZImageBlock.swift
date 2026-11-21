@@ -136,7 +136,7 @@ enum ZImageBlock {
                          ("gates", b.zeroPadded(b.cast(b.tanh(m6), to: .bf16), to: [4, gainRow]))]
         case ("modulation", _):
             // Multiplied out: 1 + m and tanh m read the true value. The codes' input rotated (`convrot`), the halves' as it is.
-            let codes = weights == .codes
+            let codes = weights.isCodes
             let (unit, f) = b.ranged(codes ? b.convrot(a("adaln")) : a("adaln"), under: codes ? target(["ada"]) : b.target(weights: [a("ada")]))
             let m6 = b.reshape(b.binary(.add, b.binary(.mul, product(unit, "ada", input: codes ? b.binary(.divide, a("adaln"), f) : unit), b.cast(f, to: .f16)), a("ada_bias")), [4, d])
             tap(.adaln, b.reshape(m6, [1, 4 * d]))

@@ -75,7 +75,10 @@ enum AnimaShared {
         }
     }
 
-    static func module(_ function: String, rows: Int, keys: Int, context: Int, weights: SharedWeights, ranks: [String: Int]) -> Aicode.Module {
+    /// `neural`: the ANE's function of a step both units take: on `integer` codes, its products q64 where the GPU's
+    /// multiply int8 × int8 (`Aicode.Module.product`).
+    static func module(_ function: String, rows: Int, keys: Int, context: Int, weights: SharedWeights, ranks: [String: Int],
+                       neural: Bool = false) -> Aicode.Module {
         let tapping = function.hasSuffix("-taps"), f = tapping ? String(function.dropLast(5)) : function
         var m = Aicode.Module(arguments: arguments(f, rows: rows, keys: keys, context: context, weights: weights, ranks: ranks).map { ($0.name, Aicode.tensor($0.shape, $0.element)) })
         let b = m.body
@@ -85,7 +88,7 @@ enum AnimaShared {
         func f32(_ x: Int) -> Int { b.castUnlessSame(x, to: .f32) }
         func f16(_ x: Int) -> Int { b.castUnlessSame(x, to: .f16) }
         func product(_ x: Int, _ name: String, input: Int) -> Int {
-            m.product(x, name, input: input, adapted: (ranks[name] ?? 0) > 0, constants: &constants)
+            m.product(x, name, input: input, adapted: (ranks[name] ?? 0) > 0, weights: weights, neural: neural, constants: &constants)
         }
         func rotated(_ t: Int, for target: String) -> (unit: Int, factor: Int, input: Int) { b.rotated16(t, target: a(target), of: weights) }
         /// LN(x̂ · X) · (1 + s) + t, the LN without affine (ε = 10⁻⁶).

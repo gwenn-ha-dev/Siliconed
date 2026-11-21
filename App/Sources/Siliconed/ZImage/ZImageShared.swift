@@ -97,8 +97,8 @@ enum ZImageShared {
     /// The guarded modulation (`ZImageBlock`'s), the four rows the block reads: s₁, g₁, s₂, g₂, each `[1, 1, d]`; with
     /// `taps`, its own outputs replaced by them.
     static func modulation(weights: SharedWeights, ranks: [String: Int] = [:], taps: [ZImageDiT.BlockTap] = []) -> Aicode.Module {
-        if !taps.isEmpty { return ZImageBlock.module("modulation", rows: 1, keys: 1, form: .shared, weights: weights, ranks: ranks, taps: taps) }
-        var m = ZImageBlock.module("modulation", rows: 1, keys: 1, form: .shared, weights: weights, ranks: ranks)
+        if !taps.isEmpty { return ZImageBlock.module("modulation", rows: 1, keys: 1, form: .shared, weights: weights, codes: weights.layout, ranks: ranks, taps: taps) }
+        var m = ZImageBlock.module("modulation", rows: 1, keys: 1, form: .shared, weights: weights, codes: weights.layout, ranks: ranks)
         let b = m.body
         let (scales, gates) = (m.outputs[0].1, m.outputs[1].1)
         // A row of the block's gains, its page's padding cut (`ZImageBlock.gainRow`): the ANE's surfaces `[1, 1, d]`.
@@ -108,8 +108,10 @@ enum ZImageShared {
     }
     static let gains = ["scale1", "gate1", "scale2", "gate2"]
 
+    /// `neural`: the ANE's function of a step both units take (`Block.Build.neural`): on `integer` codes, its products
+    /// q64 where the GPU's multiply int8 × int8 (`Aicode.Module.product`).
     static func module(_ function: String, rows: Int, keys: Int, weights: SharedWeights, ranks: [String: Int] = [:],
-                       taps: [ZImageDiT.BlockTap] = []) -> Aicode.Module {
+                       taps: [ZImageDiT.BlockTap] = [], neural: Bool = false) -> Aicode.Module {
         var m = Aicode.Module(arguments: arguments(function, rows: rows, keys: keys, weights: weights, ranks: ranks).map { ($0.name, Aicode.tensor($0.shape, $0.element)) })
         let b = m.body
         let names = m.argumentNames
@@ -118,7 +120,7 @@ enum ZImageShared {
         /// The product of a unit (rotated before codes), its low-rank path beside it reading `input` (the unit before
         /// its rotation, under the same factor).
         func product(_ x: Int, _ name: String, input: @autoclosure () -> Int) -> Int {
-            m.product(x, name, input: input(), adapted: (ranks[name] ?? 0) > 0, constants: &constants)
+            m.product(x, name, input: input(), adapted: (ranks[name] ?? 0) > 0, weights: weights, neural: neural, constants: &constants)
         }
         func rotation(_ t: Int) -> Int { b.rotation(t, of: weights) }
         /// `t` under a factor `[1, rows, 1]` f16, a power of two: exact.

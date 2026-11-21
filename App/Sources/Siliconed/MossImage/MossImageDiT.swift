@@ -247,6 +247,7 @@ final class MossDiT {
             + (0..<layers).flatMap { LoRAStack.tensors(MossFunctions.loraProducts($0), ranks: ranks, element: e, prefix: "layers.\($0).") }
         n.residents = MossFunctions.others
         let form = shared ? "shared" : "bf16"
+        if shared { n.codes = arithmetic.weights.layout }
         n.groups = (0..<2).map { Block.Group(textBlocks[$0], form: "text", weights: MossFunctions.textBlock($0)) }
             + allBlocks.enumerated().map { i, b in
                 Block.Group(b, form: tapped && i == 0 ? form + "-tapped" : form, weights: shared ? MossShared.layer(i, weights: arithmetic.weights) : MossFunctions.layer(i))
@@ -268,7 +269,7 @@ final class MossDiT {
                                                         .init("attention", on: .gpu, whole: ["k", "v"]),
                                                         .init("out", on: unit, bind: ["y": .rows("mid"), "y_factor": .rows("mid_factor")]),
                                                         .init("ffn", on: unit, bind: ["x": .rows("mid"), "x_factor": .rows("mid_factor")])]) { step, b in
-                    MossShared.module(step, rows: b.rows, keys: k, weights: arithmetic.weights, tapped: tap, ranks: ranks)
+                    MossShared.module(step, rows: b.rows, keys: k, weights: arithmetic.weights, tapped: tap, ranks: ranks, neural: b.neural)
                 })
             } else {
                 // The modulation's six rows, each on a page of its own.
@@ -303,7 +304,8 @@ final class MossDiT {
     static func open(file: SafeTensors, geometry g: Geometry, budget: Int, tapped: Bool = false, loras: LoRAStack = .none) async throws -> MossDiT {
         guard let device = MTLCreateSystemDefaultDevice() else { throw Failure("no Metal device") }
         let ranks = Self.ranks(loras)
-        let arithmetic = try Arithmetic.opened(codes: file.tensors["layers.0.proj.qkv.weight"]?.dtype == "I8", precision: CoreAI.inForce) {
+        let codes = file.tensors["layers.0.proj.qkv.weight"]?.dtype == "I8", offered = try await Arithmetic.offered(codes: codes, device)
+        let arithmetic = try Arithmetic.opened(codes: codes, precision: CoreAI.inForce, offered: offered) {
             declaration(g, $0, tapped: tapped, ranks: ranks)
         }
         let block = try await Block.open(device, declaration(g, arithmetic, tapped: tapped, ranks: ranks), files: [file], budget: budget,

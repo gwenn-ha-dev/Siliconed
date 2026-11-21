@@ -159,16 +159,37 @@ package enum Arithmetic: Equatable, Sendable, CustomStringConvertible {
         return precision == .neuralEngine ? .shared(.half, share) : .standard
     }
 
+    /// What the engine offers the Compact's codes on `device` (`SharedWeights.offered`, a trial once a system), `codes`
+    /// alone for a map of other weights or where a control decides (`CoreAI.integerProducts`).
+    package static func offered(codes: Bool, _ device: MTLDevice) async throws -> [SharedWeights] {
+        codes && CoreAI.integerProducts == nil ? try await SharedWeights.offered(device) : [.codes]
+    }
+
     /// **A render's**, `of`'s — but for the Standard beside the ANE in flight, the engine's choice between it and the
     /// Standard's bf16 on the GPU alone, each `declaration` timed on this Mac (`Block.choose`). Measured 20/11/2026 on
     /// the mini at 1024², whose GPU runs bf16 as fast as f16: the shared forms cost its GPU alone 7 to 16 % over bf16,
     /// and the ANE won that back on one DiT of five (−15 %), two even, two still slower (+7 to +9 %). Where bf16 runs
     /// slower than f16 (the M1 Pro: 2.16 TFLOP/s against 3.50), the shared forms should win everywhere.
-    package static func opened(codes: Bool, precision: Precision, _ declaration: (Arithmetic) -> Block.Declaration) throws -> Arithmetic {
+    ///
+    /// **The Compact's codes**: the weights the engine offered this Mac's GPU (`offered`, `SharedWeights.offered`:
+    /// `codes`, and `integer` where its product int8 × int8 was measured the faster), each timed by `Block.choose`; a
+    /// control's word (`CoreAI.integerProducts`) in place of the choice. Beside the ANE in flight, each on the GPU alone
+    /// too: the ANE kept only where the block is faster with it, as the Settings say. Measured 21/11/2026 on the mini at
+    /// 1024², int8 × int8: Krea 2 and Anima a step 3 % slower beside the ANE than alone, at its least share.
+    package static func opened(codes: Bool, precision: Precision, offered: [SharedWeights] = [.codes],
+                               _ declaration: (Arithmetic) -> Block.Declaration) throws -> Arithmetic {
         let a = of(codes: codes, precision: precision)
-        guard a == .shared(.half, .inFlight) else { return a }
-        let alternatives = [a, .standard]
-        return alternatives[try Block.choose(alternatives.map(declaration))]
+        let alternatives: [Arithmetic]
+        if case .shared(.codes, let share) = a {
+            let told = CoreAI.integerProducts.map { $0 ? SharedWeights.integer : .codes }
+            let shares: [Block.Share] = share == .inFlight ? [.inFlight, .gpu] : [share]
+            alternatives = (told.map { [$0] } ?? offered).flatMap { w in shares.map { Arithmetic.shared(w, $0) } }
+        } else if a == .shared(.half, .inFlight) {
+            alternatives = [a, .standard]
+        } else {
+            return a
+        }
+        return alternatives.count == 1 ? alternatives[0] : alternatives[try Block.choose(alternatives.map { (declaration($0), $0.share) })]
     }
 
     /// The shared forms, or the Standard's bf16.
@@ -187,7 +208,7 @@ package enum Arithmetic: Equatable, Sendable, CustomStringConvertible {
         switch self {
         case .standard: "standard"
         case .shared(let w, let s):
-            (w == .codes ? "compact" : "standard in f16") + (s == .gpu ? "" : s == .inFlight ? ", the ANE in flight" : ", the ANE told")
+            (w == .codes ? "compact" : w == .integer ? "compact, int8 × int8 on the GPU" : "standard in f16") + (s == .gpu ? "" : s == .inFlight ? ", the ANE in flight" : ", the ANE told")
         }
     }
 }
@@ -196,7 +217,7 @@ package enum Arithmetic: Equatable, Sendable, CustomStringConvertible {
 /// AI's assets are written.
 package enum CoreAI {
     private static let lock = NSLock()
-    nonisolated(unsafe) private static var chosen: (precision: Precision, rows: Int?) = (.exact, nil)
+    nonisolated(unsafe) private static var chosen: (precision: Precision, rows: Int?, integer: Bool?) = (.exact, nil, nil)
     /// The precision of the work in hand (`under`), which the process's does not reach until it ends.
     nonisolated(unsafe) private static var held: Precision?
 
@@ -212,6 +233,13 @@ package enum CoreAI {
     package static var neuralEngineRows: Int? {
         get { lock.withLock { chosen.rows } }
         set { lock.withLock { chosen.rows = newValue } }
+    }
+
+    /// **A control's word**: the Compact's products int8 × int8 on the GPU (`SharedWeights.integer`) or not, in place of
+    /// the engine's choice between them (`--products int8` or `q64`); `nil` leaves it to the engine.
+    package static var integerProducts: Bool? {
+        get { lock.withLock { chosen.integer } }
+        set { lock.withLock { chosen.integer = newValue } }
     }
 
     /// **One precision from end to end of a piece of work**: a render computes its text, its denoising and its decoder

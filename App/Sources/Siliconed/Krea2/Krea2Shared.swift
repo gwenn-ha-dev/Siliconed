@@ -74,7 +74,10 @@ enum Krea2Shared {
 
     /// `function` written op by op; `out-taps` and `ffn-taps` (the GPU's, for a check's block 0) also give the attention's
     /// and the feed-forward's true values, `attention` and `feed` `[1, rows, d]` f16.
-    static func module(_ function: String, rows: Int, keys: Int, weights: SharedWeights, ranks: [String: Int] = [:]) -> Aicode.Module {
+    /// `neural`: the ANE's function of a step both units take (`Block.Build.neural`): on `integer` codes, its products
+    /// q64 where the GPU's multiply int8 × int8 (`Aicode.Body.codes`).
+    static func module(_ function: String, rows: Int, keys: Int, weights: SharedWeights, ranks: [String: Int] = [:],
+                       neural: Bool = false) -> Aicode.Module {
         var m = Aicode.Module(arguments: arguments(function, rows: rows, keys: keys, weights: weights, ranks: ranks).map { ($0.name, Aicode.tensor($0.shape, $0.element)) })
         let b = m.body
         let names = m.argumentNames
@@ -82,7 +85,7 @@ enum Krea2Shared {
         var constants = Aicode.ScalingConstants()
         /// The product of `name` on x (rotated, under F), its LoRA beside on `plain`, x before the rotation under F.
         func product(_ x: Int, _ name: String, plain: Int) -> Int {
-            let y = weights == .codes ? b.q64(x, codes: a(name), scale: a(name + "_scale"), constants: &constants)
+            let y = weights.isCodes ? b.codes(x, a(name), scale: a(name + "_scale"), weights: weights, neural: neural, constants: &constants)
                 : b.product16(x, weight: a(name))
             guard let r = ranks[name] else { return y }
             let out = Aicode.shape(b.types[y]).shape[2]

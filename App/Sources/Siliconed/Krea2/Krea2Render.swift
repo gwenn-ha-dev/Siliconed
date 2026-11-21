@@ -1,4 +1,5 @@
 import Foundation
+import Metal
 import SiliCore
 
 /// **Krea 2 Turbo's render**: `Krea2Pipeline` translated into three stages, the sampler Siliconed's own.
@@ -148,7 +149,9 @@ package enum Krea2Render {
             let geometry = Krea2Session.Geometry(latentHeight: latentHeight, latentWidth: latentWidth, text: taps.shape[0])
             let rows = fused.rows
             let ranks = Krea2Functions.ranks(loras, blocks: Krea2Session.blocks.map { $0 + "." })
-            let arithmetic = try Arithmetic.opened(codes: codes, precision: CoreAI.inForce) {
+            guard let device = MTLCreateSystemDefaultDevice() else { throw ProgramError("no Metal device") }
+            let offered = try blocking { try await Arithmetic.offered(codes: codes, device) }
+            let arithmetic = try Arithmetic.opened(codes: codes, precision: CoreAI.inForce, offered: offered) {
                 Krea2Session.declaration(geometry, $0, ranks: ranks, taps: boundaries)
             }
             session = try blocking {

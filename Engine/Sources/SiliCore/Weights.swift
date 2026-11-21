@@ -61,7 +61,8 @@ public enum Recipe: Equatable, Sendable {
 /// on the M5 Pro (18/11, 512 rows) the file's layout the faster, 1.92 ms against 2.41. No Mac measures it: the codes
 /// are `inOut`, the layout whose loss is the smaller where it is the slower; bf16 `outIn`, the file's, as coreai-torch
 /// writes `linear`.
-/// The ANE's products (`q64`) read `[in, out]` whatever the GPU prefers: a stage whose weights are surfaces takes it.
+/// The ANE's products (`q64`) read `[in, out]` as they lie, `[out, in]` transposed in the function (`SharedWeights.integer`,
+/// 21/11/2026 on the M5 Pro: 15.8 TFLOP/s against 17.8): the declaration says which (`Block.Declaration.codes`).
 public enum CodesLayout: String, Codable, Sendable {
     /// `[in, out]`: the codes transposed once as they are read, what Core AI's product reads as it lies.
     case inOut = "in-out"

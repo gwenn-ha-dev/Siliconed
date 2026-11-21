@@ -96,7 +96,8 @@ import Testing
         #expect(plan.p == finest)
     }
 
-    /// The weights as surfaces: apart from the heap, their codes `[in, out]` whatever the declaration says.
+    /// The weights as surfaces: apart from the heap, their codes laid as the declaration says (the ANE reads `[out, in]`
+    /// transposed in its function: `SharedWeights.integer`).
     @Test func weightsOnSurfacesLieApart() throws {
         var d = Self.declaration()
         d.surfaces = true
@@ -104,7 +105,7 @@ import Testing
         let plan = try Self.plan(1 << 30, d)
         #expect(plan.heap == Self.tensors + Self.staging)
         #expect(plan.apart == Self.apart + Self.resident + 2 * Self.group)
-        #expect(plan.codes == .inOut)
+        #expect(plan.codes == .outIn)
         var e = Self.declaration()
         e.codes = .outIn
         #expect(try Self.plan(1 << 30, e).codes == .outIn)

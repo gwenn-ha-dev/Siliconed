@@ -139,6 +139,7 @@ final class ZImageTransformer {
         n.tensors = (t + gains).map { SiliCore.Stage.Tensor($0.0, bytes: $0.1) } + [SiliCore.Stage.Tensor("velocity", bytes: latent, .apart)]
             + lowRankTensors(ranks, form)
         n.residents = ZImageFunctions.others(form: form)
+        if form == .shared { n.codes = weights.layout }
         let name = "\(form)"
         n.groups = allBlocks.map { Block.Group($0, form: name, weights: ZImageFunctions.entries($0, form: form, weights: weights)) }
         (n.once, n.cycle) = (captionBlocks, cycle)
@@ -150,7 +151,7 @@ final class ZImageTransformer {
                                                 .init("attention", on: .gpu, whole: ["k", "v"]),
                                                 .init("out", bind: ["y": .rows("mid"), "y_factor": .rows("mid_factor")]),
                                                 .init("ffn", bind: ["x": .rows("mid"), "x_factor": .rows("mid_factor")])]) { step, b in
-                ZImageShared.module(step, rows: b.rows, keys: keys, weights: weights, ranks: ranks)
+                ZImageShared.module(step, rows: b.rows, keys: keys, weights: weights, ranks: ranks, neural: b.neural)
             }]
             ones = Dictionary(uniqueKeysWithValues: ZImageShared.gains.map { ($0, .tensor("one")) })
         } else {
@@ -187,7 +188,8 @@ final class ZImageTransformer {
     static func open(file: SafeTensors, geometry g: Geometry, precision: Precision, loras: LoRAStack = .none) async throws -> ZImageTransformer {
         guard let device = MTLCreateSystemDefaultDevice() else { throw Failure("no Metal device") }
         let codes = file.tensors["layers.0.attention.qkv.weight"]?.dtype == "I8", ranks = ZImageDiT.loraRanks(loras)
-        let arithmetic = try Arithmetic.opened(codes: codes, precision: precision) { declaration(g, $0, ranks: ranks) }
+        let offered = try await Arithmetic.offered(codes: codes, device)
+        let arithmetic = try Arithmetic.opened(codes: codes, precision: precision, offered: offered) { declaration(g, $0, ranks: ranks) }
         return try await open(device, file: file, geometry: g, arithmetic: arithmetic, loras: loras)
     }
 

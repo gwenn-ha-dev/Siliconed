@@ -54,12 +54,13 @@ package final class AnimaEvaluation {
 
     /// **The blocks the shared forms take**: beside the ANE (or told 0 rows of it), the Compact's whose ten products are
     /// codes (0 and 27 are float weights, the MLP of 1 to 3 too: the guarded forms'), every block of the Standard's in
-    /// f16; none on the GPU alone, where the Compact is the guarded forms'.
+    /// f16; none on the GPU alone, where the Compact is the guarded forms' — but where its products are int8 × int8
+    /// (`SharedWeights.integer`: the guarded forms read the codes in W8A16 only).
     static func sharedBlocks(_ a: Arithmetic, _ quantized: [Set<String>]) -> Set<Int> {
         switch a {
         case .standard, .shared(.codes, .gpu): []
         case .shared(.half, _): Set(quantized.indices)
-        case .shared(.codes, _): Set(quantized.indices.filter { quantized[$0] == Set(products.keys) })
+        case .shared(.codes, _), .shared(.integer, _): Set(quantized.indices.filter { quantized[$0] == Set(products.keys) })
         }
     }
 
@@ -241,6 +242,7 @@ package final class AnimaEvaluation {
                         held: contextEntries(block: i, path, quantized: quantized[i]))
         }
         n.cycle = blocks
+        n.codes = arithmetic.weights.layout
         // The guarded forms read the f32 factors; the activations' q beside the product's weight q.
         let factors: [String: Block.Bind] = path == .f16 ? ["x_factor": .rows("f"), "y_factor": .next("f")] : [:]
         var made = Set<String>()
@@ -260,7 +262,8 @@ package final class AnimaEvaluation {
                 .init("crossout", bind: ["x": .rows("mid"), "x_factor": .rows("mid_factor"), "y": .rows("mid2"), "y_factor": .rows("mid2_factor")],
                       taps: listening),
                 .init("ffn", bind: ["x": .rows("mid2"), "x_factor": .rows("mid2_factor")], taps: listening)]) { step, b in
-                AnimaShared.module(step + (b.tapped ? "-taps" : ""), rows: b.rows, keys: k, context: c, weights: arithmetic.weights, ranks: ranks)
+                AnimaShared.module(step + (b.tapped ? "-taps" : ""), rows: b.rows, keys: k, context: c, weights: arithmetic.weights, ranks: ranks,
+                                   neural: b.neural)
             })
         }
         n.passes = [Block.Pass("image", rows: 0..<g.tokens, shareable: 0..<g.tokens)]
@@ -297,7 +300,8 @@ package final class AnimaEvaluation {
         guard let device = MTLCreateSystemDefaultDevice() else { throw Failure("no Metal device") }
         let file = try Self.file(path)
         let quantized = blocks.indices.map { Self.quantized($0, in: file) }, ranks = ranks(loras)
-        let arithmetic = try Arithmetic.opened(codes: Self.path(of: file) == .f16, precision: CoreAI.inForce) {
+        let codes = Self.path(of: file) == .f16, offered = try await Arithmetic.offered(codes: codes, device)
+        let arithmetic = try Arithmetic.opened(codes: codes, precision: CoreAI.inForce, offered: offered) {
             declaration(geometry, $0, quantized: quantized, taps: taps, ranks: ranks)
         }
         let declaration = declaration(geometry, arithmetic, quantized: quantized, taps: taps, ranks: ranks)
