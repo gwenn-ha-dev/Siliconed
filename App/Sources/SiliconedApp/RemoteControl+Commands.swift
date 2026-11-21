@@ -284,8 +284,8 @@ extension RemoteControl {
     /// change. `set save-images FOLDER|off` is Settings ▸ General's Save Every Image To… (`EveryImage`), this Mac's: an
     /// existing folder, never created, as the panel only offers one.
     func set(_ arguments: [String], cwd: String) throws -> [String: Any] {
-        // `precision` is the app's own preference: the library's `SetOrder` does not know it.
-        if arguments.first == "precision" { return try setPrecision(Array(arguments.dropFirst())) }
+        // `neural-engine` is the app's own preference: the library's `SetOrder` does not know it.
+        if arguments.first == "neural-engine" { return try setNeuralEngine(Array(arguments.dropFirst())) }
         if arguments.first == "glass" { return try setGlass(Array(arguments.dropFirst())) }
         if arguments.first == "updates" { return try setUpdates(Array(arguments.dropFirst())) }
         if arguments.first == "memory" { return try setMemory(Array(arguments.dropFirst())) }
@@ -387,18 +387,18 @@ extension RemoteControl {
                 "default_bytes": MemoryBudget.standard, "range_bytes": [range.lowerBound, range.upperBound]]
     }
 
-    /// **`set precision [exact|ane]`**: Settings ▸ General's Precision, through the property its control is bound to
-    /// (it writes the choice and tells the engine). This Mac's preference, whichever Mac computes (a job carries it); alone, it is read.
-    func setPrecision(_ arguments: [String]) throws -> [String: Any] {
-        let previous = local.precision
+    /// **`set neural-engine [on|off]`**: Settings ▸ General's Neural Engine switch, through the property it is bound to (it
+    /// writes the choice and tells the engine). This Mac's preference, for what this Mac computes: a render it lends follows
+    /// it, one it borrows follows the lender's. Alone, it is read.
+    func setNeuralEngine(_ arguments: [String]) throws -> [String: Any] {
+        let previous = local.neuralEngine
         if let typed = arguments.first {
-            guard arguments.count == 1, let chosen = Precision(rawValue: typed) else {
-                throw Refusal("usage", String(localized: "set precision [exact|ane]"), help: "silicontrol help set")
+            guard arguments.count == 1, typed == "on" || typed == "off" else {
+                throw Refusal("usage", String(localized: "set neural-engine [on|off]"), help: "silicontrol help set")
             }
-            local.precision = chosen
+            local.neuralEngine = typed == "on"
         }
-        return ["ok": true, "precision": local.precision.rawValue, "previous": previous.rawValue,
-                "tolerance": Response.number(local.precision.tolerance)]
+        return ["ok": true, "neural_engine": local.neuralEngine, "previous": previous]
     }
 
     /// The four Beta options as the window's switches hold them (this Mac's preferences, shown by Settings whichever Mac computes).

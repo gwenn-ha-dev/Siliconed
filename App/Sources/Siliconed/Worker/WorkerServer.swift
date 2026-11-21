@@ -130,7 +130,7 @@ private final class Server: @unchecked Sendable {
     }
 
     private func rendering(_ id: UInt32, _ order: RenderOrder, _ blobs: [UInt32: Data], _ call: Call) {
-        CoreAI.precision = order.processPrecision
+        CoreAI.neuralEngine = order.neuralEngine
         CoreAI.place(order.library.library)
         do {
             let request = try order.request(blobs)
@@ -146,7 +146,7 @@ private final class Server: @unchecked Sendable {
     }
 
     private func writing(_ id: UInt32, _ order: WriteOrder, _ blobs: [UInt32: Data], _ call: Call) {
-        CoreAI.precision = order.processPrecision
+        CoreAI.neuralEngine = order.neuralEngine
         do {
             try call.token.check()
             CoreAI.place(order.library.library)

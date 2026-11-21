@@ -1,7 +1,7 @@
 import Foundation
 import SiliCore
 
-/// **The Compact's Z-Image block, as the GPU and the ANE share it** — on the GPU alone (`exact`) or beside the ANE: the
+/// **The Compact's Z-Image block, as the GPU and the ANE share it** — on the GPU alone (the Neural Engine off) or beside the ANE: the
 /// same functions, two specializations of one asset. A block in f16 written as the Standard's (its guard and its norms
 /// in f32, its `dequantize` reading a vector of scales, its post holding the attention) does not reach the ANE: the ANE's
 /// compiler fails and Core AI runs it on the GPU, bit for bit (measured 17/11 on the M1 Pro). Here pre, out and ffn are

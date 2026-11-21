@@ -70,10 +70,9 @@ final class EngineWorkerTests: XCTestCase {
         request.detail = .more
         request.solver = .dpmpp2m
         request.variations = [Variation(seed: 9, strength: 0.25)]
-        request.precision = .exact
         let library = Library(root: URL(fileURLWithPath: "/tmp/models"), local: URL(fileURLWithPath: "/tmp/mac"))
         let (order, blobs) = RenderOrder.of(request, seeds: [7, 8], model: "some-model", library: library,
-                                            processPrecision: .neuralEngine, firstBlob: 40)
+                                            neuralEngine: true, firstBlob: 40)
         XCTAssertEqual(blobs.map(\.0), [40, 41, 42])
         let (call, received) = try through(WorkerCall.render(id: 3, order), blobs: blobs, as: WorkerCall.self) {
             if case .render(_, let o) = $0 { return o.blobs }
@@ -85,7 +84,7 @@ final class EngineWorkerTests: XCTestCase {
         XCTAssertEqual(back.seeds, [7, 8])
         XCTAssertEqual(back.library.library.root, library.root)
         XCTAssertEqual(back.library.library.local, library.local)
-        XCTAssertEqual(back.processPrecision, .neuralEngine)
+        XCTAssertTrue(back.neuralEngine)
         let again = try back.request(received)
         XCTAssertEqual(again, request)
     }

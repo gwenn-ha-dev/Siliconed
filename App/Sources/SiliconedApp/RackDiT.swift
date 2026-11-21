@@ -51,13 +51,13 @@ struct DiTBox: View {
                     // The labels on one line when they fit; else what is stored and what computes stay together on a line of
                     // their own, the license and the latent on another, then each pair alone — a label is never truncated.
                     ViewThatFits(in: .horizontal) {
-                        HStack(spacing: 5) { license(card); precision; latent }
+                        HStack(spacing: 5) { license(card); weightsFormat; latent }
                         VStack(alignment: .leading, spacing: 5) {
-                            HStack(spacing: 5) { precision }
+                            HStack(spacing: 5) { weightsFormat }
                             HStack(spacing: 5) { license(card); latent }
                         }
                         VStack(alignment: .leading, spacing: 5) {
-                            HStack(spacing: 5) { precision }
+                            HStack(spacing: 5) { weightsFormat }
                             license(card)
                             latent
                         }
@@ -85,7 +85,7 @@ struct DiTBox: View {
                   : String(localized: "Non-commercial: personal and research use only"))
     }
 
-    @ViewBuilder private var precision: some View {
+    @ViewBuilder private var weightsFormat: some View {
         WeightsTag(format: app.weightFormats?.dit)
     }
 

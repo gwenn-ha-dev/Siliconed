@@ -12,7 +12,7 @@ import Siliconed
 //   2. the logits, teacher-forced on the reference's tokens: the whole forward over the prompt and the reference's
 //      answer (`continuation`), by the rule beside the reference's own bf16 run — a vocabulary entry a channel;
 //   3. the tokens that forward picks: at every step the fp32 reference's, or the bf16 reference's where the two
-//      differ (a tie the precision decides);
+//      differ (a tie the rounding decides);
 //   4. the decoding itself: `generate`, free, writes the tokens its own whole forward picks — the first one and nine
 //      in ten at least, a prefill and a decode step not being the same program to the bit (a bar fixed before the
 //      first run; the engine's own decode test holds the same bar).

@@ -47,7 +47,7 @@ enum Krea2Stages {
         proves: "one evaluation of the DiT at σ = 1 under a user's LoRA read in its published file (strength 1, every module applied: the 28 blocks' and the text fusion's), the Compact's change against the Standard's: what the LoRA moves in the fused text, in block 0's attention, feed-forward and output, and in the velocity",
         sizes: ["512"], options: ["--map", "--lora"],
         oracle: nil, weights: ["DiT", "the Compact's DiT", "the LoRA"],
-        rule: "no reference of Krea 2 under a LoRA: the change each brings (with − without) on the Compact (its shared forms, the ANE's share under --precision ane) against the Standard's (bf16, the engine's low rank checked against the CPU by LowRankRun); text_fused within 1e-2, block 0's boundaries within 5e-2; the velocity's said, not judged (28 blocks of int8 against bf16)"
+        rule: "no reference of Krea 2 under a LoRA: the change each brings (with − without) on the Compact (its shared forms, the ANE's share under --neural-engine on) against the Standard's (bf16, the engine's low rank checked against the CPU by LowRankRun); text_fused within 1e-2, block 0's boundaries within 5e-2; the velocity's said, not judged (28 blocks of int8 against bf16)"
     ) { invocation in
         let report = Report(title: "\(model) dit-lora \(invocation.size)")
         let compactPath = try invocation.ditMap(compactMap, golden: .eightBit)

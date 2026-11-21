@@ -123,7 +123,7 @@ package enum Krea2Render {
 
     /// **The DiT, opened once for a batch** (`Krea2Session`): the text fused once (`Krea2Fusion`, its arena let go before
     /// the DiT's comes), then one evaluation a step. The file says the path: `convrot` codes are the Compact's, its shared
-    /// forms (`Krea2Shared`) on the GPU, the ANE taking its share under the precision `ane` (a control's rows, else found in
+    /// forms (`Krea2Shared`) on the GPU, the ANE taking its share with the Neural Engine on (a control's rows, else found in
     /// flight: `Block`); bf16 weights the Standard's, bf16 end to end. A LoRA lands on the fusion's blocks and the DiT's (`LoRA.swift`).
     package final class Denoiser {
         let session: Krea2Session
@@ -151,7 +151,7 @@ package enum Krea2Render {
             let ranks = Krea2Functions.ranks(loras, blocks: Krea2Session.blocks.map { $0 + "." })
             guard let device = MTLCreateSystemDefaultDevice() else { throw ProgramError("no Metal device") }
             let offered = try blocking { try await Arithmetic.offered(codes: codes, device) }
-            let arithmetic = try Arithmetic.opened(codes: codes, precision: CoreAI.inForce, offered: offered) {
+            let arithmetic = try Arithmetic.opened(codes: codes, neuralEngine: CoreAI.neuralEngineInForce, offered: offered) {
                 Krea2Session.declaration(geometry, $0, ranks: ranks, taps: boundaries)
             }
             session = try blocking {

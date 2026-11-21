@@ -111,14 +111,14 @@ final class AppState {
     var exportFormat = ExportFormat(rawValue: UserDefaults.standard.string(forKey: AppState.exportFormatKey) ?? "") ?? .png {
         didSet { UserDefaults.standard.set(exportFormat.rawValue, forKey: Self.exportFormatKey) }
     }
-    private static let precisionKey = "precision", glassKey = "glass"
-    /// **How far from a model's own arithmetic a render's values may lie** (Settings ▸ General ▸ Precision). Pushed to the
-    /// engine (`CoreAI.precision`) at creation and at each change, before any plan reads it: the Neural Engine when
-    /// nothing is stored, or what is stored is no precision any more.
-    var precision = Precision(rawValue: UserDefaults.standard.string(forKey: AppState.precisionKey) ?? "") ?? .neuralEngine {
+    private static let neuralEngineKey = "neuralEngine", glassKey = "glass"
+    /// **Whether the engine may give work to the Neural Engine** (Settings ▸ General ▸ Neural Engine), on by default: the
+    /// engine sizes its share and takes it back where it does not help. Pushed to the engine (`CoreAI.neuralEngine`) at
+    /// creation and at each change, before any plan reads it.
+    var neuralEngine = UserDefaults.standard.object(forKey: AppState.neuralEngineKey) as? Bool ?? true {
         didSet {
-            UserDefaults.standard.set(precision.rawValue, forKey: Self.precisionKey)
-            CoreAI.precision = precision
+            UserDefaults.standard.set(neuralEngine, forKey: Self.neuralEngineKey)
+            CoreAI.neuralEngine = neuralEngine
         }
     }
     /// **The columns' glass** (Settings ▸ General): on, a zoomed image shows through the chain and the history; off, they
@@ -502,7 +502,7 @@ final class AppState {
         link.down = linkBlocker
         cards = ModelCard.allCards
         identifier = defaultIdentifier
-        CoreAI.precision = precision
+        CoreAI.neuralEngine = neuralEngine
     }
 
     init(library: Library) {
@@ -512,7 +512,7 @@ final class AppState {
         cards = library.cards()
         readySet = Set(library.models().map(\.id))
         identifier = defaultIdentifier
-        CoreAI.precision = precision
+        CoreAI.neuralEngine = neuralEngine
         readEditors()
         watchVolumes()
         readOccupancy()

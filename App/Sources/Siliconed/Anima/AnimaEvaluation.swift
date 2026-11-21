@@ -18,8 +18,8 @@ import SiliCore
 /// other. The padding's rows are held under a factor of 1: x̂ = 0 normalizes to 0, never to a NaN its keys would spread.
 ///
 /// **The forms**: one a layout of the blocks' weights — the Standard's bf16, the Compact's on codes but for the
-/// products it leaves in bf16 (blocks 0 and 27, the MLP of 1 to 3) —, each `pre` then `post` on the GPU. **Under the
-/// precision ane**, the blocks whose ten products are codes take the shared forms (`AnimaShared`): the ANE pre, out,
+/// products it leaves in bf16 (blocks 0 and 27, the MLP of 1 to 3) —, each `pre` then `post` on the GPU. **With the
+/// Neural Engine on**, the blocks whose ten products are codes take the shared forms (`AnimaShared`): the ANE pre, out,
 /// crossout and ffn on units of the image's first rows (`Block.Share`: a control's rows, or found in flight), the GPU
 /// the rest; the stream's factors pass from f32 to f16 entering a shared block and back leaving it, every factor a
 /// power of two (exact), on the CPU before the block, as the gates' factors are.
@@ -293,7 +293,7 @@ package final class AnimaEvaluation {
     }
 
     /// **The DiT of the file at `path` under B** (`budget`), in the work's arithmetic (`Arithmetic.opened`): the Standard's
-    /// bf16; the Compact's guarded forms under `exact`; under `ane` the shared forms (`sharedBlocks`) with the ANE's
+    /// bf16; the Compact's guarded forms with the Neural Engine off; with it on the shared forms (`sharedBlocks`) with the ANE's
     /// share. `say`: P's line, and the ANE's share.
     package static func open(_ path: String, geometry: Geometry, taps: Bool = false, loras: LoRAStack = .none, budget: Int,
                              say: (String) -> Void = { _ in }) async throws -> AnimaEvaluation {
@@ -301,7 +301,7 @@ package final class AnimaEvaluation {
         let file = try Self.file(path)
         let quantized = blocks.indices.map { Self.quantized($0, in: file) }, ranks = ranks(loras)
         let codes = Self.path(of: file) == .f16, offered = try await Arithmetic.offered(codes: codes, device)
-        let arithmetic = try Arithmetic.opened(codes: codes, precision: CoreAI.inForce, offered: offered) {
+        let arithmetic = try Arithmetic.opened(codes: codes, neuralEngine: CoreAI.neuralEngineInForce, offered: offered) {
             declaration(geometry, $0, quantized: quantized, taps: taps, ranks: ranks)
         }
         let declaration = declaration(geometry, arithmetic, quantized: quantized, taps: taps, ranks: ranks)

@@ -3,8 +3,8 @@ import Foundation
 import Metal
 import SiliCore
 
-// **What every family shares**: a map's tensors by name and shape, the precision the user lets a render take, the
-// bridge from `async` work to the render queue.
+// **What every family shares**: a map's tensors by name and shape, whether the user lets a render take the Neural
+// Engine, the bridge from `async` work to the render queue.
 //
 // **A publisher's int8 safetensors is read as it is published** (ComfyUI's convention, the same at Comfy-Org and
 // Bedovyy): `<module>.weight` I8 `[out, in]`, its scales a row in `<module>.weight_scale` F32 `[out, 1]`, and what
@@ -123,40 +123,20 @@ package struct ProgramError: Error, CustomStringConvertible {
     package init(_ description: String) { self.description = description }
 }
 
-/// **How far from a model's own arithmetic the user lets a render's values lie** — the one thing the app tells the
-/// engine about precision, the same for every function of every family.
-///
-///     exact   0   the model's arithmetic alone: bf16 on the GPU
-///     ane     8   the Neural Engine wherever it is faster (f16 on the GPU and the ANE)
-///
-/// 8 was fixed before any measure: the stages measured lay at 0.86 to 1.52 times the model's own rounding, the order of
-/// bf16's own scatter.
-package enum Precision: String, CaseIterable, Sendable, Codable {
-    case exact
-    case neuralEngine = "ane"
-
-    package var tolerance: Double {
-        switch self {
-        case .exact: 0
-        case .neuralEngine: 8
-        }
-    }
-}
-
-/// **What a DiT computes in**, the same rule for every family: its map's weights and the precision. The Standard's
-/// own bf16 functions on the GPU alone (`exact`); the shared forms — the functions the GPU and the ANE both take, f16
-/// under the guard (`SharedWeights`) — on the Compact's codes whatever the precision, on the Standard's weights rounded
-/// to f16 under `ane` (the ANE takes no bf16 at its borders); beside the ANE or not (`Block.Share`).
+/// **What a DiT computes in**, the same rule for every family: its map's weights and the Neural Engine switch. The
+/// Standard's own bf16 functions on the GPU alone (the switch off); the shared forms — the functions the GPU and the ANE
+/// both take, f16 under the guard (`SharedWeights`) — on the Compact's codes whatever the switch, on the Standard's
+/// weights rounded to f16 with it on (the ANE takes no bf16 at its borders); beside the ANE or not (`Block.Share`).
 package enum Arithmetic: Equatable, Sendable, CustomStringConvertible {
     case standard
     case shared(SharedWeights, Block.Share)
 
-    /// A map's under `precision`: its products int8 codes (the Compact) or not. Under `ane`, the ANE's rows a control
-    /// says (`CoreAI.neuralEngineRows`, 0 the GPU alone), else found in flight.
-    package static func of(codes: Bool, precision: Precision) -> Arithmetic {
-        let share: Block.Share = precision != .neuralEngine ? .gpu : CoreAI.neuralEngineRows.map { .told($0) } ?? .inFlight
+    /// A map's with the Neural Engine or not: its products int8 codes (the Compact) or not. With it, the ANE's rows a
+    /// control says (`CoreAI.neuralEngineRows`, 0 the GPU alone), else found in flight.
+    package static func of(codes: Bool, neuralEngine: Bool) -> Arithmetic {
+        let share: Block.Share = !neuralEngine ? .gpu : CoreAI.neuralEngineRows.map { .told($0) } ?? .inFlight
         if codes { return .shared(.codes, share) }
-        return precision == .neuralEngine ? .shared(.half, share) : .standard
+        return neuralEngine ? .shared(.half, share) : .standard
     }
 
     /// What the engine offers the Compact's codes on `device` (`SharedWeights.offered`, a trial once a system), `codes`
@@ -176,12 +156,14 @@ package enum Arithmetic: Equatable, Sendable, CustomStringConvertible {
     /// control's word (`CoreAI.integerProducts`) in place of the choice. Beside the ANE in flight, each on the GPU alone
     /// too: the ANE kept only where the block is faster with it, as the Settings say. Measured 21/11/2026 on the mini at
     /// 1024², int8 × int8: Krea 2 and Anima a step 3 % slower beside the ANE than alone, at its least share.
-    package static func opened(codes: Bool, precision: Precision, offered: [SharedWeights] = [.codes],
+    package static func opened(codes: Bool, neuralEngine: Bool, offered: [SharedWeights] = [.codes],
                                _ declaration: (Arithmetic) -> Block.Declaration) throws -> Arithmetic {
-        let a = of(codes: codes, precision: precision)
+        let a = of(codes: codes, neuralEngine: neuralEngine)
         let alternatives: [Arithmetic]
         if case .shared(.codes, let share) = a {
             let told = CoreAI.integerProducts.map { $0 ? SharedWeights.integer : .codes }
+            // A control's rows: nothing timed (no pace is kept under them), the weights offered first.
+            if case .told = share { return .shared(told ?? offered[0], share) }
             let shares: [Block.Share] = share == .inFlight ? [.inFlight, .gpu] : [share]
             alternatives = (told.map { [$0] } ?? offered).flatMap { w in shares.map { Arithmetic.shared(w, $0) } }
         } else if a == .shared(.half, .inFlight) {
@@ -213,19 +195,20 @@ package enum Arithmetic: Equatable, Sendable, CustomStringConvertible {
     }
 }
 
-/// **Core AI, as Siliconed hands it every function**: the precision a piece of work is computed under, and where Core
+/// **Core AI, as Siliconed hands it every function**: whether a piece of work may take the Neural Engine, and where Core
 /// AI's assets are written.
 package enum CoreAI {
     private static let lock = NSLock()
-    nonisolated(unsafe) private static var chosen: (precision: Precision, rows: Int?, integer: Bool?) = (.exact, nil, nil)
-    /// The precision of the work in hand (`under`), which the process's does not reach until it ends.
-    nonisolated(unsafe) private static var held: Precision?
+    nonisolated(unsafe) private static var chosen: (neuralEngine: Bool, rows: Int?, integer: Bool?) = (false, nil, nil)
+    /// The switch of the work in hand (`under`), which the process's does not reach until it ends.
+    nonisolated(unsafe) private static var held: Bool?
 
-    /// **The precision every render is computed under**, the process's: the app sets the user's (Settings), a command
-    /// its `--precision`. `exact` until someone says otherwise: a control is judged on the model's own arithmetic.
-    package static var precision: Precision {
-        get { lock.withLock { chosen.precision } }
-        set { lock.withLock { chosen.precision = newValue } }
+    /// **Whether every render may take the Neural Engine**, the process's switch: the app sets the user's (Settings), a
+    /// command its `--neural-engine`. Off until someone says otherwise: a control is judged on the GPU alone, the model's
+    /// own arithmetic.
+    package static var neuralEngine: Bool {
+        get { lock.withLock { chosen.neuralEngine } }
+        set { lock.withLock { chosen.neuralEngine = newValue } }
     }
 
     /// **A control's word**: the rows of every function the Neural Engine is told to take, in place of the share the
@@ -242,21 +225,21 @@ package enum CoreAI {
         set { lock.withLock { chosen.integer = newValue } }
     }
 
-    /// **One precision from end to end of a piece of work**: a render computes its text, its denoising and its decoder
-    /// at different times, and a preference changed in between would make one image of two arithmetics. The engine
-    /// queue runs one such work at a time. `nil`: the process's as it is when the work begins.
-    package static func under<T>(_ precision: Precision? = nil, _ work: (Precision) throws -> T) rethrows -> T {
-        let (now, before) = lock.withLock { () -> (Precision, Precision?) in
+    /// **One switch from end to end of a piece of work**: a render computes its text, its denoising and its decoder at
+    /// different times, and a preference changed in between would make one image of two arithmetics. The engine queue
+    /// runs one such work at a time, under the process's switch as it is when the work begins (or the work's around it).
+    package static func under<T>(_ work: (Bool) throws -> T) rethrows -> T {
+        let (now, before) = lock.withLock { () -> (Bool, Bool?) in
             let before = held
-            held = precision ?? held ?? chosen.precision
+            held = held ?? chosen.neuralEngine
             return (held!, before)
         }
         defer { lock.withLock { held = before } }
         return try work(now)
     }
 
-    /// The precision work is computed under now: the work's in hand, else the process's.
-    package static var inForce: Precision { lock.withLock { held ?? chosen.precision } }
+    /// Whether the work computed now may take the Neural Engine: the work's in hand, else the process's switch.
+    package static var neuralEngineInForce: Bool { lock.withLock { held ?? chosen.neuralEngine } }
 
     /// **Where the functions' assets are written** (`Functions.folder`): the user's caches, where everything is written
     /// again when missing — no weight in an asset, its bytes its name. What this Mac measured stays in `library`'s engine

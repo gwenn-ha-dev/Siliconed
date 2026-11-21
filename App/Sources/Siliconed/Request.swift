@@ -67,10 +67,6 @@ package struct Request: Sendable, Equatable {
     /// by the same variations.
     package var variations: [Variation] = []
 
-    /// **The precision the render is planned under**, when it is not this Mac's own (`CoreAI.precision`): a render
-    /// asked by another Mac is rendered under that Mac's.
-    package var precision: Precision?
-
     /// The most steps a request may ask for. The Turbo models are distilled for 6 to 8; the cap is
     /// there for what does not come from the stepper — a PNG's metadata, `silicontrol --steps`, the
     /// API — where 2·10⁹ steps would allocate the schedule (8 GB) before the first evaluation.

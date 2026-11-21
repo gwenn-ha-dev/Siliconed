@@ -21,8 +21,8 @@ package enum RenderCache {
         private var hash = SHA256()
 
         /// `stage`: the encoder and its configuration — two families may read one file differently.
-        /// The precision in force is part of it: the engine may compute an encoder otherwise under another.
-        package init(_ stage: String) { text(stage); text(CoreAI.inForce.rawValue) }
+        /// The Neural Engine switch in force is part of it: the engine may compute an encoder otherwise with it on.
+        package init(_ stage: String) { text(stage); text(CoreAI.neuralEngineInForce ? "neural engine" : "gpu") }
 
         /// The file as it is on disk: its path, its size, its modification date — an imported model replaced under
         /// the same name is another file.

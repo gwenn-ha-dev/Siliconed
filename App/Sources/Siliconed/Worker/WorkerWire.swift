@@ -98,7 +98,7 @@ package struct WorkerImage: Codable, Sendable, Equatable {
 }
 
 /// **A render, asked of the worker**: a `Request` and its seeds, the model by its identifier in a library, the
-/// precision the app plans under.
+/// Neural Engine switch the app plans under.
 package struct RenderOrder: Codable, Sendable, Equatable {
     package var prompt: String
     package var width: Int, height: Int
@@ -110,18 +110,17 @@ package struct RenderOrder: Codable, Sendable, Equatable {
     package var detail: Detail
     package var solver: Solver
     package var variations: [Variation]
-    package var precision: Precision?
     /// The starting image, already fitted to the format (`Request.image`); the references, as they are.
     package var image: WorkerImage?
     package var references: [WorkerImage]
     package var seeds: [UInt64]
     package var model: String
     package var library: WorkerLibrary
-    /// The app's own precision (`CoreAI.precision`), the process's in the worker: a render that names none plans under it.
-    package var processPrecision: Precision
+    /// The app's Neural Engine switch (`CoreAI.neuralEngine`), the process's in the worker: every render plans under it.
+    package var neuralEngine: Bool
 
     /// The order of `request`, its images numbered from `firstBlob`; the blobs to send before it, in order.
-    package static func of(_ request: Request, seeds: [UInt64], model: String, library: Library, processPrecision: Precision,
+    package static func of(_ request: Request, seeds: [UInt64], model: String, library: Library, neuralEngine: Bool,
                            firstBlob: UInt32) -> (order: RenderOrder, blobs: [(UInt32, Data)]) {
         var blobs: [(UInt32, Data)] = []
         func carried(_ image: ImageRGB) -> WorkerImage {
@@ -132,9 +131,9 @@ package struct RenderOrder: Codable, Sendable, Equatable {
         let order = RenderOrder(prompt: request.prompt, width: request.width, height: request.height, seed: request.seed,
                                 steps: request.steps, loras: request.loras, strength: request.strength,
                                 previews: request.previews, detail: request.detail, solver: request.solver,
-                                variations: request.variations, precision: request.precision,
+                                variations: request.variations,
                                 image: request.image.map(carried), references: request.references.map(carried),
-                                seeds: seeds, model: model, library: WorkerLibrary(library), processPrecision: processPrecision)
+                                seeds: seeds, model: model, library: WorkerLibrary(library), neuralEngine: neuralEngine)
         return (order, blobs)
     }
 
@@ -153,7 +152,6 @@ package struct RenderOrder: Codable, Sendable, Equatable {
         r.detail = detail
         r.solver = solver
         r.variations = variations
-        r.precision = precision
         return r
     }
 
@@ -171,7 +169,7 @@ package struct WriteOrder: Codable, Sendable, Equatable {
     package var input: Input
     package var instruction: String
     package var library: WorkerLibrary
-    package var processPrecision: Precision
+    package var neuralEngine: Bool
 
     package var blobs: [UInt32] {
         if case .describe(let b) = input { return [b] }

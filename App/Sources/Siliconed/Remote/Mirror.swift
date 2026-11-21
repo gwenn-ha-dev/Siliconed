@@ -135,9 +135,6 @@ package struct RemoteJob: Codable, Equatable, Sendable {
     /// pictures, sent as `.image` blobs after the edit's own. `nil`: the job cites nobody.
     package var modelPrompt: String?
     package var subjectImages: Int?
-    /// **The precision of the Mac that asks**: whoever receives the image approves its margin, not the Mac that
-    /// computes it. Set as the job is sent; `nil` in what the lender says of its own jobs.
-    package var precision: Precision?
 
     package init(ordinal: Int, model: String, modelName: String, prompt: String, width: Int, height: Int, steps: Int,
                  defaultSteps: Int?, loras: [RemoteLoRA], seeds: [UInt64], detail: Detail, solver: Solver,

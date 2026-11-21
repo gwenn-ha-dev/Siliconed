@@ -4,11 +4,11 @@ import Siliconed
 // **One check's arguments, the same grammar for every stage**:
 //
 //     siliconed check <model> <stage> [--size 512|1024|WxH] [--edit N] [--goldens DIR] [--map PATH] [--long]
-//                                     [--precision exact|ane] [--neural-engine ROWS]
+//                                     [--neural-engine off|on|ROWS]
 //
-// `--precision` is the user's setting (`Precision`): a control is judged on the model's own arithmetic, `exact`, unless
-// it says otherwise — then the engine may give the Neural Engine rows of the programs, by itself, or as many as
-// `--neural-engine` says. The stage prints what it gave.
+// `--neural-engine` is the user's switch (`CoreAI.neuralEngine`): a control is judged on the GPU alone, the model's own
+// arithmetic, unless it says otherwise — `on`, the engine gives the Neural Engine rows of the programs by itself; a
+// count, as many rows as it says (0: the shared forms on the GPU alone). The stage prints what it gave.
 //
 // Named options only, no positional magic: `--size` is the only thing that names a size, so a number
 // meant for something else is never taken for one. An option a stage does not accept is a usage
@@ -31,7 +31,7 @@ package struct Invocation: Sendable {
     package let extras: [String: String]
 
     /// The options every stage accepts.
-    package static let common: Set<String> = ["--size", "--goldens", "--precision", "--neural-engine", "--products"]
+    package static let common: Set<String> = ["--size", "--goldens", "--neural-engine", "--products"]
 
     /// Parses `arguments` (what follows `check <model> <stage>`), refusing any option outside `accepted`
     /// and `common`. `defaultSize`: the stage's own, when `--size` is absent.
@@ -62,15 +62,15 @@ package struct Invocation: Sendable {
             return n
         }
         map = values["--map"]?.last
-        // The process's precision, and a control's own share of the Neural Engine: every plan the stage makes reads them.
-        if let named = values["--precision"]?.last {
-            guard let precision = Precision(rawValue: named) else { throw UsageError("--precision \(named): exact or ane") }
-            CoreAI.precision = precision
-        }
-        if let rows = values["--neural-engine"]?.last {
-            guard let n = Int(rows), n >= 0 else { throw UsageError("--neural-engine \(rows): a count of rows") }
-            guard CoreAI.precision != .exact else { throw UsageError("--neural-engine needs --precision ane: the exact arithmetic is the GPU's") }
-            CoreAI.neuralEngineRows = n
+        // The process's switch, and a control's own share of the Neural Engine: every plan the stage makes reads them.
+        if let word = values["--neural-engine"]?.last {
+            switch word {
+            case "off": (CoreAI.neuralEngine, CoreAI.neuralEngineRows) = (false, nil)
+            case "on": (CoreAI.neuralEngine, CoreAI.neuralEngineRows) = (true, nil)
+            default:
+                guard let n = Int(word), n >= 0 else { throw UsageError("--neural-engine \(word): off, on or a count of rows") }
+                (CoreAI.neuralEngine, CoreAI.neuralEngineRows) = (true, n)
+            }
         }
         if let products = values["--products"]?.last {
             guard products == "int8" || products == "q64" else { throw UsageError("--products \(products): int8 or q64") }
@@ -85,7 +85,7 @@ package struct Invocation: Sendable {
     private static let flags: Set<String> = ["--long"]
 
     /// The options parsed above; any other accepted option lands in `extras`.
-    private static let known: Set<String> = ["--size", "--goldens", "--edit", "--map", "--precision", "--neural-engine", "--products"]
+    private static let known: Set<String> = ["--size", "--goldens", "--edit", "--map", "--neural-engine", "--products"]
 
     /// The DiT map: `--map`, else the installed one named `standard`; missing or of another variant than the golden's, the stage is skipped.
     /// `golden`: the variant the stage's golden was made for; another one is skipped (`MapCheck`).

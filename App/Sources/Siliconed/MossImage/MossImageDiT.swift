@@ -162,7 +162,7 @@ package struct MossImageDiTProgram {
 /// the stream is f16 beside its rows' factors: the embedders' bf16 rows, `e` (the text's copied after the image's once a
 /// prompt), enter it by `enter`; the gains by `gains`, once the CPU has read the gates' factors off the modulation.
 ///
-/// **The Compact** is the block in its shared forms (`MossShared`): on the GPU alone (`exact`), or with the ANE's share
+/// **The Compact** is the block in its shared forms (`MossShared`): on the GPU alone (the Neural Engine off), or with the ANE's share
 /// of the image's first rows (`Block.Share`: a control's rows, or found in flight); the Standard beside the ANE, the same
 /// forms on its weights in f16 (`SharedWeights.half`).
 final class MossDiT {
@@ -299,13 +299,13 @@ final class MossDiT {
 
     // MARK: - The block
 
-    /// **The DiT of `file` under B** (`Block.open`) in the map's arithmetic under the precision (`Arithmetic.opened`); the
+    /// **The DiT of `file` under B** (`Block.open`) in the map's arithmetic under the Neural Engine switch (`Arithmetic.opened`); the
     /// low-rank factors written.
     static func open(file: SafeTensors, geometry g: Geometry, budget: Int, tapped: Bool = false, loras: LoRAStack = .none) async throws -> MossDiT {
         guard let device = MTLCreateSystemDefaultDevice() else { throw Failure("no Metal device") }
         let ranks = Self.ranks(loras)
         let codes = file.tensors["layers.0.proj.qkv.weight"]?.dtype == "I8", offered = try await Arithmetic.offered(codes: codes, device)
-        let arithmetic = try Arithmetic.opened(codes: codes, precision: CoreAI.inForce, offered: offered) {
+        let arithmetic = try Arithmetic.opened(codes: codes, neuralEngine: CoreAI.neuralEngineInForce, offered: offered) {
             declaration(g, $0, tapped: tapped, ranks: ranks)
         }
         let block = try await Block.open(device, declaration(g, arithmetic, tapped: tapped, ranks: ranks), files: [file], budget: budget,

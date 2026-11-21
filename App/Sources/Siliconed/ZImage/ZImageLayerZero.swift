@@ -4,8 +4,8 @@ import Metal
 import SiliCore
 
 /// **Layer 0 alone, at its inner boundaries** (`siliconed check z-image block`): the render's block functions in the
-/// map's arithmetic under the process's precision (`Arithmetic.of`: `ZImageBlock`, the Standard's;
-/// `ZImageShared`, the Compact's, or the Standard's weights in f16 under `ane`, on the GPU), over the oracle's own
+/// map's arithmetic under the process's Neural Engine switch (`Arithmetic.of`: `ZImageBlock`, the Standard's;
+/// `ZImageShared`, the Compact's, or the Standard's weights in f16 with the switch on, on the GPU), over the oracle's own
 /// stream and adaln, one call over every row of the sequence (keys = rows, every key real: diffusers masks nothing at
 /// batch 1), and before each the same function with boundaries for outputs (six at most a function). The stream given
 /// as the functions take it: bf16 rounded to nearest under the Standard; under the Compact x̂ and its row factors as the
@@ -53,7 +53,7 @@ package enum ZImageLayerZero {
                                   _ tapped: [ZImageDiT.BlockTap: UnsafeMutableBufferPointer<Float>]) async throws -> String {
         guard let device = MTLCreateSystemDefaultDevice() else { throw Failure("no Metal device") }
         let file = try ZImageDiT.file(path)
-        var arithmetic = Arithmetic.of(codes: file.tensors["layers.0.attention.qkv.weight"]?.dtype == "I8", precision: CoreAI.inForce)
+        var arithmetic = Arithmetic.of(codes: file.tensors["layers.0.attention.qkv.weight"]?.dtype == "I8", neuralEngine: CoreAI.neuralEngineInForce)
         // The Compact's int8 × int8 products where a control asks for them (`--products int8`): the block on the GPU.
         if case .shared(.codes, let share) = arithmetic, CoreAI.integerProducts == true { arithmetic = .shared(.integer, share) }
         let (form, weights) = (ZImageFunctions.Form(arithmetic), arithmetic.weights)

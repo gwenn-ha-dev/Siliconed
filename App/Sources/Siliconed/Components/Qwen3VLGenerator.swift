@@ -64,7 +64,7 @@ package final class Qwen3VLGenerator {
 
     /// **Continues `prompt`** by at most `limit` tokens. `each` is handed every token as it is written and ends the
     /// run by answering `false` (a cancellation, a loop seen); a stop token ends it too. Computed exactly, whatever the
-    /// user's precision: two tokens a rounding apart are two texts.
+    /// Neural Engine switch: two tokens a rounding apart are two texts.
     package func generate(_ prompt: Prompt, limit: Int, stops: [Int], each: @escaping (Int) -> Bool = { _ in true }) throws -> Output {
         let started = Date()
         let pictures = try towerRows(prompt)

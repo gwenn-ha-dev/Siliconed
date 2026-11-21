@@ -17,7 +17,7 @@ import Siliconed
 // than the reference is, plus 25 %. `reference` is the fp32 oracle — or, on a half-precision path, the
 // worse of it and the reference run in bf16, since a bf16 path is judged against bf16.
 //
-// The witness floor is the noise of the statistic, not a tolerance. Per channel it is the floor
+// The witness floor is the noise of the statistic, not an allowance. Per channel it is the floor
 // (5·10⁻⁴): the worst position of an ill-conditioned boundary puts honest fp32 computations anywhere
 // from 1× to 3.5× the oracle's error. Per latent plane there is none: thousands of values per measure,
 // both sides near 10⁻⁶, and a floor would hide a hundredfold drift.

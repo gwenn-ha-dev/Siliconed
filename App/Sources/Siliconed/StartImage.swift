@@ -50,7 +50,7 @@ package enum StartImage {
         func distance(_ f: RecommendedFormat) -> Double { abs(log(Double(f.width) / Double(f.height)) - ratio) }
         let area = Double(current.width * current.height)
         func scale(_ f: RecommendedFormat) -> Double { abs(log(Double(f.width * f.height) / area)) }
-        // Proportions first, to a tolerance that keeps 896×1152 and 832×1216 apart; then the scale; then the catalog's order.
+        // Proportions first, to a margin that keeps 896×1152 and 832×1216 apart; then the scale; then the catalog's order.
         return formats.enumerated().min { a, b in
             let da = distance(a.element), db = distance(b.element)
             if abs(da - db) > 1e-9 { return da < db }

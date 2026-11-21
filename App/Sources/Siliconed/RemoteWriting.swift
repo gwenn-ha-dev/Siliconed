@@ -202,8 +202,8 @@ package enum SetOrder: Equatable, Sendable {
         case unknownBeta(String)
     }
 
-    /// All of `set`, the two the app reads before this parse (`precision`, `glass`: its own preferences) included.
-    package static let usage = "set beta [OPTION on|off] · set save-images [FOLDER|off] · set precision [exact|ane] · set glass [on|off]"
+    /// All of `set`, the two the app reads before this parse (`neural-engine`, `glass`: its own preferences) included.
+    package static let usage = "set beta [OPTION on|off] · set save-images [FOLDER|off] · set neural-engine [on|off] · set glass [on|off]"
 
     package static func parse(_ arguments: [String]) -> Result<SetOrder, Failure> {
         guard let what = arguments.first else { return .failure(.usage(usage)) }

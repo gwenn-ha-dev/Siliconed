@@ -251,8 +251,8 @@ extension RemoteControl {
 
     /// **`again <i7|file.png>`**: « Render Again (Same Seed) » (⌘R) — `redo` for an image of the history, which fills the rack with its
     /// settings and renders at its seed; for a PNG Siliconed wrote, the file's recipe the way a drop reads it, then « Generate ». An image
-    /// made another day comes out the same, bit for bit, if the model and the LoRAs are the ones it was made with, the precision is
-    /// exact (ane lets the engine move work to the Neural Engine between renders) and macOS has not changed.
+    /// made another day comes out the same, bit for bit, if the model and the LoRAs are the ones it was made with, the Neural Engine
+    /// is off (on, the engine may move work to it between renders) and macOS has not changed.
     func again(_ word: String, cwd: String, _ c: Connection) throws {
         let gesture: () -> Void
         switch try source(word, cwd: cwd) {

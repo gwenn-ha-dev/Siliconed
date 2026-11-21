@@ -6,11 +6,12 @@ import Foundation
 
 package struct Hello: Codable, Equatable, Sendable {
     /// The shape of the frames, of `PairingMessage` and of `SessionMessage`; moves only when they do (2: the machine without its capacity map;
-    /// 3: a job carries the precision of the Mac that asks; 4: every series published, its sheet drawn by the borrower;
-    /// 5: a pairing carries the borrower's id, an enlargement's refusal names its image; 6: a borrower removes the lender's
-    /// imported models and LoRAs; 7: the precision a job carries is exact or ane; 8: a full disk says what it stopped,
-    /// `EngineError.diskFull(writing:)`).
-    package static let protocolVersion = 8
+    /// 3: a job carries the asking Mac's margin from the model's arithmetic; 4: every series published, its sheet drawn by
+    /// the borrower; 5: a pairing carries the borrower's id, an enlargement's refusal names its image; 6: a borrower
+    /// removes the lender's imported models and LoRAs; 7: the margin a job carries is exact or ane; 8: a full disk says
+    /// what it stopped, `EngineError.diskFull(writing:)`; 9: a lent render follows the lender's Neural Engine switch, the
+    /// job carries no margin).
+    package static let protocolVersion = 9
 
     package let protocolVersion: Int
     /// The Mac's name, as the user knows it ("Mac mini de Gwenn").

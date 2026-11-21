@@ -133,9 +133,9 @@ package struct Summary: Sendable, Equatable {
     package var diskRead: UInt64
     /// Same prompt and seed gave the same pixels.
     package var bitsStable: Bool
-    /// The series ran under precision exact: the GPU alone, one plan per render, so unstable bits are a defect. Under
-    /// ane the engine moves work to the Neural Engine from one render to the next, and the pixels may move with it.
-    package var exact: Bool
+    /// The series ran with the Neural Engine off: the GPU alone, one plan per render, so unstable bits are a defect. With
+    /// it on the engine moves work to the Neural Engine from one render to the next, and the pixels may move with it.
+    package var gpuAlone: Bool
     package var distinctPictures: Int
     package var notes: [String]
 
@@ -148,8 +148,8 @@ package struct Summary: Sendable, Equatable {
         return s.count % 2 == 1 ? s[s.count / 2] : (s[s.count / 2 - 1] + s[s.count / 2]) / 2
     }
 
-    package init(_ rows: [Row], power: Set<String> = [], exact: Bool) {
-        self.exact = exact
+    package init(_ rows: [Row], power: Set<String> = [], gpuAlone: Bool) {
+        self.gpuAlone = gpuAlone
         let renders = rows.filter { $0.role == .render }
         self.renders = renders.count
         median = Self.median(renders.map(\.wallSeconds))
@@ -176,8 +176,8 @@ package struct Summary: Sendable, Equatable {
         if swapouts > 0 { notes.append("\(swapouts) pages were swapped out during the series: its times include the swap") }
         if power.contains("battery") { notes.append("part of the series ran on the battery") }
         if !bitsStable {
-            notes.append(exact ? "the same prompt and seed gave different pixels under precision exact: report it, this is not a measure"
-                               : "the same prompt and seed gave different pixels: under precision ane the Neural Engine's share moves between renders")
+            notes.append(gpuAlone ? "the same prompt and seed gave different pixels with the Neural Engine off: report it, this is not a measure"
+                                  : "the same prompt and seed gave different pixels: with the Neural Engine on its share moves between renders")
         }
         self.notes = notes
     }

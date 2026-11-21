@@ -105,7 +105,7 @@ package enum ZImageRender {
 
     /// **One DiT evaluation**, opened once for a batch: its stage planned under B (`ZImageTransformer.open`), the
     /// caption refined at the first evaluation, the latent and the time's sinusoid given at each. The arithmetic is the
-    /// map's and the precision's (`ZImageTransformer.arithmetic`). Let go with it (`Stage.close`).
+    /// map's and the Neural Engine switch's (`ZImageTransformer.arithmetic`). Let go with it (`Stage.close`).
     package final class Denoiser {
         package var caps: HostTensor?
         let dit: ZImageTransformer
@@ -115,7 +115,7 @@ package enum ZImageRender {
             let file = try ZImageDiT.file(path)
             let geometry = try ZImageTransformer.Geometry(latentHeight: latentHeight, latentWidth: latentWidth, capLength: capLength)
             nonisolated(unsafe) let loras = loras
-            dit = try blocking { try await ZImageTransformer.open(file: file, geometry: geometry, precision: CoreAI.inForce, loras: loras) }
+            dit = try blocking { try await ZImageTransformer.open(file: file, geometry: geometry, neuralEngine: CoreAI.neuralEngineInForce, loras: loras) }
         }
 
         deinit { dit.close() }

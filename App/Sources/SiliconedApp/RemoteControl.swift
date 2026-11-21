@@ -208,7 +208,7 @@ final class RemoteControl {
     private func state() -> [String: Any] {
         var o: [String: Any] = ["ok": true, "library": app.library.root.path,
                                 "history_images": app.history.count,
-                                "beta": betaState(), "precision": local.precision.rawValue, "writer": writerState(),
+                                "beta": betaState(), "neural_engine": local.neuralEngine, "writer": writerState(),
                                 "start_image": startJSON() ?? NSNull()]
         if let t = app.currentJob {
             var e = json(t)

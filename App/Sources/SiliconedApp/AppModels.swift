@@ -162,9 +162,6 @@ struct RenderSettings: Equatable {
     /// **img2img's strength** (`Request.strength`, diffusers'): set when the render starts from an image (`Job.start`), `nil` for
     /// any other. What the PNG writes and « Redo » gives back with the image.
     var strength: Double? = nil
-    /// **The precision of the Mac that asked for it**, for a render lent to another Mac (`RemoteJob.precision`);
-    /// `nil`: this Mac's own preference, as it is when the render begins.
-    var precision: Precision? = nil
     var isVariation: Bool { !variations.isEmpty }
 }
 

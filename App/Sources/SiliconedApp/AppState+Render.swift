@@ -290,7 +290,6 @@ extension AppState {
             request.detail = settings.detail
             request.solver = settings.solver
             request.variations = settings.variations
-            request.precision = settings.precision
 
             var progress = Engine.Progress()
             // A train: its jobs' seeds, one image each, in order.
@@ -525,7 +524,6 @@ extension AppState {
         }
         let jobs = (0..<(count ?? batch)).map { _ in
             var settings = entry.settings
-            settings.precision = nil   // this Mac's own, whoever asked for the image it varies
             settings.variations.append(Variation(seed: UInt64.random(in: 0...UInt64(UInt32.max)), strength: strength))
             var job = Job(ordinal: nextJobNumber(), settings: settings, seeds: [entry.seed], references: entry.references,
                           previews: previews, defaultSteps: card?.defaultSteps, plan: plan)

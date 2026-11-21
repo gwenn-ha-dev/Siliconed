@@ -113,7 +113,7 @@ package enum RemoteControlHelp {
       cancel [t3 …]                            stops the running render, or removes jobs
       clear                                    empties the queue and stops the running render
       set beta [OPTION on|off]                 the four Beta options of Settings, as a click; alone, reads them
-      set precision [exact|ane]                Precision of Settings: how far from a model's own arithmetic the values may lie; alone, reads it
+      set neural-engine [on|off]               Neural Engine of Settings: the engine gives it the work it does faster; alone, reads it
       set save-images [FOLDER|off]             Save Every Image To… of Settings: each new image as a PNG there; alone, reads it
       set glass [on|off]                       Glass of Settings: the columns let a zoomed image show through; alone, reads it
       set updates [on|off]                     Check at Launch of Settings: each launch asks GitHub for the latest version; alone, reads it
@@ -191,9 +191,9 @@ package enum RemoteControlHelp {
            A bare number is also accepted for a job (3 = t3).
         7. Nothing is written to disk without --out or save: the history lives in the app.
         8. Relative paths resolve against the terminal's current directory.
-        9. Same arguments, same seed, same model, under precision exact (help set) and the same macOS: the same image, bit
-           for bit. Under ane the engine may move work to the Neural Engine from one render to the next, and the pixels
-           may differ slightly.
+        9. Same arguments, same seed, same model, with the Neural Engine off (help set) and the same macOS: the same image,
+           bit for bit. With it on the engine may move work to the Neural Engine from one render to the next, and the
+           pixels may differ slightly.
         10. Closing the app's window empties its queue and stops the render; the app stays open.
         """,
 
@@ -563,13 +563,13 @@ package enum RemoteControlHelp {
                           "received_bytes": 5170000000, "total_bytes": 12310000000} | null,
            "queue_remaining_s": 66.5, "remaining_complete": true,
            "history_images": 12, "library": "/Users/…/Siliconed",
-           "beta": {"more_solvers": false, "steps": false, …}, "precision": "ane",
+           "beta": {"more_solvers": false, "steps": false, …}, "neural_engine": true,
            "writer": {"state": "ready"}, "start_image": {…} | null, "computing_on": "Mac mini" | null,
            "memory": {"budget_bytes": 10737418240, "chosen": false, "default_bytes": 10737418240,
                       "range_bytes": [4294967296, 12884901888]}}
 
         beta               : the four Beta options of Settings (help set): more_solvers, steps, size_scales, negative_lora.
-        precision          : Settings' Precision (help set): exact or ane.
+        neural_engine      : Settings' Neural Engine switch (help set): true or false.
         writer             : the Prompt Lab's writer (help rewrite): "state" is "ready", or "writer_absent", the code rewrite
                              would refuse with (no installed model carries a writer: install qwen-image-2.1).
         start_image        : the rack's starting image (help start-image): {"name", "width", "height", "strength", "used", …}, or null.
@@ -647,7 +647,7 @@ package enum RemoteControlHelp {
 
         "set": """
         silicontrol set beta [OPTION on|off]
-        silicontrol set precision [exact|ane]
+        silicontrol set neural-engine [on|off]
         silicontrol set save-images [FOLDER|off]
         silicontrol set glass [on|off]
         silicontrol set updates [on|off]
@@ -670,15 +670,13 @@ package enum RemoteControlHelp {
         Like the switches, they wait for nothing and apply to what is queued next. They are this Mac's preferences; when
         the window computes on another Mac, its copy is set too. « status » gives them as "beta".
 
-        PRECISION is Settings ▸ General's Precision, « ane » by default: how far from a model's own arithmetic the values
-        of a render may lie. « exact » is the model's own arithmetic, on the GPU alone, with no f16 the model does not
-        write; « ane » lets the engine give the Neural Engine all the work it does faster on this Mac, up to all of it.
-        The engine decides alone how much it gives, from the stage's measured time on this Mac, and gives none where it
-        does not help. Alone, it is read.
-        This Mac's preference, for what it renders next, whichever Mac computes: a render lent by another Mac is rendered
-        under the precision of the Mac that asks. Each image keeps the tolerance it was rendered under. « status » gives it as
-        "precision"; each image's line carries the Neural Engine's share of the render as "neural_engine" (0 to 1), absent
-        when it was not used.
+        NEURAL-ENGINE is Settings ▸ General's « Neural Engine » switch, on by default: the engine gives the Neural Engine
+        the work it does faster on this Mac. It decides alone how much it gives, from the stage's measured time on this
+        Mac, and gives none where it does not help; off, the GPU alone computes. Either way the values lie as close to
+        their references. "on" or "off"; alone, it is read.
+        This Mac's preference, for what this Mac computes next: a render it lends to another Mac follows its switch, a
+        render it borrows from another Mac follows that Mac's. « status » gives it as "neural_engine"; each image's line
+        carries the Neural Engine's share of the render as "neural_engine" (0 to 1), absent when it was not used.
 
         SAVE-IMAGES is Settings ▸ General's « Save Every Image To… », off by default: given a folder (relative to the current
         directory; one named "off" is ./off), each new image of the history — a render, a grid's cell, a crop, an
@@ -707,14 +705,14 @@ package enum RemoteControlHelp {
 
         Answer: {"ok": true, "option": "size-scales", "enabled": true, "previous": false,
                  "beta": {"more_solvers": false, "steps": false, "size_scales": true, "negative_lora": false}}
-                {"ok": true, "precision": "ane", "previous": "exact", "tolerance": 8}
+                {"ok": true, "neural_engine": true, "previous": false}
                 {"ok": true, "save_images": "/Users/me/Pictures/Siliconed", "previous": null}
                 {"ok": true, "glass": false, "previous": true}
                 {"ok": true, "updates": false, "previous": true}
                 {"ok": true, "memory": {"budget_bytes": 12884901888, "chosen": true, …}, "previous": {…}}
                 {"ok": true, "preview": false, "previous": true}
-        FAILURES: usage (also: an unknown Beta option, "hint" lists them; a precision other than exact, ane; glass, updates or
-        preview other than on, off; a memory out of this Mac's range), write (save-images: not a folder).
+        FAILURES: usage (also: an unknown Beta option, "hint" lists them; neural-engine, glass, updates or preview other
+        than on, off; a memory out of this Mac's range), write (save-images: not a folder).
         """,
 
         "history": """
@@ -852,7 +850,7 @@ package enum RemoteControlHelp {
         silicontrol settings [general|macs|lab|advanced]
         silicontrol settings lab [rewrite|describe] [--for ID]
 
-        Siliconed › Settings… (⌘,), opened on one of its four panes: general (where the library is, Precision, Save Every Image To…, Glass, Check at Launch),
+        Siliconed › Settings… (⌘,), opened on one of its four panes: general (where the library is, Neural Engine, Save Every Image To…, Glass, Check at Launch),
         macs (this Mac — Memory Limit, Compiled for This Mac —, the other Macs), lab (Prompt Lab: the writer's instructions),
         advanced (Command Line, Beta).
         Without a pane, the one last shown. The window comes forward as the menu brings it; nothing in it changes.
@@ -866,7 +864,7 @@ package enum RemoteControlHelp {
         Lab writes for. A menu not named stays as it is.
 
         Answer: {"ok": true, "settings": {"pane": "lab", "for": "krea2", "gesture": "rewrite"}}   ("for", "gesture": lab only)
-        What the panes set, commands set: set (beta, precision, save-images, glass, updates, memory), library, macs, compute, instructions.
+        What the panes set, commands set: set (beta, neural-engine, save-images, glass, updates, memory), library, macs, compute, instructions.
         Allowed while the window computes on another Mac: Settings are this Mac's.
         FAILURES: usage (a pane that does not read; a gesture or --for on a pane other than lab), model (--for names no model).
         """,
@@ -1087,7 +1085,7 @@ package enum RemoteControlHelp {
 
         again is « Render Again (Same Seed) » (⌘R): the rack takes the image's settings (model, prompt, size, steps, LoRAs, edit
         images, detail, solver, and its seed), then « Generate » renders it, at that seed — a grid's cell as one image, not its
-        series (« Reuse This Grid » is the series tile's). Same settings, same seed, same model, under precision exact and the same macOS: the same image, bit for bit.
+        series (« Reuse This Grid » is the series tile's). Same settings, same seed, same model, with the Neural Engine off and the same macOS: the same image, bit for bit.
         With a PNG that Siliconed wrote — an image of another day, a file from out/ — it is that PNG dropped in the Images box,
         « Reuse These Settings » on its tile, then « Generate »: the rack reads the file's recipe (model, prompt, size, steps, LoRAs found in this library, seed, variations),
         and what could not come back is in "notes" (a model not installed, a LoRA missing, a solver that needs More Solvers…).
@@ -1276,9 +1274,9 @@ package enum RemoteControlHelp {
                        read every 100 ms, the maximum (what we publish)
           start_GiB    the footprint just before the request: what the app and its engine held already
           swapouts     pages swapped out during the render (vm_stat's Swapouts); disk_read_GB the reads of both
-          md5          of the decoded 8-bit RGB pixels: within a series under precision exact, the same model, prompt,
-                       seed, size and settings must give the same md5 (a mismatch is a defect: report it); under ane
-                       the Neural Engine's share may move between renders, and the pixels with it; from one macOS to
+          md5          of the decoded 8-bit RGB pixels: within a series with the Neural Engine off, the same model,
+                       prompt, seed, size and settings must give the same md5 (a mismatch is a defect: report it); with
+                       it on its share may move between renders, and the pixels with it; from one macOS to
                        the next the bits may change
         beside the model, variant, steps, seed, app version, chip, memory, macOS, power
         source and thermal state. A render's prompt is encoded once and cached: with several renders on
@@ -1468,7 +1466,7 @@ package enum RemoteControlHelp {
       cancel [t3 …]                            arrête le rendu en cours, ou retire des travaux
       clear                                    vide la file et arrête le rendu en cours
       set beta [OPTION on|off]                 les quatre options Bêta des Réglages, comme un clic ; seul, les lit
-      set precision [exact|ane]                Précision des Réglages : l'écart permis aux valeurs avec l'arithmétique du modèle ; seul, le lit
+      set neural-engine [on|off]               Neural Engine des Réglages : le moteur lui confie le travail qu'il fait plus vite ; seul, le lit
       set save-images [FOLDER|off]             Enregistrer chaque image dans… des Réglages : chaque image nouvelle en PNG ; seul, le lit
       set glass [on|off]                       Verre des Réglages : les colonnes laissent voir une image zoomée ; seul, le lit
       set updates [on|off]                     Vérifier au lancement, des Réglages : chaque lancement demande à GitHub la dernière version ; seul, le lit
@@ -1548,9 +1546,9 @@ package enum RemoteControlHelp {
            Un nombre nu est aussi accepté pour un travail (3 = t3).
         7. Rien n'est écrit sur disque sans --out ou save : l'historique vit dans l'app.
         8. Les chemins relatifs se résolvent contre le répertoire courant du terminal.
-        9. Mêmes arguments, même graine, même modèle, en précision exact (help set) et sous le même macOS : la même image, au
-           bit près. En ane, le moteur peut confier du travail au Neural Engine d'un rendu à l'autre, et les pixels peuvent
-           différer légèrement.
+        9. Mêmes arguments, même graine, même modèle, le Neural Engine éteint (help set) et sous le même macOS : la même
+           image, au bit près. Allumé, le moteur peut confier du travail au Neural Engine d'un rendu à l'autre, et les
+           pixels peuvent différer légèrement.
         10. Fermer la fenêtre de l'app vide sa file et arrête le rendu ; l'app reste ouverte.
         """,
 
@@ -1930,13 +1928,13 @@ package enum RemoteControlHelp {
                           "received_bytes": 5170000000, "total_bytes": 12310000000} | null,
            "queue_remaining_s": 66.5, "remaining_complete": true,
            "history_images": 12, "library": "/Users/…/Siliconed",
-           "beta": {"more_solvers": false, "steps": false, …}, "precision": "ane",
+           "beta": {"more_solvers": false, "steps": false, …}, "neural_engine": true,
            "writer": {"state": "ready"}, "start_image": {…} | null, "computing_on": "Mac mini" | null,
            "memory": {"budget_bytes": 10737418240, "chosen": false, "default_bytes": 10737418240,
                       "range_bytes": [4294967296, 12884901888]}}
 
         beta               : les quatre options Bêta des Réglages (help set) : more_solvers, steps, size_scales, negative_lora.
-        precision          : la Précision des Réglages (help set) : exact ou ane.
+        neural_engine      : l'interrupteur Neural Engine des Réglages (help set) : true ou false.
         writer             : le rédacteur de l'Atelier (help rewrite) : "state" vaut "ready", ou "writer_absent", le code dont
                              rewrite refuserait (aucun modèle installé n'a de rédacteur : install qwen-image-2.1).
         start_image        : l'image de départ du rack (help start-image) : {"name", "width", "height", "strength", "used", …}, ou null.
@@ -2016,7 +2014,7 @@ package enum RemoteControlHelp {
 
         "set": """
         silicontrol set beta [OPTION on|off]
-        silicontrol set precision [exact|ane]
+        silicontrol set neural-engine [on|off]
         silicontrol set save-images [FOLDER|off]
         silicontrol set glass [on|off]
         silicontrol set updates [on|off]
@@ -2039,14 +2037,13 @@ package enum RemoteControlHelp {
         n'attendent rien et valent pour ce qui se met en file ensuite. Ce sont les préférences de ce Mac ; quand la fenêtre
         calcule sur un autre, sa copie est réglée aussi. « status » les donne sous "beta".
 
-        PRECISION, c'est Réglages ▸ Général ▸ Précision, « ane » par défaut : l'écart permis aux valeurs d'un rendu avec
-        l'arithmétique propre du modèle. « exact » est l'arithmétique du modèle, sur le GPU seul, sans aucun f16 que le
-        modèle n'écrit pas ; « ane » laisse le moteur confier au Neural Engine tout le travail qu'il fait plus vite sur ce
-        Mac, jusqu'à la totalité. Le moteur décide seul de la part qu'il donne, d'après le temps mesuré de l'étage sur ce
-        Mac, et n'en donne pas là où elle n'aide pas. Seul, il est lu. Préférence de ce Mac, pour ce qu'il rend ensuite, quel que soit le Mac qui calcule :
-        un rendu prêté par un autre Mac se fait sous la précision du Mac qui demande. Chaque image garde la tolérance sous
-        laquelle elle a été rendue. « status » la donne sous "precision" ; la ligne de chaque image porte la part du Neural Engine
-        dans le rendu, "neural_engine" (0 à 1), absente s'il n'a pas servi.
+        NEURAL-ENGINE, c'est l'interrupteur « Neural Engine » de Réglages ▸ Général, allumé par défaut : le moteur confie au
+        Neural Engine le travail qu'il fait plus vite sur ce Mac. Il décide seul de la part qu'il donne, d'après le temps
+        mesuré de l'étage sur ce Mac, et n'en donne pas là où elle n'aide pas ; éteint, le GPU calcule seul. Allumé ou
+        éteint, les valeurs restent aussi près de leurs références. « on » ou « off » ; seul, il est lu.
+        Préférence de ce Mac, pour ce qu'il calcule ensuite : un rendu qu'il prête à un autre Mac suit son interrupteur, un
+        rendu qu'il emprunte à un autre Mac suit celui de cet autre Mac. « status » le donne sous "neural_engine" ; la ligne
+        de chaque image porte la part du Neural Engine dans le rendu, "neural_engine" (0 à 1), absente s'il n'a pas servi.
 
         SAVE-IMAGES, c'est « Enregistrer chaque image dans… » de Réglages ▸ Général, éteint par défaut : avec un dossier
         (relatif au répertoire courant ; un dossier nommé « off » s'écrit ./off), chaque image nouvelle de l'historique — un
@@ -2079,14 +2076,14 @@ package enum RemoteControlHelp {
 
         Réponse : {"ok": true, "option": "size-scales", "enabled": true, "previous": false,
                    "beta": {"more_solvers": false, "steps": false, "size_scales": true, "negative_lora": false}}
-                  {"ok": true, "precision": "ane", "previous": "exact", "tolerance": 8}
+                  {"ok": true, "neural_engine": true, "previous": false}
                   {"ok": true, "save_images": "~/Pictures/Siliconed", "previous": null}
                   {"ok": true, "glass": false, "previous": true}
                   {"ok": true, "updates": false, "previous": true}
                   {"ok": true, "memory": {"budget_bytes": 12884901888, "chosen": true, …}, "previous": {…}}
                   {"ok": true, "preview": false, "previous": true}
-        ÉCHECS : usage (aussi : une option Bêta inconnue, "hint" les liste ; une précision autre que exact, ane ; glass, updates
-        ou preview autre que on, off ; une mémoire hors de la plage de ce Mac), write (save-images : pas un dossier).
+        ÉCHECS : usage (aussi : une option Bêta inconnue, "hint" les liste ; neural-engine, glass, updates ou preview autre
+        que on, off ; une mémoire hors de la plage de ce Mac), write (save-images : pas un dossier).
         """,
 
         "history": """
@@ -2228,7 +2225,7 @@ package enum RemoteControlHelp {
         silicontrol settings lab [rewrite|describe] [--for ID]
 
         Siliconed › Réglages… (⌘,), ouvert sur l'un de ses quatre volets : general (Général : où est la bibliothèque,
-        Précision, Enregistrer chaque image dans…, Verre, Vérifier au lancement), macs (Mac : ce Mac — Limite de mémoire, Compilé pour ce Mac —, les autres Mac), lab (Atelier de prompts : les consignes du
+        Neural Engine, Enregistrer chaque image dans…, Verre, Vérifier au lancement), macs (Mac : ce Mac — Limite de mémoire, Compilé pour ce Mac —, les autres Mac), lab (Atelier de prompts : les consignes du
         rédacteur), advanced (Avancé : Ligne de commande, Bêta). Sans volet, le dernier montré. La fenêtre
         passe devant comme le menu l'amène ; rien n'y change.
 
@@ -2241,7 +2238,7 @@ package enum RemoteControlHelp {
         pour lequel écrit l'Atelier. Un menu qu'on ne nomme pas reste comme il est.
 
         Réponse : {"ok": true, "settings": {"pane": "lab", "for": "krea2", "gesture": "rewrite"}}   ("for", "gesture" : lab seulement)
-        Ce que règlent les volets, des commandes le règlent : set (beta, precision, save-images, glass, updates, memory), library, macs, compute, instructions.
+        Ce que règlent les volets, des commandes le règlent : set (beta, neural-engine, save-images, glass, updates, memory), library, macs, compute, instructions.
         Permis quand la fenêtre calcule sur un autre Mac : les Réglages sont ceux de ce Mac.
         ÉCHECS : usage (un volet qui ne se lit pas ; un geste ou --for sur un autre volet que lab), model (--for ne nomme
         aucun modèle).
@@ -2470,7 +2467,7 @@ package enum RemoteControlHelp {
 
         again est « Rendre à nouveau (même graine) » (⌘R) : le rack prend les réglages de l'image (modèle, prompt, taille, pas, LoRA, images à
         éditer, détail, solveur, et sa graine), puis « Générer » la rend, à cette graine — la case d'une grille comme une image, pas
-        sa série (« Reprendre cette grille » est à la tuile de la série). Mêmes réglages, même graine, même modèle, en précision exact et sous le même macOS : la même image, bit pour bit.
+        sa série (« Reprendre cette grille » est à la tuile de la série). Mêmes réglages, même graine, même modèle, le Neural Engine éteint et sous le même macOS : la même image, bit pour bit.
         Avec un PNG que Siliconed a écrit — une image d'un autre jour, un fichier de out/ — c'est ce PNG déposé dans la boîte Images,
         « Reprendre ces réglages » sur sa tuile, puis « Générer » : le rack lit la recette du fichier (modèle, prompt, taille, pas, LoRA retrouvées dans cette bibliothèque, graine,
         variations), et ce qui n'a pas pu revenir est dans "notes" (un modèle non installé, une LoRA absente, un solveur qui demande
@@ -2665,9 +2662,9 @@ package enum RemoteControlHelp {
                        lu toutes les 100 ms, le maximum (ce que nous publions)
           start_GiB    l'empreinte juste avant la demande : ce que l'app et son moteur tenaient déjà
           swapouts     pages écrites en swap pendant le rendu (Swapouts de vm_stat) ; disk_read_GB les lectures des deux
-          md5          des pixels décodés en RGB 8 bits : dans une série sous la précision exact, même modèle, prompt,
+          md5          des pixels décodés en RGB 8 bits : dans une série le Neural Engine éteint, même modèle, prompt,
                        graine, format et réglages doivent donner le même md5 (un écart est un défaut : le signaler) ;
-                       sous ane la part du Neural Engine peut bouger d'un rendu à l'autre, et les pixels avec elle ;
+                       allumé, sa part peut bouger d'un rendu à l'autre, et les pixels avec elle ;
                        d'un macOS au suivant les bits peuvent changer
         avec le modèle, la version, les pas, la graine, la version de l'app, la puce, la mémoire,
         macOS, la source d'alimentation et l'état thermique. Le prompt d'un rendu est encodé une fois puis gardé :

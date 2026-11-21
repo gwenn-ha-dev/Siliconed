@@ -22,7 +22,7 @@
 //     └───────────────────────────────────────────────────────┘
 //
 //     General   what an everyday user touches: where the library is, what it weighs, what is left on its
-//               disk; Save Every Image To… (off by default: `EveryImage`); Precision; Glass; Updates (the check at
+//               disk; Save Every Image To… (off by default: `EveryImage`); Neural Engine; Glass; Updates (the check at
 //               launch, on by default: `Updates.swift`).
 //     Macs      this Mac — its name, its chip, the memory a render may hold, what Core AI compiled for it (`SettingsThisMac.swift`) —
 //               and the other Macs: lend this one, compute on another (`OtherMacsView.swift`).
@@ -208,8 +208,8 @@ struct SettingsView: View {
                 (modelBytes, freeBytes) = figures
             }
         SettingsGroup(footer: "The engine decides by itself how much to give the Neural Engine, measures it, and takes it back if it does not help on this Mac.") {
-            Text("Precision")
-        } content: { precisionRow }
+            Text("Neural Engine")
+        } content: { neuralEngineRow }
         SettingsGroup("Images") { everyImage }
         SettingsGroup("Window") { glassRow }
         SettingsGroup("Updates") { updatesRow }
@@ -240,21 +240,14 @@ struct SettingsView: View {
         }
     }
 
-    /// **Precision**: how far from a model's own arithmetic the values may lie. Exact keeps the GPU alone; ANE lets the
-    /// engine give work to the Neural Engine, which it sizes and withdraws alone.
-    private var precisionRow: some View {
-        let line: LocalizedStringKey = switch app.precision {
-        case .exact: "The model’s own arithmetic, on the GPU alone. The Neural Engine stays idle."
-        case .neuralEngine: "The Neural Engine takes all the work it does faster on this Mac, up to all of it."
-        }
-        return SettingRow(Text("Precision"), Text(line)) {
-            IconTile(symbol: "scope", color: Palette.live, side: 26)
+    /// **Neural Engine**: on, the engine gives the Neural Engine the work it does faster on this Mac, sizes that share and
+    /// takes it back alone (`AppState.neuralEngine`); off, the GPU alone. Its results lie as close to their references either way.
+    private var neuralEngineRow: some View {
+        SettingRow(Text("Neural Engine"), Text(app.neuralEngine ? "The engine gives it the work it does faster on this Mac." as LocalizedStringKey
+                                                                : "The GPU alone: the Neural Engine stays idle.")) {
+            IconTile(symbol: "cpu", color: Palette.live, side: 26)
         } trailing: {
-            Picker("Precision", selection: $app.precision) {
-                Text("Exact").tag(Precision.exact)
-                Text("ANE").tag(Precision.neuralEngine)
-            }
-            .pickerStyle(.segmented).labelsHidden().frame(width: 130).tint(Palette.control)
+            SettingSwitch("Neural Engine", isOn: $app.neuralEngine)
         }
     }
 

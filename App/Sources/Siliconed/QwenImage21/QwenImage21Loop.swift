@@ -25,7 +25,7 @@ import SiliCore
 /// are computed and masked as keys (−10⁴). The residual stream is two buffers in turn, beside their row factors under
 /// the guard of f16 (f32, one a row; f16 in the shared forms).
 ///
-/// **With the ANE's share** (the shared forms, `QwenImage21Shared`, the Compact under the precision `ane`): the ANE the
+/// **With the ANE's share** (the shared forms, `QwenImage21Shared`, the Compact with the Neural Engine on): the ANE the
 /// target's first rows by the engine's unit, told (`--neural-engine`) or found in flight; the prefix's pass is the GPU's.
 ///
 /// **Under a LoRA**: the factors of every product it adapts in the stage's tensors, `<product>_down`, `_up` outside the
@@ -57,7 +57,7 @@ package final class QwenImage21Loop {
     package enum Pass: Sendable { case prefix, target }
 
     /// **The path of a DiT's arithmetic** (`Arithmetic`): the Standard's bf16; the Compact's codes on the GPU alone in
-    /// W8A16 (`exact`: the stream under the guard of f16); the shared forms beside the ANE (or told 0 rows of it), on
+    /// W8A16 (the Neural Engine off: the stream under the guard of f16); the shared forms beside the ANE (or told 0 rows of it), on
     /// the Compact's codes or the Standard's weights in f16, and on the GPU alone where its products are int8 × int8
     /// (`SharedWeights.integer`: the guarded forms read the codes in W8A16 only).
     static func path(_ a: Arithmetic) -> Path {
@@ -168,7 +168,7 @@ package final class QwenImage21Loop {
     // MARK: - Opening
 
     /// **The DiT of the file at `map` for `sequence`, under B**: its arithmetic read from the file (int8 codes: the Compact,
-    /// on the GPU alone under `exact`, in the shared forms under `ane`, the ANE's rows a control's or found in flight;
+    /// on the GPU alone with the Neural Engine off, in the shared forms with it on, the ANE's rows a control's or found in flight;
     /// bf16: the Standard). Under `loras`, their factors written before the first call.
     package static func open(map: String, sequence: QwenImage21DiT.Sequence, loras: LoRAStack = .none, tapped: Bool = false,
                              budget: Int = MemoryBudget.machineCeiling()) async throws -> QwenImage21Loop {
@@ -180,7 +180,7 @@ package final class QwenImage21Loop {
         let g = Geometry(sequence), ranks = QwenImage21Functions.ranks(loras)
         guard let device = MTLCreateSystemDefaultDevice() else { throw ProgramError("no Metal device") }
         let codes = probe.dtype == "I8", offered = try await Arithmetic.offered(codes: codes, device)
-        let arithmetic = try Arithmetic.opened(codes: codes, precision: CoreAI.inForce, offered: offered) { declaration(g, $0, ranks: ranks, tapped: tapped) }
+        let arithmetic = try Arithmetic.opened(codes: codes, neuralEngine: CoreAI.neuralEngineInForce, offered: offered) { declaration(g, $0, ranks: ranks, tapped: tapped) }
         let block = try await Block.open(device, declaration(g, arithmetic, ranks: ranks, tapped: tapped), files: [file], budget: budget, share: arithmetic.share)
         let loop = QwenImage21Loop(block, g, arithmetic, ranks: ranks)
         try loop.write(loras)

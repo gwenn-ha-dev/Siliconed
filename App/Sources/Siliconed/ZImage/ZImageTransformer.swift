@@ -19,7 +19,7 @@ import SiliCore
 /// **The residual stream** `x` is two buffers in turn, beside its row factors in the shared forms (f16 one a row; none
 /// in bf16): a step reads one and writes the other (`y`).
 ///
-/// **The Compact** is the block in its shared forms (`ZImageShared`): on the GPU alone (`exact`), or with the ANE's share
+/// **The Compact** is the block in its shared forms (`ZImageShared`): on the GPU alone (the Neural Engine off), or with the ANE's share
 /// (`Arithmetic.shared`), the ANE units of the image's first rows in the noise refiner's and the layers' passes
 /// (`Block.Share`: a control's rows, or found in flight). **The Standard beside the ANE** is the same forms on its bf16
 /// weights rounded to f16 as they are read (`SharedWeights.half`); on the GPU alone, its own bf16 functions.
@@ -184,12 +184,12 @@ final class ZImageTransformer {
         return dit
     }
 
-    /// **A render's DiT** in the map's arithmetic under the precision (`Arithmetic.opened`).
-    static func open(file: SafeTensors, geometry g: Geometry, precision: Precision, loras: LoRAStack = .none) async throws -> ZImageTransformer {
+    /// **A render's DiT** in the map's arithmetic under the Neural Engine switch (`Arithmetic.opened`).
+    static func open(file: SafeTensors, geometry g: Geometry, neuralEngine: Bool, loras: LoRAStack = .none) async throws -> ZImageTransformer {
         guard let device = MTLCreateSystemDefaultDevice() else { throw Failure("no Metal device") }
         let codes = file.tensors["layers.0.attention.qkv.weight"]?.dtype == "I8", ranks = ZImageDiT.loraRanks(loras)
         let offered = try await Arithmetic.offered(codes: codes, device)
-        let arithmetic = try Arithmetic.opened(codes: codes, precision: precision, offered: offered) { declaration(g, $0, ranks: ranks) }
+        let arithmetic = try Arithmetic.opened(codes: codes, neuralEngine: neuralEngine, offered: offered) { declaration(g, $0, ranks: ranks) }
         return try await open(device, file: file, geometry: g, arithmetic: arithmetic, loras: loras)
     }
 

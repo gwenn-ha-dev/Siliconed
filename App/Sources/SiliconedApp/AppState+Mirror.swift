@@ -135,7 +135,6 @@ final class MirrorLink {
     func render(_ job: Job, format: Bool = true, answered: ((RemoteAnswer) -> Void)? = nil) throws(EngineError) {
         if let down { answered?(.refused(.text(down))); return }
         var r = MirrorProjection.remote(job)
-        r.precision = CoreAI.precision
         r.references = try remote(job.references)
         if !format { r.width = 0; r.height = 0 }
         r.ordinal = nextRequest
@@ -152,7 +151,6 @@ final class MirrorLink {
                  answered: ((RemoteAnswer) -> Void)? = nil) throws(EngineError) {
         if let down { answered?(.refused(.text(down))); return }
         var job = MirrorProjection.remote(settings, ordinal: 0, seeds: [], previews: previews, defaultSteps: nil)
-        job.precision = CoreAI.precision
         job.references = try remote(references)
         var request: Int?
         if let answered {
@@ -221,7 +219,6 @@ enum MirrorProjection {
         s.variations = r.variations
         s.modelPrompt = r.modelPrompt
         s.subjectImages = r.subjectImages ?? 0
-        s.precision = r.precision
         s.references = r.references.count
         return s
     }

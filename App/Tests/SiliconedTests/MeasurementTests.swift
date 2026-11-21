@@ -71,7 +71,7 @@ final class MeasurementTests: XCTestCase {
     func testSummaryMedianWitnessDriftAndNotes() {
         let rows = [row(0, .load, wall: 60), row(1, .witnessHead, wall: 40), row(2, .render, wall: 41), row(3, .render, wall: 43),
                     row(4, .render, wall: 42), row(5, .witnessTail, wall: 42)]
-        let s = Summary(rows, exact: true)
+        let s = Summary(rows, gpuAlone: true)
         XCTAssertEqual(s.median, 42); XCTAssertEqual(s.fastest, 41); XCTAssertEqual(s.slowest, 43)
         XCTAssertEqual(s.drift!, 0.05, accuracy: 1e-12)
         XCTAssertTrue(s.bitsStable); XCTAssertTrue(s.notes.isEmpty)
@@ -79,12 +79,12 @@ final class MeasurementTests: XCTestCase {
 
         var bad = rows
         bad[5].wallSeconds = 50; bad[3].md5 = "bb"; bad[4].swapouts = 7
-        let t = Summary(bad, power: ["battery"], exact: true)
+        let t = Summary(bad, power: ["battery"], gpuAlone: true)
         XCTAssertFalse(t.bitsStable)
         XCTAssertEqual(t.notes.count, 4)   // drift, swap, battery, bits
         XCTAssertTrue(t.notes[3].contains("report it"))
         // Under ane the Neural Engine's share moves between renders: said, not a defect to report.
-        let u = Summary(bad, power: ["battery"], exact: false)
+        let u = Summary(bad, power: ["battery"], gpuAlone: false)
         XCTAssertFalse(u.notes[3].contains("report it"))
     }
 

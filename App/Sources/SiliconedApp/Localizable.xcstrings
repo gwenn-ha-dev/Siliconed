@@ -6471,46 +6471,6 @@
         }
       }
     },
-    "ANE" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ANE"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ANE"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ANE"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ANE"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ANE"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ANE"
-          }
-        }
-      }
-    },
     "ANE %@" : {
       "localizations" : {
         "de" : {
@@ -15683,46 +15643,6 @@
         }
       }
     },
-    "Exact" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Exakt"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Exacta"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Exacte"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Esatta"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "厳密"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "精确"
-          }
-        }
-      }
-    },
     "Exchange the columns and the rows" : {
       "localizations" : {
         "de" : {
@@ -22193,6 +22113,46 @@
         }
       }
     },
+    "Neural Engine" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Neural Engine"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Neural Engine"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Neural Engine"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Neural Engine"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Neural Engine"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Neural Engine"
+          }
+        }
+      }
+    },
     "Neural Engine %@" : {
       "localizations" : {
         "de" : {
@@ -25886,46 +25846,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "纵向"
-          }
-        }
-      }
-    },
-    "Precision" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Präzision"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Precisión"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Précision"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Precisione"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "精度"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "精度"
           }
         }
       }
@@ -33363,6 +33283,46 @@
         }
       }
     },
+    "The GPU alone: the Neural Engine stays idle." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Allein die GPU: Die Neural Engine bleibt untätig."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Solo la GPU: el Neural Engine queda inactivo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le GPU seul : le Neural Engine reste au repos."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Solo la GPU: il Neural Engine resta inattivo."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GPUだけで計算します。Neural Engineは使いません。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仅用 GPU：Neural Engine 保持空闲。"
+          }
+        }
+      }
+    },
     "The Keychain could not be read." : {
       "localizations" : {
         "de" : {
@@ -33605,46 +33565,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "LoRA %@ 属于 Siliconed 不应用的类型：LoKr、LoHa、DoRA、rsLoRA、文本编码器的 LoRA，或各模块秩不同的 LoRA。"
-          }
-        }
-      }
-    },
-    "The Neural Engine takes all the work it does faster on this Mac, up to all of it." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Die Neural Engine übernimmt alle Arbeit, die sie auf diesem Mac schneller erledigt, bis hin zu allem."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "El Neural Engine asume todo el trabajo que hace más rápido en este Mac, hasta la totalidad."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Le Neural Engine prend tout le travail qu’il fait plus vite sur ce Mac, jusqu’à la totalité."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Il Neural Engine prende tutto il lavoro che svolge più in fretta su questo Mac, fino alla totalità."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "このMacでNeural Engineのほうが速い処理は、すべてNeural Engineが引き受けます。全部になることもあります。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "凡是 Neural Engine 在这台 Mac 上做得更快的工作，都交给它，最多可以全部交给它。"
           }
         }
       }
@@ -34291,6 +34211,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "引擎出错（%@）。"
+          }
+        }
+      }
+    },
+    "The engine gives it the work it does faster on this Mac." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Engine überlässt ihr die Arbeit, die sie auf diesem Mac schneller erledigt."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El motor le confía el trabajo que hace más rápido en este Mac."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le moteur lui confie le travail qu’il fait plus vite sur ce Mac."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il motore gli affida il lavoro che svolge più in fretta su questo Mac."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このMacでNeural Engineのほうが速い処理を、エンジンがNeural Engineに任せます。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "引擎把 Neural Engine 在这台 Mac 上做得更快的工作交给它。"
           }
         }
       }
@@ -35935,46 +35895,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "负责绘制的模型（扩散 Transformer）：从噪声出发，一步一步生成提示词所描述的图像"
-          }
-        }
-      }
-    },
-    "The model’s own arithmetic, on the GPU alone. The Neural Engine stays idle." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Die eigene Arithmetik des Modells, allein auf der GPU. Die Neural Engine bleibt untätig."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "La aritmética propia del modelo, solo en la GPU. El Neural Engine queda inactivo."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "L’arithmétique propre du modèle, sur le GPU seul. Le Neural Engine reste au repos."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "L’aritmetica propria del modello, solo sulla GPU. Il Neural Engine resta inattivo."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "モデル本来の演算を、GPUだけで行います。Neural Engineは使いません。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "模型自身的运算，仅在 GPU 上进行。Neural Engine 保持空闲。"
           }
         }
       }
@@ -47946,42 +47866,42 @@
         }
       }
     },
-    "set precision [exact|ane]" : {
+    "set neural-engine [on|off]" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "set precision [exact|ane]"
+            "value" : "set neural-engine [on|off]"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "set precision [exact|ane]"
+            "value" : "set neural-engine [on|off]"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "set precision [exact|ane]"
+            "value" : "set neural-engine [on|off]"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "set precision [exact|ane]"
+            "value" : "set neural-engine [on|off]"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "set precision [exact|ane]"
+            "value" : "set neural-engine [on|off]"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "set precision [exact|ane]"
+            "value" : "set neural-engine [on|off]"
           }
         }
       }

@@ -19,8 +19,8 @@ package enum Runner {
     package static func run(_ o: MeasureOptions, send: Send, log: (String) -> Void,
                             emit: ([String: Any]) -> Void, append: (String) -> Void) throws -> [String: Any] {
         // The queue must be idle: a render queued by someone else shares the machine with ours.
-        // And its precision: only under exact are the same seed's pixels bound to be the same (`Summary.exact`).
-        func idle() throws -> (pid: pid_t, exact: Bool) {
+        // And its Neural Engine switch: only off are the same seed's pixels bound to be the same (`Summary.gpuAlone`).
+        func idle() throws -> (pid: pid_t, gpuAlone: Bool) {
             let (status, peer) = send(["status"]) { _ in }
             guard let status, status["ok"] as? Bool == true, let peer else {
                 throw Failure(code: "app_not_running", message: "the app does not answer")
@@ -29,9 +29,9 @@ package enum Runner {
                 || status["installing"] is [String: Any] {
                 throw Failure(code: "busy", message: "the app is rendering or installing: a series measured beside another job measures both")
             }
-            return (peer, status["precision"] as? String == "exact")
+            return (peer, status["neural_engine"] as? Bool == false)
         }
-        var (pid, exact) = try idle()
+        var (pid, gpuAlone) = try idle()
         let (models, _) = send(["models"]) { _ in }
         // No --model: the app's default, the one `add` takes.
         let list = models?["models"] as? [[String: Any]] ?? []
@@ -78,7 +78,7 @@ package enum Runner {
             let (role, prompt, seed) = step
             let state = try idle()
             pid = state.pid
-            exact = exact && state.exact
+            gpuAlone = gpuAlone && state.gpuAlone
             let before = Probes.usageWithChildren(of: pid)
             let sampler = Probes.PeakSampler(pid: pid)
             let swap0 = Probes.swapouts()
@@ -118,7 +118,7 @@ package enum Runner {
                   "peak_gib": Double(peak) / 1_073_741_824, "swapouts": swaps, "disk_read_bytes": disk, "md5": md5])
         }
 
-        let s = Summary(rows, power: powers, exact: exact)
+        let s = Summary(rows, power: powers, gpuAlone: gpuAlone)
         func f(_ x: Double?, _ digits: Int = 1) -> String { x.map { String(format: "%.\(digits)f", $0) } ?? "-" }
         log("")
         log("summary  \(model) (\(variant)) \(o.size)  \(s.renders) renders")

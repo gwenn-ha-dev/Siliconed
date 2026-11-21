@@ -57,7 +57,7 @@ extension Engine {
             }
         }
         stages.changed = { tell() }
-        return try CoreAI.under(request.precision) { _ in
+        return try CoreAI.under { _ in
             @Sendable func stamped(_ render: Render) -> Render {
                 var render = render
                 render.strength = Render.strength(of: request)

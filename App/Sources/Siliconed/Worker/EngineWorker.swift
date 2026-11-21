@@ -57,7 +57,7 @@ package final class EngineWorker: @unchecked Sendable {
     /// render — the stream then ends without throwing (`AsyncThrowingStream`).
     package func render(_ request: Request, seeds: [UInt64], model: String, library: Library) -> AsyncThrowingStream<Engine.Event, Error> {
         let (stream, continuation) = AsyncThrowingStream<Engine.Event, Error>.makeStream()
-        let precision = CoreAI.precision
+        let neuralEngine = CoreAI.neuralEngine
         let id = register { reply, blobs in
             switch reply {
             case .event(_, let e):
@@ -75,7 +75,7 @@ package final class EngineWorker: @unchecked Sendable {
                 return f
             }
             let (order, blobs) = RenderOrder.of(request, seeds: seeds, model: model, library: library,
-                                                processPrecision: precision, firstBlob: first)
+                                                neuralEngine: neuralEngine, firstBlob: first)
             send(id, .render(id: id, order), blobs: blobs)
         }
         return stream
@@ -94,7 +94,7 @@ package final class EngineWorker: @unchecked Sendable {
             }
         } stopped: { continuation.finish(throwing: $0) }
         continuation.onTermination = { [weak self] _ in self?.cancel(id) }
-        let precision = CoreAI.precision
+        let neuralEngine = CoreAI.neuralEngine
         sending.async { [self] in
             var blobs: [(UInt32, Data)] = []
             let input: WriteOrder.Input
@@ -106,7 +106,7 @@ package final class EngineWorker: @unchecked Sendable {
                 input = .rewrite(text: text ?? "")
             }
             send(id, .write(id: id, WriteOrder(input: input, instruction: instruction, library: WorkerLibrary(library),
-                                               processPrecision: precision)), blobs: blobs)
+                                               neuralEngine: neuralEngine)), blobs: blobs)
         }
         return stream
     }

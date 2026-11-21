@@ -40,7 +40,7 @@ enum BandStages {
             model: model, name: "vae-bands",
             proves: "the decoder layer by layer and by bands of rows, at bands much shorter than it prefers, on the vae stage's reference: the norms' statistics combined from the bands' parts, the margins masked at the plane's edges; and at a size no reference reaches, what it held against its plan",
             sizes: sizes, options: ["--budget", "--elements"], oracle: nil, weights: ["VAE"],
-            rule: "at the reference's size, per plane, at the fp64 witness: no further from it than the reference in the decoder's precision, + 25 % (the vae stage's rule); at any size, the footprint's peak no higher than the plan's P + 64 MiB, and P under B"
+            rule: "at the reference's size, per plane, at the fp64 witness: no further from it than the reference in the decoder's arithmetic, + 25 % (the vae stage's rule); at any size, the footprint's peak no higher than the plan's P + 64 MiB, and P under B"
         ) { invocation in
             let report = Report(title: "\(model) vae-bands \(invocation.size)")
             let named = { (stem: String) in stem.replacingOccurrences(of: "{size}", with: size) }

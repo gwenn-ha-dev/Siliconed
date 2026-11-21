@@ -327,7 +327,7 @@ enum QwenImage21Stages {
 
     static let ditLoRA = Stage(
         model: model, name: "dit-lora",
-        proves: "one evaluation of the DiT at σ = 1 under a user's LoRA read in its published file (the golden's: PEFT's names, 224 modules, the SwiGLU's input in diffusers' two halves, strength 1), the low-rank path beside each product: the velocity per latent channel (with --variant compact, on the Compact's codes; under the precision ane, in the shared forms)",
+        proves: "one evaluation of the DiT at σ = 1 under a user's LoRA read in its published file (the golden's: PEFT's names, 224 modules, the SwiGLU's input in diffusers' two halves, strength 1), the low-rank path beside each product: the velocity per latent channel (with --variant compact, on the Compact's codes; under --neural-engine on, in the shared forms)",
         options: ["--map", "--lora", "--variant"],
         oracle: "tools/oracle/qwen-image-2.1.py dit; bf16; w8a8 --variant compact (the references without the LoRA); under it, dit-lora --lora FILE (the reference under it, qwen21/goldens-qwen21-dit-lora-user-{size}, whose manifest names the LoRA's file, its source and its scale)",
         weights: ["DiT", "the LoRA"],
