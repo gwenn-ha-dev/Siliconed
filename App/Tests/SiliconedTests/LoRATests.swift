@@ -120,6 +120,16 @@ final class LoRATests: XCTestCase {
         }
     }
 
+    /// The name the window shows is the card's, read from the path alone: a grid of one model's LoRA, shown while the rack
+    /// holds another model whose list does not have it, names it as its own model's list does.
+    func testALoRAsNameIsItsCardsWithoutTheCard() throws {
+        let path = try file("incase_style_v2.safetensors", peft("layers.0.attention.to_q", rank: 2, inn: 3840, out: 3840))
+        let card = LoRACard(file: try LoRAFile(path), family: .zImage)
+        XCTAssertEqual(card.name, "incase style v2")
+        XCTAssertEqual(LoRACard.name(path: path), card.name)
+        XCTAssertEqual(LoRACard.name(path: "/Lender/loras/anima/Niji_semi-realism.lora.safetensors"), "Niji semi realism")
+    }
+
     func testAStrengthOfZeroAdaptsNothing() throws {
         let path = try file("z.safetensors", peft("layers.0.attention.to_q", rank: 2, inn: 3840, out: 3840))
         XCTAssert(try LoRAStack([LoRAEntry(path, strength: 0)], on: .zImage).isEmpty)

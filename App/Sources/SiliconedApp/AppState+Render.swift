@@ -553,6 +553,9 @@ extension AppState {
         fixedSeed = true
         // After the seed: setting it drops a variation (`seed.didSet`).
         variations = entry.settings.variations
+        // The images it edited, or none: image 1 is the image's own, never the one the lab held before — otherwise an edit
+        // comes back without what it edits, and an image made from noise comes back editing what was left there.
+        setEditImages(entry.editImages)
         // The image it started from, with its strength — or none: « Redo » renders the same image, not an img2img of another.
         if let s = entry.settings.strength, let start = entry.start, startsFromImage {
             setStart(start)

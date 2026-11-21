@@ -94,7 +94,7 @@ The app ships as a `.dmg` on the [Releases](https://github.com/gwenn-ha-dev/Sili
 - [docs/VERIFY.md](docs/VERIFY.md): checking the results against the reference on your Mac.
 - [docs/REMOTE-CONTROL.md](docs/REMOTE-CONTROL.md): `silicontrol`, protocol and internals.
 - [docs/RELEASE-NOTES.md](docs/RELEASE-NOTES.md): what changed in each version.
-- Issues: [bug, idea](https://github.com/gwenn-ha-dev/Siliconed/issues/new/choose). Times from your Mac are welcome, the 8 GB ones first.
+- Issues: [bug, idea](https://github.com/gwenn-ha-dev/Siliconed/issues/new/choose). Times from your Mac are welcome, the 8 GB ones first: [one command, one form](https://github.com/gwenn-ha-dev/Siliconed/issues/new?template=times.yml).
 
 ## Credits
 

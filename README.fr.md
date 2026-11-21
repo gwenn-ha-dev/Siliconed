@@ -94,7 +94,7 @@ L'app est distribuée en `.dmg` sur la page [Releases](https://github.com/gwenn-
 - [docs/VERIFY.fr.md](docs/VERIFY.fr.md) : vérifier les résultats contre la référence sur votre Mac.
 - [docs/REMOTE-CONTROL.fr.md](docs/REMOTE-CONTROL.fr.md) : `silicontrol`, protocole et fonctionnement interne.
 - [docs/RELEASE-NOTES.fr.md](docs/RELEASE-NOTES.fr.md) : ce qui change à chaque version.
-- Les issues : [bug, idée](https://github.com/gwenn-ha-dev/Siliconed/issues/new/choose) (en anglais). Les temps de votre Mac sont les bienvenus, ceux des 8 Go d'abord.
+- Les issues : [bug, idée](https://github.com/gwenn-ha-dev/Siliconed/issues/new/choose) (en anglais). Les temps de votre Mac sont les bienvenus, ceux des 8 Go d'abord : [une commande, un formulaire](https://github.com/gwenn-ha-dev/Siliconed/issues/new?template=times.yml).
 
 ## Crédits
 

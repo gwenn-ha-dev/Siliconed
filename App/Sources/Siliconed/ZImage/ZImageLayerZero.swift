@@ -108,11 +108,11 @@ package enum ZImageLayerZero {
             }
         }
         let given = await block.pointer("adaln")
-        adaln.withUnsafeBytes { memcpy(given, $0.baseAddress!, $0.count) }
+        _ = adaln.withUnsafeBytes { memcpy(given, $0.baseAddress!, $0.count) }
         let rope = g.dit.rope(rows: rows)
         let (cos, sin) = (await block.rows("cos"), await block.rows("sin"))
-        rope.cos.withUnsafeBytes { memcpy(cos, $0.baseAddress!, $0.count) }
-        rope.sin.withUnsafeBytes { memcpy(sin, $0.baseAddress!, $0.count) }
+        _ = rope.cos.withUnsafeBytes { memcpy(cos, $0.baseAddress!, $0.count) }
+        _ = rope.sin.withUnsafeBytes { memcpy(sin, $0.baseAddress!, $0.count) }
 
         // Each function, then its boundaries on the same inputs; the block's own output, a true value.
         try await block.run("layers.0", "rows") {

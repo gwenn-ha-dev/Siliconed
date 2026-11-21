@@ -1,0 +1,47 @@
+name: Times from your Mac
+description: One timed render on your Mac, measured by the app itself. The small Macs first, 8 GB above all.
+title: "Times: "
+labels: [times]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Siliconed promises to run on every Mac, the smallest first, and only your Macs can show it. Nothing is sent by the app: you run one command, read what it prints and paste it here.
+
+        1. Open Siliconed and let it finish installing a model. Plug the Mac in and close what you can.
+        2. In Terminal, with the app open:
+
+           ```
+           /Applications/Siliconed.app/Contents/Helpers/silicontrol measure --renders 1
+           ```
+
+           Z-Image at 1024×1024, seed 42, four renders: one that loads the weights, a witness, the timed one, a witness again (they show whether the Mac drifted), with the memory peak. On an 8 GB Mac it takes a quarter of an hour; leave the Mac alone meanwhile. If Z-Image is not installed, add `--model` and the model you have (`… silicontrol models` lists them).
+  - type: input
+    id: mac
+    attributes:
+      label: Mac
+      description: Model, chip and memory, as « About This Mac » says them.
+      placeholder: MacBook Air, Apple M2, 8 GB
+    validations:
+      required: true
+  - type: input
+    id: budget
+    attributes:
+      label: Memory limit
+      description: Settings ▸ Macs ▸ Memory Limit. The default is ¾ of the memory minus 2 GB (4 GB on an 8 GB Mac).
+      placeholder: 4 GB (default)
+    validations:
+      required: true
+  - type: textarea
+    id: output
+    attributes:
+      label: What the command printed
+      description: All of it, as it is. It already names the version of the app, macOS, the chip, the model and its version.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Anything else
+      description: The image looked wrong, the Mac slowed down or swapped, another app was open, the first launch took long…

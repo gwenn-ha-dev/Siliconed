@@ -388,7 +388,7 @@ enum QwenImage21Stages {
         let goldens = try invocation.goldens.open("qwen21/goldens-qwen21-vae-encode-\(resolution).safetensors")
         let half = try invocation.goldens.half("qwen21/witness-bf16-qwen21-vae-encode-\(resolution).safetensors",
                                                script: "tools/oracle/qwen-image-2.1.py vae-encode-bf16")
-        let path = try Library.processWide.map(vaeMap)
+        let path = Library.processWide.map(vaeMap)
         let channels = QwenImage21VAEDecoder.latentChannels
         for i in 0..<2 {
             guard let entry = goldens.entries["image_\(i)"], let image = goldens.float32("image_\(i)") else {

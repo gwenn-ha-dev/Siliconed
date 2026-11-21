@@ -66,7 +66,11 @@ extension AppState {
         if let reason = libraryBlocker { return reason }
         if let reason = installBlocker { return reason }
         if missing != nil { return String(localized: "This model isn’t installed.") }
-        if prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return String(localized: "Write a prompt.") }
+        if prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            // Describe fills the text only when it ends: while it writes, the text is empty and the prompt is coming.
+            let lab = LabModel.shared
+            return lab.isWriting && lab.rack === self ? String(localized: "The writer is writing the prompt.") : String(localized: "Write a prompt.")
+        }
         if case .failure(let e) = alternatives { return Problem(e).text }
         // An unknown `@name`, too many images, a mention inside a group: said before the click (`LabInputs.carry`).
         if case .failure(let refusal) = carried { return refusal.sentence }
@@ -121,8 +125,9 @@ extension AppState {
     /// The prompt's `{…}` groups — each an axis of the series (none when it does not parse).
     var promptGroups: [[String]] { (try? PromptAlternatives(prompt, limit: .max).groups) ?? [] }
 
-    /// A LoRA as the user knows it: its card's name, or its short name.
-    func loraName(_ path: String) -> String { loraCard(path)?.name ?? RemoteControl.shortName(path) }
+    /// A LoRA as the user knows it: its card's name (`LoRACard.name(path:)`), whatever model the rack holds — not looked up
+    /// among the rack's LoRAs, where an Anima grid still shown after reusing a MOSS-Image would find none and print the file.
+    func loraName(_ path: String) -> String { LoRACard.name(path: path) }
 
     /// The series, one axis per line — the tooltip of the render count.
     var seriesHelp: String {

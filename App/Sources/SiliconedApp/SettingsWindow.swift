@@ -108,12 +108,16 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
     /// **The window at the pane's height**, its top edge where it was, so that the tabs stay under the pointer;
     /// at most the screen's height (the pane scrolls then). Animated once shown.
     func fit(_ height: CGFloat) {
-        guard let w = window, let content = w.contentView else { pending = height; return }
+        guard let w = window else { pending = height; return }
         pending = nil
-        let chrome = w.frame.height - content.frame.height
+        // The content's height as the window's frame gives it, not as its view is laid out: the first report comes while
+        // the hosting view is installed, still zero high; read from it, the whole frame counted as title bar, and a pane
+        // whose height never changed after (Prompt Lab opened first) kept that much empty under it.
+        let current = w.contentRect(forFrameRect: w.frame).height
+        let chrome = w.frame.height - current
         let room = (w.screen ?? NSScreen.main)?.visibleFrame.height ?? 900
         let h = min(ceil(height), room - chrome - 40)
-        guard abs(content.frame.height - h) > 0.5 else { return }
+        guard abs(current - h) > 0.5 else { return }
         let frame = NSRect(x: w.frame.minX, y: w.frame.maxY - (h + chrome), width: w.frame.width, height: h + chrome)
         w.setFrame(frame, display: true, animate: w.isVisible)
     }

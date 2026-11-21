@@ -386,7 +386,7 @@ extension LoRACard {
     /// The card of a recognized file: its ranks, and what its trainer wrote of it.
     package init(file: LoRAFile, family: Family) {
         let said = file.metadata
-        let raw = ((file.path as NSString).lastPathComponent as NSString).deletingPathExtension
+        let raw = LoRACard.rawName(path: file.path)
         let trainer = said["ss_output_name"].flatMap { $0.isEmpty || $0 == raw ? nil : $0 }
         self.init(path: file.path, rawName: raw, target: family.rawValue, rank: file.ranks.largest, smallestRank: file.ranks.smallest,
                   resolution: said["modelspec.resolution"], trainedOn: said["ss_sd_model_name"], trainerName: trainer,

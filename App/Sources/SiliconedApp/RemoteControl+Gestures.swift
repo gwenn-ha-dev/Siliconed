@@ -207,8 +207,8 @@ extension RemoteControl {
         return .file(URL(fileURLWithPath: absolute(word, cwd)))
     }
 
-    /// **`reuse <i7|file.png>`**: « Reuse These Settings » — the rack takes the image's model, prompt, size, steps, LoRAs and seed. Or a PNG
-    /// Siliconed wrote, as when it is dropped on the canvas: what could not come back is said in `notes`.
+    /// **`reuse <i7|file.png>`**: « Reuse These Settings » — the rack takes the image's model, prompt, size, steps, LoRAs, edit
+    /// images and seed. Or a PNG Siliconed wrote, as when it is dropped on the canvas: what could not come back is said in `notes`.
     func reuse(_ word: String, cwd: String) throws -> [String: Any] {
         var notes: String?
         switch try source(word, cwd: cwd) {

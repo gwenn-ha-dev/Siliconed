@@ -89,7 +89,7 @@ final class MeasurementTests: XCTestCase {
     }
 
     func testTSVLineHasOneCellPerColumnAndNoTab() {
-        var r = row(2, .render, wall: 12.345, prompt: "a\tb\nc")
+        let r = row(2, .render, wall: 12.345, prompt: "a\tb\nc")
         let c = Context(date: "2026-10-25T10:00:00+02:00", tag: "x", app: "0.15", chip: "Apple M1 Pro", memoryGiB: 16, macOS: "26.0 (25A1)")
         let cells = TSV.line(r, c, power: "AC", thermal: "nominal").split(separator: "\t", omittingEmptySubsequences: false)
         XCTAssertEqual(cells.count, TSV.header.count)

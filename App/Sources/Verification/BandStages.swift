@@ -22,7 +22,7 @@ enum BandStages {
     static let all: [Stage] = [
         stage("anima", sizes: ["1024"], QwenImageVAEDecoder.self, latent: { try plain($0, "anima") }, path: { try Library.processWide.component(.anima, "vae.safetensors") }),
         stage("krea2", sizes: ["1024"], QwenImageVAEDecoder.self, latent: { try plain($0, "krea2") }, path: { try Library.processWide.component(.krea2, "vae.safetensors") }),
-        stage("qwen-image-2.1", sizes: ["1024"], QwenImage21VAEDecoder.self, latent: packed, path: { try Library.processWide.map(QwenImage21Stages.vaeMap) }),
+        stage("qwen-image-2.1", sizes: ["1024"], QwenImage21VAEDecoder.self, latent: packed, path: { Library.processWide.map(QwenImage21Stages.vaeMap) }),
         layers("z-image", sizes: ["768x512", "2048"], reference: "768x512", goldens: "goldens-vae-{size}", witness: "witness-vae-f64-{size}",
                half: ("witness-bf16-vae-{size}", "tools/oracle/z-image.py vae-bf16 --size {size}"),
                vae: FluxVAEDecoder.vae, path: { try Library.processWide.component(.zImage, "vae.safetensors") }),
@@ -107,7 +107,7 @@ enum BandStages {
     }
 
     /// A decoder by bands of rows against the whole one, bit for bit, under a small B (`--budget`).
-    static func stage<Decoder: BandedDecoder>(_ model: String, sizes: [String], _: Decoder.Type, latent: @escaping @Sendable (Goldens) throws -> Latent,
+    static func stage<Decoder: BandedDecoder & SendableMetatype>(_ model: String, sizes: [String], _: Decoder.Type, latent: @escaping @Sendable (Goldens) throws -> Latent,
                                               path: @escaping @Sendable () throws -> String) -> Stage {
         Stage(
             model: model, name: "vae-bands",

@@ -65,7 +65,7 @@ The five models at 1024², 8 steps, seed 42, the app's default settings, under t
 
 **The Compact buys memory, not always time.** It reads half the bytes of the Standard, from disk and in memory. On the Mac mini, whose GPU computes bf16 as fast as f16, that saves no time: the Compact is as fast as the Standard or slower (Anima, Krea 2, Qwen-Image-2.1). Where the budget cannot hold the Standard's weights, it is the version that reads the least.
 
-Other Macs, the 8 GB ones first, await reports from the machines themselves; `silicontrol measure` takes your own ([REMOTE-CONTROL.md](REMOTE-CONTROL.md#what-gets-measured)).
+Other Macs, the 8 GB ones first, await reports from the machines themselves; `silicontrol measure` takes your own ([REMOTE-CONTROL.md](REMOTE-CONTROL.md#what-gets-measured)), and [this form](https://github.com/gwenn-ha-dev/Siliconed/issues/new?template=times.yml) brings them here.
 
 ## Next to other tools
 

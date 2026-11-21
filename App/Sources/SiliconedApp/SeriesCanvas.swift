@@ -5,8 +5,8 @@
 //        ▼
 //     the history  the series' tile, at its place in time, its cells under it — folded or not (`strip`)
 //     the canvas   the grid (`SeriesCanvas`): cells fill in as they come, the running one shows its preview and, under
-//                  the grid, its settings live; it opens filling the room, scrolls, and pinch, ⌘+ ⌘− or the slider of
-//                  the top band (`SeriesBar`) size the cells
+//                  the grid, its settings live; it fills the room and follows the window, larger or smaller, until
+//                  pinch, ⌘+ ⌘− or the slider of the top band (`SeriesBar`) size the cells; past the room, it scrolls
 //        │ a cell
 //        ▼
 //     a click chooses it and says its settings; a double-click shows its image, which is in the history like any other.
@@ -133,9 +133,16 @@ struct SeriesCanvas: View {
     let run: GridRun
     @State private var chosen: Int?
     @GestureState private var pinch: CGFloat = 1
-    /// The room the cells have, and the series whose cells were last sized to fill it.
+    /// The room the cells have, and how they were last sized to fill it.
     @State private var area: CGSize = .zero
-    @State private var fitted: Int?
+    @State private var fitted: Fit?
+
+    /// **The last fit**: the series, whether the band under the grid was there, and the side the cells got.
+    private struct Fit {
+        let run: Int
+        var band: Bool
+        let side: CGFloat
+    }
 
     var body: some View {
         let images = app.cells(of: run)
@@ -143,8 +150,8 @@ struct SeriesCanvas: View {
             ScrollView([.vertical, .horizontal]) {
                 cells(images).padding(24)
             }
-            // **A series opens at the size that fills the room**: every cell in sight, as large as they can be. The hand
-            // sizes them after; another series fits again.
+            // **A series fills the room**: every cell in sight, as large as they can be, the window larger or smaller.
+            // Once the hand sizes them, they keep its size; another series fits again.
             .onGeometryChange(for: CGSize.self) { $0.size } action: { size in
                 area = size
                 fit()
@@ -153,7 +160,7 @@ struct SeriesCanvas: View {
             .gesture(MagnifyGesture()
                 .updating($pinch) { value, state, _ in state = value.magnification }
                 .onEnded { value in app.exploreCellSide = AppState.clampedCellSide(app.exploreCellSide * value.magnification) })
-            // The chosen cell — or, while the series runs, the one rendering, live.
+            // The chosen cell — or, while the series runs, the one rendering, live (as `showsBand` reads it).
             if let i = chosen, run.cellJobs.indices.contains(i), let e = images[i] {
                 Divider()
                 detail(i, e)
@@ -164,10 +171,24 @@ struct SeriesCanvas: View {
         }
     }
 
+    /// The cells sized to the room — unless the hand sized them (pinch, slider, ⌘+ ⌘−: the side is no longer the fitted
+    /// one), or the room changed only because the band under the grid came or went: a click on a cell shows its band, and
+    /// the cells must not move under the pointer, nor at each cell of a running series.
     private func fit() {
-        guard area.width > 0, area.height > 0, fitted != run.ordinal else { return }
-        fitted = run.ordinal
+        guard area.width > 0, area.height > 0 else { return }
+        let band = showsBand
+        if let f = fitted, f.run == run.ordinal {
+            guard app.exploreCellSide == f.side else { return }
+            guard f.band == band else { fitted?.band = band; return }
+        }
         app.exploreCellSide = fittingSide(in: area)
+        fitted = Fit(run: run.ordinal, band: band, side: app.exploreCellSide)
+    }
+
+    /// Whether the band under the grid shows: a chosen cell's settings, or the running one's.
+    private var showsBand: Bool {
+        if let i = chosen, run.cellJobs.indices.contains(i), app.cells(of: run)[i] != nil { return true }
+        return running != nil
     }
 
     /// The side (a cell's longer edge) at which the whole grid, its labels and gaps, holds in `area`.

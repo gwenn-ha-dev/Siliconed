@@ -214,10 +214,10 @@ package final class QwenImage21Loop {
         for segment in s.prefix {
             for _ in 0..<segment.rows {
                 if case .text = segment {
-                    text.withUnsafeBufferPointer { memcpy(t + row * Self.context, $0.baseAddress! + textAt * Self.context, Self.context * 4) }
+                    _ = text.withUnsafeBufferPointer { memcpy(t + row * Self.context, $0.baseAddress! + textAt * Self.context, Self.context * 4) }
                     which[row] = 1; textAt += 1
                 } else {
-                    references.withUnsafeBufferPointer { memcpy(r + row * Self.channels, $0.baseAddress! + imageAt * Self.channels, Self.channels * 4) }
+                    _ = references.withUnsafeBufferPointer { memcpy(r + row * Self.channels, $0.baseAddress! + imageAt * Self.channels, Self.channels * 4) }
                     imageAt += 1
                 }
                 row += 1

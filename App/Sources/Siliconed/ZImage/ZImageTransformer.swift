@@ -236,8 +236,8 @@ final class ZImageTransformer {
         for i in 0..<cap { real[i] = i < n ? 1 : 0 }
         let rope = g.dit.rope(rows: k)
         let (cos, sin) = (await block.rows("cos"), await block.rows("sin"))
-        rope.cos.withUnsafeBytes { memcpy(cos, $0.baseAddress!, $0.count) }
-        rope.sin.withUnsafeBytes { memcpy(sin, $0.baseAddress!, $0.count) }
+        _ = rope.cos.withUnsafeBytes { memcpy(cos, $0.baseAddress!, $0.count) }
+        _ = rope.sin.withUnsafeBytes { memcpy(sin, $0.baseAddress!, $0.count) }
         let masked: UInt16 = form == .bf16 ? 0xc61c : Float16(-1e4).bitPattern
         for (name, keys) in [("mask-image", 0..<g.image), ("mask-caption", g.image..<g.sequence), ("mask-sequence", 0..<g.sequence)] {
             let m = await block.pointer(name).assumingMemoryBound(to: UInt16.self)
@@ -259,7 +259,7 @@ final class ZImageTransformer {
         let t = ZImageDiT.timestepFrequencies(time, config: c), tf = await block.pointer("t_freq").assumingMemoryBound(to: Float.self)
         for i in 0..<t.count { tf[i] = t[i] }
         let latentBytes = await block.pointer("latent")
-        latent.withUnsafeBytes { memcpy(latentBytes, $0.baseAddress!, $0.count) }
+        _ = latent.withUnsafeBytes { memcpy(latentBytes, $0.baseAddress!, $0.count) }
         try await block.call("timestep")
         if let t = taps?[.tEmbedder] { memcpy(t.baseAddress!, await block.pointer("adaln"), c.adalnDim * 4) }
         try await block.call("embed-image")

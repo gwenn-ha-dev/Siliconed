@@ -529,8 +529,13 @@ struct BracketBubble: View {
         switch key {
         case .group: wordPills
         case .seeds:
+            // Which seeds, said: the fixed seed and the ones after it, or a first one drawn at the click.
             Stepper(value: $seeds, in: 2...8) {
-                Text("\(seeds) seeds from the rack’s").monospacedDigit()
+                if app.fixedSeed {
+                    Text("\(seeds) seeds: \(String(app.seed)) to \(String(app.seed &+ UInt64(seeds - 1)))").monospacedDigit()
+                } else {
+                    Text("\(seeds) seeds, the first drawn at random").monospacedDigit()
+                }
             }
             .help("The seeds that follow the rack’s seed: drawn at the click, or the fixed one")
         case .loraStrength, .startStrength: numberPills

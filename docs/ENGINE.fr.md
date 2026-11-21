@@ -65,7 +65,7 @@ Les cinq modèles à 1024², 8 pas, graine 42, réglages par défaut de l'app, s
 
 **La Compact achète de la mémoire, pas toujours du temps.** Elle lit moitié moins d'octets que la Standard, sur le disque comme en mémoire. Sur le Mac mini, dont le GPU calcule le bf16 aussi vite que le f16, elle n'y gagne pas de temps : aussi rapide que la Standard, ou plus lente (Anima, Krea 2, Qwen-Image-2.1). Là où le budget ne tient pas les poids de la Standard, c'est la version qui lit le moins.
 
-Les autres Mac, ceux de 8 Go d'abord, attendent les rapports des machines elles-mêmes ; `silicontrol measure` prend les vôtres ([REMOTE-CONTROL.fr.md](REMOTE-CONTROL.fr.md)).
+Les autres Mac, ceux de 8 Go d'abord, attendent les rapports des machines elles-mêmes ; `silicontrol measure` prend les vôtres ([REMOTE-CONTROL.fr.md](REMOTE-CONTROL.fr.md)), et [ce formulaire](https://github.com/gwenn-ha-dev/Siliconed/issues/new?template=times.yml) les apporte ici.
 
 ## Face aux autres outils
 

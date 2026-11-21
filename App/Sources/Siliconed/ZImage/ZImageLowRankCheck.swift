@@ -289,11 +289,11 @@ package enum ZImageLowRankCheck {
                     for i in 0..<d { p[r * d + i] = Float16(x[r * d + i] / factor) }
                 }
             }
-            adaln.withUnsafeBytes { memcpy(stage.pointer("adaln"), $0.baseAddress!, $0.count) }
+            _ = adaln.withUnsafeBytes { memcpy(stage.pointer("adaln"), $0.baseAddress!, $0.count) }
             // The first rows of a 512² image's tables: its image rows.
             let dit = ZImageDiT(config: .published, latentHeight: 64, latentWidth: 64, capLength: 1), rope = dit.rope(rows: dit.positions().count)
-            rope.cos.withUnsafeBytes { memcpy(stage.pointer("cos"), $0.baseAddress!, rows * 128 * 4) }
-            rope.sin.withUnsafeBytes { memcpy(stage.pointer("sin"), $0.baseAddress!, rows * 128 * 4) }
+            _ = rope.cos.withUnsafeBytes { memcpy(stage.pointer("cos"), $0.baseAddress!, rows * 128 * 4) }
+            _ = rope.sin.withUnsafeBytes { memcpy(stage.pointer("sin"), $0.baseAddress!, rows * 128 * 4) }
             memset(stage.pointer("mask"), 0, rows * 2)
             for (p, s) in ZImageLowRankCheck.shapes {
                 memset(stage.pointer(p + "_down"), 0, s.inn * rank * 2)

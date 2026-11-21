@@ -3923,42 +3923,82 @@
         }
       }
     },
-    "%lld seeds from the rack’s" : {
+    "%lld seeds, the first drawn at random" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%lld Seeds ab dem des Racks"
+            "value" : "%lld Seeds, der erste zufällig gewürfelt"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%lld semillas a partir de la del rack"
+            "value" : "%lld semillas, la primera sorteada al azar"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%lld graines à partir de celle du rack"
+            "value" : "%lld graines, la première tirée au hasard"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%lld semi a partire da quello del rack"
+            "value" : "%lld semi, il primo estratto a caso"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ラックのシードから%lld個"
+            "value" : "シード%lld個（最初はランダムに引く）"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "从机架的种子起 %lld 个"
+            "value" : "%lld 个种子，第一个随机抽取"
+          }
+        }
+      }
+    },
+    "%lld seeds: %@ to %@" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld Seeds: %@ bis %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld semillas: de %@ a %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld graines : %@ à %@"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld semi: da %@ a %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "シード%lld個：%@～%@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 个种子：%@ 至 %@"
           }
         }
       }
@@ -37575,6 +37615,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "窗口无法变化模型、步数或要编辑的图像：这些轴已被略去。"
+          }
+        }
+      }
+    },
+    "The writer is writing the prompt." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Der Schreiber schreibt den Prompt."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El redactor está escribiendo el prompt."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le rédacteur écrit le prompt."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il redattore sta scrivendo il prompt."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ライターがプロンプトを書いています。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "写作模型正在写提示词。"
           }
         }
       }

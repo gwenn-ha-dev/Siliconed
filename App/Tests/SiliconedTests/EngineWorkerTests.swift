@@ -41,13 +41,13 @@ final class EngineWorkerTests: XCTestCase {
 
     /// **Calls and replies through a real pipe**: written by `WorkerPipe`, read back by `WorkerInbox` in pieces of any
     /// size, each message with the blobs it names, whole.
-    private func through<M: Encodable, R: Decodable>(_ message: M, blobs: [(UInt32, Data)], as: R.Type,
+    private func through<M: Encodable & Sendable, R: Decodable>(_ message: M, blobs: [(UInt32, Data)], as: R.Type,
                                                      names: (R) -> [UInt32]) throws -> (R, [UInt32: Data]) {
         var fds: [Int32] = [0, 0]
         XCTAssertEqual(pipe(&fds), 0)
         defer { close(fds[0]) }
-        let writer = WorkerPipe(fd: fds[1])
-        let thread = Thread { writer.send(message, blobs: blobs); close(fds[1]) }
+        let (writeEnd, writer) = (fds[1], WorkerPipe(fd: fds[1]))
+        let thread = Thread { writer.send(message, blobs: blobs); close(writeEnd) }
         thread.start()
         var inbox = WorkerInbox()
         var buffer = [UInt8](repeating: 0, count: 7919)   // a prime: frames cut anywhere

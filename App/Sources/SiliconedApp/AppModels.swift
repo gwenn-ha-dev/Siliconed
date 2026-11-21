@@ -189,6 +189,9 @@ struct Entry: Identifiable {
     /// The edit's references it was rendered with — what « Variations » renders again. Shared with
     /// its job's other images (the same sources), never decoded here.
     var references: [ReferenceImage] = []
+    /// **The edit's own images**, in their numbers: its references without the named subjects' pictures that follow them
+    /// (`RenderSettings.subjectImages`), which come back with the text that cites them.
+    var editImages: [ReferenceImage] { Array(references.dropLast(settings.subjectImages)) }
     /// **The image it started from** (img2img, `RenderSettings.strength`): what « Variations » and « Redo » render again.
     var start: ReferenceImage? = nil
     /// **An enlargement** (`Enlarge.swift`): its factor. Its settings stay the render's — what « Reuse

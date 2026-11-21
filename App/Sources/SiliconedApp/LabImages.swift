@@ -18,8 +18,11 @@
 // - **Right-click**: Crop…, Replace…, Name…, Reuse These Settings (a PNG Siliconed wrote), Remove.
 // - A **subject** (`SubjectSheet.swift`) goes only when the text cites it by `@name`, after the images the roles send; the
 //   others stay at the end, to be cited by a click or a drag into the text.
+// - **A tile is as wide as its picture and its words**, these at most `LabTile.meta`: tiles flow side by side while the
+//   box's width holds them, two portraits and their buttons in the column's width.
 // - **The grip under the tiles** gives the box more rows, or fewer: the tiles keep their size, more of them show; past
-//   the rows given, the box scrolls.
+//   the rows given, the box scrolls. It stops on whole rows only, the bottoms the tiles are laid at (`rowStops`): what is
+//   kept is a number of rows, not a height that would cut a row once the column's width changes.
 
 import AppKit
 import Siliconed
@@ -27,11 +30,13 @@ import SwiftUI
 
 struct LabImages: View {
     @Bindable var model: LabModel
-    /// The box's height, dragged by the grip under the tiles (`LabTile.boxHeights`) and kept: how many rows show.
-    @AppStorage(LabTile.boxHeightKey) private var boxHeight = LabTile.defaultBoxHeight
-    /// The tiles' own height, all rows: the box is never taller than they are.
-    @State private var tilesHeight = LabTile.height + 4
-    @State private var dragStart: Double?
+    /// How many rows of tiles the box shows, dragged by the grip under them and kept.
+    @AppStorage(LabTile.rowsKey) private var rows = LabTile.defaultRows
+    /// Each tile's frame in the tiles' own space, keyed by its entry: the rows' bottoms are read from them.
+    @State private var frames: [String: CGRect] = [:]
+    @State private var dragStart: CGFloat?
+    private nonisolated static let space = "lab images"
+    private static let addID = "add"
 
     /// A tile of the box: an image of the rack, or a subject of the library.
     private enum Entry: Identifiable {
@@ -76,19 +81,23 @@ struct LabImages: View {
             ScrollView(.vertical) {
                 FlowRow(spacing: 14) {
                     ForEach(entries) { entry in
-                        switch entry {
-                        case .picture(let picture, let number): PictureTile(model: model, picture: picture, number: number)
-                        case .subject(let subject, let numbers): SubjectTile(model: model, subject: subject, numbers: numbers)
+                        Group {
+                            switch entry {
+                            case .picture(let picture, let number): PictureTile(model: model, picture: picture, number: number)
+                            case .subject(let subject, let numbers): SubjectTile(model: model, subject: subject, numbers: numbers)
+                            }
                         }
+                        .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(Self.space)) } action: { frames[entry.id] = $0 }
                     }
                     addTile
+                        .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(Self.space)) } action: { frames[Self.addID] = $0 }
                 }
                 .padding(.vertical, 2)
-                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { tilesHeight = $0 }
+                .coordinateSpace(.named(Self.space))
             }
-            .frame(height: min(tilesHeight, boxHeight))
+            .frame(height: shownHeight)
             .scrollIndicators(.automatic)
-            if tilesHeight > LabTile.boxHeights.lowerBound { grip }
+            if rowStops.count > 1 { grip }
             Text(hint).font(.caption).foregroundStyle(Palette.secondary).fixedSize(horizontal: false, vertical: true)
         }
     }
@@ -114,7 +123,27 @@ struct LabImages: View {
         return "Image 1 is the one edited and gives the format. This model reads \(model.capacity) at most."
     }
 
-    /// **The box's grip**: dragged down, more rows of tiles show; up, fewer — never fewer than one, never more than there are.
+    /// **The heights at which the box shows whole rows**, the first row's then each next one's: a row's bottom is its
+    /// tallest tile's, the row's tiles sharing their middle (`FlowRow` centers them), and the padding under it.
+    private var rowStops: [CGFloat] {
+        let ids = Set(entries.map(\.id) + [Self.addID])
+        var lines: [(middle: CGFloat, bottom: CGFloat)] = []
+        for f in frames.filter({ ids.contains($0.key) }).values.sorted(by: { $0.midY < $1.midY }) {
+            if let last = lines.last, f.midY - last.middle < 1 { lines[lines.count - 1].bottom = max(last.bottom, f.maxY) }
+            else { lines.append((f.midY, f.maxY)) }
+        }
+        return lines.map { $0.bottom + 2 }
+    }
+
+    /// The box's height: the rows kept, or all the rows there are when fewer; one tile's height until they are laid out.
+    private var shownHeight: CGFloat {
+        let stops = rowStops
+        guard !stops.isEmpty else { return LabTile.height + 4 }
+        return stops[min(max(rows, 1), stops.count) - 1]
+    }
+
+    /// **The box's grip**: dragged down, more rows of tiles show; up, fewer — a row at a time, the nearest to the hand;
+    /// never fewer than one, never more than there are.
     private var grip: some View {
         Capsule().fill(Palette.secondary.opacity(0.5)).frame(width: 36, height: 4)
             .frame(maxWidth: .infinity).frame(height: 10)
@@ -122,10 +151,13 @@ struct LabImages: View {
             .pointerStyle(.rowResize)
             .gesture(DragGesture(minimumDistance: 1, coordinateSpace: .global)
                 .onChanged { drag in
-                    let start = dragStart ?? min(boxHeight, tilesHeight)
+                    let start = dragStart ?? shownHeight
                     dragStart = start
-                    let top = min(LabTile.boxHeights.upperBound, max(tilesHeight, LabTile.boxHeights.lowerBound))
-                    boxHeight = min(max(start + drag.translation.height, LabTile.boxHeights.lowerBound), top)
+                    let stops = rowStops.prefix(LabTile.rows.upperBound)
+                    let wanted = start + drag.translation.height
+                    if let nearest = stops.indices.min(by: { abs(stops[$0] - wanted) < abs(stops[$1] - wanted) }) {
+                        rows = nearest + 1
+                    }
                 }
                 .onEnded { _ in dragStart = nil })
             .help("Drag to show more images, or fewer")
@@ -153,11 +185,13 @@ struct LabImages: View {
 enum LabTile {
     /// The pictures' height: a face, a composition read at a glance; the box shows more of them, never larger.
     static let height: Double = 112
-    /// The box's height: one row of tiles at least, ten at most; two by default — the three images a render reads at most
+    /// The rows the box shows: one at least, ten at most; two by default — the three images a render reads at most
     /// (`NamedSubjects.maxImages`) and one more.
-    static let boxHeights: ClosedRange<Double> = (height + 4)...((height + 14) * 10)
-    static let defaultBoxHeight: Double = (height + 14) * 2 - 10
-    static let boxHeightKey = "labImagesBoxHeight"
+    static let rows: ClosedRange<Int> = 1...10
+    static let defaultRows = 2
+    static let rowsKey = "labImagesRows"
+    /// The widest a tile's words go, beside its picture: a longer caption wraps under it. A tile takes only what its words
+    /// need (`CappedWidth`), so that two portraits and their buttons hold side by side in the column.
     static let meta: CGFloat = 150
 
     /// A picture's width: its own proportions, between a tall portrait and a wide landscape.
@@ -173,6 +207,26 @@ enum LabTile {
             shape.strokeBorder(Color.secondary.opacity(0.6), style: StrokeStyle(lineWidth: 1.5, dash: [4, 3]))
         }
     }
+}
+
+/// **A width as the content asks, at most `width`**: the content laid out at the lesser of the two, a longer text wrapping
+/// under it. SwiftUI's `frame(maxWidth:)` clamps the frame but lays an unproposed text on one line, past the frame.
+private struct CappedWidth: Layout {
+    let width: CGFloat
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let w = min(width, proposal.width ?? width, subviews.map { $0.sizeThatFits(.unspecified).width }.max() ?? 0)
+        let h = subviews.map { $0.sizeThatFits(ProposedViewSize(width: w, height: nil)).height }.max() ?? 0
+        return CGSize(width: w, height: h)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        for s in subviews { s.place(at: bounds.origin, proposal: ProposedViewSize(width: bounds.width, height: nil)) }
+    }
+}
+
+private extension View {
+    func cappedWidth(_ width: CGFloat) -> some View { CappedWidth(width: width) { self } }
 }
 
 /// « Describe »: what the image shows, written into the text.
@@ -232,7 +286,7 @@ private struct PictureTile: View {
                 }
                 DescribeButton(model: model) { model.describe(picture) }
             }
-            .frame(width: LabTile.meta, alignment: .leading)
+            .cappedWidth(LabTile.meta)
         }
         .onHover { hover = $0 }
         .contextMenu { menu }
@@ -313,6 +367,8 @@ private struct StartStrength: View {
                     .help(rack.startCaption)
             }
         }
+        // The slider at the words' full width: alone it would take the little it asks.
+        .frame(width: LabTile.meta)
         .help(StartWords.explanation(rack.startRedraws))
         .bracketable(rack, .startStrength, gutter: 18)
     }
@@ -376,7 +432,7 @@ private struct SubjectTile: View {
                     .font(.caption2).foregroundStyle(Palette.secondary).lineLimit(2)
                 DescribeButton(model: model) { model.describe(subject) }
             }
-            .frame(width: LabTile.meta, alignment: .leading)
+            .cappedWidth(LabTile.meta)
         }
         .contextMenu {
             Button("Cite in the Text") { model.cite(subject) }

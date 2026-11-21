@@ -125,6 +125,13 @@ package struct LoRACard: Sendable, Identifiable, Hashable {
         self.resolution = resolution; self.trainedOn = trainedOn; self.trainerName = trainerName; self.triggers = triggers
     }
 
+    /// **The name shown for the LoRA at `path`**, its card's, read from the path alone: what the window writes of an image's,
+    /// a grid's or a sheet's LoRA does not depend on the model the rack holds — a LoRA of another model is not in its list.
+    package static func name(path: String) -> String { readableName(rawName(path: path)) }
+
+    /// The file's name without its extension: a card's `rawName`.
+    package static func rawName(path: String) -> String { ((path as NSString).lastPathComponent as NSString).deletingPathExtension }
+
     /// `Niji_semi_realism_v5` → `Niji semi realism v5`: `.lora` removed wherever it appears, `_` and `-` spaces.
     package static func readableName(_ raw: String) -> String {
         raw.replacingOccurrences(of: ".lora", with: "")

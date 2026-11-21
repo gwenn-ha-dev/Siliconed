@@ -60,11 +60,13 @@ struct MainView: View {
             }
             // Without the spacer the title hidden leaves the right-hand group beside the left one.
             ToolbarSpacer(.flexible)
-            // On the band's glass, as the button beside it: over a zoomed image (a pale sky), bare, it was lost. Its own
-            // capsule, not the button's: a name, not a control.
+            // Its own capsule, not the button's: a name, not a control. The band's clear glass took the colour of the image under
+            // it, and a pale sky washed the dusk gradient out: the capsule is the window's own night (or paper), nearly opaque,
+            // the ground the gradient was drawn for, whatever passes beneath.
             ToolbarItem(placement: .primaryAction) {
-                EditionMark().padding(.horizontal, 6)
+                EditionMark()
             }
+            .sharedBackgroundVisibility(.hidden)
             ToolbarSpacer(.fixed, placement: .primaryAction)
             ToolbarItem(placement: .primaryAction) {
                 Button { MainWindow.shared.toggleChain() } label: {
@@ -95,6 +97,8 @@ private struct EditionMark: View {
                 .foregroundStyle(Palette.secondary)
         }
         .fixedSize()
+        .padding(.horizontal, 12).padding(.vertical, 6)
+        .glassEffect(.regular.tint(Palette.canvas.opacity(0.85)), in: Capsule())
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text(verbatim: MainWindow.editionLine))
     }

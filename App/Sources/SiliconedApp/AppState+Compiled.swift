@@ -25,8 +25,8 @@ extension AppState {
     func eraseCompiled(_ done: (@MainActor (Result<Int, any Error>) -> Void)? = nil) {
         guard !erasingCompiled else { return }
         erasingCompiled = true
-        EngineWorker.shared.erase { result in
-            Task { @MainActor [weak self] in await self?.erased(result, done) }
+        EngineWorker.shared.erase { [weak self] result in
+            Task { @MainActor in await self?.erased(result, done) }
         }
     }
 

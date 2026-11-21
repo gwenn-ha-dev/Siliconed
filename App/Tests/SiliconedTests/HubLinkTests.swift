@@ -114,18 +114,18 @@ final class HubLinkTests: XCTestCase {
         func body(_ count: Int) -> AsyncStream<UInt8> { AsyncStream { c in for _ in 0..<count { c.yield(7) }; c.finish() } }
         let whole = try await Downloader.rangeBody(answer(206), body(8), 0, 7, file: "x")
         XCTAssertEqual(whole, Data(repeating: 7, count: 8))
-        var readOfRefused = 0
+        let readOfRefused = Tally()
         do {
-            _ = try await Downloader.rangeBody(answer(200), body(1 << 16).map { b in readOfRefused += 1; return b }, 0, 7, file: "x")
+            _ = try await Downloader.rangeBody(answer(200), body(1 << 16).map { b in readOfRefused.add(); return b }, 0, 7, file: "x")
             XCTFail("a 200 taken as a range")
         } catch {}
-        XCTAssertEqual(readOfRefused, 0, "a 200's body read")
-        var readOfLonger = 0
+        XCTAssertEqual(readOfRefused.count, 0, "a 200's body read")
+        let readOfLonger = Tally()
         do {
-            _ = try await Downloader.rangeBody(answer(206), body(1 << 16).map { b in readOfLonger += 1; return b }, 0, 7, file: "x")
+            _ = try await Downloader.rangeBody(answer(206), body(1 << 16).map { b in readOfLonger.add(); return b }, 0, 7, file: "x")
             XCTFail("a body longer than the range taken")
         } catch {}
-        XCTAssertEqual(readOfLonger, 9, "read past the first byte beyond the range")
+        XCTAssertEqual(readOfLonger.count, 9, "read past the first byte beyond the range")
         do {
             _ = try await Downloader.rangeBody(answer(206), body(7), 0, 7, file: "x")
             XCTFail("a short body taken")
@@ -143,4 +143,12 @@ final class HubLinkTests: XCTestCase {
         XCTAssertEqual(destination.deletingLastPathComponent().lastPathComponent, "hub-someone--z-lora-cdcdcdcdcdcd")
         XCTAssertEqual(destination.deletingLastPathComponent().deletingLastPathComponent().path, UploadStore.directory(in: library).path)
     }
+}
+
+/// The bytes a stream's `map` saw: the map runs in the stream's task, so its count crosses into the test under a lock.
+private final class Tally: @unchecked Sendable {
+    private let lock = NSLock()
+    private var seen = 0
+    func add() { lock.withLock { seen += 1 } }
+    var count: Int { lock.withLock { seen } }
 }
