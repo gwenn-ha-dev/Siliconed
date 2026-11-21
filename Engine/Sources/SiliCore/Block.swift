@@ -197,6 +197,8 @@ public final class Block: @unchecked Sendable {
     private let neuralRows: Set<String>
     /// The unit under trial (`UnitTrial`; nil: decided).
     private var trial: UnitTrial?
+    /// The buffers a GPU call has read or written (`encode`).
+    private var seen = Set<ObjectIdentifier>()
     /// The cycle under way, told once done (`Stages.Event.cycle`): its start, the ANE's rows over it, what its start loaded;
     /// the calls of the cycle before, summed once timed (`rebalance`).
     private var begun: (at: UInt64, rows: Int, moved: Double?, climbed: Double?)?
@@ -654,6 +656,15 @@ public final class Block: @unchecked Sendable {
     /// One GPU call put on the stream once the function's last is done: the task done when this one is, and its time.
     private func encode(_ f: String, _ io: (inputs: [String: View], outputs: [(String, View)])) async throws -> Timing {
         if let m = marks[f] { _ = await m.value }
+        // A buffer Core AI sees for the first time (a part of a surface made for this call, `Arena.part`) is read out of
+        // the stream's order: the first pass of a block shared with the ANE read its GPU rows of a stream an edge had just
+        // written as zeros, the second the right values; the stream waited for first, 1.5e-4 of the GPU alone's, f16's
+        // rounding (21/11 on the mini, `aSharedBlockIsTheGPUAlones`). Once a buffer, a few at a block's opening.
+        let buffers = (io.inputs.values.map { $0 } + io.outputs.map(\.1)).map { ObjectIdentifier($0.buffer) }
+        if !buffers.allSatisfy(seen.contains) {
+            await settled()
+            seen.formUnion(buffers)
+        }
         // An argument from off a page (a factor's rows, a value each) is copied by Core AI outside the stream's order: put
         // ahead, the call read it before the call before wrote it (measured 19/11 on the M5 Pro, Z's f16 velocities apart;
         // the same bits once such a call waits for the stream).
