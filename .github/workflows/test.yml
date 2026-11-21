@@ -11,8 +11,10 @@ on:
 
 jobs:
   swift-test:
-    # Xcode 27 or later: macOS 27 is the deployment target (Core AI), which an older SDK does not know.
-    runs-on: macos-27
+    # Xcode 27 or later: macOS 27 is the deployment target (Core AI), which an older SDK does not know. From
+    # Xcode 27 GitHub names its macOS images after Xcode: `xcode-27` is macOS 27 on Apple silicon (`macos-27`
+    # does not exist, and a job asking for it waits in the queue until it fails).
+    runs-on: xcode-27
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
