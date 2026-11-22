@@ -12,7 +12,7 @@ English · [Français](README.fr.md)
 </p>
 
 <p align="center">
-  <a href="https://github.com/gwenn-ha-dev/Siliconed/releases/latest"><img src="https://img.shields.io/github/v/release/gwenn-ha-dev/Siliconed?label=release&color=FF5E7A" alt="Latest release"></a>
+  <a href="https://github.com/gwenn-ha-dev/Siliconed/releases/latest"><img src="https://img.shields.io/github/v/release/gwenn-ha-dev/Siliconed?sort=semver&label=release&color=FF5E7A" alt="Latest release"></a>
   <a href="https://github.com/gwenn-ha-dev/Siliconed/releases"><img src="https://img.shields.io/github/downloads/gwenn-ha-dev/Siliconed/total?label=downloads&color=FFB38A" alt="Downloads"></a>
   <a href="https://huggingface.co/gwenn-ha-dev/Siliconed"><img src="https://img.shields.io/badge/mirror-Hugging%20Face-FFD21E?logo=huggingface&logoColor=black" alt="Mirrored on Hugging Face"></a>
   <a href="https://github.com/gwenn-ha-dev/Siliconed/actions/workflows/test.yml"><img src="https://img.shields.io/github/actions/workflow/status/gwenn-ha-dev/Siliconed/test.yml?branch=main&label=unit%20tests" alt="Unit tests"></a>
