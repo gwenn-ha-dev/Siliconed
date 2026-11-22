@@ -6,6 +6,8 @@ English · [Français](RELEASE-NOTES.fr.md)
 
 Still on Rhossili's sand: 0.31 is the engine of 0.30 made faster, the Compact first, and held closer to its memory limit.
 
+**From 0.30, download 0.31 from the [site](https://gwenn-ha-dev.github.io/Siliconed/).** 0.30 does not tell you about it: on some Macs its « new version » panel closed the app at launch, so 0.30 no longer sees any new version. 0.31 fixes the panel, and from it on the app reads every published version again.
+
 ### Faster
 
 - **The Compact computes int8 × int8 on the GPU.** Core AI's own integer product now multiplies the Compact's published codes with the activation brought to int8 row by row, the recipe of its int8 reference; the Neural Engine's rows keep their W8A16, on a copy of the codes laid out for it. A step of the DiT at 1024² on the Mac mini M5 Pro is 10 to 40 % faster than in 0.30, for the five models. The Compact now buys time as well as memory, where 0.30 said it bought only memory ([Numbers](ENGINE.md#numbers)).

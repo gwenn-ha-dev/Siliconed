@@ -6,7 +6,7 @@
 //     │  [Download]   [Website]       │
 //     └───────────────────────────────┘
 //
-// - **One request, to GitHub** (`NewVersion.latest`), through an ephemeral session: no cookie, no cache, nothing of the
+// - **One request, to GitHub** (`NewVersion.releases`), through an ephemeral session: no cookie, no cache, nothing of the
 //   user's. At each launch unless Settings › General › Updates says otherwise (`atLaunch`, on by default); the menu asks
 //   whatever the switch says.
 // - **At launch, only a newer version speaks**: up to date, offline, GitHub unreachable — nothing is shown. Asked from
@@ -65,12 +65,12 @@ final class Updates {
     private enum Outcome { case newer(NewVersion), upToDate, unreachable }
 
     private static func ask() async -> Outcome {
-        var request = URLRequest(url: NewVersion.latest)
+        var request = URLRequest(url: NewVersion.releases)
         request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
         request.timeoutInterval = 15
         guard let (data, response) = try? await URLSession(configuration: .ephemeral).data(for: request),
               (response as? HTTPURLResponse)?.statusCode == 200,
-              let latest = NewVersion(release: data) else { return .unreachable }
+              let latest = NewVersion(releases: data) else { return .unreachable }
         return latest.isNewer(than: Infotext.appVersion) ? .newer(latest) : .upToDate
     }
 
@@ -87,8 +87,12 @@ final class Updates {
         p.isRestorable = false
         p.hidesOnDeactivate = false
         let host = NSHostingController(rootView: NewVersionView(version: version) { [weak p] in p?.close() })
-        host.sizingOptions = [.preferredContentSize]
+        // Sized once, from what the view needs (it is `.fixedSize()`), like every other window of the app. With
+        // `.preferredContentSize` the window's constraint pass asked SwiftUI for its size, which asked for one more
+        // pass: on an M1 Pro (macOS 27.2.1) AppKit threw at launch, each launch, as soon as a newer version was out.
+        host.sizingOptions = []
         p.contentViewController = host
+        p.setContentSize(host.view.fittingSize)
         p.center()
         panel = p
         NSApp.activate()
