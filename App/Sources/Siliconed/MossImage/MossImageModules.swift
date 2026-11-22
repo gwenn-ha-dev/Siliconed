@@ -127,7 +127,7 @@ extension ModelCard {
 
 extension FamilyTraits {
     package static let mossImage = FamilyTraits(
-        name: "MOSS-Image", ditKind: MossImageDiT.kind,
+        name: "MOSS-Image",
         ditMaps: [.standard: "moss_image_sft_bf16.safetensors", .compact: "moss_image_sft_int8_convrot.safetensors"],
         encoderMaps: [.standard: "qwen3.5_9b_bf16.safetensors", .compact: "qwen3.5_9b_int8_convrot.safetensors"],
         files: MossImagePublished.files,
@@ -144,7 +144,7 @@ extension FamilyTraits {
         loraModules: { MossImageDiTProgram.loraModules() },
         ditTensors: { MossImageDiTProgram.tensors() },
         model: { try Model.mossImage(in: $0, card: $1, dit: $2) },
-        render: { try MossImageRender.render($0, $1, seeds: $2, model: $3, cancellation: $4, emit: $5) })
+        render: RenderLoop.render(MossImageRender.Parts.self))
 }
 
 extension Model {

@@ -3,8 +3,9 @@ import SiliCore
 
 /// **A Krea 2 block as the GPU and the ANE share it** (Z-Image's design, `ZImageShared`): the Compact's block cut where
 /// the ANE can take it, written in the forms both units run (`Neural.swift`: f16 at every border and inside, `[1, rows,
-/// n]`, q64 products on the codes `[in, out]`, norms by their peak, every factor a power of two `[1, rows, 1]` in f16);
-/// what reads across rows or computes in f32 is the GPU's:
+/// n]`, products on the codes q64 on `[in, out]`, or int8 × int8 on `[out, in]` where this Mac's GPU runs it faster
+/// (`SharedWeights.integer`), norms by their peak, every factor a power of two `[1, rows, 1]` in f16); what reads across
+/// rows or computes in f32 is the GPU's:
 ///
 ///     modulation   GPU    temb_mod + mod.lin: (1 + prescale), preshift, pregate, (1 + postscale), postshift, postgate,
 ///                         each `[1, 1, d]`, each an output (a surface of its own for the ANE)
@@ -19,10 +20,10 @@ import SiliCore
 /// Pro). Where Z-Image's block normalizes after each product, Krea 2's adds the product's true value: the feed-forward's
 /// is p · (F₂ g₁) · (F₂ g₃) · g₄, each pair a small factor by a large one, so that no partial product leaves f16.
 ///
-/// **A LoRA beside a product** (`ranks`, by argument: `LoRA.swift`): `<name>_down` `[1, in, R]` and `<name>_up` `[1, R, out]`
+/// **A LoRA beside a product** (`ranks`, by argument: `LoRA.swift`): `<name>_down` `[in, R]` and `<name>_up` `[R, out]`
 /// in f16, `(x / F · down) · up` added to the product's result, x the product's input before its rotation (the factors
-/// are in the model's own basis) under the same factor F as the codes read it: the change lands in the result's units.
-/// `Aicode.Block.lowRank`'s formula in the shared forms' `[1, rows, n]`.
+/// are in the model's own basis) under the same factor F as the codes read it: the change lands in the result's units
+/// (`Aicode.Module.product`, the other shared forms').
 ///
 /// **Two weights** (`SharedWeights`): the Compact's codes, each product's input rotated (q64); the Standard's bf16
 /// rounded to f16 as they are read, the input as it is (`product16`) — the Standard beside the ANE.
@@ -43,7 +44,7 @@ enum Krea2Shared {
         let x: [Argument] = [("x", [1, rows, d], .f16), ("x_factor", [1, rows, 1], .f16)]
         func product(_ name: String, _ inn: Int, _ out: Int) -> [Argument] {
             weights.arguments(name, inn: inn, out: out)
-                + (ranks[name].map { [(name + "_down", [1, inn, $0], .f16), (name + "_up", [1, $0, out], .f16)] } ?? [])
+                + (ranks[name].map { [(name + "_down", [inn, $0], .f16), (name + "_up", [$0, out], .f16)] } ?? [])
         }
         switch function {
         case "embed":
@@ -77,7 +78,7 @@ enum Krea2Shared {
     /// `function` written op by op; `out-taps` and `ffn-taps` (the GPU's, for a check's block 0) also give the attention's
     /// and the feed-forward's true values, `attention` and `feed` `[1, rows, d]` f16.
     /// `neural`: the ANE's function of a step both units take (`Block.Build.neural`): on `integer` codes, its products
-    /// q64 where the GPU's multiply int8 × int8 (`Aicode.Body.codes`).
+    /// q64 where the GPU's multiply int8 × int8 (`Aicode.Module.product`).
     static func module(_ function: String, rows: Int, keys: Int, weights: SharedWeights, ranks: [String: Int] = [:],
                        neural: Bool = false) -> Aicode.Module {
         var m = Aicode.Module(arguments: arguments(function, rows: rows, keys: keys, weights: weights, ranks: ranks).map { ($0.name, Aicode.tensor($0.shape, $0.element)) })
@@ -87,12 +88,7 @@ enum Krea2Shared {
         var constants = Aicode.ScalingConstants()
         /// The product of `name` on x (rotated, under F), its LoRA beside on `plain`, x before the rotation under F.
         func product(_ x: Int, _ name: String, plain: Int) -> Int {
-            let y = weights.isCodes ? b.codes(x, a(name), scale: a(name + "_scale"), weights: weights, neural: neural, constants: &constants)
-                : b.product16(x, weight: a(name))
-            guard let r = ranks[name] else { return y }
-            let out = Aicode.shape(b.types[y]).shape[2]
-            let t = b.matmul(plain, a(name + "_down"), result: Aicode.tensor([1, rows, r], .f16))
-            return b.binary(.add, y, b.matmul(t, a(name + "_up"), result: Aicode.tensor([1, rows, out], .f16)))
+            m.product(x, name, input: plain, adapted: (ranks[name] ?? 0) > 0, weights: weights, neural: neural, constants: &constants)
         }
         func rotation(_ t: Int) -> Int { b.rotation(t, of: weights) }
         func clamped(_ x: Int, _ c: Double) -> Int { b.scale("minimum", b.scale("maximum", x, -c), c) }
@@ -180,10 +176,8 @@ enum Krea2Shared {
             let (r, f2) = b.ranged16(rotation(n), target: a("w13_target"))
             let plain = b.binary(.divide, n, f2)
             let w1 = product(r, "mgate", plain: plain), w3 = product(r, "up", plain: plain)
-            // SiLU(w₁ F₂) · w₃ F₂ = F₂² g₁ g₃ · (w₁/g₁) σ(w₁ F₂) (w₃/g₃), each under 2⁵ (Z-Image's).
-            let (u1, g1) = b.ranged16(w1, under: 5), (u3, g3) = b.ranged16(w3, under: 5)
-            let z = clamped(b.binary(.mul, w1, f2), 16)
-            let inner = b.binary(.mul, b.binary(.mul, u1, b.sigmoid(z)), u3)
+            // SiLU(w₁ F₂) · w₃ F₂ = F₂² g₁ g₃ · (w₁/g₁) σ(w₁ F₂) (w₃/g₃) (`gatedSiLU16`).
+            let (inner, g1, g3) = b.gatedSiLU16(w1, w3, factor: f2)
             let (h, g4) = b.ranged16(rotation(inner), target: a("w2_target"))
             let p = product(h, "down", plain: b.binary(.divide, inner, g4))
             let feed = b.binary(.mul, b.binary(.mul, b.binary(.mul, p, b.binary(.mul, f2, g1)), b.binary(.mul, f2, g3)), g4)
@@ -193,8 +187,8 @@ enum Krea2Shared {
         return m
     }
 
-    /// A block's weights in the shared forms: the codes `[in, out]` (surfaces) and their scales, or the f16 weights
-    /// (`weights`); the norms' gains in f16, the table in bf16, the targets after the products they read.
+    /// A block's weights in the shared forms: the codes (surfaces, as `weights` lays them) and their scales, or the f16
+    /// weights; the norms' gains in f16, the table in bf16, the targets after the products they read.
     static func block(_ prefix: String, weights: SharedWeights) -> [Weights.Entry] {
         return Krea2Functions.products.map { weights.entry($0.0, key: prefix + $0.1) }
             + [("prenorm", prefix + "prenorm.scale", .half), ("postnorm", prefix + "postnorm.scale", .half),

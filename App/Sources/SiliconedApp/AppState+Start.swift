@@ -7,9 +7,9 @@
 //                                                                        │ Size ← the recommended format nearest its proportions
 //     rack:  [ Images ▣ 75 % ━━●━━ ] ── right rail ──▶ Image encoder ── latent ──▶ DiT    (Request.image, Request.strength)
 //
-// - **Only where the chain starts from an image** (`startsFromImage`: an image encoder and a denoiser that accepts a start —
-//   Z-Image, Anima, Krea 2). Qwen-Image-2.1 edits by reference instead: its image 1 stays the rack's references, untouched here.
-//   MOSS-Image has no image encoder yet: the role and the box appear by themselves once its chain offers the entry.
+// - **Only where the chain starts from an image** (`startsFromImage`: an image encoder and a denoiser that accepts a start).
+//   A model that reads images edits by reference instead: its image 1 stays the rack's references, untouched here. A chain
+//   with no image encoder has neither the role nor the box: they appear by themselves once its chain offers the entry.
 // - **The image is read as the file is** (`ReferenceImage.Source.bytes` for a picture of the lab or of the history, `.file` for a
 //   path): the bytes ImageIO decodes for `siliconed-dev render --image`, so that the app and the command line start from the same
 //   pixels — the same seed and strength then give the same image.
@@ -23,11 +23,11 @@ extension AppState {
     /// **The strength a starting image comes with**: the rack's family's (`StartImage.defaultStrength`).
     var defaultStartStrength: Double { StartImage.defaultStrength(for: card?.family) }
 
-    /// Whether the rack's model starts from an image: its chain offers the image entry (`Chain.entries`). Never in a mirror: the
+    /// Whether the rack's model starts from an image: its chain takes one (`Chain.acceptsStartImage`). Never in a mirror: the
     /// other Mac's traits do not say it, and its jobs carry no starting image.
     var startsFromImage: Bool {
         guard mirror == nil, let chain else { return false }
-        return chain.entries.contains { $0.kind == .image }
+        return chain.acceptsStartImage
     }
 
     /// The starting image the next render reads: the one carried, where the model starts from one.

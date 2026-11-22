@@ -221,7 +221,7 @@ struct SceneView: View {
                     Label("Variations", systemImage: "square.on.square.dashed").labelStyle(.iconOnly)
                 }
                     .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
-                    .help("Variations: cousins of this image, same scene, slightly different — as many as the rack’s Images")
+                    .help("Variations: cousins of this image, same scene, slightly different — as many as the rack’s Seeds")
                     .accessibilityLabel(Text("Variations"))
                     .unavailable(app.varyRefusal(e))
                 EnlargeButton(app: app, entry: e)

@@ -19,7 +19,6 @@ final class MossImageFamilyTests: XCTestCase {
     /// The names the stages and the engine agree on.
     func testTheMapsHaveOneName() {
         XCTAssertEqual(Family.mossImage.ditMap(.standard), MossImageStages.ditMap)
-        XCTAssertEqual(Family.mossImage.ditKind, MossImageDiT.kind)
         XCTAssertEqual(Family.mossImage.encoderMap(.standard), "qwen3.5_9b_bf16.safetensors")
         XCTAssertEqual(MossImageStages.model, ModelCard.mossImage.id)
         XCTAssertEqual(MossImageDenoisingModule(map: "", turbo: "").model, MossImageStages.model)
@@ -51,11 +50,11 @@ final class MossImageFamilyTests: XCTestCase {
         XCTAssertThrowsError(try Chain(text: text, denoising: Krea2DenoisingModule(map: ""), decoding: decoder))
         XCTAssertThrowsError(try Chain(text: text, denoising: dit, decoding: QwenImageDecodingModule(path: "")))
         XCTAssertThrowsError(try Chain(text: text, denoising: dit, decoding: FluxDecodingModule(path: "")))
-        // Without its encoder, no image entry; with FLUX.2's, a start image (img2img), and no reference.
-        XCTAssertEqual(try Chain(text: text, denoising: dit, decoding: decoder).entries.map(\.kind), [.text])
+        // Without its encoder, no start image; with FLUX.2's, a start image (img2img), and no reference.
+        XCTAssertFalse(try Chain(text: text, denoising: dit, decoding: decoder).acceptsStartImage)
         let encoder = Flux2EncodingModule(path: "")
         XCTAssertEqual(encoder.space, dit.space)
-        XCTAssertEqual(try Chain(text: text, denoising: dit, decoding: decoder, encoding: encoder).entries.map(\.kind), [.text, .image])
+        XCTAssertTrue(try Chain(text: text, denoising: dit, decoding: decoder, encoding: encoder).acceptsStartImage)
     }
 
     func testTheRecipeIsEightStepsOfEulerWithoutCFG() {

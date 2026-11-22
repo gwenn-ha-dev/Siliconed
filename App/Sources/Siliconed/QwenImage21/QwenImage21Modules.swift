@@ -139,7 +139,7 @@ extension ModelCard {
 
 extension FamilyTraits {
     package static let qwenImage21 = FamilyTraits(
-        name: "Qwen-Image 2.1", ditKind: "qwen-image-2.1-turbo-dit",
+        name: "Qwen-Image 2.1",
         // As published, read where they lie: Comfy-Org's bf16 and int8 `convrot` files, the DiT's (`diffusion_models`)
         // and Qwen3-VL-8B's (`text_encoders`).
         ditMaps: [.standard: "qwen_image_2.1_turbo_bf16.safetensors", .compact: "qwen_image_2.1_turbo_int8_convrot.safetensors"],
@@ -170,7 +170,7 @@ extension FamilyTraits {
             return PromptWriter.Source(map: map, tokenizer: try library.component(.qwenImage21, "tokenizer"), config: .qwenImage21)
         },
         model: { try Model.qwenImage21(in: $0, card: $1, dit: $2) },
-        render: { try QwenImage21Render.render($0, $1, seeds: $2, model: $3, cancellation: $4, emit: $5) })
+        render: RenderLoop.render(QwenImage21Render.Parts.self))
 }
 
 extension Model {

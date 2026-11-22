@@ -1,4 +1,4 @@
-/// GELU, one primitive as coreai-torch writes `F.gelu` (SiliCore's `CoreAIElementwise.swift`, ae45f2e): its attribute,
+/// GELU, one primitive as coreai-torch writes `F.gelu` (the former engine's `CoreAIElementwise.swift`, 0.21): its attribute,
 /// of kind 19 and one field, says the tanh form (1, `approximate="tanh"`) or the exact one (0, erf).
 extension Aicode.Block {
     public func gelu(_ x: Int, tanh: Bool) -> Int {

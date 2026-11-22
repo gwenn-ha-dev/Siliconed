@@ -33,13 +33,13 @@ struct LicenseTerms: View {
                 Text(card.licenseName).font(.headline)
             } icon: {
                 Image(systemName: card.license.commercial ? "checkmark.seal.fill" : "exclamationmark.triangle.fill")
-                    .foregroundStyle(card.license.commercial ? .green : .orange)
+                    .foregroundStyle(card.license.commercial ? .green : Palette.caution)
             }
             VStack(alignment: .leading, spacing: 4) {
                 if card.license.commercial {
                     Text("Commercial use is allowed, under the license’s terms.")
                 } else if card.imagesCommercial {
-                    // The model is non-commercial, its images are not (Anima: CircleStone's § 2.e).
+                    // The model is non-commercial, its images are not (`FamilyTraits.commercialImages`).
                     Text("Non-commercial: the model is for personal use and research only. The images it makes may be used for any purpose, commercial use included.")
                 } else {
                     Text("Non-commercial: personal use and research only. Images made with it can’t be sold or used in a commercial product.")
@@ -60,7 +60,7 @@ struct LicenseTerms: View {
                 }
                 .foregroundStyle(Palette.secondary)
                 // The license file(s) on Hugging Face, at the revision the installation takes. Several:
-                // each named by its repository (Anima: its DiT's, then its Diffusers one).
+                // each named by its repository (a DiT's, then its Diffusers one).
                 let urls = self.urls
                 ForEach(urls, id: \.self) { url in
                     Group {
@@ -75,7 +75,8 @@ struct LicenseTerms: View {
             }
             .font(.callout)
             .fixedSize(horizontal: false, vertical: true)
-            // Krea 2: the Agreement itself, whole, and its § 3.1 notice word for word (`FamilyTraits.agreement`).
+            // A family whose license is an Agreement: the text itself, whole, and its attribution notice word for word
+            // (`FamilyTraits.agreement`).
             if let agreement = card.family.traits.agreement { WholeAgreement(agreement: agreement) }
         }
     }
@@ -86,7 +87,7 @@ struct LicenseTerms: View {
     }
 }
 
-/// **A family's Agreement, in full, where it is accepted** (Krea 2's): its attribution notice (§ 3.1), then the
+/// **A family's Agreement, in full, where it is accepted** (`FamilyTraits.agreement`): its attribution notice, then the
 /// whole text in a box that scrolls. Quoted, never translated: it is the license.
 private struct WholeAgreement: View {
     let agreement: Agreement

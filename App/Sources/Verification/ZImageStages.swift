@@ -19,6 +19,7 @@ import Siliconed
 enum ZImageStages {
     static let all: [Stage] = [tokenizer, text, block, blockLoRA, dit, pace, trajectory, vae, img2img, render, renderLoRA]
 
+    static let model = "z-image"
     static let ditMap = Family.zImage.ditMap(.standard)
     static let compactMap = Family.zImage.ditMap(.compact)
     static let encoderMap = Family.zImage.encoderMap(.standard)
@@ -26,12 +27,12 @@ enum ZImageStages {
     // MARK: - The text
 
     static let tokenizer = Stage(
-        model: "z-image", name: "tokenizer",
+        model: model, name: "tokenizer",
         proves: "the chat template and the tokenizer give transformers' 512 identifiers and mask, padding included, and the app's admission the same real tokens (with --long, past 512: 1024)",
         options: ["--long"], oracle: "tools/oracle/z-image.py text [--long]", weights: ["tokenizer"], rule: "bit for bit"
     ) { invocation in
         let stem = invocation.long ? "goldens-text-long" : "goldens-text"
-        let report = Report(title: "z-image tokenizer\(invocation.long ? " --long" : "")")
+        let report = Report(title: "\(model) tokenizer\(invocation.long ? " --long" : "")")
         let tokenizer = try Tokenizer(directory: try Library.processWide.component(.zImage, "tokenizer"))
         let goldens = try invocation.goldens.open(stem + ".safetensors")
         guard let truth = goldens.int32("input_ids"), let mask = goldens.int32("attention_mask") else {
@@ -56,7 +57,7 @@ enum ZImageStages {
     // MARK: - The text
 
     static let text = Stage(
-        model: "z-image", name: "text",
+        model: model, name: "text",
         proves: "the Qwen3-4B encoder (35 of its 36 layers, bf16) gives the reference's layer 33 and its cap_feats, hidden_states[-2], on the real tokens",
         options: ["--variant"], oracle: "tools/oracle/z-image.py text; text-bf16; with --variant compact, text and text-bf16 with --variant compact",
         weights: ["text encoder"], rule: "the rule against transformers in bf16 (a Compact's: on its SDNQ int8 dequantized)"
@@ -67,16 +68,16 @@ enum ZImageStages {
     // MARK: - The DiT
 
     static let block = Stage(
-        model: "z-image", name: "block",
-        proves: "layer 0 alone, from the oracle's own input, at its 19 inner boundaries: modulation, norms, projections, QK-norm, attention, SwiGLU (with --variant compact, the Compact's int8 codes)",
+        model: model, name: "block",
+        proves: "layer 0 alone, from the oracle's own input, at its 19 inner boundaries: modulation, norms, projections, QK-norm, attention, SwiGLU (with --variant compact, the Compact's int8 codes, on the products a render takes first on this Mac or --products')",
         options: ["--map", "--variant"],
         oracle: "tools/oracle/z-image.py dit --size {size}; block-bf16 --size {size}; with --variant compact, dit and w8a8 with --variant compact at 512", weights: ["DiT"],
         rule: "the rule against diffusers' layer 0 in bf16 on the same input"
     ) { invocation in
         let compact = try invocation.compact()
         let stem = { (s: String) in "\(s)-\(compact ? "compact-" : "")\(invocation.size)" }
-        let report = Report(title: "z-image block\(compact ? " compact" : "") \(invocation.size)", half: compact ? "W8A8" : "bf16")
-        let path = try invocation.ditMap(compact ? compactMap : ditMap, golden: compact ? .eightBit : .standard)
+        let report = Report(title: "\(model) block\(compact ? " compact" : "") \(invocation.size)", half: compact ? "W8A8" : "bf16")
+        let path = try invocation.ditMap(ditMap, compactMap, compact: compact)
         let goldens = try invocation.goldens.open(stem("goldens-dit") + ".safetensors")
         // The Compact's layer 0 beside the publisher's int8 products (its W8A8 run holds layer 0's boundaries); the
         // Standard's beside diffusers' layer 0 in bf16 on the same input.
@@ -105,7 +106,7 @@ enum ZImageStages {
         defer { taps.values.forEach { $0.deallocate() } }
         let described = try ZImageLayerZero.run(map: path, x: Array(x), adaln: Array(adaln), latentHeight: h, latentWidth: w,
                                                 capLength: caps.shape[0], taps: taps)
-        print("z-image block: " + described)
+        print("\(model) block: " + described)
         for tap in ZImageDiT.BlockTap.allCases {
             report.add(goldens, tap.rawValue, taps[tap].map { Array($0) }, half: half.float32(tap.rawValue).map(Array.init), columns: widths[tap] ?? c.dim)
         }
@@ -113,21 +114,21 @@ enum ZImageStages {
     }
 
     static let blockLoRA = Stage(
-        model: "z-image", name: "block-lora",
-        proves: "each block function's low-rank path (a LoRA beside each product) against the CPU, product by product, on layer 0 over the oracle's stream; with --variant compact, the Compact's and its shared forms', the ANE's against the GPU's",
+        model: model, name: "block-lora",
+        proves: "each block function's low-rank path (a LoRA beside each product) against the CPU, product by product, on layer 0 over the oracle's stream; with --variant compact, the Compact's shared forms on the products a render takes first on this Mac or --products', the ANE's against the GPU's; under --neural-engine on, the Standard's shared forms in f16 too",
         options: ["--map", "--variant"],
         oracle: "tools/oracle/z-image.py dit --size {size}; with --variant compact, dit --variant compact (the inputs only)", weights: ["DiT"],
         rule: "each change (with its factors less without) against the CPU's x · down · up: ≤ 4 · 2⁻⁸ in bf16, ≤ 4 · 2⁻¹¹ in f16 (the result's and the path's roundings, the change as large as the result); each product's input and each function with every factor zero the same bits as without; on the ANE, the adapted function against the GPU's ≤ 2 × the same without + 2⁻⁹"
     ) { invocation in
         let compact = try invocation.compact()
-        let report = Report(title: "z-image block-lora\(compact ? " compact" : "")")
-        let path = try invocation.ditMap(compact ? compactMap : ditMap, golden: compact ? .eightBit : .standard)
+        let report = Report(title: "\(model) block-lora\(compact ? " compact" : "")")
+        let path = try invocation.ditMap(ditMap, compactMap, compact: compact)
         let goldens = try invocation.goldens.open("goldens-dit-\(compact ? "compact-" : "")512.safetensors")
         guard let x = goldens.float32("unified_in"), let adaln = goldens.float32("block_adaln_input") else {
             throw Skip("\(goldens.path): the block's inputs are missing")
         }
         let (described, results) = try ZImageLowRankCheck.run(map: path, x: Array(x), adaln: Array(adaln))
-        print("z-image block-lora: " + described)
+        print("\(model) block-lora: " + described)
         for r in results {
             report.add(r.bar.map { Judge.bound(r.name, r.value, $0, note: r.note) }
                        ?? Judge.holds(r.name, r.value == 0, note: r.value == 0 ? "bit for bit, " + r.note : "\(Int(r.value)) values differ, " + r.note))
@@ -136,7 +137,7 @@ enum ZImageStages {
     }
 
     static let dit = Stage(
-        model: "z-image", name: "dit",
+        model: model, name: "dit",
         proves: "one evaluation of the DiT, latent to velocity: the embedders, refiners, 30 layers, head and unpatchify (with --variant compact, the Compact's int8 codes)",
         sizes: ["512", "1024", "768x512", "832x1216"], options: ["--map", "--variant"],
         oracle: "tools/oracle/z-image.py dit --size {size}; witness --size {size}; bf16 --size {size}; with --variant compact, dit, witness and w8a8 with --variant compact at 512",
@@ -145,8 +146,8 @@ enum ZImageStages {
         let compact = try invocation.compact()
         // `goldens-dit-compact-512`, `witness-dit-f64-compact-512`: the variant before the size.
         let stem = { (s: String) in "\(s)-\(compact ? "compact-" : "")\(invocation.size)" }
-        let report = Report(title: "z-image dit\(compact ? " compact" : "") \(invocation.size)", half: compact ? "W8A8" : "bf16")
-        let path = try invocation.ditMap(compact ? compactMap : ditMap, golden: compact ? .eightBit : .standard)
+        let report = Report(title: "\(model) dit\(compact ? " compact" : "") \(invocation.size)", half: compact ? "W8A8" : "bf16")
+        let path = try invocation.ditMap(ditMap, compactMap, compact: compact)
         let goldens = try invocation.goldens.open(stem("goldens-dit") + ".safetensors")
         let witness = invocation.goldens.optional(stem("witness-dit-f64") + ".safetensors")
         let half = compact
@@ -170,7 +171,7 @@ enum ZImageStages {
         defer { taps.values.forEach { $0.deallocate() } }
         let velocity: [Float] = try {
             let denoiser = try ZImageRender.Denoiser(map: path, latentHeight: h, latentWidth: w, capLength: capLength)
-            print("z-image dit: " + denoiser.described)
+            print("\(model) dit: " + denoiser.described)
             denoiser.caps = HostTensor([capLength, c.capDim], floats: Array(caps))
             return try denoiser.velocity(Array(latent), time: sigma[0], taps: taps)
         }()
@@ -201,35 +202,35 @@ enum ZImageStages {
     }
 
     static let pace = Stage(
-        model: "z-image", name: "pace", proves: Pace.proves + " (with --variant compact, the Compact's)", sizes: ["1024", "512"],
+        model: model, name: "pace", proves: Pace.proves + " (with --variant compact, the Compact's)", sizes: ["1024", "512"],
         options: ["--renders", "--evaluations", "--map", "--variant"],
         oracle: nil, weights: ["DiT"], rule: Pace.rule
     ) { invocation in
         let compact = try invocation.compact()
-        let path = try invocation.ditMap(compact ? compactMap : ditMap, golden: compact ? .eightBit : .standard)
+        let path = try invocation.ditMap(ditMap, compactMap, compact: compact)
         let (h, w) = (invocation.height / LatentSpace.flux.factor, invocation.width / LatentSpace.flux.factor)
         let config = ZImageDiT.Config.published, capLength = 48
         let caps = HostTensor([capLength, config.capDim], floats: Pace.noise(capLength * config.capDim, seed: 1))
-        return try Pace.run(invocation, title: "z-image pace \(invocation.size)") {
+        return try Pace.run(invocation, title: "\(model) pace\(compact ? " compact" : "") \(invocation.size)") {
             let d = try ZImageRender.Denoiser(map: path, latentHeight: h, latentWidth: w, capLength: capLength)
-            print("z-image pace: " + d.described)
+            print("\(model) pace: " + d.described)
             d.caps = caps
             return d
         } evaluate: { d, e, time in
-            try (d as! ZImageRender.Denoiser).velocity(Pace.noise(config.channels * h * w, seed: UInt64(e + 2)), time: time)
+            try d.velocity(Pace.noise(config.channels * h * w, seed: UInt64(e + 2)), time: time)
         }
     }
 
     // MARK: - The sampler
 
     static let trajectory = Stage(
-        model: "z-image", name: "trajectory",
+        model: model, name: "trajectory",
         proves: "the seed's noise bit for bit, the 8-step σ schedule, then each step's velocity from the reference's own latent at that step (the render's DiT session, negated as the pipeline does)",
         sizes: ["512", "1024"], options: ["--map"],
         oracle: "tools/oracle/z-image.py trajectory --size {size}; trajectory-bf16 --size {size}; trajectory-witness --size {size} --step N for a step at its threshold", weights: ["DiT"],
         rule: "the noise and σ exact; each guided step by the rule against diffusers' same step in bf16, against its fp64 witness where one is written"
     ) { invocation in
-        let report = Report(title: "z-image trajectory \(invocation.size)")
+        let report = Report(title: "\(model) trajectory \(invocation.size)")
         let path = try invocation.ditMap(ditMap)
         let reference = try invocation.goldens.open("goldens-trajectory-\(invocation.size).safetensors")
         let text = try invocation.goldens.open("goldens-text.safetensors")
@@ -253,16 +254,13 @@ enum ZImageStages {
         var seconds: [Double] = []
         // An evaluation's time, the first apart (it loads): worth reading only with nothing else running.
         defer { if seconds.count > 1 { print("evaluation · first \(String(format: "%.2f", seconds[0])) s · then median \(String(format: "%.3f", seconds.dropFirst().sorted()[(seconds.count - 1) / 2])) s (\(seconds.dropFirst().map { String(format: "%.3f", $0) }.joined(separator: " ")))") } }
-        for step in 0..<(sigmas.count - 1) {
-            let name = "v_\(step)"
-            guard let latent = reference.float32(step == 0 ? "latent_init" : "latent_\(step)") else { continue }
+        // A step at its threshold is judged against its fp64 witness, where one was written (`trajectory-witness`).
+        try report.trajectory(reference, steps: sigmas.count - 1, half: half, columns: height * width, name: { "v_\($0)" }, witness: { step in
+            invocation.goldens.optional("witness-f64-trajectory-\(invocation.size)-v\(step).safetensors")?.float32("v_\(step)")
+        }) { step, latent in
             let start = Date()
-            let negated = try denoiser.velocity(Array(latent), time: FlowMatchSchedule.modelTime(sigma: schedule.sigmas[step])).map { -$0 }
-            seconds.append(Date().timeIntervalSince(start))
-            // A step at its threshold is judged against its fp64 witness, where one was written (`trajectory-witness`).
-            let witness = invocation.goldens.optional("witness-f64-trajectory-\(invocation.size)-v\(step).safetensors")
-            report.add(reference, name, negated, witness: witness?.float32(name), half: half.float32(name).map(Array.init),
-                       columns: height * width)
+            defer { seconds.append(Date().timeIntervalSince(start)) }
+            return try denoiser.velocity(latent, time: FlowMatchSchedule.modelTime(sigma: schedule.sigmas[step])).map { -$0 }
         }
         return report
     }
@@ -270,13 +268,13 @@ enum ZImageStages {
     // MARK: - The decoder
 
     static let vae = Stage(
-        model: "z-image", name: "vae",
+        model: model, name: "vae",
         proves: "Flux's decoder in bf16 on a rectangular latent (the centered crop of the final 1024² latent), plane by plane: what a square cannot see",
         sizes: ["768x512"],
         oracle: "tools/oracle/z-image.py vae --size {size}; vae-witness --size {size}; vae-bf16 --size {size}", weights: ["VAE"],
         rule: "per plane, at the fp64 witness: no further from it than diffusers decoding in bf16, + 25 %; on a rectangle, the transposed image must deviate"
     ) { invocation in
-        let report = Report(title: "z-image vae \(invocation.size)")
+        let report = Report(title: "\(model) vae \(invocation.size)")
         let goldens = try invocation.goldens.open("goldens-vae-\(invocation.size).safetensors")
         let witness = invocation.goldens.optional("witness-vae-f64-\(invocation.size).safetensors")
         let half = try invocation.goldens.half("witness-bf16-vae-\(invocation.size).safetensors",
@@ -297,13 +295,13 @@ enum ZImageStages {
     // MARK: - An image to start from
 
     static let img2img = Stage(
-        model: "z-image", name: "img2img",
+        model: model, name: "img2img",
         proves: "an image to start from: Flux's encoder in bf16 on the oracle's picture (the posterior mean, shifted and scaled), the first step run at strength 0.6 and its σ, the starting latent σ·ε + (1 − σ)·z₀ from the reference's own z₀ and noise, then the app's render from the picture",
         sizes: ["512"], options: ["--png"],
         oracle: "tools/oracle/z-image.py text; img2img --size {size}; img2img-bf16 --size {size}", weights: ["text encoder", "DiT", "VAE"],
         rule: "z₀ per latent plane by the rule against diffusers encoding in bf16; the first step and σ exact; the starting latent bit for bit; the render finite, its PSNR against the reference's final latent decoded here said and not judged (a free loop in bf16)"
     ) { invocation in
-        let report = Report(title: "z-image img2img \(invocation.size)")
+        let report = Report(title: "\(model) img2img \(invocation.size)")
         let vae = try Library.processWide.component(.zImage, "vae.safetensors")
         let reference = try StartImageReference(
             report, invocation, stem: "goldens-img2img-\(invocation.size)", witness: ("witness-bf16-img2img-\(invocation.size)", "tools/oracle/z-image.py img2img-bf16 --size \(invocation.size)"),
@@ -325,14 +323,14 @@ enum ZImageStages {
     // MARK: - The whole render
 
     static let render = Stage(
-        model: "z-image", name: "render",
+        model: model, name: "render",
         proves: "the app's render (Engine.render: tokenizer, encoder, 8 Euler steps, decoder) from the reference prompt and seed: the reference's final latent and picture",
         sizes: ["512", "1024"], options: ["--variant", "--png", "--f32"],
         oracle: "tools/oracle/z-image.py trajectory --size {size}", weights: ["text encoder", "DiT", "VAE"],
         rule: "the same picture: PSNR past 25 dB against diffusers in fp32 (a bound written before the run, until a bf16 trajectory judges each step); with --variant compact, a finite picture, its PSNR said and not judged: the Compact is judged at the DiT"
     ) { invocation in
         let compact = try invocation.compact()
-        let report = Report(title: "z-image render\(compact ? " compact" : "") \(invocation.size)")
+        let report = Report(title: "\(model) render\(compact ? " compact" : "") \(invocation.size)")
         let reference = try invocation.goldens.open("goldens-trajectory-\(invocation.size).safetensors")
         guard let prompt = try invocation.goldens.manifest("goldens-text")["prompt"] as? String,
               let seed = (try invocation.goldens.manifest("goldens-trajectory-\(invocation.size)"))["seed"] as? NSNumber,
@@ -340,7 +338,7 @@ enum ZImageStages {
             throw Skip("\(reference.path): the prompt, seed or image is missing")
         }
         let library = Library.processWide
-        let path = try invocation.ditMap(compact ? compactMap : ditMap, golden: compact ? .eightBit : .standard)
+        let path = try invocation.ditMap(ditMap, compactMap, compact: compact)
         // The encoder of the version judged, not the library's choice.
         let model = try Model.zImage(in: library, card: .zImage, dit: path,
                                      encoder: Family.zImage.encoderMap(compact ? .compact : .standard))
@@ -351,38 +349,33 @@ enum ZImageStages {
                                                  seed: seed.uint64Value, steps: 8), model: model) { event in
             if case .step(_, _, _, _, let seconds, _, _) = event { steps.withLock { $0.append(seconds) } }
         }
-        print(String(format: "rendered in %.1f s (text %.2f, denoising %.2f, decoding %.2f); the steps %@ s", Date().timeIntervalSince(started),
-                     render.timings.text, render.timings.denoising, render.timings.decoding,
-                     steps.withLock { $0 }.map { String(format: "%.2f", $0) }.joined(separator: " ")))
-        if let png = invocation.extras["--png"] { try render.png().write(to: URL(fileURLWithPath: png)) }
+        try report.rendered(render, since: started, invocation,
+                            more: "; the steps " + steps.withLock { $0 }.map { String(format: "%.2f", $0) }.joined(separator: " ") + " s")
         // The pixels' bits, `[3, H, W]` f32 as the decoder gives them: what another computation of the same render compares.
         let raw = render.image.pixels.withUnsafeBytes { Data($0) }
         print("image md5 " + Insecure.MD5.hash(data: raw).map { String(format: "%02x", $0) }.joined().prefix(12))
         if let f32 = invocation.extras["--f32"] { try raw.write(to: URL(fileURLWithPath: f32)) }
-        if compact { report.add(Judge.compactRender(render.image.pixels, expected)); return report }
-        let (psnr, _, _, notFinite) = imageError(render.image.pixels, expected)
-        report.add(Judge.bound("image PSNR", psnr, 25, unit: "dB", above: true,
-                               note: notFinite > 0 ? "\(notFinite) non-finite values" : ""))
+        report.judgePicture(render.image.pixels, expected, compact: compact)
         return report
     }
 
     /// No oracle of a LoRA for Z-Image (`z-image.py lora` not written): its functions are proved against the CPU
     /// (`block-lora`); here the render that carries them.
     static let renderLoRA = Stage(
-        model: "z-image", name: "render-lora",
+        model: model, name: "render-lora",
         proves: "the app's render with a LoRA (--lora FILE, strength 1) from the reference prompt and seed: the LoRA reaches the picture",
         sizes: ["512", "1024"], options: ["--variant", "--png", "--lora"],
         oracle: "tools/oracle/z-image.py trajectory --size {size} (the prompt and seed only)", weights: ["text encoder", "DiT", "VAE", "the LoRA"],
         rule: "the picture finite, and apart from the same render without the LoRA: PSNR between them under 40 dB (a counter-test: a LoRA that reached nothing gives the same picture)"
     ) { invocation in
         let compact = try invocation.compact()
-        let report = Report(title: "z-image render-lora\(compact ? " compact" : "") \(invocation.size)")
+        let report = Report(title: "\(model) render-lora\(compact ? " compact" : "") \(invocation.size)")
         guard let lora = invocation.extras["--lora"] else { throw Skip("no LoRA given: --lora FILE, a LoRA of Z-Image") }
         guard let prompt = try invocation.goldens.manifest("goldens-text")["prompt"] as? String,
               let seed = (try invocation.goldens.manifest("goldens-trajectory-\(invocation.size)"))["seed"] as? NSNumber else {
             throw Skip("goldens-text, goldens-trajectory-\(invocation.size): the prompt or the seed is missing")
         }
-        let path = try invocation.ditMap(compact ? compactMap : ditMap, golden: compact ? .eightBit : .standard)
+        let path = try invocation.ditMap(ditMap, compactMap, compact: compact)
         let model = try Model.zImage(in: Library.processWide, card: .zImage, dit: path, encoder: Family.zImage.encoderMap(compact ? .compact : .standard))
         func render(_ loras: [LoRAEntry]) throws -> Engine.Render {
             try Engine().render(Request(prompt, width: invocation.width, height: invocation.height, seed: seed.uint64Value, steps: 8, loras: loras), model: model)

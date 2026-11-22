@@ -4,8 +4,9 @@ import Metal
 import SiliCore
 
 /// **Layer 0 alone, at its inner boundaries** (`siliconed check z-image block`): the render's block functions in the
-/// map's arithmetic under the process's Neural Engine switch (`Arithmetic.of`: `ZImageBlock`, the Standard's;
-/// `ZImageShared`, the Compact's, or the Standard's weights in f16 with the switch on, on the GPU), over the oracle's own
+/// map's arithmetic under the process's Neural Engine switch (`Arithmetic.told`: `ZImageBlock`, the Standard's;
+/// `ZImageShared`, the Compact's on the products a render takes first on this Mac or `--products`', or the Standard's
+/// weights in f16 with the switch on, on the GPU), over the oracle's own
 /// stream and adaln, one call over every row of the sequence (keys = rows, every key real: diffusers masks nothing at
 /// batch 1), and before each the same function with boundaries for outputs (six at most a function). The stream given
 /// as the functions take it: bf16 rounded to nearest under the Standard; under the Compact x̂ and its row factors as the
@@ -53,20 +54,23 @@ package enum ZImageLayerZero {
                                   _ tapped: [ZImageDiT.BlockTap: UnsafeMutableBufferPointer<Float>]) async throws -> String {
         guard let device = MTLCreateSystemDefaultDevice() else { throw Failure("no Metal device") }
         let file = try ZImageDiT.file(path)
-        var arithmetic = Arithmetic.of(codes: file.tensors["layers.0.attention.qkv.weight"]?.dtype == "I8", neuralEngine: CoreAI.neuralEngineInForce)
-        // The Compact's int8 × int8 products where a control asks for them (`--products int8`): the block on the GPU.
-        if case .shared(.codes, let share) = arithmetic, CoreAI.integerProducts == true { arithmetic = .shared(.integer, share) }
+        // The products a render takes first on this Mac, or a control's (`--products`): the block on the GPU.
+        let arithmetic = try await Arithmetic.told(codes: Arithmetic.codes(file, marker: ZImageDiT.codesMarker),
+                                                   neuralEngine: CoreAI.neuralEngineInForce, device)
         let (form, weights) = (ZImageFunctions.Form(arithmetic), arithmetic.weights)
         let g = try ZImageTransformer.Geometry(latentHeight: h, latentWidth: w, capLength: capLength)
         let (rows, d, c) = (g.sequence, ZImageBlock.d, ZImageDiT.Config.published)
         precondition(x.count == rows * d && adaln.count == c.adalnDim, "x of \(x.count) values for \(rows) rows, adaln of \(adaln.count)")
         // A block of layer 0 alone over every row (keys = rows): each function after the same with its boundaries for
-        // outputs (tensors of their names), a step each, in the order of `taps`.
+        // outputs, a step each, in the order of `taps`. A boundary is a per-row tensor of its name, f32, written by each
+        // call at its rows as the stream is: a tensor of the whole stage was written whole by each call, the engine's
+        // second call over the last rows of the first (1056 rows in two calls, 17 boundaries of 21 red, 21/11).
         let shared = form == .shared, element: NDArray.ScalarType = shared ? .float16 : .bfloat16
         var n = Block.Declaration("Z-Image's layer 0 (\(form)\(shared ? ", \(weights)" : ""), \(rows) rows)", rows: rows)
         n.perRow = [.init("x", width: d, element, next: "y", factor: shared ? "x_factor" : nil),
                     .init("q", width: d, element), .init("k", width: d, element), .init("v", width: d, element),
                     .init("cos", width: ZImageBlock.hd, .float32), .init("sin", width: ZImageBlock.hd, .float32)]
+            + Tap.allCases.filter { ![.out, .adaln].contains($0) }.map { Block.Rows($0.rawValue, width: width($0), .float32) }
         if shared {
             n.perRow += [.init("x_factor", width: 1, .float16, next: "y_factor"), .init("qkv", width: 3 * d, .float16, factor: "qkv_factor"),
                          .init("qkv_factor", width: 1, .float16), .init("o", width: d, .float16), .init("mid", width: d, .float16, factor: "mid_factor"),
@@ -74,10 +78,10 @@ package enum ZImageLayerZero {
         }
         let gains = shared ? ZImageShared.gains.map { ($0, d * 2) } : [("scales", 4 * ZImageTransformer.gainBytes), ("gates", 4 * ZImageTransformer.gainBytes)]
         n.tensors = ([("adaln", c.adalnDim * 4), ("mask", rows * 2)] + gains).map { SiliCore.Stage.Tensor($0.0, bytes: $0.1) }
-            + Tap.allCases.filter { $0 != .out }.map { SiliCore.Stage.Tensor($0.rawValue, bytes: ($0 == .adaln ? 1 : rows) * width($0) * 4) }
+            + [SiliCore.Stage.Tensor(Tap.adaln.rawValue, bytes: width(.adaln) * 4)]
         n.groups = [Block.Group("layers.0", form: "\(form)", weights: ZImageFunctions.entries("layers.0", form: form, weights: weights))]
         n.cycle = ["layers.0"]
-        if shared { n.codes = weights.layout }
+        n.sharedWeights = shared ? weights : nil
         let functions = shared ? ["modulation", "pre", "heads", "attention", "out", "ffn"] : ZImageBlock.functions
         let calls = functions.flatMap { f in Self.taps(form).filter { $0.function == f } + [(f, [])] }
         let steps = calls.filter { $0.function != "modulation" }
@@ -104,10 +108,9 @@ package enum ZImageLayerZero {
         } else {
             let p = await block.rows("x").bindMemory(to: Float16.self, capacity: rows * d), f = await block.rows("x_factor").bindMemory(to: Float16.self, capacity: rows)
             for r in 0..<rows {
-                let top = max((0..<d).reduce(Float(0)) { max($0, abs(x[r * d + $1])) }, 0x1p-14)
-                let factor = Float(sign: .plus, exponent: RowExponent.ranged(largest: Double(top), f32Factor: false), significand: 1)
+                let (unit, factor) = RowExponent.split(x[(r * d)..<((r + 1) * d)], .ranged(f32Factor: false))
                 f[r] = Float16(factor)
-                for i in 0..<d { p[r * d + i] = Float16(x[r * d + i] / factor) }
+                for i in 0..<d { p[r * d + i] = Float16(unit[i]) }
             }
         }
         let given = await block.pointer("adaln")
@@ -126,7 +129,7 @@ package enum ZImageLayerZero {
                 let count = (t == .adaln ? 1 : rows) * width(t)
                 guard let into = tapped[t] else { continue }
                 precondition(into.count == count, "\(t): \(into.count) values for \(count)")
-                memcpy(into.baseAddress!, await block.pointer(t.rawValue), count * 4)
+                memcpy(into.baseAddress!, t == .adaln ? await block.pointer(t.rawValue) : await block.rows(t.rawValue), count * 4)
             }
         }
         if let into = tapped[.out] {

@@ -3,7 +3,7 @@
 //     the chain    the text, the images, the stages top to bottom, each with its settings (`Rack.swift`) — it scrolls
 //     ─────────
 //     an installation, the renders of others, what went wrong, the journal; what stops the render, the axes of a series,
-//     « Generate » (`LabGenerate.swift`) — the queue is time's, on the right (`HistoryTiles.swift`)
+//     « Generate » (`LabGenerate.swift`) — the queue is time's, on the right (`HistoryBanner.swift`)
 //
 // No form beside the chain: a setting lives in the box of the stage that reads it. No mask, no setting between two steps:
 // what is set is taken whole at the click (`Job`), and changing it afterwards prepares the next render. **The column
@@ -55,15 +55,21 @@ struct Sidebar: View {
                     }
                 }
                 .animation(Motion.pick(.easeOut(duration: 0.2)), value: chainAway)
-                // `silicontrol rack top|dit`: the scroll the hand would make.
-                .onChange(of: app.rackScroll?.count) {
-                    guard let place = app.rackScroll?.place, place == .top || place == .dit else { return }
-                    withAnimation(Motion.pick(.easeOut(duration: 0.3))) {
-                        proxy.scrollTo(place == .top ? RackView.top : RackView.dit, anchor: .top)
-                    }
-                }
+                // `silicontrol rack top|dit`: the scroll the hand would make — asked while the column was folded, it is
+                // made once the column is drawn (`RackColumn` unfolds it).
+                .onChange(of: app.rackScroll?.count) { scroll(proxy) }
+                .onAppear { scroll(proxy) }
             }
             Footer(app: app)
+        }
+    }
+
+    /// The scroll `silicontrol rack` asked, made once.
+    private func scroll(_ proxy: ScrollViewProxy) {
+        guard let place = app.rackScroll?.place, place == .top || place == .dit else { return }
+        app.rackScroll = nil
+        withAnimation(Motion.pick(.easeOut(duration: 0.3))) {
+            proxy.scrollTo(place == .top ? RackView.top : RackView.dit, anchor: .top)
         }
     }
 }
@@ -79,7 +85,7 @@ struct CustomSize: View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Size").font(.headline)
             HStack {
-                TextField("Size", text: $text, prompt: Text(verbatim: "832x1216"))
+                TextField("Size", text: $text, prompt: Text(verbatim: Figures.size(832, 1216)))
                     .labelsHidden()
                     .frame(width: 140)
                     .onSubmit(apply)
@@ -89,7 +95,7 @@ struct CustomSize: View {
                 Text(refusal.title).font(.caption).foregroundStyle(Palette.failure)
                     .fixedSize(horizontal: false, vertical: true)
             } else {
-                // The chosen model's rules: never a step it would refuse (Qwen-Image-2.1 32, Anima 2048 px).
+                // The chosen model's rules (`Format.check`): never a multiple nor a side it would refuse.
                 Text("Width × height: each side from 512 to \(String(app.formatMaximumSide)) and a multiple of \(String(app.formatMultiple)).")
                     .font(.caption).foregroundStyle(Palette.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -97,7 +103,7 @@ struct CustomSize: View {
         }
         .padding(14)
         .frame(width: 280)
-        .onAppear { text = "\(app.format.width)x\(app.format.height)" }
+        .onAppear { text = Figures.size(app.format.width, app.format.height) }
     }
 
     private func apply() {

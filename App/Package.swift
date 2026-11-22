@@ -21,17 +21,18 @@ let package = Package(
         // The app, `Siliconed.app`. The target is `SiliconedApp`: the library holds `Siliconed`, and the file system
         // does not tell it from `siliconed`. Its phrases are not a resource of the target: `tools/app.sh` compiles
         // them into the bundle, where `Text("…")` looks for them; under `swift run` the app speaks English.
-        .executableTarget(name: "SiliconedApp", dependencies: ["Siliconed", "SilicontrolHelp"],
+        .executableTarget(name: "SiliconedApp", dependencies: ["Siliconed", "SilicontrolHelp", "Measurement"],
                           exclude: ["Localizable.xcstrings", "InfoPlist.xcstrings"]),
         // `silicontrol`, the running app's remote control: a pipe to its socket, system frameworks only.
         .executableTarget(name: "Silicontrol", dependencies: ["SilicontrolHelp", "Measurement"]),
-        // What `silicontrol measure` reads: the app's footprint, swap-outs, pixels, power source. System calls only.
+        // What `silicontrol measure` reads: the app's footprint, swap-outs, pixels, power source. System calls only. And,
+        // the lowest module, what every command line shares: its flags (`Flags.scan`), a size's syntax, hexadecimal, the bundle.
         .target(name: "Measurement", linkerSettings: [.linkedFramework("IOKit"), .linkedFramework("ImageIO")]),
         // The remote control's help, Foundation only: one text for `silicontrol help` and for the app's socket.
         .target(name: "SilicontrolHelp"),
         // `siliconed check`: every stage of every model against the reference implementation's goldens. The executable
         // target is named apart because the file system does not tell `Siliconed` from `siliconed`.
-        .target(name: "Verification", dependencies: ["Siliconed", "SiliCore"]),
+        .target(name: "Verification", dependencies: ["Siliconed", "SiliCore", "Measurement"]),
         .executableTarget(name: "SiliconedCommand", dependencies: ["Verification"]),
         .executableTarget(name: "SiliconedWorker", dependencies: ["Siliconed"]),
         // The fast target: pure functions and small synthetic files, no map and no golden tensor.

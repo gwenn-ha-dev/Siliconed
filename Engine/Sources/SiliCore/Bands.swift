@@ -305,246 +305,31 @@ public struct Bands: Sendable {
     /// The residents every call names, sorted.
     public var weights: [String] { Array(Set(calls.flatMap(\.weights.values))).sorted() }
 
-    /// The number of each function's calls, by its key.
-    public var counts: [String: Int] { calls.reduce(into: [:]) { $0[$1.function.key, default: 0] += 1 } }
     /// The functions a plan builds: one a layer's kind and shapes.
     public var functionCount: Int { functions.count }
-    public var shapes: Set<Shaped> { Set(functions.keys) }
     /// Each function's module at its shapes, nothing named or written.
     public func modules() throws -> [Shaped: Aicode.Module] { try functions.reduce(into: [:]) { $0[$1.key] = try $1.value.build($1.key.geometry) } }
-    /// The boundaries marked, in order: each its name and the call after which it is whole.
-    public var boundaries: [(name: String, call: Int)] { marks.map { ($0.name, $0.call) } }
     public var callCount: Int { calls.count }
-}
 
-// MARK: - Writing a band's function
-
-extension Bands {
-    /// **A function's arguments at `g`**, the weights aside, in one order (an asset is named by its bytes): each window's
-    /// bands, the band before and after, their factors, its mask and its plane's carry; each output's mask and the carry
-    /// it is given.
-    public static func arguments(_ g: Geometry) -> [(String, Aicode.Entry)] {
-        func element(_ t: NDArray.ScalarType) -> Aicode.Element { t == .float16 ? .f16 : .f32 }
-        var out: [(String, Aicode.Entry)] = []
-        for (name, w) in g.windows.sorted(by: { $0.key < $1.key }) {
-            let rho = w.held / w.bands
-            let names = (0..<w.bands).map { "\(name)\($0)" } + (w.before ? ["\(name)_before"] : []) + (w.after ? ["\(name)_after"] : [])
-            for n in names {
-                out.append((n, Aicode.tensor([1, w.channels, rho, w.width], element(w.element))))
-                if w.factors { out.append(("\(n)_factor", Aicode.tensor([rho], .f32))) }
+    /// **What its calls hold, by names the same at any size** (`Stage.Extent`): of each function in the order of its
+    /// first call, numbered among those of its key, each window's elements (its rows each side counted) and each
+    /// output's; its kin named from these names, their elements' type, `prefix` and the calls kept in flight. A plane of
+    /// another size moves a function's widths and rows, not its place in the network.
+    public func extent(_ prefix: String, inFlight: Int) -> Stage.Extent {
+        var named: [Shaped: String] = [:], count: [String: Int] = [:], elements: [String: Int] = [:], lines = ["prefix \(prefix)"]
+        for call in calls where named[call.function] == nil {
+            let key = call.function.key, name = "\(key)#\(count[key, default: 0])"
+            count[key, default: 0] += 1
+            named[call.function] = name
+            for (n, w) in call.geometry.windows {
+                elements["\(name) \(n)"] = (w.held + (w.before ? 1 : 0) + (w.after ? 1 : 0)) * w.width * w.channels
+                lines.append("\(name) \(n) \(w.element)")
             }
-            if w.before || w.after { out.append(("\(name)_mask", Aicode.tensor([w.rows + (w.before ? 1 : 0) + (w.after ? 1 : 0)], .f32))) }
-            if let c = w.carry { out.append((c, Aicode.tensor(w.carried, .f32))) }
-        }
-        for (name, o) in g.outputs.sorted(by: { $0.key < $1.key }) {
-            if o.masked { out.append(("\(name)_valid", Aicode.tensor([o.rows], .f32))) }
-            if !o.carry.isEmpty { out.append(("\(name)_carried", Aicode.tensor(o.carry, .f32))) }
-        }
-        return out
-    }
-
-    /// **The shape a weight of `shape` is given as**: its first axis and the rest flat, `[O, C · kh · kw]` for a
-    /// convolution's kernel, when a row of it is a multiple of 64 bytes; else rows of 64 bytes — Core AI's GPU copies an
-    /// argument whose rows are not at every call (`Layout`). The function reshapes it back. Measured 19/11 on the mini, f16
-    /// (3×3 128 → 128 at 128 × 1024, 3×3 and 1×1 512 → 512 at 64 × 256): a kernel given flat runs at 0.95 – 0.96 × the
-    /// same kernel a constant of its asset, the same bits; given `[O, C, 3, 3]`, copied at every call, 0.77 × and 0.32 ×.
-    public static func flat(_ shape: [Int], _ e: Aicode.Element) -> [Int] {
-        let n = shape.reduce(1, *), rest = n / shape[0], row = 64 / e.size
-        if rest * e.size % 64 == 0 { return [shape[0], rest] }
-        precondition(n % row == 0, "a weight of \(shape) in no rows of 64 bytes")
-        return [n / row, row]
-    }
-
-    /// **The window `name` joined** in `m` (`Geometry.Window`): its bands, the band before's last row and the band
-    /// after's first, along the rows (`[1, C, rows + halo, W]`), and their factors (`[rows + halo]` f32) under the guard;
-    /// a whole read cut back to the plane's rows. The mask is the client's to apply (`<name>_mask`): what it zeroes
-    /// depends on what it reads (a norm's output is not zero where its input is).
-    public static func join(_ m: Aicode.Module, _ name: String, _ w: Geometry.Window) -> (value: Int, factor: Int?) {
-        let b = m.body
-        func rows(_ suffix: String, _ axis: Int) -> Int {
-            var parts: [Int] = []
-            if w.before { parts.append(b.slice(m.argument("\(name)_before\(suffix)"), axis: axis, start: w.held / w.bands - 1, size: 1)) }
-            parts += (0..<w.bands).map { m.argument("\(name)\($0)\(suffix)") }
-            if w.after { parts.append(b.slice(m.argument("\(name)_after\(suffix)"), axis: axis, start: 0, size: 1)) }
-            let joined = parts.count == 1 ? parts[0] : b.concat(parts, axis: axis)
-            return w.held > w.rows && !w.before && !w.after ? b.slice(joined, axis: axis, start: 0, size: w.rows) : joined
-        }
-        return (rows("", 2), w.factors ? rows("_factor", 0) : nil)
-    }
-
-    /// **The output `name` as its bands** (`Geometry.Output`): `value` `[1, C, rows, W]` and its factors `[rows]` cut in
-    /// `name0`, `name0_factor`, …; a whole write's rows past the plane's added, zeros and factors of 1.
-    public static func split(_ b: Aicode.Block, _ name: String, value: Int, factor: Int?, _ o: Geometry.Output) -> [(String, Int)] {
-        var (v, f) = (value, factor)
-        if o.held > o.rows {
-            let pad = o.held - o.rows, e = Aicode.shape(b.types[v]).element
-            v = b.concat([v, b.constant(Aicode.dense(Aicode.scalar(0, e), splat: true), Aicode.tensor([1, o.channels, pad, o.width], e))], axis: 2)
-            if let g = f { f = b.concat([g, b.constant(Aicode.dense(Aicode.scalar(1, .f32), splat: true), Aicode.tensor([pad], .f32))], axis: 0) }
-        }
-        let rho = o.held / o.bands
-        var out: [(String, Int)] = []
-        for i in 0..<o.bands {
-            out.append(("\(name)\(i)", o.bands == 1 ? v : b.slice(v, axis: 2, start: i * rho, size: rho)))
-            if let f { out.append(("\(name)\(i)_factor", o.bands == 1 ? f : b.slice(f, axis: 0, start: i * rho, size: rho))) }
-        }
-        return out
-    }
-}
-
-// MARK: - The live stage
-
-/// **A stage of bands, its arena filled and its functions loaded**: the plan of the first candidate whose P holds under
-/// B (bands of fewer positions, the shorter, the later), each distinct function once (the same module, the same asset:
-/// two layers of one shape share it), every weight a resident; its calls one after the other, each waited for.
-public final class BandStage: @unchecked Sendable {
-    public let plan: Bands
-    public let stage: Stage
-    /// The rank of the candidate taken (0: the preferred).
-    public let candidate: Int
-    /// **Whether B made the band shorter than the preferred**: a taller one's socle, or its estimate, over B. Not when no
-    /// candidate was ever read on this Mac and the soberest is taken for want of a reading (`Stage.choose`): that is a
-    /// first run at these shapes, not this Mac's limit (seen 21/11 under B = 46 GiB: the shortest band at a stage's first
-    /// run, the tallest at its second, and its client said B had cut it).
-    public let narrowed: Bool
-    private let functions: [Bands.Shaped: InferenceFunction]
-    private let signatures: [Bands.Shaped: Block.Signature]
-
-    private init(_ plan: Bands, _ stage: Stage, candidate: Int, narrowed: Bool, signatures: [Bands.Shaped: Block.Signature],
-                 assets: [Bands.Shaped: String]) {
-        (self.plan, self.stage, self.candidate, self.narrowed, self.signatures) = (plan, stage, candidate, narrowed, signatures)
-        var loaded: [Bands.Shaped: InferenceFunction] = [:]
-        for (key, asset) in assets { loaded[key] = stage.functions[asset] }
-        functions = loaded
-        for (name, m) in plan.masks {
-            let p = stage.pointer(name).assumingMemoryBound(to: Float.self)
-            for i in 0..<m.length { p[i] = m.inside.contains(i) ? 1 : 0 }
-        }
-    }
-
-    /// **The stage of the first of `candidates` whose socle and estimate hold under `budget`** (`plan` writes the plan of
-    /// a band's positions, the tallest first), its residents read from `files`: the functions built at each plan's shapes
-    /// and named by their bytes (`prefix-<hash>`), what Core AI will hold under each estimated from this Mac's readings
-    /// (`Stage.estimates`: its own, or another's scaled by the positions a band covers), the soberest where none was read
-    /// (`Stage.choose`). A stage's reading is kept at its close: the next decoding climbs on it.
-    public static func open(_ name: String, prefix: String, candidates: [Int], files: [SafeTensors], residents: [Weights.Entry], budget: Int,
-                            plan: (Int) -> Bands) async throws -> BandStage {
-        guard let device = MTLCreateSystemDefaultDevice() else { throw Failure("no Metal device") }
-        let plans = candidates.map(plan)
-        var modules: [String: Aicode.Module] = [:]
-        var declarations: [Stage.Declaration] = [], named: [[Bands.Shaped: String]] = []
-        for p in plans {
-            var d = Stage.Declaration("\(name), bands of \(p.positions) positions")
-            d.tensors = p.slabs.enumerated().map { Stage.Tensor("slab\($0.offset)", bytes: $0.element) }
-                + p.smalls.map { Stage.Tensor($0.name, bytes: $0.bytes, $0.apart ? .apart : .heap) }
-            d.residents = residents
-            var assets: [Bands.Shaped: String] = [:]
-            for (key, module) in try p.modules() {
-                let asset = Functions.name(module, prefix: prefix)
-                assets[key] = asset
-                modules[asset] = module
-                nonisolated(unsafe) let m = module
-                d.functions[asset] = Stage.Function(asset, unit: .gpu) { m }
-            }
-            declarations.append(d)
-            named.append(assets)
-        }
-        // A socle over B leaves the shorter bands to try (`Stage.plan` refuses with `OverBudget`); none holds, the
-        // finest's number. Any other error (a tensor the file lacks) is not a band too tall: it goes up as it is.
-        var holding: [(rank: Int, plan: Stage.Plan)] = [], refusal: OverBudget?
-        for (rank, d) in declarations.enumerated() {
-            do { holding.append((rank, try Stage.plan(d, files: files, budget: budget, floor: Memory.footprint()))) }
-            catch let o as OverBudget { refusal = o }
-        }
-        guard !holding.isEmpty else { throw refusal! }
-        let estimates = Stage.estimates(holding.map { (Stage.key($0.plan.declaration), plans[$0.rank].positions) })
-        // Every form fused: `OverBudget` too, the finest's P its number (`Stage.choose`).
-        let chosen = holding[try Stage.choose(holding.map(\.plan), estimates)].rank
-        let stage = try await Stage(device, plan: holding.first { $0.rank == chosen }!.plan, files: files)
-        let assets = named[chosen]
-        let unread = holding.count == declarations.count && estimates.allSatisfy { $0 == .unknown }
-        return BandStage(plans[chosen], stage, candidate: chosen, narrowed: chosen > 0 && !unread,
-                         signatures: assets.mapValues { Block.Signature(modules[$0]!) }, assets: assets)
-    }
-
-    private func view(_ s: Bands.Spot) -> View {
-        stage.view(s.tensor, s.shape, s.type, strides: Layout.padded(s.shape, s.type), bytes: s.offset)
-    }
-
-    /// Every call, one after the other; the marks `keeping` names read back as their calls are done, `[C, rows, W]` f32.
-    public func run(keeping: Set<String> = []) async throws -> [String: [Float]] {
-        var kept: [String: [Float]] = [:]
-        let marks = plan.marks.filter { keeping.contains($0.name) }
-        for (i, call) in plan.calls.enumerated() {
-            let sig = signatures[call.function]!
-            func bind(_ arg: String, _ shape: [Int], _ type: NDArray.ScalarType) -> View {
-                if let s = call.spots[arg] { return view(s) }
-                if let key = call.weights[arg] {
-                    guard let p = stage.residents[key] else { preconditionFailure("\(call.function): no resident \(key) for \(arg)") }
-                    return stage.view(p, shape)
-                }
-                if let t = call.tensors[arg] { return stage.view(t, shape, type, strides: Layout.padded(shape, type)) }
-                preconditionFailure("\(call.function): nothing bound to \(arg)")
-            }
-            var inputs: [String: View] = [:]
-            for (n, s, t) in sig.inputs { inputs[n] = bind(n, s, t) }
-            let outputs = sig.outputs.map { n, s, t in (n, bind(n, s, t)) }
-            try await Run.call(functions[call.function]!, stage.stream, inputs: inputs, outputs: outputs)
-            for m in marks where m.call == i { kept[m.name] = values(m.plane) }
-        }
-        // Every function called: the reading kept now (a client may hold its stage until its process ends).
-        stage.keep()
-        return kept
-    }
-
-    /// The bytes of the stage's tensor `name`.
-    public func pointer(_ name: String) -> UnsafeMutableRawPointer { stage.pointer(name) }
-
-    /// **A plane's values**, `[C, rows, W]` f32, its rows' factors multiplied out under the guard.
-    public func values(_ t: Bands.Plane) -> [Float] {
-        let base = UnsafeRawPointer(stage.pointer(t.slab.map { "slab\($0)" } ?? "t\(t.id)"))
-        let factors = t.factors ? UnsafeRawPointer(stage.pointer("f\(t.id)")) : nil
-        let row = Layout.padded([1, t.channels, t.rho, t.width], t.element)[2], half = t.element == .float16
-        var out = [Float](repeating: 0, count: t.channels * t.rows * t.width)
-        out.withUnsafeMutableBufferPointer { o in
-            for c in 0..<t.channels {
-                for y in 0..<t.rows {
-                    let (j, i) = (y / t.rho, y % t.rho), at = base + j * t.bandBytes + (c * t.rho + i) * row * Layout.element(t.element)
-                    let f = factors.map { $0.advanced(by: j * Arena.page).assumingMemoryBound(to: Float.self)[i] } ?? 1
-                    let to = o.baseAddress! + (c * t.rows + y) * t.width
-                    if half { let h = at.assumingMemoryBound(to: Float16.self); for x in 0..<t.width { to[x] = Float(h[x]) * f } }
-                    else { let s = at.assumingMemoryBound(to: Float.self); for x in 0..<t.width { to[x] = s[x] * f } }
-                }
+            for (n, o) in call.geometry.outputs {
+                elements["\(name) \(n) out"] = o.held * o.width * o.channels
+                lines.append("\(name) \(n) out \(o.element)")
             }
         }
-        return out
-    }
-
-    /// **`values` (`[C, rows, W]`) written into a plane**, under factors of 1, its carry `carry` if it has one (what a
-    /// plane the CPU writes carries to the layers that read it).
-    public func write(_ t: Bands.Plane, _ values: [Float], carry: [Float] = []) {
-        precondition(values.count == t.channels * t.rows * t.width, "\(values.count) values for a plane of \(t.channels) × \(t.rows) × \(t.width)")
-        let base = stage.pointer(t.slab.map { "slab\($0)" } ?? "t\(t.id)")
-        let row = Layout.padded([1, t.channels, t.rho, t.width], t.element)[2], half = t.element == .float16
-        values.withUnsafeBufferPointer { v in
-            for c in 0..<t.channels {
-                for y in 0..<t.rows {
-                    let (j, i) = (y / t.rho, y % t.rho), at = base + j * t.bandBytes + (c * t.rho + i) * row * Layout.element(t.element)
-                    let from = v.baseAddress! + (c * t.rows + y) * t.width
-                    if half { let h = at.assumingMemoryBound(to: Float16.self); for x in 0..<t.width { h[x] = Float16(from[x]) } }
-                    else { let s = at.assumingMemoryBound(to: Float.self); for x in 0..<t.width { s[x] = from[x] } }
-                }
-            }
-        }
-        if t.factors {
-            let f = stage.pointer("f\(t.id)")
-            for j in 0..<t.count { let p = (f + j * Arena.page).assumingMemoryBound(to: Float.self); for i in 0..<t.rho { p[i] = 1 } }
-        }
-        if !t.carry.isEmpty {
-            precondition(carry.count == t.carry.reduce(1, *), "a carry of \(carry.count) values for \(t.carry)")
-            // Read as the carry of a plane no call wrote: its first buffer.
-            let p = stage.pointer("c\(t.id)#0").assumingMemoryBound(to: Float.self)
-            let row = Layout.padded(t.carry, .float32)[max(t.carry.count - 2, 0)], width = t.carry.last!
-            for (n, x) in carry.enumerated() { p[t.carry.count == 1 ? n : (n / width) * row + n % width] = x }
-        }
+        return Stage.Extent(lines, inFlight: inFlight, elements: elements)
     }
 }

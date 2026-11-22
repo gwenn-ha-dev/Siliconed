@@ -100,15 +100,13 @@ final class EditSequenceTests: XCTestCase {
         for n in [5, 6, 7, 9] { XCTAssertThrowsError(try qwen.chain.denoising.check(steps: n, startImage: false), "\(n)") }
     }
 
-    /// What the chain declares: the text, the references, and the encoder that sees them. ⚠️ It also
-    /// declares `.image` (img2img), because it has an image encoder (the references need it) — and
-    /// the denoiser refuses img2img. The app ignores `.image`; another app would offer a field
-    /// that always fails.
+    /// What the chain declares: the text, the references, and the encoder that sees them. It has an image encoder (the
+    /// references need it) and still takes no starting image: the denoiser refuses img2img.
     func testTheChainDeclaresTheEdit() {
         XCTAssertTrue(qwen.chain.text.output.readsImages)
         XCTAssertTrue(qwen.chain.text is any ImageTextModule)
-        XCTAssertTrue(qwen.chain.entries.contains { $0.kind == .reference })
-        XCTAssertFalse(qwen.chain.entries.contains { $0.kind == .image })
+        XCTAssertGreaterThan(qwen.chain.denoising.maxReferences, 0)
+        XCTAssertFalse(qwen.chain.acceptsStartImage)
     }
 
     // ── the sequence ────────────────────────────────────────────────────────────────────────
@@ -151,7 +149,9 @@ final class EditSequenceTests: XCTestCase {
             let std = BFloat.round(Float(QwenImage21Published.latentsStd[c])), mean = BFloat.round(Float(QwenImage21Published.latentsMean[c]))
             XCTAssertEqual(out[c], BFloat.round(BFloat.round(x - mean) / std))
         }
-        XCTAssertEqual(QwenImage21Render.tokens([1, 2, 3, 4] + [Float](repeating: 0, count: 63 * 4)).prefix(65).filter { $0 != 0 }, [1, 2])
+        let planes = [1, 2, 3, 4] + [Float](repeating: 0, count: 63 * 4)
+        XCTAssertEqual(QwenImage21Render.tokens(planes: planes).prefix(65).filter { $0 != 0 }, [1, 2])
+        XCTAssertEqual(QwenImage21Render.planes(tokens: QwenImage21Render.tokens(planes: planes)), planes, "and back")
     }
 
     /// The template's one slot a picture becomes the picture's slots; a prompt that spells the slot is refused.

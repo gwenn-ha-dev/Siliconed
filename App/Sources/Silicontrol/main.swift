@@ -114,7 +114,7 @@ func ensureRunning() -> Bool {
     if let root = environment["SILICONED_ROOT"], !root.isEmpty { arguments += ["--env", "SILICONED_ROOT=\(root)"] }
     // The presentation mode, for captures (`Presentation` in the app): only what the window shows.
     if let name = environment["SILICONED_PRESENTATION"], !name.isEmpty { arguments += ["--env", "SILICONED_PRESENTATION=\(name)"] }
-    arguments += ownBundle().map { [$0] } ?? ["-b", "dev.gwenn-ha.siliconed"]
+    arguments += ownBundle().map { [$0] } ?? ["-b", siliconedBundleIdentifier]
     open.arguments = arguments
     do { try open.run() } catch { fail("app_not_found", "cannot run /usr/bin/open: \(error)") }
     open.waitUntilExit()

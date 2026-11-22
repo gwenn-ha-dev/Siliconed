@@ -65,8 +65,7 @@ public final class Arena: @unchecked Sendable {
     nonisolated(unsafe) private static var wiredAll = 0
     public static var wiredBytes: Int { lock.lock(); defer { lock.unlock() }; return wiredAll }
     /// What the arena holds apart from its heaps, the surfaces and the tensors `take(apart:)`: `aligned` of each, what
-    /// they allocate.
-    public var apartBytes: Int { lock.withLock { apart } }
+    /// they allocate (`allocated`).
     private var apart = 0
     /// The next key: past the first heap's offsets, each tensor apart, each surface and each heap added takes its bytes'
     /// worth of keys.
@@ -255,7 +254,7 @@ public final class Arena: @unchecked Sendable {
 
     /// **Tensor `key`'s pages wired** (`mlock`), `bytes` of them: what macOS may not compress. A weight the loop reads once
     /// a cycle is, for the system, a page left alone between two reads: under pressure it compresses it, and every call
-    /// that reads it pays the decompression (measured 20/11 on the M1 Pro, Z Compacte 1024² at B = 10, a browser open:
+    /// that reads it pays the decompression (measured 20/11 on the M1 Pro, a transformer of 6 billion int8 weights at 4128 rows, B = 10, a browser open:
     /// 2.1 of 6.3 GiB of kept weights compressed, the free memory at 60 MiB, the ANE's calls up to +39 % and the GPU's
     /// beside them +26 %, the GPU's own steps, which read no weight, unchanged; wired, every cycle as fast as the ring's,
     /// 83 – 86 → 79.9 s, no page swapped out). Unwired with the arena. False where the system refuses (`Memory.wireLimit`).

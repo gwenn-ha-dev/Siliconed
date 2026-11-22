@@ -71,28 +71,6 @@ public final class SafeTensors: @unchecked Sendable {
     /// The same shards opened again, past the system's cache or not, under the same prefix: the ring's reader's own.
     public func reopened(uncached: Bool) throws -> SafeTensors { try SafeTensors(shards: paths, uncached: uncached, under: prefix) }
 
-    /// **The file's fingerprint**, for an asset that carries its weights as constants (its name must change with them):
-    /// FNV-1a 64 of its header — each tensor's key, type, shape and place — and of 16 samples of 64 bytes spread over
-    /// each tensor, its first and last among them. A fine-tune changes every tensor it trains throughout: two files of
-    /// the same shapes whose weights differ give two fingerprints, at the cost of a few thousand small reads.
-    public lazy var fingerprint: String = {
-        var h: UInt64 = 0xcbf2_9ce4_8422_2325
-        func mix(_ bytes: UnsafeRawBufferPointer) { for byte in bytes { h = (h ^ UInt64(byte)) &* 0x100_0000_01b3 } }
-        var sample = [UInt8](repeating: 0, count: 64)
-        for (key, t) in tensors.sorted(by: { $0.key < $1.key }) {
-            Array("\(key):\(t.dtype):\(t.shape):\(t.start):\(t.end);".utf8).withUnsafeBytes(mix)
-            let count = t.end - t.start, n = min(64, count)
-            guard n > 0 else { continue }
-            let last = count - n
-            for i in 0..<16 {
-                let offset = last * i / 15
-                sample.withUnsafeMutableBytes { _ = pread(fds[t.file], $0.baseAddress!, n, off_t(bases[t.file] + t.start + offset)) }
-                sample.withUnsafeBytes { mix(UnsafeRawBufferPointer(rebasing: $0[0..<n])) }
-            }
-        }
-        return String(h, radix: 16)
-    }()
-
     /// The tensor `key`, of `dtype` and, unless nil, `shape`.
     public func tensor(_ key: String, _ dtype: String, _ shape: [Int]?) throws -> Tensor {
         guard let t = tensors[key] else { throw Failure("\(path): no tensor \(key)") }

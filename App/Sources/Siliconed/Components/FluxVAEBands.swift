@@ -154,4 +154,13 @@ extension FluxVAE {
                                              residents: plans[0].residents(file), budget: budget) { p in plans[candidates.firstIndex(of: p)!].bands }
         return (FluxVAEPass(plans[stage.candidate], stage), stage.narrowed)
     }
+
+    /// Whether `open` would hold under `budget`, nothing allocated (`BandStage.admit`).
+    package func admit(_ direction: FluxVAEPlan.Direction, path: String, height: Int, width: Int, budget: Int) throws {
+        let file = try SafeTensors(path)
+        let plans = Self.candidates.map { FluxVAEPlan(self, direction, height: height, width: width, positions: $0) }
+        let side = direction == .decode ? "decoder" : "encoder"
+        try BandStage.admit("\(name) \(side) \(height)x\(width)", prefix: "\(name)-\(side)", candidates: Self.candidates, files: [file],
+                            residents: plans[0].residents(file), budget: budget) { p in plans[Self.candidates.firstIndex(of: p)!].bands }
+    }
 }

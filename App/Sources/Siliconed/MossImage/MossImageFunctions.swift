@@ -2,7 +2,7 @@ import CoreAI
 import Foundation
 import SiliCore
 
-/// **MOSS-Image's DiT in functions of fixed shapes** (`MossImageDiT.swift` declares them to the engine and holds the loop): the reference's
+/// **MOSS-Image's DiT in functions of fixed shapes** (`MossImageTransformer.swift` declares them to the engine and holds the loop): the reference's
 /// arithmetic (`pipeline_moss_image.py`, `MossImageDiTProgram`'s notes) written op by op on the engine's blocks, every
 /// weight an argument read from the arena.
 ///

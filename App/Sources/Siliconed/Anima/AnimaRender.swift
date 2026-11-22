@@ -19,68 +19,42 @@ import Foundation
 ///
 /// An image to start from goes through the VAE's encoder first (`QwenImageVAEEncoder`), then the same loop from its step.
 package enum AnimaRender {
-    static func render(_ request: Request, _ admitted: Admission, seeds: [UInt64], model: Model,
-                       cancellation: Cancellation?, emit: (Engine.Event) -> Void) throws -> [Engine.Render] {
-        try RenderLoop.run(try Parts(request, admitted, model: model), request, admitted, seeds: seeds, model: model,
-                           cancellation: cancellation, emit: emit)
-    }
-
     /// **Anima's part of the render** (`RenderLoop`): two tokenizers, Qwen3-0.6B and the conditioner, the VAE's encoder for
     /// an image to start from, the DiT told `modelTime`, the decoder reading the latent normalized in bf16.
     struct Parts: RenderParts {
         typealias Decoder = QwenImageVAEDecoder
-        private let request: Request, model: Model, admitted: Admission
-        private let text: AnimaTextModule, denoising: AnimaDenoisingModule
-        private let start: (image: ImageRGB, encoding: QwenImageEncodingModule)?
-        private let loras: LoRAStack
-        let decoderPath: String
+        private let inputs: RenderInputs<AnimaTextModule, AnimaDenoisingModule, QwenImageEncodingModule, QwenImageDecodingModule>
         private var qwenIds: [Int] = [], t5Ids: [Int] = [], context: HostTensor?
 
-        init(_ request: Request, _ admitted: Admission, model: Model) throws {
-            let chain = model.chain
-            guard let text = chain.text as? AnimaTextModule, let denoising = chain.denoising as? AnimaDenoisingModule,
-                  let decoding = chain.decoding as? QwenImageDecodingModule else { throw EngineError.notOnEngine(model: model.identifier) }
-            if let image = request.image {
-                guard let encoding = chain.encoding as? QwenImageEncodingModule else { throw EngineError.notOnEngine(model: model.identifier) }
-                start = (image, encoding)
-            } else {
-                start = nil
-            }
-            loras = try LoRAStack(request.loras, on: model.card.family)
-            (self.request, self.model, self.admitted, self.text, self.denoising) = (request, model, admitted, text, denoising)
-            decoderPath = decoding.path
-        }
+        init(_ request: Request, _ admitted: Admission, model: Model) throws { inputs = try RenderInputs(request, admitted, model: model) }
 
-        var encodes: Bool { start != nil }
+        var encodes: Bool { inputs.start != nil }
+        var decoderPath: String { inputs.decoding.path }
 
         mutating func tokens() throws -> Int {
-            (qwenIds, t5Ids) = try AnimaRender.tokens(request.prompt, text)
+            (qwenIds, t5Ids) = try AnimaRender.tokens(inputs.request.prompt, inputs.text)
             return qwenIds.count
         }
 
         mutating func encode() throws -> Bool {
-            let (qwenIds, t5Ids, text) = (qwenIds, t5Ids, text)
+            let (qwenIds, t5Ids, text) = (qwenIds, t5Ids, inputs.text)
             var key = RenderCache.Key("AnimaRender.encode")
             try key.file(text.map)
             try key.file(text.adapter)
             key.integers(qwenIds)
             key.integers(t5Ids)
-            let (context, cached) = try RenderCache.conditioning(key, of: model) {
+            let (context, cached) = try RenderCache.conditioning(key, of: inputs.model) {
                 try AnimaRender.encode(qwenIds: qwenIds, t5Ids: t5Ids, encoder: text.map, adapter: text.adapter)
             }
             self.context = context
             return cached
         }
 
-        func image() throws -> Latent? {
-            guard let start else { return nil }
-            return Latent(space: denoising.space, height: admitted.height, width: admitted.width,
-                          values: try QwenImageVAEEncoder.latent(of: start.image, path: start.encoding.path))
-        }
+        func image() throws -> Latent? { try inputs.image { try QwenImageVAEEncoder.latent(of: $0, path: $1.path) } }
 
         func denoiser(height: Int, width: Int) throws -> any RenderDenoiser {
             guard let context else { preconditionFailure("the text before the DiT") }
-            let dit = try Denoiser(map: denoising.map, loras: loras, latentHeight: height, latentWidth: width, textLength: context.shape[0])
+            let dit = try Denoiser(map: inputs.denoising.map, loras: inputs.loras, latentHeight: height, latentWidth: width, textLength: context.shape[0])
             try dit.give(context)
             return dit
         }
@@ -133,7 +107,8 @@ package enum AnimaRender {
             dit = try blocking { try await AnimaEvaluation.open(path, geometry: geometry, loras: loras, budget: MemoryBudget.machineCeiling()) }
         }
 
-        deinit { dit.close() }
+        /// What the DiT is: its arithmetic and its plan under B.
+        package var described: String { dit.described }
 
         /// The conditioner's context `[rows, 1024]`, once for the batch: each block's cross keys and values.
         package func give(_ context: HostTensor) throws {

@@ -97,6 +97,16 @@ extension Aicode.Block {
         return (h, binary(.mul, binary(.mul, binary(.mul, f, f), binary(.mul, g1, g3)), g4))
     }
 
+    /// **The same in f16 alone**, for a function the ANE takes: `gate` and `up` `[1, rows, n]` f16 under F `[1, rows, 1]`
+    /// f16 (`ranged16`'s), each brought under 2⁵ (`ranged16`, g₁ and g₃), the sigmoid reading the true value clipped to
+    /// ±16. The product (g/g₁) sigmoid(g F) (u/g₃), under 2¹⁰, is the true value over F² g₁ g₃: the factors are left to the
+    /// caller, which multiplies them where its update needs them (a norm's, a residual's, in its own order).
+    public func gatedSiLU16(_ gate: Int, _ up: Int, factor f: Int) -> (value: Int, gate: Int, up: Int) {
+        let (u1, g1) = ranged16(gate, under: 5), (u3, g3) = ranged16(up, under: 5)
+        let z = scale("minimum", scale("maximum", binary(.mul, gate, f), -16), 16)
+        return (binary(.mul, binary(.mul, u1, sigmoid(z)), u3), g1, g3)
+    }
+
     /// The eps a norm reads of a row kept under F: eps / F² (0 past f32's range, where eps is nothing).
     public func epsilon(_ f: Int, _ eps: Double) -> Int { scale("divide", binary(.mul, f, f), eps, scalarFirst: true) }
 
@@ -136,14 +146,6 @@ extension Aicode.Block {
         }
     }
 
-    /// `x · W` with W in x's element, as it lies (`CodesLayout`): `[in, out]` read as it is, `[out, in]` transposed in the
-    /// function, as `linear` writes it.
-    public func product(_ x: Int, _ w: Int, layout: CodesLayout) -> Int {
-        guard layout == .inOut else { return linear(x, w) }
-        let (xs, element) = Aicode.shape(types[x]), out = Aicode.shape(types[w]).shape.last!
-        return matmul(x, w, result: Aicode.tensor(Array(xs.dropLast()) + [out], element))
-    }
-
     /// `x · W` with W f16 `[in, out]`.
     public func product(_ x: Int, _ w: Int) -> Int {
         let rows = Aicode.shape(types[x]).shape[0], out = Aicode.shape(types[w]).shape[1]
@@ -160,15 +162,31 @@ extension Aicode.Block {
 /// the stream's). Two rules, as the graph has two: written for a function that reads them, the rows are the ones it
 /// would have written itself.
 public enum RowExponent {
+    /// The rule a row's exponent is computed by: the graph's `ranged` (an f16 or an f32 factor) or `ranged16`.
+    public enum Rule: Sendable { case ranged(f32Factor: Bool), ranged16 }
+
     /// `Aicode.Block.ranged`'s: round(log₂ top + ½) − e₀, the largest in [2^(e₀−1), 2^e₀]; within [−13, 15] for an f16
-    /// factor, [−120, 120] for an f32 one.
+    /// factor, [−120, 120] for an f32 one. `top` floored at 2⁻¹⁴ as the graph floors it: a row of zeros has a factor.
     public static func ranged(largest top: Double, under e0: Int = 14, f32Factor: Bool) -> Int {
         let (low, high) = f32Factor ? (-120, 120) : (-13, 15)
-        return min(max(Int((Foundation.log2(top) + 0.5).rounded(.toNearestOrAwayFromZero)) - e0, low), high)
+        return min(max(Int((Foundation.log2(max(top, 0x1p-14)) + 0.5).rounded(.toNearestOrAwayFromZero)) - e0, low), high)
     }
 
-    /// `Aicode.Block.ranged16`'s (the ANE's, no `round`): ⌈log₂ top⌉ − e₀, the largest in (2^(e₀−1), 2^e₀], within [−13, 15].
+    /// `Aicode.Block.ranged16`'s (the ANE's, no `round`): ⌈log₂ top⌉ − e₀, the largest in (2^(e₀−1), 2^e₀], within [−13, 15];
+    /// `top` floored at 2⁻¹⁴ (`peak`'s).
     public static func ranged16(largest top: Double, under e0: Int = 14) -> Int {
-        min(max(Int(Foundation.log2(top).rounded(.up)) - e0, -13), 15)
+        min(max(Int(Foundation.log2(max(top, 0x1p-14)).rounded(.up)) - e0, -13), 15)
+    }
+
+    /// **A row of true values as the stream holds it**: its factor F = 2^e by `rule` (the row's largest under 2^e₀), and
+    /// the row over F, in f32 — a power of two: v / F is exact, rounded once where its client writes it in f16.
+    public static func split<Row: Collection<Float>>(_ row: Row, _ rule: Rule, under e0: Int = 14) -> (unit: [Float], factor: Float) {
+        let top = max(row.reduce(0) { max($0, abs($1)) }, 0x1p-14)
+        let e = switch rule {
+        case .ranged(let f32Factor): ranged(largest: Double(top), under: e0, f32Factor: f32Factor)
+        case .ranged16: ranged16(largest: Double(top), under: e0)
+        }
+        let factor = Float(sign: .plus, exponent: e, significand: 1)
+        return (row.map { $0 / factor }, factor)
     }
 }

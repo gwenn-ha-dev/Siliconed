@@ -157,6 +157,13 @@ final class QwenImageVAERun {
         return QwenImageVAERun(plans[stage.candidate], stage)
     }
 
+    /// Whether `open` would hold under `budget`, nothing allocated (`BandStage.admit`).
+    static func admit(_ network: String, file: SafeTensors, budget: Int, plan: (Int) -> Plan) throws {
+        let plans = QwenImageVAE.positions.map(plan)
+        try BandStage.admit(network, prefix: network, candidates: QwenImageVAE.positions, files: [file],
+                            residents: plans[0].residents(file), budget: budget) { p in plans[QwenImageVAE.positions.firstIndex(of: p)!].bands }
+    }
+
     /// What the run is given — the latent `[c, h, w]` f32, the picture `[c, H, W]` in [−1, 1] (f16 under factors of 1,
     /// its largest 1) — run, and what it gives back, `[C, H, W]` f32.
     func run(_ input: [Float]) async throws -> [Float] {

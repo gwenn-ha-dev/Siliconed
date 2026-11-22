@@ -100,7 +100,7 @@ extension FamilyTraits {
     /// int8 `convrot` of it. Both carry the text conditioner. No int8 of Qwen3-0.6B is published: both versions read
     /// the bf16 one (`split_files/text_encoders`).
     package static let anima = FamilyTraits(
-        name: "Anima", ditKind: "anima-turbo-dit",
+        name: "Anima",
         ditMaps: [.standard: "anima-turbo-v1.1.safetensors", .compact: "anima-turbo-v1.1-int8convrot.safetensors"],
         encoderMaps: [.standard: "qwen_3_06b_base.safetensors", .compact: "qwen_3_06b_base.safetensors"],
         files: AnimaPublished.files,
@@ -121,7 +121,7 @@ extension FamilyTraits {
             BaseCheckpoint("circlestone-labs/Anima anima-preview3-base", 4182218360, "14fffe8ad5116cd73b9a4696f6a89d7e5f6efdd24b2e4785603aa891a9b2295b"),
         ],
         model: { try Model.anima(in: $0, card: $1, dit: $2) },
-        render: { try AnimaRender.render($0, $1, seeds: $2, model: $3, cancellation: $4, emit: $5) })
+        render: RenderLoop.render(AnimaRender.Parts.self))
 }
 
 extension Qwen3Encoder.Config {

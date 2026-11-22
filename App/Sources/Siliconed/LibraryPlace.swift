@@ -1,6 +1,7 @@
 import CryptoKit
 import Darwin
 import Foundation
+import Measurement
 
 // **Where the library lives, and moving it.**
 //
@@ -328,7 +329,7 @@ enum FileCopy {
         guard fsync(output) == 0 else { throw posix(to) }
         var times = [st.st_atimespec, st.st_mtimespec]
         _ = futimens(output, &times)
-        return hasher?.finalize().map { String(format: "%02x", $0) }.joined()
+        return hasher?.finalize().hexadecimal
     }
 
     private static func posix(_ path: String) -> NSError {

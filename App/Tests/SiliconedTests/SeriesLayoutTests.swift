@@ -95,4 +95,47 @@ final class SeriesLayoutTests: XCTestCase {
         XCTAssertEqual(Bracketing.around(0.8, step: 0.2, count: 4, in: 0...1.5), [0.5, 0.7, 0.9, 1.1])
         XCTAssertEqual(Bracketing.around(0.8, step: 0.2, count: 0, in: 0...1.5), [0.8])
     }
+
+    /// **A grid fills the canvas**: the side at which every cell holds, labels and gaps included, clamped to the slider's
+    /// range — and the figures the canvas lays out with (`margin`, `gap`, the labels).
+    func testAGridFillsTheRoom() {
+        // 2 × 2 squares, no labels: (1000 − 48 − 8) / 2 = 472 wide, (800 − 48 − 8 − 8) / 2 = 368 high.
+        XCTAssertEqual(SeriesFit.side(in: CGSize(width: 1000, height: 800), columns: 2, rows: 2, aspect: 1,
+                                      rowLabels: false, columnLabels: false), 368)
+        // Labels on both axes: 128 beside (a label and a gap), 52 above: (800 − 48 − 52 − 8) / 2 = 346.
+        XCTAssertEqual(SeriesFit.side(in: CGSize(width: 1000, height: 800), columns: 2, rows: 2, aspect: 1,
+                                      rowLabels: true, columnLabels: true), 346)
+        // A landscape cell's long side is its width: the height holds at 368, the width at 368 × 2 = 736 ≥ 472.
+        XCTAssertEqual(SeriesFit.side(in: CGSize(width: 1000, height: 800), columns: 2, rows: 2, aspect: 2,
+                                      rowLabels: false, columnLabels: false), 472)
+        XCTAssertEqual(SeriesFit.side(in: CGSize(width: 100, height: 100), columns: 4, rows: 4, aspect: 1,
+                                      rowLabels: false, columnLabels: false), SeriesFit.sides.lowerBound)
+        XCTAssertEqual(SeriesFit.side(in: CGSize(width: 9000, height: 9000), columns: 1, rows: 1, aspect: 1,
+                                      rowLabels: false, columnLabels: false), SeriesFit.sides.upperBound)
+    }
+
+    /// **The cells follow the room until the hand sizes them**: a new series fits; the room changing refits while the side
+    /// is the fitted one; a side the hand set stays, and ⌘0 gives the room's back; the band under the grid coming or going
+    /// moves nothing.
+    func testTheCellsFollowTheRoomUntilTheHandSizesThem() {
+        var (fit, side) = SeriesFit.refit(nil, run: 1, band: false, current: 220, fitting: 300)
+        XCTAssertEqual(side, 300)
+        XCTAssertTrue(fit.follows(300))
+        (fit, side) = SeriesFit.refit(fit, run: 1, band: false, current: 300, fitting: 340)
+        XCTAssertEqual(side, 340)
+        // The band comes: the record follows it, the cells stay under the pointer, still following.
+        (fit, side) = SeriesFit.refit(fit, run: 1, band: true, current: 340, fitting: 320)
+        XCTAssertNil(side)
+        XCTAssertTrue(fit.follows(340))
+        // The hand sizes them: the room changing leaves them be, and ⌘0 gives back the room's side of now.
+        (fit, side) = SeriesFit.refit(fit, run: 1, band: true, current: 500, fitting: 360)
+        XCTAssertNil(side)
+        XCTAssertFalse(fit.follows(500))
+        XCTAssertEqual(fit.restore(), 360)
+        XCTAssertTrue(fit.follows(360))
+        // Another series fits, whatever the hand did to the last one.
+        (fit, side) = SeriesFit.refit(fit, run: 2, band: false, current: 900, fitting: 250)
+        XCTAssertEqual(side, 250)
+        XCTAssertEqual(fit.run, 2)
+    }
 }

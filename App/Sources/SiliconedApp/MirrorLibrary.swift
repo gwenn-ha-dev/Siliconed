@@ -29,10 +29,21 @@ extension AppState {
 
     /// **May the library change now**: this Mac's (`managementPossible`), or the lender's — nothing of
     /// ours running, no installation under way there; the lender judges again.
-    var libraryManageable: Bool {
+    var libraryManageable: Bool { libraryRefusal == nil }
+
+    /// **Why the library cannot change now**, this Mac's or the lender's, said on what it greys; `nil` when it can.
+    var libraryRefusal: String? {
+        guard let m = mirror else { return managementRefusal }
+        if let linkBlocker { return linkBlocker }
+        // Not published yet: the link is still being set up.
+        guard remoteLibrary != nil else { return String(localized: "Connecting to “\(m.macName)”…") }
         // `libraryJob`, in a mirror: the lender's job as published, or this Mac's own upload (`MirrorUpload.swift`).
-        mirror == nil ? managementPossible
-            : linkBlocker == nil && remoteLibrary != nil && remoteLibraryJob == nil && libraryJob == nil && !busy && !remoteConfirming
+        if let job = libraryJob ?? remoteLibraryJob.map({ libraryJobTitle($0.task) }) {
+            return String(localized: "\(job): this waits until it is done.")
+        }
+        if busy { return String(localized: "A render is in progress: the library changes once the queue is done.") }
+        if remoteConfirming { return String(localized: "Waiting for confirmation on “\(m.macName)”") }
+        return nil
     }
 
     func askLibrary(_ r: RemoteLibraryRequest) { mirror?.send(.libraryAsk(r)) }

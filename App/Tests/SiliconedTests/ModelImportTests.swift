@@ -46,6 +46,17 @@ final class ModelImportTests: XCTestCase {
         XCTAssertNil(MapWeights.checkpointPrefix(of: other, marker: marker))
     }
 
+    /// A MOSS-Image DiT saved as a whole checkpoint is read as the publisher's: its names found under the prefix, by a
+    /// key of that DiT alone.
+    func testAMossDiTUnderACheckpointsPrefixIsRead() throws {
+        let path = try file("moss-checkpoint.safetensors", ["final_norm_video.weight": [4], "layers.0.proj.qkv.weight": [12, 4]],
+                            prefix: "model.diffusion_model.")
+        let dit = try MossDiT.file(path)
+        XCTAssertNotNil(dit.tensors["final_norm_video.weight"])
+        XCTAssertEqual(dit.tensors["layers.0.proj.qkv.weight"]?.shape, [12, 4])
+        XCTAssertThrowsError(try MossDiT.file(try file("not-moss.safetensors", ["blocks.0.attn.wq.weight": [4, 4]])))
+    }
+
     /// An import replaces a file of the same name whole or not at all, and copies the file a link points to — never
     /// the link, never a partial copy left under the final name.
     func testAnImportCopiesTheFileItselfAndReplacesWhole() throws {

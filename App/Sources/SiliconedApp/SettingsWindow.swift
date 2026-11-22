@@ -262,29 +262,29 @@ struct SettingsView: View {
             IconTile(symbol: elsewhere ? "externaldrive.fill" : "internaldrive.fill", color: Palette.sky, side: 26)
         } trailing: {
             Button("Show in Finder") { app.showInFinder() }
-                .disabled(!app.libraryReachable)
+                .unavailable(app.libraryBlocker)
         } below: {
             Text(verbatim: app.library.shownPath).font(.caption).foregroundStyle(.tertiary)
                 .lineLimit(1).truncationMode(.middle).textSelection(.enabled)
             if !app.libraryReachable {
-                Text(app.libraryBlocker ?? "").font(.caption).foregroundStyle(.orange)
+                Text(app.libraryBlocker ?? "").font(.caption).foregroundStyle(Palette.caution)
                     .fixedSize(horizontal: false, vertical: true)
             }
             HStack {
                 Button("Move Library…") { app.chooseLibraryDestination() }
-                    .disabled(!app.managementPossible)
                     .help("Copies the library to the folder you choose, checks every file, then removes it from here. The licenses you accepted and this Mac’s settings stay on this Mac")
+                    .unavailable(app.managementRefusal)
                 Button("Open Library…") { app.chooseLibraryToOpen() }
-                    .disabled(app.libraryJob != nil || app.busy)
                     .help("Uses a library that is already somewhere else, another disk’s for instance. Nothing is moved")
+                    .unavailable(app.libraryBusy)
             }
             if elsewhere {
                 HStack {
                     Button("Move Back to This Mac") { app.moveLibraryHome() }
-                        .disabled(!app.managementPossible)
+                        .unavailable(app.managementRefusal)
                     Button("Use This Mac’s Library") { app.useLocalLibrary() }
-                        .disabled(app.libraryJob != nil || app.busy)
                         .help("Renders with what this Mac holds — maybe nothing yet. The library on the other disk is not touched")
+                        .unavailable(app.libraryBusy)
                 }
             }
             if let title = app.libraryJob {

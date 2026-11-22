@@ -74,7 +74,7 @@ package struct Latent: Sendable {
 /// **An image with transparency carries it twice**: `pixels` is always the image laid over white
 /// (what every model but one reads), and `rgba` the source's own bytes, unpremultiplied, alpha
 /// included — what Qwen-Image-2.1's edit reads, as diffusers hands its references in RGBA
-/// (`QwenImage21Pipeline.preparedReference`). An opaque image has no `rgba`: nothing changes for it.
+/// (`QwenImage21DenoisingModule.preparedReferences`). An opaque image has no `rgba`: nothing changes for it.
 package struct ImageRGB: Sendable, Equatable {
     package let pixels: [Float]
     package let height: Int
@@ -201,6 +201,10 @@ package extension DenoisingModule {
     var detailBell: Detail.Bell? { nil }
     /// Whether it honours `Request.detail`.
     var acceptsDetail: Bool { detailBell != nil }
+    /// The step counts there is a schedule for (`check(steps:)`): what `--steps` takes, and what a lender publishes.
+    var scheduledSteps: [Int] {
+        (1...Request.maximumSteps).filter { (try? check(steps: $0, startImage: false)) != nil }
+    }
 }
 
 /// A module without a name of its own carries its type's: a hand-composed chain can still be
@@ -262,32 +266,7 @@ package struct Chain: Sendable {
         self.encoding = encoding
     }
 
-    /// **An input of the chain**: what an app must offer the user to feed it.
-    package struct Entry: Sendable, Hashable {
-        package enum Kind: Sendable, Hashable {
-            /// The prompt (`Request.prompt`).
-            case text
-            /// The starting image (`Request.image`, `Request.strength`).
-            case image
-            /// An editing reference image (`Request.references`) — as many as
-            /// `DenoisingModule.maxReferences`.
-            case reference
-        }
-        package let kind: Kind
-        /// Without it, the render is refused; optional, it only changes what it does.
-        package let isRequired: Bool
-        /// The module that receives it ("Qwen3-VL-4B", "VAE Flux").
-        package let module: String
-    }
-
-    /// **What the chain accepts, in signal order** — what an app draws as inputs instead of a
-    /// fixed form. The text always, the image if there is an image
-    /// encoder and the denoiser starts from one, the references if it reads them.
-    package var entries: [Entry] {
-        [Entry(kind: .text, isRequired: true, module: text.name)]
-            + (encoding.flatMap { denoising.acceptsStartImage
-                                     ? [Entry(kind: .image, isRequired: false, module: $0.name)] : nil } ?? [])
-            + (encoding != nil && denoising.maxReferences > 0
-                ? [Entry(kind: .reference, isRequired: false, module: denoising.name)] : [])
-    }
+    /// **Whether the chain starts from an image** (img2img): an image encoder, and a denoiser that starts from one. What an
+    /// app offers a starting image for; an editing reference is the denoiser's (`DenoisingModule.maxReferences`).
+    package var acceptsStartImage: Bool { encoding != nil && denoising.acceptsStartImage }
 }

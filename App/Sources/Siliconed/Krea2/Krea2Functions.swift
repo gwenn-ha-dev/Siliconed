@@ -200,17 +200,6 @@ package enum Krea2Functions {
         ranks.isEmpty ? "" : "-lora" + ranks.sorted { $0.key < $1.key }.map { "-\($0.key)\($0.value)" }.joined()
     }
 
-    /// Each product's rank over the blocks `prefixes` (the same argument in every block a function is called on): the
-    /// largest landing on one of them (`LoRAStack.rank`), none where nothing lands.
-    static func ranks(_ loras: LoRAStack, blocks prefixes: [String]) -> [String: Int] {
-        var ranks: [String: Int] = [:]
-        for (name, module) in products {
-            let r = loras.rank(of: prefixes.map { $0 + module }, on: .krea2)
-            if r > 0 { ranks[name] = r }
-        }
-        return ranks
-    }
-
     /// A block's products: (argument, module), the module as the file and a LoRA name it.
     static let products = [("wq", "attn.wq"), ("wk", "attn.wk"), ("wv", "attn.wv"), ("gate", "attn.gate"), ("wo", "attn.wo"),
                            ("up", "mlp.up"), ("mgate", "mlp.gate"), ("down", "mlp.down")]
@@ -222,16 +211,6 @@ package enum Krea2Functions {
         func p(_ name: String, _ key: String) -> LoRAProduct { LoRAProduct(name: name, key: key, inn: shapes[key]!.inn, out: shapes[key]!.out) }
         return [("timestep", [p("tmlp0", "tmlp.0"), p("tmlp2", "tmlp.2"), p("tproj", "tproj.1")]), ("final", [p("last_linear", "last.linear")])]
     }()
-
-    /// Each edge product's rank, its own (one function, one layer), none where nothing lands.
-    static func edgeRanks(_ loras: LoRAStack) -> [String: Int] {
-        var ranks: [String: Int] = [:]
-        for p in edgeProducts.flatMap(\.products) {
-            let r = loras.rank(of: [p.key], on: .krea2)
-            if r > 0 { ranks[p.name] = r }
-        }
-        return ranks
-    }
 
     /// The ranks of what edge `function` computes.
     static func edgeRanks(_ function: String, _ ranks: [String: Int]) -> [String: Int] {

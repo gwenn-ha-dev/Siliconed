@@ -114,6 +114,19 @@ extension AppState {
         delete(history.filter { ids.contains($0.id) })
     }
 
+    /// Whether the shown series' cells follow the window: ⌘0 has nothing to give back (nor before its grid is laid out).
+    var seriesFollowsWindow: Bool {
+        guard let f = seriesFit, f.run == shownSeries else { return true }
+        return f.follows(exploreCellSide)
+    }
+
+    /// **⌘0 on a series' grid**: its cells take the size that fills the canvas, and follow the window again.
+    func fitSeries() {
+        guard var f = seriesFit, f.run == shownSeries else { return }
+        exploreCellSide = f.restore()
+        seriesFit = f
+    }
+
     /// What a column or row says, for a series.
     func exploreLabels(_ axis: RenderGrid.Axis?, of run: GridRun) -> [String] {
         guard let axis else { return [] }
@@ -133,25 +146,17 @@ struct SeriesCanvas: View {
     let run: GridRun
     @State private var chosen: Int?
     @GestureState private var pinch: CGFloat = 1
-    /// The room the cells have, and how they were last sized to fill it.
+    /// The room the cells have (how they were last sized to fill it: `AppState.seriesFit`).
     @State private var area: CGSize = .zero
-    @State private var fitted: Fit?
-
-    /// **The last fit**: the series, whether the band under the grid was there, and the side the cells got.
-    private struct Fit {
-        let run: Int
-        var band: Bool
-        let side: CGFloat
-    }
 
     var body: some View {
         let images = app.cells(of: run)
         VStack(spacing: 0) {
             ScrollView([.vertical, .horizontal]) {
-                cells(images).padding(24)
+                cells(images).padding(SeriesFit.margin)
             }
             // **A series fills the room**: every cell in sight, as large as they can be, the window larger or smaller.
-            // Once the hand sizes them, they keep its size; another series fits again.
+            // Once the hand sizes them, they keep its size; another series fits again, and ⌘0 (`AppState.fitSeries`).
             .onGeometryChange(for: CGSize.self) { $0.size } action: { size in
                 area = size
                 fit()
@@ -171,35 +176,24 @@ struct SeriesCanvas: View {
         }
     }
 
-    /// The cells sized to the room — unless the hand sized them (pinch, slider, ⌘+ ⌘−: the side is no longer the fitted
-    /// one), or the room changed only because the band under the grid came or went: a click on a cell shows its band, and
-    /// the cells must not move under the pointer, nor at each cell of a running series.
+    /// The cells sized to the room — unless the hand sized them, or only the band under the grid came or went
+    /// (`SeriesFit.refit`).
     private func fit() {
         guard area.width > 0, area.height > 0 else { return }
-        let band = showsBand
-        if let f = fitted, f.run == run.ordinal {
-            guard app.exploreCellSide == f.side else { return }
-            guard f.band == band else { fitted?.band = band; return }
-        }
-        app.exploreCellSide = fittingSide(in: area)
-        fitted = Fit(run: run.ordinal, band: band, side: app.exploreCellSide)
+        let g = run.grid, f = run.settings.format
+        let fitting = SeriesFit.side(in: area, columns: g.columns, rows: g.rows, aspect: CGFloat(f.width) / CGFloat(f.height),
+                                     rowLabels: !app.exploreLabels(g.y, of: run).isEmpty,
+                                     columnLabels: !app.exploreLabels(g.x, of: run).isEmpty)
+        let (fit, side) = SeriesFit.refit(app.seriesFit, run: run.ordinal, band: showsBand, current: app.exploreCellSide,
+                                          fitting: fitting)
+        if let side { app.exploreCellSide = side }
+        if app.seriesFit != fit { app.seriesFit = fit }
     }
 
     /// Whether the band under the grid shows: a chosen cell's settings, or the running one's.
     private var showsBand: Bool {
         if let i = chosen, run.cellJobs.indices.contains(i), app.cells(of: run)[i] != nil { return true }
         return running != nil
-    }
-
-    /// The side (a cell's longer edge) at which the whole grid, its labels and gaps, holds in `area`.
-    private func fittingSide(in area: CGSize) -> CGFloat {
-        let g = run.grid, f = run.settings.format
-        let aspect = CGFloat(f.width) / CGFloat(f.height)
-        let rowLabels: CGFloat = app.exploreLabels(g.y, of: run).isEmpty ? 0 : 128
-        let columnLabels: CGFloat = app.exploreLabels(g.x, of: run).isEmpty ? 8 : 52
-        let w = (area.width - 48 - rowLabels - CGFloat(g.columns - 1) * 8) / CGFloat(g.columns)
-        let h = (area.height - 48 - columnLabels - CGFloat(g.rows - 1) * 8) / CGFloat(g.rows)
-        return AppState.clampedCellSide(min(w / min(1, aspect), h / min(1, 1 / aspect)))
     }
 
     /// The cell rendering now, if it is one of this grid's.
@@ -213,7 +207,7 @@ struct SeriesCanvas: View {
         let f = run.settings.format
         let (w, h) = f.width >= f.height ? (side, side * CGFloat(f.height) / CGFloat(f.width))
                                          : (side * CGFloat(f.width) / CGFloat(f.height), side)
-        return Grid(horizontalSpacing: 8, verticalSpacing: 8) {
+        return Grid(horizontalSpacing: SeriesFit.gap, verticalSpacing: SeriesFit.gap) {
             GridRow {
                 if !rows.isEmpty { Color.clear.frame(width: 1, height: 1) }
                 ForEach(columns.indices, id: \.self) { c in
@@ -225,7 +219,7 @@ struct SeriesCanvas: View {
                 GridRow {
                     if !rows.isEmpty {
                         Text(rows[r]).font(.callout.weight(.semibold)).lineLimit(3).multilineTextAlignment(.trailing)
-                            .frame(width: 120, alignment: .trailing)
+                            .frame(width: SeriesFit.rowLabelWidth, alignment: .trailing)
                     }
                     ForEach(0..<g.columns, id: \.self) { c in
                         cell(r * g.columns + c, images[r * g.columns + c]).frame(width: w, height: h)
@@ -332,8 +326,8 @@ struct SeriesBar: View {
                     .help("The cells still waiting leave the queue; the running one stops")
             }
             Button("Export Sheet…") { app.exportSheet(run) }
-                .disabled(count == 0)
                 .help("The images side by side, labelled, as a PNG file")
+                .unavailable(count == 0 ? String(localized: "No cell has its image yet.") : nil)
             Button { app.shownSeries = nil } label: { Image(systemName: "xmark") }
                 .buttonStyle(.borderless)
                 .help("Back to the image — the series stays in the history, under its tile")

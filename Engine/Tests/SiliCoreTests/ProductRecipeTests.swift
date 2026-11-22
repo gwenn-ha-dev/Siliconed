@@ -4,7 +4,7 @@ import Testing
 @testable import SiliCore
 
 /// The shards of one set of weights, and a product's parts joined along `out` (`Recipe.product`): what the arena
-/// takes from the headers alone, and what it holds once read, in either layout, counted by hand.
+/// takes from the headers alone, and what it holds once read, the codes in either layout, counted by hand.
 @Suite struct ProductRecipes {
     static func le<T>(_ values: [T]) -> [UInt8] { values.withUnsafeBytes { Array($0) } }
 
@@ -38,23 +38,23 @@ import Testing
 
     @Test(arguments: [CodesLayout.inOut, .outIn])
     func aJoinedProductTakesItsPartsSideBySide(_ layout: CodesLayout) throws {
-        let slots = try Weights.layout(Self.entries, in: Self.file, codes: layout, bfloat16: layout)
+        let slots = try Weights.layout(Self.entries, in: Self.file, codes: layout)
         let shape = [3, 3]
         #expect(slots.map(\.name) == ["w", "w_scale", "v"])
         #expect(slots.map(\.shape) == [shape, [3], shape] && slots.map(\.bytes) == [9, 6, 18])
-        // Through the staging: a part transposed, or a part's scales.
-        #expect(try Weights.staging(Self.entries, in: Self.file, codes: layout, bfloat16: layout) == (layout == .inOut ? 12 : 4))
+        // Through the staging: a part of codes transposed, or a part's scales; the bf16 parts straight to their place.
+        #expect(try Weights.staging(Self.entries, in: Self.file, codes: layout) == (layout == .inOut ? 6 : 4))
         guard let device = MTLCreateSystemDefaultDevice() else { return }
-        let arena = try Arena(device, bytes: try Weights.size(Self.entries, in: Self.file, codes: layout, bfloat16: layout))
-        let placed = try Weights.load(Self.entries, from: Self.file, into: arena, codes: layout, bfloat16: layout)
+        let arena = try Arena(device, bytes: try Weights.size(Self.entries, in: Self.file, codes: layout))
+        let placed = try Weights.load(Self.entries, from: Self.file, into: arena, codes: layout)
         let w = arena.pointer(placed["w"]!.offset).assumingMemoryBound(to: Int8.self)
         let s = arena.pointer(placed["w_scale"]!.offset).assumingMemoryBound(to: Float16.self)
         let v = arena.pointer(placed["v"]!.offset).assumingMemoryBound(to: UInt16.self)
-        // [out, in]: a's rows then b's; [in, out]: its transpose.
+        // [out, in]: a's rows then b's; [in, out]: its transpose. The bf16 weights [out, in] in either.
         let outIn: [Int8] = [1, 2, 3, 4, 5, 6, -7, -8, -9], inOut: [Int8] = [1, 4, -7, 2, 5, -8, 3, 6, -9]
         #expect((0..<9).map { w[$0] } == (layout == .outIn ? outIn : inOut))
         #expect((0..<3).map { s[$0] } == [0.5, 0.25, 2])
-        #expect((0..<9).map { BFloat16Bits.widened(v[$0]) } == (layout == .outIn ? [1, 2, 3, 4, 5, 6, 7, 8, 9] : [1, 4, 7, 2, 5, 8, 3, 6, 9]))
+        #expect((0..<9).map { BFloat16Bits.widened(v[$0]) } == [1, 2, 3, 4, 5, 6, 7, 8, 9])
     }
 
     @Test func aProductWhosePartsDoNotJoinIsRefused() throws {
@@ -70,6 +70,6 @@ import Testing
         d.groups = ["g": Self.entries]
         d.once = ["g"]
         let plan = try Stage.plan(d, files: [Self.file], budget: 1 << 30, floor: 0, depth: 1)
-        #expect(plan.kept == ["g"] && plan.codes == .inOut && plan.bfloat16 == .outIn)
+        #expect(plan.kept == ["g"] && plan.codes == .inOut)
     }
 }

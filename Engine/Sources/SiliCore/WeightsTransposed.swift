@@ -1,0 +1,111 @@
+import Foundation
+
+/// **The CPU's passes over a weight as it is read**: bf16 widened, f32 rounded to f16, `[out, in]` transposed by
+/// tiles on every core.
+extension Weights {
+    /// `count` bf16 widened to f32 (exact), each through `convert` (to f16: rounded to nearest once).
+    static func bf16<B>(_ from: UnsafeRawPointer, _ count: Int, into to: UnsafeMutablePointer<B>, _ convert: (Float) -> B) {
+        let b = from.assumingMemoryBound(to: UInt16.self)
+        for i in 0..<count { to[i] = convert(Float(bitPattern: UInt32(b[i]) << 16)) }
+    }
+
+    /// `[out, in]` 16-bit values into `[in, out]`, **the rows of the result shared among the cores** by blocks of 64, each
+    /// block by tiles of 8 × 8 in NEON registers (`transposedTiles`' way, at 16 bits): the bf16 path's weights, 14 GB of a
+    /// transformer, which one core's 64 × 64 loop takes tens of seconds over. `out` and `inn` multiples of 8.
+    /// `rounding`: each bf16 rounded to nearest in f16 as its tile is stored (`halves`), in the same pass.
+    public static func transposedHalves(_ from: UnsafePointer<UInt16>, _ out: Int, _ inn: Int, into to: UnsafeMutablePointer<UInt16>,
+                                        rounding: Bool) {
+        precondition(out % 8 == 0 && inn % 8 == 0, "[\(out), \(inn)]: tiles of 8")
+        nonisolated(unsafe) let (f, t) = (from, to)
+        DispatchQueue.concurrentPerform(iterations: (inn + 63) / 64) { block in
+            let i0 = block * 64, i1 = min(i0 + 64, inn)
+            withUnsafeTemporaryAllocation(of: SIMD8<UInt16>.self, capacity: 16) { buffer in
+                let base = buffer.baseAddress!
+                for o0 in stride(from: 0, to: out, by: 8) {
+                    for i in stride(from: i0, to: i1, by: 8) {
+                        var a = base, b = base + 8
+                        for m in 0..<8 { a[m] = UnsafeRawPointer(f + (o0 + m) * inn + i).loadUnaligned(as: SIMD8<UInt16>.self) }
+                        // Three rounds of even/odd unzips swap row and column in an 8 × 8 tile (an index's six bits
+                        // rotate by one each).
+                        for _ in 0..<3 {
+                            for m in 0..<4 {
+                                let w = SIMD16(lowHalf: a[2 * m], highHalf: a[2 * m + 1])
+                                b[m] = w.evenHalf; b[m + 4] = w.oddHalf
+                            }
+                            swap(&a, &b)
+                        }
+                        for m in 0..<8 { UnsafeMutableRawPointer(t + (i + m) * out + o0).storeBytes(of: rounding ? halves(a[m]) : a[m], as: SIMD8<UInt16>.self) }
+                    }
+                }
+            }
+        }
+    }
+
+    /// Eight bf16 rounded to nearest in f16 (widened to f32, exact, then narrowed: one `fcvtn`), as bits.
+    @inline(__always) static func halves(_ b: SIMD8<UInt16>) -> SIMD8<UInt16> {
+        let wide = unsafeBitCast(SIMD8<UInt32>(truncatingIfNeeded: b) &<< 16, to: SIMD8<Float>.self)
+        return unsafeBitCast(SIMD8<Float16>(wide), to: SIMD8<UInt16>.self)
+    }
+
+    /// `count` f32 rounded to nearest in f16.
+    static func half(_ from: UnsafeRawPointer, _ count: Int, into to: UnsafeMutableRawPointer) {
+        let f = from.assumingMemoryBound(to: Float.self), h = to.bindMemory(to: Float16.self, capacity: count)
+        for i in 0..<count { h[i] = Float16(f[i]) }
+    }
+
+    /// The same by tiles of 16 × 16 in NEON registers: 16 rows loaded, four unzips of the 256 bytes (each takes the even
+    /// elements then the odd: an index's bits rotate by one, four rotations swap row and column), 16 rows stored; the
+    /// rows of the result shared among the cores by blocks of 64, as `transposedRows`. `out` and `inn` multiples of 16.
+    public static func transposedTiles(_ from: UnsafePointer<Int8>, _ out: Int, _ inn: Int, into to: UnsafeMutablePointer<Int8>, rowLength: Int? = nil) {
+        precondition(out % 16 == 0 && inn % 16 == 0, "[\(out), \(inn)]: tiles of 16")
+        nonisolated(unsafe) let (f, t) = (UnsafeRawPointer(from), UnsafeMutableRawPointer(to))
+        let ld = rowLength ?? out
+        DispatchQueue.concurrentPerform(iterations: (inn + 63) / 64) { block in
+            let i0 = block * 64, i1 = min(i0 + 64, inn)
+            withUnsafeTemporaryAllocation(of: SIMD16<UInt8>.self, capacity: 32) { buffer in
+                let base = buffer.baseAddress!
+                for o0 in stride(from: 0, to: out, by: 16) {
+                    for i in stride(from: i0, to: i1, by: 16) {
+                        var a = base, b = base + 16
+                        for m in 0..<16 { a[m] = (f + (o0 + m) * inn + i).loadUnaligned(as: SIMD16<UInt8>.self) }
+                        for _ in 0..<4 {
+                            for m in 0..<8 {
+                                let w = SIMD32(lowHalf: a[2 * m], highHalf: a[2 * m + 1])
+                                b[m] = w.evenHalf; b[m + 8] = w.oddHalf
+                            }
+                            swap(&a, &b)
+                        }
+                        for m in 0..<16 { (t + (i + m) * ld + o0).storeBytes(of: a[m], as: SIMD16<UInt8>.self) }
+                    }
+                }
+            }
+        }
+    }
+
+    /// `[out, in]` into `[in, out]` as they are (int8 codes), **the rows of the result shared among the
+    /// cores** by blocks of 64, each block by tiles of 64 × 64. By rows and not by columns: each core writes pages of its
+    /// own, which matters on an arena's fresh pages (each first write a fault, and faults on one page wait on each other).
+    /// `rowLength`: the result's row length, when it lies beside others in a wider one (the products a function fuses).
+    static func transposedRows<T>(_ from: UnsafePointer<T>, _ out: Int, _ inn: Int, into to: UnsafeMutablePointer<T>, rowLength: Int? = nil) {
+        nonisolated(unsafe) let (f, t) = (from, to)
+        let ld = rowLength ?? out
+        DispatchQueue.concurrentPerform(iterations: (inn + 63) / 64) { block in
+            let i0 = block * 64, i1 = min(i0 + 64, inn)
+            for o0 in stride(from: 0, to: out, by: 64) {
+                for o in o0..<min(o0 + 64, out) {
+                    let row = f + o * inn
+                    for i in i0..<i1 { t[i * ld + o] = row[i] }
+                }
+            }
+        }
+    }
+
+    /// `[out, in]` into `[in, out]`, by tiles of 64 × 64 (what the caches hold), each element through `convert`.
+    static func transposed<A, B>(_ from: UnsafePointer<A>, _ out: Int, _ inn: Int, into to: UnsafeMutablePointer<B>, _ convert: (A) -> B) {
+        for o0 in stride(from: 0, to: out, by: 64) {
+            for i0 in stride(from: 0, to: inn, by: 64) {
+                for o in o0..<min(o0 + 64, out) { for i in i0..<min(i0 + 64, inn) { to[i * out + o] = convert(from[o * inn + i]) } }
+            }
+        }
+    }
+}

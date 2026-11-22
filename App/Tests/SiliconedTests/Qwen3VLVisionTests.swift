@@ -15,9 +15,9 @@ final class Qwen3VLVisionTests: XCTestCase {
         XCTAssertEqual(groups.firstIndex { $0.name == "deepstack.0" }, 9)
         let blockNames = Set(groups.first { $0.name == "blocks.26" }!.weights.map(\.name))
         XCTAssertEqual(blockNames.count, 12)
-        for a in Qwen3VLVision.blockArguments(c, rows: 4, layout: .outIn).dropFirst() { XCTAssertTrue(blockNames.contains(a.name), a.name) }
+        for a in Qwen3VLVision.blockArguments(c, rows: 4).dropFirst() { XCTAssertTrue(blockNames.contains(a.name), a.name) }
         let mergerNames = Set(groups.first { $0.name == "deepstack.2" }!.weights.map(\.name))
-        for a in Qwen3VLVision.mergerArguments(c, rows: 4, deepstack: true, layout: .outIn).dropFirst() { XCTAssertTrue(mergerNames.contains(a.name), a.name) }
+        for a in Qwen3VLVision.mergerArguments(c, rows: 4, deepstack: true).dropFirst() { XCTAssertTrue(mergerNames.contains(a.name), a.name) }
         let residents = Set(v.declaration().residents.map(\.name))
         for a in Qwen3VLVision.embedArguments(c, rows: 4) where a.name.hasPrefix("kernel") { XCTAssertTrue(residents.contains(a.name)) }
     }

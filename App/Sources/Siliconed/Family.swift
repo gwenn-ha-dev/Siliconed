@@ -24,9 +24,6 @@ package enum Family: String, CaseIterable, Sendable, Codable {
     /// The product's default: the family a request that names none goes to, the first declared.
     package static var `default`: Family { allCases[0] }
 
-    /// The name of its DiT's architecture.
-    package var ditKind: String { traits.ditKind }
-
     package var variants: [Variant] { Variant.allCases.filter { traits.ditMaps[$0] != nil } }
 
     /// The DiT's map and the text encoder's, in `store/`.
@@ -37,7 +34,6 @@ package enum Family: String, CaseIterable, Sendable, Codable {
 /// What the app reads of a family, declared in the family's folder.
 package struct FamilyTraits: Sendable {
     package let name: String
-    package let ditKind: String
     package let ditMaps: [Variant: String]
     package let encoderMaps: [Variant: String]
     /// Every published file a version reads, pinned: what an installation downloads (`Installer`).
@@ -145,7 +141,7 @@ extension Library {
 
     /// The version aimed at, written by an installation before its first byte: what breaks the tie when both versions
     /// are whole.
-    func intendedVariantPath(_ f: Family) -> String { map("composants/\(f.rawValue)/variant") }
+    func intendedVariantPath(_ f: Family) -> String { components(f) + "/variant" }
 
     /// The DiT map the family renders with, by name in `store/` — that of its installed version.
     package func ditMap(_ f: Family) -> String { f.ditMap(variant(of: f)) }

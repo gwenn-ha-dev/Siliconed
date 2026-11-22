@@ -186,7 +186,7 @@ struct TextBox: View {
             Text("Stopped: an image started rendering.").font(.caption).foregroundStyle(Palette.secondary)
         }
         if let notice = model.notice {
-            Label(notice, systemImage: "exclamationmark.triangle").font(.caption).foregroundStyle(.orange)
+            Label(notice, systemImage: "exclamationmark.triangle").font(.caption).foregroundStyle(Palette.caution)
                 .fixedSize(horizontal: false, vertical: true)
         }
     }

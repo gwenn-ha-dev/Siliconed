@@ -139,7 +139,7 @@ final class ZImageTransformer {
         n.tensors = (t + gains).map { SiliCore.Stage.Tensor($0.0, bytes: $0.1) } + [SiliCore.Stage.Tensor("velocity", bytes: latent, .apart)]
             + lowRankTensors(ranks, form)
         n.residents = ZImageFunctions.others(form: form)
-        if form == .shared { n.codes = weights.layout }
+        n.sharedWeights = form == .shared ? weights : nil
         let name = "\(form)"
         n.groups = allBlocks.map { Block.Group($0, form: name, weights: ZImageFunctions.entries($0, form: form, weights: weights)) }
         (n.once, n.cycle) = (captionBlocks, cycle)
@@ -173,24 +173,15 @@ final class ZImageTransformer {
 
     // MARK: - The block
 
-    /// **The DiT of `file` at `geometry` under B** (`Block.open`), the LoRAs' factors written into it.
-    static func open(_ device: MTLDevice, file: SafeTensors, geometry: Geometry, arithmetic: Arithmetic, loras: LoRAStack = .none,
+    /// **A render's DiT** of `file` at `geometry` under B, in the map's arithmetic under the Neural Engine switch
+    /// (`Arithmetic.block`), the LoRAs' factors written into it.
+    static func open(file: SafeTensors, geometry g: Geometry, loras: LoRAStack = .none,
                      budget: Int = MemoryBudget.machineCeiling()) async throws -> ZImageTransformer {
         let ranks = ZImageDiT.loraRanks(loras)
-        let declaration = declaration(geometry, arithmetic, ranks: ranks)
-        let block = try await Block.open(device, declaration, files: [file], budget: budget, share: arithmetic.share)
-        let dit = try await ZImageTransformer(block, geometry, arithmetic, ranks: ranks)
+        let (block, arithmetic) = try await Arithmetic.block(file: file, codes: ZImageDiT.codesMarker, budget: budget) { declaration(g, $0, ranks: ranks) }
+        let dit = try await ZImageTransformer(block, g, arithmetic, ranks: ranks)
         try dit.writeLowRank(loras)
         return dit
-    }
-
-    /// **A render's DiT** in the map's arithmetic under the Neural Engine switch (`Arithmetic.opened`).
-    static func open(file: SafeTensors, geometry g: Geometry, neuralEngine: Bool, loras: LoRAStack = .none) async throws -> ZImageTransformer {
-        guard let device = MTLCreateSystemDefaultDevice() else { throw Failure("no Metal device") }
-        let codes = file.tensors["layers.0.attention.qkv.weight"]?.dtype == "I8", ranks = ZImageDiT.loraRanks(loras)
-        let offered = try await Arithmetic.offered(codes: codes, device)
-        let arithmetic = try Arithmetic.opened(codes: codes, neuralEngine: neuralEngine, offered: offered) { declaration(g, $0, ranks: ranks) }
-        return try await open(device, file: file, geometry: g, arithmetic: arithmetic, loras: loras)
     }
 
     private init(_ block: Block, _ g: Geometry, _ arithmetic: Arithmetic, ranks: [String: Int]) async throws {

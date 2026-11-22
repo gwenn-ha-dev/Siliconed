@@ -23,7 +23,7 @@ struct ChainInspector: View {
         ScrollViewReader { reader in
             ScrollView {
                 VStack(alignment: .leading, spacing: 10) {
-                    // The clock advances every second, even between two events (a Krea 2 step lasts 35 s): only the
+                    // The clock advances every second, even between two events (a step can last 35 s): only the
                     // sections that read it are drawn again with it, and only while it says something — at rest, with
                     // nothing waiting, it stops (a panel left open redrew both sections every second for nothing).
                     TimelineView(.animation(minimumInterval: 1, paused: !app.inProgress)) { context in inProgress(now: context.date) }

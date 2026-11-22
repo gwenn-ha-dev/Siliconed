@@ -97,14 +97,7 @@ package enum QwenImage21Functions {
     }
 
     /// **The ranks `stack` asks of the functions**: each product's, the largest landing on it in any layer.
-    package static func ranks(_ stack: LoRAStack) -> Ranks {
-        guard !stack.isEmpty else { return [:] }
-        var ranks = Ranks()
-        for p in outerLoRA() { ranks[p.name] = stack.rank(of: [p.key], on: .qwenImage21) }
-        let layers = (0..<c.layers).map(layerLoRA)
-        for (k, p) in layers[0].enumerated() { ranks[p.name] = stack.rank(of: layers.map { $0[k].key }, on: .qwenImage21) }
-        return ranks.filter { $0.value > 0 }
-    }
+    package static func ranks(_ stack: LoRAStack) -> Ranks { stack.ranks(outerLoRA() + (0..<c.layers).flatMap(layerLoRA), on: .qwenImage21) }
 
     /// The factors' element: f32 outside the layers (their functions compute in f32); a layer's, its path's.
     static func factorElement(_ product: String, path: Path) -> NDArray.ScalarType {

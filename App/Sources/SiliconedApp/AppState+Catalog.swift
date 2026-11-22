@@ -28,7 +28,7 @@ extension AppState {
         return m
     }
     /// The model's encoder sees the images (`TextFormat.readsImages`), so the prompt can name them
-    /// (`<image1>`, `<image2>`… in Qwen-Image-2.1's template).
+    /// (`<image1>`, `<image2>`… in its template).
     var promptNamesImages: Bool { mirror != nil ? traits?.readsImages ?? false : chain?.text.output.readsImages ?? false }
 
     /// **The format the render will have**: when editing, the one the denoiser derives from image 1
@@ -187,9 +187,8 @@ extension AppState {
         steps = card?.defaultSteps ?? 8
         // A role the new model does not offer becomes neutral, never another: the image stays, waiting (`LabInputs.conforming`).
         conformInputs()
-        // A size typed by hand stays while the new model takes it (`Format.check(…, family:)`: Qwen-Image-2.1
-        // wants multiples of 32, Anima 2048 px a side at most) — and this Mac's memory, or the footer
-        // says so and offers the largest that fits.
+        // A size typed by hand stays while the new model takes it (`Format.check(…, family:)`: each family has its multiple
+        // and its largest side) — and this Mac's memory, or the footer says so and offers the largest that fits.
         if (try? checkFormat(width: format.width, height: format.height)) == nil {
             format = formats[0]; orientation = format.orientation
         }
@@ -209,7 +208,7 @@ extension AppState {
 
     /// **A size typed by hand** (`832x1216`, `1024`): read by `Format.parse`, judged by `Format.check` —
     /// the engine's own rules (sides ≥ 512, multiples of 16, at most 8192 px a side; no area ceiling, B decides), and the
-    /// model's (Qwen-Image-2.1 multiples of 32, Anima 2048 px a side at most). The refusal, translated.
+    /// model's (its family's multiple and largest side). The refusal, translated.
     func setCustomFormat(_ text: String) -> Problem? {
         guard let (w, h) = Format.parse(text.trimmingCharacters(in: .whitespaces)) else {
             return Problem(EngineError.formatUnreadable(text: text))
@@ -226,7 +225,7 @@ extension AppState {
     /// The table cell the form's size is, `nil` for a size typed by hand or from the default menu that is not in the table.
     var sizeCell: SizeCell? { SizeScales.cell(matching: format) }
 
-    /// **Why a cell is greyed in the rack**, `nil` where it can be chosen: the model's own limit (Anima's 2048 px a side),
+    /// **Why a cell is greyed in the rack**, `nil` where it can be chosen: the model's own limit (its largest side),
     /// as the default menu checks it.
     func scaleUnavailable(_ cell: SizeCell) -> String? {
         if let family = card?.family, let refusal = SizeScales.refusal(cell, family: family) {

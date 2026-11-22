@@ -38,7 +38,7 @@ extension Qwen3Encoder {
         if a.half { d.perRow.append(.init("x_factor", width: 1, .float32, next: "y_factor", apart: true)) }
         d.layers = (0..<c.layers).map { Block.Group(Self.layer($0), form: "layer", weights: entries($0, a)) }
         let cached = writing != nil
-        d.kinds["layer"] = { b in model.layerModule(a, a.layout(b), .causal(rows: b.rows), cache: cached) }
+        d.kinds["layer"] = { b in model.layerModule(a, b.codes, .causal(rows: b.rows), cache: cached) }
         if let writing {
             let n = writing.capacity
             for i in 0..<c.layers {
@@ -47,7 +47,7 @@ extension Qwen3Encoder {
             d.tensors = [.init("token", bytes: c.width * e), .init("token_cos", bytes: c.headDim * 4), .init("token_sin", bytes: c.headDim * 4),
                          .init("mask", bytes: (n + 1) * e)]
             if a.half { d.tensors.append(.init("token_factor", bytes: 4)) }
-            d.edges["decode"] = { b in model.layerModule(a, a.layout(b), .cached(capacity: n), cache: true) }
+            d.edges["decode"] = { b in model.layerModule(a, b.codes, .cached(capacity: n), cache: true) }
             d.again = true
         }
         if let head { Qwen3Head.declare(head, self, a, in: &d) }
@@ -127,12 +127,10 @@ extension Qwen3Encoder {
         for (k, r) in range.enumerated() {
             let row = values[(k * d)..<((k + 1) * d)]
             if half {
-                let top = max(row.reduce(0) { max($0, abs($1)) }, 0x1p-14)
-                let e = RowExponent.ranged(largest: Double(top), f32Factor: true)
-                let f = Float(pow(2.0, Double(e)))
+                let (unit, f) = RowExponent.split(row, .ranged(f32Factor: true))
                 factors![r] = f
                 let h = to.assumingMemoryBound(to: Float16.self) + r * d
-                for (j, v) in row.enumerated() { h[j] = Float16(v / f) }
+                for (j, v) in unit.enumerated() { h[j] = Float16(v) }
             } else {
                 let b = to.assumingMemoryBound(to: UInt16.self) + r * d
                 for (j, v) in row.enumerated() { b[j] = UInt16(truncatingIfNeeded: BFloat.round(v).bitPattern >> 16) }

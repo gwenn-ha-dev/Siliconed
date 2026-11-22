@@ -1,4 +1,5 @@
 import Foundation
+import Measurement
 import Network
 import Security
 
@@ -74,7 +75,7 @@ package enum RemoteTransport {
     }
 
     private static func hex(_ d: Data) -> Data {
-        Data(d.map { String(format: "%02x", $0) }.joined().utf8)
+        Data(d.hexadecimal.utf8)
     }
 
     private static func dispatch(_ d: Data) -> __DispatchData {

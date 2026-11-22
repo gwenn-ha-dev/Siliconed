@@ -3,6 +3,7 @@
 
 import AppKit
 import Foundation
+import Measurement
 import Observation
 import Siliconed
 import SilicontrolHelp
@@ -78,23 +79,15 @@ extension RemoteControl {
     func wait(_ arguments: [String], cwd: String, _ c: Connection) throws {
         var ordinals: [Int] = []
         var grids: [Int] = []
-        var folder: String?
-        var i = 0
-        while i < arguments.count {
-            let a = arguments[i]
-            if a == "--out" {
-                guard i + 1 < arguments.count else { throw Refusal("usage", String(localized: "--out expects a folder")) }
-                folder = absolute(arguments[i + 1], cwd)
-                i += 2
-                continue
-            }
+        let flags = try Self.flags(arguments, valued: ["--out"])
+        let folder = flags.value("--out").map { absolute($0, cwd) }
+        for a in flags.allWords {
             // `g2`: a grid, followed to its end — and its sheet, with `--out`.
             if a.first == "g", let n = Int(a.dropFirst()) {
                 guard app.series[n] != nil || app.mirror?.grids[n] != nil else {
                     throw Refusal("unknown_job", String(localized: "no grid \(a) in this session"), help: "silicontrol status")
                 }
                 grids.append(n)
-                i += 1
                 continue
             }
             guard let n = Self.ordinal(a, prefix: "t") else {
@@ -106,7 +99,6 @@ extension RemoteControl {
                 throw Refusal("unknown_job", String(localized: "no job \(a) in this session"), help: "silicontrol status")
             }
             ordinals.append(n)
-            i += 1
         }
         if !grids.isEmpty {
             guard grids.count == 1, ordinals.isEmpty else {

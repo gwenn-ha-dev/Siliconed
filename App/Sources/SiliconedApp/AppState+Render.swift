@@ -1,5 +1,5 @@
-// **`AppState`: the render** — the queue, the jobs it launches on the engine, the grids, what each
-// event of the engine moves. The state itself is in `AppState.swift`.
+// **`AppState`: the render** — the queue, the grids, the estimates, a job removed or cancelled. A job's run on the engine
+// is in `AppState+Execute.swift`; the state itself is in `AppState.swift`.
 
 import AppKit
 import ImageIO
@@ -16,7 +16,7 @@ extension AppState {
     func render(imposedSeed: UInt64? = nil, imposedFormat: RecommendedFormat? = nil) {
         guard canRender else { return }
         // Everything that reads the state is taken here: the job no longer depends on the form.
-        let firstNumber = imposedSeed ?? (fixedSeed ? seed : UInt64.random(in: 0...UInt64(UInt32.max)))
+        let firstNumber = imposedSeed ?? (fixedSeed ? seed : Request.drawnSeed())
         // The seed drawn shown in the rack's field, greyed: Fixed then keeps it.
         if imposedSeed == nil, !fixedSeed { seed = firstNumber }
         let format = imposedFormat ?? outputFormat
@@ -101,7 +101,7 @@ extension AppState {
             // …and a cell whose model offers no Detail renders Normal.
             if let model, !model.chain.denoising.acceptsDetail { s.detail = .normal }
             // …and a cell whose model does not start from an image renders from noise.
-            let cellStart = start != nil && model?.chain.entries.contains(where: { $0.kind == .image }) == true ? start : nil
+            let cellStart = start != nil && model?.chain.acceptsStartImage == true ? start : nil
             if cellStart == nil { s.strength = nil }
             let plan = model.map { Self.plan($0.chain.denoising, steps: s.steps, format: s.format, strength: s.strength) }
             var job = Job(ordinal: nextJobNumber(), settings: s, seeds: [cell.seed], references: used,
@@ -200,7 +200,7 @@ extension AppState {
     /// **The job of an image of the running call**, made the running one: the one that was goes back to the queue, at
     /// its rank among the train's, unless its image came. `nil`: that job was removed from the queue meanwhile — the
     /// engine still computes its image (a call is not cut short), and nothing is made of it.
-    private func turn(to image: Int) -> Job? {
+    func turn(to image: Int) -> Job? {
         guard train.count > 1, train.indices.contains(image) else { return currentJob }
         let rider = train[image]
         if currentJob?.id == rider.id { return rider }
@@ -270,150 +270,6 @@ extension AppState {
         licenseRequest = LicenseRequest(card: card)
     }
 
-    private func execute(_ job: Job) async -> Issue {
-        let settings = job.settings
-        let loraEntries = settings.loras.map { LoRAEntry($0.path, strength: $0.strength) }
-        do {
-            try library.checkReachable()
-            // The references are decoded off the main thread (3072 px at most), in their order; the
-            // engine then brings each to its size: the full-size photos do not live during the render.
-            let sources = job.references
-            let references = try await Task.detached(priority: .userInitiated) {
-                try sources.map { try $0.imageRGB() }
-            }.value
-            // The starting image (img2img), decoded off the main thread too, as `siliconed-dev render --image` reads it; the
-            // request fills and crops it to the format at once (`Request.image`).
-            let startSource = settings.strength == nil ? nil : job.start
-            let start = try await Task.detached(priority: .userInitiated) { try startSource?.imageRGB() }.value
-            var request = Request(settings.modelPrompt ?? settings.prompt, width: settings.format.width,
-                                  height: settings.format.height, seed: job.seeds[0],
-                                  steps: settings.steps == job.defaultSteps ? nil : settings.steps,
-                                  loras: loraEntries, image: start, strength: settings.strength ?? Strength.defaultValue,
-                                  previews: job.previews)
-            request.references = references
-            request.detail = settings.detail
-            request.solver = settings.solver
-            request.variations = settings.variations
-
-            var progress = Engine.Progress()
-            // A train: its jobs' seeds, one image each, in order.
-            let together = train.count > 1
-            // When the denoising under way began: its box says the seconds from there to the decoding, its DiT's plan
-            // included.
-            var denoisingBegan: Date?
-            // The engine renders in its own process (`EngineWorker`): the model is read there, under B.
-            for try await item in EngineWorker.shared.render(request, seeds: together ? train.map { $0.seeds[0] } : job.seeds,
-                                                            model: settings.identifier, library: library) {
-                progress.receive(item)
-                measurements.receive(item)
-                if progress.fraction != fraction { DockTile.show(fraction: progress.fraction, waiting: file.count) }
-                fraction = progress.fraction
-                if progress.estimatedRemaining != estimatedRemaining {
-                    estimatedRemaining = progress.estimatedRemaining
-                    remainingInstant = Date()
-                }
-                switch item {
-                case .stage(let e, let image):
-                    // The stage that was working is done; this one lights up.
-                    if let previous = stage, stageStates[previous] == .active { stageStates[previous] = .done }
-                    // The denoising ends where the decoding begins.
-                    if e == .denoising { denoisingBegan = Date() }
-                    if e == .decoding, stage == .denoising, let began = denoisingBegan {
-                        stageSeconds[.denoising] = Date().timeIntervalSince(began)
-                    }
-                    stageStates[e] = .active
-                    stage = e
-                    batchImage = image
-                    if let rider = turn(to: image) { signal(.stage(rider, e, image: together ? 0 : image)) }
-                case let .text(_, tokenizer, encoder, _):
-                    stageSeconds[.text] = tokenizer + encoder
-                case .encoding(let s):
-                    stageSeconds[.image] = s
-                case .decoding(let s):
-                    stageSeconds[.decoding] = s
-                case let .step(image, index, total, _, seconds, _, _):
-                    batchImage = image; currentStep = index; totalSteps = total
-                    if let rider = turn(to: image) {
-                        signal(.step(rider, image: together ? 0 : image, index: index, total: total, seconds: seconds))
-                    }
-                case .preview(let a):
-                    // The image's own job: in a train, the cell it is of, whichever the running one is now.
-                    let of = together && train.indices.contains(a.image) ? train[a.image] : job
-                    prerenders[of.ordinal] = a.cgImage()
-                case .image(let image, let renderResult):
-                    stageStates[.decoding] = .done
-                    guard let job = turn(to: image) else { break }
-                    // The PNG and the thumbnail are made off the main thread; the engine has already
-                    // moved on to the next image of the batch.
-                    // A job `silicontrol add "@name"` translated: the PNG keeps the prompt typed, the model's beside it.
-                    // Any other job (the rack's, which reads what it holds): the engine's metadata, untouched.
-                    let named = settings.modelPrompt.map {
-                        NamedSubjects.metadata(renderResult.metadata, typed: settings.prompt, modelPrompt: $0)
-                    }
-                    let finished = try await Task.detached(priority: .userInitiated) {
-                        try FinishedImage(renderResult, metadata: named)
-                    }.value
-                    lastImage += 1
-                    let entry = Entry(ordinal: lastImage, job: job.ordinal, png: finished.png, vignette: finished.vignette,
-                                        width: renderResult.image.width, height: renderResult.image.height,
-                                        seed: renderResult.seed, timings: renderResult.timings, footprints: renderResult.footprints,
-                                        evaluations: renderResult.evaluations,
-                                        settings: settings,
-                                        metadata: named ?? renderResult.metadata, references: job.references,
-                                        start: start == nil ? nil : job.start, owner: job.owner)
-                    admit(entry, image: finished.image, shows: followsRender)
-                    prerenders[job.ordinal] = nil
-                    sessionImages += 1
-                    sessionSeconds += renderResult.timings.total
-                    jobImages.append(entry.ordinal)
-                    signal(.image(job, entry))
-                    // In a train, a job ends with its image: the call goes on for the others.
-                    if together {
-                        delivered.insert(job.id)
-                        complete(job, .finished, images: [entry.ordinal], warnings: journal)
-                    }
-                case let .unusable(image, lost):
-                    // In a train, a job whose image is lost ends with it: the call goes on for the others. Alone, its
-                    // call ends in `nonFiniteImage`, below.
-                    guard together, let job = turn(to: image) else { break }
-                    delivered.insert(job.id)
-                    let p = Problem(EngineError.nonFiniteImage(stage: lost))
-                    problem = p
-                    complete(job, .failed(p), warnings: journal)
-                case .warning(let message):
-                    journal.append(message)
-                default:
-                    break
-                }
-            }
-            // What this render teaches about speed: its own pace (the first render on a Mac finds the Neural Engine's share
-            // in flight, its pace within 3 % of the next, measured 20/11 on the mini).
-            if var v = measurements.speed {
-                // A cached prompt teaches nothing about the encoder: the cost learned before stays.
-                if v.text == nil { v.text = speeds[job.speedKey]?.text }
-                speeds[job.speedKey] = v
-            }
-            // Cancelled, the `Task` leaves the loop WITHOUT an error (AsyncThrowingStream).
-            if Task.isCancelled {
-                for (s, v) in stageStates where v == .active { stageStates[s] = .idle }
-                flash(String(localized: "Render stopped"))
-                return .stopped
-            }
-            return .finished
-        } catch {
-            // Every refusal of the engine is one `EngineError` case (`EngineError(_:)` folds the rest).
-            let e = EngineError(error)
-            if let s = stage, stageStates[s] == .active { stageStates[s] = e == .cancelled ? .idle : .failed }
-            if e == .cancelled {
-                flash(String(localized: "Render stopped"))
-                return .stopped
-            }
-            let p = Problem(e)
-            problem = p
-            return .failed(p)
-        }
-    }
-
     /// The per-image plan that the chosen model's denoiser foresees for these settings.
     func expectedPlan(steps: Int, format: RecommendedFormat, strength: Double? = nil) -> DenoisingPlan? {
         chain.map { Self.plan($0.denoising, steps: steps, format: format, strength: strength) }
@@ -463,6 +319,16 @@ extension AppState {
         return v.duration(plan, images: t.seeds.count)
     }
 
+    /// The planned duration of these jobs together, or `nil` if one was never measured.
+    func estimation(of jobs: [Job]) -> Double? {
+        var total = 0.0
+        for j in jobs {
+            guard let e = estimation(j) else { return nil }
+            total += e
+        }
+        return total
+    }
+
     /// Stops the running render; the queue continues. The engine checks for cancellation between the
     /// layers: stopping takes 0.03 to 0.41 s.
     func cancel() { if let mirror { mirror.send(.cancel) } else { task?.cancel() } }
@@ -498,194 +364,6 @@ extension AppState {
         awaitingLicense.removeAll()
         licenseRequest = nil
         for t in removedNames { complete(t, .removed) }
-    }
-
-    /// Whether « Variations » can take this image: an ordinary history image of an installed model,
-    /// no installation running.
-    func canVary(_ entry: Entry) -> Bool { varyRefusal(entry) == nil }
-
-    /// **Why « Variations » cannot take this image**, said on the greyed button; `nil` when it can.
-    func varyRefusal(_ entry: Entry) -> String? {
-        if let installBlocker { return installBlocker }
-        if entry.enlarged != nil { return String(localized: "An enlargement has no seed of its own: vary the image it was made from") }
-        if entry.cropped != nil { return String(localized: "A crop has no seed of its own: vary the image it was cut from") }
-        if !readySet.contains(entry.settings.identifier) {
-            return String(localized: "\(entry.settings.modelName) isn’t installed: install it to vary this image")
-        }
-        return nil
-    }
-
-    /// **« Variations »**: cousins of a history image — exactly its settings (model, prompt, LoRA,
-    /// size, steps, seed, edit images), each with a variation seed drawn at random at `strength`
-    /// (`Variation.Amount`, its strength for the model's family), ordinary jobs whose images join the history.
-    /// **As many as the rack's « Seeds »** (`batch`, 1 by default): at Qwen's ~200 s an edit, a fixed
-    /// four made one click a quarter of an hour.
-    ///
-    /// **A variation of a variation turns the clicked image's noise**, not its parent's: the new
-    /// variation is appended to the image's own (`Request.variations` applies them in order). The
-    /// strength is the new request's; the origin is the image clicked — what the user sees and likes.
-    /// The form is not touched: this is a gesture on an image, not a change of settings.
-    @discardableResult
-    func vary(_ entry: Entry, _ amount: Variation.Amount, count: Int? = nil) -> [Job] {
-        guard canVary(entry), let family = cards.first(where: { $0.id == entry.settings.identifier })?.family else { return [] }
-        let strength = amount.strength(for: family)
-        followsRender = true
-        let card = cards.first { $0.id == entry.settings.identifier }
-        let plan = (try? Model.named(entry.settings.identifier, in: library)).map {
-            Self.plan($0.chain.denoising, steps: entry.settings.steps, format: entry.settings.format, strength: entry.settings.strength)
-        }
-        let jobs = (0..<(count ?? batch)).map { _ in
-            var settings = entry.settings
-            settings.variations.append(Variation(seed: UInt64.random(in: 0...UInt64(UInt32.max)), strength: strength))
-            var job = Job(ordinal: nextJobNumber(), settings: settings, seeds: [entry.seed], references: entry.references,
-                          previews: previews, defaultSteps: card?.defaultSteps, plan: plan)
-            job.start = entry.start
-            return job
-        }
-        enqueue(jobs)
-        return jobs
-    }
-
-    /// Redo the chosen image: same settings, same seed — and its size: an edit's would otherwise be derived again from image 1
-    /// (`outputFormat`), and one typed on the command line (`add … 1024 --ref …`) came back at image 1's proportions.
-    func redo(_ entry: Entry) {
-        restoreSettings(entry)
-        render(imposedSeed: entry.seed, imposedFormat: entry.settings.format)
-    }
-
-    func restoreSettings(_ entry: Entry) {
-        restoreSettings(entry.settings)
-        // An image's settings are one render's: no knob bracketed.
-        brackets = []
-        seriesPlaced = [nil, nil]
-        // Fixed, or the next render draws a new seed and the settings reused are not the image's.
-        seed = entry.seed
-        fixedSeed = true
-        // After the seed: setting it drops a variation (`seed.didSet`).
-        variations = entry.settings.variations
-        // The images it edited, or none: image 1 is the image's own, never the one the lab held before — otherwise an edit
-        // comes back without what it edits, and an image made from noise comes back editing what was left there.
-        setEditImages(entry.editImages)
-        // The image it started from, with its strength — or none: « Redo » renders the same image, not an img2img of another.
-        if let s = entry.settings.strength, let start = entry.start, startsFromImage {
-            setStart(start)
-            startStrength = s
-        } else {
-            setStart(nil)
-        }
-    }
-
-    /// **« Reuse This Grid »**, on a series' tile: the form takes what the cells share and the grid's axes, as the window
-    /// brackets them — the prompt as typed, its groups the grid's.
-    func restoreSettings(_ run: GridRun) {
-        restoreSettings(run.settings)
-        prompt = run.settings.prompt
-        fixedSeed = true
-        seed = run.grid.base.seed
-        let left = setSeries(from: run.grid)
-        if !left.isEmpty { flash(String(localized: "The window can’t vary models, steps or edit images: those axes were left out.")) }
-    }
-
-    /// The form takes these settings — those of a history image, or of a job that the
-    /// remote control has just queued: the app shows what it computes, as after a click.
-    func restoreSettings(_ r: RenderSettings) {
-        identifier = r.identifier
-        // The job's prompt is an expanded one: its braces are characters, not a series.
-        prompt = PromptAlternatives.escaping(r.prompt)
-        orientation = r.format.orientation
-        format = r.format
-        steps = r.steps
-        loras = r.loras.map(allowedStrength)
-        detail = r.detail
-        solver = r.solver
-    }
-
-    /// **A Siliconed PNG dropped on the canvas**: the form takes what its metadata says
-    /// (`Engine.Render.Recipe`), through `restoreSettings` as "Reuse These Settings" does, and the
-    /// seed is fixed. What cannot come back is said (a `Problem`), and the rest is restored anyway.
-    /// `false` when the file is not a PNG written by Siliconed: the drop keeps its usual meaning.
-    ///
-    /// Incognito: the file is only read — no panel, no recent item, no copy.
-    func restoreSettings(fromPNG url: URL) -> Bool {
-        guard url.isFileURL, url.pathExtension.lowercased() == "png",
-              let data = try? Data(contentsOf: url, options: .mappedIfSafe) else { return false }
-        return restoreSettings(fromPNG: data, file: url.lastPathComponent)
-    }
-
-    /// Whether these bytes are a PNG Siliconed wrote: what offers « Reuse These Settings » on an image of the Prompt Lab.
-    static func isRecipe(_ data: Data) -> Bool { Engine.Render.Recipe(metadata: PNG.text(data)) != nil }
-
-    /// The same, from the bytes — an image of the Prompt Lab; `file` names it in the notes.
-    func restoreSettings(fromPNG data: Data, file: String) -> Bool {
-        guard let recipe = Engine.Render.Recipe(metadata: PNG.text(data)) else { return false }
-        var notes: [String] = []
-
-        // The PNG names a family, not a card (a fine-tune writes its family's name): the form's
-        // model if it is of that family, otherwise the publisher's card, otherwise an imported one.
-        let ready = visibleCards.filter { $0.family.rawValue == recipe.model && readySet.contains($0.id) }
-        let target = ready.first { $0.id == identifier } ?? ready.first { !$0.isImported } ?? ready.first
-        if target == nil, let model = recipe.model {
-            // Steps and LoRAs belong to that model: the form's stay.
-            let name = cards.first { $0.family.rawValue == model }?.name ?? model
-            notes.append(String(localized: "\(name) isn’t installed: its steps and LoRAs are left out."))
-        }
-
-        var stack: [LoRASlot] = loras
-        if let target {
-            stack = []
-            var lost: [String] = []
-            for entry in recipe.loras {
-                if stack.count < Self.maxLoRA, let found = library.lora(entry.path, for: target.id) {
-                    stack.append(LoRASlot(path: found.path, strength: entry.strength))
-                } else {
-                    lost.append(entry.path)
-                }
-            }
-            if !lost.isEmpty {
-                let names = lost.formatted(.list(type: .and))
-                notes.append(String(localized: "LoRA not found: \(names)."))
-            }
-            if !negativeLoRAStrengths, stack.contains(where: { $0.strength < 0 }) {
-                notes.append(String(localized: "A negative LoRA strength comes back as 0: turn on Settings › Advanced › Negative LoRA Strengths."))
-            }
-        }
-
-        // The size if the model it goes to renders it (`Format.check(…, family:)`), the form's otherwise.
-        var restoredFormat = format
-        let family = (target ?? card)?.family ?? .default   // no model at all: the default family's rules
-        if let w = recipe.width, let h = recipe.height, (try? Format.check(width: w, height: h, family: family)) != nil {
-            restoredFormat = RecommendedFormat(w, h)
-        }
-        if recipe.sourceImageMissing {
-            notes.append(String(localized: "The image it started from isn’t in the file (img2img)."))
-        }
-        if !recipe.unreadable.isEmpty {
-            let keys = recipe.unreadable.formatted(.list(type: .and))
-            notes.append(String(localized: "Unreadable in the file: \(keys)."))
-        }
-
-        let model = target ?? card
-        restoreSettings(RenderSettings(identifier: model?.id ?? identifier, modelName: model?.name ?? "",
-                                       prompt: recipe.prompt ?? prompt, format: restoredFormat,
-                                       steps: target == nil ? steps : (recipe.steps ?? target!.defaultSteps),
-                                       loras: stack, detail: recipe.detail, solver: recipe.solver))
-        if recipe.solver != .euler, !offeredSolvers.contains(recipe.solver) {
-            notes.append(String(localized: "Made with the \(recipe.solver.choice) solver, offered when More Solvers is on: Euler will be used."))
-        }
-        if recipe.detail != .normal, !offersDetail {
-            notes.append(String(localized: "\(model?.name ?? identifier) doesn’t offer Detail: Normal will be used."))
-        }
-        if let s = recipe.seed { seed = s; fixedSeed = true }
-        // An img2img's strength comes back to the rack; its image is not in the file (said above): the one carried, if any, stays.
-        if let s = recipe.strength { startStrength = StartImage.snapped(s) }
-        // A variation is its seed's: without the seed, there is nothing to vary.
-        variations = recipe.seed == nil ? [] : recipe.variations
-        flash(String(localized: "Settings of \(file) restored"))
-        if !notes.isEmpty {
-            problem = Problem(String(localized: "Not everything came back from \(file)."),
-                              suggestion: notes.joined(separator: "\n"))
-        }
-        return true
     }
 
     /// The window closes: nothing must keep occupying the GPU with no view to show it.

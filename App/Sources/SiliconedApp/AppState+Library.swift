@@ -45,9 +45,14 @@ extension AppState {
     /// **Why the library cannot change now**, said where a greyed button would be silent; `nil` when it can.
     var managementRefusal: String? {
         if let localOnlyHelp { return localOnlyHelp }
+        return libraryBusy ?? libraryBlocker
+    }
+
+    /// **Why the library in use cannot be changed for another now**: a job on it, or a render — its disk may be away.
+    var libraryBusy: String? {
         if let libraryJob { return String(localized: "\(libraryJob): this waits until it is done.") }
         if busy { return String(localized: "A render is in progress: the library changes once the queue is done.") }
-        return libraryBlocker
+        return nil
     }
 
     /// **No render while an installation runs**: one big job at a time on 16 GB — a download writes GBs, a
@@ -191,30 +196,37 @@ extension AppState {
         }
     }
 
-    /// Removes an imported model: its file. The form goes back to its family's own model.
-    func remove(_ card: ModelCard) {
-        if mirror != nil { askLibrary(.removeModel(card.id)); return }
+    /// **A gesture on the library, at once**: in a mirror, asked of the lender (`ask`; `nil`, a gesture of this Mac's only);
+    /// here, done when the library can change now — `act` changes it and says what to flash, if anything —, the catalog
+    /// read again; an error said.
+    private func libraryGesture(asking ask: RemoteLibraryRequest?, _ act: () throws -> String?) {
+        if mirror != nil { if let ask { askLibrary(ask) }; return }
         guard managementPossible else { return }
         do {
+            let said = try act()
+            refreshCatalog()
+            if let said { flash(said) }
+        } catch { problem = Problem(error) }
+    }
+
+    /// Removes an imported model: its file. The form goes back to its family's own model.
+    func remove(_ card: ModelCard) {
+        libraryGesture(asking: .removeModel(card.id)) {
             try ModelImport.remove(card, in: library)
             if identifier == card.id { identifier = ModelCard.of(card.family).id }
-            refreshCatalog()
-            flash(String(localized: "Model \(card.name) removed"))
-        } catch { problem = Problem(error) }
+            return String(localized: "Model \(card.name) removed")
+        }
     }
 
     /// **Removes a LoRA of the library**: its file, and the LoRA from the stack and from a comparison where it was.
     /// In a mirror the lender removes it once its user agrees (`MirrorLibraryHost`); its library news takes it off this sheet.
     func remove(_ lora: LoRACard) {
-        if mirror != nil { askLibrary(.removeLoRA(lora.path)); return }
-        guard managementPossible else { return }
-        do {
+        libraryGesture(asking: .removeLoRA(lora.path)) {
             try library.removeLoRA(lora)
             loras.removeAll { $0.path == lora.path }
             for i in brackets.indices { brackets[i].loras.removeAll { $0 == lora.path } }
-            refreshCatalog()
-            flash(String(localized: "LoRA \(lora.name) removed"))
-        } catch { problem = Problem(error) }
+            return String(localized: "LoRA \(lora.name) removed")
+        }
     }
 
     /// The model chosen in the form is not installed: offer its family.
@@ -247,41 +259,34 @@ extension AppState {
 
     /// **Renders the family with another of its versions whole on disk** (`Installer.use`).
     func use(_ family: Family, variant: Variant) {
-        if mirror != nil { askLibrary(.use(family, variant)); return }
-        guard managementPossible else { return }
-        do {
+        libraryGesture(asking: .use(family, variant)) {
             try Installer(library: library).use(family, variant: variant)
-            refreshCatalog()
-            flash(String(localized: "\(family.name) now renders with its \(VersionChoice.name(variant)) version"))
-        } catch { problem = Problem(error) }
+            return String(localized: "\(family.name) now renders with its \(VersionChoice.name(variant)) version")
+        }
     }
 
     /// Uninstalls a version of a family — what the other installed version reads stays — or the whole family (`nil`).
     func uninstall(_ family: Family, variant: Variant? = nil) {
-        if mirror != nil { askLibrary(.uninstall(family, variant)); return }
-        guard managementPossible else { return }
-        do {
+        libraryGesture(asking: .uninstall(family, variant)) {
             try Installer(library: library).uninstall(family, variant: variant)
-            refreshCatalog()
-            flash(variant.map { String(localized: "\(VersionChoice.name($0)) version of \(family.name) removed") }
-                  ?? String(localized: "\(family.name) uninstalled"))
-        } catch { problem = Problem(error) }
+            return variant.map { String(localized: "\(VersionChoice.name($0)) version of \(family.name) removed") }
+                ?? String(localized: "\(family.name) uninstalled")
+        }
     }
 
     func emptyDownloads() {
-        if mirror != nil { askLibrary(.discard); return }
-        guard managementPossible else { return }
-        do { try library.emptyDownloads(); refreshCatalog() } catch { problem = Problem(error) }
+        libraryGesture(asking: .discard) {
+            try library.emptyDownloads()
+            return nil
+        }
     }
 
-    /// Deletes what version 0.21 left in the library and this one never reads (`Library.legacyFiles`).
+    /// Deletes what version 0.21 left in the library and this one never reads (`Library.legacyFiles`) — on this Mac only.
     func releaseLegacy() {
-        guard mirror == nil, managementPossible else { return }
-        do {
+        libraryGesture(asking: nil) {
             let freed = try library.releaseLegacy()
-            refreshCatalog()
-            flash(String(localized: "\(Figures.disk(freed)) freed"))
-        } catch { problem = Problem(error) }
+            return String(localized: "\(Figures.disk(freed)) freed")
+        }
     }
 
     /// The library folder, in the Finder.

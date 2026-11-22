@@ -222,6 +222,26 @@ final class AppTests: XCTestCase {
         XCTAssertEqual(b.estimatedRemaining ?? 0, 3.4, accuracy: 1e-9)
     }
 
+    /// An image lost at the DiT is never decoded: its decoding counts as done, the fraction reaches 1 and the time
+    /// remaining no longer counts it.
+    func testAnImageLostAtTheDiTCountsAsDecoded() {
+        let plan = Engine.Plan(denoising: DenoisingPlan(startStep: 0, startSigma: 1, evaluations: 2),
+                               seeds: [1, 2], stages: [.text, .denoising, .decoding])
+        var p = Engine.Progress()
+        p.receive(.start(plan))
+        p.receive(.text(tokens: 3, tokenizer: 0, encoder: 1))
+        for n in 0..<2 {
+            p.receive(.step(image: n, index: 1, total: 2, sigma: 1, seconds: 10, latentGridHeight: 64, latentGridWidth: 64))
+            p.receive(.step(image: n, index: 2, total: 2, sigma: 0.5, seconds: 10, latentGridHeight: 64, latentGridWidth: 64))
+        }
+        p.receive(.unusable(image: 0, stage: .denoising))
+        // Only image 1's decoding remains: 0.2 of a step, 2 s.
+        XCTAssertEqual(p.estimatedRemaining ?? -1, 2, accuracy: 1e-9)
+        p.receive(.decoding(seconds: 1))
+        XCTAssertEqual(p.fraction, 1, accuracy: 1e-12)
+        XCTAssertEqual(p.estimatedRemaining ?? -1, 0, accuracy: 1e-9)
+    }
+
     /// A render's metadata: enough to redo it, and no date — and, in img2img, the fact that the
     /// source image is not in it.
     func testTheMetadataOfARender() {
@@ -288,15 +308,15 @@ final class AppTests: XCTestCase {
         XCTAssertNil(Engine.Render.Recipe(metadata: PNG.text(Data("not a png".utf8))))
     }
 
-    /// The text always, and mandatory; the image only with an encoder, optional. A module without
-    /// a name of its own bears its type's.
-    func testTheChainDeclaresItsEntries() throws {
+    /// A starting image only with an encoder. A module without a name of its own bears its type's.
+    func testTheChainTakesAStartImageWithAnEncoder() throws {
         let without = try Chain(text: FakeTextModule(), denoising: FakeDenoisingModule(), decoding: FakeDecodingModule())
-        XCTAssertEqual(without.entries, [Chain.Entry(kind: .text, isRequired: true, module: "FakeTextModule")])
+        XCTAssertFalse(without.acceptsStartImage)
+        XCTAssertEqual(without.text.name, "FakeTextModule")
         let with = try Chain(text: FakeTextModule(), denoising: FakeDenoisingModule(), decoding: FakeDecodingModule(),
                               encoding: FakeEncodingModule())
-        XCTAssertEqual(with.entries.map(\.kind), [.text, .image])
-        XCTAssertEqual(with.entries[1], Chain.Entry(kind: .image, isRequired: false, module: "VAE factice"))
+        XCTAssertTrue(with.acceptsStartImage)
+        XCTAssertEqual(with.encoding?.name, "VAE factice")
     }
 }
 

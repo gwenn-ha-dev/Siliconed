@@ -11,8 +11,10 @@ import SiliCore
 /// for a change as large as the product's result: the bound then reads the arithmetic of the path, not its size.
 ///
 ///     standard   the block's three functions (`ZImageBlock`): modulation, pre, post
-///     compact    the shared forms (`ZImageShared`) on the GPU: modulation, pre, out, ffn; and pre, out, ffn on the ANE,
-///                each with its products adapted together, against the GPU's
+///     shared     the shared forms (`ZImageShared`) on the GPU: modulation, pre, out, ffn; and pre, out, ffn on the ANE,
+///                each with its products adapted together, against the GPU's — on the weights a render takes
+///                (`Arithmetic.told`): the Compact's codes, int8 × int8 where this Mac's GPU is offered them first or
+///                `--products int8` says, the Standard's in f16 under `--neural-engine on`
 ///
 /// Without a LoRA: each function with every factor zero gives the bits of the function of no factor.
 package enum ZImageLowRankCheck {
@@ -49,8 +51,8 @@ package enum ZImageLowRankCheck {
     static func count(_ t: Tap) -> Int { (t == .adaln ? 1 : rows) * width(t) }
     static let shapes = Dictionary(uniqueKeysWithValues: ZImageDiT.products("layers.0").map { ($0.name, (inn: $0.inn, out: $0.out)) })
 
-    /// **The check on the map at `path`**: its arithmetic's block functions (the Standard's, or the Compact's shared
-    /// forms). `x`: the oracle's stream `[rows ≥ 512, d]`, `adaln` its `[256]`.
+    /// **The check on the map at `path`**: its arithmetic's block functions (the Standard's, or the shared forms on the
+    /// weights a render takes, `Arithmetic.told`). `x`: the oracle's stream `[rows ≥ 512, d]`, `adaln` its `[256]`.
     package static func run(map path: String, x: [Float], adaln: [Float]) throws -> (described: String, results: [Result]) {
         try blocking { try await check(path, x, adaln) }
     }
@@ -58,20 +60,21 @@ package enum ZImageLowRankCheck {
     private static func check(_ path: String, _ x: [Float], _ adaln: [Float]) async throws -> (described: String, results: [Result]) {
         guard let device = MTLCreateSystemDefaultDevice() else { throw Failure("no Metal device") }
         let file = try ZImageDiT.file(path)
-        let compact = file.tensors["layers.0.attention.qkv.weight"]?.dtype == "I8"
+        let arithmetic = try await Arithmetic.told(codes: Arithmetic.codes(file, marker: ZImageDiT.codesMarker),
+                                                   neuralEngine: CoreAI.neuralEngineInForce, device)
         precondition(x.count >= rows * d && adaln.count == ZImageBlock.adalnDim, "x of \(x.count) values, adaln of \(adaln.count)")
         // The seeded factors, made before any stage: what the stages' floor counts.
         let largest = shapes.values.map { max($0.inn, $0.out) }.max()!
         let down = UnsafeMutableBufferPointer<Float>.allocate(capacity: rank * largest), up = UnsafeMutableBufferPointer<Float>.allocate(capacity: rank * largest)
         defer { down.deallocate(); up.deallocate() }
-        var session = Session(device, file, form: compact ? .shared : .bf16, x: x, adaln: adaln, down: down, up: up)
+        var session = Session(device, file, arithmetic, x: x, adaln: adaln, down: down, up: up)
         let results = try await session.run()
         return (session.described, results)
     }
 
     /// One arithmetic's stage and its runs.
     struct Session {
-        let device: MTLDevice, file: SafeTensors, form: ZImageFunctions.Form
+        let device: MTLDevice, file: SafeTensors, form: ZImageFunctions.Form, weights: SharedWeights
         let x: [Float], adaln: [Float]
         let down: UnsafeMutableBufferPointer<Float>, up: UnsafeMutableBufferPointer<Float>
         var described = ""
@@ -80,9 +83,10 @@ package enum ZImageLowRankCheck {
         var element: NDArray.ScalarType { form == .bf16 ? .bfloat16 : .float16 }
         var bar: Double { form == .bf16 ? 4 * 0x1p-8 : 4 * 0x1p-11 }
 
-        init(_ device: MTLDevice, _ file: SafeTensors, form: ZImageFunctions.Form, x: [Float], adaln: [Float],
+        init(_ device: MTLDevice, _ file: SafeTensors, _ arithmetic: Arithmetic, x: [Float], adaln: [Float],
              down: UnsafeMutableBufferPointer<Float>, up: UnsafeMutableBufferPointer<Float>) {
-            (self.device, self.file, self.form, self.x, self.adaln, self.down, self.up) = (device, file, form, x, adaln, down, up)
+            (self.device, self.file, self.x, self.adaln, self.down, self.up) = (device, file, x, adaln, down, up)
+            (form, weights) = (ZImageFunctions.Form(arithmetic), arithmetic.weights)
         }
 
         /// The products a LoRA adapts in `f`: the Compact's modulation is the Standard's function under the guard.
@@ -168,12 +172,14 @@ package enum ZImageLowRankCheck {
                 for (p, s) in ZImageLowRankCheck.shapes { heap(p + "_down", s.inn * rank * e); heap(p + "_up", rank * s.out * e) }
             }
             n.tensors = t
-            n.residents = ZImageFunctions.entries("layers.0", form: form)
+            n.residents = ZImageFunctions.entries("layers.0", form: form, weights: weights)
+            n.sharedWeights = form == .shared ? weights : nil
             for c in calls {
-                let (f, ranks, taps, form, rows) = (c.f, c.ranks, c.taps, form, ZImageLowRankCheck.rows)
+                let (f, ranks, taps, form, weights, rows, ane) = (c.f, c.ranks, c.taps, form, weights, ZImageLowRankCheck.rows, c.ane)
                 n.edges[name(f, ranks: ranks, taps: taps, ane: c.ane)] = { b in
                     if form == .shared {
-                        return f == "modulation" ? ZImageShared.modulation(weights: .codes, ranks: ranks, taps: taps) : ZImageShared.module(f, rows: rows, keys: rows, weights: .codes, ranks: ranks, taps: taps)
+                        return f == "modulation" ? ZImageShared.modulation(weights: weights, ranks: ranks, taps: taps)
+                            : ZImageShared.module(f, rows: rows, keys: rows, weights: weights, ranks: ranks, taps: taps, neural: ane)
                     }
                     let r = f == "modulation" ? 1 : rows
                     return ZImageBlock.module(f, rows: r, keys: r, form: form, codes: b.codes, ranks: ranks, taps: taps)
@@ -222,7 +228,7 @@ package enum ZImageLowRankCheck {
             let block = try await Block.open(device, declaration(), files: [file], budget: MemoryBudget.machineCeiling(), share: .gpu)
             defer { block.close() }
             let stage = block.stage
-            described = "\(form)" + (form == .bf16 ? "" : ", codes \(stage.plan.codes.rawValue)") + ", " + stage.plan.line
+            described = "\(form)" + (form == .bf16 ? "" : ", \(weights), codes \(stage.plan.codes.rawValue)") + ", " + stage.plan.line
             try write(stage)
             func all(_ f: String) -> [String: Int] { Dictionary(uniqueKeysWithValues: Self.adapted(f, form).map { ($0, rank) }) }
             var results: [Result] = []
@@ -283,10 +289,9 @@ package enum ZImageLowRankCheck {
             case .shared:
                 let p = stage.pointer("x").bindMemory(to: Float16.self, capacity: rows * d)
                 for r in 0..<rows {
-                    let top = max((0..<d).reduce(Float(0)) { max($0, abs(x[r * d + $1])) }, 0x1p-14)
-                    let factor = Float(sign: .plus, exponent: RowExponent.ranged(largest: Double(top), f32Factor: false), significand: 1)
+                    let (unit, factor) = RowExponent.split(x[(r * d)..<((r + 1) * d)], .ranged(f32Factor: false))
                     stage.pointer("x_factor").assumingMemoryBound(to: Float16.self)[r] = Float16(factor)
-                    for i in 0..<d { p[r * d + i] = Float16(x[r * d + i] / factor) }
+                    for i in 0..<d { p[r * d + i] = Float16(unit[i]) }
                 }
             }
             _ = adaln.withUnsafeBytes { memcpy(stage.pointer("adaln"), $0.baseAddress!, $0.count) }

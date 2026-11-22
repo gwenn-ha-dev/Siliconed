@@ -56,10 +56,51 @@ final class MeasurementTests: XCTestCase {
     }
 
     func testOptionsRefuseWhatBreaksTheMeasure() {
-        for argv in [["--size", "256"], ["--size", "1000x1024"], ["--renders", "0"], ["--seed", "x"], ["--bogus"], ["--model"],
-                     ["--", "--batch", "2"], ["--", "--out", "x"], ["--", "--wait"]] {
+        for argv in [["--size", "big"], ["--size", "8x9x10"], ["--renders", "0"], ["--seed", "x"], ["--bogus"], ["--model"],
+                     ["a cat"], ["--", "--batch", "2"], ["--", "--out", "x"], ["--", "--wait"]] {
             XCTAssertThrowsError(try MeasureOptions.parse(argv), "\(argv)")
         }
+    }
+
+    /// **One reading of the flags for every command**: an unknown one refused by name wherever it is, a value taken as it
+    /// is, a lone `--` ending the flags.
+    func testFlagsAreReadOnce() throws {
+        let f = try Flags.scan(["a cat", "--seed", "--odd", "--wait", "1024", "--lora", "x", "--lora", "y", "--", "--ar", "--wait"],
+                               valued: ["--seed", "--lora"], switches: ["--wait"]).get()
+        XCTAssertEqual(f.value("--seed"), "--odd")
+        XCTAssertEqual(f.values["--lora"], ["x", "y"])
+        XCTAssertEqual(f.switches, ["--wait"])
+        XCTAssertEqual(f.words, ["a cat", "1024"])
+        XCTAssertEqual(f.rest, ["--ar", "--wait"])
+        XCTAssertEqual(f.allWords, ["a cat", "1024", "--ar", "--wait"])
+        XCTAssertEqual(Flags.scan(["a", "--ar 16:9 a cat"]), .failure(.unknownFlag("--ar 16:9 a cat")))
+        XCTAssertEqual(Flags.scan(["--seed"], valued: ["--seed"]), .failure(.flagWithoutValue("--seed")))
+        XCTAssertEqual(try Flags.scan(["-", "-x", "--"]).get().words, ["-", "-x"])
+        XCTAssertEqual(try Flags.scan(["--preview", "--no-preview"], switches: ["--preview", "--no-preview"]).get()
+                        .last(of: ["--preview", "--no-preview"]), "--no-preview")
+        XCTAssertEqual(Array<UInt8>([0, 0x0f, 0xa5, 0xff]).hexadecimal, "000fa5ff")
+    }
+
+    /// A size is read as the app reads one; whether the model renders it is the app's to say.
+    func testTheSizeIsTheAppsSyntax() throws {
+        XCTAssertEqual(try MeasureOptions.parse(["--size", "832 × 1216"]).size, "832x1216")
+        XCTAssertEqual(try MeasureOptions.parse(["--size", "1024"]).size, "1024x1024")
+        XCTAssertEqual(try MeasureOptions.parse(["--size", "1000x1024"]).size, "1000x1024")
+    }
+
+    /// The Neural Engine switch and B the app said at each render: two columns of the TSV, and the summary's.
+    func testTheSwitchAndBudgetAreSaid() {
+        var r = row(2, .render, wall: 12)
+        r.neuralEngine = false; r.budget = 4 << 30
+        let c = Context(date: "d", tag: "", app: "0.31", chip: "Apple M1", memoryGiB: 8, macOS: "27.0")
+        let cells = TSV.line(r, c, power: "AC", thermal: "nominal").split(separator: "\t", omittingEmptySubsequences: false)
+        XCTAssertEqual(cells[TSV.header.firstIndex(of: "neural_engine")!], "off")
+        XCTAssertEqual(cells[TSV.header.firstIndex(of: "budget")!], "4.000")
+        let s = Summary([r, r], gpuAlone: true)
+        XCTAssertEqual(s.neuralEngine, false); XCTAssertEqual(s.budget, 4 << 30); XCTAssertTrue(s.notes.isEmpty)
+        var other = r
+        other.budget = 6 << 30
+        XCTAssertEqual(Summary([r, other], gpuAlone: true).notes.count, 1)
     }
 
     private func row(_ n: Int, _ role: Role, wall: Double, md5: String = "aa", prompt: String = "p", swaps: UInt64 = 0, peak: UInt64 = 1 << 30) -> Row {
@@ -135,7 +176,8 @@ final class MeasurementTests: XCTestCase {
         let send: Runner.Send = { argv, onLine in
             switch argv[0] {
             case "status":
-                return (["ok": true, "running": busy ? ["job": "t1"] : NSNull(), "queue": []], getpid())
+                return (["ok": true, "running": busy ? ["job": "t1"] : NSNull(), "queue": [], "neural_engine": true,
+                         "memory": ["budget_bytes": 10 << 30]], getpid())
             case "models":
                 return (["ok": true, "models": [["id": "fake", "ready": true, "variant": "standard"]]], getpid())
             default:
@@ -157,6 +199,9 @@ final class MeasurementTests: XCTestCase {
         let summary = verdict["summary"] as? [String: Any]
         XCTAssertEqual(summary?["renders"] as? Int, 2)
         XCTAssertEqual(summary?["bits_stable"] as? Bool, true)
+        XCTAssertEqual(summary?["neural_engine"] as? Bool, true)
+        XCTAssertEqual(summary?["budget_bytes"] as? Int, 10 << 30)
+        XCTAssertEqual(lines[1].split(separator: "\t", omittingEmptySubsequences: false)[TSV.header.firstIndex(of: "budget")!], "10.000")
 
         busy = true
         XCTAssertThrowsError(try Runner.run(o, send: send, log: { _ in }, emit: { _ in }, append: { _ in })) {

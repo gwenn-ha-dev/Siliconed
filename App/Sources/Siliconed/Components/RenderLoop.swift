@@ -8,6 +8,9 @@ import Foundation
 /// edit's references) the family keeps.
 package protocol RenderParts {
     associatedtype Decoder: LatentDecoder
+    /// The family's part of `request` on `model`, as admitted: what it refuses before any computation (a module of
+    /// another family, a LoRA it does not recognize) thrown here.
+    init(_ request: Request, _ admitted: Admission, model: Model) throws
     /// Whether the render has an image stage: an image to start from, or an edit's references.
     var encodes: Bool { get }
     /// The prompt tokenized: the tokens the render reports.
@@ -31,6 +34,37 @@ extension RenderParts {
     package func picture(_ decoded: [Float]) -> [Float] { decoded }
 }
 
+/// **What a family's part reads of the render alike**: the request, its model and its admission; the chain's modules in
+/// the family's types; the image to start from beside its encoder's module; the request's LoRAs, recognized before the
+/// first computation. A chain of other modules is not the family's (`EngineError.notOnEngine`).
+package struct RenderInputs<Text: TextModule, Denoising: DenoisingModule, Encoding: ImageEncodingModule, Decoding: DecodingModule> {
+    package let request: Request, model: Model, admitted: Admission
+    package let text: Text, denoising: Denoising, decoding: Decoding
+    package let start: (image: ImageRGB, encoding: Encoding)?
+    package let loras: LoRAStack
+
+    package init(_ request: Request, _ admitted: Admission, model: Model) throws {
+        let chain = model.chain
+        guard let text = chain.text as? Text, let denoising = chain.denoising as? Denoising,
+              let decoding = chain.decoding as? Decoding else { throw EngineError.notOnEngine(model: model.identifier) }
+        if let image = request.image {
+            guard let encoding = chain.encoding as? Encoding else { throw EngineError.notOnEngine(model: model.identifier) }
+            start = (image, encoding)
+        } else {
+            start = nil
+        }
+        loras = try LoRAStack(request.loras, on: model.card.family)
+        (self.request, self.model, self.admitted, self.text, self.denoising, self.decoding) = (request, model, admitted, text, denoising, decoding)
+    }
+
+    /// The image stage: the latent of the image to start from as `encode` gives it (the image, its encoder's module),
+    /// nil without one.
+    package func image(_ encode: (ImageRGB, Encoding) throws -> [Float]) throws -> Latent? {
+        guard let start else { return nil }
+        return Latent(space: denoising.space, height: admitted.height, width: admitted.width, values: try encode(start.image, start.encoding))
+    }
+}
+
 /// **A family's DiT as the loop runs it**: let go when the loop drops it, before the decoder comes.
 package protocol RenderDenoiser: AnyObject {
     /// The derivative the solver walks for `latent` at the told σ: the family's time (the solver's integer timestep
@@ -46,14 +80,27 @@ package protocol RenderDenoiser: AnyObject {
 /// cancellation read the latent at every step, and a step is a few vector operations on the latent's floats against
 /// seconds of evaluation. **The sessions come one after the other**, each planned under B and let go before the next.
 package enum RenderLoop {
-    package static func run<Parts: RenderParts>(_ parts: Parts, _ request: Request, _ admitted: Admission, seeds: [UInt64], model: Model,
+    /// **A family's render** (`FamilyTraits.render`): its part made of the request (`RenderParts.init`), then `run`.
+    package static func render<Parts: RenderParts & SendableMetatype>(
+        _ parts: Parts.Type
+    ) -> @Sendable (Request, Admission, [UInt64], Model, Cancellation?, (Engine.Event) -> Void) throws -> [Engine.Render] {
+        { request, admitted, seeds, model, cancellation, emit in
+            try run(Parts.self, request, admitted, seeds: seeds, model: model, cancellation: cancellation, emit: emit)
+        }
+    }
+
+    package static func run<Parts: RenderParts>(_: Parts.Type, _ request: Request, _ admitted: Admission, seeds: [UInt64], model: Model,
                                                 cancellation: Cancellation?, emit: (Engine.Event) -> Void) throws -> [Engine.Render] {
-        var parts = parts
+        var parts = try Parts(request, admitted, model: model)
         let chain = model.chain, denoising = chain.denoising
         let plan = admitted.plan
         let space = denoising.space
         let (height, width, steps, start) = (admitted.height, admitted.width, admitted.steps, admitted.start)
         let totalStart = Date()
+        // A decoding taken again (`keeping`): the latents its DiT left, decoded alone.
+        if let kept = keeping.flatMap(KeptLatents.read) {
+            return try decode(parts, kept, request, admitted, seeds: seeds, model: model, cancellation: cancellation, emit: emit)
+        }
         emit(.start(Engine.Plan(denoising: plan, seeds: seeds, stages: parts.encodes ? [.text, .image, .denoising, .decoding] : [.text, .denoising, .decoding])))
 
         // ── the text, once ──
@@ -85,12 +132,14 @@ package enum RenderLoop {
         try cancellation.check()
         emit(.stage(.denoising, image: 0))
         let ditStart = Date()
+        // The decoder judged before the DiT, over the floor the DiT will give back: refused now, not after its minutes.
+        try Parts.Decoder.admit(path: parts.decoderPath, latentHeight: height, latentWidth: width, budget: MemoryBudget.machineCeiling())
         var dit: (any RenderDenoiser)? = try parts.denoiser(height: height, width: width)
         let schedule = denoising.sigmas(steps: steps)
         let told = request.detail.modelSigmas(schedule, start: start, bell: denoising.detailBell,
                                               scale: Detail.scale(width: request.width, height: request.height))
         let count = space.channels * height * width
-        var pending: [(index: Int, latent: [Float], timings: Engine.Timings, elapsed: TimeInterval)] = []
+        var pending: [KeptLatents.Image] = []
         var imageStart = totalStart
         for (n, seed) in seeds.enumerated() {
             try cancellation.check()
@@ -128,13 +177,34 @@ package enum RenderLoop {
             timings.denoising = Date().timeIntervalSince(denoisingStart)
             // A non-finite latent is the DiT's (or what it read), said here: decoded, it would fail at the VAE's stage.
             guard FiniteImage.isFinite(latent) else { emit(.unusable(image: n, stage: .denoising)); continue }
-            pending.append((n, latent, timings, Date().timeIntervalSince(imageStart)))
+            pending.append(KeptLatents.Image(index: n, latent: latent, timings: timings, elapsed: Date().timeIntervalSince(imageStart)))
         }
         // The DiT leaves before the decoder comes (`DecoderSession`).
         dit = nil
-        guard let first = pending.first else { throw EngineError.nonFiniteImage(stage: .denoising) }
+        guard !pending.isEmpty else { throw EngineError.nonFiniteImage(stage: .denoising) }
+        let kept = KeptLatents(tokens: tokens, images: pending)
+        if let keeping { try kept.write(to: keeping) }
+        return try decode(parts, kept, request, admitted, seeds: seeds, model: model, cancellation: cancellation, emit: emit)
+    }
 
-        // ── the decoding, image by image, one decoder session ──
+    /// **Where the worker's render keeps its latents between its DiT and its decoder** (`RenderOrder.keeping`), the
+    /// render's own file, nil outside the worker. The fuse stops the process the moment it passes B, and a decoder that
+    /// passes it would lose the DiT's minutes with it: the next worker, handed the same call, finds them here and decodes
+    /// them alone (`EngineWorker`), in a form that holds (the fuse marked the one it stopped under, `ThisMac.fuse`).
+    /// Each image leaves the file once handed over. Set by the worker for each call, which runs one at a time.
+    nonisolated(unsafe) package static var keeping: URL?
+
+    /// **The decoding, image by image, one decoder session**: the latents of `kept`, those its file still holds when
+    /// taken again (`keeping`).
+    private static func decode<Parts: RenderParts>(_ parts: Parts, _ kept: KeptLatents, _ request: Request, _ admitted: Admission,
+                                                   seeds: [UInt64], model: Model, cancellation: Cancellation?,
+                                                   emit: (Engine.Event) -> Void) throws -> [Engine.Render] {
+        let denoising = model.chain.denoising, space = denoising.space, plan = admitted.plan
+        let (height, width, steps, tokens) = (admitted.height, admitted.width, admitted.steps, kept.tokens)
+        var left = kept
+        let pending = kept.images
+        guard let first = pending.first else { throw EngineError.nonFiniteImage(stage: .decoding) }
+
         // Announced before its session is planned: the plan's seconds are the first image's decoding.
         try cancellation.check()
         emit(.stage(.decoding, image: first.index))
@@ -154,6 +224,7 @@ package enum RenderLoop {
             t.decoding = Date().timeIntervalSince(decodingStart)
             t.total = image.elapsed + t.decoding
             emit(.decoding(seconds: t.decoding))
+            defer { left.hand(n, to: keeping) }
             guard FiniteImage.isFinite(pixels) else { emit(.unusable(image: n, stage: .decoding)); continue }
             let render = Engine.Render(
                 model: denoising.model, prompt: request.prompt, seed: seeds[n], steps: steps, loras: request.loras,
@@ -165,7 +236,7 @@ package enum RenderLoop {
             emit(.image(index: n, render))
             renders.append(render)
         }
-        if renders.isEmpty { throw EngineError.nonFiniteImage(stage: .decoding) }
+        if renders.isEmpty && kept.handed == 0 { throw EngineError.nonFiniteImage(stage: .decoding) }
         return renders
     }
 }

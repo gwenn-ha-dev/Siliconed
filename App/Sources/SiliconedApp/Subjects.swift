@@ -10,9 +10,9 @@
 //                             prompt goes beside the one typed, the cited subjects' framed pictures after the edit's
 //                             images, numbered — the engine knows nothing of subjects
 //
-// Only Qwen-Image-2.1 reads them — the one visible family whose encoder reads images; for the others `@` stays the
-// model's own character (Anima's artists). `silicontrol subjects` and `silicontrol add "@name"` act on the same
-// library and translate at the `add` (`namedJob`).
+// Only a model whose text encoder reads images takes them (`TextFormat.readsImages`); for the others `@` stays the
+// model's own character (an artist's name, on a model trained so). `silicontrol subjects` and `silicontrol add "@name"` act
+// on the same library and translate at the `add` (`namedJob`).
 //
 // **Incognito, like the history**: the subjects live in this process and die with it. A picture is
 // read whole into memory when it is named (the file can go afterwards); nothing is written to disk —
@@ -322,7 +322,7 @@ extension AppState {
     func rewrite(_ expanded: String, model: Model? = nil, capacity given: Int? = nil,
                  editImages: Int? = nil) -> Result<NamedSubjects.Rewritten, NamedSubjects.Failure>? {
         guard !NamedSubjects.mentions(in: expanded).isEmpty else { return nil }
-        // Only for a model that reads images: elsewhere `@` is the model's own (Anima's card writes an artist `@incase`).
+        // Only for a model that reads images: elsewhere `@` is the model's own (a model card may write an artist `@incase`).
         guard let capacity = given ?? model.map({ $0.chain.text.output.readsImages ? $0.chain.denoising.maxReferences : 0 }),
               capacity > 0 else { return nil }
         let first = (editImages ?? references.count) + 1

@@ -96,6 +96,46 @@ package final class Report {
         add(Judge.boundary(label, engine: engine, oracle: expected, witness: witness, half: half, halfName: self.half, columns: columns))
     }
 
+    /// **A trajectory's steps, each from the reference's own latent** (`latent_init`, then `latent_<step>`; a step whose
+    /// latent the reference lacks passed): the velocity `velocity` gives for it (the step, its latent), against the
+    /// reference's `name(step)` — the line's `label(step)` —, the bf16 run's beside and the fp64 witness's where `witness`
+    /// gives one, a plane `columns` wide (`add`).
+    package func trajectory(_ reference: Safetensors, steps: Int, half: Safetensors, columns: Int, name: (Int) -> String,
+                            label: ((Int) -> String)? = nil, witness: (Int) -> UnsafeBufferPointer<Float>? = { _ in nil },
+                            velocity: (Int, [Float]) throws -> [Float]) rethrows {
+        for step in 0..<steps {
+            guard let latent = reference.float32(step == 0 ? "latent_init" : "latent_\(step)") else { continue }
+            let v = try velocity(step, Array(latent)), key = name(step)
+            add(reference, label?(step) ?? key, v, name: key, witness: witness(step), half: half.float32(key).map(Array.init), columns: columns)
+        }
+    }
+
+    /// **What a `render` stage says of the app's render** before judging it: its seconds since `started` (an edit's
+    /// references among them, `more` after), its PNG where `--png` asks.
+    package func rendered(_ render: Engine.Render, since started: Date, _ invocation: Invocation, references: Bool = false,
+                          more: String = "") throws {
+        let t = render.timings
+        print(String(format: "rendered in %.1f s (text %.2f", Date().timeIntervalSince(started), t.text)
+              + (references ? String(format: ", references %.2f", t.encoding) : "")
+              + String(format: ", denoising %.2f, decoding %.2f)", t.denoising, t.decoding) + more)
+        if let png = invocation.extras["--png"] { try render.png().write(to: URL(fileURLWithPath: png)) }
+    }
+
+    /// **A `render` stage's picture against the reference's fp32 one** (`expected`): a Compact's finite, its PSNR said and
+    /// not judged (`Judge.compactRender`); a Standard's by its family's bar — past `bar` dB, or, where diffusers' own bf16
+    /// render is given (`half`), no more than 3 dB under that render's.
+    package func judgePicture(_ pixels: [Float], _ expected: UnsafeBufferPointer<Float>, compact: Bool, bar: Double = 25, half: [Float]? = nil) {
+        if compact { add(Judge.compactRender(pixels, expected)); return }
+        let (psnr, _, _, notFinite) = imageError(pixels, expected)
+        let finite = notFinite > 0 ? "\(notFinite) non-finite values" : ""
+        guard let half else { add(Judge.bound("image PSNR", psnr, bar, unit: "dB", above: true, note: finite)); return }
+        let (under, _, _, _) = imageError(half, expected)
+        add(Judge.bound("image PSNR", psnr, under - 3, unit: "dB", above: true,
+                        note: String(format: "diffusers in bf16 %.2f dB, − 3", under) + (finite.isEmpty ? "" : ", " + finite)))
+        let (against, _, _, _) = half.withUnsafeBufferPointer { imageError(pixels, $0) }
+        print(String(format: "  against diffusers' bf16 render: %.2f dB", against))
+    }
+
     /// The verdict line, printed last; the outcome it states.
     @discardableResult
     package func verdict() -> Outcome {

@@ -41,12 +41,9 @@ extension AppState {
         }
     }
 
-    /// **At launch**: what the engines before this one left erased off the main thread (`CoreAI.sweep`: up to 10 GB that
-    /// no engine reads), and the compilations of another installation erased by the engine, before the first call it
-    /// runs. A failure leaves the mark unwritten: the next launch tries again.
+    /// **At launch**: the compilations of another installation erased by the engine, before the first call it runs. A
+    /// failure leaves the mark unwritten: the next launch tries again.
     func compiledAtLaunch() {
-        let library = library
-        Task.detached(priority: .utility) { _ = CoreAI.sweep(library) }
         guard CoreAI.due(installed: CoreAI.thisApp) else { return }
         eraseCompiled { result in
             if case .failure(let e) = result {

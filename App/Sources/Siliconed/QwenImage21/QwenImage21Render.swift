@@ -34,12 +34,6 @@ import Foundation
 ///
 /// A request's LoRAs are added beside the DiT's products (`LoRAStack`).
 package enum QwenImage21Render {
-    static func render(_ request: Request, _ admitted: Admission, seeds: [UInt64], model: Model,
-                       cancellation: Cancellation?, emit: (Engine.Event) -> Void) throws -> [Engine.Render] {
-        try RenderLoop.run(try Parts(request, admitted, model: model), request, admitted, seeds: seeds, model: model,
-                           cancellation: cancellation, emit: emit)
-    }
-
     /// **Qwen-Image-2.1's part of the render** (`RenderLoop`): the raw template and Qwen3-VL-8B's states, an edit's
     /// references through the vision tower and the VAE's encoder (their tokens to the DiT, no latent to start from), the
     /// DiT told `modelTime`, the decoder reading the latent denormalized in bf16, its RGBA's alpha dropped.
@@ -100,7 +94,7 @@ package enum QwenImage21Render {
         /// Each reference's latent, its tokens row-major, kept for the DiT's sequence.
         mutating func image() throws -> Latent? {
             guard let encoding else { return nil }
-            for reference in references { referenceTokens += try QwenImage21Render.tokens(QwenImage21Render.latent(of: reference, path: encoding.path)) }
+            for reference in references { referenceTokens += try QwenImage21Render.tokens(planes: QwenImage21Render.latent(of: reference, path: encoding.path)) }
             return nil
         }
 
@@ -132,7 +126,7 @@ package enum QwenImage21Render {
     /// model's final norm (the pipeline hooks that norm to hand back its input), `hidden` `[L, 4096]` bf16 values; and
     /// `layer<i>` for each layer of `taps`.
     package static func states(_ ids: [Int], map path: String, taps: Set<Int> = []) throws -> [String: HostTensor] {
-        try Qwen3Encoder(config: .qwenImage21, prefix: "model.", path: path).states(ids, taps: taps)
+        try Qwen3Encoder(config: .qwenImage21, path: path).states(ids, taps: taps)
     }
 
     /// **The text with pictures**: each picture through the vision tower (`Qwen3VLVision`, its tables
@@ -145,7 +139,7 @@ package enum QwenImage21Render {
         guard !pictures.isEmpty else { return try states(ids, map: path, taps: taps) }
         let rows = try Qwen3VLVision.rows(pictures, config: .eightB, map: path)
         let read = try Qwen3VLGenerator.sequence(slots: slots, pictures: pictures, rows: rows, config: .qwenImage21, tower: .eightB)
-        return try Qwen3Encoder(config: .qwenImage21, prefix: "model.", path: path).states(ids, pictures: read, taps: taps, entries: entries)
+        return try Qwen3Encoder(config: .qwenImage21, path: path).states(ids, pictures: read, taps: taps, entries: entries)
     }
 
     /// `prompt_embeds`: the states without the system turn's rows (`_drop_idx`).
@@ -174,11 +168,19 @@ package enum QwenImage21Render {
                                                                          width: reference.width, path: path))
     }
 
-    /// `_pack_latents`: planes `[64, h·w]` to tokens `[h·w, 64]`, row-major.
-    package static func tokens(_ latent: [Float]) -> [Float] {
-        let channels = LatentSpace.qwenImage21.channels, plane = latent.count / channels
-        var out = [Float](repeating: 0, count: latent.count)
-        for t in 0..<plane { for c in 0..<channels { out[t * channels + c] = latent[c * plane + t] } }
+    /// `_pack_latents`: planes `[C, n]` to tokens `[n, C]`, row-major — the latent's 64 channels by default.
+    package static func tokens(planes: [Float], channels: Int = LatentSpace.qwenImage21.channels) -> [Float] {
+        let n = planes.count / channels
+        var out = [Float](repeating: 0, count: planes.count)
+        for t in 0..<n { for c in 0..<channels { out[t * channels + c] = planes[c * n + t] } }
+        return out
+    }
+
+    /// `_unpack_latents`: tokens `[n, C]` back to planes `[C, n]`.
+    package static func planes(tokens: [Float], channels: Int = LatentSpace.qwenImage21.channels) -> [Float] {
+        let n = tokens.count / channels
+        var out = [Float](repeating: 0, count: tokens.count)
+        for t in 0..<n { for c in 0..<channels { out[c * n + t] = tokens[t * channels + c] } }
         return out
     }
 
@@ -187,7 +189,8 @@ package enum QwenImage21Render {
     /// **The DiT**, opened once for a batch (`QwenImage21Loop`): its functions loaded, its weights kept under B or read
     /// through a ring, then the prefix — the text, an edit's reference tokens — computed once, each layer's keys and
     /// values kept. Each step then runs the target alone over them. The path is the file's: bf16 weights on the bf16
-    /// path, int8 codes in W8A16 under the guard of f16. A request's LoRAs beside the products they adapt.
+    /// path, int8 codes in the shared forms under the guard of f16 (W8A16, or int8 × int8 where this Mac's GPU runs it
+    /// faster). A request's LoRAs beside the products they adapt.
     package final class Denoiser {
         let loop: QwenImage21Loop
 
@@ -201,6 +204,9 @@ package enum QwenImage21Render {
                 return UncheckedSendable(loop)
             }.value
         }
+
+        /// What the DiT is: its arithmetic and its plan under B.
+        package var described: String { loop.described }
 
         /// `model_out` for the latent at the told time (`modelTime`), in f32.
         package func velocity(_ latent: [Float], time: Float) throws -> [Float] {

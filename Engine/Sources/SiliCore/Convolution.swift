@@ -1,11 +1,11 @@
-/// The convolution, as coreai-torch writes `aten.convolution`. Recopied from SiliCore (`CoreAIConvolution.swift`,
-/// aec8f3c), without its graph's lowering: a function calls `convolution` on its block.
+/// The convolution, as coreai-torch writes `aten.convolution`. Recopied from the former engine (`CoreAIConvolution.swift`,
+/// 0.21), without its graph's lowering: a function calls `convolution` on its block.
 ///
 ///     x [N, C, *S] ⊛ w [O, C/g, *K]    constants · pad_v1 (zeros, if any padding) · conv2d_v1 | conv3d_v1
 ///     1-D: x [N, C, L]                  reshape_v2 x to [N, C, 1, L] · reshape_v2 w to [O, C/g, 1, K] · pad · conv2d_v1
 ///                                         · reshape_v2 back to [N, O, L']
 ///
-/// What a port by analogy would miss (SiliCore's findings):
+/// What a port by analogy would miss (the former engine's findings):
 ///   - **the padding is not the convolution's**: Core AI's convolutions take no padding, so coreai-torch writes a
 ///     separate `pad_v1` (a mode attribute, a zero as a rank-0 constant of the element, the amounts: two per axis,
 ///     the batch and channel axes first) and convolves the padded tensor; a padding of 0 on every axis writes no pad;

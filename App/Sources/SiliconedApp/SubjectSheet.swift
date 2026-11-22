@@ -115,7 +115,7 @@ struct SubjectSheet: View {
                     .keyboardShortcut(.cancelAction)
                 Button(draft.original == nil ? String(localized: "Create") : String(localized: "Save")) { save() }
                     .keyboardShortcut(.defaultAction).tint(Palette.control)
-                    .disabled(draft.nameProblem != nil || draft.count == 0)
+                    .unavailable(draft.nameProblem?.sentence ?? (draft.count == 0 ? String(localized: "A subject has one or two pictures.") : nil))
             }
         }
         .padding(20)
@@ -153,7 +153,8 @@ struct SubjectSheet: View {
                     .help("The subject’s two pictures: each has its own frame")
                 }
                 Button("Whole Image") { draft.pictures[shown].frame = .whole }
-                    .disabled(draft.pictures.indices.contains(shown) ? draft.pictures[shown].frame == .whole : true)
+                    .unavailable(!draft.pictures.indices.contains(shown) || draft.pictures[shown].frame == .whole
+                                 ? String(localized: "The frame takes the whole image already.") : nil)
                 Spacer()
                 if draft.count < NamedSubjects.maxPictures {
                     Button("Add a Second Picture…") { addPicture() }

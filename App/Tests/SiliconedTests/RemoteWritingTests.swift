@@ -47,8 +47,9 @@ final class RemoteWritingTests: XCTestCase {
         XCTAssertEqual(try WriterOrder.parse(.rewrite, ["a cat"]).get(), WriterOrder(gesture: .rewrite, subject: "a cat", target: nil))
         XCTAssertEqual(try WriterOrder.parse(.rewrite, ["--for", "anima", "a cat"]).get().target, "anima")
         XCTAssertEqual(try WriterOrder.parse(.rewrite, ["a cat", "--for", "anima"]).get().subject, "a cat")
-        // A text with a space is a text, even when it starts like a flag.
-        XCTAssertEqual(try WriterOrder.parse(.rewrite, ["--ar 16:9 a cat"]).get().subject, "--ar 16:9 a cat")
+        // A text that begins like a flag is one, refused by name; after a lone `--`, it is the text.
+        XCTAssertEqual(failure(.rewrite, ["--ar 16:9 a cat"]), .unknownFlag("--ar 16:9 a cat"))
+        XCTAssertEqual(try WriterOrder.parse(.rewrite, ["--for", "anima", "--", "--ar 16:9 a cat"]).get().subject, "--ar 16:9 a cat")
     }
 
     func testRewriteRefusesWhatIsNotItsSyntax() {
@@ -117,6 +118,24 @@ final class RemoteWritingTests: XCTestCase {
         XCTAssertEqual(try SetOrder.parse(["save-images", "~/Pictures/Siliconed"]).get(), .saveImages(folder: "~/Pictures/Siliconed"))
         XCTAssertEqual(try SetOrder.parse(["save-images", "./off"]).get(), .saveImages(folder: "./off"))
         guard case .failure(.usage) = SetOrder.parse(["save-images", "on", "~/Pictures"]) else { return XCTFail() }
+    }
+
+    /// Every subcommand of `set` is read here, its own usage on a mistake, all of them for an unknown one.
+    func testSetReadsTheSwitchesAndTheMemory() throws {
+        for toggle in SetOrder.Toggle.allCases {
+            XCTAssertEqual(try SetOrder.parse([toggle.rawValue]).get(), .toggle(toggle, on: nil))
+            XCTAssertEqual(try SetOrder.parse([toggle.rawValue, "on"]).get(), .toggle(toggle, on: true))
+            XCTAssertEqual(try SetOrder.parse([toggle.rawValue, "off"]).get(), .toggle(toggle, on: false))
+            XCTAssertEqual(SetOrder.parse([toggle.rawValue, "yes"]), .failure(.usage("set \(toggle.rawValue) [on|off]")))
+        }
+        XCTAssertEqual(try SetOrder.parse(["memory"]).get(), .memory(nil))
+        XCTAssertEqual(try SetOrder.parse(["memory", "default"]).get(), .memory(.standard))
+        XCTAssertEqual(try SetOrder.parse(["memory", "12.5"]).get(), .memory(.gigabytes(12.5)))
+        for bad in [["memory", "nan"], ["memory", "-4"], ["memory", "12", "GB"]] {
+            XCTAssertEqual(SetOrder.parse(bad), .failure(.usage("set memory [GB|default]")), "\(bad)")
+        }
+        XCTAssertEqual(SetOrder.parse(["volume"]), .failure(.usage(SetOrder.usage)))
+        XCTAssertEqual(SetOrder.usages.map(\.name), ["beta", "neural-engine", "save-images", "glass", "updates", "memory", "preview"])
     }
 
     /// The four options of Settings › Advanced › Beta, no more: a fifth has to be added here, in the app's `AppState.beta`

@@ -3,9 +3,10 @@ import Foundation
 import SiliCore
 
 /// **An Anima block as the GPU and the ANE share it** (MOSS's `MossShared`, Qwen-Image-2.1's `QwenImage21Shared`, the
-/// engine's forms in `Neural.swift`): f16 at every border and inside, `[1, rows, n]`, q64 products on the Compact's
-/// codes `[in, out]` (Bedovyy's `convrot`: the input rotated by groups of 256), norms by their peak, the guard's powers
-/// of two in f16; what reads across rows, or computes in f32, is the GPU's:
+/// engine's forms in `Neural.swift`): f16 at every border and inside, `[1, rows, n]`, products on the Compact's codes
+/// (Bedovyy's `convrot`: the input rotated by groups of 256) q64 on `[in, out]`, or int8 × int8 on `[out, in]` where this
+/// Mac's GPU runs it faster (`SharedWeights.integer`), norms by their peak, the guard's powers of two in f16; what reads
+/// across rows, or computes in f32, is the GPU's:
 ///
 ///     pre        both   n = LN(x̂ · X) · (1 + s₁) + t₁, rotated under 2^e₀ by F: q̂, k̂, v̂ = q64, and F
 ///     heads      GPU    q, k: RMS_head(·) · γ (eps / F²) in f32, RoPE; v = v̂ · F; heads first, into the image's keys
@@ -157,7 +158,7 @@ enum AnimaShared {
     }
 
     /// Block i's weights in these forms: its modulation's (the GPU's guarded function reads them), each product's codes
-    /// `[in, out]` or f16 weight (`weights`) and their target after them, the heads' gains in f16.
+    /// (as `weights` lays them) or f16 weight and their target after them, the heads' gains in f16.
     static func layer(_ i: Int, weights: SharedWeights) -> [Weights.Entry] {
         let p = "blocks.\(i)."
         var all = AnimaEvaluation.modulationEntries(block: i)

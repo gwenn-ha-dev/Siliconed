@@ -179,8 +179,9 @@ final class RemoteGesturesTests: XCTestCase {
         XCTAssertEqual(parse("reuse", ["i7"]), .reuse("i7"))
         XCTAssertEqual(GestureOrder.parse("again", ["i7", "i8"]), .failure(.usage("again <i7|file.png>")))
         XCTAssertEqual(GestureOrder.parse("again", ["--hard", "i7"]), .failure(.unknownFlag("--hard")))
-        // A path that has a space in it is a path, not a flag.
-        XCTAssertEqual(parse("reuse", ["--my file.png"]), .reuse("--my file.png"))
+        // A word of two dashes is a flag, wherever it is and whatever follows; a path that begins with them goes after `--`.
+        XCTAssertEqual(GestureOrder.parse("reuse", ["--my file.png"]), .failure(.unknownFlag("--my file.png")))
+        XCTAssertEqual(parse("reuse", ["--", "--my file.png"]), .reuse("--my file.png"))
     }
 
     /// A series' tile from the terminal: `remove g2` is « Remove Series from History », `reuse g2` « Reuse This Grid ». A series is

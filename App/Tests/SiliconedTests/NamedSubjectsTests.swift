@@ -202,4 +202,14 @@ final class NamedSubjectsTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(tiny.width, 1)
         XCTAssertLessThanOrEqual(tiny.x + tiny.width, 10)
     }
+
+    /// **An edit's own images**: the references without the subjects' pictures that follow them — what « Reuse These
+    /// Settings » puts back in the rack, the subjects coming back with the text that cites them.
+    func testAnEditsOwnImagesLeaveTheSubjectsPicturesOut() {
+        XCTAssertEqual(N.editImages(["edit", "ref", "@alice"], subjectImages: 1), ["edit", "ref"])
+        XCTAssertEqual(N.editImages(["edit", "ref"], subjectImages: 0), ["edit", "ref"])
+        XCTAssertEqual(N.editImages(["@alice", "@bob"], subjectImages: 2), [])
+        XCTAssertEqual(N.editImages(["edit"], subjectImages: 3), [])
+        XCTAssertEqual(N.editImages(["edit"], subjectImages: -1), ["edit"])
+    }
 }

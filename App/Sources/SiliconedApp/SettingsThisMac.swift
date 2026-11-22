@@ -66,7 +66,9 @@ struct CompiledRow: View {
             IconTile(symbol: "cpu", color: Palette.peach, side: 26)
         } trailing: {
             Button("Erase…") { confirming = true }
-                .controlSize(.small).disabled(app.erasingCompiled || app.compiledBytes == 0)
+                .controlSize(.small)
+                .unavailable(app.erasingCompiled ? String(localized: "Erasing…")
+                             : app.compiledBytes == 0 ? String(localized: "Nothing compiled yet.") : nil)
         } below: {
             EmptyView()
         }

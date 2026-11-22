@@ -100,3 +100,57 @@ package enum Bracketing {
         return out
     }
 }
+
+/// **A series' grid sized to the canvas** (`SeriesCanvas`): every cell in sight, as large as the room lets them, the window
+/// larger or smaller — until the hand sizes them (pinch, ⌘+ ⌘−, the slider): they keep its size then, until another series,
+/// or ⌘0 that gives the size back to the room.
+package struct SeriesFit: Equatable, Sendable {
+    /// The canvas around the cells, in points: its margin on each side, the gap between two cells (and between the labels
+    /// and the cells), a row label's width, a column label's height (two lines of a callout).
+    package static let margin: CGFloat = 24, gap: CGFloat = 8, rowLabelWidth: CGFloat = 120, columnLabelHeight: CGFloat = 44
+    /// A cell's long side, in points: the slider's range, the pinch's and ⌘+ ⌘−'s bounds.
+    package static let sides: ClosedRange<CGFloat> = 96...1024
+    package static func clamped(_ side: CGFloat) -> CGFloat { min(max(side, sides.lowerBound), sides.upperBound) }
+
+    /// The series fitted.
+    package let run: Int
+    /// Whether the band under the grid (a cell's settings) was there.
+    package var band: Bool
+    /// The side the cells got: while they keep it, they follow the room.
+    package var side: CGFloat
+    /// The side that fills the room now — what ⌘0 gives back.
+    package var fitting: CGFloat
+
+    /// Whether cells of side `current` follow the room — ⌘0 has nothing to give back.
+    package func follows(_ current: CGFloat) -> Bool { current == side }
+
+    /// **The side at which the whole grid holds in `room`**, its labels and gaps included: `aspect` the cells' width over
+    /// their height, `rowLabels` and `columnLabels` whether the axes have words beside and above the cells.
+    package static func side(in room: CGSize, columns: Int, rows: Int, aspect: CGFloat, rowLabels: Bool,
+                             columnLabels: Bool) -> CGFloat {
+        let beside = rowLabels ? rowLabelWidth + gap : 0
+        let above = (columnLabels ? columnLabelHeight : 0) + gap
+        let w = (room.width - 2 * margin - beside - CGFloat(columns - 1) * gap) / CGFloat(columns)
+        let h = (room.height - 2 * margin - above - CGFloat(rows - 1) * gap) / CGFloat(rows)
+        return clamped(min(w / min(1, aspect), h / min(1, 1 / aspect)))
+    }
+
+    /// **The room or the series changed**: the fit kept, and the side the cells take — `nil`, they keep theirs. They keep
+    /// it when the hand sized them (their side is no longer the fitted one), or when only the band came or went: a click on
+    /// a cell shows its band, and the cells must not move under the pointer, nor at each cell of a running series.
+    package static func refit(_ last: SeriesFit?, run: Int, band: Bool, current: CGFloat,
+                              fitting: CGFloat) -> (fit: SeriesFit, side: CGFloat?) {
+        if var f = last, f.run == run {
+            f.fitting = fitting
+            guard f.follows(current) else { return (f, nil) }
+            guard f.band == band else { f.band = band; return (f, nil) }
+        }
+        return (SeriesFit(run: run, band: band, side: fitting, fitting: fitting), fitting)
+    }
+
+    /// **⌘0**: the cells take the side that fills the room, and follow it again.
+    package mutating func restore() -> CGFloat {
+        side = fitting
+        return side
+    }
+}

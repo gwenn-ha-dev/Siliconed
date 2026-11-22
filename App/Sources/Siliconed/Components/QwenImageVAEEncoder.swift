@@ -70,9 +70,8 @@ package enum QwenImageVAEEncoder {
         let file = try SafeTensors(path), budget = MemoryBudget.machineCeiling()
         return try blocking {
             let run = try await QwenImageVAERun.open("qwen-image-vae-encoder", file: file, budget: budget) { plan(height: height, width: width, positions: $0) }
-            let mean = try await run.run(image)
-            run.stage.close()
-            return mean
+            defer { run.stage.close() }
+            return try await run.run(image)
         }
     }
 

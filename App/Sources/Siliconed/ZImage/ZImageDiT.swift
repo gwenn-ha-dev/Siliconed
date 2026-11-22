@@ -134,18 +134,15 @@ package struct ZImageDiT {
     /// **The ranks of a stack's low-rank paths**, by product name: the largest any block's takes (one function serves
     /// every block, `LoRAStack.rank`), an edge's its own; none for an empty stack.
     static func loraRanks(_ loras: LoRAStack, _ c: Config = .published) -> [String: Int] {
-        guard !loras.isEmpty else { return [:] }
-        var keys: [String: [String]] = [:]
-        for p in loraProducts(nil, c) + blocks(c).flatMap({ loraProducts($0, c) }) { keys[p.name, default: []].append(p.key) }
-        return keys.compactMapValues { k in
-            let r = loras.rank(of: k, on: .zImage)
-            return r > 0 ? r : nil
-        }
+        loras.ranks(loraProducts(nil, c) + blocks(c).flatMap { loraProducts($0, c) }, on: .zImage)
     }
 
     /// **The DiT's file**, read under the prefix it keeps the DiT's names under (a checkpoint saved whole keeps
     /// `model.diffusion_model.`), found where it puts `x_pad_token`, a tensor of the DiT alone (`MapWeights.dit`).
     static func file(_ path: String) throws -> SafeTensors { try MapWeights.dit(path, marker: "x_pad_token") }
+
+    /// The product whose element says the Compact (`Arithmetic.codes`): I8 there, the map's products are int8 codes.
+    static let codesMarker = "layers.0.attention.qkv.weight"
 
     // MARK: - The CPU's tables
 

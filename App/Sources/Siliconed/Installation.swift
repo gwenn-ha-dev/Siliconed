@@ -154,7 +154,7 @@ package struct Installer {
                                      received: told(file, index: k + 1, count: files.count, before: before, total: total),
                                      journal: journal)
                 before += file.bytes
-                if shared(f).contains(file) { try record(f, file) }
+                if shared(f).contains(file) { record(f, file) }
             }
         }
         journal(files.isEmpty ? "  already installed" : String(format: "  installed: %d file%@, %.2f GB", files.count, files.count == 1 ? "" : "s", Double(total) / 1e9))
@@ -169,15 +169,17 @@ package struct Installer {
     }
 
     /// **Hashes what is installed**: the files of the version whose bytes are not the pinned ones (absent ones
-    /// included). Reads every byte: minutes for a large family.
+    /// included). Reads every byte: minutes for a large family. A shared file found sound is recorded (`checkShared`
+    /// does not hash it again).
     package func verify(_ f: Family, _ v: Variant) throws(EngineError) -> [PublishedFile] {
         var damaged: [PublishedFile] = []
+        let sharedFiles = Set(shared(f))
         for file in f.files(v) {
             try cancellation.check()
             guard isPresent(file) else { journal("✗ \(file.place): \(Library.exists(path(file)) ? "wrong size" : "absent")"); damaged.append(file); continue }
             let same = try EngineError.boundary { try file.digest(of: path(file)) == file.digest }
             journal("\(same ? "✓" : "✗") \(file.place)")
-            if !same { damaged.append(file) }
+            if !same { damaged.append(file) } else if sharedFiles.contains(file) { record(f, file) }
         }
         return damaged
     }
@@ -185,14 +187,15 @@ package struct Installer {
     // MARK: - The shared files, hashed once
 
     /// **The files every version of a family reads**: its tokenizers, its VAE, its own LoRA — 0.2 to 1.5 GB a family,
-    /// against gigabytes for a DiT or an encoder, which each version has its own.
+    /// against gigabytes for a DiT or an encoder, which a version has its own; an encoder that every version reads is
+    /// shared too (Anima's Qwen3 0.6B, 1.2 GB).
     func shared(_ f: Family) -> [PublishedFile] {
         let versions = f.variants.map { Set(f.files($0)) }
         return f.files(f.variants[0]).filter { file in versions.allSatisfy { $0.contains(file) } }
     }
 
     /// The record of the shared files hashed in this library: a line `<place>\t<digest>` each.
-    private func hashedPath(_ f: Family) -> String { library.map("composants/\(f.rawValue)/hashed") }
+    private func hashedPath(_ f: Family) -> String { library.components(f) + "/hashed" }
 
     private func hashed(_ f: Family) -> Set<String> {
         guard let text = try? String(contentsOfFile: hashedPath(f), encoding: .utf8) else { return [] }
@@ -201,9 +204,10 @@ package struct Installer {
 
     private func line(_ file: PublishedFile) -> String { "\(file.place)\t\(file.digest.text)" }
 
-    private func record(_ f: Family, _ file: PublishedFile) throws {
+    /// A record that cannot be written costs a second hash at the next render, never the render itself.
+    private func record(_ f: Family, _ file: PublishedFile) {
         let lines = hashed(f).union([line(file)]).sorted()
-        try (lines.joined(separator: "\n") + "\n").write(toFile: hashedPath(f), atomically: true, encoding: .utf8)
+        try? (lines.joined(separator: "\n") + "\n").write(toFile: hashedPath(f), atomically: true, encoding: .utf8)
     }
 
     /// **Hashes once the shared files of `f` this library never hashed** — those an older version of the app left,
@@ -221,7 +225,7 @@ package struct Installer {
                     try FileManager.default.removeItem(atPath: path(file))
                     throw EngineError.corruptMap(file: path(file))
                 }
-                try record(f, file)
+                record(f, file)
             }
         }
     }
@@ -251,7 +255,7 @@ package struct Installer {
                 try? fm.removeItem(atPath: hashedPath(f))
             }
             // The folders the files leave empty, deepest first; never one that still holds something.
-            let folder = library.map("composants/\(f.rawValue)")
+            let folder = library.components(f)
             let folders = (fm.enumerator(atPath: folder)?.allObjects as? [String] ?? []).filter { Library.isFolder(folder + "/" + $0) }
             for sub in folders.sorted(by: { $0.count > $1.count }) + [""] {
                 let p = sub.isEmpty ? folder : folder + "/" + sub

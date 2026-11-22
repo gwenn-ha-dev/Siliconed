@@ -15,6 +15,18 @@ public enum Memory {
         return Int(info.phys_footprint)
     }
 
+    /// **The process's graphics ledger** (`ledger_tag_graphics_footprint`): what of the footprint Metal and its driver
+    /// hold, its heaps and buffers and what no allocation holds (the driver's memory for the command buffers).
+    public static func graphics() -> Int {
+        var info = task_vm_info_data_t()
+        var count = mach_msg_type_number_t(MemoryLayout<task_vm_info_data_t>.size / MemoryLayout<natural_t>.size)
+        let result = withUnsafeMutablePointer(to: &info) {
+            $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) { task_info(mach_task_self_, task_flavor_t(TASK_VM_INFO), $0, &count) }
+        }
+        precondition(result == KERN_SUCCESS, "task_info: \(result)")
+        return Int(info.ledger_tag_graphics_footprint)
+    }
+
     /// Pages swapped out since boot (`vm_stat`'s "Swapouts").
     public static func swapouts() -> UInt64 {
         var s = vm_statistics64()
@@ -35,11 +47,33 @@ public enum Memory {
         return min(read("vm.user_wire_limit"), read("vm.global_user_wire_limit"))
     }()
 
-    /// The footprint, settled: the lowest of `samples` readings a millisecond apart (what was given back is gone).
-    public static func settled(_ samples: Int = 200) -> Int {
-        var low = Int.max
-        for _ in 0..<samples { low = min(low, footprint()); usleep(1000) }
-        return low
+    /// **What `free` left billed, handed back to the kernel now**: the bytes it gave back (0 where the system has no such
+    /// buffer). On macOS 27 `malloc` does not unmap a freed page: it queues it in the task's deferred reclamation buffer,
+    /// billed in `phys_footprint` until the kernel drains it — under pressure, else never. Measured 21/11/2026 on the M5
+    /// Pro, a block of 15 groups run three times in one process: 34 to 38 MiB that its stages and its client had freed were
+    /// still billed when the next one read its floor (the floors 0.05, 0.08, 0.08 GiB; drained before each, 0.05 each).
+    /// What fills it is the frameworks' and the client's, never the arena's (Metal's heaps, unmapped at once).
+    /// `mach_vm_deferred_reclamation_buffer_flush` is the kernel's own drain, which `libmalloc` calls when the buffer is
+    /// full: the entries `malloc` has marked reclaimable are unmapped, as under pressure, nothing live touched. Not in a
+    /// public header: looked up by name (the former engine's `Arena.returnFreedPages`, 0.21); absent, nothing.
+    @discardableResult
+    public static func returnFreed() -> Int {
+        guard let flush = reclamationFlush else { return 0 }
+        var bytes: UInt64 = 0, deadline: UInt64 = 0
+        return flush(mach_task_self_, UInt32.max, &bytes, &deadline) == KERN_SUCCESS ? Int(bytes) : 0
+    }
+
+    private typealias Flush = @convention(c) (mach_port_t, UInt32, UnsafeMutablePointer<UInt64>, UnsafeMutablePointer<UInt64>) -> kern_return_t
+    private static let reclamationFlush: Flush? = {
+        guard let symbol = dlsym(dlopen(nil, RTLD_NOW), "mach_vm_deferred_reclamation_buffer_flush") else { return nil }
+        return unsafeBitCast(symbol, to: Flush.self)
+    }()
+
+    /// **The footprint a stage plans over** (`Stage.plan`'s floor): what `free` left billed handed back first
+    /// (`returnFreed`), so that no floor holds what was freed before it.
+    public static func floor() -> Int {
+        returnFreed()
+        return footprint()
     }
 
     public static func mib(_ bytes: Int) -> String { String(format: "%.1f MiB", Double(bytes) / 1_048_576) }

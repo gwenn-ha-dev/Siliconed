@@ -9,19 +9,20 @@
 //
 // - **The edge says the role**: the image wire's rose, full for the image the model edits or starts from, lighter for
 //   a reference or a cited subject; dashed for an image that does not go — neutral, or with a role the model lacks, which
-//   the tile says (« “Reference”: no effect with Anima »). A change of model never gives nor converts a role (`LabInputs`).
-// - **Under Qwen-Image-2.1** an image takes the next place as it comes in; its menu changes it (Image to Edit, Reference,
-//   No Role) or names it. Full (three images with the cited subjects), a newcomer comes in without a role and says so.
-// - **Under Z-Image, Anima, Krea 2, MOSS** an image comes in without a role: « Start From This Image » makes it the start
-//   (its tile then carries the rack's strength), Describe writes what it shows into the text. **No subject**: these
-//   models read none, the field greys their `@names`.
+//   the tile says (« “Reference”: no effect with <model> »). A change of model never gives nor converts a role (`LabInputs`).
+// - **Under a model whose encoder reads images** (`capacity` > 0) an image takes the next place as it comes in; its menu
+//   changes it (Image to Edit, Reference, No Role) or names it. Full (three images with the cited subjects), a newcomer
+//   comes in without a role and says so.
+// - **Under a model that starts from an image** (`startIsImg2Img`) an image comes in without a role: « Start From This
+//   Image » makes it the start (its tile then carries the rack's strength), Describe writes what it shows into the text.
+//   **No subject** under a model that reads no image: the field greys their `@names`.
 // - **Right-click**: Crop…, Replace…, Name…, Reuse These Settings (a PNG Siliconed wrote), Remove.
 // - A **subject** (`SubjectSheet.swift`) goes only when the text cites it by `@name`, after the images the roles send; the
 //   others stay at the end, to be cited by a click or a drag into the text.
 // - **A tile is as wide as its picture and its words**, these at most `LabTile.meta`: tiles flow side by side while the
 //   box's width holds them, two portraits and their buttons in the column's width.
 // - **The grip under the tiles** gives the box more rows, or fewer: the tiles keep their size, more of them show; past
-//   the rows given, the box scrolls. It stops on whole rows only, the bottoms the tiles are laid at (`rowStops`): what is
+//   the rows given, the box scrolls. It stops on whole rows only, the bottoms the tiles are laid at (`TileRows`): what is
 //   kept is a number of rows, not a height that would cut a row once the column's width changes.
 
 import AppKit
@@ -37,6 +38,8 @@ struct LabImages: View {
     @State private var dragStart: CGFloat?
     private nonisolated static let space = "lab images"
     private static let addID = "add"
+    /// The box's height until its tiles are laid out: one tile's.
+    private static let unlaid = LabTile.height + 4
 
     /// A tile of the box: an image of the rack, or a subject of the library.
     private enum Entry: Identifiable {
@@ -77,6 +80,9 @@ struct LabImages: View {
     }
 
     var body: some View {
+        // The tiles and the rows they make, once per drawing.
+        let entries = self.entries
+        let stops = rowStops(entries)
         VStack(alignment: .leading, spacing: 4) {
             ScrollView(.vertical) {
                 FlowRow(spacing: 14) {
@@ -95,9 +101,9 @@ struct LabImages: View {
                 .padding(.vertical, 2)
                 .coordinateSpace(.named(Self.space))
             }
-            .frame(height: shownHeight)
+            .frame(height: TileRows.height(stops, rows: rows, empty: Self.unlaid))
             .scrollIndicators(.automatic)
-            if rowStops.count > 1 { grip }
+            if stops.count > 1 { grip(stops) }
             Text(hint).font(.caption).foregroundStyle(Palette.secondary).fixedSize(horizontal: false, vertical: true)
         }
     }
@@ -123,40 +129,26 @@ struct LabImages: View {
         return "Image 1 is the one edited and gives the format. This model reads \(model.capacity) at most."
     }
 
-    /// **The heights at which the box shows whole rows**, the first row's then each next one's: a row's bottom is its
-    /// tallest tile's, the row's tiles sharing their middle (`FlowRow` centers them), and the padding under it.
-    private var rowStops: [CGFloat] {
+    /// **The heights at which the box shows whole rows** (`TileRows.stops`), from the frames of the tiles shown — the
+    /// padding under the last row included. The rows kept, or all there are when fewer, make the box's height.
+    private func rowStops(_ entries: [Entry]) -> [CGFloat] {
         let ids = Set(entries.map(\.id) + [Self.addID])
-        var lines: [(middle: CGFloat, bottom: CGFloat)] = []
-        for f in frames.filter({ ids.contains($0.key) }).values.sorted(by: { $0.midY < $1.midY }) {
-            if let last = lines.last, f.midY - last.middle < 1 { lines[lines.count - 1].bottom = max(last.bottom, f.maxY) }
-            else { lines.append((f.midY, f.maxY)) }
-        }
-        return lines.map { $0.bottom + 2 }
-    }
-
-    /// The box's height: the rows kept, or all the rows there are when fewer; one tile's height until they are laid out.
-    private var shownHeight: CGFloat {
-        let stops = rowStops
-        guard !stops.isEmpty else { return LabTile.height + 4 }
-        return stops[min(max(rows, 1), stops.count) - 1]
+        return TileRows.stops(Array(frames.filter { ids.contains($0.key) }.values), padding: 2)
     }
 
     /// **The box's grip**: dragged down, more rows of tiles show; up, fewer — a row at a time, the nearest to the hand;
     /// never fewer than one, never more than there are.
-    private var grip: some View {
+    private func grip(_ stops: [CGFloat]) -> some View {
         Capsule().fill(Palette.secondary.opacity(0.5)).frame(width: 36, height: 4)
             .frame(maxWidth: .infinity).frame(height: 10)
             .contentShape(Rectangle())
             .pointerStyle(.rowResize)
             .gesture(DragGesture(minimumDistance: 1, coordinateSpace: .global)
                 .onChanged { drag in
-                    let start = dragStart ?? shownHeight
+                    let start = dragStart ?? TileRows.height(stops, rows: rows, empty: Self.unlaid)
                     dragStart = start
-                    let stops = rowStops.prefix(LabTile.rows.upperBound)
-                    let wanted = start + drag.translation.height
-                    if let nearest = stops.indices.min(by: { abs(stops[$0] - wanted) < abs(stops[$1] - wanted) }) {
-                        rows = nearest + 1
+                    if let n = TileRows.rows(nearest: start + drag.translation.height, in: stops, limit: LabTile.rows.upperBound) {
+                        rows = n
                     }
                 }
                 .onEnded { _ in dragStart = nil })
@@ -260,17 +252,7 @@ private struct PictureTile: View {
                        height: LabTile.height).clipped()
                 .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                 .overlay { LabTile.edge(goes: goes, main: picture.role == .edited || picture.role == .start) }
-                .overlay(alignment: .topTrailing) {
-                    if hover {
-                        Button { model.remove(picture) } label: {
-                            Image(systemName: "xmark.circle.fill").symbolRenderingMode(.palette)
-                                .foregroundStyle(.white, .black.opacity(0.55))
-                        }
-                        .buttonStyle(.plain).padding(2)
-                        .help("Remove")
-                        .accessibilityLabel(Text("Remove"))
-                    }
-                }
+                .removalOnHover(hover, padding: 2, help: "Remove", label: "Remove") { model.remove(picture) }
                 .overlay { if model.describing == picture.id { ProgressView().controlSize(.small) } }
                 .accessibilityLabel(Text("An image of the lab"))
             VStack(alignment: .leading, spacing: 3) {
@@ -292,7 +274,8 @@ private struct PictureTile: View {
         .contextMenu { menu }
     }
 
-    /// Why it does not go, when it has a role: the model lacks it. Or, without a role under Qwen, that the render is full.
+    /// Why it does not go, when it has a role: the model lacks it. Or, without a role under a model that reads images, that
+    /// the render is full.
     private var caption: String? {
         if picture.role != .neutral, !goes, let name = rack.card?.name {
             return String(localized: "“\(picture.role.label)”: no effect with \(name)")
@@ -362,7 +345,7 @@ private struct StartStrength: View {
                 .accessibilityLabel(Text("Strength"))
                 .accessibilityValue(Text(verbatim: StartWords.percent(rack.startStrength)))
             if rack.startIgnored {
-                Text("Image ignored: lower the strength").font(.caption2).foregroundStyle(Color(nsColor: .systemOrange))
+                Text("Image ignored: lower the strength").font(.caption2).foregroundStyle(Palette.caution)
                     .lineLimit(2).fixedSize(horizontal: false, vertical: true)
                     .help(rack.startCaption)
             }

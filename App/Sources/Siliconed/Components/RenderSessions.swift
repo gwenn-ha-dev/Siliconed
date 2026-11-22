@@ -9,6 +9,9 @@ import Foundation
 package protocol LatentDecoder {
     /// The decoder of latents `[C, latentHeight, latentWidth]` of the VAE at `path`, under `budget` (bytes).
     static func open(path: String, latentHeight: Int, latentWidth: Int, budget: Int) async throws -> Self
+    /// **Whether `open` would hold under `budget`**, judged now, nothing allocated (`BandStage.admit`): `OverBudget`
+    /// otherwise. A render asks it before its DiT, over the floor its DiT will give back.
+    static func admit(path: String, latentHeight: Int, latentWidth: Int, budget: Int) throws
     /// Whether B made its plan cut finer than the one it prefers (`bandDecodingNotice`).
     var narrowed: Bool { get }
     /// A latent, as the decoder reads it, to the picture's planes `[3, H, W]` in `[-1, 1]`.
@@ -40,6 +43,67 @@ package final class DecoderSession<Decoder: LatentDecoder> {
     package func pixels(_ latent: [Float]) throws -> [Float] {
         let decoder = decoder
         return try blocking { try await decoder.value.pixels(latent) }
+    }
+}
+
+/// **The latents a render's DiT left, its decoder's to decode** (`RenderLoop.keeping`): each image's latent, its
+/// timings and its seconds so far, the prompt's tokens, and how many images the decoder already handed over. One file a
+/// render, written once its DiT is done (a few MiB: 1 MiB a 1024² latent of 16 channels), each image gone from it
+/// once handed over — measured 22/11/2026 on the M5 Pro: 6.1 ms written, 0.5 ms read back, four latents of 1 MiB.
+package struct KeptLatents: Codable, Sendable, Equatable {
+    package struct Image: Codable, Sendable, Equatable {
+        package let index: Int
+        package let latent: [Float]
+        package let timings: Engine.Timings
+        package let elapsed: TimeInterval
+
+        package init(index: Int, latent: [Float], timings: Engine.Timings, elapsed: TimeInterval) {
+            (self.index, self.latent, self.timings, self.elapsed) = (index, latent, timings, elapsed)
+        }
+
+        private enum CodingKeys: String, CodingKey { case index, latent, timings, elapsed }
+        // The floats as their bytes: as JSON numbers, a latent of a million floats is 10 MB and 40 ms to write.
+        package init(from decoder: any Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            let bytes = try c.decode(Data.self, forKey: .latent)
+            guard bytes.count % 4 == 0 else { throw DecodingError.dataCorruptedError(forKey: .latent, in: c, debugDescription: "not floats") }
+            latent = bytes.withUnsafeBytes { Array($0.bindMemory(to: Float.self)) }
+            (index, timings, elapsed) = (try c.decode(Int.self, forKey: .index), try c.decode(Engine.Timings.self, forKey: .timings),
+                                         try c.decode(TimeInterval.self, forKey: .elapsed))
+        }
+        package func encode(to encoder: any Encoder) throws {
+            var c = encoder.container(keyedBy: CodingKeys.self)
+            try c.encode(index, forKey: .index)
+            try c.encode(latent.withUnsafeBytes { Data($0) }, forKey: .latent)
+            try c.encode(timings, forKey: .timings)
+            try c.encode(elapsed, forKey: .elapsed)
+        }
+    }
+
+    package let tokens: Int
+    package private(set) var images: [Image]
+    package private(set) var handed = 0
+
+    package init(tokens: Int, images: [Image]) { (self.tokens, self.images) = (tokens, images) }
+
+    /// The file at `url`, nil when there is none or what it holds is not a render's latents.
+    package static func read(_ url: URL) -> KeptLatents? {
+        guard let data = try? Data(contentsOf: url) else { return nil }
+        return try? PropertyListDecoder().decode(KeptLatents.self, from: data)
+    }
+
+    package func write(to url: URL) throws {
+        let encoder = PropertyListEncoder()
+        encoder.outputFormat = .binary
+        try encoder.encode(self).write(to: url, options: .atomic)
+    }
+
+    /// Image `index` handed over (or lost): gone from the file at `url`, written again.
+    package mutating func hand(_ index: Int, to url: URL?) {
+        images.removeAll { $0.index == index }
+        handed += 1
+        guard let url else { return }
+        try? write(to: url)
     }
 }
 

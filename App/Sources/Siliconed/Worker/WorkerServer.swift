@@ -132,18 +132,11 @@ private final class Server: @unchecked Sendable {
     private func rendering(_ id: UInt32, _ order: RenderOrder, _ blobs: [UInt32: Data], _ call: Call) {
         CoreAI.neuralEngine = order.neuralEngine
         CoreAI.place(order.library.library)
+        RenderLoop.keeping = order.keeping.map { URL(fileURLWithPath: $0) }
+        defer { RenderLoop.keeping = nil }
         do {
             let request = try order.request(blobs)
-            let library = order.library.library
-            // The shared files an older app left are hashed once, before a render reads them. Silent: this process's
-            // standard output is the app's pipe.
-            if let card = library.card(order.model) {
-                var installer = Installer(library: library)
-                installer.journal = { _ in }
-                installer.cancellation = call.token
-                try installer.checkShared(card.family)
-            }
-            let model = try Model.named(order.model, in: library)
+            let model = try Model.named(order.model, in: order.library.library)
             _ = try Engine().renderBatch(request, seeds: order.seeds, model: model, cancellation: call.token) { event in
                 let (e, data) = WorkerEvent.of(event, blob: self.nextBlob())
                 self.out.send(WorkerReply.event(id: id, e), blobs: data.map { [(e.blob!, $0)] } ?? [])

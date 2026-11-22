@@ -1,5 +1,6 @@
 import CryptoKit
 import Foundation
+import Measurement
 
 // **What a family is made of on disk: published files, taken as they are.** Siliconed ships no weights and writes
 // none: an installation downloads each file a family declares (`FamilyTraits.files`) from its publisher's repository,
@@ -66,7 +67,7 @@ package struct PublishedFile: Sendable, Hashable {
             var hasher = Insecure.SHA1()
             hasher.update(data: Data("blob \(data.count)\u{0}".utf8))
             hasher.update(data: data)
-            return .gitBlob(hasher.finalize().map { String(format: "%02x", $0) }.joined())
+            return .gitBlob(hasher.finalize().hexadecimal)
         }
     }
 }

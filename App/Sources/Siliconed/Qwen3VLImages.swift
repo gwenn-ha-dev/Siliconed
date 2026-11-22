@@ -19,7 +19,7 @@ import SiliCore
 /// (`_fuse_mean_std_and_rescale_factor`: mean and std times 255), not `x/255` then `(· − 0.5)/0.5`
 /// — one rounding apart. **Transparency is ported** (`PillowAlpha`): the pipeline makes every
 /// reference RGBA, Pillow premultiplies around its Lanczos, and only this copy is laid over white
-/// (`white.paste(img, mask=A)`) — the VAE reads the RGBA itself (`QwenImage21Pipeline.preparedReference`).
+/// (`white.paste(img, mask=A)`) — the VAE reads the RGBA itself (`QwenImage21DenoisingModule.preparedReferences`).
 /// `RGB8(contentsOf:)`, the checks' reader, still refuses transparency.
 package enum Qwen3VLImages {
     /// One image, ready for the vision tower: `pixel_values` and `image_grid_thw[1:]`. The values

@@ -1,6 +1,7 @@
-// **The app's value types**: what `AppState` keeps and the views read — the LoRA stack's slots,
-// the edit's references, the history's entries, the jobs, the render's figures —, then how a figure
-// is written in the user's language (`Figures`). The state itself is in `AppState.swift`.
+// **The app's value types**: what `AppState` keeps and the views read — the LoRA stack's slots, the settings that redo an
+// image, the history's entries, the jobs, how they end and what they signal. The edit's references are in
+// `ReferenceImage.swift`, the render's figures in `Measures.swift`, how a figure is written in `Figures.swift`; the state
+// itself is in `AppState.swift`.
 
 import AppKit
 import ImageIO
@@ -15,124 +16,6 @@ struct LoRASlot: Identifiable, Equatable {
     var strength = 0.8
     /// Off: kept in the stack with its strength, out of the render — to see the image without it, and back.
     var on = true
-}
-
-/// An edit's reference: a chosen or dragged file, or an image from the history. We keep the source,
-/// not an `ImageRGB` (75 MB of floats for a 3072 px photo): it is decoded off the main thread at
-/// render time. Its size in pixels (EXIF orientation applied, as `ImageRGB(contentsOf:)` does) is
-/// read from the header alone: image 1 sets the output's format (`DenoisingModule.editFormat`).
-///
-/// `@unchecked Sendable`: immutable; the thumbnail (`NSImage`) is read only by the view.
-struct ReferenceImage: Identifiable, @unchecked Sendable {
-    /// `subject`: a named subject's picture, cropped to its frame (`Subjects.swift`) — `nil` if its
-    /// bytes did not decode, which fails the render naming it. `bytes`: a file's bytes sent by another
-    /// Mac (`MirrorServer`), decoded as the file was there. `remote`: an image that stays on the other
-    /// Mac, named only (a mirrored history image's edit images) — nothing to show or decode here.
-    enum Source { case file(URL), image(CGImage), subject(CGImage?, name: String), bytes(Data), remote(RemoteReference.Origin) }
-    /// Given only to a subject the prompt cites (`AppState.references`): the same id at every reading, for the rack's rows.
-    var id = UUID()
-    let source: Source
-    let vignette: NSImage
-    let name: String
-    let width: Int, height: Int
-    /// Taken from the history: its `i` ordinal — what a mirror sends instead of the bytes.
-    var ordinal: Int? = nil
-
-    /// The same picture as `other`: the same file, or the same image of the history.
-    func same(_ other: ReferenceImage) -> Bool {
-        if let a = ordinal, let b = other.ordinal { return a == b }
-        if case .file(let a) = source, case .file(let b) = other.source { return a.standardizedFileURL == b.standardizedFileURL }
-        return false
-    }
-
-    /// Decoded for display, upright, at `width × height` — the original under an edit's curtain.
-    func displayed(width: Int, height: Int) -> CGImage? {
-        let image: CGImage?
-        switch source {
-        case .image(let cg): image = cg
-        case .subject(let cg, _): image = cg
-        case .remote: image = nil
-        case .file, .bytes:
-            let options: [CFString: Any] = [kCGImageSourceCreateThumbnailFromImageAlways: true,
-                                            kCGImageSourceThumbnailMaxPixelSize: max(self.width, self.height),
-                                            kCGImageSourceCreateThumbnailWithTransform: true]
-            image = imageSource.flatMap { CGImageSourceCreateThumbnailAtIndex($0, 0, options as CFDictionary) }
-        }
-        guard let image, let c = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
-                                           space: CGColorSpace(name: CGColorSpace.sRGB)!,
-                                           bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
-        c.interpolationQuality = .high
-        c.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
-        return c.makeImage()
-    }
-
-    func imageRGB() throws -> ImageRGB {
-        switch source {
-        case .file(let url): return try ImageRGB(contentsOf: url)
-        case .bytes(let data): return try ImageRGB(data: data, name: name)
-        case .remote: throw EngineError.imageUnreadable(file: name)
-        case .image(let cg): return try ImageRGB(cgImage: cg)
-        case .subject(let cg, let name):
-            guard let cg else { throw EngineError.imageUnreadable(file: name) }
-            return try ImageRGB(cgImage: cg)
-        }
-    }
-
-    private var imageSource: CGImageSource? {
-        switch source {
-        case .file(let url): CGImageSourceCreateWithURL(url as CFURL, nil)
-        case .bytes(let data): CGImageSourceCreateWithData(data as CFData, nil)
-        case .image, .subject, .remote: nil
-        }
-    }
-
-    /// **A file as the render reads it** — the file itself (`ImageRGB(contentsOf:)`, upright), its vignette and size; `nil` if
-    /// ImageIO cannot read it. Its bytes come from the file's disk: 4.4 ms for a 12 MB PNG (2048²) on an M5 Pro's SSD, as long
-    /// as the disk takes from a network share — the window reads it off the main thread (`AppState.read`).
-    nonisolated static func file(_ url: URL) -> ReferenceImage? {
-        guard let vignette = NSImage(contentsOf: url), vignette.isValid, let size = size(of: url) else { return nil }
-        return ReferenceImage(source: .file(url), vignette: vignette, name: url.lastPathComponent,
-                              width: size.width, height: size.height)
-    }
-
-    /// A file's size as it will be decoded, upright — or `nil` if ImageIO cannot read its header.
-    static func size(of url: URL) -> (width: Int, height: Int)? {
-        CGImageSourceCreateWithURL(url as CFURL, nil).flatMap(size)
-    }
-
-    static func size(of data: Data) -> (width: Int, height: Int)? {
-        CGImageSourceCreateWithData(data as CFData, nil).flatMap(size)
-    }
-
-    private static func size(_ source: CGImageSource) -> (width: Int, height: Int)? {
-        guard let p = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
-              let w = p[kCGImagePropertyPixelWidth] as? Int, let h = p[kCGImagePropertyPixelHeight] as? Int,
-              w > 0, h > 0 else { return nil }
-        // Orientations 5 to 8 turn the image a quarter: the upright image has its sides swapped.
-        let quarter = ((p[kCGImagePropertyOrientation] as? Int) ?? 1) >= 5
-        return quarter ? (h, w) : (w, h)
-    }
-}
-
-/// **An image as it leaves the app** by a drag or Share: its PNG bytes, with the name the receiver
-/// gives the file. Only data: no temporary file is written on the way (incognito).
-struct PNGImage: Transferable {
-    let data: Data
-    let name: String
-    static var transferRepresentation: some TransferRepresentation {
-        DataRepresentation(exportedContentType: .png) { $0.data }
-            .suggestedFileName { $0.name }
-    }
-}
-
-/// **What the Images box accepts**: a file (the Finder), or PNG bytes — a strip thumbnail, which leaves
-/// as data only (`PNGImage`). The file first: a Finder PNG is read from its place, not copied.
-enum DroppedImage: Transferable {
-    case file(URL), png(Data)
-    static var transferRepresentation: some TransferRepresentation {
-        ProxyRepresentation(importing: { (url: URL) in DroppedImage.file(url) })
-        DataRepresentation(importedContentType: .png) { DroppedImage.png($0) }
-    }
 }
 
 /// What redoes an image: taken at launch, kept with each history image.
@@ -187,8 +70,8 @@ struct Entry: Identifiable {
     /// its job's other images (the same sources), never decoded here.
     var references: [ReferenceImage] = []
     /// **The edit's own images**, in their numbers: its references without the named subjects' pictures that follow them
-    /// (`RenderSettings.subjectImages`), which come back with the text that cites them.
-    var editImages: [ReferenceImage] { Array(references.dropLast(settings.subjectImages)) }
+    /// (`NamedSubjects.editImages`), which come back with the text that cites them.
+    var editImages: [ReferenceImage] { NamedSubjects.editImages(references, subjectImages: settings.subjectImages) }
     /// **The image it started from** (img2img, `RenderSettings.strength`): what « Variations » and « Redo » render again.
     var start: ReferenceImage? = nil
     /// **An enlargement** (`Enlarge.swift`): its factor. Its settings stay the render's — what « Reuse
@@ -341,30 +224,6 @@ struct Job: Identifiable {
     }
 }
 
-/// **The learned speed** of a model at a format, drawn from a finished render: each stage in
-/// seconds, `full` the average of a DiT evaluation.
-struct Speed {
-    var full: Double
-    /// `nil` while the text encoder has only been read back from the cache: ~0 s for that prompt,
-    /// nothing learned for the next one.
-    var text: Double?
-    var image: Double
-    var decoding: Double
-
-    /// One key per number of references: a speed learned with one reference says nothing of three
-    /// (the sequence, the encoder's images, the condition cache all grow with each).
-    static func key(_ identifier: String, _ format: RecommendedFormat, references: Int, lora: Bool) -> String {
-        "\(identifier)|\(format.width)×\(format.height)\(references > 0 ? "|edit\(references)" : "")\(lora ? "|LoRA" : "")"
-    }
-
-    /// The duration of a render of `images` images on this plan. `image` (encoding the references)
-    /// was measured with the same number of references: the key says so.
-    func duration(_ plan: DenoisingPlan, images: Int) -> Double {
-        let perImage = Double(plan.evaluations) * full + decoding
-        return (text ?? 0) + image + Double(images) * perImage
-    }
-}
-
 /// **How a job ended** — what `wait` returns to the remote control.
 enum Issue {
     case finished
@@ -396,167 +255,4 @@ enum Signal {
     case finished(Job, Issue)
     /// A series' last cell ended.
     case gridEnded(GridRun)
-}
-
-/// **The figures of a render**, drawn from its events — what the Chain inspector
-/// shows. In memory, like the rest.
-struct Measures {
-    private(set) var job: Job?
-    private(set) var begin: Date?
-    private(set) var plan: Engine.Plan?
-    private(set) var tokens: Int?
-    private(set) var tokenizer: Double?, encoder: Double?
-    private(set) var encoding: Double?
-    /// The conditioning came from `RenderCache`: its time is not the encoder's cost.
-    private(set) var textCached = false
-    /// Per image of the batch, the duration of each DiT evaluation.
-    private(set) var stepSeconds: [[Double]] = []
-    private(set) var decodings: [Double] = []
-    /// The timers and footprints of the last finished image.
-    private(set) var timings: Engine.Timings?
-    private(set) var footprints: Engine.Footprints?
-    /// What the stages held so far, as the engine's ledger read it (`Engine.Event.held`); the last image's once it is out.
-    private(set) var held: [Engine.Held] = []
-    /// The footprint over the render's whole time (`Engine.Event.memory`): the render under way's, then the last one's
-    /// until the next begins (`beginJob` clears it).
-    private(set) var memory = Engine.MemorySeries()
-    /// A mirror has no `plan`: the other Mac's evaluations per image (`RemoteMeasures`).
-    private(set) var remoteEvaluations: Int?
-    /// When each stage was last heard compiling (`compiling(_:at:)`).
-    private(set) var compiledAt: [Engine.Stage: Date] = [:]
-
-    /// **A burst of compilations said as one**: a stage compiles while the engine says so, and for `burst` seconds past
-    /// the last time it did. A model's first render compiles in bursts — the decoder a function per band, a block its
-    /// functions one after the other — and a word that came and went with each one flickered on every line that says it.
-    static let burst: TimeInterval = 1.5
-    func compiling(_ stage: Engine.Stage, at now: Date = Date()) -> Bool {
-        held.first { $0.stage == stage }?.compiling == true || compiledAt[stage].map { now.timeIntervalSince($0) < Self.burst } == true
-    }
-    func compiling(at now: Date = Date()) -> Bool { held.contains { compiling($0.stage, at: now) } }
-
-    init() {}
-
-    /// What the other Mac measured for this Mac's render, dated here: `begin` is `elapsed` ago.
-    init(remote r: RemoteMeasures, job: Job, now: Date = Date()) {
-        self.job = job
-        begin = now.addingTimeInterval(-r.elapsed)
-        remoteEvaluations = r.evaluations
-        tokens = r.tokens; tokenizer = r.tokenizer; encoder = r.encoder; encoding = r.encoding
-        textCached = r.textCached; stepSeconds = r.stepSeconds; decodings = r.decodings
-        timings = r.timings; footprints = r.footprints
-        held = r.footprints?.stages ?? []
-        memory = r.memory ?? Engine.MemorySeries()
-    }
-
-    /// The evaluations planned per image, here or on the Mac that renders.
-    var planned: Int { plan?.denoising.evaluations ?? remoteEvaluations ?? 0 }
-
-    mutating func beginJob(_ t: Job) {
-        self = Measures()
-        job = t
-        begin = Date()
-    }
-
-    mutating func receive(_ item: Engine.Event) {
-        switch item {
-        case .start(let p):
-            plan = p
-            stepSeconds = Array(repeating: [], count: p.seeds.count)
-        case let .text(j, t, e, cached):
-            tokens = j; tokenizer = t; encoder = e; textCached = cached
-        case .encoding(let s):
-            encoding = s
-        case let .step(image, _, _, _, seconds, _, _) where image < stepSeconds.count:
-            stepSeconds[image].append(seconds)
-        case .decoding(let s):
-            decodings.append(s)
-        case .image(_, let renderResult):
-            timings = renderResult.timings
-            footprints = renderResult.footprints
-            held = renderResult.footprints.stages
-        case .memory(let delta):
-            memory.append(delta)
-        case .held(let stages):
-            // Heard compiling, or done compiling since the last event: the burst's last moment so far.
-            for s in stages where s.compiling || held.first(where: { $0.stage == s.stage })?.compiling == true { compiledAt[s.stage] = Date() }
-            held = stages
-        default:
-            break
-        }
-    }
-
-    /// This render's pace; `nil` without a step.
-    var speed: Speed? {
-        func mean(_ v: [Double]) -> Double? { v.isEmpty ? nil : v.reduce(0, +) / Double(v.count) }
-        guard let full = mean(stepSeconds.flatMap { $0 }) else { return nil }
-        return Speed(full: full, text: textCached ? nil : (tokenizer ?? 0) + (encoder ?? 0),
-                       image: encoding ?? 0, decoding: mean(decodings) ?? Engine.Progress.decodingWeights * full)
-    }
-}
-
-// MARK: - The figures, in the user's language
-
-/// Durations, seconds, strengths and memory, formatted according to the system language (`0,85 s` in
-/// French, `0.85 s` in English). The developer's command line keeps its decimal point: it is a
-/// syntax, not a display.
-enum Figures {
-    /// `0.85 sec`, `12.3 sec` (`0,85 s` in French, `0.85秒` in Japanese) — the precision of the engine's timers.
-    static func seconds(_ s: Double) -> String {
-        Measurement(value: s, unit: UnitDuration.seconds)
-            .formatted(.measurement(width: .abbreviated, usage: .asProvided,
-                                    numberFormatStyle: .number.precision(.fractionLength(s < 10 ? 2 : 1))))
-    }
-
-    /// `42 s`, `1 min 5 s`, `1 h 2 min` — a waiting time ("42 sec", "1 min, 5 sec" in English).
-    static func duration(_ s: Double) -> String {
-        let d = Duration.seconds(max(0, s.rounded()))
-        return s < 3600
-            ? d.formatted(.units(allowed: [.minutes, .seconds], width: .abbreviated))
-            : d.formatted(.units(allowed: [.hours, .minutes], width: .abbreviated))
-    }
-
-    /// `1024 × 1024`, width first — every size the app shows, in every language. Its digits are never grouped (`1024`,
-    /// not `1 024`): a size is read as a pair of pixel counts, not as quantities.
-    static func size(_ width: Int, _ height: Int) -> String { "\(String(width)) × \(String(height))" }
-
-    static func strength(_ f: Double) -> String { f.formatted(.number.precision(.fractionLength(2))) }
-
-    /// `40 %` in French, `40%` in English — `n` out of 100.
-    static func percent(_ n: Int) -> String { (Double(n) / 100).formatted(.percent.precision(.fractionLength(0))) }
-
-    static func hour(_ d: Date) -> String { d.formatted(date: .omitted, time: .shortened) }
-
-    static func memory(_ bytes: Int) -> String { Int64(bytes).formatted(.byteCount(style: .memory)) }
-
-    /// The space on disk, as the Finder counts it (`20.4 GB`).
-    static func disk(_ bytes: Int) -> String { Int64(bytes).formatted(.byteCount(style: .file)) }
-}
-
-extension Engine.Stage {
-    var label: String {
-        switch self {
-        case .text: String(localized: "Encoding the prompt")
-        case .image: String(localized: "Encoding the image")
-        case .denoising: String(localized: "Denoising")
-        case .decoding: String(localized: "Decoding")
-        }
-    }
-}
-
-extension RecommendedFormat.Orientation {
-    var label: String {
-        switch self {
-        case .square: String(localized: "Square")
-        case .portrait: String(localized: "Portrait")
-        case .landscape: String(localized: "Landscape")
-        }
-    }
-    /// A symbol whose silhouette follows the aspect ratio.
-    var symbol: String {
-        switch self {
-        case .square: "square"
-        case .portrait: "rectangle.portrait"
-        case .landscape: "rectangle"
-        }
-    }
 }

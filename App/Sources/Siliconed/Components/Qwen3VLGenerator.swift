@@ -52,10 +52,10 @@ package final class Qwen3VLGenerator {
 
     package static let room = 256
 
-    package init(map path: String, config: Qwen3Encoder.Config, tower: Qwen3VLVision.Config = .eightB, prefix: String = "model.") throws {
+    package init(map path: String, config: Qwen3Encoder.Config, tower: Qwen3VLVision.Config = .eightB) throws {
         self.path = path
         (self.config, self.tower) = (config, tower)
-        encoder = Qwen3Encoder(config: config, prefix: prefix, path: path)
+        encoder = Qwen3Encoder(config: config, path: path)
         file = try Qwen3Encoder.file(path)
     }
 

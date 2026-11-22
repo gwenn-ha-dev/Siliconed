@@ -13,7 +13,7 @@ import Foundation
 ///
 /// **The naming rule**: what the engine *emits* is nested in `Engine` (`Render`, `Event`, `Plan`, `Stage`, `Preview`,
 /// `Progress`, `Timings`, `Footprints`); what the caller *builds* is at the top level (`Request`, `Model`, `ImageRGB`,
-/// `Library`, `Cancellation`). The one error that leaves the engine is `EngineError` (`Errors.swift`); inside the
+/// `Library`, `Cancellation`). The one error that leaves the engine is `EngineError` (`EngineError.swift`); inside the
 /// package, each reader keeps its `Failure`, folded at the door.
 package final class Engine: Sendable {
 
@@ -307,12 +307,12 @@ package final class Engine: Sendable {
     /// `text + [image] + images × (evaluations + decoding)` units. The non-DiT stages weigh what
     /// they weighed in measured 512² renders, rounded up: text 0.5 evaluation (Z-Image 0.54 · Anima
     /// 0.22 · Krea 2 0.25), input image 0.15 (0.06 to 0.14), decoding 0.2 (0.05 to 0.17). The
-    /// fraction never goes backwards and is 1 at the last `image`.
+    /// fraction never goes backwards and is 1 once the last image is delivered or lost.
     ///
     /// The time remaining comes **from the steps already done**, never from a constant: the speed
     /// depends on the machine, the heat and the page cache. The time remaining therefore exists only
     /// **after the first step**; decoding counts what it cost in this render, or 0.2 of a step before
-    /// the first.
+    /// the first. An image lost at the DiT (`unusable` at `denoising`) is never decoded: its decoding counts as done.
     package struct Progress: Sendable {
         package static let textWeights = 0.5, imageWeights = 0.15, decodingWeights = 0.2
 
@@ -354,6 +354,11 @@ package final class Engine: Sendable {
             case .decoding(let seconds):
                 done += Progress.decodingWeights
                 decoding = seconds; decodingsDone += 1
+            case .unusable(_, .denoising):
+                // Lost after its steps, never decoded: its decoding counts as done, so that the fraction still reaches 1
+                // and the time remaining no longer counts it.
+                done += Progress.decodingWeights
+                decodingsDone += 1
             case .stage, .preview, .image, .unusable, .warning, .held, .memory: break
             }
         }

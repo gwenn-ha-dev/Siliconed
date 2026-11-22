@@ -13,8 +13,8 @@ enum Pace {
     /// `renders` DiTs opened by `session`, each evaluated `evaluations` times through `evaluate` (its index, the
     /// sampler's time for it, the velocity it returns); then the memory judged as `memory` judges a render: each engine
     /// stage opened against its P, the process against B, no swap.
-    static func run(_ invocation: Invocation, title: String, session: () throws -> AnyObject,
-                    evaluate: (AnyObject, Int, Float) throws -> [Float]) throws -> Report {
+    static func run<Session>(_ invocation: Invocation, title: String, session: () throws -> Session,
+                             evaluate: (Session, Int, Float) throws -> [Float]) throws -> Report {
         let renders = try invocation.integer("--renders", 3)
         let evaluations = try invocation.integer("--evaluations", 8)
         guard renders >= 1, evaluations >= 1 else { throw UsageError("--renders and --evaluations: 1 or more") }

@@ -1,11 +1,11 @@
-/// Attention, called as coreai-torch's `scaled_dot_product_attention` composite. Recopied from SiliCore
-/// (`CoreAIAttention.swift`, aec8f3c), without the causal mask (the attention written here is bidirectional): the mask is an
+/// Attention, called as coreai-torch's `scaled_dot_product_attention` composite. Recopied from the former engine
+/// (`CoreAIAttention.swift`, 0.21), without the causal mask (the attention written here is bidirectional): the mask is an
 /// input, additive, the keys past the sequence's length masked out at a fixed length of keys.
 ///
 ///     asset:  graph sdpa_… (private, composite_decl)         graph main
 ///               q·scale ─ ·kᵀ ─ [+ mask] ─ softmax ─ ·v         invoke sdpa_… (q, k, v [, mask]) ─ output
 ///
-/// What a port by analogy would miss (SiliCore's findings):
+/// What a port by analogy would miss (the former engine's findings):
 ///   - **the composite is a second graph, not a region**: `silu_v1` and the products carry their decomposition inline,
 ///     attention is a private graph beside `main`, reached by `dataflow.invoke_v1`. The call carries the graph as its
 ///     body until `Module.bytecode()` hoists it beside `main`;

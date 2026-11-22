@@ -26,7 +26,7 @@
 // The engine's refusals are translated case by case in `Problems.swift`.
 //
 // A client of `Siliconed` from the same package (`import`, never `@testable`): it reaches the library's
-// `package` symbols, never its internals. The view is in `MainView.swift`, the window and the app in `App.swift`.
+// `package` symbols, never its internals. The view is in `MainView.swift`, the window in `MainWindow.swift`, the app in `App.swift`.
 
 import AppKit
 import ImageIO
@@ -111,7 +111,8 @@ final class AppState {
     var exportFormat = ExportFormat(rawValue: UserDefaults.standard.string(forKey: AppState.exportFormatKey) ?? "") ?? .png {
         didSet { UserDefaults.standard.set(exportFormat.rawValue, forKey: Self.exportFormatKey) }
     }
-    private static let neuralEngineKey = "neuralEngine", glassKey = "glass"
+    static let neuralEngineKey = "neuralEngine"
+    private static let glassKey = "glass"
     /// **Whether the engine may give work to the Neural Engine** (Settings ▸ General ▸ Neural Engine), on by default: the
     /// engine sizes its share and takes it back where it does not help. Pushed to the engine (`CoreAI.neuralEngine`) at
     /// creation and at each change, before any plan reads it.
@@ -169,7 +170,7 @@ final class AppState {
     var format = ModelCard.recommendedFormats[0]
     var loras: [LoRASlot] = []
     /// **The render's images, each with its role** (`AppState+Inputs.swift`): the image edited and the references
-    /// (Qwen-Image-2.1), the image an img2img starts from (Z-Image, Anima, Krea 2), the neutral ones waiting
+    /// (a model that reads images), the image an img2img starts from (a model that starts from one), the neutral ones waiting
     /// for a role. Brought by the Prompt Lab, a drop, « Edit This Image », ⌘V or the remote control; `references` and
     /// `startImage` read them.
     var inputs: [InputImage] = []
@@ -202,7 +203,11 @@ final class AppState {
     /// Fixed seed (the field) or drawn at random at each render, like Draw Things. A variation
     /// belongs to its seed: changing the seed, or letting it be drawn, drops it.
     var fixedSeed = false { didSet { if !fixedSeed { variations = [] } } }
-    var seed: UInt64 = 42 { didSet { if seed != oldValue { variations = [] } } }
+    var seed: UInt64 = 42 { didSet { seedShown = true; if seed != oldValue { variations = [] } } }
+    /// Whether the rack's field has a seed to show: none before the first render draws one (or a seed is set: the dice,
+    /// a reused image, `silicontrol`) — the greyed field says « — », not the 42 nothing drew. Set by `seed`, and carried
+    /// across a switch of Mac (`copyForm`).
+    var seedShown = false
     /// **The variations the next render takes** (`Request.variations`) — only ever set by reusing a
     /// variation's settings (its menu, a dropped PNG), shown in the rack with a button that removes them.
     var variations: [Variation] = []
@@ -216,18 +221,28 @@ final class AppState {
     var seriesPlaced: [SeriesKey?] = [nil, nil]
     /// The knob whose « Bracket… » bubble is open.
     var bracketing: SeriesKey?
-    /// **Where `silicontrol rack` asks the rack's column to scroll**, and a count so that the same place asked twice scrolls again.
+    /// **Where `silicontrol rack` asks the rack's column to scroll**, and a count so that the same place asked twice scrolls again;
+    /// `nil` once the column has scrolled — a folded column, unfolded for it, scrolls as soon as it is drawn (`Sidebar`).
     var rackScroll: (place: GestureOrder.RackPlace, count: Int)?
     /// **The series whose grid the canvas shows** rather than an image (`SeriesCanvas`): its tile's click, « Generate »
     /// with something bracketed, `silicontrol grid`. Any image chosen takes the canvas back. Leaving the grid loads the
     /// image the strip marks: a series renders its cells without choosing one, and the canvas would come back empty.
-    var shownSeries: Int? { didSet { if shownSeries == nil, oldValue != nil { loadSelectedImage() } } }
+    var shownSeries: Int? {
+        didSet {
+            // A grid opened fills the canvas, whatever size the hand gave its cells the last time it was shown.
+            if shownSeries != oldValue { seriesFit = nil }
+            if shownSeries == nil, oldValue != nil { loadSelectedImage() }
+        }
+    }
     /// The series whose cells the history folds under their tile — the arrows skip them.
     var foldedSeries: Set<Int> = []
     /// A grid cell's long side on the canvas, in points: the slider, the pinch, ⌘+ ⌘−.
     var exploreCellSide: CGFloat = 220
-    static let cellSides: ClosedRange<CGFloat> = 96...1024
-    static func clampedCellSide(_ s: CGFloat) -> CGFloat { min(max(s, cellSides.lowerBound), cellSides.upperBound) }
+    /// **How the shown series was last fitted to the canvas** (`SeriesFit`): whether its cells follow the window, and the
+    /// side ⌘0 gives back.
+    var seriesFit: SeriesFit?
+    static let cellSides = SeriesFit.sides
+    static func clampedCellSide(_ s: CGFloat) -> CGFloat { SeriesFit.clamped(s) }
 
     // ── The chosen model's catalog: read from disk when it changes, not at each drawing ──
     /// The chosen model's chain — what the boxes draw. `nil` if it is not installed.

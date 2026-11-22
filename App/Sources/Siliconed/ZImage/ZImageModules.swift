@@ -101,7 +101,7 @@ package enum ZImagePublished {
 
 extension FamilyTraits {
     package static let zImage = FamilyTraits(
-        name: "Z-Image", ditKind: "z-image-turbo-dit",
+        name: "Z-Image",
         // The DiT as published, read where it lies: Comfy-Org's bf16 and int8 files (`split_files/diffusion_models`).
         ditMaps: [.standard: "z_image_turbo_bf16.safetensors", .compact: "z_image_turbo_int8_convrot.safetensors"],
         // The text encoder as Tongyi publishes it: `text_encoder/`, three bf16 shards behind their index.
@@ -123,7 +123,7 @@ extension FamilyTraits {
             BaseCheckpoint("Comfy-Org/Z-Image@94d47a46 z_image_int8_convrot", 6201001296, "eb2b470694fbd9778f15efd309000ea0091312c018c10a352c120b1da9bf4279"),
         ],
         model: { try Model.zImage(in: $0, card: $1, dit: $2) },
-        render: { try ZImageRender.render($0, $1, seeds: $2, model: $3, cancellation: $4, emit: $5) })
+        render: RenderLoop.render(ZImageRender.Parts.self))
 }
 
 extension Model {

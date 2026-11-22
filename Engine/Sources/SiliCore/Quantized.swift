@@ -1,16 +1,17 @@
-/// int8 codes and their scales, read through `coreai.dequantize`: W8A16, the codes widened and scaled in the function,
-/// the products in the scale's element. Recopied from SiliCore (`CoreAIQuantized.swift`, aec8f3c), the dequantize alone.
+/// int8 codes and their scales, read through `coreai.dequantize` (W8A16: the codes widened and scaled in the function, the
+/// products in the scale's element), and values brought to int8 codes through `coreai.quantize` (W8A8's activations,
+/// `w8a8`). Recopied from the former engine (`CoreAIQuantized.swift`, 0.21).
 ///
 ///     a weight [out, in] of int8 codes, a scale a row      arguments  w (si8 [out, in])  w_scale (f16 [out])
 ///       x · wᵀ                                               broadcasting_batch_matmul(x, transpose(dequantize_v2(w, w_scale, 0, 0, axis 0)))
 ///
-/// What a port by analogy would miss (SiliCore's findings):
+/// What a port by analogy would miss (the former engine's findings):
 ///   - **`dequantize_v2` is a composite whose region does the work in f32**, as coreai-torch writes it: `(q − zeroPoint) ·
 ///     scale` in f32 then cast to the scale's element, `+ minval` there; the zero point (si8) and the minval are constants
 ///     of zeros the operation always takes, the axis a si32 constant. A scale of rank 1 is reshaped to `[1…n…1]` *inside*
 ///     the region, the shape computed from the input's own dims with an `equal` of an iota against the axis, and broadcast
 ///     by `broadcast_to` of a dynamically shaped operand;
-///   - **the scale's element is the product's**: SiliCore measured W8A16 with the scales read in the activations' element
+///   - **the scale's element is the product's**: the former engine measured W8A16 with the scales read in the activations' element
 ///     as the form Core AI's GPU fuses (12/11: 1.30 × the W8A8 kernel in bf16; with the product in f32, 4.8 ×);
 ///   - **a product reading scales that follow its contraction axis is wrong on Core AI's GPU** (it fuses the dequantize
 ///     into the product: relative error 1 to 1000): a linear's scales follow
@@ -110,7 +111,7 @@ extension Aicode.Block {
     }
 
     /// `x` as si8 codes by `scale`, along `axis`: `clamp(round(x / scale), −128, 127)`, a half rounded away from zero
-    /// (`primitive.round_v1`): `coreai.quantize` as SiliCore writes it (`CoreAIQuantized.swift`), the activations' side of
+    /// (`primitive.round_v1`): `coreai.quantize` as the former engine wrote it (`CoreAIQuantized.swift`), the activations' side of
     /// a W8A8 product (coreai-optimization: « activation precisions include INT8 »).
     public func quantize(_ x: Int, scale: Int, axis: Int, constants: inout Aicode.ScalingConstants) -> Int {
         let shape = Aicode.shape(types[x]).shape

@@ -47,7 +47,7 @@ package enum Probes {
                 let short = info["CFBundleShortVersionString"] as? String ?? "?"
                 let build = info["CFBundleVersion"] as? String
                 return (build.map { $0 == short ? short : "\(short) (\($0))" } ?? short,
-                        info["CFBundleIdentifier"] as? String ?? "dev.gwenn-ha.siliconed")
+                        info["CFBundleIdentifier"] as? String ?? siliconedBundleIdentifier)
             }
             url.deleteLastPathComponent()
         }
@@ -191,6 +191,6 @@ package enum Probes {
         for i in 0..<(w * h) {
             rgb[3 * i] = rgbx[4 * i]; rgb[3 * i + 1] = rgbx[4 * i + 1]; rgb[3 * i + 2] = rgbx[4 * i + 2]
         }
-        return Insecure.MD5.hash(data: rgb).map { String(format: "%02x", $0) }.joined()
+        return Insecure.MD5.hash(data: rgb).hexadecimal
     }
 }

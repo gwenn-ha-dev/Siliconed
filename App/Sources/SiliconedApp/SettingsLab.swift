@@ -3,9 +3,9 @@
 //
 //     INSTRUCTIONS
 //     ┌───────────────────────────────────────────────────────┐
-//     │ [Krea 2 ▾]                        [Rewrite|Describe]  │
+//     │ [<model> ▾]                       [Rewrite|Describe]  │
 //     │ ┌───────────────────────────────────────────────────┐ │
-//     │ │ You rewrite a text-to-image prompt for Krea 2.    │ │
+//     │ │ You rewrite a text-to-image prompt for <model>.   │ │
 //     │ │ Keep every element of the user's text: …          │ │
 //     │ └───────────────────────────────────────────────────┘ │
 //     │ Yours: sent instead of ours.               [Restore]  │
@@ -64,8 +64,8 @@ struct LabInstructionsPane: View {
                         .fixedSize(horizontal: false, vertical: true)
                     Spacer()
                     Button("Restore") { lab.instructions.set(nil, for: family, gesture) }
-                        .disabled(!lab.instructions.isEdited(family, gesture))
                         .help("Brings back Siliconed’s instruction for this model and gesture.")
+                        .unavailable(lab.instructions.isEdited(family, gesture) ? nil : String(localized: "This is Siliconed’s instruction already."))
                 }
             }
             .padding(12)

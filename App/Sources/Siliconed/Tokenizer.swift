@@ -4,16 +4,14 @@ import SiliCore
 /// The byte-level BPE of the Qwen2/Qwen3 family, read from a published `tokenizer.json` — and the
 /// few variants the other families publish in the same format.
 ///
-/// The Z-Image Turbo encoder is a Qwen3-4B; Anima's is a Qwen3-0.6B, Krea 2's a Qwen3-VL-4B,
-/// Qwen-Image-2.1's a Qwen3-VL-8B: the same tokenizer, nothing beyond the supported families.
+/// The families' text encoders are Qwen3 and Qwen3-VL models of several sizes: the same tokenizer,
+/// nothing beyond what they read. A family's own template (its chat turn, a padding its pipeline
+/// asks for) lives in its folder.
 ///
 /// This is **not** a general `tokenizer.json` interpreter: every field it does not reproduce
 /// is checked and **refused**, not ignored — the same discipline a graph applies to tensor
 /// names. A tokenizer that silently falls back to a neighboring behavior produces
 /// tokens, and the image that comes out is simply the other one.
-///
-/// Beside the Qwen tokenizer itself, what the Z-Image pipeline asks for: **fixed-length
-/// padding** and the **mask**.
 ///
 /// Reading 7 MB of JSON and building two tables of 151 k entries happens at every startup; the two tables are read from
 /// the mapped file into `Pages` (`ByteTable`), not into `malloc`.
@@ -369,63 +367,6 @@ package final class Tokenizer {
         // `byte_fallback` is disabled and the 256 byte symbols are in the vocabulary, so
         // a lookup cannot fail — unless the file is not the one we validated.
         return parts.map { vocabulary.value($0) ?? -1 }
-    }
-
-    // MARK: - The chat template, and what the pipeline does with it
-
-    /// `apply_chat_template([{user, prompt}], add_generation_prompt=True, enable_thinking=True)`
-    /// for the Qwen3 template, reduced to the only form the pipeline ever asks for.
-    ///
-    /// **No Jinja engine**: with a single user turn and thinking enabled, the template is
-    /// this literal and nothing else. `goldens-text.json` records the string `transformers`
-    /// produces — the shortcut is **pinned**, not assumed.
-    package static let chatPrefix = "<|im_start|>user\n"
-    package static let chatSuffix = "<|im_end|>\n<|im_start|>assistant\n"
-
-    /// The padding token: `<|endoftext|>`. Read from `goldens-text.safetensors`, not deduced.
-    package static let padToken = 151643
-
-    /// What the engine gives the text encoder: `[maxLength]` identifiers and their mask.
-    ///
-    /// **The pipeline pads to fixed length** (`padding="max_length"`, 512) and does not cut
-    /// short sequences — the mask carries the information, not the length. `cap_feats` is then
-    /// the masked extraction: 19 rows out of 512 for the bench prompt (`pipeline_z_image.py`
-    /// 217-245).
-    ///
-    /// > **Truncation is silent and it costs the assistant header**: at 512, a
-    /// > long prompt is cut mid-sentence and loses `<|im_end|>\n<|im_start|>assistant\n`
-    /// > entirely. That is the reference's behavior, so it is **reproduced and not corrected** —
-    /// > the useful budget is 504 tokens, and saying so at admission is the caller's job.
-    package func encodeChat(user prompt: String, maxLength: Int = 512) -> (ids: [Int], mask: [Int]) {
-        Self.pad(encode(Self.chatPrefix + prompt + Self.chatSuffix), maxLength: maxLength)
-    }
-
-    /// `encodeChat` for a render: the whole prompt in its template, unpadded (the encoder reads the
-    /// real tokens alone), **refused past `Request.maximumPromptTokens`**, never truncated; `prompt`, the
-    /// prompt's own tokens. `encodeChat` keeps the reference's cut at 512, for the checks.
-    package func admitChat(user prompt: String) throws -> (ids: [Int], prompt: Int) {
-        let ids = encode(Self.chatPrefix + prompt + Self.chatSuffix)
-        let tokens = ids.count - encode(Self.chatPrefix + Self.chatSuffix).count
-        try Request.admitPrompt(tokens: tokens, max: Request.maximumPromptTokens)
-        return (ids, tokens)
-    }
-
-    /// **Truncation and padding, separated from encoding.** This is the half of `encodeChat` that
-    /// does not depend on the vocabulary — hence the half that can be checked in a millisecond, without
-    /// the 7 MB of JSON that the tokenizer parses at startup.
-    ///
-    /// This is not a test convenience: it is the rule that carries **the documented trap
-    /// above**. At 512, a long prompt is cut mid-sentence and loses
-    /// `<|im_end|>\n<|im_start|>assistant\n` entirely — the reference's behavior, reproduced
-    /// and not corrected. A rule described in a comment and never executed is
-    /// a rule one believes is upheld.
-    static func pad(_ identifiers: [Int], maxLength: Int) -> (ids: [Int], mask: [Int]) {
-        var ids = identifiers
-        if ids.count > maxLength { ids = Array(ids.prefix(maxLength)) }
-        let realCount = ids.count
-        ids += Array(repeating: padToken, count: maxLength - realCount)
-        return (ids, Array(repeating: 1, count: realCount)
-                   + Array(repeating: 0, count: maxLength - realCount))
     }
 
     // MARK: - Decoding

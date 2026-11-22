@@ -5,10 +5,13 @@ import Synchronization
 //
 //     1. the model is installed          its maps and published files are all there: checked by its construction
 //                                        (`Model.named`), the only way a model gets a library
-//     2. its license is accepted         `<root>/accepted-licenses.json`, written by the app
+//     2. its license is accepted         `<local>/accepted-licenses.json`, written by the app
 //     3. the format                      side ≥ 512, multiple of 16, and the family's own rules (its traits'
 //                                        multiple and longest side, `Format.check(…, family:)`)
 //     4. no other render                 `RenderLock.machine`, one for the machine, held for the whole render
+//     5. its shared files hashed once    those an older app left (`Installer.checkShared`): after the refusals that cost
+//                                        nothing, under the lock; one that is not the pinned bytes is removed, said
+//                                        (`sharedFileRemovedNotice`) and refused (`corruptMap`)
 //
 // The first that fails throws its `EngineError`. The memory is not among them: the engine plans the render under B before
 // its first computation, and refuses it there when no plan fits.
@@ -21,16 +24,35 @@ package enum Preflight {
         try Format.check(width: width, height: height, family: card.family)
     }
 
-    /// **All four, for a model about to render**: the lock comes back held, released when dropped; `warn` hears why the
-    /// render runs unguarded when the system refuses it. A hand-composed chain (no library) has neither registry nor
-    /// lock: its files are checked by its own constructors.
-    package static func run(_ model: Model, width: Int, height: Int, warn: (String) -> Void) throws(EngineError) -> RenderLock? {
-        let library = model.library
+    /// **All five, for a model about to render**: the lock comes back held, released when dropped; `warn` hears why the
+    /// render runs unguarded when the system refuses it, and which shared file was removed. A hand-composed chain (no
+    /// library) has neither registry nor lock: its files are checked by its own constructors.
+    package static func run(_ model: Model, width: Int, height: Int, cancellation: Cancellation? = nil,
+                            warn: (String) -> Void) throws(EngineError) -> RenderLock? {
+        guard let library = model.library else {
+            try check(card: model.card, width: width, height: height, licenseAccepted: true)
+            return nil
+        }
         try check(card: model.card, width: width, height: height,
-                  licenseAccepted: library.map { Licenses.implicit || $0.isLicenseAccepted(model.card) } ?? true)
-        return library == nil ? nil : try RenderLock.acquire(RenderLock.machine, warn: warn)
+                  licenseAccepted: Licenses.implicit || library.isLicenseAccepted(model.card))
+        let lock = try RenderLock.acquire(RenderLock.machine, warn: warn)
+        var installer = Installer(library: library)
+        installer.journal = { _ in }
+        installer.cancellation = cancellation
+        do {
+            try installer.checkShared(model.card.family)
+        } catch {
+            if case .corruptMap(let file?) = error { warn("\(sharedFileRemovedNotice): \(file)") }
+            throw error
+        }
+        return lock
     }
 }
+
+
+/// What a render says of a shared file removed before it (`Preflight.run`), followed by the file's path: the app says it
+/// in its own words (`AppState.journalLine`).
+package let sharedFileRemovedNotice = "A shared file of the model was not the published bytes: it was removed, and installing the model again downloads it alone"
 
 
 // ── 2 · the accepted licenses ────────────────────────────────────────────────────────────

@@ -5,7 +5,7 @@ import Foundation
 /// layout of a product's weight) never added into the weight.
 ///
 /// **Why beside and not merged** (measured 18/11/2026 on the published weights of three transformers and low-rank changes
-/// trained for them, `.build/coeur/glue/requant.py` and `fuse16.py`, the change's own error ‖Δ_kept − Δ‖ / ‖Δ‖ for a
+/// trained for them, the change's own error ‖Δ_kept − Δ‖ / ‖Δ‖ for a
 /// Gaussian input): merged into int8 codes and requantized per row, a change of 0.1 % to 3 % of a quantization step —
 /// most of the products measured — is rounded away whole (error 1.00, nothing of it along Δ), and one of 41 % of a step
 /// keeps an error of 0.47; merged into bf16, the change loses 0.63 to 0.95 of itself on half the products measured

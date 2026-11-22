@@ -135,3 +135,38 @@ final class EngineErrorTests: XCTestCase {
         return url
     }
 }
+
+extension EngineError {
+    /// Every case once, with plausible values: the codes are unique and each case has an English sentence
+    /// (`testEveryCaseHasAUniqueCodeAndASentence`). **A new case is added here too.**
+    static let samples: [EngineError] = [
+        .modelNotInstalled(model: "z-image"), .unknownModel(model: "sd15"), .licenseNotAccepted(model: "qwen-image-2.1"),
+        .fileMissing(path: "/a.safetensors"), .fileUnreadable(path: "/a.safetensors"), .corruptMap(file: "/a.safetensors"),
+        .diskFull(needed: 30_000_000_000, available: 1_000_000_000), .downloadInterrupted(file: "vae.safetensors"),
+        .downloadRefused(file: "vae.safetensors", status: 403), .downloadCorrupt(file: "vae.safetensors"),
+        .downloadInProgress(file: "vae.safetensors"),
+        .importRefused(file: "x.safetensors", detail: "not recognized"), .notAnImportedModel(model: "Z-Image Turbo"),
+        .importNeedsFamily(file: "x.safetensors", model: "anima"),
+        .importBaseModel(file: "qwen_image_2.1_bf16.safetensors", model: "qwen-image-2.1"),
+        .libraryAbsent(path: "/Volumes/Models/Siliconed", volume: "Models"),
+        .libraryRefused(path: "/Volumes/KEY/Siliconed", reason: .fileSizeLimit),
+        .emptyPrompt, .invalidSteps(steps: 8, allowed: [5, 6, 7, 9]), .tooManyReferences(count: 4, max: 3),
+        .imageTooSmall(side: 256, minimum: 512), .formatRefused(width: 1000, height: 1000, reason: .notMultiple, bound: 16),
+        .formatUnreadable(text: "big"), .promptSyntax(position: 12, reason: .unclosedGroup),
+        .tooManyPromptVariants(count: 128, max: 64), .promptReservedText(text: "<|image_pad|>"),
+        .promptTooLong(tokens: 600, max: 512), .gridRefused(reason: .groupNotOnAxis),
+        .tooManyGridCells(count: 81, max: 64), .strengthOutOfRange(strength: 1.5),
+        .strengthTooLow(strength: 0.1, steps: 8, floor: 0.125), .imageToImageUnsupported(model: "qwen-image-2.1"),
+        .solverUnsupported(solver: "unipc", model: "qwen-image-2.1"),
+        .detailUnsupported(model: "anima"),
+        .imageUnreadable(file: "/a.png"), .imageEncodingFailed, .imageWriteFailed(file: "/a.png"),
+        .unsupportedLoRA(file: "x.safetensors", reason: .noTarget),
+        .loraForOtherModel(lora: "PopArt", target: "z-image", model: "krea2"),
+        .incompatibleChain(output: "flux", input: "qwen-image"), .notOnEngine(model: "anima"),
+        .insufficientMemory(needed: 7_800_000_000, budget: 8_589_934_592),
+        .renderAlreadyRunning, .engineStopped(budget: 4 << 30, detail: "silicore-worker held 4.12 GiB, past B = 4.00 GiB"),
+        .engineMismatch(app: 2, engine: 1), .engineSilent(seconds: 600),
+        .cancelled, .nonFiniteImage(stage: .decoding),
+        .internalFailure(component: "engine", detail: "plan refused"),
+    ]
+}

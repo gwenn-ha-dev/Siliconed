@@ -20,7 +20,10 @@ app=$PWD/.build/Siliconed.app
 [[ -d $app ]] || { echo "dmg: build the app first (tools/app.sh --no-open)" >&2; exit 1 }
 version=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$app/Contents/Info.plist")
 dmg=$PWD/.build/Siliconed-$version.dmg
-staging=$PWD/.build/dmg rw=$PWD/.build/dmg-rw.dmg
+staging=$PWD/.build/dmg rw=$PWD/.build/dmg-rw.dmg mnt=
+# Whatever stops the script — an error under `set -e`, Finder refusing the AppleScript, ^C — leaves neither the read-write
+# image mounted nor its file behind; at a normal end both are already gone and this does nothing.
+trap '[[ -n $mnt && -d $mnt ]] && hdiutil detach -force -quiet "$mnt"; rm -rf "$staging" "$rw"' EXIT
 rm -rf $staging "$dmg" "$rw"
 mkdir -p $staging/.background
 ditto "$app" $staging/Siliconed.app

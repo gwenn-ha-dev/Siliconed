@@ -12,6 +12,8 @@ import SwiftUI
 struct DiTBox: View {
     @Bindable var app: AppState
     @State private var customSize = false
+    /// The seed's field, typed or greyed: ten digits, the most a seed drawn has (`Request.drawnSeed`).
+    private static let seedWidth: CGFloat = 100
 
     var body: some View {
         StageBox(title: "DiT", symbol: "engine.combustion", kind: .latent, state: app.state(of: .denoising),
@@ -203,33 +205,34 @@ struct DiTBox: View {
         // The lot is the series' seed axis: its ± on the Seed's line, choosing how many seeds and where they go — the same count
         // as the Seeds stepper under.
         // **Fixed, a box** (issue 17): two states, one click. Off, the field shows the seed the last render drew (`render`),
-        // greyed with the dice, a text that selects and copies (a disabled field does neither); on, that seed stays — the
-        // same image again.
+        // « — » before the first one, greyed with the dice, a text that selects and copies (a disabled field does neither);
+        // on, that seed stays — the same image again.
         Field(title: "Seed", app: app, bracket: .seeds) {
             if app.fixedSeed {
                 TextField("Seed", value: $app.seed, format: .number.grouping(.never))
                     .labelsHidden()
                     .multilineTextAlignment(.trailing)
-                    .frame(width: 100)
+                    .frame(width: Self.seedWidth)
             } else {
-                Text(verbatim: String(app.seed))
+                Text(verbatim: app.seedShown ? String(app.seed) : "—")
                     .monospacedDigit()
                     .foregroundStyle(Palette.secondary)
                     .textSelection(.enabled)
                     .lineLimit(1)
                     .padding(.horizontal, 4)
-                    .frame(width: 100, height: 22, alignment: .trailing)
+                    .frame(width: Self.seedWidth, height: 22, alignment: .trailing)
                     .background(RoundedRectangle(cornerRadius: 5).fill(Color.primary.opacity(0.05)))
-                    .help("The seed the last render drew: select it to copy it, check Fixed to keep it")
+                    .help(app.seedShown ? String(localized: "The seed the last render drew: select it to copy it, check Fixed to keep it")
+                                        : String(localized: "No seed drawn yet: the next render draws one, check Fixed to choose it"))
             }
-            Button { app.seed = UInt64.random(in: 0...UInt64(UInt32.max)) } label: { Image(systemName: "dice") }
+            Button { app.seed = Request.drawnSeed() } label: { Image(systemName: "dice") }
                 .buttonStyle(.borderless)
-                .disabled(!app.fixedSeed)
                 .help("Draw a seed")
                 .accessibilityLabel(Text("Draw a seed"))
+                .unavailable(app.fixedSeed ? nil : String(localized: "Check Fixed to choose the seed: unchecked, each render draws its own"))
             Toggle("Fixed", isOn: $app.fixedSeed)
                 .toggleStyle(.checkbox).fixedSize()
-                .help("Random: a new seed for every render. Fixed: the same image again")
+                .help("Unchecked: a new seed for every render. Checked: the same seed, the same image again")
         }
         if !app.variations.isEmpty {
             Field(title: "Variation") {
@@ -272,7 +275,7 @@ struct DiTBox: View {
             }
             .help(String(localized: "\(recipe) steps: the count this model is distilled for"))
         }
-        // Not on a model that offers none (Anima): a choice that changes nothing is not shown.
+        // Not on a model that offers none (`DenoisingModule.acceptsDetail`): a choice that changes nothing is not shown.
         if app.offersDetail {
             Field(title: "Detail", app: app, bracket: .detail) {
                 Picker("Detail", selection: $app.detail) {
@@ -499,8 +502,8 @@ private struct TriggerButton: View {
                 .font(.caption)
         }
         .buttonStyle(.bordered).controlSize(.small)
-        .disabled(there)
-        .help(there ? Text("In the prompt") : Text("Its trigger words, as its file gives them: a click puts them at the head of the prompt."))
+        .help("Its trigger words, as its file gives them: a click puts them at the head of the prompt.")
+        .unavailable(there ? String(localized: "In the prompt") : nil)
     }
 }
 

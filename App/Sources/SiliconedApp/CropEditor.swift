@@ -380,9 +380,9 @@ struct CropEditor: View {
             .menuStyle(.borderlessButton).fixedSize()
             .help("The frame’s proportions — the ones the size picker offers, the image’s own, or free")
             Button { app.swapCropOrientation() } label: { Image(systemName: "rectangle.portrait.rotate") }
-                .disabled(!canTurn)
                 .help("Turn the frame: portrait or landscape")
                 .accessibilityLabel(Text("Turn the frame: portrait or landscape"))
+                .unavailable(turnRefusal)
             Divider().frame(height: 22)
             Text(verbatim: Figures.size(session.box.width, session.box.height))
                 .font(.callout).monospacedDigit()
@@ -393,8 +393,8 @@ struct CropEditor: View {
                 .help("Leave without cropping (Esc)")
             Button("Crop") { app.commitCrop() }
                 .buttonStyle(.prominent)
-                .disabled(session.isWhole)
-                .help(session.isWhole ? Text("Move a side of the frame first") : Text("Crop the image (↩)"))
+                .help("Crop the image (↩)")
+                .unavailable(session.isWhole ? String(localized: "Move a side of the frame first") : nil)
         }
         .imageScale(.large)
         .padding(.horizontal, 16).padding(.vertical, 8)
@@ -410,9 +410,10 @@ struct CropEditor: View {
         }
     }
 
-    private var canTurn: Bool {
-        guard let r = session.ratio, r.num != r.den else { return false }
-        return session.frame.supports(.fixed(r.swapped))
+    /// Why the frame cannot turn, `nil` when it can.
+    private var turnRefusal: String? {
+        guard let r = session.ratio, r.num != r.den else { return String(localized: "A free or square frame has no other orientation.") }
+        return session.frame.supports(.fixed(r.swapped)) ? nil : String(localized: "Turned, this frame would not fit in the image.")
     }
 
     private func shapeItem(_ shape: Crop.Shape, _ title: Text) -> some View {

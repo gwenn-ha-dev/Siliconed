@@ -1,4 +1,5 @@
 import Foundation
+import Measurement
 import Siliconed
 
 // **One check's arguments, the same grammar for every stage**:
@@ -36,21 +37,16 @@ package struct Invocation: Sendable {
     /// Parses `arguments` (what follows `check <model> <stage>`), refusing any option outside `accepted`
     /// and `common`. `defaultSize`: the stage's own, when `--size` is absent.
     package init(_ arguments: [String], accepted: Set<String>, defaultSize: String) throws {
-        var values: [String: [String]] = [:]
-        var flags: Set<String> = []
-        var i = 0
-        while i < arguments.count {
-            let option = arguments[i]
-            guard option.hasPrefix("--") else { throw UsageError("unexpected argument '\(option)': options are named (--size 1024)") }
-            guard accepted.contains(option) || Self.common.contains(option) else {
-                let all = (accepted.union(Self.common)).sorted().joined(separator: " ")
-                throw UsageError("this stage does not take \(option) (it takes: \(all))")
-            }
-            if Self.flags.contains(option) { flags.insert(option); i += 1; continue }
-            guard i + 1 < arguments.count, !arguments[i + 1].hasPrefix("--") else { throw UsageError("\(option) expects a value") }
-            values[option, default: []].append(arguments[i + 1])
-            i += 2
+        let all = accepted.union(Self.common)
+        let scanned: Flags
+        switch Flags.scan(arguments, valued: all.subtracting(Self.flags), switches: all.intersection(Self.flags)) {
+        case .success(let f): scanned = f
+        case .failure(.unknownFlag(let option)):
+            throw UsageError("this stage does not take \(option) (it takes: \(all.sorted().joined(separator: " ")))")
+        case .failure(.flagWithoutValue(let option)): throw UsageError("\(option) expects a value")
         }
+        if let word = scanned.allWords.first { throw UsageError("unexpected argument '\(word)': options are named (--size 1024)") }
+        let values = scanned.values, flags = Set(scanned.switches)
         let size = values["--size"]?.last ?? defaultSize
         guard let (w, h) = Format.parse(size), w >= Format.minimumSide, h >= Format.minimumSide else {
             throw UsageError("--size \(size): 512, 1024 or WxH (768x512)")
@@ -93,6 +89,12 @@ package struct Invocation: Sendable {
         let path = map ?? Library.processWide.map(standard)
         guard FileManager.default.fileExists(atPath: path) else { throw Skip("map missing: \(path) — siliconed install") }
         return try MapCheck.use(path, golden: golden)
+    }
+
+    /// `ditMap` of the version judged (`compact()`): the Compact's map against the goldens of its int8 codes, else the
+    /// Standard's.
+    package func ditMap(_ standard: String, _ compactMap: String, compact: Bool) throws -> String {
+        try ditMap(compact ? compactMap : standard, golden: compact ? .eightBit : .standard)
     }
 
     /// `--variant compact`: the Compact's map and goldens; absent, the Standard's. Any other variant is a usage error.

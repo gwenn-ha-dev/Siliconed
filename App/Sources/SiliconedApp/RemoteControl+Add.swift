@@ -1,80 +1,114 @@
-// `add` and its argument parsing, single images and XY grids: the command that
-// builds a `RenderOrder` from the command line. Split from `RemoteControl.swift`.
+// `add` and `grid`: the order read from the command line (`RenderOrder`), checked, queued.
 
 import AppKit
 import Foundation
+import Measurement
 import Observation
 import Siliconed
 import SilicontrolHelp
 
 extension RemoteControl {
+    /// **A command's flags, read as every command reads them** (`Flags.scan`): one it does not take is refused by name, and
+    /// a text that begins with `--` goes after a lone `--`.
+    static func flags(_ arguments: [String], valued: Set<String>, switches: Set<String> = []) throws -> Flags {
+        switch Flags.scan(arguments, valued: valued, switches: switches) {
+        case .success(let flags): return flags
+        case .failure(.unknownFlag(let a)):
+            throw Refusal("usage", String(localized: "unknown flag: \(a)"),
+                          help: String(localized: "a text that begins with -- goes after a lone --"))
+        case .failure(.flagWithoutValue(let a)): throw Refusal("usage", String(localized: "\(a) expects a value"))
+        }
+    }
+
+    /// The flags of `add` and `grid`, by kind: those that take a value, and the switches.
+    static let addValued: Set<String> = ["--model", "--steps", "--detail", "--solver", "--batch", "--x", "--y", "--lora", "--ref",
+                                         "--out", "--image", "--strength"]
+    static let addSwitches: Set<String> = ["--preview", "--no-preview", "--wait", "--no-sheet"]
+
+    /// The arguments of the developer's render command, plus `--wait` and `--out`.
+    struct RenderOrder {
+        var model = ModelCard.of(.default).id
+        var prompt: String?
+        var format: (Int, Int)?
+        var seed: UInt64?
+        var batch = 1
+        var steps: Int?
+        /// `--detail more|most`: the rack's Detail choice (`Request.detail`).
+        var detail = Detail.normal
+        /// `--solver NAME`: the rack's Solver (`Request.solver`), More Solvers and `AppState.solverFamilies` only.
+        var solver = Solver.euler
+        var loras: [(name: String, strength: Double)] = []
+        /// The `--ref`, in their order: the first is image 1, the one edited.
+        var references: [String] = []
+        /// `--image IMAGE|i7`: the starting image of an img2img (a model with "start_image": true); `--strength`: its strength,
+        /// diffusers' (the family's, `StartImage.defaultStrength`, when left out).
+        var image: String?
+        var strength: Double?
+        /// `nil`: like the DiT box's « Preview every step » switch.
+        var previews: Bool?
+        var wait = false
+        /// `grid --no-sheet`: a series as « Generate » renders it — the cells, the sheet only on `sheet g2`.
+        var sheet = true
+        var folder: String?
+        /// `grid`: the axes as typed (`RenderGrid.axis`), and whether `--batch` was given (refused).
+        var x: String?, y: String?
+        var batchGiven = false
+    }
+
     func parse(_ arguments: [String]) throws -> RenderOrder {
         var d = RenderOrder()
-        var positional: [String] = []
-        var i = 0
-        func value(_ flag: String) throws -> String {
-            guard i + 1 < arguments.count else { throw Refusal("usage", String(localized: "\(flag) expects a value")) }
-            i += 1
-            return arguments[i]
-        }
-        while i < arguments.count {
-            let a = arguments[i]
-            switch a {
-            case "--model": d.model = try value(a)
-            case "--steps":
-                let v = try value(a)
-                guard let n = Int(v), (1...Request.maximumSteps).contains(n) else {
-                    throw Refusal("usage", String(localized: "--steps expects an integer from 1 to \(Request.maximumSteps), not \"\(v)\""))
-                }
-                d.steps = n
-            case "--detail":
-                let v = try value(a)
-                guard let level = Detail(rawValue: v.lowercased()) else {
-                    throw Refusal("usage", String(localized: "--detail expects normal, more or most, not \"\(v)\""))
-                }
-                d.detail = level
-            case "--solver":
-                let v = try value(a)
-                guard let rule = Solver(rawValue: v.lowercased()) else {
-                    throw Refusal("usage", String(localized: "--solver expects euler, euler-ancestral, dpmpp-2m or unipc, not \"\(v)\""))
-                }
-                d.solver = rule
-            case "--batch":
-                let v = try value(a)
-                guard let n = Int(v), (1...8).contains(n) else { throw Refusal("usage", String(localized: "--batch expects an integer from 1 to 8, not \"\(v)\"")) }
-                d.batch = n
-                d.batchGiven = true
-            case "--x": d.x = try value(a)
-            case "--y": d.y = try value(a)
-            case "--lora":
-                let v = try value(a)
-                // `name:strength` — the last colon separates the strength (a path has none).
-                if let colonIndex = v.lastIndex(of: ":"), let f = Double(v[v.index(after: colonIndex)...].replacingOccurrences(of: ",", with: ".")) {
-                    // `Double` reads « nan » and « inf »: a strength that would make every weight NaN.
-                    guard f.isFinite else { throw Refusal("usage", String(localized: "--lora expects a finite strength, not \"\(v)\"")) }
-                    d.loras.append((String(v[..<colonIndex]), f))
-                } else {
-                    d.loras.append((v, 1))
-                }
-            case "--ref": d.references.append(try value(a))
-            case "--out": d.folder = try value(a)
-            case "--preview": d.previews = true
-            case "--no-preview": d.previews = false
-            case "--wait": d.wait = true
-            case "--no-sheet": d.sheet = false
-            case "--image": d.image = try value(a)
-            case "--strength":
-                let v = try value(a)
-                guard let s = StartImage.strength(v) else {
-                    throw Refusal("usage", String(localized: "--strength expects a number above 0 and at most 1 (0.65 or 65%), not \"\(v)\""))
-                }
-                d.strength = s
-            default:
-                if a.hasPrefix("--") { throw Refusal("usage", String(localized: "unknown flag: \(a)")) }
-                positional.append(a)
+        let flags = try Self.flags(arguments, valued: Self.addValued, switches: Self.addSwitches)
+        // A flag given twice: its last value, except those that add up (`--lora`, `--ref`).
+        if let model = flags.value("--model") { d.model = model }
+        if let v = flags.value("--steps") {
+            guard let n = Int(v), (1...Request.maximumSteps).contains(n) else {
+                throw Refusal("usage", String(localized: "--steps expects an integer from 1 to \(Request.maximumSteps), not \"\(v)\""))
             }
-            i += 1
+            d.steps = n
         }
+        if let v = flags.value("--detail") {
+            guard let level = Detail(rawValue: v.lowercased()) else {
+                throw Refusal("usage", String(localized: "--detail expects normal, more or most, not \"\(v)\""))
+            }
+            d.detail = level
+        }
+        if let v = flags.value("--solver") {
+            guard let rule = Solver(rawValue: v.lowercased()) else {
+                throw Refusal("usage", String(localized: "--solver expects euler, euler-ancestral, dpmpp-2m or unipc, not \"\(v)\""))
+            }
+            d.solver = rule
+        }
+        if let v = flags.value("--batch") {
+            guard let n = Int(v), (1...8).contains(n) else { throw Refusal("usage", String(localized: "--batch expects an integer from 1 to 8, not \"\(v)\"")) }
+            d.batch = n
+            d.batchGiven = true
+        }
+        d.x = flags.value("--x")
+        d.y = flags.value("--y")
+        for v in flags.values["--lora"] ?? [] {
+            // `name:strength` — the last colon separates the strength (a path has none).
+            if let colonIndex = v.lastIndex(of: ":"), let f = Double(v[v.index(after: colonIndex)...].replacingOccurrences(of: ",", with: ".")) {
+                // `Double` reads « nan » and « inf »: a strength that would make every weight NaN.
+                guard f.isFinite else { throw Refusal("usage", String(localized: "--lora expects a finite strength, not \"\(v)\"")) }
+                d.loras.append((String(v[..<colonIndex]), f))
+            } else {
+                d.loras.append((v, 1))
+            }
+        }
+        d.references = flags.values["--ref"] ?? []
+        d.folder = flags.value("--out")
+        if let last = flags.last(of: ["--preview", "--no-preview"]) { d.previews = last == "--preview" }
+        if flags.has("--wait") { d.wait = true }
+        if flags.has("--no-sheet") { d.sheet = false }
+        d.image = flags.value("--image")
+        if let v = flags.value("--strength") {
+            guard let s = StartImage.strength(v) else {
+                throw Refusal("usage", String(localized: "--strength expects a number above 0 and at most 1 (0.65 or 65%), not \"\(v)\""))
+            }
+            d.strength = s
+        }
+        // A prompt that begins with `--` is written after a lone `--`: everything there is a word.
+        let positional = flags.allWords
         guard let prompt = positional.first else {
             throw Refusal("usage", String(localized: "the prompt is missing"), help: "silicontrol add [--model id] \"<prompt>\" [512|1024|WxH|P:Q@1K|2K] [seed] — silicontrol help add")
         }
@@ -149,7 +183,7 @@ extension RemoteControl {
             throw Refusal("usage", String(localized: "--strength goes with --image"), help: "silicontrol help add")
         }
         if let word = d.image {
-            guard model.chain.entries.contains(where: { $0.kind == .image }) else {
+            guard model.chain.acceptsStartImage else {
                 let name = card?.name ?? model.name
                 throw Refusal("img2img", String(localized: "\(name) doesn’t start from an image (--image)"),
                               help: model.chain.denoising.maxReferences > 0
@@ -243,7 +277,7 @@ extension RemoteControl {
         }
         let plan = model.chain.denoising.plan(height: height / f, width: width / f, steps: steps, start: first)
         // One seed for the whole series, drawn once: the alternatives are compared at the same seeds.
-        let firstNumber = d.seed ?? UInt64.random(in: 0...UInt64(UInt32.max))
+        let firstNumber = d.seed ?? Request.drawnSeed()
         if grid {
             if alternatives.variants.contains(where: { app.rewrite($0.prompt, model: model) != nil }) {
                 throw Refusal("subject", String(localized: "a grid does not cite named subjects yet"),
@@ -281,17 +315,8 @@ extension RemoteControl {
         // The canvas follows the render, as after « Generate » — a series shown before keeps it otherwise.
         app.followsRender = true
         app.enqueue(jobs)
-        // The form takes what the job computes, as after a click: settings, edit images, seed — and
-        // the prompt as typed, so that « Generate » would queue the same series.
-        app.restoreSettings(jobs[0].settings)
-        app.prompt = prompt
-        app.setEditImages(references)
-        // The starting image too, or none: « Generate » would queue the same request.
-        app.setStart(start)
-        if let strength { app.startStrength = strength }
-        // A seed drawn here is a Random render, as after a click: the rack shows the seed drawn, greyed, not an old Fixed one.
-        app.fixedSeed = d.seed != nil
-        app.seed = firstNumber
+        app.takeRequest(jobs[0].settings, prompt: prompt, references: references, start: start, strength: strength,
+                        seed: firstNumber, fixed: d.seed != nil)
 
         let added = zip(jobs, variants).map { job, v -> [String: Any] in
             var o = queued(job)
@@ -311,232 +336,6 @@ extension RemoteControl {
         }
     }
 
-    // ── grid ──
-
-    /// **`grid`**: the request `add` checked, its axes read and the grid checked by the library
-    /// (`RenderGrid`), every step count of it checked by the denoiser, the queue's room — then one job
-    /// per cell; with `--wait --out D`, the sheet written into D when the last one ends.
-    private func addGrid(_ d: RenderOrder, prompt: String, model: Model, card: ModelCard?, format: RecommendedFormat,
-                         steps: Int, stack: [LoRASlot], references: [ReferenceImage], start: ReferenceImage?, strength: Double?,
-                         seed: UInt64,
-                         defaultSteps: Int, folder: String?, cwd: String, _ c: Connection) throws {
-        // A LoRA axis names its LoRAs as `--lora` does (a name, else a path from the client's folder).
-        let g = try readGrid(d, prompt: prompt, seed: seed, steps: steps, stack: stack, images: references.count, start: start != nil) { name in
-            (app.library.lora(name, for: model.identifier) ?? app.library.lora(absolute(name, cwd), for: model.identifier))?.path
-        }
-        try checkSolverAxis(g, family: card?.family, name: card?.name ?? model.name)
-        // Each cell's step count against its own model's schedules (a model axis: each model's).
-        for cell in g.cells {
-            guard let n = cell.steps else { continue }
-            let denoising = cell.model.flatMap { try? Model.named($0, in: app.library).chain.denoising } ?? model.chain.denoising
-            try checkSteps(n, scheduled: denoising.scheduledSteps, defaultSteps: nil)
-        }
-        guard app.file.count + g.count <= AppState.maxQueueLength else {
-            let n = g.count, max = AppState.maxQueueLength, room = max - app.file.count
-            throw Refusal("queue_full", String(localized: "\(n) jobs for the grid: the queue has room for \(room) (\(max) jobs)"),
-                          help: "silicontrol wait, then retry")
-        }
-        var settings = RenderSettings(identifier: model.identifier, modelName: card?.name ?? model.name, prompt: prompt,
-                                      format: format, steps: steps, loras: stack, references: references.count, detail: d.detail,
-                                      solver: d.solver)
-        settings.strength = strength
-        let (run, jobs) = app.enqueueGrid(g, settings: settings, references: references, previews: d.previews ?? app.previews,
-                                          start: start)
-        // The form takes the grid, as after a click: settings, prompt as typed, edit images, and the axes the window brackets
-        // (a models, steps, listed seeds or images axis stays silicontrol's).
-        app.restoreSettings(settings)
-        app.prompt = prompt
-        app.setEditImages(references)
-        app.setStart(start)
-        if let strength { app.startStrength = strength }
-        if let s = d.seed { app.fixedSeed = true; app.seed = s } else { app.fixedSeed = false }
-        _ = app.setSeries(from: g)
-        // …and the canvas shows the grid filling in, as « Generate » shows a series (`renderSeries`).
-        app.followsRender = false
-        app.shownSeries = run.ordinal
-
-        let added = jobs.map(queued)
-        if d.wait {
-            for var o in added { o["type"] = "added"; emit(c, o) }
-            followGrid(run.ordinal, folder: folder, sheet: d.sheet, c)
-        } else {
-            finish(c, ["ok": true, "grid": run.name, "columns": g.columns, "rows": g.rows, "jobs": added,
-                       "estimate_s": estimate(jobs)])
-        }
-    }
-}
-
-// MARK: - The starting image
-
-extension RemoteControl {
-    /// **An image the remote control names as a starting image**: `i7` of the history (its PNG's bytes), or a file — read as
-    /// `siliconed-dev render --image` reads it.
-    func startImage(_ word: String, cwd: String) throws -> ReferenceImage {
-        if let entry = image(word) { return app.startImage(from: entry) }
-        return try fileImage(word, cwd: cwd)
-    }
-
-    /// **`start-image`**: the rack's starting image, as the Prompt Lab carries it and the rack's Images box retouches it —
-    /// `start-image` alone says what it holds; `start-image IMAGE|i7 [--strength S]` carries one (the size set to the nearest
-    /// recommended format, `carryStart`); `--strength S` alone retouches its strength; `--remove` takes it out.
-    func startImage(_ action: GestureOrder.StartImageAction, cwd: String) throws -> [String: Any] {
-        func refuseWithoutImg2Img() throws {
-            guard app.startsFromImage else {
-                let name = app.card?.name ?? app.identifier
-                throw Refusal("img2img", String(localized: "\(name) doesn’t start from an image"),
-                              help: app.editingPossible ? String(localized: "--ref <image> to edit it (help edit)")
-                                                        : String(localized: "models that do have \"start_image\": true in \"silicontrol models\""))
-            }
-        }
-        switch action {
-        case .status:
-            break
-        case .carry(let word, let strength):
-            try refuseWithoutImg2Img()
-            app.carryStart(try startImage(word, cwd: cwd), strength: strength)
-        case .strength(let s):
-            guard app.startImage != nil else {
-                throw Refusal("no_start_image", String(localized: "the rack holds no starting image"),
-                              help: "silicontrol start-image <image|i7>")
-            }
-            app.setStartStrength(s)
-        case .remove:
-            app.removeStart()
-        }
-        return ["ok": true, "rack": rackSettings()]
-    }
-
-    /// The starting image the rack holds, as the answers say it — `nil` when none.
-    func startJSON() -> [String: Any]? {
-        guard let s = app.startImage else { return nil }
-        var o: [String: Any] = ["name": s.name, "width": s.width, "height": s.height,
-                                "strength": Response.number(app.startStrength), "used": app.usedStart != nil]
-        if let r = app.startRedraws { o["redrawn_steps"] = r.redrawn; o["of_steps"] = r.of }
-        if app.usedStart != nil { o["image_ignored"] = app.startIgnored }
-        return o
-    }
-}
-
-// MARK: - What `add` and `grid` check alike, on this Mac and on another
-
-extension RemoteControl {
-    /// The flags of one command that the other does not take.
-    func checkUsage(_ d: RenderOrder, grid: Bool) throws {
-        if !grid, d.x != nil || d.y != nil || !d.sheet {
-            throw Refusal("usage", String(localized: "--x, --y and --no-sheet belong to “silicontrol grid”"), help: "silicontrol help grid")
-        }
-        if grid, d.x == nil {
-            throw Refusal("usage", String(localized: "a grid needs --x (and optionally --y)"), help: "silicontrol help grid")
-        }
-        if grid, d.batchGiven {
-            throw Refusal("usage", String(localized: "a grid’s cell is one image: --batch does not apply"),
-                          help: String(localized: "--x seeds=N gives N seeds — silicontrol help grid"))
-        }
-    }
-
-    /// `--solver` other than Euler: the rack's, so More Solvers on, and a model whose family walks the others
-    /// (`AppState.solverFamilies`). `name`: the model's, as the refusal says it.
-    func checkSolver(_ solver: Solver, family: Family?, name: String) throws {
-        guard solver != .euler else { return }
-        guard app.developerMode else {
-            throw Refusal("solver", String(localized: "--solver \(solver.rawValue) is offered only when More Solvers is on"),
-                          help: String(localized: "turn on More Solvers in Settings (⌘,)"))
-        }
-        guard family.map(AppState.solverFamilies.contains) == true else {
-            throw Refusal("solver", String(localized: "\(name) doesn’t offer the \(solver.rawValue) solver"), help: solverHint)
-        }
-    }
-
-    /// A solver axis is the rack's Solver swept, so as `--solver` — but with a model axis, a cell of a model walking
-    /// Euler alone renders Euler, as in the app.
-    func checkSolverAxis(_ g: RenderGrid, family: Family?, name: String) throws {
-        guard g.cells.contains(where: { ($0.solver ?? .euler) != .euler }) else { return }
-        guard app.developerMode else {
-            throw Refusal("solver", String(localized: "a solver axis is offered only when More Solvers is on"),
-                          help: String(localized: "turn on More Solvers in Settings (⌘,)"))
-        }
-        guard g.cells.contains(where: { $0.model != nil }) || family.map(AppState.solverFamilies.contains) == true else {
-            throw Refusal("solver", String(localized: "\(name) walks Euler only"), help: solverHint)
-        }
-    }
-
-    /// The models a solver other than Euler is offered on, as `--model` takes them: read from the families' traits.
-    private var solverHint: String {
-        let ids = Family.allCases.filter(AppState.solverFamilies.contains).map { ModelCard.of($0).id }.joined(separator: "|")
-        return String(localized: "Euler only, or --model \(ids)")
-    }
-
-    /// Detail: not on a model that offers none — the rack hides it there.
-    func checkDetail(_ detail: Detail, accepted: Bool, name: String) throws {
-        guard detail != .normal, !accepted else { return }
-        throw Refusal("detail", String(localized: "\(name) doesn’t offer Detail"), help: String(localized: "leave out --detail"))
-    }
-
-    /// The stack as the rack allows it: `AppState.maxLoRA` at most, a negative strength only with its Beta option.
-    func checkLoRAs(_ d: RenderOrder) throws {
-        guard d.loras.count <= AppState.maxLoRA else {
-            let n = d.loras.count, max = AppState.maxLoRA
-            throw Refusal("lora", String(localized: "\(n) LoRAs: the app stacks \(max) at most"))
-        }
-        guard app.negativeLoRAStrengths || !d.loras.contains(where: { $0.strength < 0 }) else {
-            throw Refusal("lora", String(localized: "negative LoRA strengths are off"),
-                          help: String(localized: "turn on Settings › Advanced › Negative LoRA Strengths (⌘,)"))
-        }
-    }
-
-    /// A step count with no schedule among `scheduled`, refused with the counts there are.
-    func checkSteps(_ n: Int, scheduled: [Int], defaultSteps: Int?) throws {
-        guard !scheduled.contains(n) else { return }
-        let accepted = scheduled.map(String.init).formatted(.list(type: .or))
-        throw Refusal("steps", String(localized: "This model has no schedule for \(String(n)) steps: \(accepted)."),
-                      help: defaultSteps.map { "--steps \($0) (the model's \"default_steps\")" })
-    }
-
-    /// **The grid of `grid`**: its axes read, a LoRA axis's names turned into paths by `lora` (`nil`: no such LoRA),
-    /// and the grid checked by the library (`RenderGrid`) — and by the rack's rule on negative strengths.
-    func readGrid(_ d: RenderOrder, prompt: String, seed: UInt64, steps: Int, stack: [LoRASlot], images: Int, start: Bool,
-                  lora: (String) -> String?) throws -> RenderGrid {
-        do {
-            let names = d.loras.map(\.name)
-            func resolved(_ a: RenderGrid.Axis) throws(EngineError) -> RenderGrid.Axis {
-                guard case let .addedLoRAs(l, f) = a else { return a }
-                var paths: [String] = []
-                for name in l {
-                    if name.isEmpty { paths.append(""); continue }
-                    guard let path = lora(name) else { throw .gridRefused(reason: .noSuchLoRA) }
-                    paths.append(path)
-                }
-                return .addedLoRAs(paths, strength: f)
-            }
-            let x = try resolved(RenderGrid.axis(d.x ?? "", loras: names))
-            let y = try d.y.map { try resolved(RenderGrid.axis($0, loras: names)) }
-            let g = try RenderGrid(.init(prompt: prompt, seed: seed, steps: steps, loraStrengths: stack.map(\.strength),
-                                         images: images, start: start), x: x, y: y)
-            guard !app.refusesNegativeStrength(g) else { throw EngineError.gridRefused(reason: .invalidValue) }
-            return g
-        } catch {
-            let p = Problem(error)
-            throw Refusal("grid", p.title, help: p.suggestion ?? "silicontrol help grid")
-        }
-    }
-
-    /// An edit's image as the command line names it: `i7` of the history, or a file.
-    func referenceImage(_ word: String, cwd: String) throws -> ReferenceImage {
-        if let entry = image(word), let reference = app.fromHistory(entry) { return reference }
-        return try fileImage(word, cwd: cwd)
-    }
-
-    /// An image file, from the client's folder: refused if ImageIO cannot read it. Read here, on the main thread: a job takes
-    /// its place in the queue when its command arrives, and a read awaited elsewhere would let a later command pass it.
-    func fileImage(_ path: String, cwd: String) throws -> ReferenceImage {
-        let url = URL(fileURLWithPath: absolute(path, cwd))
-        guard let image = ReferenceImage.file(url) else {
-            let path = url.path
-            throw Refusal("ref", String(localized: "image unreadable or missing: \(path)"))
-        }
-        return image
-    }
-
     /// A job queued on this Mac, as `add` and `grid` answer it: its place (0: rendering, else from 1) and its estimate.
     func queued(_ job: Job) -> [String: Any] {
         var o = json(job)
@@ -548,23 +347,4 @@ extension RemoteControl {
 
     /// The jobs' estimate, all together; `null` when one was never measured.
     func estimate(_ jobs: [Job]) -> Any { app.estimation(of: jobs).map { Response.number($0, 1) } ?? NSNull() }
-}
-
-extension AppState {
-    /// The planned duration of these jobs together, or `nil` if one was never measured.
-    func estimation(of jobs: [Job]) -> Double? {
-        var total = 0.0
-        for j in jobs {
-            guard let e = estimation(j) else { return nil }
-            total += e
-        }
-        return total
-    }
-}
-
-extension DenoisingModule {
-    /// The step counts there is a schedule for (`check(steps:)`): what `--steps` takes, and what a lender publishes.
-    var scheduledSteps: [Int] {
-        (1...Request.maximumSteps).filter { (try? check(steps: $0, startImage: false)) != nil }
-    }
 }

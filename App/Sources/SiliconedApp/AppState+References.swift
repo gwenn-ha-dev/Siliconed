@@ -10,8 +10,9 @@ import UniformTypeIdentifiers
 extension AppState {
     // MARK: Reference (editing)
 
-    // **Editing by reference** (Qwen-Image-2.1) lives here. The re-noised starting image (img2img, SDEdit) of
-    // Z-Image, Anima and Krea 2 is another input, chosen in the Prompt Lab: `AppState+Start.swift`.
+    // **Editing by reference** (a model that reads images, `DenoisingModule.maxReferences`) lives here. The re-noised
+    // starting image (img2img, SDEdit) of a model that starts from one is another input, chosen in the Prompt Lab:
+    // `AppState+Start.swift`.
 
     /// A file as the render reads it (`ReferenceImage.file`), read off the main thread; an unreadable one is said.
     func read(_ url: URL) async -> ReferenceImage? {
@@ -68,7 +69,7 @@ extension AppState {
         }
     }
 
-    /// « Edit with Qwen-Image-2.1 »: the rack takes that model, and the image becomes its image 1.
+    /// « Edit with <model> »: the rack takes that model, which reads images, and the image becomes its image 1.
     func edit(_ entry: Entry, with model: String) {
         if identifier != model { identifier = model }
         placeReference(entry)

@@ -40,11 +40,9 @@ enum Krea2Fusion {
         }
     }
 
-    /// Each kind of block's ranks: the largest landing on one of its blocks' products, by argument (`LoRAStack.rank`).
+    /// Each kind of block's ranks: the largest landing on one of its blocks' products, by argument (`LoRAStack.ranks`).
     static func ranks(_ loras: LoRAStack) -> [String: [String: Int]] {
-        Dictionary(uniqueKeysWithValues: ["layerwise", "refiner"].map { kind in
-            (kind, Krea2Functions.ranks(loras, blocks: blocks(kind)))
-        })
+        Dictionary(uniqueKeysWithValues: ["layerwise", "refiner"].map { kind in (kind, loras.ranks(blocks(kind).flatMap(loraProducts), on: .krea2)) })
     }
 
     /// The functions by kind, at their rows: the layerwise blocks' a tile of 32 tokens' taps, the projector's 32 tokens,

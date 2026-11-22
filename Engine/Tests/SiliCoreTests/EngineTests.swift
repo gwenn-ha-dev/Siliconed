@@ -8,7 +8,7 @@ import Testing
 /// The engine knows no word of a workload: a model writes its functions with the engine's tools, the engine holds the
 /// memory and the units.
 @Test func engineKnowsNoWorkload() throws {
-    let forbidden = #"\b(dit|diffusion|sigma|σ|timesteps?|prompts?|latents?|denois\w*|vae|lora|adapters?|images?|pixels?|videos?|texts?|tokens?|llm|captions?|samplers?|schedulers?|cfg|guidance|qwen\w*|krea\w*|anima|moss|flux|z-image|siliconed)\b"#
+    let forbidden = #"\b(dit|diffusion|sigma|σ|timesteps?|prompts?|latents?|denois\w*|vae|lora|adapters?|images?|pixels?|videos?|texts?|tokens?|llm|captions?|samplers?|schedulers?|cfg|guidance|qwen\w*|krea\w*|anima|moss|flux|z-image|siliconed|velocit\w*|decoders?|z's|z at|z compact\w*)\b"#
     let regex = try NSRegularExpression(pattern: forbidden, options: [.caseInsensitive])
     let sources = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
         .appendingPathComponent("../../Sources/SiliCore").standardizedFileURL
@@ -61,11 +61,12 @@ private let device = MTLCreateSystemDefaultDevice()
     }
     #expect(arena.used == expected - Arena.aligned(sizes.last!) + sizes.last!)
 
+    let heaps = arena.allocated
     let exit = arena.take(apart: 1000)
-    #expect(exit == arena.size && arena.apartBytes == Arena.aligned(1000) && arena.buffer(exit).heap == nil)
+    #expect(exit == arena.size && arena.allocated - heaps == Arena.aligned(1000) && arena.buffer(exit).heap == nil)
     let s = arena.take(surface: [3, 64], element: 2)
     let surface = try #require(arena.surface(s))
-    #expect(s == arena.size + Arena.aligned(1000) && arena.apartBytes == apart)
+    #expect(s == arena.size + Arena.aligned(1000) && arena.allocated - heaps == apart)
     #expect(surface.width == 64 && surface.height == 3 && surface.bytesPerRow == 128)
     #expect(arena.surface(exit) == nil)
     // The GPU's buffer over the surface is its bytes.
@@ -96,6 +97,45 @@ func safetensors(_ name: String, _ tensors: [(String, String, [Int], [UInt8])]) 
 
 private func bytes<T>(_ values: [T]) -> [UInt8] { values.withUnsafeBytes { Array($0) } }
 private func bf16(_ x: Float) -> UInt16 { UInt16(x.bitPattern >> 16) }
+
+extension Weights {
+    /// `entries` read from `file` into `arena` as a stage reads them (`Weights.place`, then `Weights.read` through a
+    /// staging), the staging in `Pages` of its own.
+    static func load(_ entries: [Entry], from file: SafeTensors, into arena: Arena, codes: CodesLayout = .inOut) throws -> [String: Placed] {
+        let placed = place(try layout(entries, in: file, codes: codes), in: arena)
+        let staging = Pages(bytes: try Self.staging(entries, in: file, codes: codes))
+        try withExtendedLifetime(staging) {
+            try read(entries, from: file, into: placed, arena: arena, staging: staging.base, codes: codes)
+        }
+        return placed
+    }
+}
+
+/// **A shared form's product, by its weights**: the arguments its function declares are the slots its entry lays in the
+/// arena, a leading 1 before each — the codes `[in, out]` (`codes`) or as the file lays them `[out, in]` (`integer`, the
+/// plan's layout `outIn`), their scales `[1, 1, out]`; the Standard's weight `<key>.weight` rounded to f16 `[in, out]`.
+@Test func aSharedProductsArgumentsAreItsEntrysSlots() throws {
+    let (out, inn) = (96, 64)
+    let path = try safetensors("shared-weights.safetensors", [
+        ("p.weight", "I8", [out, inn], [UInt8](repeating: 1, count: out * inn)),
+        ("p.weight_scale", "F32", [out, 1], bytes([Float](repeating: 0.01, count: out))),
+        ("q.weight", "BF16", [out, inn], bytes([UInt16](repeating: bf16(0.5), count: out * inn))),
+    ])
+    let file = try SafeTensors(path)
+    #expect(SharedWeights.codes.layout == .inOut && SharedWeights.integer.layout == .outIn && SharedWeights.half.layout == .inOut)
+    #expect(SharedWeights.codes.isCodes && SharedWeights.integer.isCodes && !SharedWeights.half.isCodes)
+    for (weights, key, shape) in [(SharedWeights.codes, "p", [1, inn, out]), (.integer, "p", [1, out, inn]), (.half, "q", [1, inn, out])] {
+        let entry = weights.entry("w", key: key)
+        #expect(entry.name == "w" && entry.key == (weights.isCodes ? key : key + ".weight") && entry.recipe == (weights.isCodes ? .codes : .halfTransposed))
+        let arguments = weights.arguments("w", inn: inn, out: out)
+        let slots = try Weights.layout([entry], in: file, codes: weights.layout)
+        #expect(arguments.map(\.name) == slots.map(\.name), "\(weights)")
+        #expect(arguments.map(\.shape) == slots.map { $0.shape.count == 1 ? [1, 1] + $0.shape : [1] + $0.shape }, "\(weights)")
+        #expect(arguments[0].shape == shape, "\(weights)")
+        #expect(arguments.map(\.element) == (weights.isCodes ? [.si8, .f16] : [.f16]), "\(weights)")
+        #expect(slots.map(\.type) == (weights.isCodes ? [.int8, .float16] : [.float16]), "\(weights)")
+    }
+}
 
 /// What a file's weights become in the arena by their recipes, from its header alone: codes transposed with their
 /// scales in f16, reals rounded to f16 or kept in f32, transposed or not, a target of one f16.
@@ -205,7 +245,7 @@ private func bf16(_ x: Float) -> UInt16 { UInt16(x.bitPattern >> 16) }
     var a = [Int8](repeating: 0, count: out * inn), b = a
     codes.withUnsafeBufferPointer { c in
         a.withUnsafeMutableBufferPointer { Weights.transposedTiles(c.baseAddress!, out, inn, into: $0.baseAddress!) }
-        b.withUnsafeMutableBufferPointer { Weights.transposedCodes(c.baseAddress!, out, inn, into: $0.baseAddress!) }
+        b.withUnsafeMutableBufferPointer { Weights.transposedRows(c.baseAddress!, out, inn, into: $0.baseAddress!) }
     }
     #expect(a == b)
     #expect((0..<out).allSatisfy { o in (0..<inn).allSatisfy { i in a[i * out + o] == codes[o * inn + i] } })

@@ -56,10 +56,10 @@ final class Krea2Session {
 
     // MARK: - What the DiT needs
 
-    /// **The LoRAs' ranks by product**: a block's (`Krea2Functions.ranks`, the same in every block) and the edges' (their
+    /// **The LoRAs' ranks by product** (`LoRAStack.ranks`): a block's, the same in every block, and each edge's own (their
     /// names apart from the blocks'), none where nothing lands.
     static func ranks(_ loras: LoRAStack) -> [String: Int] {
-        Krea2Functions.ranks(loras, blocks: blocks.map { $0 + "." }).merging(Krea2Functions.edgeRanks(loras)) { a, _ in a }
+        loras.ranks(blocks.indices.flatMap(loraProducts) + Krea2Functions.edgeProducts.flatMap(\.products), on: .krea2)
     }
 
     /// The ranks of what step `kind` computes: a block's products only.
@@ -113,7 +113,7 @@ final class Krea2Session {
         d.groups = blocks.map { Block.Group($0, form: form, weights: a.shared ? Krea2Shared.block($0 + ".", weights: a.weights) : Krea2Functions.block($0 + ".")) }
         d.cycle = blocks
         d.tapped = taps
-        if a.shared { d.codes = a.weights.layout }
+        d.sharedWeights = a.sharedWeights
         if a.shared {
             d.forms = [Block.Form(form, steps: [.init("pre"), .init("heads", on: .gpu), .init("attention", on: .gpu, whole: ["k", "v"]),
                                                 .init("out", bind: ["y": .rows("mid"), "y_factor": .rows("mid_factor")], taps: true),
@@ -148,13 +148,18 @@ final class Krea2Session {
 
     // MARK: - Opening
 
-    /// **The DiT of `file` at `geometry` under `budget`** (`Block.open`), the LoRAs' factors and the tables written.
-    static func open(file: SafeTensors, geometry: Geometry, arithmetic: Arithmetic, loras: LoRAStack = .none, taps: Bool = false,
+    /// A product of the DiT alone, by which its file is found under a checkpoint's prefix (`MapWeights.dit`) and its
+    /// element says the Compact (`Arithmetic.codes`).
+    static let marker = "blocks.0.attn.wq.weight"
+
+    /// **The DiT of `file` at `geometry` under `budget`**, in the map's arithmetic under the Neural Engine switch
+    /// (`Arithmetic.block`), the LoRAs' factors and the tables written.
+    static func open(file: SafeTensors, geometry: Geometry, loras: LoRAStack = .none, taps: Bool = false,
                      budget: Int) async throws -> Krea2Session {
-        guard let device = MTLCreateSystemDefaultDevice() else { throw Failure("no Metal device") }
         let ranks = Self.ranks(loras)
-        let declaration = declaration(geometry, arithmetic, ranks: ranks, taps: taps)
-        let block = try await Block.open(device, declaration, files: [file], budget: budget, share: arithmetic.share)
+        let (block, arithmetic) = try await Arithmetic.block(file: file, codes: marker, budget: budget) {
+            declaration(geometry, $0, ranks: ranks, taps: taps)
+        }
         let session = Krea2Session(block, geometry: geometry, arithmetic: arithmetic, ranks: ranks)
         try session.writeLowRank(loras)
         await session.writeTables()
@@ -221,13 +226,10 @@ final class Krea2Session {
         }
         let x = saved.assumingMemoryBound(to: Float16.self), factors = await block.pointer("saved-factors").assumingMemoryBound(to: Float16.self)
         for r in 0..<g.text {
-            let row = text[(r * d)..<((r + 1) * d)]
-            let top = max(row.reduce(0) { max($0, abs($1)) }, 0x1p-14)
             // The shared forms' rule (`ranged16`): p in (2^m, 2^(m+1)] to (2¹³, 2¹⁴], e = m + 1 − 14.
-            let e = RowExponent.ranged16(largest: Double(top))
-            let factor = Float(sign: .plus, exponent: e, significand: 1)
+            let (unit, factor) = RowExponent.split(text[(r * d)..<((r + 1) * d)], .ranged16)
             factors[r] = Float16(factor)
-            for (c, v) in row.enumerated() { x[r * d + c] = Float16(v / factor) }
+            for (c, v) in unit.enumerated() { x[r * d + c] = Float16(v) }
         }
     }
 

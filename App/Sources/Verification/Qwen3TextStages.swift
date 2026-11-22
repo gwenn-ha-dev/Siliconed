@@ -22,7 +22,7 @@ enum Qwen3TextStages {
         }
         // Causal attention with right padding: the real tokens alone are computed, no real row reads a padded one.
         let real = (0..<mask.count).filter { mask[$0] != 0 }.map { Int(ids[$0]) }
-        let encoder = Qwen3Encoder(config: .zImage, prefix: "model.", path: path)
+        let encoder = Qwen3Encoder(config: .zImage, path: path)
         let width = encoder.config.width
         let started = Date()
         let states = try encoder.states(real, taps: [33])
@@ -57,7 +57,7 @@ enum Qwen3TextStages {
         // The computation starts from the golden's identifiers: one thing judged at a time.
         let qwen = (0..<qwenGolden.count).map { Int(qwenGolden[$0]) }
         let path = try MapCheck.use(Library.processWide.map(Family.anima.encoderMap(.standard)))
-        let encoder = Qwen3Encoder(config: .anima, prefix: "model.", path: path)
+        let encoder = Qwen3Encoder(config: .anima, path: path)
         let width = encoder.config.width, layers = [0, 13, 26]
         let states = try encoder.states(qwen, taps: Set(layers))
         for i in layers {

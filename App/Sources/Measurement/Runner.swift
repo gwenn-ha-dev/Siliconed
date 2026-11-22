@@ -16,11 +16,15 @@ package enum Runner {
 
     private static func now() -> Double { Double(DispatchTime.now().uptimeNanoseconds) / 1e9 }
 
+    /// B in GiB for a person, `-` when the app did not say.
+    private static func gib(_ bytes: Int?) -> String { bytes.map { String(format: "%.1f", Double($0) / 1_073_741_824) } ?? "-" }
+
     package static func run(_ o: MeasureOptions, send: Send, log: (String) -> Void,
                             emit: ([String: Any]) -> Void, append: (String) -> Void) throws -> [String: Any] {
         // The queue must be idle: a render queued by someone else shares the machine with ours.
-        // And its Neural Engine switch: only off are the same seed's pixels bound to be the same (`Summary.gpuAlone`).
-        func idle() throws -> (pid: pid_t, gpuAlone: Bool) {
+        // And its Neural Engine switch: only off are the same seed's pixels bound to be the same (`Summary.gpuAlone`); with B,
+        // what a time is read with, said on every row.
+        func idle() throws -> (pid: pid_t, neuralEngine: Bool?, budget: Int?) {
             let (status, peer) = send(["status"]) { _ in }
             guard let status, status["ok"] as? Bool == true, let peer else {
                 throw Failure(code: "app_not_running", message: "the app does not answer")
@@ -29,9 +33,11 @@ package enum Runner {
                 || status["installing"] is [String: Any] {
                 throw Failure(code: "busy", message: "the app is rendering or installing: a series measured beside another job measures both")
             }
-            return (peer, status["neural_engine"] as? Bool == false)
+            return (peer, status["neural_engine"] as? Bool,
+                    ((status["memory"] as? [String: Any])?["budget_bytes"] as? NSNumber)?.intValue)
         }
-        var (pid, gpuAlone) = try idle()
+        let first = try idle()
+        var pid = first.pid, gpuAlone = first.neuralEngine == false
         let (models, _) = send(["models"]) { _ in }
         // No --model: the app's default, the one `add` takes.
         let list = models?["models"] as? [[String: Any]] ?? []
@@ -51,7 +57,8 @@ package enum Runner {
         let context = Context(date: formatter.string(from: Date()), tag: o.tag, app: bundle?.version ?? "?",
                               chip: host.chip, memoryGiB: host.memoryGiB, macOS: host.macOS)
         log("measure: \(model) (\(variant)) \(o.size), seed \(o.seed), \(o.renders) renders + load + 2 witnesses, "
-            + "app \(context.app), \(host.chip) \(host.memoryGiB) GiB, \(Probes.powerSource())")
+            + "app \(context.app), \(host.chip) \(host.memoryGiB) GiB, \(Probes.powerSource()), "
+            + "Neural Engine \(TSV.switchText(first.neuralEngine)), B \(gib(first.budget)) GiB")
         if Probes.powerSource() == "battery" { log("measure: on the battery — plug the adapter in for a time comparable to ours") }
 
         append(TSV.header.joined(separator: "\t"))
@@ -78,7 +85,7 @@ package enum Runner {
             let (role, prompt, seed) = step
             let state = try idle()
             pid = state.pid
-            gpuAlone = gpuAlone && state.gpuAlone
+            gpuAlone = gpuAlone && state.neuralEngine == false
             let before = Probes.usageWithChildren(of: pid)
             let sampler = Probes.PeakSampler(pid: pid)
             let swap0 = Probes.swapouts()
@@ -105,7 +112,7 @@ package enum Runner {
             let row = Row(n: n, role: role, model: model, variant: variant, size: o.size, steps: steps, seed: seed,
                           prompt: prompt, wallSeconds: imageAt - t0,
                           engineSeconds: engine, startFootprint: before?.footprint ?? 0, peakSampled: peak,
-                          swapouts: swaps, diskRead: disk, md5: md5)
+                          swapouts: swaps, diskRead: disk, md5: md5, neuralEngine: state.neuralEngine, budget: state.budget)
             rows.append(row)
             let power = Probes.powerSource(), thermal = Probes.thermal()
             powers.insert(power)
@@ -121,7 +128,7 @@ package enum Runner {
         let s = Summary(rows, power: powers, gpuAlone: gpuAlone)
         func f(_ x: Double?, _ digits: Int = 1) -> String { x.map { String(format: "%.\(digits)f", $0) } ?? "-" }
         log("")
-        log("summary  \(model) (\(variant)) \(o.size)  \(s.renders) renders")
+        log("summary  \(model) (\(variant)) \(o.size)  \(s.renders) renders   Neural Engine \(TSV.switchText(s.neuralEngine))   B \(gib(s.budget)) GiB")
         log("  median \(f(s.median)) s   fastest \(f(s.fastest)) s   slowest \(f(s.slowest)) s   (the load render: \(f(s.load)) s)")
         log("  witness \(f(s.witnessHead)) s -> \(f(s.witnessTail)) s   drift \(s.drift.map { String(format: "%+.1f %%", $0 * 100) } ?? "-")")
         log(String(format: "  peak %.2f GiB   swapouts %d   disk read %.1f GB   pixels %@", Double(s.peak) / 1_073_741_824, s.swapouts,
@@ -130,7 +137,8 @@ package enum Runner {
 
         var summary: [String: Any] = ["renders": s.renders, "peak_gib": Double(s.peak) / 1_073_741_824, "swapouts": s.swapouts,
                                       "disk_read_bytes": s.diskRead, "bits_stable": s.bitsStable, "distinct_pictures": s.distinctPictures,
-                                      "notes": s.notes]
+                                      "notes": s.notes, "neural_engine": s.neuralEngine.map { $0 as Any } ?? NSNull(),
+                                      "budget_bytes": s.budget.map { $0 as Any } ?? NSNull()]
         for (k, v) in [("median_seconds", s.median), ("fastest_seconds", s.fastest), ("slowest_seconds", s.slowest),
                        ("load_seconds", s.load), ("witness_head_seconds", s.witnessHead),
                        ("witness_tail_seconds", s.witnessTail), ("witness_drift", s.drift)] { if let v { summary[k] = v } }

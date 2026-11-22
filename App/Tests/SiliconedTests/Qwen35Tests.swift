@@ -29,7 +29,7 @@ final class Qwen35Tests: XCTestCase {
         XCTAssertEqual(Set(d.kinds.keys), ["delta", "attention"])
         XCTAssertEqual(Set(d.edges.keys), ["norm"])
         for i in [0, 3] {
-            XCTAssertEqual(Set(e.entries(i).map(\.name)), Set(e.arguments(full: c.isFull(i), rows: 1, layout: .outIn).dropFirst().map(\.name)), "layer \(i)")
+            XCTAssertEqual(Set(e.entries(i).map(\.name)), Set(e.arguments(full: c.isFull(i), rows: 1).dropFirst().map(\.name)), "layer \(i)")
         }
         XCTAssertEqual(e.entries(0).first { $0.name == "in" }?.recipe,
                        .product(joined: ["in_proj_z", "in_proj_b", "in_proj_a"].map { "model.language_model.layers.0.linear_attn.\($0)" }))

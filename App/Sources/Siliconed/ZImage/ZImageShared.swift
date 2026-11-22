@@ -5,7 +5,8 @@ import SiliCore
 /// same functions, two specializations of one asset. A block in f16 written as the Standard's (its guard and its norms
 /// in f32, its `dequantize` reading a vector of scales, its post holding the attention) does not reach the ANE: the ANE's
 /// compiler fails and Core AI runs it on the GPU, bit for bit (measured 17/11 on the M1 Pro). Here pre, out and ffn are
-/// written in the forms both units take (`Neural.swift`: f16 at every border and inside, `[1, rows, n]`, q64 products,
+/// written in the forms both units take (`Neural.swift`: f16 at every border and inside, `[1, rows, n]`, q64 products or
+/// int8 × int8 where this Mac's GPU runs it faster (`SharedWeights.integer`),
 /// norms by their peak, the guard's powers of two in f16); what reads across rows or computes in f32 is a function of
 /// the GPU's:
 ///
@@ -186,11 +187,8 @@ enum ZImageShared {
             let (r, f2) = b.ranged16(rotation(n3), target: target(["w1", "w3"]))
             lazy var ffnInput = under(n3, f2)
             let w1 = product(r, "w1", input: ffnInput), w3 = product(r, "w3", input: ffnInput)
-            // SiLU(w₁ F₂) · w₃ F₂ = F₂² g₁ g₃ · (w₁/g₁) σ(w₁ F₂) (w₃/g₃), each under 2⁵: their product under 2¹⁰,
-            // rotated under 2¹⁴. σ reads the true value clipped to ±16, where σ is 1 or 0 in f16.
-            let (u1w, g1) = b.ranged16(w1, under: 5), (u3w, g3) = b.ranged16(w3, under: 5)
-            let z = b.scale("minimum", b.scale("maximum", b.binary(.mul, w1, f2), -16), 16)
-            let swiglu = b.binary(.mul, b.binary(.mul, u1w, b.sigmoid(z)), u3w)
+            // SiLU(w₁ F₂) · w₃ F₂ = F₂² g₁ g₃ · (w₁/g₁) σ(w₁ F₂) (w₃/g₃) (`gatedSiLU16`), rotated under 2¹⁴.
+            let (swiglu, g1, g3) = b.gatedSiLU16(w1, w3, factor: f2)
             let (h, g4) = b.ranged16(rotation(swiglu), target: target(["w2"]))
             let ff = product(h, "w2", input: under(swiglu, g4))
             let n4 = b.binary(.mul, b.norm(ff, eps: eps, factors: [f2, f2, g1, g3, g4]), a("ffn_norm2"))

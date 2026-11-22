@@ -32,8 +32,8 @@ extension Engine {
     }
 
     /// **The render, on the engine queue**, in this order: the request's own refusals (`Admission`, pure: a request the model
-    /// cannot render is refused for what it is), the preflights (`Preflight`: installed, license, format, no other render)
-    /// — all before any computation. Then the family's render runs — one line here, the rest in the family's folder — and
+    /// cannot render is refused for what it is), the preflights (`Preflight`: installed, license, format, no other render,
+    /// the shared files hashed once) — all before any computation. Then the family's render runs — one line here, the rest in the family's folder — and
     /// each image it hands over is stamped with what the request, not the family, says of it.
     func renderBatchOnQueue(_ request: Request, seeds: [UInt64], model: Model, cancellation: Cancellation?,
                             onProgress: (@Sendable (Event) -> Void)?) throws -> [Render] {
@@ -41,7 +41,7 @@ extension Engine {
         guard !seeds.isEmpty else { return [] }
         try cancellation.check()
         let admitted = try Admission.judge(request, chain: model.chain)
-        let lock = try Preflight.run(model, width: request.width, height: request.height) { onProgress?(.warning($0)) }
+        let lock = try Preflight.run(model, width: request.width, height: request.height, cancellation: cancellation) { onProgress?(.warning($0)) }
         defer { withExtendedLifetime(lock) {} }
         // What the render's stages held and what the Neural Engine computed of it: the engine's stages' own account,
         // stamped on each image as the family hands it over — the event is the only result a stream's reader gets.
@@ -57,7 +57,7 @@ extension Engine {
             }
         }
         stages.changed = { tell() }
-        return try CoreAI.under { _ in
+        return try CoreAI.under {
             @Sendable func stamped(_ render: Render) -> Render {
                 var render = render
                 render.strength = Render.strength(of: request)

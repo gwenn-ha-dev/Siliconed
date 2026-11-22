@@ -40,7 +40,10 @@ struct Problem: Equatable, Sendable {
         title = Self.sentence(e)
         suggestion = Self.suggestion(e)
         switch e {
-        case let .internalFailure(_, detail), let .importRefused(_, detail), let .engineStopped(_, detail):
+        // The component that failed is a word of the code (`engine`, `gpu`): the detail says it, the sentence does not.
+        case let .internalFailure(component, detail):
+            self.detail = detail.isEmpty ? component : "\(component): \(Library.withoutHome(detail))"
+        case let .importRefused(_, detail), let .engineStopped(_, detail):
             self.detail = Library.withoutHome(detail)
         case let .engineMismatch(app, engine):
             detail = "the app's protocol \(app), the engine's \(engine.map(String.init) ?? "none")"
@@ -211,8 +214,8 @@ struct Problem: Equatable, Sendable {
             return String(localized: "This render went wrong in the VAE and its image is unusable: it wasn’t kept.")
         case .nonFiniteImage:
             return String(localized: "This render went wrong in the DiT and its image is unusable: it wasn’t kept.")
-        case .internalFailure(let component, _):                     // internal_failure
-            return String(localized: "The engine failed (\(component)).")
+        case .internalFailure:                                       // internal_failure
+            return String(localized: "The engine failed.")
         }
     }
 
@@ -410,6 +413,10 @@ extension AppState {
         // The one warning that is no anomaly: the plan chose a slower decoding, and the render says so.
         if journal.allSatisfy({ $0 == bandDecodingNotice }) {
             return String(localized: "Decoded in bands to stay within this Mac’s memory limit: the same image, a longer decoding.")
+        }
+        // A shared file an older app left was not the published bytes: removed before the render, which it refused.
+        if journal.contains(where: { $0.hasPrefix(sharedFileRemovedNotice) }) {
+            return String(localized: "A file of this model wasn’t the published one: it was removed, and installing the model again downloads it alone.")
         }
         return String(localized: "The engine noted something unusual during this render.")
     }

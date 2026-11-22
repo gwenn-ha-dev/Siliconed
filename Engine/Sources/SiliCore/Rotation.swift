@@ -1,10 +1,10 @@
 /// The rotation ComfyUI's `convrot` codes carry, as a product of Core AI: `W = (q · s) · R` with R the Hadamard by 256 of
 /// the regular order 4 (`H₄ ⊗ H₄ ⊗ H₄ ⊗ H₄`, normalized), so `x · Wᵀ = (x · R) · (q · s)ᵀ` (R is symmetric). Recopied
-/// from SiliCore (`CoreAIAttention.swift`'s `lowerHadamard`, aec8f3c), its product form along the last axis.
+/// from the former engine (`CoreAIAttention.swift`'s `lowerHadamard`, 0.21), its product form along the last axis.
 ///
 ///     x [rows, n]  reshape [rows · n/256, 256] · matmul(·, Kᵀ) · reshape [rows, n]        K = H₂₅₆ / 16
 ///
-/// What a port by analogy would miss (SiliCore's findings):
+/// What a port by analogy would miss (the former engine's findings):
 ///   - **1/√256 is folded into the matrix**: 256 = 4⁴, so every entry ±2⁻⁴ is exact in f16 and bf16, and no scaling op
 ///     follows the product;
 ///   - **the constants are created in the reverse of their order in the block** (the last shape, the matrix, the first
@@ -14,6 +14,9 @@
 extension Aicode {
     /// The regular Hadamard matrix of order 4 (constant row sums: all ones but −1 on the anti-diagonal), ConvRot's.
     static let regular: [[Int8]] = [[1, 1, 1, -1], [1, 1, -1, 1], [1, -1, 1, 1], [-1, 1, 1, 1]]
+
+    /// The values ConvRot rotates together: 4⁴.
+    public static let rotationGroup = 256
 
     /// `F ⊗ … ⊗ F` (`count` factors), row-major, the last factor on the fastest digit.
     static func kronecker(_ f: [[Int8]], _ count: Int) -> (order: Int, entries: [Int8]) {
@@ -49,22 +52,29 @@ extension Aicode {
 }
 
 extension Aicode.Block {
-    /// `x` rotated along its last axis by groups of 256: ConvRot's Hadamard, as a product of Core AI.
-    public func convrot(_ x: Int) -> Int {
-        let (shape, element) = Aicode.shape(types[x])
-        let m = 4, g = 1 << (2 * m)  // 4⁴ = 256
+    /// **ConvRot's K = H₂₅₆ / 16 transposed**, `[256, 256]` in `element` (y = x · Kᵀ), its entries ±2⁻⁴ exact: the
+    /// matrix every rotation multiplies by, a constant of the block.
+    func rotationMatrix(_ element: Aicode.Element) -> Int {
+        let m = 4, g = Aicode.rotationGroup
         let (order, entries) = Aicode.kronecker(Aicode.regular, m)
-        precondition(order == g && shape.last! % g == 0, "convrot: \(shape) is not by groups of \(g)")
-        let groups = shape.last! / g
-        let dims = groups > 1 ? [shape.reduce(1, *) / g, g] : shape
-
-        // K transposed (y = x · Kᵀ), entries ±2⁻ᵐ.
+        precondition(order == g, "rotation: an order of \(order)")
         let one = Aicode.roundedScalar(Double(sign: .plus, exponent: -m, significand: 1), element)
         let minus = Aicode.roundedScalar(-Double(sign: .plus, exponent: -m, significand: 1), element)
         let bytes = (0..<g * g).flatMap { i in entries[(i % g) * g + i / g] > 0 ? one : minus }
+        return constant(Aicode.dense(bytes, splat: false), Aicode.tensor([g, g], element))
+    }
+
+    /// `x` rotated along its last axis by groups of 256: ConvRot's Hadamard, as a product of Core AI.
+    public func convrot(_ x: Int) -> Int {
+        let (shape, element) = Aicode.shape(types[x]), g = Aicode.rotationGroup
+        precondition(shape.last! % g == 0, "convrot: \(shape) is not by groups of \(g)")
+        let groups = shape.last! / g
+        let dims = groups > 1 ? [shape.reduce(1, *) / g, g] : shape
+
         func indices(_ v: [Int]) -> Int { constant(Aicode.dense(v.map { UInt32($0) }), Aicode.tensor([v.count], .ui32)) }
+        // The output's shape, the matrix, the input's: the constants in the order the assets were written in.
         let shapeOut = groups > 1 ? indices(shape) : nil
-        let matrix = constant(Aicode.dense(bytes, splat: false), Aicode.tensor([g, g], element))
+        let matrix = rotationMatrix(element)
         let shapeIn = groups > 1 ? indices(dims) : nil
 
         var v = x

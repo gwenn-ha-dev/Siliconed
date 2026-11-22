@@ -111,6 +111,10 @@ package struct Request: Sendable, Equatable {
     /// read texts longer than diffusers ever hands them.
     package static let maximumPromptTokens = 1024
 
+    /// **A seed drawn at random**: the rack's dice, a render whose seed is not Fixed, a variation's own, `silicontrol add`
+    /// without `--seed` — every draw of the app, in this one range.
+    package static func drawnSeed() -> UInt64 { UInt64.random(in: 0...UInt64(UInt32.max)) }
+
     /// **No prompt is ever cut in silence**: past its bound a prompt is refused, so an image always
     /// answers the whole prompt. `tokens` and `max` count the prompt's own tokens, the template's left
     /// out: what the user can shorten.

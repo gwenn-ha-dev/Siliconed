@@ -10,7 +10,7 @@ package struct Hello: Codable, Equatable, Sendable {
     /// the borrower; 5: a pairing carries the borrower's id, an enlargement's refusal names its image; 6: a borrower
     /// removes the lender's imported models and LoRAs; 7: the margin a job carries is exact or ane; 8: a full disk says
     /// what it stopped, `EngineError.diskFull(writing:)`; 9: a lent render follows the lender's Neural Engine switch, the
-    /// job carries no margin).
+    /// job carries no margin, and a render gone wrong says its stage, `EngineError.nonFiniteImage(stage:)`).
     package static let protocolVersion = 9
 
     package let protocolVersion: Int

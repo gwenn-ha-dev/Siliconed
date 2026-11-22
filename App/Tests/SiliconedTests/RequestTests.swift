@@ -64,7 +64,7 @@ final class RequestTests: XCTestCase {
                 XCTAssertEqual($0 as? EngineError, .tooManyReferences(count: n, max: max), "\(m.identifier) : \($0)")
             }
         }
-        XCTAssertEqual(zImage.chain.entries.map(\.kind), [.text, .image])
+        XCTAssertTrue(zImage.chain.acceptsStartImage)
     }
 
     /// An empty or blank prompt is refused by the three models, before any computation.
@@ -126,6 +126,11 @@ final class RequestTests: XCTestCase {
         let reread = try ImageRGB(cgImage: image.cgImage())
         XCTAssertEqual(reread.width, 2); XCTAssertEqual(reread.height, 1)
         for (a, b) in zip(reread.pixels, image.pixels) { XCTAssertEqual(a, b, accuracy: 1e-6) }
+    }
+
+    /// **A seed drawn** stays in 32 bits — every draw of the app (the dice, a Random render, a variation, `silicontrol add`).
+    func testASeedDrawnStaysIn32Bits() {
+        for _ in 0..<1000 { XCTAssertLessThanOrEqual(Request.drawnSeed(), UInt64(UInt32.max)) }
     }
 }
 

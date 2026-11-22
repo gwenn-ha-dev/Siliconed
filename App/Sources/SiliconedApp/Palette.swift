@@ -95,6 +95,9 @@ enum Palette {
     /// A label or a glyph on `live`.
     static let onLive = dynamic(dark: 0x0F1021, light: 0xFCFCFC)
     static let failure = dynamic(dark: 0xFC5852, light: 0xD02C2A)
+    /// **A caveat, not an error**: the system's orange — an image ignored, a non-commercial license, a beta, another Mac on
+    /// its way, an axis beyond the two a series has.
+    static let caution = Color(nsColor: .systemOrange)
     /// Behind the image: the color is the image's, the ground stays dark at night, pale by day.
     static let canvas = dynamic(dark: 0x131424, light: 0xF9F6F2)
     /// The rack's column; the ground of the Settings.
@@ -221,4 +224,23 @@ struct ChartLinkStyle: ButtonStyle {
 
 extension ButtonStyle where Self == ChartLinkStyle {
     static var chartLink: ChartLinkStyle { ChartLinkStyle() }
+}
+
+extension View {
+    /// **The ✕ of a hovered tile** (issue 16), in its top-right corner, `padding` from it: the lab's images and the history's
+    /// images and series. No question asked: what it removes comes back (⌘Z), or is dropped again.
+    func removalOnHover(_ hover: Bool, padding: CGFloat, help: LocalizedStringKey, label: LocalizedStringKey,
+                        action: @escaping () -> Void) -> some View {
+        overlay(alignment: .topTrailing) {
+            if hover {
+                Button(action: action) {
+                    Image(systemName: "xmark.circle.fill").symbolRenderingMode(.palette)
+                        .foregroundStyle(.white, .black.opacity(0.55))
+                }
+                .buttonStyle(.plain).padding(padding)
+                .help(help)
+                .accessibilityLabel(Text(label))
+            }
+        }
+    }
 }

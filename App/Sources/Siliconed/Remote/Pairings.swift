@@ -1,5 +1,6 @@
 import CryptoKit
 import Foundation
+import Measurement
 import Security
 
 /// **What this Mac remembers of the others**: the Macs it lends itself to, the Macs it may borrow, and
@@ -40,7 +41,7 @@ package struct Pairings: Codable, Equatable, Sendable {
     package init(id: String = Pairings.newID()) { self.id = id }
 
     package static func newID() -> String {
-        Pairing.random(8).map { String(format: "%02x", $0) }.joined()
+        Pairing.random(8).hexadecimal
     }
 
     /// Whether `id` is one `newID` draws: it came from another Mac before being filed.
@@ -72,7 +73,7 @@ package struct Pairings: Codable, Equatable, Sendable {
 // MARK: - The Keychain
 
 extension Pairings {
-    static let service = "dev.gwenn-ha.siliconed.pairings"
+    static let service = siliconedBundleIdentifier + ".pairings"
 
     package static func account(environment: [String: String] = ProcessInfo.processInfo.environment) -> String {
         if let root = environment["SILICONED_ROOT"], !root.isEmpty { return "pairings " + root }

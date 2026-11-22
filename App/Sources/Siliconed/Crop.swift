@@ -12,7 +12,7 @@ import Foundation
 //   into the models (edit it, enlarge it), and 512 is where they stop being in their domain. An image
 //   already under the floor on a side cannot be cropped at all (`Frame.canCrop`).
 // - **No multiple of 16 or 32 is asked of the frame**: an edit's reference is rescaled by the
-//   pipeline (`QwenImage21Pipeline`'s format rule floors the sides itself), and a cropped history
+//   denoiser (`QwenImage21DenoisingModule.preparedReferences` floors the sides itself), and a cropped history
 //   image is a picture, not a render's size.
 // - **A fixed proportion is exact in integers**: 7:9 is a frame of 7k × 9k pixels, so the ratio holds
 //   to the pixel however the user drags — except for the image's own proportion, when it does not

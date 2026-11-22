@@ -5,8 +5,7 @@ import SiliCore
 import Testing
 
 /// A product whose parts are joined along `out` (`Recipe.product`), its weights across two shards, int8 codes with
-/// SDNQ's and ComfyUI's scales or bf16, in either layout; a chain of calls put on the stream unwaited; the bf16 layout
-/// measured on this Mac. The bars as `FunctionsRun`'s, written before the run: the f16 path's rounding, ~1e-3 relative;
+/// SDNQ's and ComfyUI's scales in either layout, or bf16 `[out, in]`; a chain of calls put on the stream unwaited. The bars as `FunctionsRun`'s, written before the run: the f16 path's rounding, ~1e-3 relative;
 /// bf16 throughout, its rounding of the result, ~4e-3; a wrong layout, part or scale gives errors of order 1.
 extension Runs {
     @Test(.enabled(if: metalEnabled), arguments: [CodesLayout.inOut, .outIn])
@@ -27,10 +26,10 @@ extension Runs {
         let file = try SafeTensors(shards: [a, b])
         let entries: [Weights.Entry] = [("w", "a", .product(joined: ["b"])), ("v", "p", .product(joined: ["q"]))]
         let x = rng.uniform(rows * k)
-        let arena = try Arena(bench.device, bytes: try Weights.size(entries, in: file, codes: layout, bfloat16: layout) + 3 * Arena.aligned(rows * n * 2) + 2 * Arena.aligned(rows * k * 2))
-        let placed = try Weights.load(entries, from: file, into: arena, codes: layout, bfloat16: layout)
+        let arena = try Arena(bench.device, bytes: try Weights.size(entries, in: file, codes: layout) + 3 * Arena.aligned(rows * n * 2) + 2 * Arena.aligned(rows * k * 2))
+        let placed = try Weights.load(entries, from: file, into: arena, codes: layout)
         let shape = layout == .inOut ? [k, n] : [n, k]
-        #expect(placed["w"]!.shape == shape && placed["v"]!.shape == shape && placed["w_scale"]!.shape == [n])
+        #expect(placed["w"]!.shape == shape && placed["v"]!.shape == [n, k] && placed["w_scale"]!.shape == [n])
         let x16 = arena.take(rows * k * 2), x16b = arena.take(rows * k * 2), y = arena.take(rows * n * 2), z = arena.take(rows * n * 2)
         let xs = arena.write(x, at: x16)
         let xb = arena.pointer(x16b).bindMemory(to: UInt16.self, capacity: rows * k)
@@ -38,10 +37,10 @@ extension Runs {
         func view(_ p: Placed) -> View { View(buffer: arena.buffer(p.offset), type: p.type, shape: p.shape) }
 
         var m = Aicode.Module(arguments: [("x", Aicode.tensor([rows, k], .f16)), ("w", Aicode.tensor(shape, .si8)), ("w_scale", Aicode.tensor([n], .f16)),
-                                          ("xb", Aicode.tensor([rows, k], .bf16)), ("v", Aicode.tensor(shape, .bf16))])
+                                          ("xb", Aicode.tensor([rows, k], .bf16)), ("v", Aicode.tensor([n, k], .bf16))])
         var constants = Aicode.ScalingConstants()
         m.outputs = [("y", m.body.w8a16(m.argument("x"), codes: m.argument("w"), scale: m.argument("w_scale"), layout: layout, constants: &constants)),
-                     ("z", m.body.product(m.argument("xb"), m.argument("v"), layout: layout))]
+                     ("z", m.body.linear(m.argument("xb"), m.argument("v")))]
         let f = try await Functions.load(try Functions.asset(m, "run-joined-\(layout.rawValue)"))
         try await Run.call(f, bench.stream, inputs: ["x": View(buffer: arena.buffer(x16), type: .float16, shape: [rows, k]), "w": view(placed["w"]!),
                                                      "w_scale": view(placed["w_scale"]!), "xb": View(buffer: arena.buffer(x16b), type: .bfloat16, shape: [rows, k]),
@@ -57,6 +56,64 @@ extension Runs {
         let ey = relative(arena.halves(y, rows * n), wantY), ez = relative((0..<rows * n).map { BFloat16Bits.widened(zs[$0]) }, wantZ)
         #expect(ey < 2e-3, "W8A16 relative error \(ey)")
         #expect(ez < 4e-3, "bf16 relative error \(ez)")
+    }
+
+    /// **The product int8 × int8 (`w8a8`) is the CPU's exact int8 product by rows**: each row of x brought to int8 codes
+    /// by its peak (127 · 2⁻¹⁴ at least), the codes' sums exact in integers, times the row's scale and the codes' — on 64
+    /// rows of k = 10 240 inputs (the widest product of the shared forms, its sums within f16: 2k ≤ 65 504), magnitudes
+    /// from 1/16 to 8, a row of zeros and a row whose peak lies under the floor. The bars, written before the run: within
+    /// 2e-3 of the exact int8 product (f16's roundings of 1/127, of the sums and of the scaled result, each within 2⁻¹¹),
+    /// and at least twice as far from x's own product by the codes (W8A16: the activations' quantization, ~4e-3 for
+    /// uniform rows); the row of zeros exactly zeros, every value finite.
+    @Test(.enabled(if: metalEnabled))
+    func theIntegerProductIsTheCPUsInt8ProductByRows() async throws {
+        let bench = try await Bench()
+        let (rows, k, n) = (64, 10_240, 128), (zero, small) = (5, 9)
+        var rng = Seeded(state: 8)
+        var x = rng.uniform(rows * k)
+        for r in 0..<rows {
+            let magnitude: Float = r == zero ? 0 : r == small ? 4e-3 : [1, 8, 1.0 / 16][r % 3]
+            for i in 0..<k { x[r * k + i] *= magnitude }
+        }
+        let codes = (0..<n * k).map { _ in Int8(Int(rng.next() * 255) - 127) }
+        let scales = rng.uniform(n, 0.001...0.01)
+        let arena = try Arena(bench.device, bytes: Arena.aligned(rows * k * 2) + Arena.aligned(n * k) + Arena.aligned(n * 2) + Arena.aligned(rows * n * 2))
+        let (xk, wk, sk, yk) = (arena.take(rows * k * 2), arena.take(n * k), arena.take(n * 2), arena.take(rows * n * 2))
+        let xs = arena.write(x, at: xk), ss = arena.write(scales, at: sk)
+        arena.write(codes: codes, at: wk)
+
+        var m = Aicode.Module(arguments: [("x", Aicode.tensor([1, rows, k], .f16)), ("w", Aicode.tensor([1, n, k], .si8)),
+                                          ("w_scale", Aicode.tensor([1, 1, n], .f16))])
+        var constants = Aicode.ScalingConstants()
+        m.outputs = [("y", m.body.w8a8(m.argument("x"), codes: m.argument("w"), scale: m.argument("w_scale"), constants: &constants))]
+        let f = try await Functions.load(try Functions.asset(m, "run-w8a8-\(rows)x\(k)x\(n)"))
+        try await Run.call(f, bench.stream, inputs: ["x": View(buffer: arena.buffer(xk), type: .float16, shape: [1, rows, k]),
+                                                     "w": View(buffer: arena.buffer(wk), type: .int8, shape: [1, n, k]),
+                                                     "w_scale": View(buffer: arena.buffer(sk), type: .float16, shape: [1, 1, n])],
+                           outputs: [("y", View(buffer: arena.buffer(yk), type: .float16, shape: [1, rows, n]))])
+        let got = arena.halves(yk, rows * n)
+
+        // The CPU's: the row's peak and its scale in f16 as the function computes them, its codes a half away from zero.
+        var exact = [Float](repeating: 0, count: rows * n)
+        for r in 0..<rows {
+            let peak = max(xs[r * k ..< (r + 1) * k].reduce(Float(0)) { max($0, abs($1)) }, 127 * 0x1p-14)
+            let scale = Float(Float16(peak / 127))
+            let q = (0..<k).map { i in Int(max(-128, min(127, (xs[r * k + i] / scale).rounded(.toNearestOrAwayFromZero)))) }
+            for o in 0..<n {
+                var sum = 0
+                for i in 0..<k { sum += q[i] * Int(codes[o * k + i]) }
+                exact[r * n + o] = Float(Double(sum) * Double(scale) * Double(ss[o]))
+            }
+        }
+        let activations = product(xs, rows: rows, k: k, n: n) { i, o in Double(codes[o * k + i]) * Double(ss[o]) }
+        let (e8, e16) = (relative(got, exact), relative(got, activations))
+        print(String(format: "w8a8 %d × %d → %d: from the int8 product %.2e, from x's own %.2e", rows, k, n, e8, e16))
+        #expect(got.allSatisfy { $0.isFinite }, "a value not finite")
+        #expect(got[zero * n ..< (zero + 1) * n].allSatisfy { $0 == 0 }, "the row of zeros: \(Array(got[zero * n ..< zero * n + 4]))")
+        #expect(e8 < 2e-3, "W8A8 relative error \(e8)")
+        #expect(e16 > 2 * e8, "from x's own product \(e16), from the int8 product \(e8)")
+        let r = small, row = relative(Array(got[r * n ..< (r + 1) * n]), Array(exact[r * n ..< (r + 1) * n]))
+        #expect(row < 2e-3, "the row under the floor: relative error \(row)")
     }
 
     /// Calls put on the stream one after the other, unwaited, each reading the value the one before returned: eight

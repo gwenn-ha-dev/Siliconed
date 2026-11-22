@@ -25,52 +25,40 @@ package struct MeasureOptions: Equatable, Sendable {
     /// Options the series owns: a `--` passthrough may not change what is measured or how it ends.
     private static let reserved: Set<String> = ["--wait", "--out", "--batch", "--ref", "--model", "--preview", "--no-preview"]
 
+    private static let valued: Set<String> = ["--model", "--size", "--renders", "--seed", "--settle", "--prompt", "--tsv", "--out", "--tag"]
+
+    /// The size is read as the app reads one (`SizeSyntax`: `1024`, `832x1216`, `832 × 1216`) and handed to `add` as
+    /// `WxH`; whether the model renders it is the app's to say, at the first render.
     package static func parse(_ argv: [String]) throws -> MeasureOptions {
-        var o = MeasureOptions()
-        var i = 0
-        func value(_ flag: String) throws -> String {
-            i += 1
-            guard i < argv.count else { throw Failure(message: "\(flag) needs a value") }
-            return argv[i]
+        let flags: Flags
+        switch Flags.scan(argv, valued: valued) {
+        case .success(let f): flags = f
+        case .failure(let failure): throw Failure(message: failure.message)
         }
-        func number(_ flag: String, min: Int) throws -> Int {
-            guard let n = Int(try value(flag)), n >= min else { throw Failure(message: "\(flag) needs an integer ≥ \(min)") }
+        if let word = flags.words.first { throw Failure(message: "unexpected argument \"\(word)\": the options of add go after --") }
+        func number(_ flag: String, min: Int) throws -> Int? {
+            guard let v = flags.value(flag) else { return nil }
+            guard let n = Int(v), n >= min else { throw Failure(message: "\(flag) needs an integer ≥ \(min)") }
             return n
         }
-        while i < argv.count {
-            let a = argv[i]
-            switch a {
-            case "--model": o.model = try value(a)
-            case "--size":
-                let v = try value(a)
-                o.size = v == "512" ? "512x512" : v == "1024" ? "1024x1024" : v
-                guard let (w, h) = dimensions(o.size) else { throw Failure(message: "--size: 512, 1024 or WxH") }
-                guard min(w, h) >= 512, w % 16 == 0, h % 16 == 0 else {
-                    throw Failure(message: "--size: each side ≥ 512 and a multiple of 16")
-                }
-            case "--renders": o.renders = try number(a, min: 1)
-            case "--seed": o.seed = try number(a, min: 0)
-            case "--settle": o.settle = try number(a, min: 0)
-            case "--prompt": o.prompts.append(try value(a))
-            case "--tsv": o.tsv = try value(a)
-            case "--out": o.out = try value(a)
-            case "--tag": o.tag = try value(a)
-            case "--":
-                o.extra = Array(argv[(i + 1)...])
-                i = argv.count
-            default: throw Failure(message: "unknown option \(a)")
-            }
-            i += 1
+        var o = MeasureOptions()
+        o.model = flags.value("--model")
+        if let v = flags.value("--size") {
+            guard let (w, h) = SizeSyntax.parse(v) else { throw Failure(message: "--size: 512, 1024 or WxH (832x1216)") }
+            o.size = "\(w)x\(h)"
         }
+        o.renders = try number("--renders", min: 1) ?? o.renders
+        o.seed = try number("--seed", min: 0) ?? o.seed
+        o.settle = try number("--settle", min: 0) ?? o.settle
+        o.prompts = flags.values["--prompt"] ?? []
+        o.tsv = flags.value("--tsv")
+        o.out = flags.value("--out")
+        o.tag = flags.value("--tag") ?? o.tag
+        o.extra = flags.rest
         if let bad = o.extra.first(where: { reserved.contains($0) }) {
             throw Failure(message: "\(bad) belongs to the measure itself and cannot follow --")
         }
         return o
-    }
-
-    package static func dimensions(_ size: String) -> (Int, Int)? {
-        let p = size.split(separator: "x").compactMap { Int($0) }
-        return p.count == 2 && size.split(separator: "x").count == 2 ? (p[0], p[1]) : nil
     }
 
     /// The prompt of render `n` (1-based): the list in turn, the default prompt when none was given.
@@ -91,6 +79,9 @@ package struct Row: Sendable, Equatable {
     package var startFootprint: UInt64, peakSampled: UInt64
     package var swapouts: UInt64, diskRead: UInt64
     package var md5: String
+    /// The app's Neural Engine switch and its B when the render was asked (`status`); `nil` when the app did not say.
+    package var neuralEngine: Bool? = nil
+    package var budget: Int? = nil
 }
 
 /// What is the same on every row of a series: when, where, with which build.
@@ -103,21 +94,24 @@ package enum TSV {
     package static let header = ["date", "tag", "n", "role", "model", "variant", "size", "steps", "seed", "prompt",
                                  "wall_s", "engine_s", "start_GiB", "peak_GiB",
                                  "swapouts", "disk_read_GB", "md5", "app", "chip", "memory_GiB", "macos",
-                                 "power", "thermal"]
+                                 "power", "thermal", "neural_engine", "budget"]
 
     private static func gib(_ b: UInt64) -> String { String(format: "%.3f", Double(b) / 1_073_741_824) }
     private static func clean(_ s: String) -> String {
         s.map { $0 == "\t" || $0 == "\n" || $0 == "\r" ? " " : $0 }.reduce(into: "") { $0.append($1) }
     }
 
-    /// `power` and `thermal` are read at each render: a series that left the adapter shows where.
+    /// `on` or `off`, `-` when the app did not say.
+    package static func switchText(_ on: Bool?) -> String { on.map { $0 ? "on" : "off" } ?? "-" }
+
+    /// `power` and `thermal` are read at each render: a series that left the adapter shows where. `budget` is B in GiB.
     package static func line(_ r: Row, _ c: Context, power: String, thermal: String) -> String {
         [c.date, clean(c.tag), String(r.n), r.role.rawValue, r.model, r.variant, r.size, r.steps.map(String.init) ?? "-",
          String(r.seed), clean(r.prompt),
          String(format: "%.2f", r.wallSeconds), r.engineSeconds.map { String(format: "%.2f", $0) } ?? "-",
          gib(r.startFootprint), gib(r.peakSampled), String(r.swapouts),
          String(format: "%.2f", Double(r.diskRead) / 1e9), r.md5, c.app, c.chip, String(c.memoryGiB), c.macOS,
-         power, thermal].joined(separator: "\t")
+         power, thermal, switchText(r.neuralEngine), r.budget.map { gib(UInt64($0)) } ?? "-"].joined(separator: "\t")
     }
 }
 
@@ -137,6 +131,9 @@ package struct Summary: Sendable, Equatable {
     /// it on the engine moves work to the Neural Engine from one render to the next, and the pixels may move with it.
     package var gpuAlone: Bool
     package var distinctPictures: Int
+    /// The Neural Engine switch and B of the series' first render; a change during the series is a note.
+    package var neuralEngine: Bool?
+    package var budget: Int?
     package var notes: [String]
 
     /// Past this, the machine moved more than the 4 to 13 % that series have shown: the series says nothing.
@@ -169,7 +166,12 @@ package struct Summary: Sendable, Equatable {
         for r in rows { groups["\(r.prompt)\u{1}\(r.seed)\u{1}\(r.size)", default: []].insert(r.md5) }
         bitsStable = groups.values.allSatisfy { $0.count == 1 }
         distinctPictures = Set(rows.map(\.md5)).count
+        neuralEngine = rows.first?.neuralEngine
+        budget = rows.first?.budget
         var notes: [String] = []
+        if Set(rows.map { TSV.switchText($0.neuralEngine) }).count > 1 || Set(rows.map { $0.budget ?? -1 }).count > 1 {
+            notes.append("the Neural Engine switch or B changed during the series: its renders were not made under one setting")
+        }
         if let d = drift, abs(d) > Self.driftLimit {
             notes.append(String(format: "the witness moved %+.1f %% over the series (beyond %.0f %%): do not compare it to another series", d * 100, Self.driftLimit * 100))
         }

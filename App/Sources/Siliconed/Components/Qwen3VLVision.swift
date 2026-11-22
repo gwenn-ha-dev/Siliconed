@@ -112,17 +112,15 @@ package struct Qwen3VLVision {
          ("positions", [n, c.width], .bf16)]
     }
 
-    /// A product's weight `[out, in]` or `[in, out]` as `layout` lays it (`Recipe.product`).
-    static func product(_ name: String, _ out: Int, _ inn: Int, _ layout: CodesLayout) -> Argument {
-        (name, layout == .inOut ? [inn, out] : [out, inn], .bf16)
-    }
+    /// A product's weight `[out, in]`, as the file lays it (`Recipe.product`).
+    static func product(_ name: String, _ out: Int, _ inn: Int) -> Argument { (name, [out, inn], .bf16) }
 
-    static func blockArguments(_ c: Config, rows n: Int, layout: CodesLayout) -> [Argument] {
+    static func blockArguments(_ c: Config, rows n: Int) -> [Argument] {
         [("x", [n, c.width], .bf16), ("norm1", [c.width], .bf16), ("norm1_bias", [c.width], .bf16),
-         product("qkv", 3 * c.width, c.width, layout), ("qkv_bias", [3 * c.width], .bf16),
-         product("proj", c.width, c.width, layout), ("proj_bias", [c.width], .bf16),
+         product("qkv", 3 * c.width, c.width), ("qkv_bias", [3 * c.width], .bf16),
+         product("proj", c.width, c.width), ("proj_bias", [c.width], .bf16),
          ("norm2", [c.width], .bf16), ("norm2_bias", [c.width], .bf16),
-         product("fc1", c.hidden, c.width, layout), ("fc1_bias", [c.hidden], .bf16), flat(product("fc2", c.width, c.hidden, layout)), ("fc2_bias", [c.width], .bf16)]
+         product("fc1", c.hidden, c.width), ("fc1_bias", [c.hidden], .bf16), flat(product("fc2", c.width, c.hidden)), ("fc2_bias", [c.width], .bf16)]
     }
 
     /// **A weight given flat**, its shape back inside the function (`Writer.a`): the block's fc2 `[1152, 4304]` bf16 lies
@@ -131,23 +129,23 @@ package struct Qwen3VLVision {
     static func flat(_ a: Argument) -> Argument { (a.name, [a.shape.reduce(1, *)], a.element) }
 
     /// A merger: the main one normalizes the stream's width, a deepstack one the regrouped width.
-    static func mergerArguments(_ c: Config, rows n: Int, deepstack: Bool, layout: CodesLayout) -> [Argument] {
+    static func mergerArguments(_ c: Config, rows n: Int, deepstack: Bool) -> [Argument] {
         let wide = c.group * c.width, normed = deepstack ? wide : c.width
         return [("x", [n, c.width], .bf16), ("norm", [normed], .bf16), ("norm_bias", [normed], .bf16),
-                product("fc1", wide, wide, layout), ("fc1_bias", [wide], .bf16), product("fc2", c.output, wide, layout), ("fc2_bias", [c.output], .bf16)]
+                product("fc1", wide, wide), ("fc1_bias", [wide], .bf16), product("fc2", c.output, wide), ("fc2_bias", [c.output], .bf16)]
     }
 
     /// Each function's builder on one block: its arguments by name, a product with its bias, torch's LayerNorm.
     private struct Writer {
-        let b: Aicode.Block, names: [String], eps: Double, layout: CodesLayout
+        let b: Aicode.Block, names: [String], eps: Double
         /// The weights given flat (`flat`) and their shapes.
         var shapes: [String: [Int]] = [:]
         func a(_ name: String) -> Int {
             let i = names.firstIndex(of: name)!
             return shapes[name].map { b.reshape(i, $0) } ?? i
         }
-        /// `x · Wᵀ + b`, the product (its weight as `layout` lays it) rounded to bf16, then the bias added in bf16.
-        func linear(_ x: Int, _ name: String) -> Int { b.binary(.add, b.product(x, a(name), layout: layout), a(name + "_bias")) }
+        /// `x · Wᵀ + b`, the product rounded to bf16, then the bias added in bf16.
+        func linear(_ x: Int, _ name: String) -> Int { b.binary(.add, b.linear(x, a(name)), a(name + "_bias")) }
         /// `F.layer_norm` on bf16: statistics, gain and bias in f32, one rounding.
         func layerNorm(_ x: Int, _ name: String, axis: Int) -> Int {
             let normed = b.layerNorm(b.cast(x, to: .f32), axes: [axis], epsilon: b.scalar(eps, .f32))
@@ -155,14 +153,14 @@ package struct Qwen3VLVision {
         }
     }
 
-    private static func module(_ arguments: [Argument], eps: Double, layout: CodesLayout, shapes: [String: [Int]] = [:]) -> (Aicode.Module, Writer) {
+    private static func module(_ arguments: [Argument], eps: Double, shapes: [String: [Int]] = [:]) -> (Aicode.Module, Writer) {
         let m = Aicode.Module(arguments: arguments.map { ($0.name, Aicode.tensor($0.shape, $0.element)) })
-        return (m, Writer(b: m.body, names: m.argumentNames, eps: eps, layout: layout, shapes: shapes))
+        return (m, Writer(b: m.body, names: m.argumentNames, eps: eps, shapes: shapes))
     }
 
     static func embedModule(_ c: Config, rows n: Int) -> Aicode.Module {
-        // The patch kernel is the file's convolution `[width, 3, 2, 16, 16]` read flat `[out, in]`: no product's layout.
-        let (made, w) = module(embedArguments(c, rows: n), eps: c.eps, layout: .outIn)
+        // The patch kernel is the file's convolution `[width, 3, 2, 16, 16]` read flat `[out, in]`.
+        let (made, w) = module(embedArguments(c, rows: n), eps: c.eps)
         var m = made
         let b = w.b
         let x = b.binary(.add, b.linear(b.cast(w.a("pixels"), to: .bf16), w.a("kernel")), w.a("kernel_bias"))
@@ -171,11 +169,11 @@ package struct Qwen3VLVision {
         return m
     }
 
-    /// One block on the grid's rows, its RoPE tables constants, its products' weights as `layout` lays them.
-    func blockModule(layout: CodesLayout) -> Aicode.Module {
+    /// One block on the grid's rows, its RoPE tables constants, its products' weights `[out, in]`.
+    func blockModule() -> Aicode.Module {
         let c = config, n = patches, d = c.headDim
-        let shapes = ["fc2": layout == .inOut ? [c.hidden, c.width] : [c.width, c.hidden]]
-        let (made, w) = Self.module(Self.blockArguments(c, rows: n, layout: layout), eps: c.eps, layout: layout, shapes: shapes)
+        let shapes = ["fc2": [c.width, c.hidden]]
+        let (made, w) = Self.module(Self.blockArguments(c, rows: n), eps: c.eps, shapes: shapes)
         var m = made
         let (cosValues, sinValues) = rope()
         let cos = m.constant("rope_cos", cosValues.withUnsafeBytes { Array($0) }, Aicode.tensor([n, 1, d], .f32))
@@ -199,8 +197,8 @@ package struct Qwen3VLVision {
         return m
     }
 
-    static func mergerModule(_ c: Config, rows n: Int, deepstack: Bool, layout: CodesLayout) -> Aicode.Module {
-        let (made, w) = module(mergerArguments(c, rows: n, deepstack: deepstack, layout: layout), eps: c.eps, layout: layout)
+    static func mergerModule(_ c: Config, rows n: Int, deepstack: Bool) -> Aicode.Module {
+        let (made, w) = module(mergerArguments(c, rows: n, deepstack: deepstack), eps: c.eps)
         var m = made
         let b = w.b, wide = c.group * c.width
         let regrouped = deepstack ? w.layerNorm(b.reshape(w.a("x"), [n / c.group, wide]), "norm", axis: 1)
@@ -212,8 +210,8 @@ package struct Qwen3VLVision {
 
     // MARK: - The weights
 
-    /// A block's weights or a merger's, each argument by its name, the file's key under `stem`: the products in the plan's
-    /// bf16 layout (`Recipe.product`, by their keys without `.weight`), the rest as they lie.
+    /// A block's weights or a merger's, each argument by its name, the file's key under `stem`: the products `[out, in]`
+    /// (`Recipe.product`, by their keys without `.weight`), the rest as they lie.
     func entries(_ stem: String, _ parts: [String: String]) -> [Weights.Entry] {
         parts.sorted { $0.key < $1.key }.flatMap { name, part -> [Weights.Entry] in
             let key = prefix + stem + "." + part
@@ -254,9 +252,9 @@ package struct Qwen3VLVision {
         d.layers = groups()
         d.tensors = d.layers.filter { $0.form != "block" }.map { .init("\($0.name).out", bytes: slots * c.output * 2, .apart) }
         d.residents = [("kernel", prefix + "patch_embed.proj.weight", .bfloat16(joined: [])), ("kernel_bias", prefix + "patch_embed.proj.bias", .bfloat16(joined: []))]
-        d.kinds = ["block": { b in v.blockModule(layout: b.bfloat16) },
-                   "merger": { b in Self.mergerModule(c, rows: n, deepstack: false, layout: b.bfloat16) },
-                   "deepstack": { b in Self.mergerModule(c, rows: n, deepstack: true, layout: b.bfloat16) }]
+        d.kinds = ["block": { _ in v.blockModule() },
+                   "merger": { _ in Self.mergerModule(c, rows: n, deepstack: false) },
+                   "deepstack": { _ in Self.mergerModule(c, rows: n, deepstack: true) }]
         d.edges["embed"] = { _ in Self.embedModule(c, rows: n) }
         return d
     }

@@ -1,6 +1,6 @@
 import Foundation
 import XCTest
-import SiliCore
+@testable import SiliCore
 @testable import Siliconed
 
 /// **The VAEs' plans, without a byte of weights**: one function a layer's shape whatever the picture's height, what
@@ -8,25 +8,25 @@ import SiliCore
 final class VAEBandsTests: XCTestCase {
     private let flux = FluxVAEDecoder.vae, flux2 = Flux2VAEDecoder.vae
 
-    /// The functions a plan names, by their keys and shapes.
-    private func shapes(_ b: Bands) -> Set<Bands.Shaped> { b.shapes }
+    /// The functions a plan builds, by their keys and shapes.
+    private func shapes(_ b: Bands) throws -> Set<Bands.Shaped> { Set(try b.modules().keys) }
 
     /// **A picture as tall as it likes, the same functions**: at one width, every height decodes and encodes with the
     /// functions of the others (the head and the tail aside, whole: the attention reads every position), a taller one
     /// with more calls.
-    func testTheFunctionsDoNotMoveWithTheHeight() {
-        func banded(_ b: Bands) -> Set<Bands.Shaped> { shapes(b).filter { !$0.key.contains("-head-") && !$0.key.contains("-tail-") && !$0.key.contains("head(") && !$0.key.contains("tail(") } }
+    func testTheFunctionsDoNotMoveWithTheHeight() throws {
+        func banded(_ b: Bands) throws -> Set<Bands.Shaped> { try shapes(b).filter { !$0.key.contains("-head-") && !$0.key.contains("-tail-") && !$0.key.contains("head(") && !$0.key.contains("tail(") } }
         for vae in [flux, flux2] {
             let plans = [512, 832, 1024, 1248].map { FluxVAEPlan(vae, .decode, height: $0 / vae.factor, width: 832 / vae.factor, positions: FluxVAE.candidates[0]) }
-            XCTAssert(plans.allSatisfy { banded($0.bands) == banded(plans[0].bands) }, vae.name)
+            XCTAssert(try plans.allSatisfy { try banded($0.bands) == banded(plans[0].bands) }, vae.name)
             XCTAssertLessThan(plans[0].bands.callCount, plans[3].bands.callCount)
             let encoders = [512, 1024, 1248].map { FluxVAEPlan(vae, .encode, height: $0, width: 832, positions: FluxVAE.candidates[0]) }
-            XCTAssert(encoders.allSatisfy { banded($0.bands) == banded(encoders[0].bands) }, vae.name)
+            XCTAssert(try encoders.allSatisfy { try banded($0.bands) == banded(encoders[0].bands) }, vae.name)
         }
         let qwen = [512, 832, 1024, 1248].map { QwenImageVAEDecoder.plan(h: $0 / 8, w: 104, positions: QwenImageVAE.positions[0]) }
-        XCTAssert(qwen.allSatisfy { banded($0.bands) == banded(qwen[0].bands) })
+        XCTAssert(try qwen.allSatisfy { try banded($0.bands) == banded(qwen[0].bands) })
         let qwen21 = [512, 832, 1024].map { QwenImage21VAEDecoder.plan(h: $0 / 16, w: 52, positions: QwenImageVAE.positions[0]) }
-        XCTAssert(qwen21.allSatisfy { banded($0.bands) == banded(qwen21[0].bands) })
+        XCTAssert(try qwen21.allSatisfy { try banded($0.bands) == banded(qwen21[0].bands) })
     }
 
     /// **Every function builds**, the decoders' and the encoders', at a size and a short band: what a pass loads.
@@ -47,7 +47,6 @@ final class VAEBandsTests: XCTestCase {
     func testLayersOfOneShapeShareAFunction() {
         let plan = FluxVAEPlan(flux, .decode, height: 128, width: 128, positions: FluxVAE.candidates[0])
         XCTAssertEqual(plan.bands.functionCount, 20)
-        XCTAssertEqual(Set(plan.bands.counts.keys).count, plan.bands.counts.count)
     }
 
     /// The decoder hands back the picture, the encoder the latent its decoder reads: Flux's 16 channels at an eighth,
@@ -71,9 +70,10 @@ final class VAEBandsTests: XCTestCase {
     /// The boundaries the oracle writes are marked, in the decoder's order.
     func testTheBoundariesAreMarkedInOrder() {
         let plan = FluxVAEPlan(flux2, .decode, height: 32, width: 32, positions: FluxVAE.candidates[0])
-        XCTAssertEqual(plan.bands.boundaries.map(\.name), ["decoder_mid", "decoder_up0", "decoder_up1", "decoder_up2"])
-        XCTAssertEqual(plan.bands.boundaries.map(\.call), plan.bands.boundaries.map(\.call).sorted())
-        XCTAssert(Set(Flux2VAEDecoder.tapNames).isSubset(of: plan.bands.boundaries.map(\.name)))
+        let marks = plan.bands.marks
+        XCTAssertEqual(marks.map(\.name), ["decoder_mid", "decoder_up0", "decoder_up1", "decoder_up2"])
+        XCTAssertEqual(marks.map(\.call), marks.map(\.call).sorted())
+        XCTAssert(Set(Flux2VAEDecoder.tapNames).isSubset(of: marks.map(\.name)))
     }
 
     /// Every weight a resident read by its recipe, no kernel in an asset: the kernels of Wan's causal VAE at their last
@@ -88,59 +88,29 @@ final class VAEBandsTests: XCTestCase {
     }
 
     /// Wan's convolution to the pixels lies in the tallest candidate's bands in every plan: its bits do not move with B.
-    func testThePixelsConvolutionKeepsItsBands() {
+    func testThePixelsConvolutionKeepsItsBands() throws {
         for (tall, short) in [(QwenImageVAEDecoder.plan(h: 128, w: 128, positions: 1 << 14), QwenImageVAEDecoder.plan(h: 128, w: 128, positions: 1 << 11)),
                               (QwenImage21VAEDecoder.plan(h: 64, w: 64, positions: 1 << 14), QwenImage21VAEDecoder.plan(h: 64, w: 64, positions: 1 << 11))] {
-            func outs(_ p: QwenImageVAE.Plan) -> Set<Int> { Set(p.bands.shapes.filter { $0.key.contains("out(") }.map(\.geometry.rows)) }
-            XCTAssertEqual(outs(tall), outs(short))
-            XCTAssertFalse(outs(tall).isEmpty)
-            XCTAssertNotEqual(shapes(tall.bands), shapes(short.bands))
+            func outs(_ p: QwenImageVAE.Plan) throws -> Set<Int> { Set(try shapes(p.bands).filter { $0.key.contains("out(") }.map(\.geometry.rows)) }
+            XCTAssertEqual(try outs(tall), try outs(short))
+            XCTAssertFalse(try outs(tall).isEmpty)
+            XCTAssertNotEqual(try shapes(tall.bands), try shapes(short.bands))
         }
     }
 }
 
-/// **The launch's sweep on a library of its own**: what the engines before this one left in the engine folder (its
-/// assets, and `functions/` with its folder) and the former mark erased, what this Mac measured kept; the compilations' mark, beside their
-/// folder, says whose they are.
-final class FunctionsSweepTests: XCTestCase {
-    func testTheFormerAssetsGoTheMeasuresStay() throws {
-        let fm = FileManager.default
-        let root = fm.temporaryDirectory.appendingPathComponent("sweep-\(UUID().uuidString)")
-        defer { try? fm.removeItem(at: root) }
-        let library = Library(root: root.appendingPathComponent("library"), local: root.appendingPathComponent("local"))
-        let old = library.engineFolder.appendingPathComponent("functions")
-        for (folder, name) in [(old, "a-00"), (old, "b-01"), (library.engineFolder, "c-02")] {
-            try fm.createDirectory(at: folder.appendingPathComponent("\(name).aimodel"), withIntermediateDirectories: true)
-            try Data(count: 5000).write(to: folder.appendingPathComponent("\(name).aimodel/main.hash"))
-        }
-        try Data("{}".utf8).write(to: library.engineFolder.appendingPathComponent("this-mac.json"))
-        let functions = root.appendingPathComponent("caches/functions")
-        try fm.createDirectory(at: functions, withIntermediateDirectories: true)
-        try Data("0.22 (690)".utf8).write(to: functions.appendingPathComponent("installed"))
-        XCTAssertGreaterThanOrEqual(CoreAI.sweep(library, functions: functions), 15000)
-        XCTAssertFalse(fm.fileExists(atPath: old.path))
-        XCTAssertFalse(fm.fileExists(atPath: functions.appendingPathComponent("installed").path))
-        XCTAssertEqual(try fm.contentsOfDirectory(atPath: library.engineFolder.path), ["this-mac.json"])
-        XCTAssertEqual(CoreAI.sweep(library, functions: functions), 0)
-    }
-
-    /// What this Mac measured is read in the library placed, the measures an engine kept beside the assets copied there once.
-    func testTheMeasuresFollowTheLibrary() throws {
+/// **The compilations' mark**, beside their folder, says whose they are; what this Mac measured is read in the app space.
+final class CompilationsTests: XCTestCase {
+    /// What this Mac measured is read in the engine folder of the library's app space.
+    func testTheMeasuresAreTheAppSpaces() throws {
         let fm = FileManager.default
         let root = fm.temporaryDirectory.appendingPathComponent("measures-\(UUID().uuidString)")
         let (folder, file) = (Functions.folder, ThisMac.file)
         defer { try? fm.removeItem(at: root); Functions.folder = folder; ThisMac.file = file }
         let library = Library(root: root.appendingPathComponent("library"), local: root.appendingPathComponent("local"))
-        let functions = root.appendingPathComponent("caches/functions"), before = root.appendingPathComponent("caches/this-mac.json")
-        try fm.createDirectory(at: functions, withIntermediateDirectories: true)
-        try Data("{\"kept\":{}}".utf8).write(to: before)
-        CoreAI.place(library, functions: functions)
-        let measures = library.engineFolder.appendingPathComponent("this-mac.json")
-        XCTAssertEqual(ThisMac.url, measures)
-        XCTAssertEqual(try Data(contentsOf: measures), Data("{\"kept\":{}}".utf8))
-        try Data("{}".utf8).write(to: before)
-        CoreAI.place(library, functions: functions)
-        XCTAssertEqual(try Data(contentsOf: measures), Data("{\"kept\":{}}".utf8), "the library's measures are never replaced")
+        CoreAI.place(library, functions: root.appendingPathComponent("caches/functions"))
+        XCTAssertEqual(ThisMac.url, library.local.appendingPathComponent("engine/this-mac.json"))
+        XCTAssertFalse(ThisMac.url.path.hasPrefix(library.root.path + "/"), "the measures stay on this Mac when the library moves")
     }
 
     func testTheMarkSaysWhoseTheCompilationsAre() throws {

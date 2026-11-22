@@ -24,19 +24,11 @@ body:
       placeholder: MacBook Air, Apple M2, 8 GB
     validations:
       required: true
-  - type: input
-    id: budget
-    attributes:
-      label: Memory limit
-      description: Settings ▸ Macs ▸ Memory Limit. The default is ¾ of the memory minus 2 GB (4 GB on an 8 GB Mac).
-      placeholder: 4 GB (default)
-    validations:
-      required: true
   - type: textarea
     id: output
     attributes:
       label: What the command printed
-      description: All of it, as it is. It already names the version of the app, macOS, the chip, the model and its version.
+      description: All of it, as it is. It already names the version of the app, macOS, the chip and its memory, the model and its version, the Neural Engine switch and the memory limit (B).
       render: text
     validations:
       required: true

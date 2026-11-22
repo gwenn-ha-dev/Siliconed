@@ -1,5 +1,6 @@
 import CoreAI
 import Foundation
+import Measurement
 import Metal
 import SiliCore
 
@@ -145,6 +146,19 @@ package enum Arithmetic: Equatable, Sendable, CustomStringConvertible {
         codes && CoreAI.integerProducts == nil ? try await SharedWeights.offered(device) : [.codes]
     }
 
+    /// The Compact's weights a control says (`--products int8` or `q64`), nil where the engine chooses.
+    private static var toldWeights: SharedWeights? { CoreAI.integerProducts.map { $0 ? .integer : .codes } }
+
+    /// **A check's**, where nothing is timed (`check z-image block`, `block-lora`): `of`'s, the Compact's weights a
+    /// control's word (`--products`), else the first the engine offers this Mac (`offered`) — the one a render tries
+    /// first, the faster where the trial measured it.
+    package static func told(codes: Bool, neuralEngine: Bool, _ device: MTLDevice) async throws -> Arithmetic {
+        let a = of(codes: codes, neuralEngine: neuralEngine)
+        guard case .shared(.codes, let share) = a else { return a }
+        if let told = toldWeights { return .shared(told, share) }
+        return .shared(try await offered(codes: true, device)[0], share)
+    }
+
     /// **A render's**, `of`'s — but for the Standard beside the ANE in flight, the engine's choice between it and the
     /// Standard's bf16 on the GPU alone, each `declaration` timed on this Mac (`Block.choose`). Measured 20/11/2026 on
     /// the mini at 1024², whose GPU runs bf16 as fast as f16: the shared forms cost its GPU alone 7 to 16 % over bf16,
@@ -161,7 +175,7 @@ package enum Arithmetic: Equatable, Sendable, CustomStringConvertible {
         let a = of(codes: codes, neuralEngine: neuralEngine)
         let alternatives: [Arithmetic]
         if case .shared(.codes, let share) = a {
-            let told = CoreAI.integerProducts.map { $0 ? SharedWeights.integer : .codes }
+            let told = toldWeights
             // A control's rows: nothing timed (no pace is kept under them), the weights offered first.
             if case .told = share { return .shared(told ?? offered[0], share) }
             let shares: [Block.Share] = share == .inFlight ? [.inFlight, .gpu] : [share]
@@ -174,6 +188,24 @@ package enum Arithmetic: Equatable, Sendable, CustomStringConvertible {
         return alternatives.count == 1 ? alternatives[0] : alternatives[try Block.choose(alternatives.map { (declaration($0), $0.share) })]
     }
 
+    /// **Whether a DiT's file holds the Compact's codes**: its product `marker` (a key of the file, `.weight` included)
+    /// stored I8.
+    package static func codes(_ file: SafeTensors, marker: String) -> Bool { file.tensors[marker]?.dtype == "I8" }
+
+    /// **A render's DiT, opened**: its arithmetic `opened` under the Neural Engine switch, from what the engine offers
+    /// this Mac's GPU (`offered`), each alternative's `declaration` timed where there is a choice; then the block of that
+    /// declaration under `budget` (`Block.open`), on the share the arithmetic says. `marker`: the product whose element
+    /// says the Compact (`codes`).
+    package static func block(file: SafeTensors, codes marker: String, budget: Int,
+                              _ declaration: (Arithmetic) -> Block.Declaration) async throws -> (block: Block, arithmetic: Arithmetic) {
+        guard let device = MTLCreateSystemDefaultDevice() else { throw ProgramError("no Metal device") }
+        let codes = Self.codes(file, marker: marker)
+        let offered = try await Self.offered(codes: codes, device)
+        let arithmetic = try opened(codes: codes, neuralEngine: CoreAI.neuralEngineInForce, offered: offered, declaration)
+        let block = try await Block.open(device, declaration(arithmetic), files: [file], budget: budget, share: arithmetic.share)
+        return (block, arithmetic)
+    }
+
     /// The shared forms, or the Standard's bf16.
     package var shared: Bool { self != .standard }
     /// The shared forms' weights (the Standard's: none, `codes` said).
@@ -182,6 +214,11 @@ package enum Arithmetic: Equatable, Sendable, CustomStringConvertible {
     }
     package var share: Block.Share {
         if case .shared(_, let s) = self { s } else { .gpu }
+    }
+    /// The shared forms' weights, nil for the Standard's: what a block's declaration lays its codes by
+    /// (`Block.Declaration.sharedWeights`).
+    package var sharedWeights: SharedWeights? {
+        if case .shared(let w, _) = self { w } else { nil }
     }
     /// The residual stream's element, and the low-rank factors': f16 in the shared forms, bf16 in the Standard's.
     package var element: NDArray.ScalarType { shared ? .float16 : .bfloat16 }
@@ -228,34 +265,27 @@ package enum CoreAI {
     /// **One switch from end to end of a piece of work**: a render computes its text, its denoising and its decoder at
     /// different times, and a preference changed in between would make one image of two arithmetics. The engine queue
     /// runs one such work at a time, under the process's switch as it is when the work begins (or the work's around it).
-    package static func under<T>(_ work: (Bool) throws -> T) rethrows -> T {
-        let (now, before) = lock.withLock { () -> (Bool, Bool?) in
+    package static func under<T>(_ work: () throws -> T) rethrows -> T {
+        let before = lock.withLock { () -> Bool? in
             let before = held
             held = held ?? chosen.neuralEngine
-            return (held!, before)
+            return before
         }
         defer { lock.withLock { held = before } }
-        return try work(now)
+        return try work()
     }
 
     /// Whether the work computed now may take the Neural Engine: the work's in hand, else the process's switch.
     package static var neuralEngineInForce: Bool { lock.withLock { held ?? chosen.neuralEngine } }
 
     /// **Where the functions' assets are written** (`Functions.folder`): the user's caches, where everything is written
-    /// again when missing — no weight in an asset, its bytes its name. What this Mac measured stays in `library`'s engine
-    /// folder (`ThisMac`, `this-mac.json`), which macOS never purges and which follows the library: in the caches, a purge
-    /// sent every block back to its unit's trial. Set before a piece of work computes.
+    /// again when missing — no weight in an asset, its bytes its name. What this Mac measured stays in the engine folder
+    /// of `library`'s app space (`<local>/engine`, `ThisMac`, `this-mac.json`), which macOS never purges and which stays on
+    /// this Mac when the library moves: in the caches, a purge sent every block back to its unit's trial. Set before a
+    /// piece of work computes.
     package static func place(_ library: Library, functions: URL = functions) {
         Functions.folder = functions
-        let measures = library.engineFolder.appendingPathComponent("this-mac.json")
-        // An engine before 21/11 kept them beside the assets: copied once to a library that has none (copied, not moved:
-        // an app of before still reads them there).
-        let fm = FileManager.default, before = functions.deletingLastPathComponent().appendingPathComponent("this-mac.json")
-        if !fm.fileExists(atPath: measures.path), fm.fileExists(atPath: before.path) {
-            try? fm.createDirectory(at: library.engineFolder, withIntermediateDirectories: true)
-            try? fm.copyItem(at: before, to: measures)
-        }
-        ThisMac.file = measures
+        ThisMac.file = library.engineFolder.appendingPathComponent("this-mac.json")
     }
 
     /// **This app, as the compilations' mark names it** (`markCompiled`): its version and its build, inside the app's own
@@ -264,7 +294,7 @@ package enum CoreAI {
     /// `_GenericObjCError` at its first stage, every render (20/11, the M1 Pro: two builds of one number, nothing erased,
     /// a family that rendered no longer did); a build number does not change between two builds of one commit.
     package static let thisApp: String = {
-        guard Bundle.main.bundleIdentifier == "dev.gwenn-ha.siliconed", let info = Bundle.main.infoDictionary else { return "siliconed" }
+        guard Bundle.main.bundleIdentifier == siliconedBundleIdentifier, let info = Bundle.main.infoDictionary else { return "siliconed" }
         let version = "\(info["CFBundleShortVersionString"] as? String ?? "?") (\(info["CFBundleVersion"] as? String ?? "?"))"
         return EngineWorker.executable.flatMap(binaryUUID).map { "\(version) \($0)" } ?? version
     }()
@@ -320,10 +350,9 @@ package enum CoreAI {
     }
 
     /// **The processes that specialize this app's functions**, as Core AI files them (`Functions.specializations`): the
-    /// engine's (`silicore-worker`), the command line's (`siliconed`, the same assets), and one gone on 20/11
-    /// (`silicore-share`, which measured each function's share apart: up to 6 GB that nothing else erases).
+    /// engine's (`silicore-worker`) and the command line's (`siliconed`, the same assets).
     package static let worker = "silicore-worker"
-    package static let specializing = [worker, "siliconed", "silicore-share"]
+    package static let specializing = [worker, "siliconed"]
 
     /// **What this Mac's compilations weigh**: the functions' assets and what Core AI specialized of them for each
     /// process of the app, in bytes.
@@ -354,23 +383,6 @@ package enum CoreAI {
 
     /// Beside the functions' folder, not in it: erased with them, it would say nothing.
     private static func mark(_ folder: URL) -> URL { folder.deletingLastPathComponent().appendingPathComponent("compiled-for") }
-
-    /// **At the app's launch: what the engines before this one left** — in `library`'s engine folder,
-    /// the assets of 14/11 beside the measures, and `functions/`, where an app before 19/11 kept them (9.7 GB on the
-    /// mini, 20/11); in `functions`, the mark an app before 20/11 kept inside it; the calibrations' records, which no
-    /// app writes since 20/11. No engine reads them: off the main thread, at any time. What this Mac measured stays.
-    /// What it erased, in bytes.
-    package static func sweep(_ library: Library, functions: URL = functions) -> Int {
-        let fm = FileManager.default, folder = library.engineFolder, old = folder.appendingPathComponent("functions", isDirectory: true)
-        try? fm.removeItem(at: functions.appendingPathComponent("installed"))
-        try? fm.removeItem(at: folder.appendingPathComponent("calibrations.json"))
-        var bytes = Functions.erase(folder)
-        if fm.fileExists(atPath: old.path) {
-            bytes += Functions.erase(old)
-            try? fm.removeItem(at: old)
-        }
-        return bytes
-    }
 }
 
 /// **A tensor handed from one piece of a render to the next on the CPU** (a text's conditioning, a latent): its shape

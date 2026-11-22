@@ -43,7 +43,6 @@ extension Runs {
         for round in 0..<2 {
             let stage = try await Stage.open(bench.device, d, files: [file], budget: 1 << 40)
             floors.append(stage.plan.floor)
-            try stage.filled()
             try await call(stage.functions["product"]!, stage)
             let settled = autoreleasepool { () -> Stage.Settled in
                 let p = stage.pointer("big")

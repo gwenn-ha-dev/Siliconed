@@ -40,11 +40,13 @@ package struct Qwen3Encoder {
         /// The model's final `norm` applied after the last layer (`last_hidden_state`); without it the output is the last
         /// layer's raw one (`hidden_states[-2]` of a 36-layer file read to layer 34).
         package let finalNorm: Bool
+        /// What the file puts before each name of the language model (`model.`, `model.language_model.`).
+        package let prefix: String
 
         package init(width: Int, heads: Int, kvHeads: Int, headDim: Int, hidden: Int, layers: Int, vocabulary: Int = 151_936,
-                     theta: Double = 1e6, eps: Double = 1e-6, finalNorm: Bool) {
+                     theta: Double = 1e6, eps: Double = 1e-6, finalNorm: Bool, prefix: String = "model.") {
             (self.width, self.heads, self.kvHeads, self.headDim, self.hidden) = (width, heads, kvHeads, headDim, hidden)
-            (self.layers, self.vocabulary, self.theta, self.eps, self.finalNorm) = (layers, vocabulary, theta, eps, finalNorm)
+            (self.layers, self.vocabulary, self.theta, self.eps, self.finalNorm, self.prefix) = (layers, vocabulary, theta, eps, finalNorm, prefix)
         }
 
         /// q, k and v side by side, the fused product's width.
@@ -69,14 +71,13 @@ package struct Qwen3Encoder {
     }
 
     package let config: Config
-    /// What the file puts before each name of the language model (`model.`, `model.language_model.`).
-    package let prefix: String
     /// The file, or the index of its shards.
     package let path: String
+    /// What the file puts before each name of the language model: the configuration's.
+    package var prefix: String { config.prefix }
 
-    package init(config: Config, prefix: String = "model.", path: String) {
+    package init(config: Config, path: String) {
         self.config = config
-        self.prefix = prefix
         self.path = path
     }
 

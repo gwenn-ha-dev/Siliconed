@@ -1,6 +1,18 @@
 import Foundation
 
-/// **The shared forms' residual where no norm bounds the update** (`Neural.swift`'s `residual16` reads Δ as a true value
+extension Aicode.Block {
+    /// The residual stream's update in f16 (the guard's `residual`): x̂ kept under X `[1, rows, 1]`, plus Δ a true value,
+    /// both brought to half the larger factor C = 2 · max(X, 4), summed, the sum brought back to [2¹³, 2¹⁴]: (x̂', C · F).
+    /// Every factor a power of two, every quotient exact; C past 2¹⁵ (a stream past 2²⁹) leaves f16.
+    public func residual16(_ x: Int, _ xf: Int, plus delta: Int) -> (value: Int, factor: Int) {
+        let c = scale("mul", scale("maximum", xf, 4), 2)
+        let sum = binary(.add, binary(.mul, x, binary(.divide, xf, c)), binary(.mul, delta, scale("divide", c, 1, scalarFirst: true)))
+        let (u, f) = ranged16(sum, under: 14)
+        return (u, binary(.mul, c, f))
+    }
+}
+
+/// **The shared forms' residual where no norm bounds the update** (`residual16(_:_:plus:)`, above, reads Δ as a true value
 /// in f16, which a transformer without a sandwich norm leaves: its update is a product's result under its target, times
 /// the factors of every input it came from). Δ is kept as (Δ̂, G), G = ∏ Gᵢ, each Gᵢ a power of two `[1, rows, 1]`
 /// in f16 (`ranged16`'s). The product of the Gᵢ is never formed: a feed-forward's five factors can leave f16 on the way

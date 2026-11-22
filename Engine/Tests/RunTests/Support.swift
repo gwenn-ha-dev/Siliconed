@@ -109,3 +109,31 @@ func share(_ call: () async throws -> Void) async throws -> Int {
     try await call()
     return watch.peak - before
 }
+
+extension Weights {
+    /// `entries` read from `file` into `arena` as a stage reads them (`Weights.place`, then `Weights.read` through a
+    /// staging), the staging in `Pages` of its own.
+    static func load(_ entries: [Entry], from file: SafeTensors, into arena: Arena, codes: CodesLayout = .inOut) throws -> [String: Placed] {
+        let placed = place(try layout(entries, in: file, codes: codes), in: arena)
+        let staging = Pages(bytes: try Self.staging(entries, in: file, codes: codes))
+        try withExtendedLifetime(staging) {
+            try read(entries, from: file, into: placed, arena: arena, staging: staging.base, codes: codes)
+        }
+        return placed
+    }
+}
+
+extension Memory {
+    /// The footprint, settled: the lowest of `samples` readings a millisecond apart (what was given back is gone).
+    static func settled(_ samples: Int = 200) -> Int {
+        var low = Int.max
+        for _ in 0..<samples { low = min(low, footprint()); usleep(1000) }
+        return low
+    }
+}
+
+extension Stage.Settled {
+    /// The stage let go whole: the footprint back within the stage's margin of what it was before, no arena alive, no
+    /// heap held.
+    var within: Bool { footprint <= before + Stage.margin && alive == 0 && held == 0 }
+}

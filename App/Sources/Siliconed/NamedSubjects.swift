@@ -49,6 +49,12 @@ package enum NamedSubjects {
     /// A name's length, in characters.
     package static let maxNameLength = 32
 
+    /// **An edit's own images**, in their numbers: a render's references without the `subjectImages` subjects' pictures
+    /// that follow them (`RenderSettings.subjectImages` in the app), which come back with the text that cites them.
+    package static func editImages<Image>(_ references: [Image], subjectImages: Int) -> [Image] {
+        Array(references.dropLast(max(0, subjectImages)))
+    }
+
     // ── the kinds ──
 
     /// **What a subject is, hence what the model keeps of its picture** — a closed list.

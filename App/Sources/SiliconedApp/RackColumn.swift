@@ -86,11 +86,10 @@ struct RackColumn: View {
         .columnGlass(app.glass)
         .overlay(alignment: .trailing) { if !gone { resizer } }
         .onChange(of: app.problem != nil) { _, said in if said { model.unfold() } }
-        // A column unfolded for a scroll was not there to hear it: the scroll is said again once the rack is drawn.
+        // A scroll asked of a folded column unfolds it: the rack, drawn, makes the scroll still asked (`Sidebar`).
         .onChange(of: app.rackScroll?.count) {
-            guard model.folded, let asked = app.rackScroll else { return }
+            guard model.folded, app.rackScroll != nil else { return }
             model.unfold()
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { app.rackScroll = (asked.place, asked.count + 1) }
         }
     }
 

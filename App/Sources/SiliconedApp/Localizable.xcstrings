@@ -4739,46 +4739,6 @@
         }
       }
     },
-    "--out expects a folder" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "--out erwartet einen Ordner"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "--out espera una carpeta"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "--out attend un dossier"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "--out richiede una cartella"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "--out にはフォルダを指定してください"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "--out 需要一个文件夹"
-          }
-        }
-      }
-    },
     "--ref <image> to edit it (help edit)" : {
       "localizations" : {
         "de" : {
@@ -5665,6 +5625,46 @@
         }
       }
     },
+    "A file of this model wasn’t the published one: it was removed, and installing the model again downloads it alone." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eine Datei dieses Modells war nicht die veröffentlichte: Sie wurde entfernt, und eine erneute Installation des Modells lädt nur sie herunter."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un archivo de este modelo no era el publicado: se ha eliminado, y al instalar de nuevo el modelo solo se descarga ese archivo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un fichier de ce modèle n’était pas celui publié : il a été effacé, et réinstaller le modèle ne télécharge que lui."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un file di questo modello non era quello pubblicato: è stato rimosso, e reinstallare il modello scarica solo quello."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このモデルのファイルが公開版と一致しなかったため削除しました。モデルを再インストールすると、そのファイルだけをダウンロードします。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此模型的一个文件与发布版本不符，已被删除；重新安装模型只会下载这一个文件。"
+          }
+        }
+      }
+    },
     "A file read back from the new place differs from the original: %@." : {
       "localizations" : {
         "de" : {
@@ -5741,6 +5741,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "包含 Siliconed 资源库的文件夹。不会移动任何内容：当前资源库留在原处。"
+          }
+        }
+      }
+    },
+    "A free or square frame has no other orientation." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ein freier oder quadratischer Rahmen hat keine andere Ausrichtung."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un marco libre o cuadrado no tiene otra orientación."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un cadre libre ou carré n’a pas d’autre orientation."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Una cornice libera o quadrata non ha un’altra orientazione."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自由または正方形のフレームには、ほかの向きがありません。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自由或正方形的取景框没有另一个方向。"
           }
         }
       }
@@ -8991,6 +9031,46 @@
         }
       }
     },
+    "Check Fixed to choose the seed: unchecked, each render draws its own" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kreuzen Sie Fest an, um den Seed zu wählen: ohne Haken zieht jedes Rendering seinen eigenen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Marca Fija para elegir la semilla: sin marcar, cada renderizado saca la suya"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cochez Fixe pour choisir la graine : décochée, chaque rendu tire la sienne"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Spunta Fisso per scegliere il seme: senza spunta, ogni rendering estrae il proprio"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "シードを選ぶには固定にチェック：チェックなしでは、生成ごとに新しいシードを引きます"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "勾选“固定”即可选择种子：不勾选时，每次渲染都会抽取自己的种子"
+          }
+        }
+      }
+    },
     "Check at Launch" : {
       "localizations" : {
         "de" : {
@@ -10267,6 +10347,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "请为其中一个轴选择其他设置。"
+          }
+        }
+      }
+    },
+    "Choose one of the files the import takes." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wählen Sie eine der Dateien, die der Import annimmt."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Elige uno de los archivos que admite la importación."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choisissez un des fichiers que l’import accepte."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scegli uno dei file che l’importazione accetta."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "読み込めるファイルのいずれかを選んでください。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请选择一个可以导入的文件。"
           }
         }
       }
@@ -19685,6 +19805,46 @@
         }
       }
     },
+    "Its license and the space it takes are shown below." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lizenz und Platzbedarf stehen unten."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Su licencia y el espacio que ocupa se muestran abajo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sa licence et la place qu’il prend sont affichées ci-dessous."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La licenza e lo spazio occupato sono mostrati qui sotto."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ライセンスと必要な容量は下に表示されています。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "其许可证和所占空间显示在下方。"
+          }
+        }
+      }
+    },
     "Its trigger words, as its file gives them: a click puts them at the head of the prompt." : {
       "localizations" : {
         "de" : {
@@ -22554,6 +22714,46 @@
         }
       }
     },
+    "No cell has its image yet." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Noch keine Zelle hat ihr Bild."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ninguna celda tiene aún su imagen."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucune case n’a encore son image."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nessuna cella ha ancora la sua immagine."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "画像のあるセルはまだありません。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "还没有任何单元格生成图像。"
+          }
+        }
+      }
+    },
     "No image" : {
       "localizations" : {
         "de" : {
@@ -22630,6 +22830,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "此次生成不包含图像 %@：这些词会被略去。"
+          }
+        }
+      }
+    },
+    "No image in the history yet." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Noch kein Bild im Verlauf."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Todavía no hay ninguna imagen en el historial."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucune image dans l’historique pour l’instant."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ancora nessuna immagine nella cronologia."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "履歴にはまだ画像がありません。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "历史记录中还没有图像。"
           }
         }
       }
@@ -22910,6 +23150,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "尚无生成记录。"
+          }
+        }
+      }
+    },
+    "No seed drawn yet: the next render draws one, check Fixed to choose it" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Noch kein Seed gezogen: Das nächste Rendering zieht einen, kreuzen Sie Fest an, um ihn zu wählen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aún no se ha sacado ninguna semilla: el próximo renderizado sacará una, marca Fija para elegirla"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucune graine tirée pour l’instant : le prochain rendu en tire une, cochez Fixe pour la choisir"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nessun seme ancora estratto: il prossimo rendering ne estrae uno, spunta Fisso per sceglierlo"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "シードはまだ引かれていません：次の生成で引かれます。選ぶには固定にチェック"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "尚未抽取种子：下次渲染会抽取一个，勾选“固定”即可自行选择"
           }
         }
       }
@@ -24808,6 +25088,46 @@
         }
       }
     },
+    "Only “%@” frees the files of version 0.21 of its library." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nur „%@“ gibt die Dateien der Version 0.21 seiner Bibliothek frei."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Solo «%@» libera los archivos de la versión 0.21 de su biblioteca."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seul « %@ » libère les fichiers de la version 0.21 de sa bibliothèque."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Solo «%@» libera i file della versione 0.21 della sua libreria."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ライブラリにあるバージョン0.21のファイルを解放できるのは「%@」だけです。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "只有“%@”才能释放其资源库中 0.21 版的文件。"
+          }
+        }
+      }
+    },
     "Open" : {
       "localizations" : {
         "de" : {
@@ -26526,46 +26846,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Qwen Research（非商用）"
-          }
-        }
-      }
-    },
-    "Random: a new seed for every render. Fixed: the same image again" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Zufällig: ein neuer Seed für jedes Rendering. Fest: noch einmal dasselbe Bild"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Aleatoria: una semilla nueva en cada renderizado. Fija: la misma imagen otra vez"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Au hasard : une nouvelle graine à chaque rendu. Fixe : la même image à nouveau"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Casuale: un nuovo seme a ogni rendering. Fisso: di nuovo la stessa immagine"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ランダム：生成ごとに新しいシード。固定：同じ画像をもう一度"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "随机：每次生成使用新种子。固定：再次得到同一张图像"
           }
         }
       }
@@ -34135,42 +34415,42 @@
         }
       }
     },
-    "The engine failed (%@)." : {
+    "The engine failed." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Die Engine ist fehlgeschlagen (%@)."
+            "value" : "Die Engine ist fehlgeschlagen."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "El motor ha fallado (%@)."
+            "value" : "El motor ha fallado."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Le moteur a échoué (%@)."
+            "value" : "Le moteur a échoué."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Il motore non è riuscito (%@)."
+            "value" : "Il motore non è riuscito."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "エンジンが失敗しました（%@）。"
+            "value" : "エンジンが失敗しました。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "引擎出错（%@）。"
+            "value" : "引擎出错。"
           }
         }
       }
@@ -34649,6 +34929,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "仅此版本读取的文件会被删除；再次安装将重新下载它们。"
+          }
+        }
+      }
+    },
+    "The frame takes the whole image already." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Der Rahmen umfasst bereits das ganze Bild."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El marco ya abarca toda la imagen."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le cadre prend déjà toute l’image."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La cornice prende già l’intera immagine."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "フレームはすでに画像全体を囲んでいます。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "取景框已覆盖整张图像。"
           }
         }
       }
@@ -36415,6 +36735,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "队列已满。"
+          }
+        }
+      }
+    },
+    "The rack already renders with this model." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das Rack rendert bereits mit diesem Modell."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El rack ya renderiza con este modelo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le rack rend déjà avec ce modèle."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il rack renderizza già con questo modello."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ラックはすでにこのモデルで生成します。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "机架已在使用此模型渲染。"
           }
         }
       }
@@ -38803,6 +39163,46 @@
         }
       }
     },
+    "This is Siliconed’s instruction already." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das ist bereits die Anweisung von Siliconed."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ya es la instrucción de Siliconed."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "C’est déjà la consigne de Siliconed."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "È già l’istruzione di Siliconed."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "すでに Siliconed の指示です。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这已经是 Siliconed 的指令。"
+          }
+        }
+      }
+    },
     "This is the library of “%@”: only that Mac can open it, move it or show it in the Finder." : {
       "localizations" : {
         "de" : {
@@ -40037,6 +40437,46 @@
         }
       }
     },
+    "Turned, this frame would not fit in the image." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gedreht passt dieser Rahmen nicht ins Bild."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Girado, este marco no cabría en la imagen."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tourné, ce cadre ne tiendrait pas dans l’image."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ruotata, questa cornice non starebbe nell’immagine."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "回転すると、このフレームは画像に収まりません。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "旋转后，此取景框将超出图像。"
+          }
+        }
+      }
+    },
     "Turns the DiT’s result, the latent, into pixels: the final image" : {
       "localizations" : {
         "de" : {
@@ -40353,6 +40793,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "输入或粘贴提示词。写 @ 可引用主体。"
+          }
+        }
+      }
+    },
+    "Unchecked: a new seed for every render. Checked: the same seed, the same image again" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ohne Haken: ein neuer Seed für jedes Rendering. Mit Haken: derselbe Seed, noch einmal dasselbe Bild"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sin marcar: una semilla nueva en cada renderizado. Marcada: la misma semilla, la misma imagen otra vez"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Décochée : une graine neuve à chaque rendu. Cochée : la même graine, la même image à nouveau"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Senza spunta: un nuovo seme a ogni rendering. Con la spunta: lo stesso seme, di nuovo la stessa immagine"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "チェックなし：生成ごとに新しいシード。チェックあり：同じシードで、同じ画像をもう一度"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "不勾选：每次渲染使用新种子。勾选：相同的种子，再次得到同一张图像"
           }
         }
       }
@@ -40997,42 +41477,42 @@
         }
       }
     },
-    "Variations: cousins of this image, same scene, slightly different — as many as the rack’s Images" : {
+    "Variations: cousins of this image, same scene, slightly different — as many as the rack’s Seeds" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Variationen: Verwandte dieses Bilds, gleiche Szene, leicht anders – so viele, wie das Feld „Bilder“ des Racks angibt"
+            "value" : "Variationen: Verwandte dieses Bilds, gleiche Szene, leicht anders – so viele, wie der Zähler „Seeds“ des Racks angibt"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Variaciones: primas de esta imagen, misma escena, algo distintas — tantas como indique el campo Imágenes del rack"
+            "value" : "Variaciones: primas de esta imagen, misma escena, algo distintas — tantas como indique el contador Semillas del rack"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Variations : des cousines de cette image, même scène, un peu différentes — autant que le champ Images du rack"
+            "value" : "Variations : des cousines de cette image, même scène, un peu différentes — autant que le compteur Graines du rack"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Variazioni: parenti di questa immagine, stessa scena, leggermente diverse — tante quante indica il campo Immagini del rack"
+            "value" : "Variazioni: parenti di questa immagine, stessa scena, leggermente diverse — tante quante indica il contatore Semi del rack"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "バリエーション：この画像の仲間で、同じシーンを少しずつ変えたもの — ラックの「画像」の枚数だけ"
+            "value" : "バリエーション：この画像の仲間で、同じシーンを少しずつ変えたもの — ラックの「シード数」の数だけ"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "变体：这张图像的“近亲”，场景相同，略有不同——数量与机架的“图像”一致"
+            "value" : "变体：这张图像的“近亲”，场景相同，略有不同——数量与机架的“种子数”一致"
           }
         }
       }
@@ -42925,6 +43405,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "窗口在“%@”上计算时不提供起始图像"
+          }
+        }
+      }
+    },
+    "a text that begins with -- goes after a lone --" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ein Text, der mit -- beginnt, steht nach einem einzelnen --"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "un texto que empieza por -- va después de un -- solo"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "un texte qui commence par -- s’écrit après un -- seul"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "un testo che inizia con -- va dopo un -- da solo"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "-- で始まるテキストは、単独の -- の後に書きます"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "以 -- 开头的文本写在单独的 -- 之后"
           }
         }
       }
@@ -47780,86 +48300,6 @@
         }
       }
     },
-    "set glass [on|off]" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "set glass [on|off]"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "set glass [on|off]"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "set glass [on|off]"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "set glass [on|off]"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "set glass [on|off]"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "set glass [on|off]"
-          }
-        }
-      }
-    },
-    "set memory [GB|default]" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "set memory [GB|default]"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "set memory [GB|default]"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "set memory [Go|default]"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "set memory [GB|default]"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "set memory [GB|default]"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "set memory [GB|default]"
-          }
-        }
-      }
-    },
     "set memory [GB|default]: from %lld to %lld on this Mac" : {
       "localizations" : {
         "de" : {
@@ -47902,126 +48342,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "set memory [GB|default]：这台 Mac 上为 %lld 到 %lld"
-          }
-        }
-      }
-    },
-    "set neural-engine [on|off]" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "set neural-engine [on|off]"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "set neural-engine [on|off]"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "set neural-engine [on|off]"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "set neural-engine [on|off]"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "set neural-engine [on|off]"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "set neural-engine [on|off]"
-          }
-        }
-      }
-    },
-    "set preview [on|off]" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "set preview [on|off]"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "set preview [on|off]"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "set preview [on|off]"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "set preview [on|off]"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "set preview [on|off]"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "set preview [on|off]"
-          }
-        }
-      }
-    },
-    "set updates [on|off]" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "set updates [on|off]"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "set updates [on|off]"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "set updates [on|off]"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "set updates [on|off]"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "set updates [on|off]"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "set updates [on|off]"
           }
         }
       }

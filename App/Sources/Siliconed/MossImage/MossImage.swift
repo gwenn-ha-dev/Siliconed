@@ -59,8 +59,6 @@ package enum MossImageDiT {
         /// Bands per axis (`head_dim / 8`): four axes, sin and cos, make `head_dim`.
         package var bands: Int { headDim / 8 }
     }
-
-    package static let kind = "moss-image-sft-dit"
 }
 
 // MARK: - the scheduler

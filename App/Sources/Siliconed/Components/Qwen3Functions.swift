@@ -4,8 +4,7 @@ import SiliCore
 
 /// **Qwen3's functions**, written op by op (`Aicode.Block`), their weights arguments: one layer over a palier of rows
 /// (the encoder; the prefill, which also hands back its keys and values), one layer over a token and the K/V cache (the
-/// decode), the head over a stretch of the vocabulary. The proto's encoder (`Qwen3.swift`, 18/11) generalized to every
-/// size, to bf16 and to ComfyUI's rotated codes.
+/// decode), the head over a stretch of the vocabulary: every size, bf16 and ComfyUI's rotated codes.
 ///
 ///     y₁ = x + o(sdpa(RoPE(RMS_head(q) γ_q), RoPE(RMS_head(k) γ_k), v, causal))     q k v = RMS(x) γ₁ · Wqkv
 ///     y  = y₁ + down(SiLU(gate(n)) ⊙ up(n))                                           n = RMS(y₁) γ₂
@@ -46,8 +45,6 @@ enum Qwen3Arithmetic: Equatable {
 
     var half: Bool { if case .w8a16 = self { true } else { false } }
     var rotated: Bool { if case .w8a16(_, let r) = self { r } else { false } }
-    /// How the products' weights lie in a function built for `b`: the codes' layout, or the bf16 weights'.
-    func layout(_ b: Block.Build) -> CodesLayout { half ? b.codes : b.bfloat16 }
     /// The element of the stream, the gains and (bf16) the weights.
     var element: Aicode.Element { half ? .f16 : .bf16 }
     var scalar: NDArray.ScalarType { half ? .float16 : .bfloat16 }
@@ -62,15 +59,15 @@ typealias Qwen3Argument = (name: String, shape: [Int], element: Aicode.Element)
 
 extension Qwen3Encoder {
     /// **A layer's weights as its function reads them**: the products that share an input fused side by side along
-    /// `out` (q k v; gate up, `Recipe.product`), in the stage's layout (`CodesLayout`, `inOut` for the codes: Core AI's GPU
-    /// read codes in the file's `[out, in]` 1.6 × slower at 32 rows and 7 × past 128 on the M1 Pro, 18/11); the gains in
-    /// the stream's element.
+    /// `out` (q k v; gate up, `Recipe.product`), the codes in the stage's layout (`CodesLayout`, `inOut`: Core AI's GPU
+    /// read codes in the file's `[out, in]` 1.6 × slower at 32 rows and 7 × past 128 on the M1 Pro, 18/11), the bf16
+    /// weights `[out, in]`; the gains in the stream's element.
     func weightArguments(_ a: Qwen3Arithmetic, _ layout: CodesLayout) -> [Qwen3Argument] {
         let c = config, d = c.width, hd = c.headDim, e = a.element
         func lies(_ inn: Int, _ out: Int) -> [Int] { layout == .inOut ? [inn, out] : [out, inn] }
         guard a.half else {
-            return [("norm1", [d], e), ("qkv", lies(d, c.qkvWidth), e), ("q_norm", [hd], e), ("k_norm", [hd], e),
-                    ("o", lies(c.heads * hd, d), e), ("norm2", [d], e), ("gate_up", lies(d, 2 * c.hidden), e), ("down", lies(c.hidden, d), e)]
+            return [("norm1", [d], e), ("qkv", [c.qkvWidth, d], e), ("q_norm", [hd], e), ("k_norm", [hd], e),
+                    ("o", [d, c.heads * hd], e), ("norm2", [d], e), ("gate_up", [2 * c.hidden, d], e), ("down", [d, c.hidden], e)]
         }
         return [("norm1", [d], e), ("qkv", lies(d, c.qkvWidth), .si8), ("qkv_scale", [c.qkvWidth], e), ("q_norm", [hd], e), ("k_norm", [hd], e),
                 ("o", lies(c.heads * hd, d), .si8), ("o_scale", [d], e), ("norm2", [d], e),
@@ -154,7 +151,7 @@ extension Qwen3Encoder {
         if a.half {
             outputs = f16Layer(b, a, layout, rows: rows, arg: arg, attend: attend, rotatedHalves: rotatedHalves)
         } else {
-            outputs = bf16Layer(b, a, layout, rows: rows, arg: arg, attend: attend, rotatedHalves: rotatedHalves)
+            outputs = bf16Layer(b, a, rows: rows, arg: arg, attend: attend, rotatedHalves: rotatedHalves)
         }
         m.outputs = outputs.filter { cache || !["k", "v"].contains($0.0) || isDecode(attending) }
         return m
@@ -162,7 +159,7 @@ extension Qwen3Encoder {
 
     private func isDecode(_ a: Attending) -> Bool { if case .cached = a { true } else { false } }
 
-    /// **The f16 layer** (the proto's, `Qwen3.swift`): the stream (x̂, X), each product's input under its own target, a
+    /// **The f16 layer**: the stream (x̂, X), each product's input under its own target, a
     /// rotated file's input rotated first (`convrot`: x · Wᵀ = (x · R) · (q · s)ᵀ). Outputs y, y_factor, k, v.
     private func f16Layer(_ b: Aicode.Block, _ a: Qwen3Arithmetic, _ layout: CodesLayout, rows: Int, arg: (String) -> Int, attend: (Int, Int, Int) -> Int,
                           rotatedHalves: (Int, Aicode.Element) -> Int) -> [(String, Int)] {
@@ -201,10 +198,10 @@ extension Qwen3Encoder {
 
     /// **The bf16 layer**, transformers' roundings op by op: RMSNorm's normalized value rounded, then × γ; RoPE in bf16 on
     /// tables brought to bf16 (`cos.to(x.dtype)`); SiLU in f32, rounded once (torch's kernel); every sum in bf16.
-    private func bf16Layer(_ b: Aicode.Block, _ a: Qwen3Arithmetic, _ layout: CodesLayout, rows: Int, arg: (String) -> Int, attend: (Int, Int, Int) -> Int,
+    private func bf16Layer(_ b: Aicode.Block, _ a: Qwen3Arithmetic, rows: Int, arg: (String) -> Int, attend: (Int, Int, Int) -> Int,
                            rotatedHalves: (Int, Aicode.Element) -> Int) -> [(String, Int)] {
         let c = config, hd = c.headDim, eps = c.eps
-        func product(_ x: Int, _ name: String) -> Int { b.product(x, arg(name), layout: layout) }
+        func product(_ x: Int, _ name: String) -> Int { b.linear(x, arg(name)) }
         func rms(_ t: Int, _ gain: String, axis: Int) -> Int { b.binary(.mul, b.rmsNorm(t, axes: [axis], eps: eps), arg(gain)) }
         let x = arg("x")
         let all = product(rms(x, "norm1", axis: 1), "qkv")

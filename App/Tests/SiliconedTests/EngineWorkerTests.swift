@@ -262,4 +262,115 @@ final class EngineWorkerTests: XCTestCase {
         XCTAssertEqual(budget, MemoryBudget.budget)
         XCTAssertTrue(detail.contains("past 1.0 MiB"), detail)
     }
+
+    // MARK: - A decoding the fuse stopped
+
+    /// **The latents a render keeps between its DiT and its decoder** come back as they left, bit for bit, and each
+    /// image leaves the file once handed over. Four latents of 1 MiB (16 × 128 × 128, a 1024² image) are timed.
+    func testKeptLatentsComeBackAndLeaveOneByOne() throws {
+        let url = try folder().appendingPathComponent("1.latents")
+        var t = Engine.Timings(); t.text = 1.5; t.denoising = 60
+        let images = (0..<4).map { n in
+            KeptLatents.Image(index: n, latent: (0..<(16 * 128 * 128)).map { Float($0 % 977) * 1e-3 - 0.4 + Float(n) }, timings: t, elapsed: 61.5 + Double(n))
+        }
+        var kept = KeptLatents(tokens: 12, images: images + [KeptLatents.Image(index: 4, latent: [.nan, .infinity, -0.0], timings: t, elapsed: 1)])
+        let start = Date()
+        try kept.write(to: url)
+        let wrote = Date().timeIntervalSince(start)
+        let back = try XCTUnwrap(KeptLatents.read(url))
+        let read = Date().timeIntervalSince(start) - wrote
+        print(String(format: "kept latents: written in %.2f ms, read back in %.2f ms", wrote * 1e3, read * 1e3))
+        XCTAssertEqual(back.tokens, 12)
+        XCTAssertEqual(Array(back.images.prefix(4)), images)
+        XCTAssertEqual(back.images[4].latent.map(\.bitPattern), [Float.nan, .infinity, -0.0].map(\.bitPattern))
+        kept.hand(0, to: url)
+        kept.hand(4, to: url)
+        let left = try XCTUnwrap(KeptLatents.read(url))
+        XCTAssertEqual(left.images.map(\.index), [1, 2, 3])
+        XCTAssertEqual(left.handed, 2)
+        try Data("not latents".utf8).write(to: url)
+        XCTAssertNil(KeptLatents.read(url))
+    }
+
+    /// A stand-in worker for renders: its hello, then — when the call's latents are kept (`$1`) — the replies of
+    /// `replies` (`$2`) and silence; else the latents `$3` laid as the call's (its DiT done) and the fuse's words, exit 3.
+    private func renderStandIn(_ folder: URL, replies: [(WorkerReply, [(UInt32, Data)])], latents: KeptLatents?, always fuse: Bool = false) throws -> (EngineWorker, URL) {
+        let hello = folder.appendingPathComponent("hello"), answers = folder.appendingPathComponent("replies")
+        let given = folder.appendingPathComponent("given"), kept = folder.appendingPathComponent("latents")
+        try Frame(kind: .message, payload: JSONEncoder().encode(WorkerHello())).bytes.write(to: hello)
+        FileManager.default.createFile(atPath: answers.path, contents: nil)
+        let handle = try FileHandle(forWritingTo: answers)
+        let pipe = WorkerPipe(fd: handle.fileDescriptor)
+        for (r, blobs) in replies { _ = pipe.send(r, blobs: blobs) }
+        try handle.close()
+        if let latents { try latents.write(to: given) }
+        let call = kept.appendingPathComponent("1.latents").path
+        let script = #"echo run >> "$3.runs"; "# + (fuse ? "" : #"if [ -e "$1" ]; then cat "$0" "$2"; exec cat >/dev/null; fi; "#)
+            + #"cat "$0"; [ -e "$3" ] && cp "$3" "$1"; echo "SiliCore: the footprint 10244.5 MiB past 10240.0 MiB: stopped, under a decoder" >&2; exit 3"#
+        let worker = EngineWorker(executable: URL(fileURLWithPath: "/bin/sh"), arguments: ["-c", script, hello.path, call, answers.path, given.path],
+                                  latents: kept)
+        return (worker, URL(fileURLWithPath: call))
+    }
+
+    /// The workers the stand-in started.
+    private func runs(_ folder: URL) -> Int {
+        ((try? String(contentsOf: folder.appendingPathComponent("given.runs"), encoding: .utf8)) ?? "").split(separator: "\n").count
+    }
+
+    private func events(_ worker: EngineWorker, _ folder: URL) async -> (events: [Engine.Event], error: Error?) {
+        var seen: [Engine.Event] = []
+        do {
+            for try await e in worker.render(Request("a lighthouse", width: 64, height: 64), seeds: [1], model: "m", library: Library(root: folder)) {
+                seen.append(e)
+            }
+            return (seen, nil)
+        } catch { return (seen, error) }
+    }
+
+    private var rendered: Engine.Render {
+        Engine.Render(model: "m", prompt: "a lighthouse", seed: 1, steps: 8, loras: [], image: ImageRGB(pixels: [Float](repeating: 0.5, count: 3 * 8 * 8), height: 8, width: 8),
+                      evaluations: 8, startStep: 0, startSigma: 1, timings: Engine.Timings(), footprints: Engine.Footprints(), tokens: 3,
+                      detail: .normal, solver: .euler, variations: [], modelName: "M", isImportedModel: false)
+    }
+
+    /// **The guarantee**: a worker the fuse stopped once its DiT was done hands the call to the next worker, which
+    /// decodes the latents kept: the image is delivered, the call ends without error, and its latents are gone.
+    func testADecodingTheFuseStoppedIsDecodedByTheNextWorker() async throws {
+        let folder = try folder()
+        let (wire, data) = WorkerEvent.of(.image(index: 0, rendered), blob: 900)
+        let latents = KeptLatents(tokens: 3, images: [KeptLatents.Image(index: 0, latent: [0.25], timings: Engine.Timings(), elapsed: 60)])
+        let (worker, kept) = try renderStandIn(folder, replies: [(.event(id: 1, .decoding(seconds: 0.5)), []), (.event(id: 1, wire), [(900, data!)]), (.finished(id: 1), [])],
+                                             latents: latents)
+        defer { worker.stop() }
+        let (seen, error) = await events(worker, folder)
+        XCTAssertNil(error, "\(String(describing: error))")
+        XCTAssertEqual(seen.count, 2)
+        guard case .image(0, let r)? = seen.last else { return XCTFail("\(seen)") }
+        XCTAssertEqual(r.seed, 1)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: kept.path), "the latents removed with the call")
+        XCTAssertEqual(runs(folder), 2)
+    }
+
+    /// Stopped before its DiT was done (no latents kept), the call fails with the fuse, as before: nothing is run again.
+    func testAStopBeforeTheLatentsFailsTheCall() async throws {
+        let folder = try folder()
+        let (worker, _) = try renderStandIn(folder, replies: [(.finished(id: 1), [])], latents: nil)
+        defer { worker.stop() }
+        let (_, error) = await events(worker, folder)
+        guard case .engineStopped(_?, let detail)? = error as? EngineError else { return XCTFail("\(String(describing: error))") }
+        XCTAssertTrue(detail.contains("past 10240.0 MiB"), detail)
+        XCTAssertEqual(runs(folder), 1)
+    }
+
+    /// Handed on once: a decoding the fuse stops again fails the call, its latents removed.
+    func testADecodingStoppedTwiceFailsTheCall() async throws {
+        let folder = try folder()
+        let latents = KeptLatents(tokens: 3, images: [KeptLatents.Image(index: 0, latent: [0.25], timings: Engine.Timings(), elapsed: 60)])
+        let (worker, kept) = try renderStandIn(folder, replies: [], latents: latents, always: true)
+        defer { worker.stop() }
+        let (_, error) = await events(worker, folder)
+        guard case .engineStopped(_?, _)? = error as? EngineError else { return XCTFail("\(String(describing: error))") }
+        XCTAssertFalse(FileManager.default.fileExists(atPath: kept.path))
+        XCTAssertEqual(runs(folder), 2)
+    }
 }

@@ -66,7 +66,9 @@ struct ModelManagement: View {
                             }
                             Spacer()
                             Text(Figures.disk(t)).monospacedDigit().foregroundStyle(Palette.secondary)
-                            Button("Free…") { legacyRemoval = true }.disabled(!app.managementPossible || app.mirror != nil)
+                            Button("Free…") { legacyRemoval = true }
+                                .unavailable(app.mirror.map { String(localized: "Only “\($0.macName)” frees the files of version 0.21 of its library.") }
+                                             ?? app.managementRefusal)
                         }
                     }
                 }
@@ -79,7 +81,7 @@ struct ModelManagement: View {
                             }
                             Spacer()
                             Text(Figures.disk(t)).monospacedDigit().foregroundStyle(Palette.secondary)
-                            Button("Discard") { app.emptyDownloads() }.disabled(!app.libraryManageable)
+                            Button("Discard") { app.emptyDownloads() }.unavailable(app.libraryRefusal)
                         }
                     }
                 }
@@ -133,7 +135,7 @@ struct ModelManagement: View {
         let ready = app.readySet.contains(card.id)
         return HStack(spacing: 12) {
             Image(systemName: ready ? "checkmark.circle.fill" : "exclamationmark.circle")
-                .foregroundStyle(ready ? .green : .orange).frame(width: 18)
+                .foregroundStyle(ready ? .green : Palette.caution).frame(width: 18)
             VStack(alignment: .leading, spacing: 3) {
                 Text(card.name).fontWeight(.medium)
                 Text(ready ? String(localized: "\(card.family.name) architecture")
@@ -143,15 +145,15 @@ struct ModelManagement: View {
             Spacer()
             Text(Figures.disk(bytes)).monospacedDigit().foregroundStyle(Palette.secondary)
             if ready {
-                Button("Use") { app.identifier = card.id; shutDown() }
-                    .disabled(app.identifier == card.id)
+                useButton(card)
             } else {
                 Button("Install…") { app.offerInstall(card.family) }
-                    .disabled(!app.libraryManageable)
+                    .unavailable(app.libraryRefusal)
             }
             Button { importedRemoval = card } label: { Image(systemName: "trash") }
                 .buttonStyle(.borderless).help("Remove this model")
-                .disabled(!app.libraryManageable)
+                .accessibilityLabel(Text("Remove this model"))
+                .unavailable(app.libraryRefusal)
         }
         .padding(.vertical, 2)
     }
@@ -173,7 +175,8 @@ struct ModelManagement: View {
             Text(Figures.disk(bytes)).monospacedDigit().foregroundStyle(Palette.secondary)
             Button { loraRemoval = l } label: { Image(systemName: "trash") }
                 .buttonStyle(.borderless).help("Remove this LoRA")
-                .disabled(!app.libraryManageable)
+                .accessibilityLabel(Text("Remove this LoRA"))
+                .unavailable(app.libraryRefusal)
         }
         .padding(.vertical, 2)
     }
@@ -279,7 +282,7 @@ struct ModelManagement: View {
                 if let plan, plan.fitsReplacing, let replaced = plan.others.first {
                     Label("Not enough room to keep both: the \(VersionChoice.name(replaced)) version will be removed before the download (\(Figures.disk(plan.releasable)) freed). Until the installation is done, \(card.name) cannot render.",
                           systemImage: "exclamationmark.triangle")
-                        .font(.callout).foregroundStyle(.orange)
+                        .font(.callout).foregroundStyle(Palette.caution)
                 }
                 Divider()
             }
@@ -313,7 +316,7 @@ struct ModelManagement: View {
                     app.acceptAndInstall(p.family, variant: offer.variant, replacing: plan?.fitsReplacing ?? false)
                 }
                 .buttonStyle(.prominent)
-                .disabled(!app.libraryManageable || tooBig)
+                .unavailable(app.libraryRefusal ?? (tooBig ? String(localized: "Not enough free space on this disk to install it.") : nil))
             }
         }
         .padding(12)
@@ -338,7 +341,7 @@ struct ModelManagement: View {
                             .help(VersionChoice.summary(v, p.family))
                     }
                     if !card.license.commercial {
-                        Text("non-commercial").font(.caption).foregroundStyle(.orange)
+                        Text("non-commercial").font(.caption).foregroundStyle(Palette.caution)
                     }
                 }
                 Text(state(p)).font(.caption).foregroundStyle(Palette.secondary)
@@ -354,12 +357,12 @@ struct ModelManagement: View {
 
     @ViewBuilder private func familyButtons(_ p: Library.Occupancy.FamilyPart, card: ModelCard) -> some View {
         if p.isReady {
-            Button("Use") { app.identifier = card.id; shutDown() }
-                .disabled(app.identifier == card.id)
+            useButton(card)
         } else {
             Button(p.present ? "Finish Installing…" : "Install…") { app.offerInstall(p.family) }
-                .disabled(!app.libraryManageable || app.installOffer?.family == p.family)
                 .help(String(localized: "Shows the license and the space it takes; nothing is downloaded before you accept"))
+                .unavailable(app.libraryRefusal
+                             ?? (app.installOffer?.family == p.family ? String(localized: "Its license and the space it takes are shown below.") : nil))
         }
         if p.present {
             Menu {
@@ -383,8 +386,14 @@ struct ModelManagement: View {
                 .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
                 .help("More Actions")
                 .accessibilityLabel(Text("More Actions"))
-                .disabled(!app.libraryManageable)
+                .unavailable(app.libraryRefusal)
         }
+    }
+
+    /// « Use »: the rack takes the model, and the sheet closes — greyed on the rack's own.
+    private func useButton(_ card: ModelCard) -> some View {
+        Button("Use") { app.identifier = card.id; shutDown() }
+            .unavailable(app.identifier == card.id ? String(localized: "The rack already renders with this model.") : nil)
     }
 
     private func icon(_ p: Library.Occupancy.FamilyPart) -> String {
@@ -475,9 +484,9 @@ struct BetaBadge: View {
     /// What the hover says: by default, why a model is in beta.
     var help: LocalizedStringKey = "Beta: the 8-step recipe is the community’s distillation, not the publisher’s. It leaves beta when the publisher releases its own fast version."
     var body: some View {
-        Text("Beta").font(.caption).foregroundStyle(.orange)
+        Text("Beta").font(.caption).foregroundStyle(Palette.caution)
             .padding(.horizontal, 5).padding(.vertical, 1)
-            .overlay(Capsule().strokeBorder(Color.orange.opacity(0.6)))
+            .overlay(Capsule().strokeBorder(Palette.caution.opacity(0.6)))
             .help(help)
     }
 }

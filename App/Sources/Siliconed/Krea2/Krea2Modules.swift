@@ -96,7 +96,7 @@ extension ModelCard {
 
 extension FamilyTraits {
     package static let krea2 = FamilyTraits(
-        name: "Krea 2", ditKind: "krea2-turbo-dit",
+        name: "Krea 2",
         // As published, read where they lie: Comfy-Org's bf16 and int8 `convrot` files, the DiT's (`diffusion_models`)
         // and Qwen3-VL-4B's (`text_encoders`).
         ditMaps: [.standard: "krea2_turbo_bf16.safetensors", .compact: "krea2_turbo_int8_convrot.safetensors"],
@@ -119,7 +119,7 @@ extension FamilyTraits {
             BaseCheckpoint("Comfy-Org/Krea-2@588feaf9 krea2_raw_int8_convrot", 13492686496, "5585a4a38c4bcfb6fde2d480a4aa6edf7f665721ebde56d30662c35a45f5fa5c"),
         ],
         model: { try Model.krea2(in: $0, card: $1, dit: $2) },
-        render: { try Krea2Render.render($0, $1, seeds: $2, model: $3, cancellation: $4, emit: $5) })
+        render: RenderLoop.render(Krea2Render.Parts.self))
 }
 
 extension Model {
@@ -145,5 +145,5 @@ extension Qwen3Encoder.Config {
     /// the last state drawn is `hidden_states[35]`, layer 34's output — 35 of its 36 layers, no final norm; RoPE's θ is
     /// 5·10⁶.
     package static let krea2 = Qwen3Encoder.Config(width: 2560, heads: 32, kvHeads: 8, headDim: 128, hidden: 9728,
-                                                   layers: 35, theta: 5e6, finalNorm: false)
+                                                   layers: 35, theta: 5e6, finalNorm: false, prefix: "model.language_model.")
 }

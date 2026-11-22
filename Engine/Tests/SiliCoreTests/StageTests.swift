@@ -111,14 +111,13 @@ import Testing
         #expect(try Self.plan(1 << 30, e).codes == .outIn)
     }
 
-    /// The layouts are the declaration's (the plan reads no measure of this Mac): the functions are written for them
+    /// The codes' layout is the declaration's (the plan reads no measure of this Mac): the functions are written for it
     /// (19/11: a measure kept between two reads handed the functions weights laid otherwise, and the worker stopped).
-    @Test func theLayoutsAreTheDeclarations() throws {
-        #expect(try Self.plan(1 << 30).codes == .inOut && Self.plan(1 << 30).bfloat16 == .outIn)
+    @Test func theLayoutIsTheDeclarations() throws {
+        #expect(try Self.plan(1 << 30).codes == .inOut)
         var d = Self.declaration()
-        (d.codes, d.bfloat16) = (.outIn, .inOut)
-        let declared = try Self.plan(1 << 30, d)
-        #expect(declared.codes == .outIn && declared.bfloat16 == .inOut)
+        d.codes = .outIn
+        #expect(try Self.plan(1 << 30, d).codes == .outIn)
     }
 }
 
@@ -224,10 +223,20 @@ import Testing
 }
 
 /// **A height chosen before its first call** (`Stage.estimates`, `Stage.choose`), on readings written by hand: three
-/// forms, the tallest first, of 4096, 2048 and 1024 rows, the same socle.
+/// forms, the tallest first, whose calls hold 4096, 2048 and 1024 rows' elements, of one kin, the same socle.
 @Suite struct StageHeights {
-    static let forms = [("tall", 4096), ("mid", 2048), ("low", 1024)].map { (key: $0.0, rows: $0.1) }
-    static func measured(_ readings: [String: Int]) -> ThisMac { var m = ThisMac(); m.readings = readings; return m }
+    static func extent(_ rows: Int) -> Stage.Extent { Stage.Extent(kin: "kin f", elements: ["f results": rows * 64, "f largest": rows * 8]) }
+    static let forms = [("tall", 4096), ("mid", 2048), ("low", 1024)].map { (key: $0.0, extent: Optional(extent($0.1))) }
+    /// The readings, each −1 this engine's mark, each read beside its extent.
+    static func measured(_ readings: [String: Int]) -> ThisMac {
+        var m = ThisMac()
+        m.readings = readings
+        m.extents = Dictionary(uniqueKeysWithValues: forms.filter { readings[$0.key] != nil }.map { ($0.key, $0.extent!) })
+        m.fusedBy = readings.filter { $0.value == -1 }.mapValues { _ in ThisMac.engine }
+        return m
+    }
+    /// A reading times its ratio, by the swing, the margin beside.
+    static func bound(_ bytes: Int) -> Int { StageExtents.bound(bytes) }
     static func plans(_ budget: Int) throws -> [Stage.Plan] {
         var d = StagePlans.declaration()
         d.functions = [:]
@@ -237,36 +246,92 @@ import Testing
 
     /// Never read: unknown, and the soberest taken.
     @Test func nothingReadTakesTheSoberest() throws {
-        let e = Stage.estimates(Self.forms, measured: ThisMac())
+        let e = Stage.estimates(extents: Self.forms, measured: ThisMac())
         #expect(e == [.unknown, .unknown, .unknown])
         #expect(try Stage.choose(try Self.plans(1 << 40), e) == 2)
     }
 
-    /// One read: the others scaled by their rows from it; the tallest that holds taken.
-    @Test func aReadingScalesToTheOthers() throws {
-        let e = Stage.estimates(Self.forms, measured: Self.measured(["low": 100 << 20]))
-        #expect(e == [.scaled(400 << 20), .scaled(200 << 20), .read(100 << 20)])
+    /// One read: the taller bounded from it by their ratio, the swing and the margin; the tallest that holds taken.
+    @Test func aReadingBoundsTheTaller() throws {
+        let e = Stage.estimates(extents: Self.forms, measured: Self.measured(["low": 100 << 20]))
+        #expect(e == [.scaled(Self.bound(400 << 20)), .scaled(Self.bound(200 << 20)), .read(100 << 20)])
         let socle = try Self.plans(1 << 40)[0].p
         #expect(try Stage.choose(try Self.plans(1 << 40), e) == 0)
-        #expect(try Stage.choose(try Self.plans(socle + Stage.margin + (300 << 20)), e) == 1)
+        #expect(try Stage.choose(try Self.plans(socle + Stage.margin + Self.bound(300 << 20)), e) == 1)
     }
 
-    /// Several read: a form's own reading; the others from the tallest read.
-    @Test func itsOwnReadingFirstThenTheTallestRead() throws {
-        let e = Stage.estimates(Self.forms, measured: Self.measured(["mid": 300 << 20, "low": 100 << 20]))
-        #expect(e == [.scaled(600 << 20), .read(300 << 20), .read(100 << 20)])
+    /// **A shorter form is never estimated below a taller one's reading** (22/11/2026: the rows' scaling gave a DiT's
+    /// calls of 2112 rows 987 MiB from 1943 read over a call a pass, and they held 1589): bounded by the reading itself.
+    @Test func aShorterFormIsNeverBelowATallerReading() throws {
+        let e = Stage.estimates(extents: Self.forms, measured: Self.measured(["tall": 400 << 20]))
+        #expect(e == [.read(400 << 20), .scaled(Self.bound(400 << 20)), .scaled(Self.bound(400 << 20))])
+        // The tallest read does not hold, nor the bound of the others: refused, the least known its number.
+        let socle = try Self.plans(1 << 40)[0].p, budget = socle + Stage.margin + (300 << 20)
+        let refusal = #expect(throws: OverBudget.self) { try Stage.choose(try Self.plans(budget), e) }
+        #expect(refusal?.needed == socle + (400 << 20) + Stage.margin)
     }
 
-    /// A form the fuse stopped is never taken, and no reading of its own is scaled from.
+    /// Several read: a form's own reading; the others from the least of the bounds their kin's readings give.
+    @Test func itsOwnReadingFirstThenTheLeastBound() throws {
+        let e = Stage.estimates(extents: Self.forms, measured: Self.measured(["mid": 300 << 20, "low": 100 << 20]))
+        #expect(e == [.scaled(Self.bound(400 << 20)), .read(300 << 20), .read(100 << 20)])
+    }
+
+    /// A form with no extent (a stage of one form): its own reading, or unknown — no other reading bounds it.
+    @Test func aFormWithNoExtentIsItsReadingOrUnknown() {
+        let m = Self.measured(["low": 100 << 20])
+        #expect(Stage.estimates(extents: [("low", nil), ("other", nil)], measured: m) == [.read(100 << 20), .unknown])
+    }
+
+    /// A form the fuse stopped is never taken, and no reading of its own bounds another.
     @Test func aFusedFormIsNeverTaken() throws {
-        let e = Stage.estimates(Self.forms, measured: Self.measured(["tall": -1, "low": 100 << 20]))
-        #expect(e == [.fused, .scaled(200 << 20), .read(100 << 20)])
+        let e = Stage.estimates(extents: Self.forms, measured: Self.measured(["tall": -1, "low": 100 << 20]))
+        #expect(e == [.fused, .scaled(Self.bound(200 << 20)), .read(100 << 20)])
         #expect(try Stage.choose(try Self.plans(1 << 40), e) == 1)
+    }
+
+    /// **A mark another engine took is no reading** (decided 21/11/2026): the form tried once more, as never read — the
+    /// mark of a file written before any engine was named alike. Fused again, the mark is this engine's, and holds;
+    /// read, the reading replaces it.
+    @Test func anotherEnginesMarkIsTriedOnceMore() throws {
+        var m = Self.measured(["tall": -1, "mid": -1, "low": 100 << 20])
+        m.fusedBy = ["tall": "another engine"]
+        let e = Stage.estimates(extents: Self.forms, measured: m)
+        #expect(e == [.scaled(Self.bound(400 << 20)), .scaled(Self.bound(200 << 20)), .read(100 << 20)])
+        #expect(try Stage.choose(try Self.plans(1 << 40), e) == 0)
+
+        m.fuse("tall")
+        #expect(Stage.estimates(extents: Self.forms, measured: m)[0] == .fused)
+        m.keep(reading: 50 << 20, under: "tall")
+        #expect(m.reading("tall") == -1, "this engine's mark outlives a reading")
+
+        m.keep(reading: 300 << 20, under: "mid")
+        #expect(m.reading("mid") == 300 << 20 && m.fusedBy?["mid"] == nil)
+        m.fuse("tall", engine: "an older engine")
+        m.keep(reading: 500 << 20, under: "tall")
+        #expect(m.reading("tall") == 500 << 20 && m.fusedBy?["tall"] == nil)
+    }
+
+    /// The engine is named by its binary: a UUID of 32 hexadecimal digits, read once.
+    @Test func theEngineIsNamedByItsBinary() {
+        #expect(ThisMac.engine.count == 32 && ThisMac.engine.allSatisfy(\.isHexDigit))
+    }
+
+    /// **A reading holds for its functions launched as they were**: two calls in flight are another key (each holds
+    /// its intermediates), one call the key it always was — a DiT's readings kept across the change.
+    @Test func callsInFlightAreAnotherKey() {
+        var d = Stage.Declaration("bands")
+        d.functions["f-1"] = Stage.Function("f-1", unit: .gpu) { Aicode.Module(arguments: []) }
+        let one = Stage.key(d)
+        #expect(one == Stage.key([(asset: "f-1", unit: .gpu)]))
+        #expect(one == "stage 788dd46466a4957e")  // sha256("gpu f-1"), the key of before
+        d.inFlight = 2
+        #expect(Stage.key(d) != one && Stage.key(d) == Stage.key([(asset: "f-1", unit: .gpu)], inFlight: 2))
     }
 
     /// None read and the soberest fused: the soberest form never tried, not a refusal.
     @Test func noneReadAndTheSoberestFusedTakesTheOneNeverTried() throws {
-        let e = Stage.estimates(Self.forms, measured: Self.measured(["low": -1]))
+        let e = Stage.estimates(extents: Self.forms, measured: Self.measured(["low": -1]))
         #expect(e == [.unknown, .unknown, .fused])
         #expect(try Stage.choose(try Self.plans(1 << 40), e) == 1)
     }
@@ -274,7 +339,7 @@ import Testing
     /// Every form fused: refused as a lack of memory, the soberest's P its number (the one a client says).
     @Test func everyFormFusedIsRefusedWithTheSoberestsP() throws {
         let plans = try Self.plans(1 << 40)
-        let e = Stage.estimates(Self.forms, measured: Self.measured(["tall": -1, "mid": -1, "low": -1]))
+        let e = Stage.estimates(extents: Self.forms, measured: Self.measured(["tall": -1, "mid": -1, "low": -1]))
         let refusal = #expect(throws: OverBudget.self) { try Stage.choose(plans, e) }
         #expect(refusal?.needed == plans[2].p + Stage.margin && refusal?.budget == 1 << 40)
     }
@@ -282,10 +347,63 @@ import Testing
     /// Known and none holding: refused, with the number.
     @Test func noFormThatHoldsIsRefused() throws {
         let socle = try Self.plans(1 << 40)[0].p
-        let e = Stage.estimates(Self.forms, measured: Self.measured(["low": 100 << 20]))
+        let e = Stage.estimates(extents: Self.forms, measured: Self.measured(["low": 100 << 20]))
         let budget = socle + Stage.margin + (50 << 20)
         let refusal = #expect(throws: OverBudget.self) { try Stage.choose(try Self.plans(budget), e) }
         // The soberest form, its estimate and the margin counted: 100 MiB read, 50 short.
         #expect(refusal?.needed == socle + (100 << 20) + Stage.margin && refusal?.budget == budget)
+    }
+}
+
+/// **A form never read, bounded from its kin read at other shapes** (`Stage.estimates(extents:)`), on readings and
+/// extents written by hand: a function `f` reading `x` and writing `y`.
+@Suite struct StageExtents {
+    static func extent(_ x: Int, _ y: Int, kin: String = "kin f") -> Stage.Extent { Stage.Extent(kin: kin, elements: ["f#0 x": x, "f#0 y y out": y]) }
+    /// A reading times its ratio, by the swing, the margin beside.
+    static func bound(_ bytes: Int) -> Int { Int((Double(bytes) * Stage.swing).rounded(.up)) + Stage.margin }
+    static func measured(_ read: [String: (reading: Int, extent: Stage.Extent)]) -> ThisMac {
+        var m = ThisMac()
+        m.readings = read.mapValues(\.reading)
+        m.extents = read.mapValues(\.extent)
+        m.fusedBy = read.filter { $0.value.reading == -1 }.mapValues { _ in ThisMac.engine }
+        return m
+    }
+
+    /// Its own reading first; never read, the reading of its kin times its largest ratio of elements, by the swing, the margin beside.
+    @Test func aLargerFormIsTheReadingTimesItsLargestRatio() {
+        let m = Self.measured(["1024": (100 << 20, Self.extent(1000, 2000))])
+        #expect(Stage.estimates(extents: [("1024", Self.extent(1000, 2000))], measured: m) == [.read(100 << 20)])
+        #expect(Stage.estimates(extents: [("2048", Self.extent(1500, 2200))], measured: m) == [.scaled(Self.bound(150 << 20))])
+    }
+
+    /// A form whose calls hold less is bounded by the reading itself: Core AI's share beside the calls' (their functions'
+    /// code) does not shrink with them.
+    @Test func aSmallerFormIsNeverBelowTheReading() {
+        let m = Self.measured(["1024": (100 << 20, Self.extent(1000, 2000))])
+        #expect(Stage.estimates(extents: [("512", Self.extent(500, 1000))], measured: m) == [.scaled(Self.bound(100 << 20))])
+    }
+
+    /// Several readings of its kin: the least of their bounds.
+    @Test func theLeastOfTheBounds() {
+        let m = Self.measured(["1024": (100 << 20, Self.extent(1000, 2000)), "1536": (110 << 20, Self.extent(1500, 2400))])
+        #expect(Stage.estimates(extents: [("2048", Self.extent(1500, 3000))], measured: m) == [.scaled(Self.bound(110 << 20 + (110 << 20) / 4))])
+        #expect(Stage.estimates(extents: [("1280", Self.extent(1200, 2400))], measured: m) == [.scaled(Self.bound(110 << 20))])
+    }
+
+    /// Another kin, other arguments, a reading the fuse marked: no bound; its own mark, never taken.
+    @Test func whatIsNotItsKinBoundsNothing() {
+        let m = Self.measured(["other": (100 << 20, Self.extent(1000, 2000, kin: "kin g")),
+                               "fewer": (100 << 20, Stage.Extent(kin: "kin f", elements: ["f#0 x": 1000])),
+                               "fused": (-1, Self.extent(1000, 2000))])
+        #expect(Stage.estimates(extents: [("new", Self.extent(1000, 2000))], measured: m) == [.unknown])
+        #expect(Stage.estimates(extents: [("fused", Self.extent(1000, 2000))], measured: m) == [.fused])
+    }
+
+    /// A kin names its functions apart from their order, with the calls in flight and the engine that wrote them.
+    @Test func theKinNamesTheFunctionsTheirFlightAndTheEngine() {
+        let a = Stage.Extent(["f#0 x f16", "f#0 y out f16"], inFlight: 2, elements: [:])
+        #expect(a.kin == Stage.Extent(["f#0 y out f16", "f#0 x f16"], inFlight: 2, elements: [:]).kin)
+        #expect(a.kin != Stage.Extent(["f#0 x f16", "f#0 y out f16"], inFlight: 1, elements: [:]).kin)
+        #expect(a.kin != Stage.Extent(["f#0 x f32", "f#0 y out f16"], inFlight: 2, elements: [:]).kin)
     }
 }

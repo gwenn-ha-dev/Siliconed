@@ -1,4 +1,5 @@
 import Foundation
+import Measurement
 
 // **The formats a render accepts** (`Format`): the per-side floor, the multiple of 16, the longest
 // side, and what a family adds — a coarser multiple, a shorter longest side. There is no area ceiling:
@@ -75,18 +76,8 @@ package enum Format {
 
     /// **`LxH`: width × height**, the order of Draw Things and of screens — `832x1216` is a
     /// portrait. `×` counts as `x`, spaces around it nothing (`832 × 1216`, as `label` writes it);
-    /// a lone integer is a square. Checks nothing but the syntax.
-    package static func parse(_ text: String) -> (width: Int, height: Int)? {
-        let pieces = text.lowercased().replacingOccurrences(of: "×", with: "x")
-            .split(separator: "x", omittingEmptySubsequences: false).map { $0.trimmingCharacters(in: .whitespaces) }
-        switch pieces.count {
-        case 1: return Int(pieces[0]).map { ($0, $0) }
-        case 2:
-            guard let l = Int(pieces[0]), let h = Int(pieces[1]) else { return nil }
-            return (l, h)
-        default: return nil
-        }
-    }
+    /// a lone integer is a square. Checks nothing but the syntax, `silicontrol measure`'s too (`SizeSyntax`).
+    package static func parse(_ text: String) -> (width: Int, height: Int)? { SizeSyntax.parse(text) }
 
     /// `512` for a square, `832x1216` otherwise — what a file name carries. Square names do not
     /// change: the close-out and the journal find them again.

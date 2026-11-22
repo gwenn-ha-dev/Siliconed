@@ -1,7 +1,7 @@
 // **The Prompt Lab: where the inputs of a render are prepared, and an installed language model helps write them** — the
 // Text and Images boxes at the head of the window's column (`LabBoxes.swift`).
 //
-//     ┌ Text ─────────────────────────────── for Qwen-Image-2.1 ● ┐
+//     ┌ Text ───────────────────────────────────────── for <model> ● ┐
 //     │                                                [✦ Rewrite] │
 //     │ put (▣ alice) on the platform of image 1, fine rain, neon… │   the rack's prompt
 //     └────────────────────────────────────────────────────────────┘
@@ -12,7 +12,7 @@
 // - **One text, one set of images, nothing to carry.** The Lab edits the rack's own prompt (`AppState.prompt`) and images
 //   (`AppState.inputs`): the rack shows what will go, the render translates the `@names` when it is queued
 //   (`AppState.namedJob`). The rules are `LabInputs` (`Sources/Siliconed`), pure and tested.
-// - **The starting image of an img2img** (Z-Image, Anima, Krea 2: a model that reads no image but starts from one) is a role
+// - **The starting image of an img2img** (a model that reads no image but starts from one, `startIsImg2Img`) is a role
 //   too, chosen by a gesture — « Start From This Image », or the role menu — never by default: a picture dropped to be described
 //   must not turn the next render into an img2img. Its tile then carries the rack's strength (0 to 100 %, `StartImage`).
 // - **No tabs, gestures that mix, written in the field as they come.** Describe writes into the text: it fills it when empty,
@@ -69,7 +69,7 @@ final class LabModel {
     private(set) var running: Gesture?
     private(set) var describing: InputImage.ID?
     private(set) var stopped = false
-    private(set) var failure: String?
+    var failure: String?
     /// The engine's stable code of that failure, when it has one (`prompt_too_long`…): what `silicontrol lab rewrite --wait` says.
     private(set) var failureCode: String?
     /// What a rewrite did not keep of the mentions, in one sentence.
@@ -79,12 +79,15 @@ final class LabModel {
 
     /// The sheet that names or edits a subject, while it is open — and the image it names.
     var draft: SubjectDraft?
-    @ObservationIgnored private var naming: (picture: InputImage.ID, known: Int)?
+    @ObservationIgnored var naming: (picture: InputImage.ID, known: Int)?
 
     @ObservationIgnored private var task: Task<Void, Never>?
     /// One more at each gesture begun or stopped: a gesture that ends with the same number ended by itself (`lab rewrite --wait`).
     @ObservationIgnored private(set) var generation = 0
     @ObservationIgnored private var watching = false
+    /// The images read off the main thread come in **in the order they were given** — several files dropped at once keep their
+    /// order, and with it their roles —, each after the one before; one unreadable is said, the others still come.
+    @ObservationIgnored var arriving: Task<Void, Never>?
 
     /// A gesture of the window, or one `silicontrol` asked: there is one writer, and it writes one text at a time.
     var isWriting: Bool { phase != .idle || remote != nil }
@@ -94,52 +97,6 @@ final class LabModel {
     @ObservationIgnored var remote: (task: Task<Void, Never>, stop: @MainActor (RemoteOutcome) -> Void)?
 
     func refresh() { installed = writer.isInstalled }
-
-    // MARK: Where it writes for
-
-    /// The rack the lab fills: the one the window shows — this Mac's, or the other Mac's mirror.
-    var rack: AppState { MainWindow.shared.app }
-    /// Whether the window follows another Mac.
-    var following: Bool { MainWindow.shared.carrier.mirror != nil }
-    var subjects: SubjectLibrary { MainWindow.shared.local.subjects }
-
-    /// The families the lab prepares for: those installed here, in the catalog's order — or, in a mirror, the model
-    /// the other Mac's rack has chosen.
-    var families: [Family] {
-        if following { return rack.card.map { [$0.family] } ?? [] }
-        let ready = Set(rack.cards.filter { rack.readySet.contains($0.id) }.map(\.family))
-        return Family.allCases.filter(ready.contains)
-    }
-
-    /// The model the Lab writes for: the rack's — one setting, chosen in the rack.
-    var target: Family? { WriterTarget.pick(chosen: nil, rack: rack.card?.family, installed: families) }
-
-    /// The installed card the rack takes to render for `family`: its own when it is of that family.
-    func card(for family: Family) -> ModelCard? {
-        if let current = rack.card, current.family == family { return current }
-        return rack.cards.first { $0.family == family && rack.readySet.contains($0.id) }
-    }
-
-    /// **How many images the rack's model reads** (0: none) — from its denoiser here, from the traits the other Mac
-    /// published in a mirror.
-    var capacity: Int { rack.imageCapacity }
-
-    /// The same, for the model a gesture writes for (`silicontrol rewrite --for`).
-    func capacity(for family: Family?) -> Int {
-        guard let family else { return 0 }
-        if following { return rack.promptNamesImages ? rack.maxReferences : 0 }
-        guard let card = card(for: family), let model = rack.model(card.id) else { return 0 }
-        return model.chain.text.output.readsImages ? model.chain.denoising.maxReferences : 0
-    }
-
-    /// **Whether the rack's model starts from an image** (img2img). Never in a mirror — the other Mac's traits do not say it,
-    /// and its jobs carry no starting image.
-    var startsFromImage: Bool { rack.startsFromImage }
-
-    /// The model's start is an img2img's.
-    var startIsImg2Img: Bool { capacity == 0 && startsFromImage }
-
-    var offeredRoles: [LabInputs.Role] { LabInputs.roles(capacity: capacity, startsFromImage: startsFromImage) }
 
     // MARK: The render's priority
 
@@ -175,44 +132,6 @@ final class LabModel {
         }
     }
 
-    // MARK: What waits, gesture by gesture
-
-    /// **Why Rewrite and Describe wait**, in one sentence; `nil` when they can run. They are the only gestures that need the
-    /// language model: everything else in the lab works without it, during a render too.
-    var writerPause: (symbol: String, sentence: String)? { pause(rendering: rendering).map(Self.presentation) }
-
-    /// The decision (`WriterPause.decide`), for the window and for `silicontrol rewrite` and `describe`: the render is passed in
-    /// because the command reads the queue itself, not the copy this model keeps up to date for the window.
-    func pause(rendering: Bool) -> WriterPause? {
-        return WriterPause.decide(following: following, rendering: rendering, installed: installed, hasTarget: target != nil)
-    }
-
-    static func presentation(_ pause: WriterPause) -> (symbol: String, sentence: String) {
-        switch pause {
-        case .following: ("macbook", String(localized: "Rewrite and Describe are off while the window follows another Mac."))
-        case .rendering: ("pause.circle", String(localized: "Rewrite and Describe wait while an image renders."))
-        case .notInstalled: ("shippingbox", String(localized: "No writer is installed yet. Install a model to have one."))
-        }
-    }
-
-    var canRewrite: Bool { rewriteRefusal == nil }
-
-    var canDescribe: Bool { describeRefusal == nil }
-
-    /// **Why Rewrite is greyed**, its hover; `nil` when it can write.
-    var rewriteRefusal: String? {
-        if let p = writerPause { return p.sentence }
-        if isWriting { return String(localized: "The writer is writing: wait for it, or stop it") }
-        if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return String(localized: "Write a prompt first: Rewrite starts from it") }
-        return nil
-    }
-
-    /// **Why Describe is greyed**, its hover; `nil` when it can write.
-    var describeRefusal: String? {
-        if let p = writerPause { return p.sentence }
-        return isWriting ? String(localized: "The writer is writing: wait for it, or stop it") : nil
-    }
-
     // MARK: Writing
 
     /// **Rewrite**: the whole text, its mentions put aside and put back. It is written **in the field, as it comes**: the marks
@@ -235,7 +154,7 @@ final class LabModel {
     }
 
     /// **What a rewrite sends the writer** — the lab's and `silicontrol rewrite`'s alike. `@` is a subject's only for a model that
-    /// reads images (`capacity` > 0); elsewhere it is the model's own (Anima's artists), and the text goes as it is.
+    /// reads images (`capacity` > 0); elsewhere it is the model's own (an artist's name), and the text goes as it is.
     static func rewriteInput(_ typed: String, capacity: Int) -> (input: LabInput, guarded: LabInputs.MentionGuard?) {
         let guarded = capacity > 0 ? LabInputs.MentionGuard(typed) : nil
         return (.text(guarded?.masked ?? typed), guarded)
@@ -420,148 +339,5 @@ final class LabModel {
             RackColumnModel.shared.unfold()
             return true
         }
-    }
-
-    // MARK: The images
-
-    /// « Start From This Image »: the gesture that makes an img2img's start — the previous start, if any, goes back to neutral.
-    func startFrom(_ picture: InputImage) { setRole(.start, of: picture) }
-
-    func setRole(_ role: LabInputs.Role, of picture: InputImage) { rack.setRole(role, of: picture.id) }
-
-    func remove(_ picture: InputImage) {
-        if describing == picture.id { stop() }
-        rack.removeInput(picture.id)
-    }
-
-    /// **An image comes in as bytes** (a drop of pixels, ⌘V): a history image (dragged from the column) as « Send to the Prompt
-    /// Lab » brings it — its pixels, its ordinal for a mirror —, any other decoded upright: its pixels for an edit, its bytes
-    /// for a start. It takes the role a newcomer takes. Decoded off the main thread, with its vignette: 51 ms for a 2048² PNG
-    /// on an M5 Pro.
-    func load(image data: Data, name: String = String(localized: "dropped image")) {
-        arrive {
-            if let entry = self.rack.history.first(where: { $0.png.count == data.count && $0.png == data }),
-               let image = self.rack.fromHistory(entry) {
-                self.rack.addInput(image, bytes: entry.png)
-                return true
-            }
-            let decoded = await Task.detached(priority: .userInitiated) { () -> (image: CGImage, vignette: CGImage)? in
-                guard let source = CGImageSourceCreateWithData(data as CFData, nil),
-                      let cg = CGImageSourceCreateImageAtIndex(source, 0, nil) else { return nil }
-                return (cg, FinishedImage.reduce(cg, side: 240) ?? cg)
-            }.value
-            guard let decoded else { return false }
-            self.rack.addInput(ReferenceImage(source: .image(decoded.image), vignette: NSImage(cgImage: decoded.vignette, size: .zero),
-                                              name: name, width: decoded.image.width, height: decoded.image.height), bytes: data)
-            return true
-        }
-    }
-
-    /// The image of a gesture: bytes as above, a file as the render reads a file (`AppState.read`) — the same pixels for an
-    /// edit and for a start (`ImageRGB(data:)` reads bytes as the file).
-    func load(_ dropped: DroppedImage) {
-        switch dropped {
-        case .png(let data): load(image: data)
-        case .file(let url):
-            arrive {
-                guard let image = await self.rack.read(url) else { return false }
-                self.rack.addInput(image)
-                return true
-            }
-        }
-    }
-
-    /// The images read off the main thread come in **in the order they were given** — several files dropped at once keep their
-    /// order, and with it their roles —, each after the one before; one unreadable is said, the others still come.
-    @ObservationIgnored private var arriving: Task<Void, Never>?
-
-    private func arrive(_ read: @escaping @MainActor () async -> Bool) {
-        let before = arriving
-        arriving = Task {
-            await before?.value
-            failure = await read() ? nil : String(localized: "This image could not be read.")
-        }
-    }
-
-    func chooseImages() {
-        let panel = NSOpenPanel()
-        panel.allowedContentTypes = [.image]
-        panel.allowsMultipleSelection = true
-        panel.prompt = String(localized: "Choose")
-        panel.message = String(localized: "Images to describe, to start from, or to name.")
-        guard panel.runModal() == .OK else { return }
-        for url in panel.urls { load(.file(url)) }
-    }
-
-    // MARK: The subjects
-
-    /// The sheet opens on an image of the rack: once the subject is created, the image becomes it.
-    func name(_ picture: InputImage) {
-        guard let data = Self.bytes(of: picture), let draft = SubjectDraft(new: .png(data), taken: subjects.all.map(\.name)) else {
-            failure = String(localized: "This image could not be read.")
-            return
-        }
-        naming = (picture.id, subjects.all.count)
-        self.draft = draft
-    }
-
-    /// The open panel, then the sheet: an image to name that is not in the zone.
-    func chooseImageToName() {
-        let panel = NSOpenPanel()
-        panel.allowedContentTypes = [.image]
-        panel.prompt = String(localized: "Choose")
-        panel.message = String(localized: "An image to name: a person, a garment, an object, a place or a style.")
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        guard let draft = SubjectDraft(new: .file(url), taken: subjects.all.map(\.name)) else {
-            failure = String(localized: "This image could not be read.")
-            return
-        }
-        naming = nil
-        self.draft = draft
-    }
-
-    func edit(_ s: NamedSubjects.Subject) {
-        naming = nil
-        draft = SubjectDraft(editing: s, library: subjects)
-    }
-
-    /// The sheet is closed: an image it named leaves the zone — it is a subject now.
-    func sheetClosed() {
-        defer { naming = nil }
-        guard let naming, subjects.all.count > naming.known else { return }
-        rack.removeInput(naming.picture)
-    }
-
-    /// Asked first: texts that cite it are refused afterwards.
-    func confirmDeletion(_ s: NamedSubjects.Subject) {
-        let alert = NSAlert()
-        alert.messageText = String(localized: "Delete @\(s.name)?")
-        alert.informativeText = String(localized: "Prompts that cite it will be refused.")
-        alert.addButton(withTitle: String(localized: "Delete"))
-        alert.addButton(withTitle: String(localized: "Cancel"))
-        alert.buttons[0].hasDestructiveAction = true
-        if alert.runModal() == .alertFirstButtonReturn { deleteSubject(s) }
-    }
-
-    func deleteSubject(_ s: NamedSubjects.Subject) { subjects.delete(s) }
-
-    /// `@name` inserted where the caret is (a click on a subject) — appended when the field is not on screen. A space
-    /// before it when it would glue to a word.
-    func cite(_ s: NamedSubjects.Subject) {
-        if let field = PromptTextView.current, field.window != nil {
-            field.insertMention(s.name)
-            return
-        }
-        let glue = text.last.map { !$0.isWhitespace } ?? false
-        text += (glue ? " " : "") + "@\(s.name) "
-    }
-
-    /// A subject renamed: the text's mentions of it follow.
-    func renameMentions(_ old: String, to new: String) {
-        var renamed = text
-        for m in NamedSubjects.mentions(in: text).reversed() where NamedSubjects.key(m.name) == NamedSubjects.key(old) {
-            if let r = Range(NSRange(m.range, in: text), in: renamed) { renamed.replaceSubrange(r, with: "@" + new) }
-        }
-        if renamed != text { text = renamed }
     }
 }

@@ -242,12 +242,9 @@ extension Qwen35Encoder {
     static func writeStream(_ values: [Float], width d: Int, to: UnsafeMutableRawPointer, factors: UnsafeMutablePointer<Float>) {
         let h = to.assumingMemoryBound(to: Float16.self)
         for r in 0..<(values.count / d) {
-            let row = values[(r * d)..<((r + 1) * d)]
-            let top = max(row.reduce(0) { max($0, abs($1)) }, 0x1p-14)
-            let e = RowExponent.ranged(largest: Double(top), f32Factor: true)
-            let f = Float(pow(2.0, Double(e)))
+            let (unit, f) = RowExponent.split(values[(r * d)..<((r + 1) * d)], .ranged(f32Factor: true))
             factors[r] = f
-            for (j, v) in row.enumerated() { h[r * d + j] = Float16(v / f) }
+            for (j, v) in unit.enumerated() { h[r * d + j] = Float16(v) }
         }
     }
 }

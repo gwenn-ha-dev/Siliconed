@@ -25,8 +25,9 @@ import SiliCore
 /// are computed and masked as keys (−10⁴). The residual stream is two buffers in turn, beside their row factors under
 /// the guard of f16 (f32, one a row; f16 in the shared forms).
 ///
-/// **With the ANE's share** (the shared forms, `QwenImage21Shared`, the Compact with the Neural Engine on): the ANE the
-/// target's first rows by the engine's unit, told (`--neural-engine`) or found in flight; the prefix's pass is the GPU's.
+/// **With the ANE's share** (the shared forms, `QwenImage21Shared` — the Compact's whatever the switch, the Standard's
+/// weights in f16 with the Neural Engine on —, the switch on): the ANE the target's first rows by the engine's unit, told
+/// (`--neural-engine`) or found in flight; the prefix's pass is the GPU's.
 ///
 /// **Under a LoRA**: the factors of every product it adapts in the stage's tensors, `<product>_down`, `_up` outside the
 /// layers, `<layer>.<product>_…` in them, written once the stage is opened (`LoRAStack.write`); the functions at their
@@ -136,7 +137,7 @@ package final class QwenImage21Loop {
         n.residents = QwenImage21Functions.others()
         let form = path.rawValue
         n.groups = groups.enumerated().map { Block.Group($1, form: form, weights: QwenImage21Functions.layer($0, path: path, weights: weights)) }
-        if path == .shared { n.codes = weights.layout }
+        n.sharedWeights = path == .shared ? weights : nil
         (n.once, n.cycle) = (groups, groups)
         let (pk, tk) = (g.prefixKeys, g.targetKeys)
         let keys: Set<String> = ["kp", "vp", "kt", "vt"]
@@ -173,15 +174,13 @@ package final class QwenImage21Loop {
     package static func open(map: String, sequence: QwenImage21DiT.Sequence, loras: LoRAStack = .none, tapped: Bool = false,
                              budget: Int = MemoryBudget.machineCeiling()) async throws -> QwenImage21Loop {
         let file = try MapWeights.dit(map, marker: "img_in.weight")
-        guard let probe = file.tensors["transformer_blocks.0.attn.to_q.weight"] else { throw ProgramError("\(map): not Qwen-Image-2.1's DiT") }
+        let marker = "transformer_blocks.0.attn.to_q.weight"
+        guard let probe = file.tensors[marker] else { throw ProgramError("\(map): not Qwen-Image-2.1's DiT") }
         guard ["I8", "BF16", "F32"].contains(probe.dtype) else {
             throw ProgramError("\(map): its products are \(probe.dtype), which no path of the DiT reads")
         }
         let g = Geometry(sequence), ranks = QwenImage21Functions.ranks(loras)
-        guard let device = MTLCreateSystemDefaultDevice() else { throw ProgramError("no Metal device") }
-        let codes = probe.dtype == "I8", offered = try await Arithmetic.offered(codes: codes, device)
-        let arithmetic = try Arithmetic.opened(codes: codes, neuralEngine: CoreAI.neuralEngineInForce, offered: offered) { declaration(g, $0, ranks: ranks, tapped: tapped) }
-        let block = try await Block.open(device, declaration(g, arithmetic, ranks: ranks, tapped: tapped), files: [file], budget: budget, share: arithmetic.share)
+        let (block, arithmetic) = try await Arithmetic.block(file: file, codes: marker, budget: budget) { declaration(g, $0, ranks: ranks, tapped: tapped) }
         let loop = QwenImage21Loop(block, g, arithmetic, ranks: ranks)
         try loop.write(loras)
         return loop
@@ -190,8 +189,6 @@ package final class QwenImage21Loop {
     private init(_ block: Block, _ g: Geometry, _ arithmetic: Arithmetic, ranks: Ranks) {
         (self.block, self.g, self.arithmetic, self.ranks) = (block, g, arithmetic, ranks)
     }
-
-    deinit { _ = block.close() }
 
     /// The factors of `loras` into their tensors (`LoRAStack.write`), each layer's under its group.
     private func write(_ loras: LoRAStack) throws {
@@ -308,9 +305,9 @@ package final class QwenImage21Loop {
 
     // MARK: - What a check reads
 
-    /// The stage's plan as a line, and the ANE's rows in the shared forms.
+    /// What the DiT is: its arithmetic, its plan under B, and the ANE's rows in the shared forms.
     package var described: String {
-        block.stage.plan.line + (path == .shared ? "; the ANE the target's first \(block.units * block.unit) rows of \(g.target)" : "")
+        "\(arithmetic), " + block.stage.plan.line + (path == .shared ? "; the ANE the target's first \(block.units * block.unit) rows of \(g.target)" : "")
     }
 
     /// The stream's rows `0 ..< n` as true values, `[n, 4096]` f32.

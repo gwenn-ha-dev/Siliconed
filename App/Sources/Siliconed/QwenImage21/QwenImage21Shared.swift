@@ -3,8 +3,9 @@ import Foundation
 import SiliCore
 
 /// **A Qwen-Image-2.1 layer as the GPU and the ANE share it** (Z's `ZImageShared`, the engine's forms in
-/// `Neural.swift`): f16 at every border and inside, `[1, rows, n]`, q64 products on the codes `[in, out]`, norms by their
-/// peak, the guard's powers of two in f16; what reads across rows or computes in f32 is the GPU's:
+/// `Neural.swift`): f16 at every border and inside, `[1, rows, n]`, products on the codes q64 on `[in, out]`, or int8 ×
+/// int8 on `[out, in]` where this Mac's GPU runs it faster (`SharedWeights.integer`), norms by their peak, the guard's
+/// powers of two in f16; what reads across rows or computes in f32 is the GPU's:
 ///
 ///     pre          both   n = LN(x̂ · X) · (1 + s₁), rotated, under 2^e₀ by F: q̂, k̂, v̂ = q64, and F
 ///     heads        GPU    q, k: RoPE(RMS_head(q̂) · γ) (eps / F², `headNorm`) in f32; v = v̂ · F; heads first, into the pass's keys
@@ -119,11 +120,8 @@ enum QwenImage21Shared {
             let input = b.binary(.divide, n, f2)
             let w1 = product(r, "gate_up", unrotated: input, columns: 0..<c.hidden)
             let w3 = product(r, "gate_up", unrotated: input, columns: c.hidden..<(2 * c.hidden))
-            // SiLU(w₁ F₂) · w₃ F₂ = F₂² g₁ g₃ · (w₁/g₁) σ(w₁ F₂) (w₃/g₃), each under 2⁵ (the half path's): their product
-            // under 2¹⁰, rotated under 2¹⁴. σ reads the true value clipped to ±16, where σ is 1 or 0 in f16.
-            let (u1, g1) = b.ranged16(w1, under: 5), (u3, g3) = b.ranged16(w3, under: 5)
-            let z = b.scale("minimum", b.scale("maximum", b.binary(.mul, w1, f2), -16), 16)
-            let gated = b.binary(.mul, b.binary(.mul, u1, b.sigmoid(z)), u3)
+            // SiLU(w₁ F₂) · w₃ F₂ = F₂² g₁ g₃ · (w₁/g₁) σ(w₁ F₂) (w₃/g₃) (`gatedSiLU16`), rotated under 2¹⁴.
+            let (gated, g1, g3) = b.gatedSiLU16(w1, w3, factor: f2)
             let (hidden, g4) = b.ranged16(rotation(gated), target: a("down_target"))
             let delta = b.binary(.mul, a("gate2"), product(hidden, "down", unrotated: b.binary(.divide, gated, g4)))
             let (y, yf) = b.residual16(a("x"), a("x_factor"), plus: delta, factors: [f2, f2, g1, g3, g4])

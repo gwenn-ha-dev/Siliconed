@@ -70,6 +70,10 @@ package final class QwenImage21VAEDecoder: BandedDecoder {
         QwenImage21VAEDecoder(try await QwenImageVAERun.open("qwen-image-2.1-vae-decoder", file: try SafeTensors(path), budget: budget) { plan(h: latentHeight, w: latentWidth, positions: $0) })
     }
 
+    package static func admit(path: String, latentHeight: Int, latentWidth: Int, budget: Int) throws {
+        try QwenImageVAERun.admit("qwen-image-2.1-vae-decoder", file: try SafeTensors(path), budget: budget) { plan(h: latentHeight, w: latentWidth, positions: $0) }
+    }
+
     /// Whether B made the bands smaller than the run prefers.
     package var narrowed: Bool { run.bands.narrowed }
 

@@ -148,8 +148,9 @@ enum Krea2Stages {
         oracle: nil, weights: ["DiT"], rule: Pace.rule
     ) { invocation in
         let compact = try invocation.compact()
-        let path = try invocation.ditMap(compact ? compactMap : ditMap, golden: compact ? .eightBit : .standard)
-        let (h, w) = (invocation.height / 8, invocation.width / 8), rows = 48
+        let path = try invocation.ditMap(ditMap, compactMap, compact: compact)
+        let space = LatentSpace.qwenImage, rows = 48
+        let (h, w) = (invocation.height / space.factor, invocation.width / space.factor)
         let taps = HostTensor([rows, Krea2Text.sockets.count, Krea2Functions.textWidth],
                               floats: Pace.noise(rows * Krea2Text.sockets.count * Krea2Functions.textWidth, seed: 1))
         return try Pace.run(invocation, title: "\(model) pace\(compact ? " compact" : "") \(invocation.size)") {
@@ -157,7 +158,7 @@ enum Krea2Stages {
             print("krea2 pace: " + d.described)
             return d
         } evaluate: { d, e, time in
-            try (d as! Krea2Render.Denoiser).velocity(Pace.noise(16 * h * w, seed: UInt64(e + 2)), time: time)
+            try d.velocity(Pace.noise(space.channels * h * w, seed: UInt64(e + 2)), time: time)
         }
     }
 
@@ -220,7 +221,7 @@ enum Krea2Stages {
         // `goldens-krea2-dit-compact-512`: the variant before the size.
         let stem = "\(compact ? "compact-" : "")\(invocation.size)"
         let report = Report(title: "\(model) dit\(compact ? " compact" : "") \(invocation.size)", half: compact ? "W8A8" : "bf16")
-        let path = try invocation.ditMap(compact ? compactMap : ditMap, golden: compact ? .eightBit : .standard)
+        let path = try invocation.ditMap(ditMap, compactMap, compact: compact)
         let goldens = try invocation.goldens.open("krea2/goldens-krea2-dit-\(stem).safetensors")
         let text = try invocation.goldens.open("krea2/goldens-krea2-text.safetensors")
         let half = compact
@@ -295,13 +296,10 @@ enum Krea2Stages {
         report.add(Judge.schedule(schedule, sigmas))
         let denoiser = try Krea2Render.Denoiser(map: path, taps: HostTensor(tapsEntry.shape, floats: Array(taps)),
                                                 latentHeight: height, latentWidth: width)
-        for step in 0..<steps {
-            let name = "velocity_\(step)"
-            guard let latent = reference.float32(step == 0 ? "latent_init" : "latent_\(step)") else { continue }
-            let v = try denoiser.velocity(Array(latent), time: Krea2Render.modelTime(sigma: schedule[step], solver: .euler, first: step == 0))
-            let witness = invocation.goldens.optional("krea2/witness-krea2-f64-\(invocation.size)-step\(step).safetensors")
-            report.add(reference, name, v, witness: witness?.float32("model_out"), half: half.float32(name).map(Array.init),
-                       columns: height * width)
+        try report.trajectory(reference, steps: steps, half: half, columns: height * width, name: { "velocity_\($0)" }, witness: { step in
+            invocation.goldens.optional("krea2/witness-krea2-f64-\(invocation.size)-step\(step).safetensors")?.float32("model_out")
+        }) { step, latent in
+            try denoiser.velocity(latent, time: Krea2Render.modelTime(sigma: schedule[step], solver: .euler, first: step == 0))
         }
         return report
     }
@@ -373,20 +371,15 @@ enum Krea2Stages {
               let expected = image.float32("image") else {
             throw Skip("\(image.path): the prompt, seed or image is missing")
         }
-        let path = try invocation.ditMap(compact ? compactMap : ditMap, golden: compact ? .eightBit : .standard)
+        let path = try invocation.ditMap(ditMap, compactMap, compact: compact)
         // The encoder of the version judged, not the library's choice.
         let encoder = Library.processWide.map(Family.krea2.encoderMap(compact ? .compact : .standard))
         let model = try Model.krea2(in: Library.processWide, card: .krea2, dit: path, encoder: encoder)
         let started = Date()
         let render = try Engine().render(Request(prompt, width: invocation.width, height: invocation.height,
                                                  seed: seed.uint64Value, steps: 8), model: model)
-        print(String(format: "rendered in %.1f s (text %.2f, denoising %.2f, decoding %.2f)", Date().timeIntervalSince(started),
-                     render.timings.text, render.timings.denoising, render.timings.decoding))
-        if let png = invocation.extras["--png"] { try render.png().write(to: URL(fileURLWithPath: png)) }
-        if compact { report.add(Judge.compactRender(render.image.pixels, expected)); return report }
-        let (psnr, _, _, notFinite) = imageError(render.image.pixels, expected)
-        report.add(Judge.bound("image PSNR", psnr, 25, unit: "dB", above: true,
-                               note: notFinite > 0 ? "\(notFinite) non-finite values" : ""))
+        try report.rendered(render, since: started, invocation)
+        report.judgePicture(render.image.pixels, expected, compact: compact)
         return report
     }
 }

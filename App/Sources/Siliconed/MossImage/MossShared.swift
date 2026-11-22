@@ -3,8 +3,9 @@ import Foundation
 import SiliCore
 
 /// **A MOSS-Image block as the GPU and the ANE share it** (Z's `ZImageShared`, the engine's forms in `Neural.swift`): f16
-/// at every border and inside, `[1, rows, n]`, q64 products on the codes `[in, out]`, norms by their peak, the guard's
-/// powers of two in f16; what reads across rows or computes in f32 is the GPU's:
+/// at every border and inside, `[1, rows, n]`, products on the codes q64 on `[in, out]`, or int8 × int8 on `[out, in]` where
+/// this Mac's GPU runs it faster (`SharedWeights.integer`), norms by their peak, the guard's powers of two in f16; what
+/// reads across rows or computes in f32 is the GPU's:
 ///
 ///     gains       GPU    the modulation's six rows each its own `[1, 1, d]`: shift, 1 + scale, a gate as ĝ = g / G
 ///     enter       GPU    the embedders' bf16 rows as the stream (x̂, X), X `[1, rows, 1]`
@@ -156,8 +157,8 @@ enum MossShared {
         return m
     }
 
-    /// One of the 42 blocks' weights in the shared forms: the codes `[in, out]` (the stage's surfaces) or the f16
-    /// weights (`weights`), each product's target after it, the gains in f16.
+    /// One of the 42 blocks' weights in the shared forms: the codes (the stage's surfaces, as `weights` lays them) or the
+    /// f16 weights, each product's target after it, the gains in f16.
     static func layer(_ i: Int, weights: SharedWeights) -> [Weights.Entry] {
         let p = "layers.\(i)."
         var all: [Weights.Entry] = []

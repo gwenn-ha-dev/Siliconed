@@ -19,7 +19,7 @@ import Foundation
 /// `version` goes up with any change to what crosses below; the hello's own shape never changes — every build reads it
 /// first.
 package struct WorkerHello: Codable, Sendable, Equatable {
-    package static let version = 5
+    package static let version = 6
     package var protocolVersion: Int
 
     package init(protocolVersion: Int = WorkerHello.version) { self.protocolVersion = protocolVersion }
@@ -118,10 +118,13 @@ package struct RenderOrder: Codable, Sendable, Equatable {
     package var library: WorkerLibrary
     /// The app's Neural Engine switch (`CoreAI.neuralEngine`), the process's in the worker: every render plans under it.
     package var neuralEngine: Bool
+    /// **Where the render keeps its latents between its DiT and its decoder** (`RenderLoop.keeping`): the app's file for
+    /// this call, which a worker handed the call again after the fuse stopped the one before finds and decodes alone.
+    package var keeping: String?
 
     /// The order of `request`, its images numbered from `firstBlob`; the blobs to send before it, in order.
     package static func of(_ request: Request, seeds: [UInt64], model: String, library: Library, neuralEngine: Bool,
-                           firstBlob: UInt32) -> (order: RenderOrder, blobs: [(UInt32, Data)]) {
+                           keeping: URL? = nil, firstBlob: UInt32) -> (order: RenderOrder, blobs: [(UInt32, Data)]) {
         var blobs: [(UInt32, Data)] = []
         func carried(_ image: ImageRGB) -> WorkerImage {
             let id = firstBlob &+ UInt32(blobs.count)
@@ -133,7 +136,8 @@ package struct RenderOrder: Codable, Sendable, Equatable {
                                 previews: request.previews, detail: request.detail, solver: request.solver,
                                 variations: request.variations,
                                 image: request.image.map(carried), references: request.references.map(carried),
-                                seeds: seeds, model: model, library: WorkerLibrary(library), neuralEngine: neuralEngine)
+                                seeds: seeds, model: model, library: WorkerLibrary(library), neuralEngine: neuralEngine,
+                                keeping: keeping?.path)
         return (order, blobs)
     }
 

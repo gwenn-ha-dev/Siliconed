@@ -11,7 +11,10 @@ import Foundation
 ///               choice among declarations of one computation reads (`Block.choose`)
 ///     reserves  what a stage's functions took past its first signal, at its largest reading (`Stage.signal`)
 ///     readings  Core AI's share under a stage's functions, its largest reading — the hint a height is chosen on
-///               (`Stage.estimates`); −1, the fuse stopped the process under them
+///               (`Stage.estimates`); −1, the fuse stopped the process under them, a mark that holds for the engine
+///               that took it (`fusedBy`)
+///     extents   what a stage's functions held beside its reading, the same names at any shapes (`Stage.Extent`): a
+///               form never read is bounded from its kin's readings (`Stage.estimates(extents:)`)
 ///     integerProducts  the GPU's product int8 × int8 over the shared forms' of today, timed once (`SharedWeights.offered`)
 ///
 /// **By Mac and by system**: Core AI's kernels and Metal's change with the OS, so what was measured is kept under the
@@ -32,8 +35,17 @@ public struct ThisMac: Codable, Sendable, Equatable {
     /// file written before.
     public var reserves: [String: Int]? = nil
     /// Core AI's share read under a stage's functions, its largest, by the stage's key (`Stage.key`); −1: the fuse stopped
-    /// the process under them, and they are not taken again on this system. Nil in a file written before.
+    /// the process under them, and this engine does not take them again on this system (`reading`). Nil in a file written
+    /// before.
     public var readings: [String: Int]? = nil
+    /// **The engine that marked a stage's functions −1**, by the stage's key: its binary's (`engine`). A mark holds for the
+    /// engine that took it alone: a new one tries the functions once more, on every Mac — what stopped the fuse may have
+    /// been the engine's own fault, since corrected (decided 21/11/2026, after a mark of the M1 Pro left a block's
+    /// functions 2 % slower for good). A −1 with no engine beside it (a file written before) is another engine's. Nil in a file
+    /// written before.
+    public var fusedBy: [String: String]? = nil
+    /// What the functions of a stage's reading held, by the stage's key (`Stage.Extent`); nil in a file written before.
+    public var extents: [String: Stage.Extent]? = nil
     /// The GPU's product int8 × int8 against the Compact's of today, seconds over seconds (`SharedWeights.integerTrial`):
     /// below 1, the shared forms are offered it; nil, not yet measured under this system.
     public var integerProducts: Double? = nil
@@ -42,6 +54,50 @@ public struct ThisMac: Codable, Sendable, Equatable {
 
     /// The key of a function's share: its unit and its asset's name.
     public static func shareKey(asset: String, unit: ComputeUnitKind) -> String { (unit == .neuralEngine ? "ane " : "gpu ") + asset }
+
+    // MARK: - The readings and the fuse's marks
+
+    /// **The reading under `key` as `engine` takes it**: a −1 its own (`fusedBy`); another engine's −1 nil, as never read,
+    /// so that the functions are tried once more.
+    public func reading(_ key: String, engine: String = ThisMac.engine) -> Int? {
+        guard let r = readings?[key] else { return nil }
+        return r == -1 && fusedBy?[key] != engine ? nil : r
+    }
+
+    /// **A reading kept at its largest** (`Stage.keep`); over `engine`'s own −1 nothing, over another's −1 the reading,
+    /// the mark gone.
+    public mutating func keep(reading share: Int, under key: String, engine: String = ThisMac.engine) {
+        let old = reading(key, engine: engine)
+        if old == -1 { return }
+        readings = (readings ?? [:]).merging([key: max(old ?? 0, max(share, 0))]) { $1 }
+        fusedBy?[key] = nil
+    }
+
+    /// **The fuse stopped the process under `key`'s functions** (`Stage.fused`): −1, `engine`'s mark.
+    public mutating func fuse(_ key: String, engine: String = ThisMac.engine) {
+        readings = (readings ?? [:]).merging([key: -1]) { $1 }
+        fusedBy = (fusedBy ?? [:]).merging([key: engine]) { $1 }
+    }
+
+    /// **This engine, as a mark of the fuse names it**: the UUID of the binary its code runs in (`LC_UUID`, read from the
+    /// Mach-O header of its own code in memory). Every build is a binary of its own: an engine changed is a UUID changed,
+    /// whatever the version its client gives itself (two builds of one number differ, 20/11). `""` where it has none.
+    public static let engine: String = {
+        let header = #dsohandle
+        // mach_header_64: magic, cputype, cpusubtype, filetype, ncmds (16), sizeofcmds, flags, reserved; then the commands.
+        guard header.load(as: UInt32.self) == 0xFEED_FACF else { return "" }
+        let count = Int(header.load(fromByteOffset: 16, as: UInt32.self))
+        var at = 32
+        for _ in 0..<count {
+            let (command, size) = (header.load(fromByteOffset: at, as: UInt32.self), Int(header.load(fromByteOffset: at + 4, as: UInt32.self)))
+            if command == 0x1B {  // LC_UUID
+                return (0..<16).map { String(format: "%02X", header.load(fromByteOffset: at + 8 + $0, as: UInt8.self)) }.joined()
+            }
+            guard size > 0 else { break }
+            at += size
+        }
+        return ""
+    }()
 
     // MARK: - The store
 

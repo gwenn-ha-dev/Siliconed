@@ -67,6 +67,32 @@ import Testing
         #expect(try Block.choose(both, measured: measured) == 0)
     }
 
+    /// **A trial B refused** (the plan with both units' surfaces over B: the block reopened untried) runs at the first
+    /// candidate and keeps it decided, so that its pace is read under it and the choice goes on to the alternatives never
+    /// timed — undecided, the first alternative was chosen again and again.
+    @Test func aTrialRefusedUnderBDecidesTheFirstCandidate() throws {
+        var d = Self.declaration
+        d.rows = 4096
+        d.passes = [Block.Pass("p", rows: 0..<4096, shareable: 0..<4096), Block.Pass("other", rows: 0..<4096, bind: ["mask": .tensor("mask-b")])]
+        let candidates = UnitTrial.candidates(rows: 4096)
+        #expect(candidates == [1024, 512])
+        #expect(Block.decidedAtOpen(inFlight: true, decided: nil, candidates: candidates, trying: false) == 1024)
+        #expect(Block.decidedAtOpen(inFlight: true, decided: nil, candidates: candidates, trying: true) == nil)     // the trial decides
+        #expect(Block.decidedAtOpen(inFlight: true, decided: nil, candidates: [512], trying: true) == 512)          // one unit: at once
+        #expect(Block.decidedAtOpen(inFlight: true, decided: 512, candidates: candidates, trying: false) == nil)    // decided before
+        #expect(Block.decidedAtOpen(inFlight: false, decided: nil, candidates: candidates, trying: false) == nil)   // no share in flight
+        // The block ran at 1024 and kept its pace there; the GPU alone is the alternative never timed.
+        let (pace, unit) = (try Block.paceKey(d), try #require(try Block.unitKey(d)))
+        let both: [(declaration: Block.Declaration, share: Block.Share)] = [(d, .inFlight), (d, .gpu)]
+        var measured = ThisMac()
+        measured.paces = [pace + Block.byUnit(1024): 2.0]
+        #expect(try Block.choose(both, measured: measured) == 0)       // its unit undecided: its pace unread
+        measured.neuralUnits = [unit: 1024]
+        #expect(try Block.choose(both, measured: measured) == 1)
+        measured.paces?[pace] = 2.5
+        #expect(try Block.choose(both, measured: measured) == 0)
+    }
+
     @Test func anArgumentIsBoundByItsNameFirstMatch() {
         let r = Self.resolver, d = Self.declaration
         let (g, p, other) = (d.groups[0], d.passes[0], d.passes[1])
@@ -141,7 +167,7 @@ import Testing
 
     /// A call's height: its rows rounded up to 64, never past the per-row tensors' rows; under a cut, equal calls.
     @Test func aCallIsItsRowsRoundedTo64() {
-        typealias T = Tiles.Tile
+        typealias T = Block.Tile
         #expect(Block.calls(0..<4144, cut: nil, limit: 4608) == [T(start: 0, rows: 4160)])
         #expect(Block.calls(2048..<4144, cut: nil, limit: 4608) == [T(start: 2048, rows: 2112)])
         #expect(Block.calls(4096..<4144, cut: nil, limit: 4608) == [T(start: 4096, rows: 64)])
@@ -265,8 +291,47 @@ import Testing
         #expect(r.resolve("k", input: true, group: d.groups[1], pass: d.passes[1], step: nil, call: ["k": .rows("kp")]) == .rows("M.kp", next: false, whole: false))
         let called = Block.steps(d, [d.forms[0]], neural: 0, cut: nil)
         #expect(called[Block.gpu("s", "heads", 16)] != nil && called[Block.gpu("s", "heads", 12)] != nil)
-        #expect(Block.calls(0..<10, cut: nil, limit: 12) == [Tiles.Tile(start: 0, rows: 12)] && Block.calls(0..<10, cut: nil, limit: 10) == [Tiles.Tile(start: 0, rows: 10)])
+        #expect(Block.calls(0..<10, cut: nil, limit: 12) == [Block.Tile(start: 0, rows: 12)] && Block.calls(0..<10, cut: nil, limit: 10) == [Block.Tile(start: 0, rows: 10)])
         #expect(Block.steps(of: d.forms[0], until: "heads").map(\.element.name) == ["pre", "heads"])
         #expect(Block.steps(of: d.forms[0], until: nil).count == 3)
+    }
+}
+
+/// **What a block's functions hold** (`Block.extent`): a step's functions named apart from their rows, their results'
+/// elements summed by name; the same kin at any height, another for other ops.
+@Suite struct BlockExtents {
+    /// A step over `rows` rows of 8: `x · w`, then its SiLU — results of `[rows, 16]` each.
+    static func step(_ rows: Int, silu: Bool = true) -> Stage.Function {
+        let T = Aicode.tensor
+        var m = Aicode.Module(arguments: [("x", T([rows, 8], .f16)), ("w", T([8, 16], .f16))])
+        let product = m.body.matmul(0, 1, result: T([rows, 16], .f16))
+        m.outputs = [("y", silu ? m.body.silu(product) : product)]
+        nonisolated(unsafe) let module = m
+        return Stage.Function("asset-\(rows)") { module }
+    }
+
+    @Test func aStepIsNamedApartFromItsRows() {
+        #expect(Block.unsized("layer.ffn-4160") == "layer.ffn" && Block.unsized("layer.ffn+taps-64") == "layer.ffn+taps")
+        #expect(Block.unsized("edge-embed-2") == "edge-embed-2" && Block.unsized("ane-layer.ffn@512") == "ane-layer.ffn@512")
+    }
+
+    /// Two calls' heights over one pass (2048, the last 1024 rows shorter): their elements summed — twice the functions
+    /// hold more than one of 2048 rows, and the kin is the same.
+    @Test func theCallsOfAHeightAreSummedByName() throws {
+        let one = try Block.extent(["f.s-2048": Self.step(2048)], inFlight: 1)
+        let two = try Block.extent(["f.s-2048": Self.step(2048), "f.s-1024": Self.step(1024)], inFlight: 1)
+        let pass = try Block.extent(["f.s-4096": Self.step(4096)], inFlight: 1)
+        #expect(one.kin == two.kin && two.kin == pass.kin)
+        // The largest of the ratios: the products' results are as tall as their rows; a second function brings its
+        // own constants (the SiLU's), a few elements more.
+        #expect(two.ratio(over: one)! >= 1.5 && two.ratio(over: one)! < 1.001 * 1.5 && pass.ratio(over: one) == 2)
+        #expect(one.ratio(over: pass)! > 0.5 && one.ratio(over: pass)! < 1)
+        #expect(one.elements["f.s results"]! > 2048 * 16 && one.elements["f.s largest"] == 2048 * 16)
+    }
+
+    /// Other ops are another kin: no reading of one bounds the other.
+    @Test func otherOpsAreAnotherKin() throws {
+        let a = try Block.extent(["f.s-64": Self.step(64)], inFlight: 1), b = try Block.extent(["f.s-64": Self.step(64, silu: false)], inFlight: 1)
+        #expect(a.kin != b.kin && a.ratio(over: b) == nil)
     }
 }

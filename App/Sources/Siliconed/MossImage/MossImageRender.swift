@@ -17,68 +17,40 @@ import SiliCore
 ///   - **the caption is encoded once, unpadded**, real tokens only; no negative branch at CFG 1.
 ///
 /// An image to start from is encoded once, before the DiT's session comes (`Flux2VAEEncoder`), and mixed with each seed's noise at the
-/// first step run. Not yet, refused before any computation: a solver other than Euler (the recipe's).
+/// first step run.
 package enum MossImageRender {
-    static func render(_ request: Request, _ admitted: Admission, seeds: [UInt64], model: Model,
-                       cancellation: Cancellation?, emit: (Engine.Event) -> Void) throws -> [Engine.Render] {
-        try RenderLoop.run(try Parts(request, admitted, model: model), request, admitted, seeds: seeds, model: model,
-                           cancellation: cancellation, emit: emit)
-    }
-
     /// **MOSS-Image's part of the render** (`RenderLoop`): the chat template and Qwen3.5-9B's states, Flux 2's encoder for
     /// an image to start from, the DiT with the recipe's LoRA told `σ·1000`, Flux 2's decoder in f32.
     struct Parts: RenderParts {
         typealias Decoder = Flux2VAEDecoder
-        private let request: Request, model: Model, admitted: Admission
-        private let text: MossImageTextModule, denoising: MossImageDenoisingModule
-        private let start: (image: ImageRGB, encoding: Flux2EncodingModule)?
-        private let user: LoRAStack
-        let decoderPath: String
+        private let inputs: RenderInputs<MossImageTextModule, MossImageDenoisingModule, Flux2EncodingModule, Flux2DecodingModule>
         private var ids: [Int] = [], caps: HostTensor?
 
-        init(_ request: Request, _ admitted: Admission, model: Model) throws {
-            let chain = model.chain
-            guard let text = chain.text as? MossImageTextModule, let denoising = chain.denoising as? MossImageDenoisingModule,
-                  let decoding = chain.decoding as? Flux2DecodingModule else { throw EngineError.notOnEngine(model: model.identifier) }
-            if let image = request.image {
-                guard let encoding = chain.encoding as? Flux2EncodingModule else { throw EngineError.notOnEngine(model: model.identifier) }
-                start = (image, encoding)
-            } else {
-                start = nil
-            }
-            // What the engine cannot run yet, before the first computation.
-            user = try LoRAStack(request.loras, on: model.card.family)
-            guard request.solver == .euler else { throw EngineError.notOnEngine(model: model.identifier) }
-            (self.request, self.model, self.admitted, self.text, self.denoising) = (request, model, admitted, text, denoising)
-            decoderPath = decoding.path
-        }
+        init(_ request: Request, _ admitted: Admission, model: Model) throws { inputs = try RenderInputs(request, admitted, model: model) }
 
-        var encodes: Bool { start != nil }
+        var encodes: Bool { inputs.start != nil }
+        var decoderPath: String { inputs.decoding.path }
 
         mutating func tokens() throws -> Int {
-            let (ids, promptTokens) = try Qwen35Prompt.admitted(request.prompt, tokenizer: try Tokenizer(directory: text.tokenizer))
+            let (ids, promptTokens) = try Qwen35Prompt.admitted(inputs.request.prompt, tokenizer: try Tokenizer(directory: inputs.text.tokenizer))
             self.ids = ids
             return promptTokens
         }
 
         mutating func encode() throws -> Bool {
-            let (ids, map) = (ids, text.map)
+            let (ids, map) = (ids, inputs.text.map)
             var key = RenderCache.Key("MossImageRender.encode")
             try key.file(map)
             key.integers(ids)
-            let (caps, cached) = try RenderCache.conditioning(key, of: model) { try MossImageRender.encode(ids, map: map) }
+            let (caps, cached) = try RenderCache.conditioning(key, of: inputs.model) { try MossImageRender.encode(ids, map: map) }
             self.caps = caps
             return cached
         }
 
-        func image() throws -> Latent? {
-            guard let start else { return nil }
-            return Latent(space: denoising.space, height: admitted.height, width: admitted.width,
-                          values: try Flux2VAEEncoder.latent(of: start.image, path: start.encoding.path))
-        }
+        func image() throws -> Latent? { try inputs.image { try Flux2VAEEncoder.latent(of: $0, path: $1.path) } }
 
         func denoiser(height: Int, width: Int) throws -> any RenderDenoiser {
-            let dit = try Denoiser(map: denoising.map, loras: try MossImageRender.recipe(denoising.turbo, then: user),
+            let dit = try Denoiser(map: inputs.denoising.map, loras: try MossImageRender.recipe(inputs.denoising.turbo, then: inputs.loras),
                                    latentHeight: height, latentWidth: width, textLength: ids.count)
             dit.text = caps
             return dit
@@ -104,12 +76,10 @@ package enum MossImageRender {
         private var prompted = false
 
         package init(map path: String, loras: LoRAStack, latentHeight: Int, latentWidth: Int, textLength: Int) throws {
-            let file = try SafeTensors(path)
+            let file = try MossDiT.file(path)
             let g = MossDiT.Geometry(height: latentHeight, width: latentWidth, text: textLength)
             dit = try blocking { try await MossDiT.open(file: file, geometry: g, budget: MemoryBudget.machineCeiling(), loras: loras) }
         }
-
-        deinit { dit.close() }
 
         /// What the DiT is: its arithmetic and its plan under B.
         package var described: String { dit.described }
@@ -131,7 +101,7 @@ package enum MossImageRender {
     /// `[128, h, w]`, the caption `text` `[T, 4096]`, the told timestep; the velocity and the boundaries by the oracle's names.
     package static func probe(map path: String, latent: [Float], latentHeight: Int, latentWidth: Int, text: [Float], textLength: Int,
                               timestep: Float, loras: LoRAStack = .none) throws -> (velocity: [Float], boundaries: [String: [Float]]) {
-        let file = try SafeTensors(path)
+        let file = try MossDiT.file(path)
         let g = MossDiT.Geometry(height: latentHeight, width: latentWidth, text: textLength)
         return try blocking {
             let dit = try await MossDiT.open(file: file, geometry: g, budget: MemoryBudget.machineCeiling(), tapped: true, loras: loras)

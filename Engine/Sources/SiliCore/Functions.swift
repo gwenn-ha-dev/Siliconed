@@ -143,12 +143,20 @@ public enum Functions {
     /// Measured 19/11 on the mini, a trivial GPU function on 128 × 256 f16, each in a fresh process: the first +61.5 MiB,
     /// the next +0.7 and +1.9; past the witness (+58.7), the first +1.5. **Of that first cost ≈ 22 MiB stay and ≈ 36 come
     /// and go**: idle 2.5 s, the footprint gives back 36.2 MiB, and the next call of any function takes them again (+37.7),
-    /// the witness's functions held or not — Core AI's own, while it computes. A floor read after a pause misses them; the
-    /// first call of the stage takes them back (`Stage.margin`).
+    /// the witness's functions held or not — Core AI's own, while it computes.
+    ///
+    /// **The witness waits for them to leave** (`settle`): the driver's memory for its command buffers, in the graphics
+    /// ledger and in no allocation — 36 to 44 MiB, given back 1.0 to 1.5 s after the witness's last command buffer
+    /// (21/11/2026 on the M5 Pro, the ledger 44.8 MiB, then 0.5 to 8.5, Metal's allocations 0.4). Read at once, the
+    /// first stage's floor held them and no later floor did: of three runs of a block in one process, the first's floor
+    /// and peak 31 to 46 MiB above the two others', for each of five clients' blocks. Paid once a process.
     public static func witness(_ device: MTLDevice) async throws {
         let task = lock.withLock { () -> Task<Void, Error> in
             if let witnessed { return witnessed }
-            let t = Task { try await call(device) }
+            let t = Task {
+                try await call(device)
+                settle(device)
+            }
             witnessed = t
             return t
         }
@@ -172,6 +180,13 @@ public enum Functions {
             let ane = try await load(asset, unit: .neuralEngine)
             try await Run.neural(ane, inputs: ["x": view(sx)], outputs: [("y", view(sy))])
             withExtendedLifetime((gpu, ane, stream, arena)) {}
+        }
+
+        /// The driver's memory for the witness's command buffers, which no allocation holds, given back before any floor
+        /// is read: the graphics ledger within 16 MiB of what Metal still has allocated, 2 s at most.
+        @Sendable func settle(_ device: MTLDevice) {
+            let t = DispatchTime.now().uptimeNanoseconds
+            while Memory.graphics() > device.currentAllocatedSize + (16 << 20) && seconds(since: t) < 2 { usleep(2000) }
         }
     }
     nonisolated(unsafe) private static var witnessed: Task<Void, Error>?

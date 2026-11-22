@@ -1,4 +1,5 @@
 import Foundation
+import Measurement
 
 /// **A render said in A1111's "infotext"** — the `parameters` text chunk, the one format Civitai
 /// reads from a PNG made off its site, written beside the app's own keys (`Engine.Render.metadata`).
@@ -89,7 +90,7 @@ package enum Infotext {
     /// **The app's version** (`CFBundleShortVersionString`), only inside the app's own bundle: the
     /// CLI and the test runner have none of theirs to give, and say `Siliconed` alone.
     package static let appVersion: String? = {
-        guard Bundle.main.bundleIdentifier == "dev.gwenn-ha.siliconed" else { return nil }
+        guard Bundle.main.bundleIdentifier == siliconedBundleIdentifier else { return nil }
         return Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String
     }()
 

@@ -1,12 +1,12 @@
 /// The RMS norm and what it is made of (sum, mean, square, rsqrt), each written as coreai-torch writes it. Recopied from
-/// SiliCore (`CoreAIReductions.swift`, aec8f3c).
+/// the former engine (`CoreAIReductions.swift`, 0.21).
 ///
 ///     reduce_sum_v1  ⊃ { constant 0 · reduce_v1 ⊃ { cast · add · yield } · yield }          f16 and bf16 add in f32
 ///     reduce_mean_v1 ⊃ { cast f32 · reduce_sum_v1 · shape ▸ gather_nd ▸ reduce_product (8-byte ints) ▸ cast f32 ·
 ///                        broadcasting_divide_v1 ⊃ { get_shape · broadcast_shapes · broadcast_to ×2 · divide } · cast }
 ///     norm           cast f32 · pow 2 · reduce_mean_v1 · add eps · rsqrt · mul · cast
 ///
-/// What a port by analogy would miss (SiliCore's findings):
+/// What a port by analogy would miss (the former engine's findings):
 ///   - **the reduce's declared result is dynamic** (`?x?`: the input's rank, no sizes) inside the composite: types are
 ///     copied, never inferred;
 ///   - **f16 and bf16 are summed in f32 but their zero differs**: f16's initial value is a constant f32, bf16's a bf16
@@ -151,7 +151,7 @@ extension Aicode.Block {
     }
 
     /// The largest element along `axes`, kept at size 1: `reduce_max_v1`, started at the lowest finite value of the
-    /// element (an all-infinite row gives the largest finite, not ∞). Recopied from SiliCore (`reduceExtremum`).
+    /// element (an all-infinite row gives the largest finite, not ∞). Recopied from the former engine (`reduceExtremum`).
     public func reduceMax(_ x: Int, axes: [Int]) -> Int {
         let (shape, element) = Aicode.shape(types[x])
         let vector = integers(axes, .si32)

@@ -41,6 +41,9 @@ package struct Library: Sendable {
         root.appendingPathComponent("store").appendingPathComponent(name).path
     }
 
+    /// `<root>/store/composants/<family>`: the folder of a family's files of a generic name.
+    package func components(_ family: Family) -> String { map("composants/\(family.rawValue)") }
+
     /// **The app's socket**: the Unix socket where the app open on this library listens for
     /// `silicontrol …` (`docs/REMOTE-CONTROL.md`). It exists only while the app runs. In `local`:
     /// a socket cannot be made on every disk (exFAT, a network share), and `silicontrol` finds it
@@ -62,7 +65,7 @@ package struct Library: Sendable {
     /// A file (or folder) of a family's components. Throws if it is not there: a missing
     /// tokenizer is discovered here, not after a minute of encoder.
     package func component(_ family: Family, _ relative: String) throws -> String {
-        let path = root.appendingPathComponent("store/composants/\(family.rawValue)/\(relative)").path
+        let path = components(family) + "/" + relative
         guard FileManager.default.fileExists(atPath: path) else { throw MissingFile(path, .published) }
         return path
     }

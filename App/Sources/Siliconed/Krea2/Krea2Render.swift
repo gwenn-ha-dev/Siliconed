@@ -22,66 +22,40 @@ import SiliCore
 ///
 /// An image to start from goes through the VAE's encoder first (`QwenImageVAEEncoder`), then the same loop from its step.
 package enum Krea2Render {
-    static func render(_ request: Request, _ admitted: Admission, seeds: [UInt64], model: Model,
-                       cancellation: Cancellation?, emit: (Engine.Event) -> Void) throws -> [Engine.Render] {
-        try RenderLoop.run(try Parts(request, admitted, model: model), request, admitted, seeds: seeds, model: model,
-                           cancellation: cancellation, emit: emit)
-    }
-
     /// **Krea 2's part of the render** (`RenderLoop`): the template and Qwen3-VL's twelve taps, the VAE's encoder for an
     /// image to start from, the DiT (the text fused once) told `modelTime`, the decoder reading the latent normalized in bf16.
     struct Parts: RenderParts {
         typealias Decoder = QwenImageVAEDecoder
-        private let request: Request, model: Model, admitted: Admission
-        private let text: Krea2TextModule, denoising: Krea2DenoisingModule
-        private let start: (image: ImageRGB, encoding: QwenImageEncodingModule)?
-        private let loras: LoRAStack
-        let decoderPath: String
+        private let inputs: RenderInputs<Krea2TextModule, Krea2DenoisingModule, QwenImageEncodingModule, QwenImageDecodingModule>
         private var ids: [Int] = [], taps: HostTensor?
 
-        init(_ request: Request, _ admitted: Admission, model: Model) throws {
-            let chain = model.chain
-            guard let text = chain.text as? Krea2TextModule, let denoising = chain.denoising as? Krea2DenoisingModule,
-                  let decoding = chain.decoding as? QwenImageDecodingModule else { throw EngineError.notOnEngine(model: model.identifier) }
-            if let image = request.image {
-                guard let encoding = chain.encoding as? QwenImageEncodingModule else { throw EngineError.notOnEngine(model: model.identifier) }
-                start = (image, encoding)
-            } else {
-                start = nil
-            }
-            loras = try LoRAStack(request.loras, on: model.card.family)
-            (self.request, self.model, self.admitted, self.text, self.denoising) = (request, model, admitted, text, denoising)
-            decoderPath = decoding.path
-        }
+        init(_ request: Request, _ admitted: Admission, model: Model) throws { inputs = try RenderInputs(request, admitted, model: model) }
 
-        var encodes: Bool { start != nil }
+        var encodes: Bool { inputs.start != nil }
+        var decoderPath: String { inputs.decoding.path }
 
         mutating func tokens() throws -> Int {
-            let (ids, promptTokens) = try Krea2Text.admitted(request.prompt, tokenizer: try Tokenizer(directory: text.tokenizer))
+            let (ids, promptTokens) = try Krea2Text.admitted(inputs.request.prompt, tokenizer: try Tokenizer(directory: inputs.text.tokenizer))
             self.ids = ids
             return promptTokens
         }
 
         mutating func encode() throws -> Bool {
-            let (ids, text) = (ids, text)
+            let (ids, text) = (ids, inputs.text)
             var key = RenderCache.Key("Krea2Render.encode")
             try key.file(text.map)
             key.integers(ids)
             key.integers(text.sockets)
-            let (taps, cached) = try RenderCache.conditioning(key, of: model) { try Krea2Render.encode(ids, map: text.map, sockets: text.sockets) }
+            let (taps, cached) = try RenderCache.conditioning(key, of: inputs.model) { try Krea2Render.encode(ids, map: text.map, sockets: text.sockets) }
             self.taps = taps
             return cached
         }
 
-        func image() throws -> Latent? {
-            guard let start else { return nil }
-            return Latent(space: denoising.space, height: admitted.height, width: admitted.width,
-                          values: try QwenImageVAEEncoder.latent(of: start.image, path: start.encoding.path))
-        }
+        func image() throws -> Latent? { try inputs.image { try QwenImageVAEEncoder.latent(of: $0, path: $1.path) } }
 
         func denoiser(height: Int, width: Int) throws -> any RenderDenoiser {
             guard let taps else { preconditionFailure("the text before the DiT") }
-            return try Denoiser(map: denoising.map, loras: loras, taps: taps, latentHeight: height, latentWidth: width)
+            return try Denoiser(map: inputs.denoising.map, loras: inputs.loras, taps: taps, latentHeight: height, latentWidth: width)
         }
 
         func decoderInput(_ latent: [Float]) -> [Float] { QwenImageVAEDecoder.normalized(latent) }
@@ -100,7 +74,7 @@ package enum Krea2Render {
     /// **The text**: Qwen3-VL's twelve taps over the real tokens (template included), the template's rows dropped
     /// (`assemble`): `[L, 12, 2560]` bf16 values.
     package static func encode(_ ids: [Int], map path: String, sockets: [Int]) throws -> HostTensor {
-        let encoder = Qwen3Encoder(config: .krea2, prefix: "model.language_model.", path: path)
+        let encoder = Qwen3Encoder(config: .krea2, path: path)
         let states = try encoder.states(ids, taps: Set(sockets.map { $0 - 1 }))
         return try assemble(states, sockets: sockets, rows: ids.count, width: encoder.config.width)
     }
@@ -138,24 +112,16 @@ package enum Krea2Render {
         package init(map path: String, loras: LoRAStack = .none, taps: HostTensor, latentHeight: Int, latentWidth: Int,
                      boundaries: Bool = false) throws {
             // A fine-tune saved as a whole checkpoint keeps the DiT under its prefix: read without it, as published.
-            let marker = "blocks.0.attn.wq.weight"
-            let file = try MapWeights.dit(path, marker: marker)
+            let file = try MapWeights.dit(path, marker: Krea2Session.marker)
             self.file = file
-            let codes = file.tensors[marker]?.dtype == "I8"
             let budget = MemoryBudget.machineCeiling()
             let fused = try blocking { try await Krea2Fusion.text(taps, file: file, loras: loras, budget: budget, fused: boundaries) }
             text = boundaries ? (fused.fused, fused.rows) : nil
-            velocities = [Float](repeating: 0, count: 16 * latentHeight * latentWidth)
+            velocities = [Float](repeating: 0, count: LatentSpace.qwenImage.channels * latentHeight * latentWidth)
             let geometry = Krea2Session.Geometry(latentHeight: latentHeight, latentWidth: latentWidth, text: taps.shape[0])
             let rows = fused.rows
-            let ranks = Krea2Session.ranks(loras)
-            guard let device = MTLCreateSystemDefaultDevice() else { throw ProgramError("no Metal device") }
-            let offered = try blocking { try await Arithmetic.offered(codes: codes, device) }
-            let arithmetic = try Arithmetic.opened(codes: codes, neuralEngine: CoreAI.neuralEngineInForce, offered: offered) {
-                Krea2Session.declaration(geometry, $0, ranks: ranks, taps: boundaries)
-            }
             session = try blocking {
-                let session = try await Krea2Session.open(file: file, geometry: geometry, arithmetic: arithmetic, loras: loras, taps: boundaries, budget: budget)
+                let session = try await Krea2Session.open(file: file, geometry: geometry, loras: loras, taps: boundaries, budget: budget)
                 await session.setText(rows)
                 return session
             }
@@ -163,9 +129,6 @@ package enum Krea2Render {
 
         /// What the DiT is: its arithmetic and its plan under B.
         package var described: String { "\(session.arithmetic), " + session.stage.plan.line }
-
-        /// The stage let go before the next one comes, the footprint waited for (`Stage.close`).
-        deinit { session.close() }
 
         /// What a check reads of an evaluation: each boundary in the reference's rows, text first (`Krea2Transformer.Tap`),
         /// true values in f32 written into the check's own buffers (`tapCounts` values each) — made before the DiT is

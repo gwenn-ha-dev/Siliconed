@@ -159,16 +159,6 @@ public final class Ring: @unchecked Sendable {
         condition.lock(); condition.broadcast(); condition.unlock()
     }
 
-    /// Waits for a group kept from the start to be read into its place.
-    public func ready(_ group: String) throws {
-        condition.lock(); defer { condition.unlock() }
-        while !read.contains(group) && failure == nil { condition.wait() }
-        if let failure { throw failure }
-    }
-
-    /// Every kept group among `groups` read.
-    public func ready(_ groups: [String]) throws { for g in groups { try ready(g) } }
-
     /// Ring use n done: its slot may take the use `depth` after it.
     public func release(_ n: Int) {
         condition.lock(); released = max(released, n + 1); condition.broadcast(); condition.unlock()

@@ -63,7 +63,7 @@ package enum MossImageStages {
         let compact = try invocation.compact()
         let stem = { (s: String) in "moss/\(s)\(compact ? "-compact" : "")-\(invocation.size)" }
         let report = Report(title: "\(model) dit\(compact ? " compact" : "") \(invocation.size)", half: compact ? "W8A8" : "bf16")
-        let path = try invocation.ditMap(compact ? compactMap : ditMap, golden: compact ? .eightBit : .standard)
+        let path = try invocation.ditMap(ditMap, compactMap, compact: compact)
         let goldens = try invocation.goldens.open(stem("goldens-moss-dit") + ".safetensors")
         let witness = invocation.goldens.optional("moss/witness-moss-dit\(compact ? "-compact" : "")-f64-\(invocation.size).safetensors")
         let half = compact
@@ -131,7 +131,7 @@ package enum MossImageStages {
         oracle: nil, weights: ["DiT", "LoRA"], rule: Pace.rule
     ) { invocation in
         let compact = try invocation.compact()
-        let path = try invocation.ditMap(compact ? compactMap : ditMap, golden: compact ? .eightBit : .standard)
+        let path = try invocation.ditMap(ditMap, compactMap, compact: compact)
         let (h, w) = (invocation.height / LatentSpace.flux2.factor, invocation.width / LatentSpace.flux2.factor), rows = 48
         let text = HostTensor([rows, MossImageDiT.Config.published.textDim], floats: Pace.noise(rows * MossImageDiT.Config.published.textDim, seed: 1))
         let loras = try MossImageRender.recipe(try Library.processWide.component(.mossImage, MossImagePublished.turbo))
@@ -141,7 +141,7 @@ package enum MossImageStages {
             d.text = text
             return d
         } evaluate: { d, e, time in
-            try (d as! MossImageRender.Denoiser).velocity(Pace.noise(LatentSpace.flux2.channels * h * w, seed: UInt64(e + 2)), time: 1000 * time)
+            try d.velocity(Pace.noise(LatentSpace.flux2.channels * h * w, seed: UInt64(e + 2)), time: 1000 * time)
         }
     }
 
@@ -205,12 +205,9 @@ package enum MossImageStages {
         let denoiser = try MossImageRender.Denoiser(map: path, loras: try MossImageRender.recipe(try Library.processWide.component(.mossImage, MossImagePublished.turbo)),
                                                     latentHeight: height, latentWidth: width, textLength: textEntry.shape[0])
         denoiser.text = HostTensor(textEntry.shape, floats: Array(text))
-        for step in 0..<(sigmas.count - 1) {
-            guard let latent = reference.float32(step == 0 ? "latent_init" : "latent_\(step)"),
-                  let expected = reference.float32("velocity_\(step)") else { continue }
-            let v = try denoiser.velocity(Array(latent), time: timesteps[step])
-            report.add(Judge.boundary("v_\(step)", engine: v, oracle: expected, half: half.float32("velocity_\(step)").map(Array.init),
-                                      columns: height * width))
+        try report.trajectory(reference, steps: sigmas.count - 1, half: half, columns: height * width, name: { "velocity_\($0)" },
+                          label: { "v_\($0)" }) { step, latent in
+            try denoiser.velocity(latent, time: timesteps[step])
         }
         return report
     }
@@ -260,17 +257,13 @@ package enum MossImageStages {
         }
         let library = Library.processWide
         let variant: Variant = compact ? .compact : .standard
-        let path = try invocation.ditMap(compact ? compactMap : ditMap, golden: compact ? .eightBit : .standard)
+        let path = try invocation.ditMap(ditMap, compactMap, compact: compact)
         let model = try Model.mossImage(in: library, card: .mossImage, dit: path, encoder: Family.mossImage.encoderMap(variant))
         let started = Date()
         let render = try Engine().render(Request(prompt, width: invocation.width, height: invocation.height, seed: seed.uint64Value, steps: 8),
                                          model: model)
-        print(String(format: "rendered in %.1f s (text %.2f, denoising %.2f, decoding %.2f)", Date().timeIntervalSince(started),
-                     render.timings.text, render.timings.denoising, render.timings.decoding))
-        if let png = invocation.extras["--png"] { try render.png().write(to: URL(fileURLWithPath: png)) }
-        if compact { report.add(Judge.compactRender(render.image.pixels, expected)); return report }
-        let (psnr, _, _, notFinite) = imageError(render.image.pixels, expected)
-        report.add(Judge.bound("image PSNR", psnr, 25, unit: "dB", above: true, note: notFinite > 0 ? "\(notFinite) non-finite values" : ""))
+        try report.rendered(render, since: started, invocation)
+        report.judgePicture(render.image.pixels, expected, compact: compact)
         return report
     }
 }

@@ -1,6 +1,6 @@
 // **The window's column: the chain of the render, from the idea to the button, top to bottom** — one column.
 //
-//   ┌ Text ───────────── for Z-Image ● ┐   written here (`LabBoxes.swift`): the field grows with its text, its edge drags
+//   ┌ Text ───────────── for <model> ● ┐   written here (`LabBoxes.swift`): the field grows with its text, its edge drags
 //   │ a lighthouse on a cliff…         │
 //   └──┬───────────────────────────────┘
 //   ┌ Images ──────────────────── 1/3 ● ┐   the images the render reads, each with its role; one to describe, or to start
@@ -170,7 +170,7 @@ struct RackView: View {
             e.append(Edge(from: .imageEncoder, to: .dit, kind: .latent, stage: .denoising, lane: Edge.imageLane))
         }
         if app.editingPossible {
-            // Qwen-Image-2.1's encoder sees the images (`TextFormat.readsImages`): one more wire, into the encoder just under.
+            // An encoder that sees the images (`TextFormat.readsImages`): one more wire, into the encoder just under.
             if app.promptNamesImages {
                 e.append(Edge(from: .images, to: .textEncoder, kind: .image, stage: .text, live: live, lane: Edge.crossLane))
             }
@@ -329,7 +329,7 @@ private struct LinkEdge: View {
             let (color, dashed): (Color, Bool) = switch w.otherMacs.links[id] {
             case .connected?: (Palette.link, false)
             case .refused?: (Palette.failure, false)
-            default: (Color(nsColor: .systemOrange), true)
+            default: (Palette.caution, true)
             }
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .strokeBorder(color, style: StrokeStyle(lineWidth: 2, dash: dashed ? [6, 4] : []))

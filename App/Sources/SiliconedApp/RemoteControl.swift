@@ -302,7 +302,7 @@ final class RemoteControl {
                 o["edit"] = max > 0
                 o["max_references"] = max
                 // img2img: the rack's starting image (`start-image`, `add --image`).
-                o["start_image"] = chain?.entries.contains { $0.kind == .image } ?? false
+                o["start_image"] = chain?.acceptsStartImage ?? false
                 o["loras"] = b.loras(for: f.id).map { card -> [String: Any] in
                     var l: [String: Any] = ["lora": Self.shortName(card.path), "name": card.name]
                     if !card.triggers.isEmpty { l["triggers"] = card.triggers }

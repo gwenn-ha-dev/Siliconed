@@ -97,7 +97,8 @@ enum AnimaStages {
         let rows = contextEntry.shape[0]
         let geometry = AnimaEvaluation.Geometry(height: latentEntry.shape[1], width: latentEntry.shape[2], context: rows)
         let tapped = try blocking {
-            let dit = try await AnimaEvaluation.open(path, geometry: geometry, taps: true, budget: MemoryBudget.machineCeiling()) { print($0) }
+            let dit = try await AnimaEvaluation.open(path, geometry: geometry, taps: true, budget: MemoryBudget.machineCeiling())
+            print("\(model) block: " + dit.described)
             defer { print("let go: \(dit.close().line)") }
             try await dit.prompt(Array(context), rows: rows)
             try await dit.blockZero(x: Array(x), temb: Array(temb), embedded: Array(embedded))
@@ -121,7 +122,7 @@ enum AnimaStages {
         // `goldens-anima-dit-compact-512`: the variant before the size.
         let stem = { (s: String) in "anima/\(s)-\(compact ? "compact-" : "")\(invocation.size)" }
         let report = Report(title: "\(model) dit\(compact ? " compact" : "") \(invocation.size)", half: compact ? "W8A8" : "bf16")
-        let path = try invocation.ditMap(compact ? compactMap : ditMap, golden: compact ? .eightBit : .standard)
+        let path = try invocation.ditMap(ditMap, compactMap, compact: compact)
         let goldens = try invocation.goldens.open(stem("goldens-anima-dit") + ".safetensors")
         // The Standard's fp64 witness is the Standard's weights': a variant has none.
         let witness = compact ? nil : invocation.goldens.optional("anima/witness-anima-f64-\(invocation.size)-step0.safetensors")
@@ -136,7 +137,8 @@ enum AnimaStages {
         let (h, w, rows, d) = (latentEntry.shape[1], latentEntry.shape[2], contextEntry.shape[0], AnimaFunction.d)
         let geometry = AnimaEvaluation.Geometry(height: h, width: w, context: rows)
         let (velocity, tapped) = try blocking {
-            let dit = try await AnimaEvaluation.open(path, geometry: geometry, taps: true, budget: MemoryBudget.machineCeiling()) { print($0) }
+            let dit = try await AnimaEvaluation.open(path, geometry: geometry, taps: true, budget: MemoryBudget.machineCeiling())
+            print("\(model) dit: " + dit.described)
             defer { print("let go: \(dit.close().line)") }
             try await dit.prompt(Array(context), rows: rows)
             // The bf16 reference is told its timestep in bf16 (`timestep.to(half)`).
@@ -172,15 +174,16 @@ enum AnimaStages {
         options: ["--renders", "--evaluations", "--map", "--variant"], oracle: nil, weights: ["DiT"], rule: Pace.rule
     ) { invocation in
         let compact = try invocation.compact()
-        let path = try invocation.ditMap(compact ? compactMap : ditMap, golden: compact ? .eightBit : .standard)
-        let (h, w) = (invocation.height / 8, invocation.width / 8), rows = 512
+        let path = try invocation.ditMap(ditMap, compactMap, compact: compact)
+        let (h, w) = (invocation.height / LatentSpace.qwenImage.factor, invocation.width / LatentSpace.qwenImage.factor), rows = 512
         let context = HostTensor([rows, AnimaFunction.textDim], floats: Pace.noise(rows * AnimaFunction.textDim, seed: 1))
         return try Pace.run(invocation, title: "\(model) pace\(compact ? " compact" : "") \(invocation.size)") {
             let d = try AnimaRender.Denoiser(map: path, latentHeight: h, latentWidth: w, textLength: rows)
+            print("\(model) pace: " + d.described)
             try d.give(context)
             return d
         } evaluate: { d, e, time in
-            try (d as! AnimaRender.Denoiser).velocity(Pace.noise(AnimaFunction.channels * h * w, seed: UInt64(e + 2)), time: time)
+            try d.velocity(Pace.noise(AnimaFunction.channels * h * w, seed: UInt64(e + 2)), time: time)
         }
     }
 
@@ -214,13 +217,10 @@ enum AnimaStages {
         // Then each step from the reference's own latent: each velocity is computed on the input the reference saw.
         let denoiser = try AnimaRender.Denoiser(map: path, latentHeight: height, latentWidth: width, textLength: contextEntry.shape[0])
         try denoiser.give(HostTensor(contextEntry.shape, floats: Array(context)))
-        for step in 0..<steps {
-            let name = "velocity_\(step)"
-            guard let latent = reference.float32(step == 0 ? "latent_init" : "latent_\(step)") else { continue }
-            let v = try denoiser.velocity(Array(latent), time: AnimaRender.modelTime(sigma: schedule[step], solver: .euler, first: step == 0))
-            let witness = invocation.goldens.optional("anima/witness-anima-f64-\(invocation.size)-step\(step).safetensors")
-            report.add(reference, name, v, witness: witness?.float32("velocity"), half: half.float32(name).map(Array.init),
-                       columns: height * width)
+        try report.trajectory(reference, steps: steps, half: half, columns: height * width, name: { "velocity_\($0)" }, witness: { step in
+            invocation.goldens.optional("anima/witness-anima-f64-\(invocation.size)-step\(step).safetensors")?.float32("velocity")
+        }) { step, latent in
+            try denoiser.velocity(latent, time: AnimaRender.modelTime(sigma: schedule[step], solver: .euler, first: step == 0))
         }
         return report
     }
@@ -294,24 +294,13 @@ enum AnimaStages {
               let expected = image.float32("image"), compact || half?.float32("image") != nil else {
             throw Skip("\(image.path): the prompt, seed or image is missing")
         }
-        let path = try invocation.ditMap(compact ? compactMap : ditMap, golden: compact ? .eightBit : .standard)
+        let path = try invocation.ditMap(ditMap, compactMap, compact: compact)
         let model = try Model.anima(in: Library.processWide, dit: path)
         let started = Date()
         let render = try Engine().render(Request(prompt, width: invocation.width, height: invocation.height,
                                                  seed: seed.uint64Value, steps: 8), model: model)
-        print(String(format: "rendered in %.1f s (text %.2f, denoising %.2f, decoding %.2f)", Date().timeIntervalSince(started),
-                     render.timings.text, render.timings.denoising, render.timings.decoding))
-        if let png = invocation.extras["--png"] { try render.png().write(to: URL(fileURLWithPath: png)) }
-        guard let reference = half?.float32("image") else {
-            report.add(Judge.compactRender(render.image.pixels, expected))
-            return report
-        }
-        let (psnr, _, _, notFinite) = imageError(render.image.pixels, expected)
-        let (bar, _, _, _) = imageError(Array(reference), expected)
-        report.add(Judge.bound("image PSNR", psnr, bar - 3, unit: "dB", above: true,
-                               note: String(format: "diffusers in bf16 %.2f dB, − 3", bar) + (notFinite > 0 ? ", \(notFinite) non-finite values" : "")))
-        let (against, _, _, _) = imageError(render.image.pixels, reference)
-        print(String(format: "  against diffusers' bf16 render: %.2f dB", against))
+        try report.rendered(render, since: started, invocation)
+        report.judgePicture(render.image.pixels, expected, compact: compact, half: half?.float32("image").map(Array.init))
         return report
     }
 
@@ -346,7 +335,8 @@ enum AnimaStages {
         let (h, w, rows) = (latentEntry.shape[1], latentEntry.shape[2], contextEntry.shape[0])
         let (velocity, tapped) = try blocking {
             let dit = try await AnimaEvaluation.open(path, geometry: AnimaEvaluation.Geometry(height: h, width: w, context: rows), loras: stack,
-                                                     budget: MemoryBudget.machineCeiling()) { print($0) }
+                                                     budget: MemoryBudget.machineCeiling())
+            print("\(model) dit-lora: " + dit.described)
             defer { dit.close() }
             try await dit.prompt(Array(context), rows: rows)
             // The bf16 reference is told its timestep in bf16 (`timestep.to(half)`).

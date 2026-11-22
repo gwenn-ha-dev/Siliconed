@@ -45,7 +45,9 @@ struct HubSheet: View {
                     .keyboardShortcut(.cancelAction)
                 Button(actionTitle(offer)) { app.importFromHub() }
                     .keyboardShortcut(.defaultAction).tint(Palette.control)
-                    .disabled(!(offer.map { AppState.HubOffer.choosable($0.choice?.verdict) } ?? false) || !app.managementPossible)
+                    .unavailable(app.managementRefusal
+                                 ?? (offer.map { AppState.HubOffer.choosable($0.choice?.verdict) } == true ? nil
+                                     : String(localized: "Choose one of the files the import takes.")))
             }
         }
         .padding(20)
@@ -117,9 +119,9 @@ struct HubSheet: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .disabled(!choosable)
         .opacity(choosable || v == nil ? 1 : 0.5)
-        .help(refusal(v) ?? f.path)
+        .help(f.path)
+        .unavailable(choosable ? nil : refusal(v) ?? String(localized: "Checking…"))
     }
 
     @ViewBuilder

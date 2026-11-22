@@ -270,6 +270,17 @@ extension LoRAStack {
         LowRank.padded(keys.map { landings(on: $0, modules: modules).reduce(0) { $0 + $1.module.rank } }.max() ?? 0)
     }
 
+    /// **The ranks a DiT's functions are written at**, by argument: each name of `products` (a block's, every block's;
+    /// an edge's, its own) at the rank over every product of that name (`rank(of:on:)`); none where nothing lands.
+    package func ranks(_ products: [LoRAProduct], on family: Family) -> [String: Int] {
+        guard !isEmpty else { return [:] }
+        let modules = Self.modules(of: family)
+        return Dictionary(grouping: products, by: \.name).compactMapValues { same in
+            let r = rank(of: same.map(\.key), modules: modules)
+            return r > 0 ? r : nil
+        }
+    }
+
     /// **The tensors of the factors** of `products` at their function's ranks (`ranks`, by the argument's name; a rank
     /// of 0 has none), for the stage's declaration (`Stage.Declaration.tensors`): `<prefix><name>_down` `[in, R]` and
     /// `<prefix><name>_up` `[R, out]` in `element`, `prefix` telling a layer's from another's.

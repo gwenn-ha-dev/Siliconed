@@ -1,5 +1,5 @@
-/// Reshape, slice, concat and tanh, each one primitive as SiliCore writes it (`CoreAIShapes.swift`,
-/// `CoreAIElementwise.swift`, aec8f3c), without the constant order of coreai-torch's references: a constant is
+/// Reshape, slice, concat and tanh, each one primitive as the former engine wrote it (`CoreAIShapes.swift`,
+/// `CoreAIElementwise.swift`, 0.21), without the constant order of coreai-torch's references: a constant is
 /// placed just before its op (valid MLIR, other bytes — the order matters to a byte comparison, not to Core AI).
 ///
 ///     reshape   primitive.reshape_v2 (shape: a ui32 constant)

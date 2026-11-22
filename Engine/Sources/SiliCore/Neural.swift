@@ -7,7 +7,9 @@ import Metal
 /// anywhere a function's graph shows it.
 ///
 ///     peak       max(max|t| along the last axis, 2⁻¹⁴), kept `[1, rows, 1]`: what brings a row to 1
-///     q64        x · (codes over 64) · 64 s: a `dequantize` by the constant 2⁻⁶, the scales after the sum
+///     q64        x · (codes over 64) · 64 s: a `dequantize` by the constant 2⁻⁶, the scales after the sum (W8A16)
+///     w8a8       x's rows brought to int8 by their peaks, int8 × int8 summed on the GPU, the sums · 64 s · peak (W8A8,
+///                `integer`: the GPU's only)
 ///     norm       u = t / peak, u · rsqrt(mean(u²) + (√eps / (peak · F))²): RMS of the true value t · F
 ///     rotation   ConvRot's Hadamard by groups of 256 as a product at rank 4, `[1, rows, n / 256, 256] · K`
 ///
@@ -15,102 +17,9 @@ import Metal
 /// ANE beside 1024 on the GPU): **the ANE takes the codes as its own int8 weights only from a `dequantize` by a scalar
 /// constant** — 7.6 TFLOP/s from the arena's `MTLBuffer` through a stream, 10.1 from IOSurfaces; the codes cast and
 /// multiplied by 2⁻⁶ run at 4.8 and 5.6, and a `dequantize` by a vector of scales falls whole to the GPU (wrong on the
-/// ANE besides, measured 12/11). Core AI's GPU runs q64 at its rate for today's form (22.1 ms for 22.0), nearer the
+/// ANE besides, measured 12/11). Core AI's GPU runs q64 at the rate of its f16 product (22.1 ms for 22.0), nearer the
 /// CPU (2.1e-4 for 3.0e-4: the scales multiply the sums, never a code), and both units compute at once (0.95 – 0.99 ×
-/// the longer alone). The codes as the file lays them, transposed in the function, cost the GPU 1.7 ×.
-/// **What the shared forms' products read**: ConvRot's int8 codes `[in, out]` and their scales (the Compact: the input
-/// rotated by groups of 256, `q64`), or f16 weights `[in, out]` (the Standard beside the ANE: the publisher's bf16 rounded
-/// once to f16 as they are read, `Recipe.halfTransposed`; the input as it is, `product16`). The ANE takes no bf16 at its
-/// borders (DONE, « L'ANE par Core AI »), so the Standard's rows there are f16 under the guard, the GPU's beside them the
-/// same functions on the same bytes: one copy of the weights. **bf16 → f16 is exact** within f16's normals (8 bits of
-/// significand into 11); measured 20/11/2026 on five published transformers (2 to 12.5 billion weights each): no weight
-/// past 65 504 (the largest 123), 0.03 to 0.72 % under 2⁻¹⁴, each rounded to f16's subnormals within 2⁻²⁵. The ANE
-/// flushes those: at most 5 · 10⁻⁶ of a product's energy (the product with the most under 2⁻¹⁴: 3.7 % of its weights).
-///
-/// **`integer`: the Compact's codes as the file lays them, `[1, out, in]`**, for a GPU whose tensor units multiply int8
-/// into int32 (`offered`): its products int8 × int8 (`w8a8`), the ANE's `q64` on the same codes transposed in the
-/// function. Measured 21/11/2026 on the M5 Pro, a product of 4128 rows: 4128 × 3840 → 10 240, 44.4 TFLOP/s against q64's
-/// 24.7; 4128 × 10 240 → 3840, 39.6 against 24.3; the ANE's q64 on the codes transposed 15.8 against 17.8 as they lie
-/// `[in, out]` (1024 rows × 3840 → 10 240). The codes in `[in, out]`, the same W8A8 runs at q64's rate: Core AI's GPU
-/// takes the integer product NT only.
-public enum SharedWeights: Sendable, Hashable {
-    case codes, integer, half
-
-    /// The weights are the Compact's int8 codes (`codes` or `integer`).
-    public var isCodes: Bool { self != .half }
-
-    /// How the plan lays a product's codes (`Block.Declaration.codes`).
-    public var layout: CodesLayout { self == .integer ? .outIn : .inOut }
-
-    /// **The weights this Mac's GPU is offered for the Compact's codes**, the first tried first: `integer` where its
-    /// product int8 × int8 was measured faster than `codes`' (`integerTrial`, kept by Mac and system:
-    /// `ThisMac.integerProducts`), then `codes`; `codes` alone elsewhere. Which of the two a block runs is then timed on
-    /// this Mac (`Block.choose`). No chip is named: Core AI's int8 kernel is fast where the GPU's tensor units multiply
-    /// int8 (the M5 Pro's, 21/11/2026), and may be on a GPU not known today, or be slow on one (MPS's fallback ran at
-    /// 0.3 TFLOP/s against 49, scales in f32); a block offered a slow product would spend a whole run finding out.
-    public static func offered(_ device: MTLDevice) async throws -> [SharedWeights] {
-        let ratio: Double
-        if let kept = ThisMac.current.integerProducts { ratio = kept } else {
-            ratio = try await integerTrial(device)
-            try ThisMac.update { $0.integerProducts = ratio }
-        }
-        return ratio < 1 ? [.integer, .codes] : [.codes]
-    }
-
-    /// **The trial**: one product of the shared forms, 2048 × 3840 → 3840 in f16 on the GPU, as `integer` (`w8a8`) and as
-    /// `codes` (`q64`), each called 2 times cold then 9 timed; the ratio of their medians, `integer`'s over `codes'`.
-    /// One square product: the same bytes serve both layouts, and what is timed is the kernel, not the values. The
-    /// shape: a call long enough on every GPU that its launch does not weigh (on the M5 Pro, about 1.3 ms against 2.5),
-    /// and an arena of 46 MiB taken and given back before any stage opens.
-    static func integerTrial(_ device: MTLDevice) async throws -> Double {
-        let (m, k) = (2048, 3840)
-        guard let queue = device.makeCommandQueue() else { throw Failure("no command queue") }
-        let stream = ComputeStream(commandQueue: queue)
-        let arena = try Arena(device, bytes: 2 * Arena.aligned(m * k * 2) + Arena.aligned(k * k) + Arena.aligned(k * 2))
-        let (xk, wk, sk, yk) = (arena.take(m * k * 2), arena.take(k * k), arena.take(k * 2), arena.take(m * k * 2))
-        // x = 1, the codes 1, their scales 1/1024: every sum 3840, nothing out of f16's range.
-        let x = arena.pointer(xk).bindMemory(to: UInt16.self, capacity: m * k), s = arena.pointer(sk).bindMemory(to: UInt16.self, capacity: k)
-        for i in 0..<m * k { x[i] = Float16(1).bitPattern }
-        for i in 0..<k { s[i] = Float16(1.0 / 1024).bitPattern }
-        memset(arena.pointer(wk), 1, k * k)
-        func view(_ key: Int, _ type: NDArray.ScalarType, _ shape: [Int]) -> View { View(buffer: arena.buffer(key), type: type, shape: shape) }
-        var medians: [Double] = []
-        for integer in [true, false] {
-            var mod = Aicode.Module(arguments: [("x", Aicode.tensor([1, m, k], .f16)), ("w", Aicode.tensor([1, k, k], .si8)),
-                                                ("w_scale", Aicode.tensor([1, 1, k], .f16))])
-            var c = Aicode.ScalingConstants()
-            let b = mod.body, (xa, wa, sa) = (mod.argument("x"), mod.argument("w"), mod.argument("w_scale"))
-            mod.outputs = [("y", integer ? b.w8a8(xa, codes: wa, scale: sa, constants: &c) : b.q64(xa, codes: wa, scale: sa, constants: &c))]
-            let f = try await Functions.load(try Functions.asset(mod, "integer-trial-\(integer ? "w8a8" : "q64")-\(m)x\(k)x\(k)"))
-            let inputs = ["x": view(xk, .float16, [1, m, k]), "w": view(wk, .int8, [1, k, k]), "w_scale": view(sk, .float16, [1, 1, k])]
-            var times: [Double] = []
-            for _ in 0..<11 {
-                let t = DispatchTime.now().uptimeNanoseconds
-                try await Run.call(f, stream, inputs: inputs, outputs: [("y", view(yk, .float16, [1, m, k]))])
-                times.append(Functions.seconds(since: t))
-            }
-            medians.append(times.dropFirst(2).sorted()[4])
-        }
-        return medians[0] / medians[1]
-    }
-
-    /// A product's arguments: the codes `[1, in, out]` (`[1, out, in]` for `integer`) and their scales `[1, 1, out]`,
-    /// or the f16 weight `[1, in, out]`.
-    public func arguments(_ name: String, inn: Int, out: Int) -> [(name: String, shape: [Int], element: Aicode.Element)] {
-        switch self {
-        case .codes: [(name, [1, inn, out], .si8), (name + "_scale", [1, 1, out], .f16)]
-        case .integer: [(name, [1, out, inn], .si8), (name + "_scale", [1, 1, out], .f16)]
-        case .half: [(name, [1, inn, out], .f16)]
-        }
-    }
-
-    /// A product's entry from its file's key (`<key>.weight`, `[out, in]`): its codes and scales (`Recipe.codes`, laid
-    /// by the plan's `layout`), or the weight rounded to f16 `[in, out]` (`Recipe.halfTransposed`).
-    public func entry(_ name: String, key: String) -> Weights.Entry {
-        isCodes ? (name, key, .codes) : (name, key + ".weight", .halfTransposed)
-    }
-}
-
+/// the longer alone). The codes as the file lays them, transposed in the function, cost q64 on the GPU 1.7 ×.
 extension Aicode.Block {
     /// `[1, rows, 1]`: each row's largest magnitude, f16's smallest normal at least.
     public func peak(_ t: Int) -> Int {
@@ -140,10 +49,13 @@ extension Aicode.Block {
     /// `dequantize` runs at 0.74 TFLOP/s and wrong (1.13 relative, measured 21/11/2026 on the M5 Pro), so the row's
     /// scale is taken out of the product and multiplied after: the same codes, the same sums. The sums stay in f16: each
     /// term within 2 (|code| / 127 ≤ 1, |code| / 64 ≤ 2), k · 2 at most. Scales in f32 take MPS's fallback (0.3 – 1.1
-    /// TFLOP/s): every one here is f16.
+    /// TFLOP/s): every one here is f16. **The row's peak at 127 · 2⁻¹⁴ at least**, not `peak`'s 2⁻¹⁴: its scale p / 127
+    /// then stays among f16's normals (2⁻¹⁴ / 127 is a subnormal, which a unit may flush to 0: a row of zeros quantized by
+    /// 0 / 0). A row whose peak lies under it takes fewer than 127 codes, its error still within half its scale.
     public func w8a8(_ x: Int, codes: Int, scale s: Int, constants: inout Aicode.ScalingConstants) -> Int {
         let shape = Aicode.shape(types[x]).shape, rows = shape[1], n = Aicode.shape(types[codes]).shape[1]
-        let p = peak(x)
+        precondition(2 * shape[2] <= 65504, "w8a8: \(shape[2]) inputs, past what f16's sums hold (each term within 2)")
+        let p = scale("maximum", reduceMax(primitive("abs", x), axes: [shape.count - 1]), 127 * 0x1p-14)
         let q = quantize(x, scale: reshape(scale("divide", p, 127), [rows]), axis: 1, constants: &constants)
         let xq = dequantize(q, scale: scalar(1.0 / 127, .f16), axis: 0, constants: &constants)
         let w = dequantize(codes, scale: scalar(1.0 / 64, .f16), axis: 0, constants: &constants)
@@ -200,14 +112,9 @@ extension Aicode.Block {
 
     /// ConvRot's rotation of `[1, rows, n]` by groups of 256, at rank 4: `[1, rows, n / 256, 256] · Kᵀ`, K's entries ±2⁻⁴.
     public func rotation(_ x: Int) -> Int {
-        let (shape, element) = Aicode.shape(types[x])
-        let m = 4, g = 1 << (2 * m)
-        let (order, entries) = Aicode.kronecker(Aicode.regular, m)
-        precondition(order == g && shape.count == 3 && shape[2] % g == 0, "rotation: \(shape) is not [1, rows, n] by groups of \(g)")
-        let one = Aicode.roundedScalar(Double(sign: .plus, exponent: -m, significand: 1), element)
-        let minus = Aicode.roundedScalar(-Double(sign: .plus, exponent: -m, significand: 1), element)
-        let bytes = (0..<g * g).flatMap { i in entries[(i % g) * g + i / g] > 0 ? one : minus }
-        let matrix = constant(Aicode.dense(bytes, splat: false), Aicode.tensor([g, g], element))
+        let (shape, element) = Aicode.shape(types[x]), g = Aicode.rotationGroup
+        precondition(shape.count == 3 && shape[2] % g == 0, "rotation: \(shape) is not [1, rows, n] by groups of \(g)")
+        let matrix = rotationMatrix(element)
         let grouped = [1, shape[1], shape[2] / g, g]
         return reshape(matmul(reshape(x, grouped), matrix, result: Aicode.tensor(grouped, element)), shape)
     }
@@ -234,9 +141,7 @@ extension Aicode.Block {
     }
 
     private func ranged16(_ t: Int, exponent e: Int) -> (unit: Int, factor: Int) {
-        let e = scale("minimum", scale("maximum", e, -13), 15)
-        func power(_ k: Int) -> Int { scale("pow", scale("maximum", k, 0), 2, scalarFirst: true) }
-        let f = binary(.divide, power(e), power(scale("mul", e, -1)))
+        let f = power16(scale("minimum", scale("maximum", e, -13), 15))
         return (binary(.divide, t, f), f)
     }
 
@@ -258,17 +163,5 @@ extension Aicode.Block {
         }
         let high = count(p, 0...15, shift: 0), low = count(scale("mul", p, 1024), -16 ... -1, shift: 10)
         return scale("sub", binary(.add, high, low), 17)
-    }
-}
-
-extension Aicode.Block {
-    /// The residual stream's update in f16 (the guard's `residual`): x̂ kept under X `[1, rows, 1]`, plus Δ a true value,
-    /// both brought to half the larger factor C = 2 · max(X, 4), summed, the sum brought back to [2¹³, 2¹⁴]: (x̂', C · F).
-    /// Every factor a power of two, every quotient exact; C past 2¹⁵ (a stream past 2²⁹) leaves f16.
-    public func residual16(_ x: Int, _ xf: Int, plus delta: Int) -> (value: Int, factor: Int) {
-        let c = scale("mul", scale("maximum", xf, 4), 2)
-        let sum = binary(.add, binary(.mul, x, binary(.divide, xf, c)), binary(.mul, delta, scale("divide", c, 1, scalarFirst: true)))
-        let (u, f) = ranged16(sum, under: 14)
-        return (u, binary(.mul, c, f))
     }
 }

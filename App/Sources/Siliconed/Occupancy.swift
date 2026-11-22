@@ -82,7 +82,7 @@ extension Library {
         let store = root.appendingPathComponent("store").path
         let published = Set(Family.allCases.flatMap { f in f.variants.flatMap { f.files($0) } }.map { map($0.place) })
         let configurations: Set<String> = ["dit.json", "transformer.json", "vae.json", "model_index.json", "scheduler.json"]
-        let components = Set(Family.allCases.map { store + "/composants/\($0.rawValue)" })
+        let components = Set(Family.allCases.map(self.components))
         let processors = Set(components.map { $0 + "/processor" })
         return Self.regularFiles(under: store).compactMap { file in
             let name = (file.path as NSString).lastPathComponent, folder = (file.path as NSString).deletingLastPathComponent

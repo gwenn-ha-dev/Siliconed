@@ -14,6 +14,7 @@
 //   other Mac); `enlarge` asks the other Mac, which enlarges its own pixels and says if it needs Apple's
 //   model (`--download` is the consent, as here). A cell's, a variation's or an enlargement's answer has
 //   the fields it has here, plus `computing_on`.
+// - `add` and `grid` fill the rack as a click would, and the canvas shows the series once published, as on this Mac.
 // - **Named subjects stay on this Mac** (`subjects` acts on them, mirrored or not; no refusal): a job
 //   that cites them goes with its rewrite and their framed pictures (`namedJob`, `RemoteJob.modelPrompt`).
 
@@ -136,7 +137,7 @@ extension RemoteControl {
             try createFolder(folder!)
         }
 
-        let firstNumber = d.seed ?? UInt64.random(in: 0...UInt64(UInt32.max))
+        let firstNumber = d.seed ?? Request.drawnSeed()
         let variants = alternatives.variants
         // Named subjects (they stay here): each expanded prompt rewritten — refused whole if one is —, and
         // a model that reads no images has none. A grid cites none, as here.
@@ -194,6 +195,8 @@ extension RemoteControl {
                 finish(c, ["ok": true, "jobs": added, "computing_on": mirror.macName])
             }
         }
+        // The canvas follows the render, as after « Generate ».
+        app.followsRender = true
         for (i, job) in jobs.enumerated() {
             do {
                 // An edit's own images decide the format; the subjects' pictures never do.
@@ -205,6 +208,9 @@ extension RemoteControl {
                 throw Refusal("ref", Problem(error).text)
             }
         }
+        // The form takes the request, as after a click, as `add` on this Mac does.
+        app.takeRequest(jobs[0].settings, prompt: prompt, references: references, start: nil, strength: nil,
+                        seed: firstNumber, fixed: d.seed != nil)
     }
 
     /// A LoRA of the other Mac, by the name `--lora` was given: its short name, its path, or its own name.
@@ -265,6 +271,12 @@ extension RemoteControl {
         } catch {
             throw Refusal("ref", Problem(error).text)
         }
+        // The form takes the grid, as after a click, and the canvas shows it once the other Mac publishes it
+        // (`MirrorLink.explore`), as `grid` on this Mac does.
+        app.takeRequest(settings, prompt: prompt, references: references, start: nil, strength: nil, seed: seed,
+                        fixed: d.seed != nil)
+        _ = app.setSeries(from: g)
+        app.followsRender = false
     }
 
     /// **`wait g2` and `grid --wait` on a mirror**: each cell's image as it comes (written into `folder` if given), then —

@@ -64,7 +64,6 @@ extension Runs {
         let xs = (0..<rows * k).map { _ in Float(Float16(Float(rng.next() * 2 - 1))) }
         let x = stage.pointer("x").bindMemory(to: Float16.self, capacity: rows * k)
         for i in xs.indices { x[i] = Float16(xs[i]) }
-        try stage.filled()
         // The function read from the stage at each call, never held here: a function holds its last call's buffers, the
         // stage's heap among them, until it is let go (`close`).
         let checked = 4

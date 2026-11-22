@@ -41,7 +41,7 @@ struct OtherMacsSection: View {
                     }
                 }
                 if let p = macs.lendingProblem {
-                    Text(verbatim: p).font(.caption).foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true)
+                    Text(verbatim: p).font(.caption).foregroundStyle(Palette.caution).fixedSize(horizontal: false, vertical: true)
                 }
             }
             if macs.lending {
@@ -117,7 +117,7 @@ struct OtherMacsSection: View {
     static func dot(_ s: RemoteLink.State?) -> Color {
         switch s {
         case .connected?: Palette.live
-        case .connecting?, .waiting?: .orange
+        case .connecting?, .waiting?: Palette.caution
         case .refused?: Palette.failure
         case nil, .off?: .secondary
         }

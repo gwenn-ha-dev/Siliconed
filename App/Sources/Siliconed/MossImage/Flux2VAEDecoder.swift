@@ -38,6 +38,10 @@ package final class Flux2VAEDecoder: LatentDecoder {
         return Flux2VAEDecoder(pass, narrowed: narrowed)
     }
 
+    package static func admit(path: String, latentHeight: Int, latentWidth: Int, budget: Int) throws {
+        try vae.admit(.decode, path: path, height: latentHeight, width: latentWidth, budget: budget)
+    }
+
     /// `[128, h, w]` f32 to `[3, 16h, 16w]` f32, clamped to [−1, 1].
     package func pixels(_ latent: [Float]) async throws -> [Float] { try await pass.decode(latent) }
 

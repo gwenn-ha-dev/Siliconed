@@ -14,6 +14,21 @@ final class FamilyFrontierTests: XCTestCase {
         return all.filter { $0.pathExtension == "swift" }
     }
 
+    /// **What lies outside the families' folders**: the interface, the library but the families' folders and the file
+    /// that declares their cases, and the command lines' modules (`silicontrol`, its help, `measure`) — the help's pages
+    /// alone exempt, a manual that names the models (what it says of them is held against their traits,
+    /// `HelpTraitsTests`).
+    private func outside() -> [URL] {
+        let folders = Set(Family.allCases.map { "\($0)".prefix(1).uppercased() + "\($0)".dropFirst() })
+        let library = swiftFiles(under: "Siliconed").filter { file in
+            file.lastPathComponent != "Family.swift" && folders.isDisjoint(with: file.pathComponents)
+        }
+        let pages: Set = ["HelpContract.swift", "HelpRender.swift", "HelpLibrary.swift", "HelpWriter.swift", "HelpSettings.swift"]
+        let tools = ["Silicontrol", "SilicontrolHelp", "Measurement"].flatMap(swiftFiles)
+            .filter { !pages.contains($0.lastPathComponent) }
+        return library + tools
+    }
+
     /// The code of the interface and of the library outside the families' folders names no family: neither a case of
     /// `Family`, nor a type of a family's folder, nor its identifier in a string. Comments may: they tell what was
     /// measured, on which model.
@@ -24,13 +39,7 @@ final class FamilyFrontierTests: XCTestCase {
         let pattern = #"\.("# + cases.joined(separator: "|") + #")\b|\b("# + types.joined(separator: "|") + #")[A-Z]\w*|"("#
             + ids.joined(separator: "|") + #")""#
         let regex = try NSRegularExpression(pattern: pattern)
-        let folders = Set(types)
-        // `Family.swift` is where the cases are declared; `Errors.swift` holds one sample of every error, with
-        // plausible model names in them.
-        let exempt: Set<String> = ["Family.swift", "Errors.swift"]
-        let files = swiftFiles(under: "SiliconedApp") + swiftFiles(under: "Siliconed").filter { file in
-            !exempt.contains(file.lastPathComponent) && folders.isDisjoint(with: file.pathComponents)
-        }
+        let files = swiftFiles(under: "SiliconedApp") + outside()
         XCTAssertGreaterThan(files.count, 100)
         var hits: [String] = []
         for file in files {
@@ -45,21 +54,19 @@ final class FamilyFrontierTests: XCTestCase {
         XCTAssertTrue(hits.isEmpty, hits.joined(separator: "\n"))
     }
 
-    /// **Nor its words**: no string of the interface writes a family's name, its model's or its license's, and none of the
-    /// library outside the families' folders writes its license's — what is said of a family, it declares
+    /// **Nor its words**: no string of the interface or of the command lines' modules writes a family's name, its model's
+    /// or its license's, and none of the library outside the families' folders writes its license's — what is said of a family, it declares
     /// (`FamilyPresentation`, `FamilyTraits`), and the interface reads it there. Compared without case: « Qwen-Image-2.1 » in a
     /// sentence is the identifier as much as a name.
     func testNoStringOutsideAFamilysFolderSaysItsNameOrLicense() throws {
         let licenses = Set(Family.allCases.map { $0.traits.card.license.text.lowercased() })
         let names = Set(Family.allCases.flatMap { f in [f.rawValue, f.traits.name, f.traits.card.name].map { $0.lowercased() } })
         let literal = try NSRegularExpression(pattern: #""(?:[^"\\]|\\.)*""#)
-        let folders = Set(Family.allCases.map { "\($0)".prefix(1).uppercased() + "\($0)".dropFirst() })
-        let exempt: Set<String> = ["Family.swift", "Errors.swift"]
-        let library = swiftFiles(under: "Siliconed").filter { file in
-            !exempt.contains(file.lastPathComponent) && folders.isDisjoint(with: file.pathComponents)
-        }
+        let all = outside()
+        let inLibrary = { (file: URL) in file.path.hasPrefix(Self.sources.appendingPathComponent("Siliconed").path + "/") }
+        let tools = all.filter { !inLibrary($0) }, library = all.filter(inLibrary)
         var hits: [String] = []
-        for (files, words) in [(swiftFiles(under: "SiliconedApp"), licenses.union(names)), (library, licenses)] {
+        for (files, words) in [(swiftFiles(under: "SiliconedApp") + tools, licenses.union(names)), (library, licenses)] {
             for file in files {
                 let text = try String(contentsOf: file, encoding: .utf8)
                 for (i, line) in text.split(separator: "\n", omittingEmptySubsequences: false).enumerated() {

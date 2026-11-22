@@ -23,65 +23,38 @@ import SiliCore
 /// An image to start from is encoded once, before the DiT's session comes (`FluxVAEEncoder`), and mixed with each
 /// seed's noise at the first step run.
 package enum ZImageRender {
-    static func render(_ request: Request, _ admitted: Admission, seeds: [UInt64], model: Model,
-                       cancellation: Cancellation?, emit: (Engine.Event) -> Void) throws -> [Engine.Render] {
-        try RenderLoop.run(try Parts(request, admitted, model: model), request, admitted, seeds: seeds, model: model,
-                           cancellation: cancellation, emit: emit)
-    }
-
     /// **Z-Image's part of the render** (`RenderLoop`): the chat template and Qwen3-4B's states, Flux's encoder for an
     /// image to start from, the DiT told the inverted time and its velocity negated, Flux's decoder.
     struct Parts: RenderParts {
         typealias Decoder = FluxVAEDecoder
-        private let request: Request, model: Model, admitted: Admission
-        private let text: ZImageTextModule, denoising: ZImageDenoisingModule
-        private let start: (image: ImageRGB, encoding: FluxEncodingModule)?
-        private let loras: LoRAStack
-        let decoderPath: String
+        private let inputs: RenderInputs<ZImageTextModule, ZImageDenoisingModule, FluxEncodingModule, FluxDecodingModule>
         private var ids: [Int] = [], caps: HostTensor?
 
-        init(_ request: Request, _ admitted: Admission, model: Model) throws {
-            let chain = model.chain
-            guard let text = chain.text as? ZImageTextModule, let denoising = chain.denoising as? ZImageDenoisingModule,
-                  let decoding = chain.decoding as? FluxDecodingModule else { throw EngineError.notOnEngine(model: model.identifier) }
-            if let image = request.image {
-                guard let encoding = chain.encoding as? FluxEncodingModule else { throw EngineError.notOnEngine(model: model.identifier) }
-                start = (image, encoding)
-            } else {
-                start = nil
-            }
-            // The LoRAs recognized before the first computation.
-            loras = try LoRAStack(request.loras, on: model.card.family)
-            (self.request, self.model, self.admitted, self.text, self.denoising) = (request, model, admitted, text, denoising)
-            decoderPath = decoding.path
-        }
+        init(_ request: Request, _ admitted: Admission, model: Model) throws { inputs = try RenderInputs(request, admitted, model: model) }
 
-        var encodes: Bool { start != nil }
+        var encodes: Bool { inputs.start != nil }
+        var decoderPath: String { inputs.decoding.path }
 
         mutating func tokens() throws -> Int {
-            let (ids, promptTokens) = try Tokenizer(directory: text.tokenizer).admitChat(user: request.prompt)
+            let (ids, promptTokens) = try Tokenizer(directory: inputs.text.tokenizer).admitChat(user: inputs.request.prompt)
             self.ids = ids
             return promptTokens
         }
 
         mutating func encode() throws -> Bool {
-            let (ids, map) = (ids, text.map)
+            let (ids, map) = (ids, inputs.text.map)
             var key = RenderCache.Key("ZImageRender.encode")
             try key.file(map)
             key.integers(ids)
-            let (caps, cached) = try RenderCache.conditioning(key, of: model) { try ZImageRender.encode(ids, map: map) }
+            let (caps, cached) = try RenderCache.conditioning(key, of: inputs.model) { try ZImageRender.encode(ids, map: map) }
             self.caps = caps
             return cached
         }
 
-        func image() throws -> Latent? {
-            guard let start else { return nil }
-            return Latent(space: denoising.space, height: admitted.height, width: admitted.width,
-                          values: try FluxVAEEncoder.latent(of: start.image, path: start.encoding.path))
-        }
+        func image() throws -> Latent? { try inputs.image { try FluxVAEEncoder.latent(of: $0, path: $1.path) } }
 
         func denoiser(height: Int, width: Int) throws -> any RenderDenoiser {
-            let dit = try Denoiser(map: denoising.map, loras: loras, latentHeight: height, latentWidth: width, capLength: ids.count)
+            let dit = try Denoiser(map: inputs.denoising.map, loras: inputs.loras, latentHeight: height, latentWidth: width, capLength: ids.count)
             dit.caps = caps
             return dit
         }
@@ -97,7 +70,7 @@ package enum ZImageRender {
 
     /// **The text**: the encoder over the real tokens, `hidden_states[-2]` back as bf16 values, `[L, 2560]`.
     package static func encode(_ ids: [Int], map path: String) throws -> HostTensor {
-        guard let caps = try Qwen3Encoder(config: .zImage, prefix: "model.", path: path).states(ids)["hidden"] else {
+        guard let caps = try Qwen3Encoder(config: .zImage, path: path).states(ids)["hidden"] else {
             throw ProgramError("the encoder gave no hidden states")
         }
         return caps
@@ -115,10 +88,8 @@ package enum ZImageRender {
             let file = try ZImageDiT.file(path)
             let geometry = try ZImageTransformer.Geometry(latentHeight: latentHeight, latentWidth: latentWidth, capLength: capLength)
             nonisolated(unsafe) let loras = loras
-            dit = try blocking { try await ZImageTransformer.open(file: file, geometry: geometry, neuralEngine: CoreAI.neuralEngineInForce, loras: loras) }
+            dit = try blocking { try await ZImageTransformer.open(file: file, geometry: geometry, loras: loras) }
         }
-
-        deinit { dit.close() }
 
         /// What the DiT is: its arithmetic and its plan under B.
         package var described: String { "\(dit.arithmetic), " + dit.stage.plan.line }
