@@ -243,7 +243,7 @@ struct SettingsView: View {
     /// **Neural Engine**: on, the engine gives the Neural Engine the work it does faster on this Mac, sizes that share and
     /// takes it back alone (`AppState.neuralEngine`); off, the GPU alone. Its results lie as close to their references either way.
     private var neuralEngineRow: some View {
-        SettingRow(Text("Neural Engine"), Text(app.neuralEngine ? "The engine gives it the work it does faster on this Mac." as LocalizedStringKey
+        SettingRow(Text("Neural Engine"), Text(app.neuralEngine ? "The engine gives the Neural Engine the work it does faster than the GPU on this Mac." as LocalizedStringKey
                                                                 : "The GPU alone: the Neural Engine stays idle.")) {
             IconTile(symbol: "cpu", color: Palette.live, side: 26)
         } trailing: {

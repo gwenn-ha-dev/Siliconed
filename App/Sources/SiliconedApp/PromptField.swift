@@ -100,8 +100,10 @@ struct PromptField: NSViewRepresentable {
 
         let scroll = NSScrollView()
         scroll.documentView = view
-        scroll.hasVerticalScroller = true
-        scroll.autohidesScrollers = true
+        // No scroller: the field is as tall as its text (`sizeThatFits`), the column scrolls. With legacy scrollers (a mouse,
+        // or « Show scroll bars: Always ») one appeared on a paste longer than the field, took its width from the text,
+        // which wrapped to more lines than measured and spilled below the box (issue 18).
+        scroll.hasVerticalScroller = false
         scroll.drawsBackground = false
         scroll.borderType = .noBorder
         view.string = text

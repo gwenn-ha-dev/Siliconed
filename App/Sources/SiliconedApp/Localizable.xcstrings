@@ -10351,7 +10351,7 @@
         }
       }
     },
-    "Choose one of the files the import takes." : {
+    "Choose one of the files the import accepts." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -34455,42 +34455,42 @@
         }
       }
     },
-    "The engine gives it the work it does faster on this Mac." : {
+    "The engine gives the Neural Engine the work it does faster than the GPU on this Mac." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Die Engine überlässt ihr die Arbeit, die sie auf diesem Mac schneller erledigt."
+            "value" : "Die Engine überlässt der Neural Engine die Arbeit, die sie auf diesem Mac schneller als die GPU erledigt."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "El motor le confía el trabajo que hace más rápido en este Mac."
+            "value" : "El motor confía al Neural Engine el trabajo que hace más rápido que la GPU en este Mac."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Le moteur lui confie le travail qu’il fait plus vite sur ce Mac."
+            "value" : "Le moteur confie au Neural Engine le travail qu’il fait plus vite que le GPU sur ce Mac."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Il motore gli affida il lavoro che svolge più in fretta su questo Mac."
+            "value" : "Il motore affida al Neural Engine il lavoro che svolge più in fretta della GPU su questo Mac."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "このMacでNeural Engineのほうが速い処理を、エンジンがNeural Engineに任せます。"
+            "value" : "このMacでGPUよりNeural Engineのほうが速い処理を、エンジンがNeural Engineに任せます。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "引擎把 Neural Engine 在这台 Mac 上做得更快的工作交给它。"
+            "value" : "引擎把 Neural Engine 在这台 Mac 上比 GPU 做得更快的工作交给它。"
           }
         }
       }

@@ -47,7 +47,7 @@ struct HubSheet: View {
                     .keyboardShortcut(.defaultAction).tint(Palette.control)
                     .unavailable(app.managementRefusal
                                  ?? (offer.map { AppState.HubOffer.choosable($0.choice?.verdict) } == true ? nil
-                                     : String(localized: "Choose one of the files the import takes.")))
+                                     : String(localized: "Choose one of the files the import accepts.")))
             }
         }
         .padding(20)
