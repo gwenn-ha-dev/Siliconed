@@ -4493,46 +4493,6 @@
         }
       }
     },
-    "--format expects a value" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "--format erwartet einen Wert"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "--format espera un valor"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "--format attend une valeur"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "--format richiede un valore"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "--format には値が必要です"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "--format 需要一个值"
-          }
-        }
-      }
-    },
     "--format expects png, jpeg or heic, not \"%@\"" : {
       "localizations" : {
         "de" : {
