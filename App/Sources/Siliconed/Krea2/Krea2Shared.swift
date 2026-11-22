@@ -9,7 +9,7 @@ import SiliCore
 ///
 ///     modulation   GPU    temb_mod + mod.lin: (1 + prescale), preshift, pregate, (1 + postscale), postshift, postgate,
 ///                         each `[1, 1, d]`, each an output (a surface of its own for the ANE)
-///     pre          both   n = RMS(x̂ · X) · (1 + γ₁) · s₁ + t₁, rotated, brought under 2^e₀ by F: q̂, k̂, v̂, ĝ = q64, and F
+///     pre          both   n = RMS(x̂ · X) · (1 + γ₁) · s₁ + t₁, rotated, brought under 2^e₀ by F: q̂, k̂, v̂, ĝ = the products, and F
 ///     heads        GPU    q, k: RMS_head(q̂, k̂) · (1 + γ) (eps / F²), RoPE in f32, heads first into the sequence's rows;
 ///                         v = v̂ · F; σ(ĝ · F) the attention's gate
 ///     attention    GPU    o = sdpa(q, K, V, mask) · σ, rows first, the four query heads of a key head one of 4r rows
@@ -25,8 +25,9 @@ import SiliCore
 /// are in the model's own basis) under the same factor F as the codes read it: the change lands in the result's units
 /// (`Aicode.Module.product`, the other shared forms').
 ///
-/// **Two weights** (`SharedWeights`): the Compact's codes, each product's input rotated (q64); the Standard's bf16
-/// rounded to f16 as they are read, the input as it is (`product16`) — the Standard beside the ANE.
+/// **Two weights** (`SharedWeights`): the Compact's codes, each product's input rotated, int8 × int8 on the GPU's codes
+/// by pieces `[p, out, in / p]` (`w8a8`) and q64 on the ANE's copy `[1, in, out]`; the Standard's bf16 rounded to f16 as
+/// they are read, the input as it is (`product16`), one product on both units — the Standard beside the ANE.
 enum Krea2Shared {
     typealias Argument = Krea2Functions.Argument
     static let d = Krea2Functions.d, hd = Krea2Functions.hd, heads = Krea2Functions.heads, kvHeads = Krea2Functions.kvHeads

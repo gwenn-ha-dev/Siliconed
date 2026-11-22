@@ -1,6 +1,6 @@
 import Foundation
 import Metal
-import SiliCore
+@testable import SiliCore
 import Testing
 
 /// **A stage's plan, on declarations written by hand**: a file of five groups that lay out alike (one used once, four in
@@ -199,6 +199,45 @@ import Testing
         #expect(lost.isEmpty, "\(lost.count) of 100 lost")
     }
 
+    /// **A stage closed with no call keeps no reading** (a render cancelled while its functions load, a refusal past
+    /// the opening): its key never read stays so, rekeyed or closed — what nothing called holds is no reading.
+    @Test func aStageNeverCalledKeepsNoReading() async throws {
+        guard let device = MTLCreateSystemDefaultDevice() else { return }
+        var d = StagePlans.declaration("never called")
+        d.functions = [:]
+        d.inFlight = 3
+        let plan = try Stage.plan(d, files: [StagePlans.file], budget: 1 << 40, floor: StagePlans.floor, depth: 2)
+        let footprint = StageSignals.Footprint()
+        let stage = try await Stage(device, plan: plan, files: [StagePlans.file], measured: ThisMac()) { footprint.bytes }
+        // Core AI's share read 10 MiB: the footprint past the floor and the arena.
+        let allocated = stage.arena.allocated
+        footprint.lock.withLock { (footprint.arena, footprint.start, footprint.base) = (stage.arena, allocated, StagePlans.floor + allocated + (10 << 20)) }
+        #expect(stage.rekey("never called, climbed", expects: 0))
+        stage.close()
+        #expect(ThisMac.current.reading(Stage.key(d)) == nil && ThisMac.current.reading("never called, climbed") == nil)
+        #expect(ThisMac.current.reserves?[Stage.key(d)] == nil)
+    }
+
+    /// **A stage called keeps its reading**, its key's from its opening to a climb; the climb's key, its functions never
+    /// called, none.
+    @Test func aStageCalledKeepsItsReading() async throws {
+        guard let device = MTLCreateSystemDefaultDevice() else { return }
+        var d = StagePlans.declaration("called")
+        d.functions = [:]
+        d.inFlight = 4
+        let plan = try Stage.plan(d, files: [StagePlans.file], budget: 1 << 40, floor: StagePlans.floor, depth: 2)
+        let footprint = StageSignals.Footprint()
+        let stage = try await Stage(device, plan: plan, files: [StagePlans.file], measured: ThisMac()) { footprint.bytes }
+        // Core AI's share read 10 MiB: the footprint past the floor and the arena.
+        let allocated = stage.arena.allocated
+        footprint.lock.withLock { (footprint.arena, footprint.start, footprint.base) = (stage.arena, allocated, StagePlans.floor + allocated + (10 << 20)) }
+        Stage.call(on: stage.stream)
+        #expect(stage.rekey("called, climbed", expects: 0))
+        stage.close()
+        #expect(ThisMac.current.reading(Stage.key(d)) == 10 << 20)
+        #expect(ThisMac.current.reading("called, climbed") == nil)
+    }
+
     @Test func whatThisMacMeasuredIsKeptBySystem() throws {
         try ThisMac.update { $0.neuralUnits = ["block k": 1024]; $0.readings = ["stage f": 42] }
         #expect(ThisMac.current.neuralUnits?["block k"] == 1024)
@@ -250,7 +289,7 @@ import Testing
     /// calls of 2112 rows 987 MiB from 1943 read over a call a pass, and they held 1589): bounded by the reading itself.
     @Test func aShorterFormIsNeverBelowATallerReading() throws {
         let e = Stage.estimates(extents: Self.forms, measured: Self.measured(["tall": 400 << 20]))
-        #expect(e == [.read(400 << 20), .scaled(Self.bound(400 << 20)), .scaled(Self.bound(400 << 20))])
+        #expect(e == [.read(400 << 20), .capped(Self.bound(400 << 20)), .capped(Self.bound(400 << 20))])
         // The tallest read does not hold, nor the bound of the others: B lowered under every form read, the soberest
         // never read goes as on a Mac with no reading, not a refusal (decided 22/11/2026).
         let socle = try Self.plans(1 << 40)[0].p, budget = socle + Stage.margin + (300 << 20)
@@ -264,6 +303,34 @@ import Testing
         let socle = try Self.plans(1 << 40)[0].p, budget = socle + Stage.margin + (50 << 20)
         let refusal = #expect(throws: OverBudget.self) { try Stage.choose(try Self.plans(budget), e) }
         #expect(refusal?.needed == socle + (100 << 20) + Stage.margin)
+    }
+
+    /// The readings of `forms` beside one of their kin at another size (`other`, calls of `rows` rows' elements).
+    static func measured(_ readings: [String: Int], other: (bytes: Int, rows: Int)) -> ThisMac {
+        var m = measured(readings)
+        m.readings = (m.readings ?? [:]).merging(["other size": other.bytes]) { $1 }
+        m.extents = (m.extents ?? [:]).merging(["other size": extent(other.rows)]) { $1 }
+        return m
+    }
+
+    /// **A bound from a form that holds no more** (`scaled`, a reading at another size times the ratio): a prediction —
+    /// past B, refused before the call, never taken on paper (the soberest's at a size larger than any read).
+    @Test func anExtrapolatedBoundPastBIsRefused() throws {
+        let e = Stage.estimates(extents: Self.forms, measured: Self.measured([:], other: (50 << 20, 512)))
+        #expect(e == [.scaled(Self.bound(400 << 20)), .scaled(Self.bound(200 << 20)), .scaled(Self.bound(100 << 20))])
+        let socle = try Self.plans(1 << 40)[0].p, budget = socle + Stage.margin + Self.bound(100 << 20) - (1 << 20)
+        let refusal = #expect(throws: OverBudget.self) { try Stage.choose(try Self.plans(budget), e) }
+        #expect(refusal?.needed == socle + Self.bound(100 << 20) + Stage.margin && refusal?.budget == budget)
+    }
+
+    /// **A sober form fused, the taller ones bounded from another size**: a form taller than one fused holds more than
+    /// it, and is never taken on paper — refused, the soberest's P its number.
+    @Test func aSoberFusedFormNeverTakesTheOneAbove() throws {
+        let e = Stage.estimates(extents: Self.forms, measured: Self.measured(["low": -1], other: (50 << 20, 512)))
+        #expect(e == [.scaled(Self.bound(400 << 20)), .scaled(Self.bound(200 << 20)), .fused])
+        let socle = try Self.plans(1 << 40)[0].p, budget = socle + Stage.margin + (50 << 20)
+        let refusal = #expect(throws: OverBudget.self) { try Stage.choose(try Self.plans(budget), e) }
+        #expect(refusal?.needed == socle + Stage.margin && refusal?.budget == budget)
     }
 
     /// Several read: a form's own reading; the others from the least of the bounds their kin's readings give.
@@ -307,6 +374,28 @@ import Testing
         #expect(m.reading("tall") == 500 << 20 && m.fusedBy?["tall"] == nil)
     }
 
+    /// **A mark holds under the B it was taken under, not a larger one** (decided 22/11/2026): the one thing kept that
+    /// depends on B. Under a larger B the form is tried once more, as never read; read there, the reading replaces the
+    /// mark; under the same or a smaller B, the mark holds and a reading leaves it. A mark with no B (a file written
+    /// before) holds under any.
+    @Test func aMarkHoldsUnderTheBItWasTakenUnder() throws {
+        var m = Self.measured(["low": 100 << 20])
+        m.fuse("tall", budget: 8 << 30)
+        #expect(m.fusedUnder?["tall"] == 8 << 30)
+        #expect(Stage.estimates(extents: Self.forms, measured: m, budget: 8 << 30)[0] == .fused)
+        #expect(Stage.estimates(extents: Self.forms, measured: m, budget: 6 << 30)[0] == .fused)
+        #expect(Stage.estimates(extents: Self.forms, measured: m)[0] == .fused, "no B: the mark holds")
+        #expect(Stage.estimates(extents: Self.forms, measured: m, budget: 12 << 30)[0] != .fused)
+
+        m.keep(reading: 50 << 20, under: "tall", budget: 8 << 30)
+        #expect(m.reading("tall") == -1, "under the same B, the mark outlives a reading")
+        m.keep(reading: 500 << 20, under: "tall", budget: 12 << 30)
+        #expect(m.reading("tall") == 500 << 20 && m.fusedBy?["tall"] == nil && m.fusedUnder?["tall"] == nil)
+
+        m.fuse("mid")
+        #expect(m.reading("mid", budget: 1 << 40) == -1, "a mark with no B holds under any")
+    }
+
     /// The engine is named by its binary: a UUID of 32 hexadecimal digits, read once.
     @Test func theEngineIsNamedByItsBinary() {
         #expect(ThisMac.engine.count == 32 && ThisMac.engine.allSatisfy(\.isHexDigit))
@@ -324,11 +413,14 @@ import Testing
         #expect(Stage.key(d) != one && Stage.key(d) == Stage.key([(asset: "f-1", unit: .gpu)], inFlight: 2))
     }
 
-    /// None read and the soberest fused: the soberest form never tried, not a refusal.
-    @Test func noneReadAndTheSoberestFusedTakesTheOneNeverTried() throws {
+    /// None read and the soberest fused: the forms above it never tried hold more than it — refused, the soberest's P
+    /// its number.
+    @Test func noneReadAndTheSoberestFusedIsRefused() throws {
+        let plans = try Self.plans(1 << 40)
         let e = Stage.estimates(extents: Self.forms, measured: Self.measured(["low": -1]))
         #expect(e == [.unknown, .unknown, .fused])
-        #expect(try Stage.choose(try Self.plans(1 << 40), e) == 1)
+        let refusal = #expect(throws: OverBudget.self) { try Stage.choose(plans, e) }
+        #expect(refusal?.needed == plans[2].p + Stage.margin && refusal?.budget == 1 << 40)
     }
 
     /// Every form fused: refused as a lack of memory, the soberest's P its number (the one a client says).
@@ -375,7 +467,15 @@ import Testing
     /// code) does not shrink with them.
     @Test func aSmallerFormIsNeverBelowTheReading() {
         let m = Self.measured(["1024": (100 << 20, Self.extent(1000, 2000))])
-        #expect(Stage.estimates(extents: [("512", Self.extent(500, 1000))], measured: m) == [.scaled(Self.bound(100 << 20))])
+        #expect(Stage.estimates(extents: [("512", Self.extent(500, 1000))], measured: m) == [.capped(Self.bound(100 << 20))])
+    }
+
+    /// **The least bound says its nature**: from a form that holds no more, a prediction (`scaled`); from one that holds
+    /// more, at most (`capped`).
+    @Test func theLeastBoundSaysItsNature() {
+        let m = Self.measured(["1024": (100 << 20, Self.extent(1000, 2000)), "1536": (110 << 20, Self.extent(1500, 2400))])
+        #expect(Stage.estimates(extents: [("1280", Self.extent(1250, 2000))], measured: m) == [.capped(Self.bound(110 << 20))])
+        #expect(Stage.estimates(extents: [("1024 again", Self.extent(1000, 2000))], measured: m) == [.scaled(Self.bound(100 << 20))])
     }
 
     /// Several readings of its kin: the least of their bounds.

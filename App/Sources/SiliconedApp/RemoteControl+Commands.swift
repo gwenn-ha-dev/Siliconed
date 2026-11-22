@@ -15,10 +15,12 @@ extension RemoteControl {
     /// anything is copied, so that a refusal — not a model nor a LoRA of a family, a model whose family is not
     /// installed — comes back as the command's failure and not as a sentence in a window nobody looks at.
     func importing(_ arguments: [String], cwd: String) throws -> [String: Any] {
-        guard !arguments.isEmpty, !arguments.contains(where: { $0.hasPrefix("--") }) else {
+        // A file whose name begins with `--` goes after a lone `--`.
+        let paths = try Self.flags(arguments).allWords
+        guard !paths.isEmpty else {
             throw Refusal("usage", String(localized: "import expects one or more .safetensors files"), help: "silicontrol help import")
         }
-        let urls = arguments.map { URL(fileURLWithPath: absolute($0, cwd)) }
+        let urls = paths.map { URL(fileURLWithPath: absolute($0, cwd)) }
         if let other = urls.first(where: { !AppState.importable($0) }) {
             throw Refusal("usage", String(localized: "not a .safetensors file: \(other.lastPathComponent)"), help: "silicontrol help import")
         }
@@ -51,16 +53,12 @@ extension RemoteControl {
     /// version: whole on disk beside the one rendered, the family renders with it at once, like
     /// « Switch to … » in the sheet; else its installation is offered.
     func install(_ arguments: [String]) throws -> [String: Any] {
-        let options = arguments.filter { $0.hasPrefix("--") }
-        let flags = Variant.allCases.map { "--" + $0.rawValue }
-        if let unknown = options.first(where: { !flags.contains($0) }) {
-            throw Refusal("usage", String(localized: "unknown flag: \(unknown)"), help: "silicontrol help install")
-        }
-        let named = Variant.allCases.filter { options.contains("--" + $0.rawValue) }
+        let flags = try Self.flags(arguments, switches: Set(Variant.allCases.map { "--" + $0.rawValue }))
+        let named = Variant.allCases.filter { flags.has("--" + $0.rawValue) }
         if named.count > 1 {
             throw Refusal("usage", String(localized: "one version at most: --standard or --compact"), help: "silicontrol help install")
         }
-        let ids = arguments.filter { !$0.hasPrefix("--") }
+        let ids = flags.allWords
         guard ids.count == 1, let id = ids.first else {
             throw Refusal("usage", String(localized: "install expects one model id"), help: "silicontrol models")
         }
@@ -175,7 +173,7 @@ extension RemoteControl {
 
     func cancel(_ arguments: [String]) throws -> [String: Any] {
         var stopped: String?, removedNames: [String] = [], alreadyFinished: [String] = []
-        let ordinals = try arguments.map { a -> Int in
+        let ordinals = try Self.flags(arguments).allWords.map { a -> Int in
             guard let n = Self.ordinal(a, prefix: "t") else { throw Refusal("usage", String(localized: "job expected (t3), not \"\(a)\"")) }
             return n
         }
@@ -209,7 +207,7 @@ extension RemoteControl {
     /// weighs (`CoreAI.compiled`, read off the main thread); `erase` has the engine erase it, as « Erase… » does, and
     /// answers once it is done — after the render under way, if one is.
     func compiled(_ arguments: [String], _ c: Connection) throws {
-        switch arguments {
+        switch try Self.flags(arguments).allWords {
         case []:
             Task { finish(c, ["ok": true, "compiled_bytes": await app.weighCompiled(), "erasing": app.erasingCompiled]) }
         case ["erase"]:

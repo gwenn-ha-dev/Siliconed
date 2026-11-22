@@ -8,7 +8,7 @@ import Testing
 /// The engine knows no word of a workload: a model writes its functions with the engine's tools, the engine holds the
 /// memory and the units.
 @Test func engineKnowsNoWorkload() throws {
-    let forbidden = #"\b(dit|diffusion|sigma|σ|timesteps?|prompts?|latents?|denois\w*|vae|lora|adapters?|images?|pixels?|videos?|texts?|tokens?|llm|captions?|samplers?|schedulers?|cfg|guidance|qwen\w*|krea\w*|anima|moss|flux|z-image|siliconed|velocit\w*|decoders?|z's|z at|z compact\w*)\b"#
+    let forbidden = #"\b(dit|diffusion|sigma|σ|timesteps?|prompts?|latents?|denois\w*|vae|lora|adapters?|images?|pixels?|videos?|texts?|tokens?|llm|captions?|samplers?|schedulers?|cfg|guidance|qwen\w*|krea\w*|anima|moss|flux|z-image|siliconed|velocit\w*|decoders?|decod(?:ed|ing)(?!:)|render\w*|famil\w*|z's|z at|z compact\w*)\b"#
     let regex = try NSRegularExpression(pattern: forbidden, options: [.caseInsensitive])
     let sources = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
         .appendingPathComponent("../../Sources/SiliCore").standardizedFileURL
@@ -140,8 +140,8 @@ extension Weights {
 /// wider), every row's piece i after every row's piece i − 1, the parts of a joined product side by side in each; the
 /// ANE's copy of them, `[k, out]`, the transpose of the file's rows (`Weights.transposedPieces`).
 @Test func theCodesLieByPiecesOfK() throws {
-    #expect(Weights.pieces(64) == (1, 64) && Weights.pieces(3) == (1, 3) && Weights.pieces(4096) == (1, 4096))
-    #expect(Weights.pieces(10240) == (4, 2560) && Weights.pieces(16384) == (4, 4096) && Weights.pieces(6912) == (2, 3456))
+    #expect(try Weights.pieces(64) == (1, 64) && Weights.pieces(3) == (1, 3) && Weights.pieces(4096) == (1, 4096))
+    #expect(try Weights.pieces(10240) == (4, 2560) && Weights.pieces(16384) == (4, 4096) && Weights.pieces(6912) == (2, 3456))
     let (a, b, inn) = (16, 32, 8192)
     func code(_ o: Int, _ i: Int) -> Int8 { Int8(truncatingIfNeeded: o &* 31 &+ i &* 7) }
     let path = try safetensors("pieces.safetensors", [
@@ -162,6 +162,23 @@ extension Weights {
     defer { copy.deallocate() }
     Weights.transposedPieces(w, count: 2, out: out, piece: 4096, into: copy)
     #expect((0..<inn * out).allSatisfy { j in copy[j] == code(j % out, j / out) })
+}
+
+/// **A file's codes no pieces cut are refused**: k past 4096 and no equal pieces of at most 4096 a multiple of 64 each
+/// (4100 = 4 · 5 · 5 · 41) — an error said at the layout, never the process stopped; bf16 weights of that k laid as
+/// they lie, which no piece reads.
+@Test func codesNoPiecesCutAreRefused() throws {
+    let (out, inn) = (2, 4100)
+    #expect(throws: Failure.self) { try Weights.pieces(inn) }
+    let path = try safetensors("uncut.safetensors", [
+        ("a.weight", "I8", [out, inn], [UInt8](repeating: 1, count: out * inn)),
+        ("a.weight_scale", "F32", [out, 1], bytes([Float](repeating: 0.01, count: out))),
+        ("b.weight", "BF16", [out, inn], bytes([UInt16](repeating: bf16(1), count: out * inn))),
+    ])
+    let file = try SafeTensors(path)
+    #expect(throws: Failure.self) { try Weights.layout([("w", "a", .codes)], in: file) }
+    #expect(throws: Failure.self) { try Weights.staging([("w", "a", .codes)], in: file) }
+    #expect(try Weights.layout([("w", "b", .product(joined: []))], in: file).map(\.shape) == [[out, inn]])
 }
 
 /// What a file's weights become in the arena by their recipes, from its header alone: codes transposed with their

@@ -115,9 +115,9 @@ package enum MossImageRender {
 }
 
 extension MossImageRender.Denoiser: RenderDenoiser {
-    /// The velocity itself, at the told timestep `σ·1000` (`MossImageSchedule.timesteps`): `scheduler.step` adds
+    /// The velocity itself, at the told timestep `σ·1000` (`MossImageSchedule.timestep`): `scheduler.step` adds
     /// `(σ_next − σ) · v`. Euler alone, so neither the solver nor the first step changes it.
     package func derivative(_ latent: [Float], sigma: Float, solver: Solver, first: Bool) throws -> [Float] {
-        try velocity(latent, time: sigma * Float(MossImageSchedule.trainTimesteps))
+        try velocity(latent, time: MossImageSchedule.timestep(sigma))
     }
 }

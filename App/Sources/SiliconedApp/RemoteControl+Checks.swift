@@ -9,7 +9,7 @@ import SilicontrolHelp
 
 extension RemoteControl {
     /// The flags of one command that the other does not take.
-    func checkUsage(_ d: RenderOrder, grid: Bool) throws {
+    func checkUsage(_ d: AddOrder, grid: Bool) throws {
         if !grid, d.x != nil || d.y != nil || !d.sheet {
             throw Refusal("usage", String(localized: "--x, --y and --no-sheet belong to “silicontrol grid”"), help: "silicontrol help grid")
         }
@@ -61,7 +61,7 @@ extension RemoteControl {
     }
 
     /// The stack as the rack allows it: `AppState.maxLoRA` at most, a negative strength only with its Beta option.
-    func checkLoRAs(_ d: RenderOrder) throws {
+    func checkLoRAs(_ d: AddOrder) throws {
         guard d.loras.count <= AppState.maxLoRA else {
             let n = d.loras.count, max = AppState.maxLoRA
             throw Refusal("lora", String(localized: "\(n) LoRAs: the app stacks \(max) at most"))

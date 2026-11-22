@@ -73,7 +73,7 @@ struct LabWriter: Sendable {
         // The writer's own sentence: the render's speaks of a size and of images. Where the Standard version's encoder
         // is the one that writes, its Compact version is the way under this Mac's budget (it writes under 10 GiB).
         case let EngineError.insufficientMemory(needed, budget):
-            // Within the limit: every form stopped the fuse (`Stage.choose`), the number known is a socle, not a need.
+            // Within the limit: the soberest form stopped the fuse (`Stage.choose`), the number known is a socle, not a need.
             let need = needed <= budget
                 ? String(localized: "The writer went past this Mac’s memory limit of \(Figures.memory(budget)) every time it was tried: it is refused.")
                 : String(localized: "The writer needs \(Figures.memory(needed)) of memory, more than this Mac’s limit of \(Figures.memory(budget)).")

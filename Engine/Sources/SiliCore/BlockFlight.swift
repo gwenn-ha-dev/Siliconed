@@ -206,7 +206,7 @@ extension Block {
         var measured = ThisMac.current
         measured.keep(reading: share, under: now.key)
         measured.extents = (measured.extents ?? [:]).merging([now.key: now.extent]) { $1 }
-        return Stage.estimates(extents: forms.map { ($0.key, $0.extent) }, measured: measured)
+        return Stage.estimates(extents: forms.map { ($0.key, $0.extent) }, measured: measured, budget: stage.plan.budget)
     }
 
     /// **The GPU's functions of the share now**, each built, named and loaded where it is not, the others let go once

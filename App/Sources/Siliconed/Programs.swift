@@ -152,15 +152,14 @@ package enum Arithmetic: Equatable, Sendable, CustomStringConvertible {
     /// alone, at its least share (the ANE then read the codes `[out, in]`, transposed at every call).
     package static func opened(codes: Bool, neuralEngine: Bool, _ declaration: (Arithmetic) -> Block.Declaration) throws -> Arithmetic {
         let a = of(codes: codes, neuralEngine: neuralEngine)
-        let alternatives: [Arithmetic]
-        if a == .shared(.codes, .inFlight) {
-            alternatives = [a, .shared(.codes, .gpu)]
-        } else if a == .shared(.half, .inFlight) {
-            alternatives = [a, .standard]
-        } else {
-            return a
+        let alone: Arithmetic
+        switch a {
+        case .shared(.codes, .inFlight): alone = .shared(.codes, .gpu)
+        case .shared(.half, .inFlight): alone = .standard
+        default: return a
         }
-        return alternatives.count == 1 ? alternatives[0] : alternatives[try Block.choose(alternatives.map { (declaration($0), $0.share) })]
+        let alternatives = [a, alone]
+        return alternatives[try Block.choose(alternatives.map { (declaration($0), $0.share) })]
     }
 
     /// **Whether a DiT's file holds the Compact's codes**: its product `marker` (a key of the file, `.weight` included)

@@ -14,9 +14,9 @@ public enum Weights {
             switch e.recipe {
             case .codes, .product:
                 let (_, out, inn, int8) = try product(e, in: file)
-                let (count, piece) = pieces(inn)
-                return int8 ? [(e.name, [count, out, piece], .int8, out * inn), (e.name + "_scale", [out], .float16, out * 2)]
-                    : [(e.name, [out, inn], .bfloat16, 2 * out * inn)]
+                guard int8 else { return [(e.name, [out, inn], .bfloat16, 2 * out * inn)] }
+                let (count, piece) = try pieces(inn)
+                return [(e.name, [count, out, piece], .int8, out * inn), (e.name + "_scale", [out], .float16, out * 2)]
             case .half, .float:
                 let t = try file.real(e.key), n = t.shape.reduce(1, *)
                 return e.recipe == .half ? [(e.name, t.shape, .float16, n * 2)] : [(e.name, t.shape, .float32, n * 4)]
@@ -57,20 +57,30 @@ public enum Weights {
     /// GPU without int8 units falls with k (22/11 on the M1 Pro, 4096 rows: 16 384 → 6144 at 2.17 TFLOP/s whole, 3.96 in
     /// pieces, q64 3.94; 10 240 → 3840 3.56 and 3.90; the M5 Pro 42.0 and 44.9 in pieces). The codes lie by these pieces
     /// (`layout`), each whole: x's pieces read as slices keep Core AI's fusion, the codes' as slices of their rows lose it
-    /// (≈ 24 TFLOP/s against 45 on the M5 Pro).
-    public static func pieces(_ k: Int) -> (count: Int, piece: Int) {
+    /// (≈ 24 TFLOP/s against 45 on the M5 Pro). A file's codes of a k no such pieces cut are refused, not read: a model
+    /// of other widths than its client's is a file's fault, said, never the worker stopped.
+    public static func pieces(_ k: Int) throws -> (count: Int, piece: Int) {
+        guard let p = cut(k) else { throw Failure("codes of \(k) inputs: no equal pieces of at most \(widest), a multiple of 64 each") }
+        return p
+    }
+
+    /// **The same for a function's arguments** (`codesShape`, the products' graphs), written at its client's own widths:
+    /// a k no pieces cut there is the client's fault, not a file's.
+    static func written(_ k: Int) -> (count: Int, piece: Int) {
+        guard let p = cut(k) else { preconditionFailure("a function of \(k) inputs: no equal pieces of at most \(widest), a multiple of 64 each") }
+        return p
+    }
+
+    private static func cut(_ k: Int) -> (count: Int, piece: Int)? {
         guard k > widest else { return (1, k) }
-        guard let count = ((k + widest - 1) / widest...(k / 64)).first(where: { k % $0 == 0 && (k / $0) % 64 == 0 }) else {
-            preconditionFailure("k = \(k): no equal pieces of at most \(widest), a multiple of 64 each")
-        }
-        return (count, k / count)
+        return ((k + widest - 1) / widest...(k / 64)).first(where: { k % $0 == 0 && (k / $0) % 64 == 0 }).map { ($0, k / $0) }
     }
 
     static let widest = 4096
 
     /// The shape a product's codes `[out, in]` take in the arena, and their argument: `[p, out, in / p]` (`pieces`).
     public static func codesShape(inn: Int, out: Int) -> [Int] {
-        let (count, piece) = pieces(inn)
+        let (count, piece) = written(inn)
         return [count, out, piece]
     }
 
@@ -82,7 +92,7 @@ public enum Weights {
             case .codes, .product:
                 let (parts, _, inn, int8) = try product(e, in: file)
                 // A part cut in pieces through the staging; the scales through it.
-                let transposed = int8 && pieces(inn).count > 1
+                let transposed = try int8 && pieces(inn).count > 1
                 return try parts.map { key, t in
                     let s = int8 ? try scales(key, in: file, out: t.shape[0]) : nil
                     return max(transposed ? t.end - t.start : 0, s.map { $0.end - $0.start } ?? 0)
@@ -119,7 +129,7 @@ public enum Weights {
             switch e.recipe {
             case .codes, .product:
                 let (parts, total, inn, int8) = try product(e, in: file)
-                let (count, piece) = pieces(inn)
+                let (count, piece) = int8 ? try pieces(inn) : (1, inn)
                 let to = place(e.name, int8 ? [count, total, piece] : [total, inn])
                 var column = 0
                 for (key, t) in parts {

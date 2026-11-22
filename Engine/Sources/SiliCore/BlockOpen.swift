@@ -13,6 +13,23 @@ extension Block {
         try await opened(device, d, files: files, budget: budget, share: share, measured: measured, trying: true)
     }
 
+    /// **The edges' functions**, each the GPU's or the ANE's (`Declaration.neuralEdges`). An edge of the ANE's reads no
+    /// codes: the ANE reads codes `[1, in, out]` from their copy only, which the engine makes for the steps of a shared
+    /// form (`places`, `copy`), never for an edge — bound to the codes themselves, `[p, out, in / p]`, it would stop at
+    /// a surface of another shape (`Run.neural`) or read W transposed. Refused here, before anything is placed.
+    static func edges(_ d: Declaration) throws -> [String: (module: Aicode.Module, unit: ComputeUnitKind)] {
+        var modules: [String: (module: Aicode.Module, unit: ComputeUnitKind)] = [:]
+        for (name, build) in d.edges {
+            let neural = d.neuralEdges.contains(name)
+            let m = try build(Build(rows: 0, neural: neural))
+            if neural, let codes = Signature(m).inputs.first(where: { $0.2 == .int8 }) {
+                throw Failure("\(d.name): edge \(name) of the ANE's reads the codes \(codes.0), which the ANE reads only from a shared form's copy")
+            }
+            modules[edge(name)] = (m, neural ? .neuralEngine : .gpu)
+        }
+        return modules
+    }
+
     /// `trying`: the unit under trial where this Mac decided none (`UnitTrial`) — false where the plan with both units'
     /// surfaces does not hold under B: the block then runs at the first candidate, the trial left to a block that fits.
     private static func opened(_ device: MTLDevice, _ d: Declaration, files: [SafeTensors], budget: Int, share: Share,
@@ -53,10 +70,7 @@ extension Block {
                 for s in f.steps where s.unit == .either { modules[neural(f.name, s.name, u)] = (try f.module(s.name, Build(rows: u, neural: true)), .neuralEngine) }
             }
         }
-        for (name, build) in d.edges {
-            let neural = d.neuralEdges.contains(name)
-            modules[edge(name)] = (try build(Build(rows: 0, neural: neural)), neural ? .neuralEngine : .gpu)
-        }
+        modules.merge(try edges(d)) { $1 }
         var assets: [String: String] = [:]
         for (name, m) in modules { assets[name] = try Functions.named(m.module, prefix: "block") }
 
@@ -114,12 +128,12 @@ extension Block {
             if trial != nil { return try await opened(device, d, files: files, budget: budget, share: share, measured: measured, trying: false) }
             throw refusal!
         }
-        let estimates = Stage.estimates(extents: heights.map { ($0.key, $0.extent) }, measured: measured)
+        let estimates = Stage.estimates(extents: heights.map { ($0.key, $0.extent) }, measured: measured, budget: budget)
         let height = try Stage.choose(plans, estimates)
         signatures = modules.mapValues { Signature($0.module) }
         let named = Functions.seconds(since: began)
         let stage = try await Stage(device, plan: plans[height], files: files, measured: measured)
-        // Timed where it runs as a render would: not under a control's share, nor tapped.
+        // Timed where it runs as its client's loop runs it: not under a control's share, nor tapped.
         let told: Bool = if case .told = share { true } else { false }
         let pace = told || d.tapped ? "" : try paceKey(d)
         let block = Block(d, stage: stage, heights: heights, height: height, unit: unit, total: total, units: units, share: share, key: key,

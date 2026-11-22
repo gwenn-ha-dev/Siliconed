@@ -203,7 +203,10 @@ package enum RenderLoop {
         let (height, width, steps, tokens) = (admitted.height, admitted.width, admitted.steps, kept.tokens)
         var left = kept
         let pending = kept.images
-        guard let first = pending.first else { throw EngineError.nonFiniteImage(stage: .decoding) }
+        // Never empty: `run` decodes only once a latent came out finite, and the worker hands a render on to the next
+        // worker only while its file still holds a latent (`EngineWorker.Pending.handedOn`).
+        precondition(!pending.isEmpty, "a decoding with no latent to decode")
+        let first = pending[0]
 
         // Announced before its session is planned: the plan's seconds are the first image's decoding.
         try cancellation.check()

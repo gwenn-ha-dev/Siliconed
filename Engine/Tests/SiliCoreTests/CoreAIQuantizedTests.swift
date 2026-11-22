@@ -26,7 +26,6 @@ private func quantizedReference(_ name: String) -> [UInt8] {
         case "row": (0, [shape[0]])
         case "tensor": (0, [1])
         case "tensor0d": (0, [])
-        case "axis1": (1, [shape[1]])
         case "axis2": (2, [shape[2]])
         default: preconditionFailure(name)
         }
@@ -43,40 +42,16 @@ private func quantizedReference(_ name: String) -> [UInt8] {
         return module([("x", dims, e), ("x_scale", s, e)], output: "dequantize") {
             $0.dequantize($0.quantize(0, scale: 1, axis: axis, constants: &constants), scale: 1, axis: axis, constants: &constants)
         }
-    case "product":
-        let (m, k, n) = (dims[0], dims[1], dims[2])
-        let (axis, s) = scales([k, n])
-        return module([("x", [m, k], e), ("w", [k, n], .si8), ("w_scale", s, e)], output: "mm") {
-            $0.matmul(0, $0.dequantize(1, scale: 2, axis: axis, constants: &constants), result: T([m, n], e))
-        }
-    case "linear":
-        // coreai-torch creates the permutation before the dequantize's constants; the engine's core, where it transposes.
-        let (m, k, n) = (dims[0], dims[1], dims[2])
-        return module([("x", [m, k], e), ("w", [n, k], .si8), ("w_scale", [n], e)], output: "mm") { b in
-            let p = b.constant(Aicode.dense([UInt32(1), 0]), T([2], .ui32))
-            let w = b.dequantize(1, scale: 2, axis: 0, constants: &constants)
-            let t = b.add(Aicode.Op("primitive.transpose_v1", operands: [w, p], results: [T([k, n], e)]))[0]
-            return b.matmul(0, t, result: T([m, n], e))
-        }
-    case "pair":
-        let (m, k, n) = (dims[0], dims[1], dims[2])
-        return module([("x", [m, k], e), ("w1", [k, n], .si8), ("w1_scale", [n], e), ("w2", [k, n], .si8), ("w2_scale", [n], e)], output: "mul") { b in
-            let first = b.matmul(0, b.dequantize(1, scale: 2, axis: 1, constants: &constants), result: T([m, n], e))
-            let second = b.matmul(0, b.dequantize(3, scale: 4, axis: 1, constants: &constants), result: T([m, n], e))
-            return b.binary(.mul, first, second)
-        }
     default: preconditionFailure(name)
     }
 }
 
-/// The references' names carry what they vary: `<op>_<group>_<element>_<dims>`; `product`/`linear`/`pair` are `m_k_n`.
+/// The references' names carry what they vary: `<op>_<group>_<element>_<dims>`. A dequantize by one scale only, as the
+/// engine writes it (`Aicode.Block.dequantize`); a quantize by one or a vector.
 @Test(arguments: coreAIQuantizedReferences.keys.sorted())
 func coreAIQuantizedBytecodeEqualsTheReference(_ name: String) throws {
-    var key = name
-    // `linear_row_f16_3_5_7` and `pair_f16_3_5_7` carry no group.
-    if name.hasPrefix("pair_") { key = name.replacingOccurrences(of: "pair_", with: "pair_col_") }
     let expected = [UInt8](Data(base64Encoded: coreAIQuantizedReferences[name]!)!)
-    let written = quantizedReference(key)
+    let written = quantizedReference(name)
     let first = (0..<min(expected.count, written.count)).first { expected[$0] != written[$0] } ?? min(expected.count, written.count)
     #expect(written == expected, "\(name): \(written.count) bytes against \(expected.count), first difference at \(first)")
 }

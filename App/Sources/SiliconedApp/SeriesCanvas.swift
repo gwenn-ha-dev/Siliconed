@@ -114,10 +114,10 @@ extension AppState {
         delete(history.filter { ids.contains($0.id) })
     }
 
-    /// Whether the shown series' cells follow the window: ⌘0 has nothing to give back (nor before its grid is laid out).
-    var seriesFollowsWindow: Bool {
+    /// Whether the shown series' cells fill the window: ⌘0 has nothing to give back (nor before its grid is laid out).
+    var seriesFillsWindow: Bool {
         guard let f = seriesFit, f.run == shownSeries else { return true }
-        return f.follows(exploreCellSide)
+        return !f.restores(exploreCellSide)
     }
 
     /// **⌘0 on a series' grid**: its cells take the size that fills the canvas, and follow the window again.

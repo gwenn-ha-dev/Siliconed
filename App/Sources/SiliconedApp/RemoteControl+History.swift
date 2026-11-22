@@ -10,7 +10,9 @@ import SilicontrolHelp
 extension RemoteControl {
     func history(_ arguments: [String]) throws -> [String: Any] {
         var n = Int.max
-        if let a = arguments.first {
+        let words = try Self.flags(arguments).allWords
+        guard words.count <= 1 else { throw Refusal("usage", "history [N]") }
+        if let a = words.first {
             guard let v = Int(a), v >= 1 else { throw Refusal("usage", String(localized: "history [N]: N an integer ≥ 1, not \"\(a)\"")) }
             n = v
         }
@@ -21,17 +23,16 @@ extension RemoteControl {
     /// file's extension (.png, .jpg/.jpeg, .heic), as the panel's Format pop-up does; into a folder, each image under its export name, in `--format`
     /// (PNG by default). Only PNG keeps the prompt, the seed and the model.
     func save(_ arguments: [String], cwd: String) throws -> [String: Any] {
-        var arguments = arguments
+        // A file or a folder whose name begins with `--` goes after a lone `--`.
+        let flags = try Self.flags(arguments, valued: ["--format"])
         var kind = ExportFormat.png
-        if let i = arguments.firstIndex(of: "--format") {
-            guard i + 1 < arguments.count else { throw Refusal("usage", String(localized: "--format expects a value")) }
-            guard let k = ExportFormat(extension: arguments[i + 1]) else {
-                let v = arguments[i + 1]
+        if let v = flags.value("--format") {
+            guard let k = ExportFormat(extension: v) else {
                 throw Refusal("usage", String(localized: "--format expects png, jpeg or heic, not \"\(v)\""))
             }
             kind = k
-            arguments.removeSubrange(i...(i + 1))
         }
+        let arguments = flags.allWords
         guard arguments.count >= 2, let destination = arguments.last else {
             throw Refusal("usage", "save <i7> [i8 …] <file.png|file.jpg|file.heic|folder> [--format png|jpeg|heic]")
         }
@@ -78,34 +79,27 @@ extension RemoteControl {
 
     /// What `vary` is asked: the image, the amount, how many — read the same on this Mac and on a mirror.
     func varyRequest(_ arguments: [String]) throws -> (entry: Entry, amount: Variation.Amount, count: Int) {
+        let flags = try Self.flags(arguments, valued: ["--batch"])
         var count = app.batch
-        var rest = arguments
-        if rest.count == 4, rest[2] == "--batch" {
-            guard let n = Int(rest[3]), (1...8).contains(n) else {
-                throw Refusal("usage", String(localized: "--batch expects an integer from 1 to 8, not \"\(rest[3])\""))
+        if let v = flags.value("--batch") {
+            guard let n = Int(v), AddOrder.batches.contains(n) else {
+                throw Refusal("usage", String(localized: "--batch expects an integer from 1 to 8, not \"\(v)\""))
             }
             count = n
-            rest.removeLast(2)
         }
-        guard rest.count == 2, let amount = Variation.Amount(rawValue: rest[1]) else {
+        let words = flags.allWords
+        guard words.count == 2, let amount = Variation.Amount(rawValue: words[1]) else {
             throw Refusal("usage", "vary <i7> subtle|strong [--batch N]")
         }
-        let arguments = rest
-        guard let e = image(arguments[0]) else {
-            throw Refusal("unknown_image", String(localized: "no image \"\(arguments[0])\" in the history"), help: "silicontrol history")
+        guard let e = image(words[0]) else {
+            throw Refusal("unknown_image", String(localized: "no image \"\(words[0])\" in the history"), help: "silicontrol history")
         }
         return (e, amount, count)
     }
 
     /// `enlarge i7 [--download]`: « Enlarge ×4 », answered once the enlarged image is in the history.
     func enlarge(_ arguments: [String], _ c: Connection) throws {
-        guard (1...2).contains(arguments.count), arguments.count == 1 || arguments[1] == "--download" else {
-            throw Refusal("usage", "enlarge <i7> [--download]")
-        }
-        guard let e = image(arguments[0]) else {
-            throw Refusal("unknown_image", String(localized: "no image \"\(arguments[0])\" in the history"), help: "silicontrol history")
-        }
-        let download = arguments.count == 2
+        let (e, download) = try enlargeRequest(arguments)
         Task {
             do {
                 let result = try await app.enlarged(e, download: download)
@@ -122,6 +116,16 @@ extension RemoteControl {
                 finish(c, Response.failure("internal", String(localized: "This image could not be enlarged")))
             }
         }
+    }
+
+    /// What `enlarge` is asked: the image, and whether macOS may download its model — read the same on this Mac and on a mirror.
+    func enlargeRequest(_ arguments: [String]) throws -> (entry: Entry, download: Bool) {
+        let flags = try Self.flags(arguments, switches: ["--download"])
+        guard flags.allWords.count == 1, let name = flags.allWords.first else { throw Refusal("usage", "enlarge <i7> [--download]") }
+        guard let e = image(name) else {
+            throw Refusal("unknown_image", String(localized: "no image \"\(name)\" in the history"), help: "silicontrol history")
+        }
+        return (e, flags.has("--download"))
     }
 
     // ── Tools ──

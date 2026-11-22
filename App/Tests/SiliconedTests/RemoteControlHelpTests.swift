@@ -44,6 +44,16 @@ final class RemoteControlHelpTests: XCTestCase {
         }
     }
 
+    /// **After a lone `--`, `--help` and `-h` are words** — a prompt's —; before it, they ask for the command's page.
+    func testHelpIsAskedBeforeTheLoneSeparatorOnly() {
+        let pages = RemoteControlHelp.english
+        for argv in [["add", "--", "-h"], ["add", "--", "--help"], ["add", "--wait", "--", "a cat", "-h"], ["rewrite", "--", "--help me"]] {
+            XCTAssertNil(RemoteControlHelp.answer(argv, pages), "\(argv)")
+        }
+        XCTAssertEqual(RemoteControlHelp.answer(["add", "-h", "--", "a cat"], pages)?["help"] as? String, pages.pages["add"])
+        XCTAssertEqual(RemoteControlHelp.answer(["add", "a cat", "--help"], pages)?["help"] as? String, pages.pages["add"])
+    }
+
     /// **What the app refuses is documented**: no render during an installation — `add`,
     /// `grid` and `vary` list `busy` among their failures — and `install` names the versions' flags.
     func testTheRefusalsOfC2bAreDocumented() {

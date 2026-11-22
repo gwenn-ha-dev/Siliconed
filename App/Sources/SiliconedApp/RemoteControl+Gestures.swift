@@ -18,7 +18,9 @@ extension RemoteControl {
         case .success(let order): return order
         case .failure(.usage(let line)): throw Refusal("usage", line, help: "silicontrol help \(command)")
         case .failure(.unknownFlag(let flag)):
-            throw Refusal("usage", String(localized: "unknown flag: \(flag)"), help: "silicontrol help \(command)")
+            // `lab text` takes a text, which may begin with `--`.
+            let text = command == "lab" && arguments.first == "text"
+            throw Self.unknownFlag(flag, text: text)
         case .failure(.flagWithoutValue(let flag)): throw Refusal("usage", String(localized: "\(flag) expects a value"))
         case .failure(.badValue(let what, let value)):
             switch what {

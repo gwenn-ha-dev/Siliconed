@@ -1,16 +1,16 @@
 /// **The ANE's unit, decided once** (`Block.settle`, `ThisMac.neuralUnits`): the unit a share is counted in is one of
 /// `candidates`, and no formula predicts which is faster on a Mac — a call's own cost and the finer rounding of the share
 /// pull the other way, by 0.4 % to 8 % a cycle, by the model and the Mac. So the block that first
-/// finds its key undecided runs its cycles at each candidate in turn, in its own render (which compiles anyway), and keeps
+/// finds its key undecided runs its cycles at each candidate in turn, in its own run (whose functions are specialized anyway), and keeps
 /// the unit of the faster cycle for good.
 ///
 /// **A unit's cycles**: the first is cold — its functions are specialized at their first call, which no later cycle pays —
 /// and left out; the `measured` cycles after it are compared, each unit by its best share predicted (`Best`) — a unit is
 /// worth what it does at its own best share, which a cycle run at the other's does not show.
-/// One measured cycle: a render has few cycles (8 for most families), the
-/// trial takes `candidates.count × (1 + measured)` of them — 4 — and the render goes on at the winner for the rest, where
+/// One measured cycle: a block's client runs few cycles (8 for most of today's), the
+/// trial takes `candidates.count × (1 + measured)` of them — 4 — and the run goes on at the winner for the rest, where
 /// its pace (`ThisMac.paces`) is taken from a block's fourth cycle at the kept unit on. More measured cycles would
-/// compare more fairly and leave a render of 8 steps too few at the winner to time it. A unit's cold cycle moves
+/// compare more fairly and leave a run of 8 cycles too few at the winner to time it. A unit's cold cycle moves
 /// no share; its measured cycle runs at the share the unit before predicted best, rounded to its own units, and tells
 /// what its own best share would do.
 struct UnitTrial: Equatable, Sendable {

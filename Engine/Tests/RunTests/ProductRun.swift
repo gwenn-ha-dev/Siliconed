@@ -81,7 +81,7 @@ extension Runs {
         let arena = try Arena(bench.device, bytes: Arena.aligned(rows * k * 2) + Arena.aligned(n * k) + Arena.aligned(n * 2) + Arena.aligned(rows * n * 2))
         let (xk, wk, sk, yk) = (arena.take(rows * k * 2), arena.take(n * k), arena.take(n * 2), arena.take(rows * n * 2))
         let xs = arena.write(x, at: xk), ss = arena.write(scales, at: sk)
-        let (count, piece) = Weights.pieces(k)
+        let (count, piece) = try Weights.pieces(k)
         var pieced = [Int8](repeating: 0, count: n * k)
         for p in 0..<count { for o in 0..<n { for i in 0..<piece { pieced[(p * n + o) * piece + i] = codes[o * k + p * piece + i] } } }
         arena.write(codes: pieced, at: wk)

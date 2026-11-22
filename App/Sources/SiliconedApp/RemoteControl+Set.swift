@@ -17,6 +17,7 @@ extension RemoteControl {
         switch SetOrder.parse(arguments) {
         case .success(let parsed): order = parsed
         case .failure(.usage(let line)): throw Refusal("usage", line, help: "silicontrol help set")
+        case .failure(.unknownFlag(let flag)): throw Self.unknownFlag(flag, text: false)
         case .failure(.unknownBeta(let name)):
             throw Refusal("usage", String(localized: "unknown Beta option: \"\(name)\""),
                           help: String(localized: "Beta options: \(BetaOption.names)"))

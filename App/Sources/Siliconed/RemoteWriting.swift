@@ -204,6 +204,9 @@ package enum SetOrder: Equatable, Sendable {
         /// The associated value is the usage line of the subcommand, or all of `set`'s.
         case usage(String)
         case unknownBeta(String)
+        /// `set` takes no flag: a word of two dashes is refused, by name — a folder whose name begins with `--` goes after a
+        /// lone `--` (`set save-images -- --renders`).
+        case unknownFlag(String)
     }
 
     /// Each subcommand's usage, in the order `help set` gives them.
@@ -232,8 +235,13 @@ package enum SetOrder: Equatable, Sendable {
     }
 
     package static func parse(_ arguments: [String]) -> Result<SetOrder, Failure> {
-        guard let what = arguments.first else { return .failure(.usage(usage)) }
-        let rest = Array(arguments.dropFirst())
+        let words: [String]
+        switch Flags.scan(arguments) {
+        case .success(let f): words = f.allWords
+        case .failure(.unknownFlag(let flag)), .failure(.flagWithoutValue(let flag)): return .failure(.unknownFlag(flag))
+        }
+        guard let what = words.first else { return .failure(.usage(usage)) }
+        let rest = Array(words.dropFirst())
         let refused = Result<SetOrder, Failure>.failure(.usage(usage(of: what)))
         switch what {
         case "beta":

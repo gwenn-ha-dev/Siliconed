@@ -115,7 +115,7 @@ enum ZImageStages {
 
     static let blockLoRA = Stage(
         model: model, name: "block-lora",
-        proves: "each block function's low-rank path (a LoRA beside each product) against the CPU, product by product, on layer 0 over the oracle's stream; with --variant compact, the Compact's shared forms, the ANE's against the GPU's; under --neural-engine on, the Standard's shared forms in f16 too",
+        proves: "each block function's low-rank path (a LoRA beside each product) against the CPU, product by product, on the render's layer 0 over the oracle's stream; with --variant compact, the Compact's shared forms; under --neural-engine on, the Standard's shared forms in f16 too, and the shared forms' ANE steps against the GPU's (the ANE's share told, as a render takes it)",
         options: ["--map", "--variant"],
         oracle: "tools/oracle/z-image.py dit --size {size}; with --variant compact, dit --variant compact (the inputs only)", weights: ["DiT"],
         rule: "each change (with its factors less without) against the CPU's x · down · up: ≤ 4 · 2⁻⁸ in bf16, ≤ 4 · 2⁻¹¹ in f16 (the result's and the path's roundings, the change as large as the result); each product's input and each function with every factor zero the same bits as without; on the ANE, the adapted function against the GPU's ≤ 2 × the same without + 2⁻⁹"
@@ -124,10 +124,12 @@ enum ZImageStages {
         let report = Report(title: "\(model) block-lora\(compact ? " compact" : "")")
         let path = try invocation.ditMap(ditMap, compactMap, compact: compact)
         let goldens = try invocation.goldens.open("goldens-dit-\(compact ? "compact-" : "")512.safetensors")
-        guard let x = goldens.float32("unified_in"), let adaln = goldens.float32("block_adaln_input") else {
+        guard let x = goldens.float32("unified_in"), let adaln = goldens.float32("block_adaln_input"), let caps = goldens.entries["in_caps"],
+              let latent = goldens.entries["in_latent"] else {
             throw Skip("\(goldens.path): the block's inputs are missing")
         }
-        let (described, results) = try ZImageLowRankCheck.run(map: path, x: Array(x), adaln: Array(adaln))
+        let (described, results) = try ZImageLowRankCheck.run(map: path, x: Array(x), adaln: Array(adaln), latentHeight: latent.shape[2],
+                                                              latentWidth: latent.shape[3], capLength: caps.shape[0])
         print("\(model) block-lora: " + described)
         for r in results {
             report.add(r.bar.map { Judge.bound(r.name, r.value, $0, note: r.note) }
@@ -225,7 +227,7 @@ enum ZImageStages {
 
     static let trajectory = Stage(
         model: model, name: "trajectory",
-        proves: "the seed's noise bit for bit, the 8-step σ schedule, then each step's velocity from the reference's own latent at that step (the render's DiT session, negated as the pipeline does)",
+        proves: "the seed's noise bit for bit, the 8-step σ schedule, then each step's velocity from the reference's own latent at that step (the render's DiT session and its derivative, the velocity negated as the pipeline does)",
         sizes: ["512", "1024"], options: ["--map"],
         oracle: "tools/oracle/z-image.py trajectory --size {size}; trajectory-bf16 --size {size}; trajectory-witness --size {size} --step N for a step at its threshold", weights: ["DiT"],
         rule: "the noise and σ exact; each guided step by the rule against diffusers' same step in bf16, against its fp64 witness where one is written"
@@ -260,7 +262,8 @@ enum ZImageStages {
         }) { step, latent in
             let start = Date()
             defer { seconds.append(Date().timeIntervalSince(start)) }
-            return try denoiser.velocity(latent, time: FlowMatchSchedule.modelTime(sigma: schedule.sigmas[step])).map { -$0 }
+            // The render's own call (`RenderLoop`): its time and its sign, under the reference's Euler (the render's default).
+            return try denoiser.derivative(latent, sigma: schedule.sigmas[step], solver: .euler, first: step == 0)
         }
         return report
     }

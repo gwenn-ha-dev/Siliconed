@@ -8,10 +8,10 @@ import SiliCore
 /// (`SharedWeights`), norms by their peak, the guard's powers of two in f16; what reads
 /// across rows, or computes in f32, is the GPU's:
 ///
-///     pre        both   n = LN(x̂ · X) · (1 + s₁) + t₁, rotated under 2^e₀ by F: q̂, k̂, v̂ = q64, and F
+///     pre        both   n = LN(x̂ · X) · (1 + s₁) + t₁, rotated under 2^e₀ by F: q̂, k̂, v̂ = the products, and F
 ///     heads      GPU    q, k: RMS_head(·) · γ (eps / F²) in f32, RoPE; v = v̂ · F; heads first, into the image's keys
 ///     attention  GPU    o = sdpa(q, K, V, mask) over every row: a true value
-///     out        both   x₁ = x + g₁ · (o R) · W_o; then n₂ = LN(x₁) · (1 + s₂) + t₂ rotated: ĉq = q64, and its F
+///     out        both   x₁ = x + g₁ · (o R) · W_o; then n₂ = LN(x₁) · (1 + s₂) + t₂ rotated: ĉq = the product, and its F
 ///     cross      GPU    RMS_head(cq) · γ (eps / F²) in f32, sdpa against the prompt's keys: a true value
 ///     crossout   both   x₂ = x₁ + g₂ · (o R) · W_co
 ///     ffn        both   y = x₂ + g₃ · W₂(GELU(W₁(LN(x₂) · (1 + s₃) + t₃ R)) R)

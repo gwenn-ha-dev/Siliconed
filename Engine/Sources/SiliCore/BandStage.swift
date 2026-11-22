@@ -35,8 +35,10 @@ public final class BandStage: @unchecked Sendable {
     /// a band's positions, the tallest first), its residents read from `files`: the functions built at each plan's shapes
     /// and named by their bytes (`prefix-<hash>`), what Core AI will hold under each estimated from this Mac's readings
     /// (`Stage.estimates(extents:)`: its own, or a bound from a reading of the same functions at another height or
-    /// size), the soberest where none was read
-    /// (`Stage.choose`). A stage's reading is kept at its close: the next decoding climbs on it.
+    /// size); none holding, the soberest on paper where nothing of its kin was read or only bands that hold more bound
+    /// it, refused where a reading of bands that hold no more predicts it past B — a size larger than any read, refused
+    /// before the computation `admit` judges for (`Stage.choose`). A stage's reading is kept at its close, once its
+    /// functions were called: the next stage of its kin climbs on it.
     public static func open(_ name: String, prefix: String, candidates: [Int], files: [SafeTensors], residents: [Weights.Entry], budget: Int,
                             plan: (Int) -> Bands) async throws -> BandStage {
         guard let device = MTLCreateSystemDefaultDevice() else { throw Failure("no Metal device") }
@@ -93,7 +95,7 @@ public final class BandStage: @unchecked Sendable {
             catch let o as OverBudget { refusal = o }
         }
         guard !holding.isEmpty else { throw refusal! }
-        let estimates = Stage.estimates(extents: holding.map { (Stage.key($0.plan.declaration), $0.plan.declaration.extent!) })
+        let estimates = Stage.estimates(extents: holding.map { (Stage.key($0.plan.declaration), $0.plan.declaration.extent!) }, budget: budget)
         // Every form fused: `OverBudget` too, the finest's P its number (`Stage.choose`).
         let chosen = holding[try Stage.choose(holding.map(\.plan), estimates)].rank
         let unread = holding.count == declarations.count && estimates.allSatisfy { $0 == .unknown }

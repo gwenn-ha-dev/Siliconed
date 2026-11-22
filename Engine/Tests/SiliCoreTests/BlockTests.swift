@@ -267,6 +267,16 @@ import Testing
         #expect(Block.Build(rows: 16).tapped == false)
     }
 
+    /// An edge of the ANE's that reads codes is refused at the opening, a declaration's error (the ANE reads codes only
+    /// from a shared form's copy); the same edge the GPU's is built.
+    @Test func anEdgeOfTheANEsReadsNoCodes() throws {
+        var d = Self.declaration
+        d.edges = ["head": { _ in Self.module(rows: 1) }]
+        #expect(try Block.edges(d)[Block.edge("head")]?.unit == .gpu)
+        d.neuralEdges = ["head"]
+        #expect(throws: Failure.self) { try Block.edges(d) }
+    }
+
     @Test func aSignatureIsTheModulesShapes() {
         let s = Block.Signature(Self.module(rows: 8))
         #expect(s.inputs.map(\.0) == ["x", "x_factor", "g", "w", "w_down"])

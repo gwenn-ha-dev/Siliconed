@@ -207,7 +207,8 @@ package enum MossImageStages {
         denoiser.text = HostTensor(textEntry.shape, floats: Array(text))
         try report.trajectory(reference, steps: sigmas.count - 1, half: half, columns: height * width, name: { "velocity_\($0)" },
                           label: { "v_\($0)" }) { step, latent in
-            try denoiser.velocity(latent, time: timesteps[step])
+            // The render's own call (`RenderLoop`) at our σ, its timestep `MossImageSchedule.timestep`'s, judged above.
+            try denoiser.derivative(latent, sigma: ours[step], solver: .euler, first: step == 0)
         }
         return report
     }

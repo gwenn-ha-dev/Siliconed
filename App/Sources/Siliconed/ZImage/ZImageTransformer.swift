@@ -93,12 +93,12 @@ final class ZImageTransformer {
         return ZImageFunctions.adapted.sorted { $0.key < $1.key }.map { f, names in (f, all.filter { names.contains($0.name) }) }
     }
 
-    /// **The factors' tensors**: the edges', each block's under its prefix (`<block>.`, the block's own: `Block`) —
+    /// **The factors' tensors**: the edges', each of `blocks`' under its prefix (`<block>.`, the block's own: `Block`) —
     /// surfaces where the ANE reads them, by the block.
-    static func lowRankTensors(_ ranks: [String: Int], _ form: ZImageFunctions.Form) -> [SiliCore.Stage.Tensor] {
+    static func lowRankTensors(_ ranks: [String: Int], _ form: ZImageFunctions.Form, blocks: [String] = allBlocks) -> [SiliCore.Stage.Tensor] {
         guard !ranks.isEmpty else { return [] }
         return edgeFunctions.flatMap { LoRAStack.tensors($0.products, ranks: ranks, element: lowRankType($0.function, form)) }
-            + allBlocks.flatMap { LoRAStack.tensors(ZImageDiT.loraProducts($0), ranks: ranks, element: lowRankType(nil, form), prefix: "\($0).") }
+            + blocks.flatMap { LoRAStack.tensors(ZImageDiT.loraProducts($0), ranks: ranks, element: lowRankType(nil, form), prefix: "\($0).") }
     }
 
     /// **The stack's factors written into the stage's tensors** (`lowRankTensors`), before the first call.
@@ -117,13 +117,21 @@ final class ZImageTransformer {
     /// A row of the gains', on a page of its own (`ZImageBlock.gainRow`).
     static var gainBytes: Int { ZImageBlock.gainRow * 2 }
 
+    /// **What a check opens of the DiT** (`declaration`'s `part`): the whole, a render's; or layer 0 alone over the
+    /// sequence's pass, its modulation the one edge — in the render's form (`layer`), or that form with the block's inner
+    /// boundaries written before each of its steps (`tapped`: `ZImageLayerZero.tap`, a run the GPU's alone). What
+    /// `check z-image block` and `block-lora` judge is then the render's layer: its tensors, bindings, forms, rows, keys.
+    enum Part { case whole, layer, tapped }
+
     /// **The DiT's declaration**: its per-row tensors (the stream, its factors, q k v, the RoPE tables; in the shared
     /// forms the steps' own), its other tensors, the edges' weights read once, a group a block, the order the loop uses
-    /// them in (the context refiner's once a prompt, then the cycle at every evaluation), its forms and passes.
-    static func declaration(_ g: Geometry, _ arithmetic: Arithmetic, ranks: [String: Int] = [:]) -> Block.Declaration {
+    /// them in (the context refiner's once a prompt, then the cycle at every evaluation), its forms and passes. `part`:
+    /// a check's layer 0 alone (`Part`), what the whole declares less what layer 0's pass does not read.
+    static func declaration(_ g: Geometry, _ arithmetic: Arithmetic, ranks: [String: Int] = [:], part: Part = .whole) -> Block.Declaration {
         let (d, cap, form, weights) = (Self.d, g.caption, ZImageFunctions.Form(arithmetic), arithmetic.weights), latent = c.channels * g.height * g.width * 4
         let element: NDArray.ScalarType = form == .bf16 ? .bfloat16 : .float16, factor = NDArray.ScalarType.float16
-        var n = Block.Declaration("Z-Image's DiT (\(form), \(g.height)×\(g.width), \(g.keys) keys)", rows: g.keys)
+        let whole = part == .whole, blocks = whole ? allBlocks : ["layers.0"]
+        var n = Block.Declaration("Z-Image's DiT (\(form), \(g.height)×\(g.width), \(g.keys) keys)" + (whole ? "" : ", layer 0 \(part)"), rows: g.keys)
         n.perRow = [.init("x", width: d, element, next: "y", factor: form == .bf16 ? nil : "x_factor"),
                     .init("q", width: d, element), .init("k", width: d, element), .init("v", width: d, element),
                     .init("cos", width: ZImageBlock.hd, .float32), .init("sin", width: ZImageBlock.hd, .float32)]
@@ -137,11 +145,12 @@ final class ZImageTransformer {
                                   ("mask-sequence", g.keys * 2), ("saved", cap * d * 2), ("saved-factors", cap * Layout.element(factor))]
         let gains = form == .shared ? (ZImageShared.gains + ["one"]).map { ($0, d * 2) } : ["scales", "gates", "ones"].map { ($0, 4 * gainBytes) }
         n.tensors = (t + gains).map { SiliCore.Stage.Tensor($0.0, bytes: $0.1) } + [SiliCore.Stage.Tensor("velocity", bytes: latent, .apart)]
-            + lowRankTensors(ranks, form)
-        n.residents = ZImageFunctions.others(form: form)
+            + lowRankTensors(ranks, form, blocks: blocks)
+        // Layer 0's pass reads no edge's weights but its modulation's, which are its group's.
+        n.residents = whole ? ZImageFunctions.others(form: form) : []
         let name = "\(form)"
-        n.groups = allBlocks.map { Block.Group($0, form: name, weights: ZImageFunctions.entries($0, form: form, weights: weights)) }
-        (n.once, n.cycle) = (captionBlocks, cycle)
+        n.groups = blocks.map { Block.Group($0, form: part == .tapped ? name + "-tapped" : name, weights: ZImageFunctions.entries($0, form: form, weights: weights)) }
+        (n.once, n.cycle) = whole ? (captionBlocks, cycle) : ([], blocks)
         let keys = g.keys
         // The gains: the shared forms' each a tensor (the ANE reads them so), the others' a row each of four.
         let ones: [String: Block.Bind]
@@ -164,9 +173,11 @@ final class ZImageTransformer {
         n.passes = [Block.Pass("image", rows: 0..<g.image, shareable: 0..<g.image, bind: ["mask": .tensor("mask-image")]),
                     Block.Pass("caption", rows: g.image..<g.sequence, bind: ones.merging(["mask": .tensor("mask-caption")]) { a, _ in a }),
                     Block.Pass("sequence", rows: 0..<g.sequence, shareable: 0..<g.image, bind: ["mask": .tensor("mask-sequence")])]
-        for f in ["timestep", "embed-image", "embed-caption", "modulation", "final"] {
+        for f in whole ? ["timestep", "embed-image", "embed-caption", "modulation", "final"] : ["modulation"] {
             n.edges[f] = { b in module(f, g, form, weights, ranks: ranks) }
         }
+        if !whole { n.passes = n.passes.filter { $0.name == "sequence" } }
+        if part == .tapped { ZImageLayerZero.tap(&n, form: form, weights: weights, keys: keys, ranks: ranks) }
         return n
     }
 

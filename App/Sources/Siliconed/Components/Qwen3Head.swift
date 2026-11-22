@@ -53,7 +53,7 @@ final class Qwen3Head {
             scales = try file.floats("lm_head" + suffix)
         }
         // The codes by pieces of k as the head's products read them (`Weights.codesShape`): one piece, the file's rows.
-        let (pieces, piece) = a.half ? Weights.pieces(d) : (1, d)
+        let (pieces, piece) = a.half ? try Weights.pieces(d) : (1, d)
         var rows = [UInt8](repeating: 0, count: pieces > 1 ? s * d : 0)
         for k in 0..<count {
             let into = await layers.pointer("head_w\(k)")

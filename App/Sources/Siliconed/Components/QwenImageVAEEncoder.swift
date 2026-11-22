@@ -69,7 +69,7 @@ package enum QwenImageVAEEncoder {
     package static func mean(of image: [Float], height: Int, width: Int, path: String) throws -> [Float] {
         let file = try SafeTensors(path), budget = MemoryBudget.machineCeiling()
         return try blocking {
-            let run = try await QwenImageVAERun.open("qwen-image-vae-encoder", file: file, budget: budget) { plan(height: height, width: width, positions: $0) }
+            let run = try await QwenImageVAERun.open(.init("qwen-image-vae-encoder", file: file) { plan(height: height, width: width, positions: $0) }, budget: budget)
             defer { run.stage.close() }
             return try await run.run(image)
         }

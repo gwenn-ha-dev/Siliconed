@@ -192,7 +192,7 @@ struct Problem: Equatable, Sendable {
         case .notOnEngine(let m):                                    // not_on_engine
             return String(localized: "\(name(m)) doesn’t run on this engine yet.")
         case let .insufficientMemory(needed, budget):                // insufficient_memory
-            // Within the limit: every form stopped the fuse (`Stage.choose`), the number known is the soberest's socle, not a need.
+            // Within the limit: the soberest form stopped the fuse (`Stage.choose`), the number known is the soberest's socle, not a need.
             if needed <= budget {
                 return String(localized: "This render went past this Mac’s memory limit of \(Figures.memory(budget)) every time it was tried: it is refused.")
             }
@@ -409,6 +409,8 @@ enum LibraryJobProgress {
 extension AppState {
     /// The warnings of the last render, said by the app; the engine's own rows are its tooltip.
     var journalLine: String? {
+        // A lost image is the problem's to say (`execute`), not the engine's noting something unusual.
+        let journal = journal.filter { !LostImage.isWarning($0) }
         if journal.isEmpty { return nil }
         // The one warning that is no anomaly: the plan chose a slower decoding, and the render says so.
         if journal.allSatisfy({ $0 == bandDecodingNotice }) {

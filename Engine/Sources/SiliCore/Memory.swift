@@ -80,7 +80,7 @@ public enum Memory {
 }
 
 /// **The one thread that reads the footprint, every millisecond, for every watch of the process**: a reading costs
-/// 0.64 µs and a thread waking 790 times a second 0.5 % of a core (M1 Pro), and a render had up to three of them — the
+/// 0.64 µs and a thread waking 790 times a second 0.5 % of a core (M1 Pro), and a process had up to three of them — the
 /// fuse's, the stage's, its caller's — reading the same footprint. It runs while a watch is registered and
 /// ends with the last; the fuse's watches are read first, a tick that reads the others never delays them.
 final class FootprintTicker: @unchecked Sendable {

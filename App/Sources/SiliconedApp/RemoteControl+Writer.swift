@@ -117,7 +117,9 @@ extension RemoteControl {
         let help = "silicontrol help \(command)"
         switch failure {
         case .usage(let line): return Refusal("usage", line, help: help)
-        case .unknownFlag(let flag): return Refusal("usage", String(localized: "unknown flag: \(flag)"), help: help)
+        // `rewrite` takes a text, which may begin with `--`.
+        case .unknownFlag(let flag): return command == "rewrite" ? unknownFlag(flag, text: true)
+                                                                 : Refusal("usage", String(localized: "unknown flag: \(flag)"), help: help)
         case .flagWithoutValue(let flag): return Refusal("usage", String(localized: "\(flag) expects a value"), help: help)
         case .emptyText: return Refusal("usage", String(localized: "empty text"), help: help)
         }

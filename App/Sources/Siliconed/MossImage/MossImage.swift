@@ -122,9 +122,11 @@ package enum MossImageSchedule {
     }
 
     /// What the transformer is told at each evaluation: `σ·1000`, fp32 (the scheduler's `timesteps`).
-    package static func timesteps(_ sigmas: [Float]) -> [Float] {
-        sigmas.dropLast().map { $0 * Float(trainTimesteps) }
-    }
+    package static func timesteps(_ sigmas: [Float]) -> [Float] { sigmas.dropLast().map(timestep) }
+
+    /// What the transformer is told at σ, the render's (`MossImageRender.Denoiser.derivative`): one function, so that
+    /// the trajectory's identity on `timesteps` judges it.
+    package static func timestep(_ sigma: Float) -> Float { sigma * Float(trainTimesteps) }
 }
 
 /// **The prompt side of MOSS-Image's encoder**: the chat template and the cut. Pure functions.

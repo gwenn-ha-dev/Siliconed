@@ -22,8 +22,8 @@ import SiliCore
 ///
 /// **The rows**: the prefix's real rows `P` within a palier of 256 keys (no prompt within it asks for a new shape), the
 /// target's `S = h·w` within a multiple of 64; each pass is the engine's calls over its rows. The rows past the real ones
-/// are computed and masked as keys (−10⁴). The residual stream is two buffers in turn, beside their row factors under
-/// the guard of f16 (f32, one a row; f16 in the shared forms).
+/// are computed and masked as keys (−10⁴). The residual stream is two buffers in turn: f32 on the Standard's path; in
+/// the shared forms f16, beside their row factors in f16.
 ///
 /// **With the ANE's share** (the shared forms, `QwenImage21Shared` — the Compact's whatever the switch, the Standard's
 /// weights in f16 with the Neural Engine on —, the switch on): the ANE the target's first rows by the engine's unit, told
@@ -158,9 +158,10 @@ package final class QwenImage21Loop {
 
     // MARK: - Opening
 
-    /// **The DiT of the file at `map` for `sequence`, under B**: its arithmetic read from the file (int8 codes: the Compact,
-    /// on the GPU alone with the Neural Engine off, in the shared forms with it on, the ANE's rows a control's or found in flight;
-    /// bf16: the Standard). Under `loras`, their factors written before the first call.
+    /// **The DiT of the file at `map` for `sequence`, under B**: its arithmetic read from the file and the Neural Engine
+    /// switch (`Arithmetic.block`): int8 codes, the Compact, always in the shared forms — on the GPU alone with the switch
+    /// off, beside the ANE with it on (its rows a control's or found in flight), or alone where that is faster; bf16, the
+    /// Standard. Under `loras`, their factors written before the first call.
     package static func open(map: String, sequence: QwenImage21DiT.Sequence, loras: LoRAStack = .none, tapped: Bool = false,
                              budget: Int = MemoryBudget.machineCeiling()) async throws -> QwenImage21Loop {
         let file = try MapWeights.dit(map, marker: "img_in.weight")

@@ -110,13 +110,19 @@ extension AppState {
                         complete(job, .finished, images: [entry.ordinal], warnings: journal)
                     }
                 case let .unusable(image, lost):
-                    // In a train, a job whose image is lost ends with it: the call goes on for the others. Alone, its
-                    // call ends in `nonFiniteImage`, below.
-                    guard together, let job = turn(to: image) else { break }
-                    delivered.insert(job.id)
                     let p = Problem(EngineError.nonFiniteImage(stage: lost))
-                    problem = p
-                    complete(job, .failed(p), warnings: journal)
+                    if together {
+                        // In a train, a job whose image is lost ends with it: the call goes on for the others.
+                        guard let job = turn(to: image) else { break }
+                        delivered.insert(job.id)
+                        problem = p
+                        complete(job, .failed(p), warnings: journal)
+                    } else if job.seeds.indices.contains(image) {
+                        // Alone, a job of several seeds keeps the images that come and says the one lost (`LostImage`):
+                        // never "done" in silence with an image fewer. All lost, its call ends in `nonFiniteImage`, below.
+                        problem = p
+                        journal.append(LostImage.warning(seed: job.seeds[image], stage: lost))
+                    }
                 case .warning(let message):
                     journal.append(message)
                 default:

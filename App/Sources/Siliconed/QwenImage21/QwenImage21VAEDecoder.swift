@@ -67,11 +67,16 @@ package final class QwenImage21VAEDecoder: BandedDecoder {
     /// The decoder of a latent `latentHeight × latentWidth` from the VAE at `path`: its stage planned under `budget`
     /// (the tallest bands that hold), its arena filled, its functions loaded — the GPU's alone.
     package static func open(path: String, latentHeight: Int, latentWidth: Int, budget: Int) async throws -> QwenImage21VAEDecoder {
-        QwenImage21VAEDecoder(try await QwenImageVAERun.open("qwen-image-2.1-vae-decoder", file: try SafeTensors(path), budget: budget) { plan(h: latentHeight, w: latentWidth, positions: $0) })
+        QwenImage21VAEDecoder(try await QwenImageVAERun.open(try plans(path: path, latentHeight: latentHeight, latentWidth: latentWidth), budget: budget))
     }
 
     package static func admit(path: String, latentHeight: Int, latentWidth: Int, budget: Int) throws {
-        try QwenImageVAERun.admit("qwen-image-2.1-vae-decoder", file: try SafeTensors(path), budget: budget) { plan(h: latentHeight, w: latentWidth, positions: $0) }
+        try QwenImageVAERun.admit(try plans(path: path, latentHeight: latentHeight, latentWidth: latentWidth), budget: budget)
+    }
+
+    /// The plans `open` opens among and `admit` judges, one function for both.
+    private static func plans(path: String, latentHeight: Int, latentWidth: Int) throws -> QwenImageVAERun.Plans {
+        QwenImageVAERun.Plans("qwen-image-2.1-vae-decoder", file: try SafeTensors(path)) { plan(h: latentHeight, w: latentWidth, positions: $0) }
     }
 
     /// Whether B made the bands smaller than the run prefers.

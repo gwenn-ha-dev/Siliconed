@@ -7,7 +7,7 @@ import SiliCore
 /// on the ANE's copy of them (`SharedWeights`), norms by their peak, the guard's
 /// powers of two in f16; what reads across rows or computes in f32 is the GPU's:
 ///
-///     pre          both   n = LN(x̂ · X) · (1 + s₁), rotated, under 2^e₀ by F: q̂, k̂, v̂ = q64, and F
+///     pre          both   n = LN(x̂ · X) · (1 + s₁), rotated, under 2^e₀ by F: q̂, k̂, v̂ = the products, and F
 ///     heads        GPU    q, k: RoPE(RMS_head(q̂) · γ) (eps / F², `headNorm`) in f32; v = v̂ · F; heads first, into the pass's keys
 ///     attention    GPU    o = sdpa(q, [kₚ | kₜ], [vₚ | vₜ], mask), rows first: a true value
 ///     out          both   x₁ = x + tanh g₁ · to_out(o R), the stream kept as (x̂, X)

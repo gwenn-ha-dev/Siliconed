@@ -19,6 +19,13 @@ package enum Runner {
     /// B in GiB for a person, `-` when the app did not say.
     private static func gib(_ bytes: Int?) -> String { bytes.map { String(format: "%.1f", Double($0) / 1_073_741_824) } ?? "-" }
 
+    /// **One render of the series, as `add` reads it**: the series' flags, then the passthrough's, then a lone `--` and the
+    /// prompt, the size and the seed — a prompt given to `--prompt` may begin with `--` (`--ar 16:9 a cat`), and before the
+    /// `--` `add` would take it for a flag and refuse it.
+    package static func addLine(prompt: String, size: String, seed: Int, model: String, extra: [String], out: String) -> [String] {
+        ["add", "--wait", "--out", out, "--model", model] + extra + ["--", prompt, size, String(seed)]
+    }
+
     package static func run(_ o: MeasureOptions, send: Send, log: (String) -> Void,
                             emit: ([String: Any]) -> Void, append: (String) -> Void) throws -> [String: Any] {
         // The queue must be idle: a render queued by someone else shares the machine with ours.
@@ -91,7 +98,8 @@ package enum Runner {
             let swap0 = Probes.swapouts()
             var imageAt: Double?, engine: Double?, steps: Int?, path: String?
             let t0 = now()
-            let (last, _) = send(["add", "--wait", "--out", outDirectory.path, "--model", model] + o.extra + [prompt, o.size, String(seed)]) { line in
+            let (last, _) = send(Self.addLine(prompt: prompt, size: o.size, seed: seed, model: model, extra: o.extra,
+                                              out: outDirectory.path)) { line in
                 if line["type"] as? String == "image", imageAt == nil {
                     imageAt = now()
                     engine = (line["seconds"] as? NSNumber)?.doubleValue

@@ -97,8 +97,8 @@ extension Stage {
     public static let margin = 64 << 20
 
     /// **What the groups kept past the signal leave clear under B, for the rest of the Mac**: a kept group is wired, so a
-    /// stage whose weights pass B kept groups up to B less `margin` and held the footprint there, wired, the whole render;
-    /// macOS then swapped other processes' pages out (a 16 GB M1 Pro, B = 10 GiB, 9.75 GiB: 4 to 283 pages a render,
+    /// stage whose weights pass B kept groups up to B less `margin` and held the footprint there, wired, the whole run;
+    /// macOS then swapped other processes' pages out (a 16 GB M1 Pro, B = 10 GiB, 9.75 GiB: 4 to 283 pages a run,
     /// 21–22/11/2026). Keeping is optional: the same step there with 2, 10 or 13 of 28 groups kept (22/11/2026).
     public static let keepClear = 512 << 20
 
@@ -221,7 +221,7 @@ extension Stage {
     public static func open(_ device: MTLDevice, _ declaration: Declaration, files: [SafeTensors], budget: Int, depth: Int = 2,
                             measured: ThisMac = .current) async throws -> Stage {
         let p = try plan(declaration, files: files, budget: budget, floor: Memory.floor(), depth: depth)
-        _ = try choose([p], estimates(extents: [(key(p.declaration), p.declaration.extent)], measured: measured))
+        _ = try choose([p], estimates(extents: [(key(p.declaration), p.declaration.extent)], measured: measured, budget: p.budget))
         return try await Stage(device, plan: p, files: files, measured: measured)
     }
 }

@@ -117,7 +117,7 @@ private struct AppCommands: Commands {
                 if app.shownSeries != nil { app.fitSeries() } else { app.zoom = 1 }
             }
                 .keyboardShortcut("0")
-                .disabled(app.shownSeries != nil ? app.seriesFollowsWindow : app.zoom == 1)
+                .disabled(app.shownSeries != nil ? app.seriesFillsWindow : app.zoom == 1)
             Divider()
         }
         CommandMenu("Render") {

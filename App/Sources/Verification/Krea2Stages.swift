@@ -299,7 +299,8 @@ enum Krea2Stages {
         try report.trajectory(reference, steps: steps, half: half, columns: height * width, name: { "velocity_\($0)" }, witness: { step in
             invocation.goldens.optional("krea2/witness-krea2-f64-\(invocation.size)-step\(step).safetensors")?.float32("model_out")
         }) { step, latent in
-            try denoiser.velocity(latent, time: Krea2Render.modelTime(sigma: schedule[step], solver: .euler, first: step == 0))
+            // The render's own call (`RenderLoop`), under the reference's Euler (the render's default): Krea 2's derivative is its velocity.
+            try denoiser.derivative(latent, sigma: schedule[step], solver: .euler, first: step == 0)
         }
         return report
     }

@@ -218,9 +218,11 @@ public final class Block: @unchecked Sendable {
         return Stage.Extent(Array(lines), inFlight: inFlight, elements: elements)
     }
 
-    /// **What a function computes apart from its shapes**: the digest of its ops and of their results' elements, in
-    /// order, composites' insides included — what a kin names (`Stage.Extent`), so that a function written otherwise
-    /// under the same name is another kin, whatever engine wrote it —; and its results' elements, summed and the largest.
+    /// **What a function computes apart from its shapes**: the digest of its ops and of their results' element types, in
+    /// order, composites' insides included — what a kin names (`Stage.Extent`): under the same name, other ops or other
+    /// element types are another kin; the same ops at other sizes — another height, another size, intermediates larger
+    /// or smaller — the same kin, a reading of one bounding the other by the ratio of their results' elements
+    /// (`Stage.Extent.ratio(over:)`) —; and its results' elements, summed and the largest.
     static func walk(_ body: Aicode.Block) -> (ops: String, results: Int, largest: Int) {
         var ops: [String] = [], results = 0, largest = 0
         func visit(_ b: Aicode.Block) {

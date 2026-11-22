@@ -40,7 +40,8 @@ package enum RemoteControlHelp {
     }
 
     /// **The answer to a help request**, or `nil` if `argv` is not one: `help [topic]`, `-h`, `--help`,
-    /// `<command> --help` (or `-h`), and nothing at all (the overview). A page is
+    /// `<command> --help` (or `-h`) before a lone `--` — after it, they are words, a prompt's (`add -- -h`) —, and nothing
+    /// at all (the overview). A page is
     /// `{"ok": true, "help": …}`; an unknown topic, the usage failure (`"error": "usage"`, with the
     /// topics as `"hint"`).
     package static func answer(_ argv: [String]) -> [String: Any]? { answer(argv, preferred) }
@@ -50,7 +51,8 @@ package enum RemoteControlHelp {
         switch argv.first {
         case nil: subject = nil
         case "help", "-h", "--help": subject = argv.dropFirst().first
-        case let command? where argv.dropFirst().contains("--help") || argv.dropFirst().contains("-h"): subject = command
+        case let command? where argv.dropFirst().prefix(while: { $0 != "--" }).contains(where: { $0 == "--help" || $0 == "-h" }):
+            subject = command
         default: return nil
         }
         guard let text = text(for: subject, pages) else {

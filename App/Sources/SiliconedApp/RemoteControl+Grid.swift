@@ -11,7 +11,7 @@ extension RemoteControl {
     /// **`grid`**: the request `add` checked, its axes read and the grid checked by the library
     /// (`RenderGrid`), every step count of it checked by the denoiser, the queue's room — then one job
     /// per cell; with `--wait --out D`, the sheet written into D when the last one ends.
-    func addGrid(_ d: RenderOrder, prompt: String, model: Model, card: ModelCard?, format: RecommendedFormat,
+    func addGrid(_ d: AddOrder, prompt: String, model: Model, card: ModelCard?, format: RecommendedFormat,
                          steps: Int, stack: [LoRASlot], references: [ReferenceImage], start: ReferenceImage?, strength: Double?,
                          seed: UInt64,
                          defaultSteps: Int, folder: String?, cwd: String, _ c: Connection) throws {
@@ -58,7 +58,7 @@ extension RemoteControl {
 
     /// **The grid of `grid`**: its axes read, a LoRA axis's names turned into paths by `lora` (`nil`: no such LoRA),
     /// and the grid checked by the library (`RenderGrid`) — and by the rack's rule on negative strengths.
-    func readGrid(_ d: RenderOrder, prompt: String, seed: UInt64, steps: Int, stack: [LoRASlot], images: Int, start: Bool,
+    func readGrid(_ d: AddOrder, prompt: String, seed: UInt64, steps: Int, stack: [LoRASlot], images: Int, start: Bool,
                   lora: (String) -> String?) throws -> RenderGrid {
         do {
             let names = d.loras.map(\.name)

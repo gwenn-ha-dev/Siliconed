@@ -12,7 +12,7 @@ import Foundation
 ///     reserves  what a stage's functions took past its first signal, at its largest reading (`Stage.signal`)
 ///     readings  Core AI's share under a stage's functions, its largest reading — the hint a height is chosen on
 ///               (`Stage.estimates`); −1, the fuse stopped the process under them, a mark that holds for the engine
-///               that took it (`fusedBy`)
+///               that took it (`fusedBy`) and under a B no larger than the one it was taken under (`fusedUnder`)
 ///     extents   what a stage's functions held beside its reading, the same names at any shapes (`Stage.Extent`): a
 ///               form never read is bounded from its kin's readings (`Stage.estimates(extents:)`)
 ///
@@ -43,6 +43,11 @@ public struct ThisMac: Codable, Sendable, Equatable {
     /// functions 2 % slower for good). A −1 with no engine beside it (a file written before) is another engine's. Nil in a file
     /// written before.
     public var fusedBy: [String: String]? = nil
+    /// **The B a stage's functions were marked −1 under**, by the stage's key. The one thing kept that depends on B: a
+    /// reading is what Core AI held, whatever the limit; a mark, that it held too much under that limit. Under a larger
+    /// B, the mark is no reading, and the functions are tried once more (decided 22/11/2026). Nil, or no entry (a file
+    /// written before): the mark holds under any B.
+    public var fusedUnder: [String: Int]? = nil
     /// What the functions of a stage's reading held, by the stage's key (`Stage.Extent`); nil in a file written before.
     public var extents: [String: Stage.Extent]? = nil
 
@@ -53,26 +58,34 @@ public struct ThisMac: Codable, Sendable, Equatable {
 
     // MARK: - The readings and the fuse's marks
 
-    /// **The reading under `key` as `engine` takes it**: a −1 its own (`fusedBy`); another engine's −1 nil, as never read,
-    /// so that the functions are tried once more.
-    public func reading(_ key: String, engine: String = ThisMac.engine) -> Int? {
+    /// **The reading under `key` as `engine` takes it under `budget`**: a −1 its own (`fusedBy`), taken under a B no
+    /// smaller (`fusedUnder`); another engine's −1, or one taken under a smaller B than `budget`, nil, as never read, so
+    /// that the functions are tried once more. No `budget`: the mark holds.
+    public func reading(_ key: String, engine: String = ThisMac.engine, budget: Int? = nil) -> Int? {
         guard let r = readings?[key] else { return nil }
-        return r == -1 && fusedBy?[key] != engine ? nil : r
+        guard r == -1 else { return r }
+        if fusedBy?[key] != engine { return nil }
+        if let budget, let under = fusedUnder?[key], budget > under { return nil }
+        return r
     }
 
-    /// **A reading kept at its largest** (`Stage.keep`); over `engine`'s own −1 nothing, over another's −1 the reading,
-    /// the mark gone.
-    public mutating func keep(reading share: Int, under key: String, engine: String = ThisMac.engine) {
-        let old = reading(key, engine: engine)
+    /// **A reading kept at its largest** (`Stage.keep`), of a stage run under `budget`; over `engine`'s own −1 that
+    /// still holds under it nothing (a stage closing while the fuse marks), over another's −1, or one taken under a smaller
+    /// B, the reading, the mark gone.
+    public mutating func keep(reading share: Int, under key: String, engine: String = ThisMac.engine, budget: Int? = nil) {
+        let old = reading(key, engine: engine, budget: budget)
         if old == -1 { return }
         readings = (readings ?? [:]).merging([key: max(old ?? 0, max(share, 0))]) { $1 }
         fusedBy?[key] = nil
+        fusedUnder?[key] = nil
     }
 
-    /// **The fuse stopped the process under `key`'s functions** (`Stage.fused`): −1, `engine`'s mark.
-    public mutating func fuse(_ key: String, engine: String = ThisMac.engine) {
+    /// **The fuse stopped the process under `key`'s functions** (`Stage.fused`), run under `budget`: −1, `engine`'s
+    /// mark, and the B it holds under.
+    public mutating func fuse(_ key: String, engine: String = ThisMac.engine, budget: Int? = nil) {
         readings = (readings ?? [:]).merging([key: -1]) { $1 }
         fusedBy = (fusedBy ?? [:]).merging([key: engine]) { $1 }
+        if let budget { fusedUnder = (fusedUnder ?? [:]).merging([key: budget]) { $1 } } else { fusedUnder?[key] = nil }
     }
 
     /// **This engine, as a mark of the fuse names it**: the UUID of the binary its code runs in (`LC_UUID`, read from the

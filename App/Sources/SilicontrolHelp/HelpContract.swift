@@ -219,8 +219,9 @@ extension RemoteControlHelp {
            pixels may differ slightly.
         10. Closing the app's window empties its queue and stops the render; the app stays open.
         11. A word of two dashes is a flag, wherever it is: one the command does not take is refused, by name ("usage").
-            A lone -- ends the flags: a text that begins with -- (a prompt) is written after it:
-            silicontrol add -- "--ar 16:9 a lighthouse at dusk".
+            A lone -- ends the flags: a text, a file or a folder whose name begins with -- is written after it:
+            silicontrol add -- "--ar 16:9 a lighthouse at dusk". --help or -h before it asks for the command's page;
+            after it, they are words.
         """, fr: """
         LE CONTRAT — ce qui vaut pour toutes les commandes
 
@@ -249,8 +250,9 @@ extension RemoteControlHelp {
            pixels peuvent différer légèrement.
         10. Fermer la fenêtre de l'app vide sa file et arrête le rendu ; l'app reste ouverte.
         11. Un mot de deux tirets est une option, où qu'il soit : une option que la commande ne prend pas est refusée,
-            nommée (« usage »). Un -- seul clôt les options : un texte qui commence par -- (un prompt) s'écrit après lui :
-            silicontrol add -- "--ar 16:9 a lighthouse at dusk".
+            nommée (« usage »). Un -- seul clôt les options : un texte, un fichier ou un dossier dont le nom commence par --
+            s'écrit après lui : silicontrol add -- "--ar 16:9 a lighthouse at dusk". --help ou -h avant lui demande la page
+            de la commande ; après lui, ce sont des mots.
         """),
 
         "wait": Page(en: """
@@ -283,8 +285,10 @@ extension RemoteControlHelp {
                  · removed (removed from the queue before running) · error (with "message",
                  the engine's sentence in the app's language, and "code", its stable key:
                  "license_not_accepted", "insufficient_memory", "disk_full"…). An image whose
-                 pixels came out unusable (black or blank) is never "done": "error", code
-                 "non_finite_image", its message naming where (the DiT or the VAE). A render whose
+                 pixels came out unusable (black or blank) is never kept: a job that loses them all
+                 is "error", code "non_finite_image", its message naming where (the DiT or the VAE);
+                 a job of several seeds that loses some is "done" with the others, and each one lost
+                 is a line of its "warnings": "non_finite_image: seed 43: <where>". A render whose
                  engine stopped (past this Mac's budget B, or a crash) is "error", code
                  "engine_stopped"; one silent for ten minutes, "engine_silent"; one of another build
                  than the app, "engine_mismatch". The jobs waiting behind it go on, in a new engine.
@@ -323,12 +327,15 @@ extension RemoteControlHelp {
                   · removed (retiré de la file avant de tourner) · error (avec "message", la
                   phrase du moteur dans la langue de l'app, et "code", sa clé stable :
                   "license_not_accepted", "insufficient_memory", "disk_full"…). Une image dont
-                  les pixels sont sortis inutilisables (noire ou vide) n'est jamais "done" :
-                  "error", code "non_finite_image", son message disant où (le DiT ou le VAE). Un
+                  les pixels sont sortis inutilisables (noire ou vide) n'est jamais gardée : un
+                  travail qui les perd toutes est "error", code "non_finite_image", son message
+                  disant où (le DiT ou le VAE) ; un travail de plusieurs graines qui en perd
+                  quelques-unes est "done" avec les autres, et chaque image perdue est une ligne de
+                  ses "warnings" : "non_finite_image: seed 43: <où>". Un
                   rendu dont le moteur s'est arrêté (au-delà du budget B de ce Mac, ou un plantage)
                   est "error", code "engine_stopped" ; muet dix minutes, "engine_silent" ; d'une
                   autre version que l'app, "engine_mismatch". Les travaux qui attendaient derrière
-                  lui sont retirés.
+                  lui continuent, dans un moteur neuf.
           "warnings" : les lignes du moteur pendant le rendu du travail (en anglais), s'il en a écrit.
           Si un travail n'est pas "done" : "ok": false, "error": "render", sortie 1.
 

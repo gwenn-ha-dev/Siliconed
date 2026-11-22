@@ -96,16 +96,23 @@ extension AppState {
     /// **The form takes a request the remote control has queued** (`silicontrol add` and `grid`, on this Mac or another), as
     /// after a click: its settings, the prompt as typed — so that « Generate » would queue the same series —, the edit's images,
     /// the starting image or none, and the seed: one drawn there is a Random render, the rack showing it greyed, not an old
-    /// Fixed one.
+    /// Fixed one. Nothing bracketed is left of the series before, and `batch` seeds are the lot (`add --batch`); a grid's axes
+    /// are set after, by `setSeries`.
     func takeRequest(_ settings: RenderSettings, prompt: String, references: [ReferenceImage], start: ReferenceImage?,
-                     strength: Double?, seed: UInt64, fixed: Bool) {
+                     strength: Double?, seed: UInt64, fixed: Bool, batch: Int = 1) {
         restoreSettings(settings)
         self.prompt = prompt
+        brackets = []
+        seriesPlaced = [nil, nil]
+        self.batch = batch
         setEditImages(references)
         setStart(start)
         if let strength { startStrength = strength }
         fixedSeed = fixed
         self.seed = seed
+        // After the seed, which drops them only when it changes: a variation the rack held stays otherwise, on a seed the
+        // command gave that is the rack's.
+        variations = settings.variations
     }
 
     /// The form takes these settings — those of a history image, or of a job that the

@@ -221,13 +221,13 @@ extension Block {
         guard k + 2 == reads.count else { return done }
         let next = held.turn + 1
         let names = reads[0].subtracting(reads.dropFirst().reduce(into: Set()) { $0.formUnion($1) })
-        guard !names.isEmpty else { return done }
+        // Only into a group of the same form: another form's codes bear other names, and its run copies its own.
+        guard !names.isEmpty, let up = stage.ring?.group(next), groups[up]?.form == groups[held.group]!.form else { return done }
         ahead = (next, names)
-        nonisolated(unsafe) let stage = self.stage
-        let shared = Set(groups.values.filter { forms[$0.form]!.shared }.map(\.name))
-        copier.async { [weak self] in
-            guard let self, let up = stage.upcoming(next), shared.contains(up.group) else { return }
-            self.write(up.weights, names)
+        let stage = self.stage
+        copier.async {
+            guard let up = stage.upcoming(next) else { return }
+            Self.write(stage, up.weights, names)
         }
         return done
     }
@@ -264,12 +264,15 @@ extension Block {
     /// The copy of `names` of `weights`, on the copier.
     private func enqueue(_ weights: [String: Placed], _ names: Set<String>) {
         guard !names.isEmpty else { return }
-        nonisolated(unsafe) let w = weights
-        copier.async { [weak self] in self?.write(w, names) }
+        let stage = self.stage
+        copier.async { Self.write(stage, weights, names) }
     }
 
-    /// Each code of `names`, `[p, out, in / p]`, written `[1, in, out]` into its copy.
-    private func write(_ weights: [String: Placed], _ names: Set<String>) {
+    /// Each code of `names`, `[p, out, in / p]`, written `[1, in, out]` into its copy. Of the stage, never of the
+    /// block: a copy on the copier holding the block's last reference would run its `deinit` there, whose `close`
+    /// waits for the copier (`copier.sync`) on the copier itself, and the process stops. The stage outlives every
+    /// copy put on the copier: the block's `close` waits for them before it closes the stage.
+    private static func write(_ stage: Stage, _ weights: [String: Placed], _ names: Set<String>) {
         for name in names.sorted() {
             guard let p = weights[name] ?? stage.residents[name] else { preconditionFailure("\(name): no codes to copy") }
             precondition(p.type == .int8 && p.shape.count == 3, "\(name): \(p.shape) \(p.type), not codes by pieces")

@@ -82,6 +82,8 @@ final class RemoteControl {
         let arguments = Array(argv.dropFirst())
         do {
             try refuseOnMirror(command, arguments)
+            // The commands that take nothing: a flag given to them is refused, never ignored.
+            if ["status", "models", "clear", "follow"].contains(command) { _ = try Self.flags(arguments) }
             switch command {
             case "status": finish(c, state())
             case "models": finish(c, app.mirror == nil ? models() : mirroredModels())

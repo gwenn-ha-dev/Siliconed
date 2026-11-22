@@ -210,7 +210,7 @@ extension RemoteControl {
         }
         // The form takes the request, as after a click, as `add` on this Mac does.
         app.takeRequest(jobs[0].settings, prompt: prompt, references: references, start: nil, strength: nil,
-                        seed: firstNumber, fixed: d.seed != nil)
+                        seed: firstNumber, fixed: d.seed != nil, batch: d.batch)
     }
 
     /// A LoRA of the other Mac, by the name `--lora` was given: its short name, its path, or its own name.
@@ -224,7 +224,7 @@ extension RemoteControl {
     /// **`grid` on a mirror**: the request `add` checked, its axes read and the grid checked here by the
     /// library (`RenderGrid`, which the other Mac checks again), every cell's step count against the
     /// steps its model published — then the cells are made there, and the command answers with them.
-    private func addGridOnMirror(_ mirror: MirrorLink, _ d: RenderOrder, prompt: String, card: ModelCard, format: RecommendedFormat,
+    private func addGridOnMirror(_ mirror: MirrorLink, _ d: AddOrder, prompt: String, card: ModelCard, format: RecommendedFormat,
                                  steps: Int, stack: [LoRASlot], references: [ReferenceImage], seed: UInt64,
                                  folder: String?, _ c: Connection) throws {
         let available = app.mirrorCatalog?.loras[d.model] ?? []
@@ -386,12 +386,7 @@ extension RemoteControl {
     /// **`enlarge` on a mirror**: the other Mac enlarges its own pixels. Its answer is the new image, or
     /// the need for Apple's model — which `--download` consents to, as here —, or a refusal.
     func enlargeOnMirror(_ mirror: MirrorLink, _ arguments: [String], _ c: Connection) throws {
-        guard (1...2).contains(arguments.count), arguments.count == 1 || arguments[1] == "--download" else {
-            throw Refusal("usage", "enlarge <i7> [--download]")
-        }
-        guard let e = image(arguments[0]) else {
-            throw Refusal("unknown_image", String(localized: "no image \"\(arguments[0])\" in the history"), help: "silicontrol history")
-        }
+        let (e, download) = try enlargeRequest(arguments)
         if let refusal = app.enlargeRefusal(e) {
             finish(c, Response.failure("refused", refusal))
             return
@@ -409,6 +404,6 @@ extension RemoteControl {
                 finish(c, Response.failure("refused", sentence))
             }
         }
-        mirror.send(.enlarge(e.ordinal, download: arguments.count == 2))
+        mirror.send(.enlarge(e.ordinal, download: download))
     }
 }

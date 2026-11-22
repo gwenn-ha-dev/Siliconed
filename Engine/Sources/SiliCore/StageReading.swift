@@ -17,7 +17,7 @@ extension Stage {
         /// The kin of `lines` (what names the functions apart from their shapes, their ops among it: `Block.walk`),
         /// launched `inFlight` at a time. Not the engine that wrote them: a new binary that writes the same ops keeps its
         /// kin's readings, and one that writes them otherwise is another kin by its ops (decided 22/11/2026: with the
-        /// engine in its kin, every version decoded sober once a family).
+        /// engine in its kin, every build lost every reading, and each stage took its soberest form once more).
         public init(_ lines: [String], inFlight: Int, elements: [String: Int]) {
             let all = (["in flight \(inFlight)"] + lines.sorted()).joined(separator: "\n")
             self.init(kin: "kin " + Block.digest(Data(all.utf8)), elements: elements)
@@ -104,7 +104,8 @@ extension Stage {
             return old
         }
         guard let old else { return false }
-        Self.keep(reading: old.reading, under: old.key, extent: old.extent)
+        // The old key's reading, if its functions were called; the new key's needs calls of its own (`called`).
+        if called(again: true) { Self.keep(reading: old.reading, under: old.key, extent: old.extent, budget: plan.budget) }
         opened(key)
         return true
     }
@@ -112,49 +113,84 @@ extension Stage {
     /// A kept group's heap allocated (or its place failed): no longer promised.
     func delivered(_ bytes: Int) { lock.withLock { promised -= Arena.allocation(bytes: bytes) } }
 
-    /// A reading kept at its largest (`ThisMac.keep`: a mark −1 of this engine kept as it is, another's replaced), and
-    /// what its functions held beside it (`ThisMac.extents`).
-    static func keep(reading share: Int, under key: String, extent: Extent? = nil) {
+    /// A reading kept at its largest, of a stage run under `budget` (`ThisMac.keep`: a mark −1 of this engine that holds
+    /// under it kept as it is, another's or one taken under a smaller B replaced), and what its functions held beside it
+    /// (`ThisMac.extents`).
+    static func keep(reading share: Int, under key: String, extent: Extent? = nil, budget: Int) {
         try? ThisMac.update { m in
-            m.keep(reading: share, under: key)
+            m.keep(reading: share, under: key, budget: budget)
             if let extent { m.extents = (m.extents ?? [:]).merging([key: extent]) { $1 } }
         }
     }
 
     /// The open stages' reading keys and names, by stage: what the fuse marks and says (`fused`).
-    nonisolated(unsafe) private static var open: [ObjectIdentifier: (key: String, name: String, order: Int)] = [:]
+    nonisolated(unsafe) private static var open: [ObjectIdentifier: (key: String, name: String, order: Int, budget: Int)] = [:]
     nonisolated(unsafe) private static var openings = 0
     private static let openLock = NSLock()
     func opened(_ key: String?) {
-        let name = plan.declaration.name
+        let (name, budget) = (plan.declaration.name, plan.budget)
         Self.openLock.withLock {
             Self.openings += 1
-            Self.open[ObjectIdentifier(self)] = key.map { ($0, name, Self.openings) }
+            Self.open[ObjectIdentifier(self)] = key.map { ($0, name, Self.openings, budget) }
         }
     }
 
     /// **The fuse stopped the process** (`FootprintWatch`): the functions of the stage opened (or rekeyed) last marked −1
-    /// on this system, never taken again by this engine (`estimates`, `ThisMac.fuse`), and named. Not every open stage's:
+    /// on this system under the B it ran under, never taken again by this engine under a B no larger (`estimates`,
+    /// `ThisMac.fuse`), and named. Not every open stage's:
     /// one opened before it held its place under B until it opened (a stage of bands its client holds idle until the
     /// process ends, `Bands`), and marking it
     /// would refuse it for good for another's fault.
     static func fused() -> [String] {
         guard let last = openLock.withLock({ open.values.max { $0.order < $1.order } }) else { return [] }
-        try? ThisMac.update { $0.fuse(last.key) }
+        try? ThisMac.update { $0.fuse(last.key, budget: last.budget) }
         return [last.name]
+    }
+
+    /// **The open stages' streams, each with whether a call was put on it** since its stage opened or was rekeyed
+    /// (`Run.encode`): a reading is kept of functions called only. The share read under functions loaded and never
+    /// called is next to nothing; kept, it became the reading of a key never read and, `estimates` taking the least
+    /// bound, the bound of its whole kin (a stage closed after its loading, its client stopped: a block whose tallest
+    /// calls hold 1589 MiB would have kept ≈ 0, and the next opening taken them). A stage calls the ANE (`Run.neural`,
+    /// no stream) beside the GPU's calls on its stream, never alone.
+    nonisolated(unsafe) private static var calls: [ObjectIdentifier: Bool] = [:]
+
+    /// A call put on `stream`: its stage's, if a stage's.
+    static func call(on stream: ComputeStream) {
+        let id = ObjectIdentifier(stream)
+        openLock.withLock { if calls[id] != nil { calls[id] = true } }
+    }
+
+    /// The stage's stream listened to (at its opening), or no longer (`nil`, at its close).
+    func listen(_ stream: ComputeStream?) {
+        Self.openLock.withLock {
+            if let stream { Self.calls[ObjectIdentifier(stream)] = false } else if let id = streamID { Self.calls[id] = nil }
+        }
+        if let stream { streamID = ObjectIdentifier(stream) }
+    }
+
+    /// Whether a call was put on the stage's stream since it opened or was rekeyed; `again`, from now on as if none.
+    func called(again: Bool = false) -> Bool {
+        guard let id = streamID else { return false }
+        return Self.openLock.withLock {
+            defer { if again && Self.calls[id] != nil { Self.calls[id] = false } }
+            return Self.calls[id] ?? false
+        }
     }
 
     /// **What a set of functions will hold, before its first call**: its own reading on this Mac; never read, a bound from
     /// its kin's readings at other shapes (`estimates`: a block's other heights and shares of the ANE, a stage's other
-    /// bands, at any size); none read, unknown; fused by this engine, never taken (another engine's mark is no reading:
-    /// `ThisMac.reading`).
+    /// bands, at any size) — `scaled` from a form whose calls hold no more, the reading times their ratio, a prediction
+    /// (bands of 16 384 positions from a reading of 14 336, 10 % over what they held); `capped` by a form whose calls
+    /// hold more, the reading itself, which says what it holds at most and nothing of how much less; none read,
+    /// unknown; fused by this engine, never taken (another engine's mark is no reading: `ThisMac.reading`).
     public enum Estimate: Sendable, Equatable {
-        case read(Int), scaled(Int), unknown, fused
-        public var bytes: Int? { switch self { case .read(let b), .scaled(let b): b; default: nil } }
+        case read(Int), scaled(Int), capped(Int), unknown, fused
+        public var bytes: Int? { switch self { case .read(let b), .scaled(let b), .capped(let b): b; default: nil } }
     }
 
     /// **What a reading moves by with what ran before it in its process** (the same form's share read alone and after a
-    /// render's other stages: −1 % to +9 %, and a form's reading times its ratio up to 4 % short of another's, 22/11/2026
+    /// process's other stages: −1 % to +9 %, and a form's reading times its ratio up to 4 % short of another's, 22/11/2026
     /// on the M5 Pro): a bound from another form's reading counts it (`estimates`).
     public static let swing = 1.125
 
@@ -162,12 +198,14 @@ extension Stage {
     /// another height or beside another share of the ANE, bands of another height, at any size): its own
     /// reading on this Mac; never read, the least of the bounds each reading of its kin gives — the reading times how
     /// much more its calls hold (`Extent.ratio`), never less than the reading itself (what Core AI holds beside the
-    /// calls' intermediates, its functions' code, does not shrink with them), by `swing`, and `margin` beside; none, or
-    /// a form that says no extent, unknown; fused by this engine, never taken.
+    /// calls' intermediates, its functions' code, does not shrink with them), by `swing`, and `margin` beside: `scaled`
+    /// where the least comes from a form that holds no more, `capped` from one that holds more (`Estimate`; a tie,
+    /// `scaled`: a prediction says that number); none, or a form that says no extent, unknown; fused by this engine,
+    /// never taken.
     ///
     /// Measured 22/11/2026 on the M5 Pro. Four stages of bands at ten sizes and four heights each (3024 pairs of a
-    /// reading and another form's, each read in a process of its own; then 1656, read after a render's other stages):
-    /// the reading times its ratio fell short of the other form's by 7 MiB at most alone, by 145 MiB after a render
+    /// reading and another form's, each read in a process of its own; then 1656, read after the process's other stages):
+    /// the reading times its ratio fell short of the other form's by 7 MiB at most alone, by 145 MiB after the other stages
     /// (2979 MiB read at 896 × 1152, bands of 14 336 positions, times 1.14, against 3549 read at 1024², of 16 384) — the
     /// swing and the margin left 122 MiB at the least over every pair. Three transformers' blocks, their products int8
     /// and bf16, on the GPU alone and beside the ANE, at every height over passes of two sizes (4096 to 4160 rows, 1024
@@ -178,41 +216,45 @@ extension Stage {
     /// bounded a shorter form from a taller one below its own reading: bands of 2¹³ from 2¹⁴, 721 MiB, 914 read; a
     /// block's calls of 2112 rows from a call a pass of 4160, 987 MiB, 1589 read (int8, 4608 keys); 68 of the blocks'
     /// 136 pairs of one size below their reading.
-    public static func estimates(extents forms: [(key: String, extent: Extent?)], measured: ThisMac = .current) -> [Estimate] {
+    /// `budget`: the B the forms are planned under, under which a mark −1 taken under a smaller one is no reading
+    /// (`ThisMac.reading`); nil, every mark holds.
+    public static func estimates(extents forms: [(key: String, extent: Extent?)], measured: ThisMac = .current, budget: Int? = nil) -> [Estimate] {
         forms.map { f in
-            if let r = measured.reading(f.key) { return r == -1 ? .fused : .read(r) }
+            if let r = measured.reading(f.key, budget: budget) { return r == -1 ? .fused : .read(r) }
             guard let extent = f.extent else { return .unknown }
-            let bounds = (measured.extents ?? [:]).compactMap { key, read -> Int? in
+            let bounds = (measured.extents ?? [:]).compactMap { key, read -> (bytes: Int, capped: Int)? in
                 guard let r = measured.reading(key), r >= 0, let ratio = extent.ratio(over: read) else { return nil }
-                return Int((Double(r) * max(ratio, 1) * swing).rounded(.up)) + margin
+                return (Int((Double(r) * max(ratio, 1) * swing).rounded(.up)) + margin, ratio < 1 ? 1 : 0)
             }
-            return bounds.min().map { .scaled($0) } ?? .unknown
+            guard let least = bounds.min(by: { ($0.bytes, $0.capped) < ($1.bytes, $1.capped) }) else { return .unknown }
+            return least.capped == 1 ? .capped(least.bytes) : .scaled(least.bytes)
         }
     }
 
     /// **The form to take of `plans` (the tallest first), their `estimates` beside**: the first whose P, its estimate
-    /// counted, holds under B with the margin; else the soberest never read (unknown, or bounded from its kin) past the
-    /// soberest read, as on a Mac with no reading — its socle on paper, under the fuse; every form past it read or fused,
-    /// refused with the number; every form fused, refused with the soberest's P, the one number known.
-    ///
-    /// **A B lowered under every form read** (decided 22/11/2026): a form never read is bounded from its kin by a reading
-    /// times what it holds more, the swing and the margin — an upper bound, which a B lowered under the readings refuses
-    /// though the form may hold; it goes as on a Mac with no reading rather than a refusal. Past the soberest read only:
-    /// a taller form holds more than it, which did not hold.
+    /// counted, holds under B with the margin. None holds: a form taller than one read or fused holds more than it, and
+    /// is never taken; of the forms soberer than every one read or fused, the soberest goes on paper, under the fuse,
+    /// where nothing bounds it from below — nothing of its kin read (`unknown`: a size never met, no one can know), or
+    /// only a form that holds more (`capped`: a B lowered under every form read, decided 22/11/2026, goes as on a Mac
+    /// with no reading) —, and is refused where a form that holds no more predicts it past B (`scaled`: a size larger
+    /// than any this Mac read, refused before the computation whose result it reads, `BandStage.admit`). Refused, the
+    /// number: the soberest fused, its P, the one number known; else the least P its estimate counted.
     public static func choose(_ plans: [Plan], _ estimates: [Estimate]) throws -> Int {
         precondition(!plans.isEmpty && plans.count == estimates.count)
         if let i = plans.indices.first(where: { i in estimates[i].bytes.map { plans[i].p + $0 + margin <= plans[i].budget } ?? false }) { return i }
-        let past = (estimates.lastIndex { if case .read = $0 { true } else { false } } ?? -1) + 1
-        if let i = (past..<plans.count).last(where: { estimates[$0] != .fused }) { return i }
-        let i = plans.indices.filter { estimates[$0].bytes != nil }.min { plans[$0].p + estimates[$0].bytes! < plans[$1].p + estimates[$1].bytes! }
-        guard let i else {
+        let past = (estimates.lastIndex { switch $0 { case .read, .fused: true; default: false } } ?? -1) + 1, last = plans.count - 1
+        if past <= last { switch estimates[last] { case .unknown, .capped: return last; default: break } }
+        guard estimates[last] != .fused else {
             // What Core AI held past the soberest's socle was never read, only that the process passed B under it (the
             // mark outlives the B it was taken under): its P is the number known.
-            let soberest = plans.last!
+            let soberest = plans[last]
             throw OverBudget(needed: soberest.p + margin, budget: soberest.budget,
-                             description: "\(soberest.declaration.name): every form stopped the fuse on this Mac; at its soberest P = "
-                                 + "\(Memory.mib(soberest.p)) + \(Memory.mib(margin)), under B = \(Memory.mib(soberest.budget))")
+                             description: "\(soberest.declaration.name): its soberest form stopped the fuse on this Mac, and a taller one "
+                                 + "holds more; at its soberest P = \(Memory.mib(soberest.p)) + \(Memory.mib(margin)), under B = "
+                                 + "\(Memory.mib(soberest.budget))")
         }
+        // The soberest read or predicted: an estimate at least.
+        let i = plans.indices.filter { estimates[$0].bytes != nil }.min { plans[$0].p + estimates[$0].bytes! < plans[$1].p + estimates[$1].bytes! }!
         let p = plans[i].p + estimates[i].bytes!
         throw OverBudget(needed: p + margin, budget: plans[i].budget,
                          description: "\(plans[i].declaration.name): its socle and what Core AI will hold, \(Memory.mib(p)) + "
@@ -249,7 +291,7 @@ extension Stage {
     /// first met): read in this stage — the reader keeps from the first signal of the cycle's third turn, every function
     /// then seen called twice, a function called once a turn too (the reserve 0; the margin and the fuse beside), and
     /// this stage's reading kept at its close (20/11: kept from the second turn, the share grew 156 MiB past a margin of
-    /// 91 as a step's edges took their working memory, and the fuse stopped a render at B = 4). Given, never waited for.
+    /// 91 as a step's edges took their working memory, and the fuse stopped a run at B = 4). Given, never waited for.
     public func signal() {
         let (share, _, _) = read()
         let on = lock.withLock { () -> Bool in

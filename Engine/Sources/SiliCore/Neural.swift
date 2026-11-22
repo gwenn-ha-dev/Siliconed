@@ -35,8 +35,9 @@ extension Aicode.Block {
     }
 
     /// **`x · W` on the ANE** for W int8 codes `[1, k, n]` with their scales `[1, 1, n]` (the ANE's copy of a group's codes,
-    /// `Block`): x times the codes over 64, the sums times 64 s. The sums stay in f16 while k · 2 · max|x| does: x brought
-    /// to 1 first (`peak`). k cut as `Weights.pieces` cuts it. Measured 22/11/2026 on the M5 Pro (1024 × 3840 → 10 240):
+    /// `Block`): x times the codes over 64, the sums times 64 s. The sums stay in f16: x comes under the product's
+    /// target 2^e₀ (`rotated16`, `Recipe.target`), each term within 2 · 2^e₀ (|code| / 64 ≤ 2), k · 2 · 2^e₀ ≤ 65 504 by
+    /// the target's cap (`Weights.target16`); times 64 s, the result the guard bounds. k cut as `Weights.pieces` cuts it. Measured 22/11/2026 on the M5 Pro (1024 × 3840 → 10 240):
     /// 17.8 TFLOP/s on `[in, out]`; the same codes `[out, in]` transposed in the function 15.7 (a fixed cost a call, the
     /// same from 512 to 3072 rows: W transposed at every call; on the M1 Pro 0.54 to 0.87 ×), transposed before their
     /// dequantize 15.7, read as W · xᵀ 11.8 (11.9 with x and y given channels first), as a 1 × 1 convolution 0.37.
@@ -96,7 +97,7 @@ extension Aicode.Block {
     /// `x · w` in f16 `[1, rows, n]`, k cut as `Weights.pieces` cuts it, each piece a product, summed.
     private func pieces(_ x: Int, _ w: Int) -> Int {
         let rows = Aicode.shape(types[x]).shape[1], (k, n) = (Aicode.shape(types[w]).shape[1], Aicode.shape(types[w]).shape[2])
-        let (pieces, piece) = Weights.pieces(k)
+        let (pieces, piece) = Weights.written(k)
         var sum: Int? = nil
         for i in 0..<pieces {
             let xp = pieces == 1 ? x : slice(x, axis: 2, start: i * piece, size: piece)

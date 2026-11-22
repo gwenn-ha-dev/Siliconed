@@ -9,7 +9,7 @@ import SiliCore
 ///
 ///     gains       GPU    the modulation's six rows each its own `[1, 1, d]`: shift, 1 + scale, a gate as ĝ = g / G
 ///     enter       GPU    the embedders' bf16 rows as the stream (x̂, X), X `[1, rows, 1]`
-///     pre         both   n = RMS(x̂ · X) · γ₁ · (1 + s₁) + t₁, rotated, under 2^e₀ by F: qkv̂ = q64, and F
+///     pre         both   n = RMS(x̂ · X) · γ₁ · (1 + s₁) + t₁, rotated, under 2^e₀ by F: qkv̂ = the product, and F
 ///     heads       GPU    q, k: RMS_head(qkv̂) · γ (eps / F²), RoPE in f32; v = v̂ · F; heads first, into the sequence's keys
 ///     attention   GPU    o = sdpa(q, K, V, mask), rows first: a true value
 ///     out         both   x₁ = x + g₁ · (o R) · Wo, the stream kept as (x̂, X)
@@ -26,8 +26,9 @@ import SiliCore
 ///   - **SITU** reads its two halves true: h · F clipped to ±128 (25 tanh(h / 25) is 25 in f16 past it), g · F to ±32
 ///     (σ and tanh(g / 4) are 1 past it); its result within ±100 by construction, rotated under 2¹⁴.
 ///
-/// **Two weights** (`SharedWeights`): the Compact's codes, each product's input rotated (q64); the Standard's bf16
-/// rounded to f16 as they are read, the input as it is (`product16`) — the Standard beside the ANE.
+/// **Two weights** (`SharedWeights`): the Compact's codes, each product's input rotated, int8 × int8 on the GPU's codes
+/// by pieces `[p, out, in / p]` (`w8a8`) and q64 on the ANE's copy `[1, in, out]`; the Standard's bf16 rounded to f16 as
+/// they are read, the input as it is (`product16`), one product on both units — the Standard beside the ANE.
 enum MossShared {
     typealias Argument = MossFunctions.Argument
     static let d = MossFunctions.d, heads = MossFunctions.heads, hd = MossFunctions.hd, hidden = MossFunctions.hidden

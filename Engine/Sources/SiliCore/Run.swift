@@ -35,13 +35,15 @@ public enum Run {
     /// values, to give the next call as its `chained` inputs. The stream orders its work by these values, not by the
     /// buffers they lie in: a call reading, as a view of our buffer, what the call before writes there may read it before
     /// it is written (a transformer's layers chained through the arena's views gave wrong values, 18/11; chained through
-    /// the returned values, right). `finish` waits for the stream.
+    /// the returned values, right). `finish` waits for the stream. A stage's stream: the stage called (`Stage.keep`).
     public static func encode(_ function: InferenceFunction, _ stream: ComputeStream, inputs: [String: View],
                               chained: [String: InferenceFunction.AsyncValue] = [:],
                               outputs: [(String, View)]) throws -> [String: InferenceFunction.AsyncValue] {
         var ins = chained
         for (name, v) in inputs { ins[name] = value(v) }
-        return try bind(function, stream, ins, outputs[...], InferenceFunction.AsyncMutableViews())
+        let values = try bind(function, stream, ins, outputs[...], InferenceFunction.AsyncMutableViews())
+        Stage.call(on: stream)
+        return values
     }
 
     /// A view borrows its value: each output's value lives in its own frame, the encode at the deepest.

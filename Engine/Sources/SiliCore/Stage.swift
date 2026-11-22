@@ -10,12 +10,14 @@ import Metal
 ///                   the tensors, the residents, the groups the ring cannot hold, the ring's slots), refused where
 ///                   P + 64 MiB passes B. Core AI's share is not on paper: it is read in flight (`signal`)
 ///     `choose`      of a client's forms (taller calls or bands first), each planned, the first whose P and what Core
-///                   AI was read to hold under its functions on this Mac hold under B; none read, the soberest
+///                   AI will hold under its functions on this Mac (read, or bounded from their kin's readings) hold
+///                   under B; none, the soberest on paper where nothing bounds it from below, else refused
 ///     `Stage`       the arena allocated, the residents read, the ring's reader started (the groups kept from the start
 ///                   read ahead in the loop's order, the others through the slots), the functions loaded; views by
 ///                   name, groups acquired and released in the loop's order; past the loop's signal (`signal`), the
 ///                   cycle's groups kept in flight while what Core AI is read to hold leaves room under B; `close` lets
-///                   everything go, waits for the footprint and keeps what this stage's functions were read to hold
+///                   everything go, waits for the footprint and keeps what this stage's functions were read to hold,
+///                   if called
 ///
 /// The engine knows tensors, groups, functions and bytes; what they compute is the client's.
 public final class Stage: @unchecked Sendable {
@@ -65,6 +67,8 @@ public final class Stage: @unchecked Sendable {
     var use = 0
     /// What its close waited for, once closed (`Stages` told once): a stage may be closed again by its owner's `deinit`.
     private var settled: Settled?
+    /// Its stream's identity, which a call on it marks (`called`).
+    var streamID: ObjectIdentifier?
     let lock = NSLock()
     /// The footprint before the stage allocated: what `close` waits for.
     public let before: Int
@@ -94,6 +98,7 @@ public final class Stage: @unchecked Sendable {
         guard let queue = device.makeCommandQueue() else { throw Failure("no command queue") }
         self.queue = queue
         stream = ComputeStream(commandQueue: queue)
+        listen(stream)
         let arena = try Arena(device, bytes: plan.heap + plan.apart, apart: plan.apart)
         self.arena = arena
         for t in d.tensors {
@@ -171,6 +176,7 @@ public final class Stage: @unchecked Sendable {
         watch?.stop()
         opened(nil)
         if lock.withLock({ settled == nil && ready }) { keep() }
+        listen(nil)
     }
 
     /// **What this stage read, kept on this Mac**, at its largest: the share read since its key, the reading of the
@@ -178,14 +184,14 @@ public final class Stage: @unchecked Sendable {
     /// functions (`ThisMac.reserves`) — not past a climb: a reserve counts from a stage's first signal on its functions,
     /// where a stage opened on them gives it (20/11: read past a climb from a signal of the main pass, 31 MiB; opened on
     /// the same functions, the first signal in a pass of keys before it, the share grew 194 MiB past the margin and the
-    /// fuse stopped a render at B = 10). At the close or the stage let go, and wherever its client knows every function was
-    /// called (`Bands`, a pass done: a client may hold its stage until the process ends). A stage that loads no function
-    /// keeps nothing.
+    /// fuse stopped a run at B = 10). At the close or the stage let go, and wherever its client knows every function was
+    /// called (`Bands`, a pass done: a client may hold its stage until the process ends). A stage none of whose functions
+    /// was called since its opening or its last climb keeps nothing (`called`).
     public func keep() {
+        guard called() else { return }
         let (share, _, _) = read()
         let (keyed, readingKey, extent, first, climbed) = lock.withLock { (self.keyed, self.readingKey, self.readingExtent, self.first, self.climbed != nil) }
-        guard !plan.declaration.functions.isEmpty else { return }
-        Self.keep(reading: keyed, under: readingKey, extent: extent)
+        Self.keep(reading: keyed, under: readingKey, extent: extent, budget: plan.budget)
         if let first, !climbed {
             let reading = max(share - first, 0), key = readingKey
             try? ThisMac.update { $0.reserves = ($0.reserves ?? [:]).merging([key: reading]) { max($0, $1) } }
@@ -284,7 +290,7 @@ public final class Stage: @unchecked Sendable {
 
     /// **Everything let go** — the reader stopped, the arena, then the functions, the queue and the stream — then the
     /// wait until the footprint is back within 64 MiB of what it was before the stage, 2 s at most (measured 18/11 on the
-    /// M1 Pro, a render's stages each let go: the heap leaves within 0.05 to 0.5 s, then 100 to 160 MiB of Core AI's or
+    /// M1 Pro, a run's stages each let go: the heap leaves within 0.05 to 0.5 s, then 100 to 160 MiB of Core AI's or
     /// Metal's 1 to 2 s after; a function holds its last call's buffers until it is let go, `Arena.take(apart:)`).
     /// **The arena before the functions that read it**: a heap let go after them stays billed to the process 12 to 36 s,
     /// before them 0.06 s (14–15/11 on the M1 Pro, the graphics ledger; the int8 trial's arena likewise). Past the wait it
@@ -300,6 +306,7 @@ public final class Stage: @unchecked Sendable {
         ring = nil
         opened(nil)
         keep()
+        listen(nil)
         watch?.stop()
         watch = nil
         residents = [:]

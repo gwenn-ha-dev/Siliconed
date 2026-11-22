@@ -10,7 +10,7 @@ import SiliCore
 /// the GPU's:
 ///
 ///     modulation   GPU    `ZImageBlock`'s under the guard (one row), its four rows each an output
-///     pre          both   n = RMS(x̂ · X) · γ₁ · s₁, rotated, brought under 2^e₀ by F: qkv̂ = q64, and F (e₀ an argument, `targets`)
+///     pre          both   n = RMS(x̂ · X) · γ₁ · s₁, rotated, brought under 2^e₀ by F: qkv̂ = the product, and F (e₀ an argument, `targets`)
 ///     heads        GPU    q, k: RMS_head(qkv̂) · γ (eps / F²), RoPE in f16; v = v̂ · F; q heads first, k and v
 ///                         token first into the whole sequence's rows
 ///     attention    GPU    o = sdpa(q, K, V, mask), rows first: a true value, under max|v|
@@ -23,8 +23,9 @@ import SiliCore
 ///
 /// Every factor is a power of two `[1, rows, 1]` in f16, the stream's included: X within [2⁻¹³, 2¹⁵].
 ///
-/// **Two weights** (`SharedWeights`): the Compact's codes, each product's input rotated (q64); the Standard's bf16 rounded
-/// to f16 as they are read, the input as it is (`product16`) — the Standard beside the ANE, the same functions else.
+/// **Two weights** (`SharedWeights`): the Compact's codes, each product's input rotated, int8 × int8 on the GPU's codes by
+/// pieces `[p, out, in / p]` (`w8a8`) and q64 on the ANE's copy `[1, in, out]`; the Standard's bf16 rounded to f16 as they
+/// are read, the input as it is (`product16`), one product on both units — the Standard beside the ANE, the same functions else.
 /// Its modulation reads `ada` in f16 under the guard of the edges (`ZImageFunctions`), the GPU's.
 ///
 /// **The modulation gives the four rows the block reads each as its own output**: called by `encode` on the heap's

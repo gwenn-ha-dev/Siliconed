@@ -120,6 +120,16 @@ final class RemoteWritingTests: XCTestCase {
         guard case .failure(.usage) = SetOrder.parse(["save-images", "on", "~/Pictures"]) else { return XCTFail() }
     }
 
+    /// **`set` takes no flag**: a word of two dashes is refused by name, never read as a folder; a folder whose name begins with
+    /// `--` goes after a lone `--`.
+    func testSetRefusesAFlagAndTakesAFolderAfterTheSeparator() throws {
+        XCTAssertEqual(SetOrder.parse(["save-images", "--x"]), .failure(.unknownFlag("--x")))
+        XCTAssertEqual(SetOrder.parse(["--glass"]), .failure(.unknownFlag("--glass")))
+        XCTAssertEqual(SetOrder.parse(["glass", "on", "--now"]), .failure(.unknownFlag("--now")))
+        XCTAssertEqual(try SetOrder.parse(["save-images", "--", "--x"]).get(), .saveImages(folder: "--x"))
+        XCTAssertEqual(try SetOrder.parse(["--", "glass", "off"]).get(), .toggle(.glass, on: false))
+    }
+
     /// Every subcommand of `set` is read here, its own usage on a mistake, all of them for an unknown one.
     func testSetReadsTheSwitchesAndTheMemory() throws {
         for toggle in SetOrder.Toggle.allCases {

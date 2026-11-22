@@ -1,7 +1,8 @@
 import Foundation
 
 /// **The shared forms' pieces that several transformers write the same** (`Neural.swift`'s forms put together): a
-/// product's input rotated under its target, the q64 product with its low-rank path, a head's RMS norm of a guarded
+/// product's input rotated under its target, the product on codes (int8 × int8 on the GPU, q64 on the ANE) or on
+/// halves with its low-rank path, a head's RMS norm of a guarded
 /// value, a LayerNorm without affine in f16, an update through a gate held as (ĝ, G), the exact GELU of a true value
 /// within f16's range. Each the very graph its clients wrote: the same values to the bit.
 extension Aicode.Block {

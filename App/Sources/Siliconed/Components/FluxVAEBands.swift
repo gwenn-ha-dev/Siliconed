@@ -146,21 +146,33 @@ extension FluxVAE {
     /// (`BandStage.narrowed`).
     package func open(_ direction: FluxVAEPlan.Direction, path: String, height: Int, width: Int, budget: Int,
                       positions: Int? = nil) async throws -> (pass: FluxVAEPass, narrowed: Bool) {
-        let file = try SafeTensors(path)
-        let candidates = positions.map { [$0] } ?? Self.candidates
-        let plans = candidates.map { FluxVAEPlan(self, direction, height: height, width: width, positions: $0) }
-        let side = direction == .decode ? "decoder" : "encoder"
-        let stage = try await BandStage.open("\(name) \(side) \(height)x\(width)", prefix: "\(name)-\(side)", candidates: candidates, files: [file],
-                                             residents: plans[0].residents(file), budget: budget) { p in plans[candidates.firstIndex(of: p)!].bands }
-        return (FluxVAEPass(plans[stage.candidate], stage), stage.narrowed)
+        let s = try staged(direction, path: path, height: height, width: width, candidates: positions.map { [$0] } ?? Self.candidates)
+        let stage = try await BandStage.open(s.name, prefix: s.prefix, candidates: s.candidates, files: [s.file], residents: s.residents,
+                                             budget: budget, plan: s.bands)
+        return (FluxVAEPass(s.plans[stage.candidate], stage), stage.narrowed)
     }
 
     /// Whether `open` would hold under `budget`, nothing allocated (`BandStage.admit`).
     package func admit(_ direction: FluxVAEPlan.Direction, path: String, height: Int, width: Int, budget: Int) throws {
+        let s = try staged(direction, path: path, height: height, width: width, candidates: Self.candidates)
+        try BandStage.admit(s.name, prefix: s.prefix, candidates: s.candidates, files: [s.file], residents: s.residents, budget: budget, plan: s.bands)
+    }
+
+    /// **What `open` opens and `admit` judges, written once**: the stage's name, its plans among `candidates`, its
+    /// residents — so that what a render judges before its DiT is what it opens after.
+    private func staged(_ direction: FluxVAEPlan.Direction, path: String, height: Int, width: Int, candidates: [Int]) throws -> Staged {
         let file = try SafeTensors(path)
-        let plans = Self.candidates.map { FluxVAEPlan(self, direction, height: height, width: width, positions: $0) }
+        let plans = candidates.map { FluxVAEPlan(self, direction, height: height, width: width, positions: $0) }
         let side = direction == .decode ? "decoder" : "encoder"
-        try BandStage.admit("\(name) \(side) \(height)x\(width)", prefix: "\(name)-\(side)", candidates: Self.candidates, files: [file],
-                            residents: plans[0].residents(file), budget: budget) { p in plans[Self.candidates.firstIndex(of: p)!].bands }
+        return Staged(name: "\(name) \(side) \(height)x\(width)", prefix: "\(name)-\(side)", file: file, candidates: candidates, plans: plans)
+    }
+
+    private struct Staged {
+        let name, prefix: String
+        let file: SafeTensors
+        let candidates: [Int]
+        let plans: [FluxVAEPlan]
+        var residents: [Weights.Entry] { plans[0].residents(file) }
+        func bands(_ positions: Int) -> Bands { plans[candidates.firstIndex(of: positions)!].bands }
     }
 }

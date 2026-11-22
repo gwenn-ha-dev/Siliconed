@@ -1,6 +1,6 @@
 import Foundation
 
-/// **The guard of f16**: the rules every family's functions
+/// **The guard of f16**: the rules every client's functions
 /// are written with, whatever the model — no value whose size the activations decide is written in f16 as it is. It
 /// travels as (t, F): t in f16, F = 2^e a row (f32, `[rows, 1]`), computed by the graph, its true value t · F:
 ///   - **a product** reads t brought under 2^e₀, e₀ its own: K · max|w| · 2^e₀ ≤ 65 504 bounds its result whatever its

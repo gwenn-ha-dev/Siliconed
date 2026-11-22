@@ -244,7 +244,6 @@ package enum QwenImage21Functions {
         let names = m.argumentNames
         func a(_ name: String) -> Int { names.firstIndex(of: name)! }
         let (d, hd, h, eps, e) = (Self.d, Self.hd, Self.heads, c.eps, path.element)
-        var constants = Aicode.ScalingConstants()
         /// `y`, the product `w`'s result on `x`, with its LoRA's change when one adapts it.
         func adapt(_ y: Int, _ x: Int, _ w: String) -> Int {
             (ranks[w] ?? 0) > 0 ? b.lowRank(y, x, down: a(w + "_down"), up: a(w + "_up")) : y

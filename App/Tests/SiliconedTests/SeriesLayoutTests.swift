@@ -138,4 +138,22 @@ final class SeriesLayoutTests: XCTestCase {
         XCTAssertEqual(side, 250)
         XCTAssertEqual(fit.run, 2)
     }
+
+    /// **⌘0 gives back when the grid no longer fills the room**, whether the hand sized the cells or the band under the grid
+    /// came: then they keep their side and still follow the room, but the grid overflows it.
+    func testZoomToFitIsOfferedWhenTheGridNoLongerFits() {
+        var (fit, _) = SeriesFit.refit(nil, run: 1, band: false, current: 0, fitting: 340)
+        XCTAssertFalse(fit.restores(340), "fitted: nothing to give back")
+        // The band comes: the cells stay at 340 under the pointer, the room now fits 320.
+        (fit, _) = SeriesFit.refit(fit, run: 1, band: true, current: 340, fitting: 320)
+        XCTAssertTrue(fit.follows(340))
+        XCTAssertTrue(fit.restores(340), "the grid overflows: ⌘0 is offered")
+        XCTAssertEqual(fit.restore(), 320)
+        XCTAssertFalse(fit.restores(320))
+        // The band goes: the cells keep 320, and the room fits 340 again: ⌘0 gives it back.
+        (fit, _) = SeriesFit.refit(fit, run: 1, band: false, current: 320, fitting: 340)
+        XCTAssertTrue(fit.restores(320))
+        // The hand sizes them: ⌘0 is offered too.
+        XCTAssertTrue(fit.restores(500))
+    }
 }

@@ -11,7 +11,7 @@ public struct Placed: Sendable {
     public init(offset: Int, shape: [Int], type: NDArray.ScalarType) { self.offset = offset; self.shape = shape; self.type = type }
 }
 
-/// **How a tensor of a file enters the arena.** A family's recipe names, for each argument of its functions, the
+/// **How a tensor of a file enters the arena.** A client's recipe names, for each argument of its functions, the
 /// file's key and one of these; the loader knows no model.
 public enum Recipe: Equatable, Sendable {
     /// int8 codes `[out, in]` (`<key>.weight`) laid `[p, out, in / p]`, the file's rows by pieces of k (`Weights.pieces`;
@@ -39,11 +39,12 @@ public enum Recipe: Equatable, Sendable {
     case float
     /// f32 `[out, in]` as `[in, out]`, in f32.
     case floatTransposed
-    /// bf16 `[out, in]` as `[in, out]`, kept bf16 (f32 rounded once): the bf16 path's weights, laid out as the codes are,
-    /// what Core AI's product reads as it lies.
+    /// bf16 `[out, in]` as `[in, out]`, kept bf16 (f32 rounded once): the weight of a product written `x · W` in bf16
+    /// (a one-row function's, a client's function in bf16 that reads W `[in, out]`), laid out as that product reads it —
+    /// Core AI copies a transposed view at every call (`codes`), so the layout is written once, here.
     case bfloatTransposed
-    /// The exponent e₀ the q64 products of these codes (entries before it, by their arguments' names) read their one
-    /// input under, f16 `[1, 1, 1]`: `target16`'s rule (`target16(scales:count:k:)`), computed here from the scales once read, not in
+    /// The exponent e₀ the products of these codes (q64 on the ANE, int8 × int8 on the GPU; entries before it, by their
+    /// arguments' names) read their one input under, f16 `[1, 1, 1]`: `target16`'s rule (`target16(scales:count:k:)`), computed here from the scales once read, not in
     /// the function's graph; of f16 weights (`SharedWeights.half`, no scales), from their largest magnitude
     /// (`target16(weights:count:k:)`). Measured 18/11/2026 on the M5 Pro: in a transformer's shared feed-forward function, the ANE gave
     /// `target16` −65 504 where the GPU gave 2 for the layers whose largest w₁ scale lies just under 2⁻⁷ (1, 2, 7) — the

@@ -1,4 +1,4 @@
-// `add` and `grid`: the order read from the command line (`RenderOrder`), checked, queued.
+// `add` and `grid`: the order read from the command line (`AddOrder`), checked, queued.
 
 import AppKit
 import Foundation
@@ -8,139 +8,60 @@ import Siliconed
 import SilicontrolHelp
 
 extension RemoteControl {
-    /// **A command's flags, read as every command reads them** (`Flags.scan`): one it does not take is refused by name, and
-    /// a text that begins with `--` goes after a lone `--`.
-    static func flags(_ arguments: [String], valued: Set<String>, switches: Set<String> = []) throws -> Flags {
+    /// **A command's flags, read as every command reads them** (`Flags.scan`): one it does not take is refused by name.
+    /// `text`: the command takes a free text (a prompt), which may begin with `--` — the refusal then says where such a text goes.
+    static func flags(_ arguments: [String], valued: Set<String> = [], switches: Set<String> = [], text: Bool = false) throws -> Flags {
         switch Flags.scan(arguments, valued: valued, switches: switches) {
         case .success(let flags): return flags
-        case .failure(.unknownFlag(let a)):
-            throw Refusal("usage", String(localized: "unknown flag: \(a)"),
-                          help: String(localized: "a text that begins with -- goes after a lone --"))
+        case .failure(.unknownFlag(let a)): throw unknownFlag(a, text: text)
         case .failure(.flagWithoutValue(let a)): throw Refusal("usage", String(localized: "\(a) expects a value"))
         }
     }
 
-    /// The flags of `add` and `grid`, by kind: those that take a value, and the switches.
-    static let addValued: Set<String> = ["--model", "--steps", "--detail", "--solver", "--batch", "--x", "--y", "--lora", "--ref",
-                                         "--out", "--image", "--strength"]
-    static let addSwitches: Set<String> = ["--preview", "--no-preview", "--wait", "--no-sheet"]
-
-    /// The arguments of the developer's render command, plus `--wait` and `--out`.
-    struct RenderOrder {
-        var model = ModelCard.of(.default).id
-        var prompt: String?
-        var format: (Int, Int)?
-        var seed: UInt64?
-        var batch = 1
-        var steps: Int?
-        /// `--detail more|most`: the rack's Detail choice (`Request.detail`).
-        var detail = Detail.normal
-        /// `--solver NAME`: the rack's Solver (`Request.solver`), More Solvers and `AppState.solverFamilies` only.
-        var solver = Solver.euler
-        var loras: [(name: String, strength: Double)] = []
-        /// The `--ref`, in their order: the first is image 1, the one edited.
-        var references: [String] = []
-        /// `--image IMAGE|i7`: the starting image of an img2img (a model with "start_image": true); `--strength`: its strength,
-        /// diffusers' (the family's, `StartImage.defaultStrength`, when left out).
-        var image: String?
-        var strength: Double?
-        /// `nil`: like the DiT box's « Preview every step » switch.
-        var previews: Bool?
-        var wait = false
-        /// `grid --no-sheet`: a series as « Generate » renders it — the cells, the sheet only on `sheet g2`.
-        var sheet = true
-        var folder: String?
-        /// `grid`: the axes as typed (`RenderGrid.axis`), and whether `--batch` was given (refused).
-        var x: String?, y: String?
-        var batchGiven = false
+    /// A flag the command does not take. A hint about the lone `--` only where a text may begin with `--`: elsewhere the
+    /// command's page says what it takes (`handle`).
+    static func unknownFlag(_ a: String, text: Bool) -> Refusal {
+        Refusal("usage", String(localized: "unknown flag: \(a)"),
+                help: text ? String(localized: "a text that begins with -- goes after a lone --") : nil)
     }
 
-    func parse(_ arguments: [String]) throws -> RenderOrder {
-        var d = RenderOrder()
-        let flags = try Self.flags(arguments, valued: Self.addValued, switches: Self.addSwitches)
-        // A flag given twice: its last value, except those that add up (`--lora`, `--ref`).
-        if let model = flags.value("--model") { d.model = model }
-        if let v = flags.value("--steps") {
-            guard let n = Int(v), (1...Request.maximumSteps).contains(n) else {
-                throw Refusal("usage", String(localized: "--steps expects an integer from 1 to \(Request.maximumSteps), not \"\(v)\""))
-            }
-            d.steps = n
+    /// `add` and `grid` read (`AddOrder`, the library's), their mistakes said in the app's words.
+    func parse(_ arguments: [String]) throws -> AddOrder {
+        switch AddOrder.parse(arguments) {
+        case .success(let order): return order
+        case .failure(let failure): throw Self.refusal(failure)
         }
-        if let v = flags.value("--detail") {
-            guard let level = Detail(rawValue: v.lowercased()) else {
-                throw Refusal("usage", String(localized: "--detail expects normal, more or most, not \"\(v)\""))
-            }
-            d.detail = level
+    }
+
+    static func refusal(_ failure: AddOrder.Failure) -> Refusal {
+        switch failure {
+        case .unknownFlag(let a): return unknownFlag(a, text: true)
+        case .flagWithoutValue(let a): return Refusal("usage", String(localized: "\(a) expects a value"))
+        case .badValue(.steps, let v):
+            return Refusal("usage", String(localized: "--steps expects an integer from 1 to \(Request.maximumSteps), not \"\(v)\""))
+        case .badValue(.detail, let v): return Refusal("usage", String(localized: "--detail expects normal, more or most, not \"\(v)\""))
+        case .badValue(.solver, let v):
+            return Refusal("usage", String(localized: "--solver expects euler, euler-ancestral, dpmpp-2m or unipc, not \"\(v)\""))
+        case .badValue(.batch, let v): return Refusal("usage", String(localized: "--batch expects an integer from 1 to 8, not \"\(v)\""))
+        case .badValue(.lora, let v): return Refusal("usage", String(localized: "--lora expects a finite strength, not \"\(v)\""))
+        case .badValue(.strength, let v):
+            return Refusal("usage", String(localized: "--strength expects a number above 0 and at most 1 (0.65 or 65%), not \"\(v)\""))
+        case .promptMissing:
+            return Refusal("usage", String(localized: "the prompt is missing"),
+                           help: "silicontrol add [--model id] \"<prompt>\" [512|1024|WxH|P:Q@1K|2K] [seed] — silicontrol help add")
+        case .unknownRatio(let r):
+            return Refusal("format", String(localized: "no such proportion: \"\(r)\""),
+                           help: String(localized: "proportions: \(SizeScales.ratioList) — silicontrol help add"))
+        case .unknownResolution(let r):
+            return Refusal("format", String(localized: "no such resolution: \"\(r)\""), help: String(localized: "1K or 2K, e.g. 3:4@2K"))
+        case .unreadableScale(let p):
+            return Refusal("format", String(localized: "unreadable size: \"\(p)\""), help: String(localized: "proportion@resolution, e.g. 3:4@2K"))
+        case .unreadableFormat(let p):
+            return Refusal("format", String(localized: "unreadable format: \"\(p)\""), help: String(localized: "width x height, e.g. 832x1216"))
+        case .extraArgument(let p):
+            return Refusal("usage", String(localized: "extra argument: \"\(p)\""),
+                           help: String(localized: "the prompt is ONE argument: put it in quotes — silicontrol help add"))
         }
-        if let v = flags.value("--solver") {
-            guard let rule = Solver(rawValue: v.lowercased()) else {
-                throw Refusal("usage", String(localized: "--solver expects euler, euler-ancestral, dpmpp-2m or unipc, not \"\(v)\""))
-            }
-            d.solver = rule
-        }
-        if let v = flags.value("--batch") {
-            guard let n = Int(v), (1...8).contains(n) else { throw Refusal("usage", String(localized: "--batch expects an integer from 1 to 8, not \"\(v)\"")) }
-            d.batch = n
-            d.batchGiven = true
-        }
-        d.x = flags.value("--x")
-        d.y = flags.value("--y")
-        for v in flags.values["--lora"] ?? [] {
-            // `name:strength` — the last colon separates the strength (a path has none).
-            if let colonIndex = v.lastIndex(of: ":"), let f = Double(v[v.index(after: colonIndex)...].replacingOccurrences(of: ",", with: ".")) {
-                // `Double` reads « nan » and « inf »: a strength that would make every weight NaN.
-                guard f.isFinite else { throw Refusal("usage", String(localized: "--lora expects a finite strength, not \"\(v)\"")) }
-                d.loras.append((String(v[..<colonIndex]), f))
-            } else {
-                d.loras.append((v, 1))
-            }
-        }
-        d.references = flags.values["--ref"] ?? []
-        d.folder = flags.value("--out")
-        if let last = flags.last(of: ["--preview", "--no-preview"]) { d.previews = last == "--preview" }
-        if flags.has("--wait") { d.wait = true }
-        if flags.has("--no-sheet") { d.sheet = false }
-        d.image = flags.value("--image")
-        if let v = flags.value("--strength") {
-            guard let s = StartImage.strength(v) else {
-                throw Refusal("usage", String(localized: "--strength expects a number above 0 and at most 1 (0.65 or 65%), not \"\(v)\""))
-            }
-            d.strength = s
-        }
-        // A prompt that begins with `--` is written after a lone `--`: everything there is a word.
-        let positional = flags.allWords
-        guard let prompt = positional.first else {
-            throw Refusal("usage", String(localized: "the prompt is missing"), help: "silicontrol add [--model id] \"<prompt>\" [512|1024|WxH|P:Q@1K|2K] [seed] — silicontrol help add")
-        }
-        d.prompt = prompt
-        for p in positional.dropFirst() {
-            if d.format == nil, SizeScales.looksLikeScale(p) {
-                // `3:4@2K`: the pixels of the rack's two-scale Size (`SizeScales`), whether or not that Beta option is on.
-                // The model's own limits are judged below, with `WxH`'s.
-                do { let c = try SizeScales.parse(p); d.format = (c.width, c.height) } catch {
-                    switch error {
-                    case .unknownRatio(let r):
-                        throw Refusal("format", String(localized: "no such proportion: \"\(r)\""),
-                                      help: String(localized: "proportions: \(SizeScales.ratioList) — silicontrol help add"))
-                    case .unknownResolution(let r):
-                        throw Refusal("format", String(localized: "no such resolution: \"\(r)\""), help: String(localized: "1K or 2K, e.g. 3:4@2K"))
-                    case .unreadable:
-                        throw Refusal("format", String(localized: "unreadable size: \"\(p)\""), help: String(localized: "proportion@resolution, e.g. 3:4@2K"))
-                    }
-                }
-            } else if d.format == nil, p.lowercased().contains("x") || p.contains("×") {
-                guard let f = Format.parse(p) else { throw Refusal("format", String(localized: "unreadable format: \"\(p)\""), help: String(localized: "width x height, e.g. 832x1216")) }
-                d.format = (f.width, f.height)
-            } else if d.format == nil, p == "512" || p == "1024" {
-                d.format = (Int(p)!, Int(p)!)
-            } else if d.seed == nil, let g = UInt64(p) {
-                d.seed = g
-            } else {
-                throw Refusal("usage", String(localized: "extra argument: \"\(p)\""),
-                            help: String(localized: "the prompt is ONE argument: put it in quotes — silicontrol help add"))
-            }
-        }
-        return d
     }
 
     func absolute(_ path: String, _ cwd: String) -> String {
@@ -316,7 +237,7 @@ extension RemoteControl {
         app.followsRender = true
         app.enqueue(jobs)
         app.takeRequest(jobs[0].settings, prompt: prompt, references: references, start: start, strength: strength,
-                        seed: firstNumber, fixed: d.seed != nil)
+                        seed: firstNumber, fixed: d.seed != nil, batch: d.batch)
 
         let added = zip(jobs, variants).map { job, v -> [String: Any] in
             var o = queued(job)

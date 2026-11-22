@@ -164,8 +164,8 @@ extension EngineError {
         case .notOnEngine(let model):
             return "\(model) does not run on this engine yet."
         case let .insufficientMemory(needed, budget):
-            // Said of a render and of a rewrite alike: the sentence names neither. `needed` within the budget: every form
-            // stopped the fuse (`Stage.choose`), and the one number known is the soberest's socle — not what it needs.
+            // Said of a render and of a rewrite alike: the sentence names neither. `needed` within the budget: the soberest
+            // form stopped the fuse (`Stage.choose`), and the one number known is the soberest's socle — not what it needs.
             if needed <= budget { return "Past this Mac's memory limit of \(gigabytes(budget)) every time it was tried: refused." }
             return "Beyond this Mac's memory limit: \(gigabytes(needed)) needed, this Mac offers \(gigabytes(budget))."
         case .renderAlreadyRunning: return "Another render is already running on this machine."

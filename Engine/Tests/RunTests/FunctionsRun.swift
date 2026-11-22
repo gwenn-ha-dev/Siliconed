@@ -26,7 +26,7 @@ extension Runs {
             ("w.weight_scale", "F32", [n, 1], scales.withUnsafeBytes { Array($0) }),
         ]))
         let entries: [Weights.Entry] = [("w", "w", .codes)]
-        let (count, piece) = Weights.pieces(k)
+        let (count, piece) = try Weights.pieces(k)
         let arena = try Arena(bench.device, bytes: try Weights.size(entries, in: file) + Arena.aligned(k * n) + Arena.aligned(rows * k * 2) + 2 * Arena.aligned(rows * n * 2))
         let w = try Weights.load(entries, from: file, into: arena)
         #expect(w["w"]!.shape == [count, n, piece] && count == 2)

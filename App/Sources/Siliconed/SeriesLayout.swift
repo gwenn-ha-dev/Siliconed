@@ -121,8 +121,13 @@ package struct SeriesFit: Equatable, Sendable {
     /// The side that fills the room now — what ⌘0 gives back.
     package var fitting: CGFloat
 
-    /// Whether cells of side `current` follow the room — ⌘0 has nothing to give back.
+    /// Whether cells of side `current` follow the room: the hand has not sized them since they were fitted.
     package func follows(_ current: CGFloat) -> Bool { current == side }
+
+    /// **Whether ⌘0 has something to give back**: cells of side `current` are not the side that fills the room now. Not the
+    /// same as not following it: when the band comes, the cells keep their side (`refit`) and still follow, yet the grid
+    /// now holds no longer in the room.
+    package func restores(_ current: CGFloat) -> Bool { current != fitting }
 
     /// **The side at which the whole grid holds in `room`**, its labels and gaps included: `aspect` the cells' width over
     /// their height, `rowLabels` and `columnLabels` whether the axes have words beside and above the cells.

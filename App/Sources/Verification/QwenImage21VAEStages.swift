@@ -115,9 +115,11 @@ extension QwenImage21Stages {
         let denoiser = try QwenImage21Render.Denoiser(map: path, sequence: sequence, text: HostTensor([sequence.textRows, context], floats: spoken),
                                                       references: references)
         // Token-major, as the oracle writes it: its 64 channels are the latent's planes.
+        // The render's own call (`RenderLoop`), under the reference's Euler (the render's default): Qwen-Image-2.1's
+        // derivative is its velocity.
         try report.trajectory(reference, steps: sigmas.count - 1, half: half, columns: space.channels, name: { "velocity_\($0)" }) { step, latent in
-            QwenImage21Render.tokens(planes: try denoiser.velocity(QwenImage21Render.planes(tokens: latent),
-                                                                   time: QwenImage21Render.modelTime(sigma: QwenImage21DiT.sigmas[step], solver: .euler, first: step == 0)))
+            QwenImage21Render.tokens(planes: try denoiser.derivative(QwenImage21Render.planes(tokens: latent), sigma: QwenImage21DiT.sigmas[step],
+                                                                     solver: .euler, first: step == 0))
         }
         return report
     }
