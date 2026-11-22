@@ -36,14 +36,12 @@ struct SceneView: View {
                 inProgress(job)
             } else if app.showsOriginal, let original = app.original, let selected = app.selectedImage,
                       let entry = app.selectedEntry {
-                VStack(spacing: 14) {
+                staged(bar: app.componentsAway ? nil : bar(entry)) {
                     CurtainView(app: app, a: original.image, b: selected.image, width: entry.width, height: entry.height,
                                 tags: (String(localized: "Original"), String(localized: "Edited")))
-                    if !app.componentsAway { bar(entry) }
                 }
-                .padding(28)
             } else if !app.compared.isEmpty, let entry = app.selectedEntry {
-                VStack(spacing: 14) {
+                staged(bar: app.componentsAway ? nil : bar(entry)) {
                     if let pair = Curtain.pair(app), Curtain.shared.preferred {
                         // The larger's size: the smaller is stretched to it, as the curtain of an enlargement shows it.
                         let big = pair.a.entry.width >= pair.b.entry.width ? pair.a.entry : pair.b.entry
@@ -52,15 +50,9 @@ struct SceneView: View {
                     } else {
                         Comparison(app: app)
                     }
-                    if !app.componentsAway { bar(entry) }
                 }
-                .padding(28)
             } else if let selected = app.selectedImage, let entry = app.selectedEntry {
-                VStack(spacing: 14) {
-                    image(selected.image)
-                    if !app.componentsAway { bar(entry) }
-                }
-                .padding(28)
+                staged(bar: app.componentsAway ? nil : bar(entry)) { image(selected.image) }
             } else {
                 empty
             }
@@ -102,13 +94,29 @@ struct SceneView: View {
         return CGSize(width: min(max(o.width, -x), x), height: min(max(o.height, -y), y))
     }
 
+    /// **The image and what floats under it, never laid out together**: the image takes its zone — the canvas less a
+    /// fixed band at the bottom, where the bar sits —, and the bar lies over the canvas, at its foot. A bar that changes
+    /// height (the progress's steps, then its line; the progress giving way to the image's bar when the render ends) moves
+    /// nothing; one taller than the band covers the image's edge, the image sliding under it. Without a bar (the image
+    /// alone in the window), the band goes too.
+    private func staged<Content: View>(bar: (some View)?, @ViewBuilder _ content: () -> Content) -> some View {
+        content()
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .padding(.bottom, bar == nil ? 0 : Self.band)
+            .overlay(alignment: .bottom) { bar }
+            .padding(28)
+    }
+
+    /// The bottom band the bar sits in: its height (the image's bar and the progress both ≈ 46 points) and the gap above it.
+    private static let band: CGFloat = 46 + 14
+
     // ── During the render ──
 
     /// The frame already has the shape of the coming image; each step's preview is drawn in it, and
     /// the progress floats below.
     private func inProgress(_ job: Job) -> some View {
         let l = CGFloat(job.settings.format.width), h = CGFloat(job.settings.format.height)
-        return VStack(spacing: 14) {
+        return staged(bar: ProgressIndicator(app: app)) {
             ZStack {
                 if let preview = app.preview {
                     Image(decorative: preview, scale: 1)
@@ -124,9 +132,7 @@ struct SceneView: View {
             .shadow(color: .black.opacity(0.35), radius: 18, y: 6)
             .frame(maxWidth: l, maxHeight: h)
             .animation(Motion.pick(.easeInOut(duration: 0.25)), value: app.preview == nil)
-            ProgressIndicator(app: app)
         }
-        .padding(28)
     }
 
     // ── The chosen image ──
