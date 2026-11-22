@@ -2,9 +2,52 @@ English · [Français](RELEASE-NOTES.fr.md)
 
 # Siliconed — release notes
 
+## 0.31 · Rhossili
+
+Still on Rhossili's sand: 0.31 is the engine of 0.30 made faster, the Compact first, and held closer to its memory limit.
+
+### Faster
+
+- **The Compact computes int8 × int8 on the GPU.** Core AI's own integer product now multiplies the Compact's published codes with the activation brought to int8 row by row, the recipe of its int8 reference; the Neural Engine's rows keep their W8A16, on a copy of the codes laid out for it. A step of the DiT at 1024² on the Mac mini M5 Pro is 10 to 40 % faster than in 0.30, for the five models. The Compact now buys time as well as memory, where 0.30 said it bought only memory ([Numbers](ENGINE.md#numbers)).
+- **The decoder keeps the GPU busy**: its bands run two calls in flight instead of one at a time, while the CPU prepares the next. The VAE at 1024² on the Mac mini: Z-Image 1.25 → 0.89 s, Qwen-Image-2.1 1.67 → 1.26 s, Anima and Krea 2 0.77 → 0.48 s, MOSS-Image 1.32 → 0.92 s, the same pixels to the bit.
+- **A size never rendered decodes at full pace from the first image**: its bands are sized from what the other sizes held on this Mac, where 0.30 fell back to the narrowest bands (4.5 to 8 s for the VAE at a new size).
+- **The Neural Engine is kept only where it helps**: the engine also times each model on the GPU alone and keeps the faster. On the Mac mini, Anima and Krea 2 now render on the GPU alone. The first renders of a model at a new size each try one way before the fastest is kept.
+- **Times** on the Mac mini M5 Pro, 1024², 8 steps, the model loaded. The Compact: Z-Image 23.8 → 18.3 s, Anima 10.2 → 9.1, Krea 2 46.9 → 30.5, MOSS-Image 24.7 → 19.7, Qwen-Image-2.1 32.2 → 24.0. The Standard: Z-Image 23.8 → 23.1 s, Anima 7.9 → 7.9, Krea 2 43.2 → 39.6, MOSS-Image 25.7 → 23.0, and Qwen-Image-2.1 29.7 → 32.4, slower. The 16 GB M1 Pro's are still 0.30's ([Numbers](ENGINE.md#numbers)).
+
+### The memory limit, held tighter
+
+- **Never past the limit at a height never read.** In 0.30, a DiT's calls at a height the Mac had not measured yet were estimated by scaling another height by its rows, which could fall short (by up to 650 MB on the Mac mini); a decoder's narrower bands too. Both are now bounded from what the functions hold, never below a measure.
+- **The limit holds from one render to the next.** Memory macOS still bills after it is freed is handed back before each stage is planned, so that the third render of a session plans like the first.
+- **The decoder is judged before the DiT**: a decoding that cannot fit is refused before the minutes of the DiT, not after them. If a decoding is stopped anyway, the DiT's result is kept and decoded once more, without running the DiT again.
+- **A larger image is judged from the smaller ones.** At a size larger than any this Mac rendered, what each stage will hold is predicted from the sizes it did, and a render that cannot fit is refused up front, with the number it is short by. At a size with nothing to go on, the render goes ahead under the limit's watch.
+- **A form that once stopped at the limit is tried again under a larger one**: raising the memory limit in Settings lets it run again, where 0.30 never took it back.
+- **An update keeps what this Mac learned** of a stage's memory, as long as the stage computes the same way.
+
+### Fixed
+
+- **Under the Neural Engine, the first step of a render was slightly off** (2.8 % from the GPU alone): a buffer was read before the GPU had written it. Fixed.
+- **A MOSS-Image fine-tune whose file names its tensors under a prefix** imported, then would not render; it renders now, as the other four models' did.
+- **A Qwen-Image-2.1 that renders only black or broken images after an update from 0.21** (issue 17): the files a model's versions share (tokenizers, VAE) are now checked once against their published bytes; a damaged one is removed and downloaded again on its own.
+- **A render that goes wrong says where**: a non-finite result turns the DiT's box red, not the VAE's, and is never decoded; an image lost among several seeds is said, by its seed and its stage, the others kept, and the progress still reaches its end.
+- **Krea 2 reads LoRAs under diffusers' names again** (issue 17), with the ones that adapt the timestep and the last layer: the 4-step distillation LoRA that 0.21 applied and 0.30 refused renders again.
+- **A long prompt pasted no longer spills below its box** (issue 18), with scroll bars always shown.
+- **Reuse These Settings and Render Again bring back the image's own edit images**, and none for an image made from noise, instead of keeping the Prompt Lab's.
+- A series' grid follows the window as it shrinks as well as grows; Settings no longer leaves half its window empty under the Prompt Lab; the Prompt Lab's image tiles sit side by side; the edition's name stays readable over a pale sky; a grid keeps a LoRA's name after the rack changes model; the detached Chain panel keeps its minimum size.
+
+### The app
+
+- **The Neural Engine switch replaces Precision** (Settings › General), on by default: it never chose a precision, only whether the engine may use the Neural Engine. 0.30's Exact becomes the switch off. `silicontrol set neural-engine on|off`; `siliconed check --neural-engine off|on|ROWS`.
+- **The seed: a Fixed box beside the field and the dice.** Off, the field shows greyed the seed the last render drew, selectable to copy, and « — » before the first; checking Fixed keeps it. The Seeds bubble says which seeds it renders (3 seeds: 9402 to 9404).
+- **⌘0 gives a series' cells back to the window** after you sized them by hand.
+- **Every greyed button says why** when the pointer rests on it.
+- **The disk image** opens on a background of its own.
+- **`silicontrol`**: a `--flag` a command does not take is refused by name, wherever it stands, and a prompt that begins with `--` goes after a lone `--`; `add` and `grid` fill the rack as a click does, without the series it held before, `grid` with the seed it drew; `measure` reports the Neural Engine switch and the memory limit (two more columns in its TSV); `set precision` is gone, for `set neural-engine`.
+- **Times from your Mac**: an issue form takes what `silicontrol measure` prints, the 8 GB Macs first ([the form](https://github.com/gwenn-ha-dev/Siliconed/issues/new?template=times.yml)).
+- **Render on another Mac**: both Macs need 0.31.
+
 ## 0.30 · Rhossili
 
-The first edition named after a beach: Rhossili, three miles of sand at the end of the Gower peninsula, in Wales. Every version now gets its own, somewhere on the Atlantic coast between Ireland and Galicia; the name shows at the right of the window's bar and in “About”. From 0.21 to 0.30, the jump says the break: a new engine, and a new window.
+The first edition named after a beach: Rhossili, three miles of sand at the end of the Gower peninsula, in Wales. Every edition gets its own, somewhere on the Atlantic coast between Ireland and Galicia; the name shows at the right of the window's bar and in “About”. From 0.21 to 0.30, the jump says the break: a new engine, and a new window.
 
 ### Core AI
 

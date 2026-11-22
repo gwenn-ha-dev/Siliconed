@@ -215,7 +215,7 @@
       <path d="M 40 830 L 560 830 A 310 310 0 0 0 560 210 A 310 310 0 0 0 250 520"/>
     </g>
   </svg>
-  <p class="eyebrow h-fade">v0.30 · the Rhossili edition · free · open source</p>
+  <p class="eyebrow h-fade">v0.31 · the Rhossili edition · free · open source</p>
     <h1 class="h-fade d1"><span class="grad">Apple wrote the kernels.<br>We brought the models.</span><span class="sub">And a plan that fits them in <em>your</em> Mac's memory.</span></h1>
     <p class="lead h-fade d2">Five image models written as Core AI functions, on the very files their publishers released.
       Core AI computes them on your Mac's GPU and Neural Engine; Siliconed plans every byte under your Mac's memory
@@ -277,7 +277,7 @@
       <tr><td><a href="https://huggingface.co/circlestone-labs/Anima">Anima Turbo</a></td><td>text-to-image (illustration, painting, anime), LoRA</td><td>CircleStone Labs Non-Commercial (the images may be used commercially)</td></tr>
       <tr><td><a href="https://huggingface.co/OpenMOSS-Team/MOSS-Image-SFT">MOSS-Image</a></td><td>text-to-image, LoRA; beta, under the community's 8-step LoRA</td><td>Apache 2.0</td></tr>
     </table></div>
-    <p class="times">At 1024², 8 steps, seed 42, the model loaded: on a Mac mini M5 Pro with 64 GB, Standard, Krea 2 Turbo 43.2 s, Z-Image Turbo 23.8 s, Qwen-Image-2.1 Turbo 29.7 s, Anima Turbo 7.9 s, MOSS-Image 25.7 s; on a 16 GB M1 Pro, Compact, 128.1 s, 75.9 s, 97.7 s, 33.6 s, 76.4 s. The first render at a size also compiles, once. <a href="https://github.com/gwenn-ha-dev/Siliconed/blob/main/docs/ENGINE.md#numbers">All the numbers</a>; yours are welcome, the 8 GB Macs first: <a href="https://github.com/gwenn-ha-dev/Siliconed/issues/new?template=times.yml">one command, one form</a>.</p>
+    <p class="times">At 1024², 8 steps, seed 42, the model loaded: on a Mac mini M5 Pro with 64 GB, Standard, Krea 2 Turbo 39.6 s, Z-Image Turbo 23.1 s, Qwen-Image-2.1 Turbo 32.4 s, Anima Turbo 7.9 s, MOSS-Image 23.0 s; on a 16 GB M1 Pro, Compact, in 0.30, 128.1 s, 75.9 s, 97.7 s, 33.6 s, 76.4 s. The first render at a size also compiles, once. <a href="https://github.com/gwenn-ha-dev/Siliconed/blob/main/docs/ENGINE.md#numbers">All the numbers</a>; yours are welcome, the 8 GB Macs first: <a href="https://github.com/gwenn-ha-dev/Siliconed/issues/new?template=times.yml">one command, one form</a>.</p>
   </div>
   <div class="split rev" id="moss" style="margin-top:clamp(64px, 9vw, 112px)">
     <div class="text reveal">
@@ -318,14 +318,14 @@
       <p>Each model is written in Swift as a few Core AI functions of fixed shapes, in the arithmetic of its
         weights, and the loop that calls them; Core AI runs them on your Mac's GPU and Neural Engine. The Neural
         Engine's share of each block is found while the image renders, step after step, and goes to whichever unit
-        finishes first. Nothing is measured before the first render: a Mac that does not exist yet runs the same code.</p>
+        finishes first; where the GPU alone is faster, the Neural Engine is left out. Nothing is measured before the first render: a Mac that does not exist yet runs the same code.</p>
       <p>What stays ours is the plan. Before every stage of a render the engine works out, to the byte, what it
         will hold, under ¾ of the Mac's memory minus 2 GB. A model too large for it keeps the weights that fit
         and reads the others from disk while it computes; what Core AI holds for its functions is read in flight,
-        every millisecond; a large image is decoded in bands; what truly does not fit is refused up front, and told why.</p>
+        every millisecond; a large image is decoded in bands; a size never rendered is judged from the ones that were; what truly does not fit is refused up front, and told why.</p>
     </div>
-    <div class="map reveal" role="img" aria-label="The app's memory peak at 1024² on a 16 GB M1 Pro, Compact, under its 10 GiB limit: Krea 2 Turbo 9.8 GiB, Z-Image Turbo 8.2 GiB, Qwen-Image-2.1 Turbo 9.7 GiB, Anima Turbo 5.1 GiB, MOSS-Image 7.5 GiB.">
-      <p class="head">peak at 1024² · a real 16 GB M1 Pro · Compact</p>
+    <div class="map reveal" role="img" aria-label="The app's memory peak at 1024² on a 16 GB M1 Pro, Compact, in 0.30, under its 10 GiB limit: Krea 2 Turbo 9.8 GiB, Z-Image Turbo 8.2 GiB, Qwen-Image-2.1 Turbo 9.7 GiB, Anima Turbo 5.1 GiB, MOSS-Image 7.5 GiB.">
+      <p class="head">peak at 1024² · a real 16 GB M1 Pro · Compact · 0.30</p>
       <div class="row"><span>Krea 2 Turbo</span><span class="on">9.8 GiB</span><span class="gain">of 10</span></div>
       <div class="row"><span>Z-Image Turbo</span><span class="on">8.2 GiB</span><span class="gain">of 10</span></div>
       <div class="row"><span>Qwen-Image-2.1</span><span class="on">9.7 GiB</span><span class="gain">of 10</span></div>
@@ -476,7 +476,7 @@
       <h2>Pick your diet.</h2>
       <p class="punch">Standard or Compact.</p>
       <p>The publisher's weights, or published 8-bit ones. The Compact is
-        preselected: half the disk, half the memory for the weights. Both can live side
+        preselected: half the disk, half the memory for the weights, and its products computed in int8 on the GPU. Both can live side
         by side. Every file is pinned to a revision and checked by sha256, and downloads resume where they
         stopped.</p>
     </div>

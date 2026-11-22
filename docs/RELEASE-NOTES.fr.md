@@ -2,9 +2,52 @@
 
 # Siliconed — notes de version
 
+## 0.31 · Rhossili
+
+Toujours sur le sable de Rhossili : la 0.31, c'est le moteur de la 0.30 rendu plus rapide, la Compact d'abord, et tenu de plus près sous sa limite de mémoire.
+
+### Plus rapide
+
+- **La Compact calcule en int8 × int8 au GPU.** Le produit entier de Core AI multiplie désormais les codes publiés de la Compact par l’activation ramenée en int8 rangée par rangée, la recette de sa référence int8 ; les rangées du Neural Engine gardent leur W8A16, sur une copie des codes rangée pour lui. Un pas du DiT à 1024² sur le Mac mini M5 Pro va de 10 à 40 % plus vite qu’en 0.30, pour les cinq modèles. La Compact achète désormais du temps autant que de la mémoire, là où la 0.30 disait qu’elle n’achetait que de la mémoire ([Les chiffres](ENGINE.fr.md#les-chiffres)).
+- **Le décodeur garde le GPU occupé** : ses bandes tournent à deux appels en vol au lieu d’un à la fois, pendant que le CPU prépare le suivant. Le VAE à 1024² sur le Mac mini : Z-Image 1,25 → 0,89 s, Qwen-Image-2.1 1,67 → 1,26 s, Anima et Krea 2 0,77 → 0,48 s, MOSS-Image 1,32 → 0,92 s, les mêmes pixels au bit près.
+- **Une taille jamais rendue décode à pleine allure dès la première image** : ses bandes se dimensionnent d’après ce que les autres tailles ont tenu sur ce Mac, là où la 0.30 retombait sur les bandes les plus fines (4,5 à 8 s de VAE à une taille neuve).
+- **Le Neural Engine n’est gardé que là où il aide** : le moteur chronomètre aussi chaque modèle au GPU seul et garde le plus rapide. Sur le Mac mini, Anima et Krea 2 rendent désormais au GPU seul. Les premiers rendus d’un modèle à une taille neuve essaient chacun une façon avant que la plus rapide soit gardée.
+- **Les temps** au Mac mini M5 Pro, 1024², 8 pas, le modèle chargé. La Compact : Z-Image 23,8 → 18,3 s, Anima 10,2 → 9,1, Krea 2 46,9 → 30,5, MOSS-Image 24,7 → 19,7, Qwen-Image-2.1 32,2 → 24,0. La Standard : Z-Image 23,8 → 23,1 s, Anima 7,9 → 7,9, Krea 2 43,2 → 39,6, MOSS-Image 25,7 → 23,0, et Qwen-Image-2.1 29,7 → 32,4, plus lente. Ceux du M1 Pro de 16 Go sont encore ceux de la 0.30 ([Les chiffres](ENGINE.fr.md#les-chiffres)).
+
+### La limite de mémoire, tenue de plus près
+
+- **Jamais au-delà de la limite à une hauteur jamais lue.** En 0.30, les appels du DiT à une hauteur que le Mac n’avait pas encore mesurée s’estimaient en mettant une autre hauteur à l’échelle de ses rangées, ce qui pouvait tomber court (jusqu’à 650 Mo au Mac mini) ; les bandes plus fines d’un décodeur aussi. Les deux sont désormais bornées d’après ce que tiennent les fonctions, jamais sous une mesure.
+- **La limite tient d’un rendu au suivant.** La mémoire que macOS compte encore après sa libération est rendue avant que chaque étage se planifie : le troisième rendu d’une session se planifie comme le premier.
+- **Le décodeur est jugé avant le DiT** : un décodage qui ne peut pas tenir est refusé avant les minutes du DiT, plus après. Si un décodage est arrêté malgré tout, le résultat du DiT est gardé et décodé une fois de plus, sans relancer le DiT.
+- **Une image plus grande se juge d’après les plus petites.** À une taille plus grande que toutes celles que ce Mac a rendues, ce que chaque étage tiendra se prévoit d’après celles qu’il a rendues, et un rendu qui ne peut pas tenir est refusé d’emblée, avec le chiffre qui manque. À une taille sans rien pour en juger, le rendu part sous la veille de la limite.
+- **Une forme qui s’est un jour arrêtée à la limite est réessayée sous une limite plus grande** : relever la limite de mémoire dans les Réglages la laisse tourner de nouveau, là où la 0.30 ne la reprenait jamais.
+- **Une mise à jour garde ce que ce Mac a appris** de la mémoire d’un étage, tant que l’étage calcule de la même façon.
+
+### Corrigé
+
+- **Sous le Neural Engine, le premier pas d’un rendu était un peu faux** (2,8 % du GPU seul) : un tampon était lu avant que le GPU l’ait écrit. Corrigé.
+- **Un fine-tune de MOSS-Image dont le fichier nomme ses tenseurs sous un préfixe** s’importait puis ne se rendait pas ; il se rend désormais, comme ceux des quatre autres modèles.
+- **Un Qwen-Image-2.1 qui ne rend que des images noires ou cassées après une mise à jour depuis la 0.21** (issue 17) : les fichiers que partagent les versions d’un modèle (tokenizers, VAE) sont désormais vérifiés une fois contre leurs octets publiés ; un fichier abîmé est retiré et retéléchargé seul.
+- **Un rendu qui tourne mal dit où** : un résultat non fini rougit la boîte du DiT, plus celle du VAE, et n’est jamais décodé ; une image perdue parmi plusieurs graines est dite, par sa graine et son étage, les autres gardées, et la progression va quand même jusqu’au bout.
+- **Krea 2 relit les LoRA aux noms de diffusers** (issue 17), y compris celles qui adaptent le pas de temps et la dernière couche : la LoRA de distillation en 4 pas que la 0.21 appliquait et que la 0.30 refusait se rend de nouveau.
+- **Un long prompt collé ne déborde plus sous sa boîte** (issue 18), barres de défilement toujours affichées.
+- **Reprendre ces réglages et Rendre à nouveau ramènent les images d’édition de l’image elle-même**, et aucune pour une image faite du bruit, au lieu de garder celles de l’Atelier de prompts.
+- La grille d’une série suit la fenêtre quand elle rétrécit comme quand elle grandit ; les Réglages ne laissent plus la moitié de leur fenêtre vide sous l’Atelier de prompts ; les vignettes d’images de l’Atelier se rangent côte à côte ; le nom de l’édition reste lisible sur un ciel pâle ; une grille garde le nom d’une LoRA après que le rack a changé de modèle ; le panneau Chaîne détaché garde sa taille minimale.
+
+### L’app
+
+- **L’interrupteur Neural Engine remplace Précision** (Réglages › Général), allumé par défaut : il n’a jamais choisi une précision, seulement si le moteur peut se servir du Neural Engine. L’Exacte de la 0.30 devient l’interrupteur éteint. `silicontrol set neural-engine on|off` ; `siliconed check --neural-engine off|on|RANGÉES`.
+- **La graine : une case Fixe à côté du champ et du dé.** Décochée, le champ montre en grisé la graine que le dernier rendu a tirée, sélectionnable pour la copier, et « — » avant le premier ; cocher Fixe la garde. La bulle des Graines dit lesquelles elle rend (3 graines : 9402 à 9404).
+- **⌘0 rend les cases d’une série à la fenêtre** après qu’on les a dimensionnées à la main.
+- **Chaque bouton grisé dit pourquoi** quand le pointeur s’y pose.
+- **L’image disque** s’ouvre sur un fond à elle.
+- **`silicontrol`** : un `--drapeau` qu’une commande ne prend pas est refusé par son nom, où qu’il soit, et un prompt qui commence par `--` se place après un `--` seul ; `add` et `grid` remplissent le rack comme un clic, sans la série qu’il tenait avant, `grid` avec la graine qu’il a tirée ; `measure` dit l’interrupteur Neural Engine et la limite de mémoire (deux colonnes de plus à son TSV) ; `set precision` s’en va, pour `set neural-engine`.
+- **Des temps de votre Mac** : un formulaire d’issue prend ce qu’imprime `silicontrol measure`, les Mac de 8 Go d’abord ([le formulaire](https://github.com/gwenn-ha-dev/Siliconed/issues/new?template=times.yml)).
+- **Rendre sur un autre Mac** : les deux Mac en 0.31.
+
 ## 0.30 · Rhossili
 
-La première édition qui porte un nom de plage : Rhossili, cinq kilomètres de sable au bout de la péninsule de Gower, au pays de Galles. Chaque version aura désormais la sienne, quelque part sur la côte atlantique entre l’Irlande et la Galice ; le nom s’affiche à droite de la barre de la fenêtre et dans « À propos ». De la 0.21 à la 0.30, le saut dit la rupture : un moteur neuf, et une fenêtre neuve.
+La première édition qui porte un nom de plage : Rhossili, cinq kilomètres de sable au bout de la péninsule de Gower, au pays de Galles. Chaque édition aura la sienne, quelque part sur la côte atlantique entre l’Irlande et la Galice ; le nom s’affiche à droite de la barre de la fenêtre et dans « À propos ». De la 0.21 à la 0.30, le saut dit la rupture : un moteur neuf, et une fenêtre neuve.
 
 ### Core AI
 

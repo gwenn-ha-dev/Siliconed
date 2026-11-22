@@ -52,13 +52,13 @@ A 12.8-billion-parameter model on a 16 GB Mac sounds like a bad idea. Siliconed 
 
 <p align="center"><img src="docs/images/budget.svg" width="900" alt="A stage under the memory limit: the floor, the arena, the ring fed from the published files, the weights kept, Core AI's share read in flight; a block's rows shared between the Neural Engine and the GPU."></p>
 
-| 1024², 8 steps | Mac mini M5 Pro, 64 GB | M1 Pro, 16 GB · Compact |
+| 1024², 8 steps | Mac mini M5 Pro, 64 GB | M1 Pro, 16 GB · Compact, 0.30 |
 |---|---:|---:|
-| Z-Image Turbo | 23.8 s | 75.9 s |
+| Z-Image Turbo | 23.1 s | 75.9 s |
 | Anima Turbo | 7.9 s | 33.6 s |
-| Krea 2 Turbo | 43.2 s | 128.1 s |
-| MOSS-Image | 25.7 s | 76.4 s |
-| Qwen-Image-2.1 Turbo | 29.7 s | 97.7 s |
+| Krea 2 Turbo | 39.6 s | 128.1 s |
+| MOSS-Image | 23.0 s | 76.4 s |
+| Qwen-Image-2.1 Turbo | 32.4 s | 97.7 s |
 
 *The Mac mini in Standard, the M1 Pro in Compact under its 10 GB limit; the model loaded, compilation done. Both versions, the first renders and how to take your own: [Numbers](docs/ENGINE.md#numbers).*
 

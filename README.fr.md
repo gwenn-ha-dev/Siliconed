@@ -52,13 +52,13 @@ Un modèle de 12,8 milliards de paramètres sur un Mac de 16 Go, ça sent la mau
 
 <p align="center"><img src="docs/images/budget.svg" width="900" alt="Un étage sous la limite de mémoire : le plancher, l'arène, l'anneau nourri par les fichiers publiés, les poids gardés, la part de Core AI lue en vol ; les rangées d'un bloc partagées entre le Neural Engine et le GPU."></p>
 
-| 1024², 8 pas | Mac mini M5 Pro, 64 Go | M1 Pro, 16 Go · Compact |
+| 1024², 8 pas | Mac mini M5 Pro, 64 Go | M1 Pro, 16 Go · Compact, 0.30 |
 |---|---:|---:|
-| Z-Image Turbo | 23,8 s | 75,9 s |
+| Z-Image Turbo | 23,1 s | 75,9 s |
 | Anima Turbo | 7,9 s | 33,6 s |
-| Krea 2 Turbo | 43,2 s | 128,1 s |
-| MOSS-Image | 25,7 s | 76,4 s |
-| Qwen-Image-2.1 Turbo | 29,7 s | 97,7 s |
+| Krea 2 Turbo | 39,6 s | 128,1 s |
+| MOSS-Image | 23,0 s | 76,4 s |
+| Qwen-Image-2.1 Turbo | 32,4 s | 97,7 s |
 
 *Le Mac mini en Standard, le M1 Pro en Compact sous sa limite de 10 Go ; le modèle chargé, la compilation faite. Les deux versions, les premiers rendus et comment prendre les vôtres : [Les chiffres](docs/ENGINE.fr.md#les-chiffres).*
 
