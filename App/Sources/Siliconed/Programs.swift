@@ -10,8 +10,9 @@ import SiliCore
 // **A publisher's int8 safetensors is read as it is published** (ComfyUI's convention, the same at Comfy-Org and
 // Bedovyy): `<module>.weight` I8 `[out, in]`, its scales a row in `<module>.weight_scale` F32 `[out, 1]`, and what
 // they mean in `<module>.comfy_quant`, a JSON text stored as bytes — `{"format": "int8_tensorwise", "convrot": true,
-// "convrot_groupsize": 256}`. Any other format is refused: codes read as another quantization give a plausible,
-// wrong weight.
+// "convrot_groupsize": 256}`. ComfyUI's « fp8 scaled » is read too, in bf16: `<module>.weight` F8_E4M3, its one scale
+// in `<module>.weight_scale`, `{"format": "float8_e4m3fn"}` (the engine's `SafeTensors` widens it). Any other format is
+// refused: codes read as another quantization give a plausible, wrong weight.
 
 /// **A map's tensors, by the names a family gives them**: a safetensors, or the shards behind an index. Names and shapes
 /// only — what an import is recognized by (`ModelImport`, `LoRAFile`); the values are the engine's to read.
@@ -57,8 +58,8 @@ package final class MapWeights {
         for key in keys where key.hasSuffix(".comfy_quant") {
             guard let text = entry(key), text.entry.dtype == "U8", let pointer = files[text.file].pointer(text.entry.name),
                   let said = try? JSONSerialization.jsonObject(with: Data(bytes: pointer, count: text.entry.bytes)) as? [String: Any],
-                  said["format"] as? String == "int8_tensorwise" else {
-                throw ProgramError("\(path): \(key) is not an int8 quantization this app reads")
+                  let format = said["format"] as? String, ["int8_tensorwise", "float8_e4m3fn"].contains(format) else {
+                throw ProgramError("\(path): \(key) is not an int8 or fp8 quantization this app reads")
             }
             guard said["convrot"] as? Bool == true else { continue }
             guard let group = said["convrot_groupsize"] as? Int, group > 0 else {

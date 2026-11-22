@@ -91,11 +91,11 @@ public enum Weights {
             switch e.recipe {
             case .codes, .product:
                 let (parts, _, inn, int8) = try product(e, in: file)
-                // A part cut in pieces through the staging; the scales through it.
-                let transposed = try int8 && pieces(inn).count > 1
+                // A part cut in pieces, or of f32s rounded to bf16, through the staging; the scales through it.
+                let staged = try int8 ? pieces(inn).count > 1 : parts[0].tensor.dtype == "F32"
                 return try parts.map { key, t in
                     let s = int8 ? try scales(key, in: file, out: t.shape[0]) : nil
-                    return max(transposed ? t.end - t.start : 0, s.map { $0.end - $0.start } ?? 0)
+                    return max(staged ? t.end - t.start : 0, s.map { $0.end - $0.start } ?? 0)
                 }.max()!
             case .float: let t = try file.real(e.key); return t.dtype == "F32" ? 0 : t.end - t.start
             case .target: return 0
@@ -134,7 +134,13 @@ public enum Weights {
                 var column = 0
                 for (key, t) in parts {
                     let out = t.shape[0], size = int8 ? 1 : 2
-                    if !int8 || count == 1 {
+                    if !int8 && t.dtype == "F32" {
+                        // A fine-tune's f32s (or f16s, `SafeTensors`) rounded to bf16 once, each part's after the one before.
+                        try file.read(t, into: staging)
+                        let from = staging.assumingMemoryBound(to: Float.self)
+                        let into = (to + column * inn * size).bindMemory(to: UInt16.self, capacity: out * inn)
+                        for i in 0..<(out * inn) { into[i] = BFloat16Bits.rounded(from[i]) }
+                    } else if !int8 || count == 1 {
                         // The file's rows as they lie, each part's after the one before.
                         try file.read(t, into: to + column * inn * size)
                     } else {
@@ -237,7 +243,7 @@ public enum Weights {
     }
 
     /// A product's parts (`Recipe.codes`, `Recipe.product`): each part's key and `<key>.weight`, the summed `out`, the
-    /// shared `in`, whether int8 codes (else bf16).
+    /// shared `in`, whether int8 codes (else bf16, read as such or rounded from the file's f32s).
     static func product(_ e: Entry, in file: SafeTensors) throws -> (parts: [(key: String, tensor: SafeTensors.Tensor)], out: Int, inn: Int, int8: Bool) {
         let keys: [String]
         switch e.recipe {
@@ -250,8 +256,8 @@ public enum Weights {
             return (k, t)
         }
         let first = parts[0].tensor, int8 = first.dtype == "I8"
-        guard first.shape.count == 2, int8 || first.dtype == "BF16", e.recipe != .codes || int8 else {
-            throw Failure("\(e.key).weight: \(first.dtype) \(first.shape), not a product's int8 codes or bf16 weight")
+        guard first.shape.count == 2, int8 || first.dtype == "BF16" || first.dtype == "F32", e.recipe != .codes || int8 else {
+            throw Failure("\(e.key).weight: \(first.dtype) \(first.shape), not a product's int8 codes or real weight")
         }
         for (k, t) in parts where t.dtype != first.dtype || t.shape.count != 2 || t.shape[1] != first.shape[1] {
             throw Failure("\(e.name): \(k).weight \(t.dtype) \(t.shape) does not join \(first.dtype) \(first.shape)")

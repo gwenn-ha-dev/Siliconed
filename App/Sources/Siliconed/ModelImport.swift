@@ -8,7 +8,7 @@ import os
 //     a model   a DiT alone, without encoder or VAE: the family whose graph finds every tensor it reads in the file,
 //               at its shape, at the file's root or under a checkpoint's prefix (`MapWeights(dit:)`) —
 //               `store/importes/<family>/`. It renders with the family's installed text encoder and VAE, in the
-//               arithmetic its file is stored in (ComfyUI's int8, else bf16: a weight stored in fp32 or fp16 is loaded in bf16)
+//               arithmetic its file is stored in (ComfyUI's int8, else bf16: a weight stored in fp32, fp16 or ComfyUI's scaled fp8 is loaded in bf16)
 //
 // **Recognized by its tensors, never by its name or its metadata**: a fine-tune keeps its architecture's names and
 // shapes, and a file is its family's when that family's graph can be built over it — the same graph that renders.
