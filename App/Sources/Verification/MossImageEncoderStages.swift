@@ -75,7 +75,7 @@ enum MossImageEncoderStages {
     /// The encoder's layers 0, 3, 15 and 31 and its final state, on the golden's identifiers.
     static func judged(_ invocation: Invocation, title: String, suffix: String, script: String) throws -> Report {
         let report = Report(title: "\(model) \(title)")
-        // `--variant compact`: the Compact's encoder (int8 convrot, W8A16 in f16). The goldens have no Compact of their
+        // `--variant compact`: the Compact's encoder (int8 convrot, W8A8 in f16). The goldens have no Compact of their
         // own for the text: the 8-bit map is taken against the Standard's, said, its measures the quantization's error
         // and the path's together.
         let compact = try invocation.compact()

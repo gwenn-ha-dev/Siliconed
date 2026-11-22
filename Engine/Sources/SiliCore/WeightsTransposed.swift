@@ -108,4 +108,14 @@ extension Weights {
             }
         }
     }
+
+    /// **Codes by pieces `[count, out, piece]` into `[count · piece, out]`**: each piece transposed into its rows, on
+    /// every core (`transposedTiles` where out and piece are multiples of 16). Measured 22/11/2026, int8 `[n, k]` into
+    /// `[k, n]`: 58 to 119 GB/s read and written on the M5 Pro, 25 to 46 on the M1 Pro.
+    public static func transposedPieces(_ from: UnsafePointer<Int8>, count: Int, out: Int, piece: Int, into to: UnsafeMutablePointer<Int8>) {
+        for i in 0..<count {
+            let f = from + i * out * piece, t = to + i * piece * out
+            if out % 16 == 0 && piece % 16 == 0 { transposedTiles(f, out, piece, into: t) } else { transposedRows(f, out, piece, into: t) }
+        }
+    }
 }

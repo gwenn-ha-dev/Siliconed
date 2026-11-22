@@ -36,23 +36,20 @@ import Testing
         #expect(try again.floats("q.weight") == [7, 8, 9])
     }
 
-    @Test(arguments: [CodesLayout.inOut, .outIn])
-    func aJoinedProductTakesItsPartsSideBySide(_ layout: CodesLayout) throws {
-        let slots = try Weights.layout(Self.entries, in: Self.file, codes: layout)
-        let shape = [3, 3]
+    @Test func aJoinedProductTakesItsPartsSideBySide() throws {
+        let slots = try Weights.layout(Self.entries, in: Self.file)
         #expect(slots.map(\.name) == ["w", "w_scale", "v"])
-        #expect(slots.map(\.shape) == [shape, [3], shape] && slots.map(\.bytes) == [9, 6, 18])
-        // Through the staging: a part of codes transposed, or a part's scales; the bf16 parts straight to their place.
-        #expect(try Weights.staging(Self.entries, in: Self.file, codes: layout) == (layout == .inOut ? 6 : 4))
+        #expect(slots.map(\.shape) == [[1, 3, 3], [3], [3, 3]] && slots.map(\.bytes) == [9, 6, 18])
+        // Through the staging: a part's scales; codes of one piece and the bf16 parts straight to their place.
+        #expect(try Weights.staging(Self.entries, in: Self.file) == 4)
         guard let device = MTLCreateSystemDefaultDevice() else { return }
-        let arena = try Arena(device, bytes: try Weights.size(Self.entries, in: Self.file, codes: layout))
-        let placed = try Weights.load(Self.entries, from: Self.file, into: arena, codes: layout)
+        let arena = try Arena(device, bytes: try Weights.size(Self.entries, in: Self.file))
+        let placed = try Weights.load(Self.entries, from: Self.file, into: arena)
         let w = arena.pointer(placed["w"]!.offset).assumingMemoryBound(to: Int8.self)
         let s = arena.pointer(placed["w_scale"]!.offset).assumingMemoryBound(to: Float16.self)
         let v = arena.pointer(placed["v"]!.offset).assumingMemoryBound(to: UInt16.self)
-        // [out, in]: a's rows then b's; [in, out]: its transpose. The bf16 weights [out, in] in either.
-        let outIn: [Int8] = [1, 2, 3, 4, 5, 6, -7, -8, -9], inOut: [Int8] = [1, 4, -7, 2, 5, -8, 3, 6, -9]
-        #expect((0..<9).map { w[$0] } == (layout == .outIn ? outIn : inOut))
+        // [out, in]: a's rows then b's, as the bf16 weights.
+        #expect((0..<9).map { w[$0] } == [1, 2, 3, 4, 5, 6, -7, -8, -9])
         #expect((0..<3).map { s[$0] } == [0.5, 0.25, 2])
         #expect((0..<9).map { BFloat16Bits.widened(v[$0]) } == [1, 2, 3, 4, 5, 6, 7, 8, 9])
     }
@@ -70,6 +67,6 @@ import Testing
         d.groups = ["g": Self.entries]
         d.once = ["g"]
         let plan = try Stage.plan(d, files: [Self.file], budget: 1 << 30, floor: 0, depth: 1)
-        #expect(plan.kept == ["g"] && plan.codes == .inOut)
+        #expect(plan.kept == ["g"])
     }
 }

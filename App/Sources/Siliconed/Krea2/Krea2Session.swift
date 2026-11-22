@@ -113,7 +113,6 @@ final class Krea2Session {
         d.groups = blocks.map { Block.Group($0, form: form, weights: a.shared ? Krea2Shared.block($0 + ".", weights: a.weights) : Krea2Functions.block($0 + ".")) }
         d.cycle = blocks
         d.tapped = taps
-        d.sharedWeights = a.sharedWeights
         if a.shared {
             d.forms = [Block.Form(form, steps: [.init("pre"), .init("heads", on: .gpu), .init("attention", on: .gpu, whole: ["k", "v"]),
                                                 .init("out", bind: ["y": .rows("mid"), "y_factor": .rows("mid_factor")], taps: true),

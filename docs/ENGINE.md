@@ -10,7 +10,7 @@ What Siliconed computes on, how it stays within its memory budget and how it pro
 
 **The frontier.** The engine knows tensors, weights by groups, functions, bytes and seconds; each model (a *family*, in `App/`) declares what it needs in those words and keeps its own. The engine holds no word of the image domain, and a test fails if it learns one.
 
-**The arithmetic is the family's**, written in its functions: int8 codes dequantized inside the function (W8A16) or multiplied on the Neural Engine, bf16 weights rounded once to f16 as they are read where the Standard shares its rows with the Neural Engine, f16 kept in range by explicit factors, f32 where a family asks for it. The starting noise is `torch.randn`'s, bit for bit.
+**The arithmetic is the family's**, written in its functions: int8 codes multiplied int8 × int8 on the GPU (W8A8) and dequantized inside the function on the Neural Engine (W8A16, on a copy of the codes laid as it reads them), bf16 weights rounded once to f16 as they are read where the Standard shares its rows with the Neural Engine, f16 kept in range by explicit factors, f32 where a family asks for it. The starting noise is `torch.randn`'s, bit for bit.
 
 **Compilation.** Core AI compiles a function for its shapes, and keeps it. The first render of a model at a new size, in a version (Standard or Compact) not yet run, or with a LoRA of a new rank compiles first and pays for it once: Z-Image Compact at 1024² on a 16 GB M1 Pro takes 93 s the first time, 76 s afterwards. Every render after it, at that size, starts at once.
 

@@ -20,15 +20,10 @@ extension Block {
         let forms = Dictionary(uniqueKeysWithValues: d.forms.map { ($0.name, $0) })
         let used = d.used, shareable = d.shareable
         let surfaces = used.contains(where: \.shared) || !d.neuralEdges.isEmpty
-        // The layout the functions are written for and the plan lays the int8 codes in, as the declaration says (`[in,
-        // out]` unless its products read them as the file lays them); bf16 weights as the file lies. Not timed per Mac:
-        // one product's timing chose `[out, in]` for q64's codes on the mini, which ran a whole transformer of 6 billion
-        // int8 weights 3.5 % slower than `[in, out]` (20/11).
-        let codes = d.codes
         let began = DispatchTime.now().uptimeNanoseconds
 
         // The unit and the share.
-        let key = shareable > 0 ? try Self.key(used, codes: codes, shareable: shareable) : ""
+        let key = shareable > 0 ? try Self.key(used, shareable: shareable) : ""
         let candidates = UnitTrial.candidates(rows: shareable)
         let decided = measured.neuralUnits?[key].flatMap { candidates.contains($0) ? $0 : nil }
         var unit = decided ?? candidates[0], units = 0
@@ -55,12 +50,12 @@ extension Block {
         var modules: [String: (module: Aicode.Module, unit: ComputeUnitKind)] = [:]
         for f in used where units > 0 {
             for u in tried {
-                for s in f.steps where s.unit == .either { modules[neural(f.name, s.name, u)] = (try f.module(s.name, Build(rows: u, codes: codes, neural: true)), .neuralEngine) }
+                for s in f.steps where s.unit == .either { modules[neural(f.name, s.name, u)] = (try f.module(s.name, Build(rows: u, neural: true)), .neuralEngine) }
             }
         }
         for (name, build) in d.edges {
             let neural = d.neuralEdges.contains(name)
-            modules[edge(name)] = (try build(Build(rows: 0, codes: codes, neural: neural)), neural ? .neuralEngine : .gpu)
+            modules[edge(name)] = (try build(Build(rows: 0, neural: neural)), neural ? .neuralEngine : .gpu)
         }
         var assets: [String: String] = [:]
         for (name, m) in modules { assets[name] = try Functions.named(m.module, prefix: "block") }
@@ -68,7 +63,7 @@ extension Block {
         let groups = Dictionary(uniqueKeysWithValues: d.groups.map { ($0.name, $0) })
         // The weights' names as the functions read them: their layout's (a product's codes and its scales).
         func layout(_ entries: [Weights.Entry]) throws -> [Weights.Slot] {
-            try Stage.byFile(entries, files).flatMap { f, e in try Weights.layout(e, in: f, codes: codes) }
+            try Stage.byFile(entries, files).flatMap { f, e in try Weights.layout(e, in: f) }
         }
         var weightNames = ["": Set(try layout(d.residents).map(\.name))], heldNames: [String: Set<String>] = [:], layouts: [String: [String]] = [:]
         for g in d.groups {
@@ -79,6 +74,7 @@ extension Block {
         let resolver = Resolver(d, forms: forms, weights: weightNames, held: heldNames)
         var signatures = modules.mapValues { Signature($0.module) }
         let tensors = places(d, forms: forms, signatures: signatures, resolver: resolver, unit: units > 0 ? unit : nil, alternate: trial.map { $0.order[1] })
+        let copies = Set(tensors.compactMap { $0.name.hasPrefix(copy("")) ? String($0.name.dropFirst(copy("").count)) : nil })
         let neuralRows = Set(d.perRow.map(\.name).filter { r in
             tensors.contains { if case .units = $0.place { $0.name == r || $0.name == r + "#0" } else { false } }
         })
@@ -93,7 +89,7 @@ extension Block {
         for cut in cuts {
             let now = steps(d, used, neural: units * unit, cut: cut)
             for (name, spec) in now where assets[name] == nil {
-                let m = try module(spec, codes: codes)
+                let m = try module(spec)
                 (modules[name], assets[name]) = ((m, .gpu), Functions.name(m, prefix: "block"))
             }
             var s = Stage.Declaration("\(d.name), \(cut.map { "calls of \($0) rows at most" } ?? "a call a pass")\(units > 0 ? ", the ANE by \(tried.map(String.init).joined(separator: " or "))" : "")")
@@ -101,7 +97,7 @@ extension Block {
             s.residents = d.residents + d.groups.flatMap { g in g.held.map { ("\(g.name).\($0.name)", $0.key, $0.recipe) } }
             for g in d.groups { s.groups[g.name] = g.weights }
             s.slot = d.slot ?? slot(layouts, order: d.cycle + d.once)
-            (s.once, s.cycle, s.surfaces, s.codes) = (d.once, d.cycle, surfaces, codes)
+            (s.once, s.cycle, s.surfaces) = (d.once, d.cycle, surfaces)
             for (name, m) in modules where name.hasPrefix("edge-") || name.hasPrefix("ane-") || now[name] != nil {
                 nonisolated(unsafe) let module = m.module
                 s.functions[name] = Stage.Function(assets[name]!, unit: m.unit) { module }
@@ -128,7 +124,7 @@ extension Block {
         let pace = told || d.tapped ? "" : try paceKey(d)
         let block = Block(d, stage: stage, heights: heights, height: height, unit: unit, total: total, units: units, share: share, key: key,
                           pace: (pace, shareable > 0 && share == .inFlight), trial: trial, shareable: shareable, neuralRows: neuralRows,
-                          codes: codes, named: named, signatures: signatures, forms: forms, groups: groups, resolver: resolver)
+                          copies: copies, named: named, signatures: signatures, forms: forms, groups: groups, resolver: resolver)
         if let unit = decidedAtOpen(inFlight: inFlight, decided: decided, candidates: candidates, trying: trying) { block.keep(unit, best: [:]) }
         block.told()
         return block
@@ -160,7 +156,7 @@ extension Block {
     public static func paceKey(_ d: Declaration) throws -> String {
         var bytes = Data()
         for f in d.used {
-            for s in f.steps { bytes += try f.module(s.name, Build(rows: 64, codes: d.codes)).trimmed().bytecode() }
+            for s in f.steps { bytes += try f.module(s.name, Build(rows: 64)).trimmed().bytecode() }
         }
         return "pace " + digest(bytes) + " of \(d.rows) rows"
     }
@@ -168,7 +164,7 @@ extension Block {
     /// The key of a declaration's unit (`ThisMac.neuralUnits`); nil where none of its rows may go to the ANE.
     static func unitKey(_ d: Declaration) throws -> String? {
         let shareable = d.shareable
-        return shareable > 0 ? try key(d.used, codes: d.codes, shareable: shareable) : nil
+        return shareable > 0 ? try key(d.used, shareable: shareable) : nil
     }
 
     /// What a pace key carries once its block shares the ANE's rows: the unit it was taken at.
@@ -198,9 +194,9 @@ extension Block {
 
     /// **The block's key**: the hash of its ANE's steps at 64 rows — what they compute, not their unit — and the rows
     /// they share.
-    static func key(_ used: [Form], codes: CodesLayout, shareable: Int) throws -> String {
+    static func key(_ used: [Form], shareable: Int) throws -> String {
         var bytes = Data()
-        for f in used { for s in f.steps where s.unit == .either { bytes += try f.module(s.name, Build(rows: 64, codes: codes, neural: true)).trimmed().bytecode() } }
+        for f in used { for s in f.steps where s.unit == .either { bytes += try f.module(s.name, Build(rows: 64, neural: true)).trimmed().bytecode() } }
         return "block " + digest(bytes) + " of \(shareable) rows"
     }
 
@@ -209,7 +205,7 @@ extension Block {
     /// at the signature's shape where an ANE's step binds it.
     static func places(_ d: Declaration, forms: [String: Form], signatures: [String: Signature], resolver: Resolver, unit: Int?,
                        alternate: Int? = nil) -> [Stage.Tensor] {
-        var neuralRows = Set<String>(), neuralTensors: [String: ([Int], NDArray.ScalarType)] = [:]
+        var neuralRows = Set<String>(), neuralTensors: [String: ([Int], NDArray.ScalarType)] = [:], neuralCodes: [String: [Int]] = [:]
         if unit != nil {
             for g in d.groups where forms[g.form]!.shared {
                 for p in d.passes where p.shareable != nil && p.serves(forms[g.form]!) {
@@ -221,7 +217,8 @@ extension Block {
                             case .tensor(let t, let row):
                                 precondition(row == nil, "\(s.name).\(arg): a row of \(t), which the ANE reads whole")
                                 neuralTensors[t] = (shape, type)
-                            case .weight: break
+                            case .weight(let w):
+                                if type == .int8 { neuralCodes[w] = shape }
                             }
                         }
                     }
@@ -246,6 +243,10 @@ extension Block {
         for t in d.tensors {
             guard let (shape, type) = neuralTensors[t.name] else { tensors.append(t); continue }
             tensors.append(Stage.Tensor(t.name, surface: shape, element: Layout.element(type)))
+        }
+        // The ANE's copy of the codes its functions read, `[1, in, out]`: one each, rewritten while the ANE is idle (`copy`).
+        for (w, shape) in neuralCodes.sorted(by: { $0.key < $1.key }) {
+            tensors.append(Stage.Tensor(copy(w), surface: shape, element: 1))
         }
         return tensors
     }

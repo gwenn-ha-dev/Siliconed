@@ -3,8 +3,8 @@ import Foundation
 import SiliCore
 
 /// **A MOSS-Image block as the GPU and the ANE share it** (Z's `ZImageShared`, the engine's forms in `Neural.swift`): f16
-/// at every border and inside, `[1, rows, n]`, products on the codes q64 on `[in, out]`, or int8 × int8 on `[out, in]` where
-/// this Mac's GPU runs it faster (`SharedWeights.integer`), norms by their peak, the guard's powers of two in f16; what
+/// at every border and inside, `[1, rows, n]`, products on the codes int8 × int8 on the GPU, q64 on the ANE's copy of them
+/// (`SharedWeights`), norms by their peak, the guard's powers of two in f16; what
 /// reads across rows or computes in f32 is the GPU's:
 ///
 ///     gains       GPU    the modulation's six rows each its own `[1, 1, d]`: shift, 1 + scale, a gate as ĝ = g / G
@@ -37,15 +37,15 @@ enum MossShared {
     static let gains = ["shift1", "scale1", "gate1", "shift2", "scale2", "gate2"]
     static let gateFactors = ["gate1_factor", "gate2_factor"]
 
-    static func arguments(_ f: String, rows: Int, keys: Int, weights: SharedWeights, ranks: [String: Int] = [:]) -> [Argument] {
-        plainArguments(f, rows: rows, keys: keys, weights: weights) + MossFunctions.lowRankArguments(f, ranks: ranks, element: .f16)
+    static func arguments(_ f: String, rows: Int, keys: Int, weights: SharedWeights, ranks: [String: Int] = [:], neural: Bool = false) -> [Argument] {
+        plainArguments(f, rows: rows, keys: keys, weights: weights, neural: neural) + MossFunctions.lowRankArguments(f, ranks: ranks, element: .f16)
     }
 
-    static func plainArguments(_ f: String, rows: Int, keys: Int, weights: SharedWeights) -> [Argument] {
+    static func plainArguments(_ f: String, rows: Int, keys: Int, weights: SharedWeights, neural: Bool = false) -> [Argument] {
         let row = [1, 1, d], one = [1, 1, 1]
         let stream: [Argument] = [("x", [1, rows, d], .f16), ("x_factor", [1, rows, 1], .f16)]
         func weight(_ name: String, _ inn: Int, _ out: Int) -> [Argument] {
-            weights.arguments(name, inn: inn, out: out) + [(name + "_target", one, .f16)]
+            weights.arguments(name, inn: inn, out: out, neural: neural) + [(name + "_target", one, .f16)]
         }
         switch f {
         case "gains": return [("modulation", [6, MossFunctions.gainRow], .bf16), ("gate1_factor", one, .f16), ("gate2_factor", one, .f16)]
@@ -67,18 +67,18 @@ enum MossShared {
         }
     }
 
-    /// `neural`: the ANE's function of a step both units take: on `integer` codes, its products q64 where the GPU's
-    /// multiply int8 × int8 (`Aicode.Module.product`).
+    /// `neural`: the ANE's function of a step both units take: its products q64 on the ANE's copy of the codes, the
+    /// GPU's int8 × int8 (`Aicode.Module.product`).
     static func module(_ f: String, rows: Int, keys: Int, weights: SharedWeights, height h: Int = 0, width w: Int = 0, tapped: Bool = false,
                        ranks: [String: Int] = [:], neural: Bool = false) -> Aicode.Module {
-        let arguments = arguments(f, rows: rows, keys: keys, weights: weights, ranks: ranks)
+        let arguments = arguments(f, rows: rows, keys: keys, weights: weights, ranks: ranks, neural: neural)
         var m = Aicode.Module(arguments: arguments.map { ($0.name, Aicode.tensor($0.shape, $0.element)) })
         let b = m.body
         let names = m.argumentNames
         func a(_ name: String) -> Int { names.firstIndex(of: name)! }
         var constants = Aicode.ScalingConstants()
         func product(_ x: Int, _ name: String, input: Int) -> Int {
-            m.product(x, name, input: input, adapted: (ranks[name] ?? 0) > 0, weights: weights, neural: neural, constants: &constants)
+            m.product(x, name, input: input, adapted: (ranks[name] ?? 0) > 0, neural: neural, constants: &constants)
         }
         func f32(_ x: Int) -> Int { b.castUnlessSame(x, to: .f32) }
         func bf16(_ x: Int) -> Int { b.castUnlessSame(x, to: .bf16) }

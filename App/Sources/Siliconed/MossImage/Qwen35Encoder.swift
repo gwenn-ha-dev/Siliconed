@@ -158,7 +158,7 @@ package struct Qwen35Encoder: Sendable {
             d.edges["norm"] = { _ in e.normModule(rows: rows) }
         case .half:
             d.perRow.append(.init("x_factor", width: 1, .float32, next: "y_factor"))
-            d.kinds = ["delta": { b in e.halfDeltaModule(rows: b.rows, codes: b.codes) }, "attention": { b in e.halfAttentionModule(rows: b.rows, codes: b.codes) }]
+            d.kinds = ["delta": { b in e.halfDeltaModule(rows: b.rows) }, "attention": { b in e.halfAttentionModule(rows: b.rows) }]
             d.edges["norm"] = { _ in e.halfNormModule(rows: rows) }
         }
         return d

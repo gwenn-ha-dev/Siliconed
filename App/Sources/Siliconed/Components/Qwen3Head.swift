@@ -49,11 +49,17 @@ final class Qwen3Head {
         let size = a.half ? 1 : a.element.size, s = stretch
         var scales: [Float] = []
         if a.half {
-            guard case .w8a16(let suffix, _) = a else { preconditionFailure() }
+            guard case .w8a8(let suffix, _) = a else { preconditionFailure() }
             scales = try file.floats("lm_head" + suffix)
         }
+        // The codes by pieces of k as the head's products read them (`Weights.codesShape`): one piece, the file's rows.
+        let (pieces, piece) = a.half ? Weights.pieces(d) : (1, d)
+        var rows = [UInt8](repeating: 0, count: pieces > 1 ? s * d : 0)
         for k in 0..<count {
-            try file.read(table, at: k * s * d * size, count: s * d * size, into: await layers.pointer("head_w\(k)"))
+            let into = await layers.pointer("head_w\(k)")
+            if pieces == 1 { try file.read(table, at: k * s * d * size, count: s * d * size, into: into); continue }
+            try rows.withUnsafeMutableBytes { try file.read(table, at: k * s * d, count: s * d, into: $0.baseAddress!) }
+            for p in 0..<pieces { for o in 0..<s { rows.withUnsafeBytes { (into + (p * s + o) * piece).copyMemory(from: $0.baseAddress! + o * d + p * piece, byteCount: piece) } } }
             if a.half { Qwen3Encoder.write(Array(scales[(k * s)..<((k + 1) * s)]), as: .f16, to: await layers.pointer("head_s\(k)")) }
         }
     }

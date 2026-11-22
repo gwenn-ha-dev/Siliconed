@@ -5,9 +5,8 @@ import SiliCore
 /// same functions, two specializations of one asset. A block in f16 written as the Standard's (its guard and its norms
 /// in f32, its `dequantize` reading a vector of scales, its post holding the attention) does not reach the ANE: the ANE's
 /// compiler fails and Core AI runs it on the GPU, bit for bit (measured 17/11 on the M1 Pro). Here pre, out and ffn are
-/// written in the forms both units take (`Neural.swift`: f16 at every border and inside, `[1, rows, n]`, q64 products or
-/// int8 × int8 where this Mac's GPU runs it faster (`SharedWeights.integer`),
-/// norms by their peak, the guard's powers of two in f16); what reads across rows or computes in f32 is a function of
+/// written in the forms both units take (`Neural.swift`: f16 at every border and inside, `[1, rows, n]`, int8 × int8
+/// products on the GPU, q64 on the ANE's copy of the codes (`SharedWeights`), norms by their peak, the guard's powers of two in f16); what reads across rows or computes in f32 is a function of
 /// the GPU's:
 ///
 ///     modulation   GPU    `ZImageBlock`'s under the guard (one row), its four rows each an output
@@ -61,8 +60,8 @@ enum ZImageShared {
     /// The products a LoRA adapts, by the function that computes each.
     static let adapted: [String: [String]] = ["pre": ["qkv"], "out": ["out"], "ffn": ["w1", "w3", "w2"]]
 
-    static func arguments(_ function: String, rows: Int, keys: Int, weights: SharedWeights, ranks: [String: Int] = [:]) -> [Argument] {
-        plainArguments(function, rows: rows, keys: keys, weights: weights) + lowRankArguments(function, ranks: ranks)
+    static func arguments(_ function: String, rows: Int, keys: Int, weights: SharedWeights, ranks: [String: Int] = [:], neural: Bool = false) -> [Argument] {
+        plainArguments(function, rows: rows, keys: keys, weights: weights, neural: neural) + lowRankArguments(function, ranks: ranks)
     }
 
     static func lowRankArguments(_ function: String, ranks: [String: Int]) -> [Argument] {
@@ -73,9 +72,9 @@ enum ZImageShared {
         }
     }
 
-    private static func plainArguments(_ function: String, rows: Int, keys: Int, weights: SharedWeights) -> [Argument] {
+    private static func plainArguments(_ function: String, rows: Int, keys: Int, weights: SharedWeights, neural: Bool) -> [Argument] {
         let row = [1, 1, d], one = [1, 1, 1]
-        func product(_ name: String, _ inn: Int, _ out: Int) -> [Argument] { weights.arguments(name, inn: inn, out: out) }
+        func product(_ name: String, _ inn: Int, _ out: Int) -> [Argument] { weights.arguments(name, inn: inn, out: out, neural: neural) }
         switch function {
         case "pre":
             return [("x", [1, rows, d], .f16), ("x_factor", [1, rows, 1], .f16), ("scale1", row, .f16), ("norm1", row, .f16)]
@@ -98,8 +97,8 @@ enum ZImageShared {
     /// The guarded modulation (`ZImageBlock`'s), the four rows the block reads: s₁, g₁, s₂, g₂, each `[1, 1, d]`; with
     /// `taps`, its own outputs replaced by them.
     static func modulation(weights: SharedWeights, ranks: [String: Int] = [:], taps: [ZImageDiT.BlockTap] = []) -> Aicode.Module {
-        if !taps.isEmpty { return ZImageBlock.module("modulation", rows: 1, keys: 1, form: .shared, weights: weights, codes: weights.layout, ranks: ranks, taps: taps) }
-        var m = ZImageBlock.module("modulation", rows: 1, keys: 1, form: .shared, weights: weights, codes: weights.layout, ranks: ranks)
+        if !taps.isEmpty { return ZImageBlock.module("modulation", rows: 1, keys: 1, form: .shared, weights: weights, ranks: ranks, taps: taps) }
+        var m = ZImageBlock.module("modulation", rows: 1, keys: 1, form: .shared, weights: weights, ranks: ranks)
         let b = m.body
         let (scales, gates) = (m.outputs[0].1, m.outputs[1].1)
         // A row of the block's gains, its page's padding cut (`ZImageBlock.gainRow`): the ANE's surfaces `[1, 1, d]`.
@@ -109,11 +108,11 @@ enum ZImageShared {
     }
     static let gains = ["scale1", "gate1", "scale2", "gate2"]
 
-    /// `neural`: the ANE's function of a step both units take (`Block.Build.neural`): on `integer` codes, its products
-    /// q64 where the GPU's multiply int8 × int8 (`Aicode.Module.product`).
+    /// `neural`: the ANE's function of a step both units take (`Block.Build.neural`): its products q64 on the ANE's copy
+    /// of the codes, the GPU's int8 × int8 (`Aicode.Module.product`).
     static func module(_ function: String, rows: Int, keys: Int, weights: SharedWeights, ranks: [String: Int] = [:],
                        taps: [ZImageDiT.BlockTap] = [], neural: Bool = false) -> Aicode.Module {
-        var m = Aicode.Module(arguments: arguments(function, rows: rows, keys: keys, weights: weights, ranks: ranks).map { ($0.name, Aicode.tensor($0.shape, $0.element)) })
+        var m = Aicode.Module(arguments: arguments(function, rows: rows, keys: keys, weights: weights, ranks: ranks, neural: neural).map { ($0.name, Aicode.tensor($0.shape, $0.element)) })
         let b = m.body
         let names = m.argumentNames
         func a(_ name: String) -> Int { names.firstIndex(of: name)! }
@@ -121,7 +120,7 @@ enum ZImageShared {
         /// The product of a unit (rotated before codes), its low-rank path beside it reading `input` (the unit before
         /// its rotation, under the same factor).
         func product(_ x: Int, _ name: String, input: @autoclosure () -> Int) -> Int {
-            m.product(x, name, input: input(), adapted: (ranks[name] ?? 0) > 0, weights: weights, neural: neural, constants: &constants)
+            m.product(x, name, input: input(), adapted: (ranks[name] ?? 0) > 0, neural: neural, constants: &constants)
         }
         func rotation(_ t: Int) -> Int { b.rotation(t, of: weights) }
         /// `t` under a factor `[1, rows, 1]` f16, a power of two: exact.

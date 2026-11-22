@@ -15,7 +15,6 @@ import Foundation
 ///               that took it (`fusedBy`)
 ///     extents   what a stage's functions held beside its reading, the same names at any shapes (`Stage.Extent`): a
 ///               form never read is bounded from its kin's readings (`Stage.estimates(extents:)`)
-///     integerProducts  the GPU's product int8 × int8 over the shared forms' of today, timed once (`SharedWeights.offered`)
 ///
 /// **By Mac and by system**: Core AI's kernels and Metal's change with the OS, so what was measured is kept under the
 /// Mac's model and the system's build (`system`), and measured again past an update; the file keeps every system's.
@@ -46,9 +45,6 @@ public struct ThisMac: Codable, Sendable, Equatable {
     public var fusedBy: [String: String]? = nil
     /// What the functions of a stage's reading held, by the stage's key (`Stage.Extent`); nil in a file written before.
     public var extents: [String: Stage.Extent]? = nil
-    /// The GPU's product int8 × int8 against the Compact's of today, seconds over seconds (`SharedWeights.integerTrial`):
-    /// below 1, the shared forms are offered it; nil, not yet measured under this system.
-    public var integerProducts: Double? = nil
 
     public init() {}
 

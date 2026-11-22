@@ -4,8 +4,8 @@ import Foundation
 /// **What a stage's functions hold, read in flight and kept on this Mac**: their key and extent, the share read, the
 /// climb (`rekey`), the reader's keeping and the loop's signal, the fuse's mark, the estimates and the form chosen.
 extension Stage {
-    /// **A stage's functions apart from their shapes** (`kin`: the client's functions, how many calls it keeps in
-    /// flight, the engine that wrote them) **and the elements they hold** (`elements`, by a name the same at any shapes:
+    /// **A stage's functions apart from their shapes** (`kin`: the client's functions and what each computes, how many
+    /// calls it keeps in flight) **and the elements they hold** (`elements`, by a name the same at any shapes:
     /// a stage of bands' arguments, `Bands.extent`; a block's functions' results, `Block.extent`). Core AI's share under
     /// functions written alike grows with what their calls hold, never faster, but where its kernels change with the
     /// shapes (`estimates(extents:)`).
@@ -14,10 +14,12 @@ extension Stage {
         public let elements: [String: Int]
         public init(kin: String, elements: [String: Int]) { (self.kin, self.elements) = (kin, elements) }
 
-        /// The kin of `lines` (what names the functions apart from their shapes), launched `inFlight` at a time by this
-        /// engine: a function's bytes change with its engine, whose share at another size says nothing of them.
+        /// The kin of `lines` (what names the functions apart from their shapes, their ops among it: `Block.walk`),
+        /// launched `inFlight` at a time. Not the engine that wrote them: a new binary that writes the same ops keeps its
+        /// kin's readings, and one that writes them otherwise is another kin by its ops (decided 22/11/2026: with the
+        /// engine in its kin, every version decoded sober once a family).
         public init(_ lines: [String], inFlight: Int, elements: [String: Int]) {
-            let all = (["engine \(ThisMac.engine)", "in flight \(inFlight)"] + lines.sorted()).joined(separator: "\n")
+            let all = (["in flight \(inFlight)"] + lines.sorted()).joined(separator: "\n")
             self.init(kin: "kin " + Block.digest(Data(all.utf8)), elements: elements)
         }
 
@@ -189,14 +191,19 @@ extension Stage {
     }
 
     /// **The form to take of `plans` (the tallest first), their `estimates` beside**: the first whose P, its estimate
-    /// counted, holds under B with the margin; none known, the soberest whose socle holds (the last); one known and none
-    /// that holds, refused with the number; every form fused, refused with the soberest's P, the one number known.
+    /// counted, holds under B with the margin; else the soberest never read (unknown, or bounded from its kin) past the
+    /// soberest read, as on a Mac with no reading — its socle on paper, under the fuse; every form past it read or fused,
+    /// refused with the number; every form fused, refused with the soberest's P, the one number known.
+    ///
+    /// **A B lowered under every form read** (decided 22/11/2026): a form never read is bounded from its kin by a reading
+    /// times what it holds more, the swing and the margin — an upper bound, which a B lowered under the readings refuses
+    /// though the form may hold; it goes as on a Mac with no reading rather than a refusal. Past the soberest read only:
+    /// a taller form holds more than it, which did not hold.
     public static func choose(_ plans: [Plan], _ estimates: [Estimate]) throws -> Int {
         precondition(!plans.isEmpty && plans.count == estimates.count)
         if let i = plans.indices.first(where: { i in estimates[i].bytes.map { plans[i].p + $0 + margin <= plans[i].budget } ?? false }) { return i }
-        if estimates.last == .unknown { return plans.count - 1 }
-        // None read, some fused: the soberest form never tried.
-        if estimates.allSatisfy({ $0 == .unknown || $0 == .fused }), let i = estimates.lastIndex(of: .unknown) { return i }
+        let past = (estimates.lastIndex { if case .read = $0 { true } else { false } } ?? -1) + 1
+        if let i = (past..<plans.count).last(where: { estimates[$0] != .fused }) { return i }
         let i = plans.indices.filter { estimates[$0].bytes != nil }.min { plans[$0].p + estimates[$0].bytes! < plans[$1].p + estimates[$1].bytes! }
         guard let i else {
             // What Core AI held past the soberest's socle was never read, only that the process passed B under it (the
@@ -215,7 +222,7 @@ extension Stage {
     /// **Whether the reader keeps a group of `bytes` now**: past the signal, if the footprint, what is allocated and not
     /// yet written (`pending`: the slots never read into), the group, what is left of the reserve (the reserve less
     /// what Core AI's share grew since the first signal) and a margin hold under B — the margin the larger of
-    /// `Stage.margin` and 5 % of the share read —, and if the process may wire it beside what it wired (`Arena.wire`: a
+    /// `Stage.keepClear` and 5 % of the share read —, and if the process may wire it beside what it wired (`Arena.wire`: a
     /// kept group is wired, or macOS compresses it between two reads).
     func keeps(_ bytes: Int, pending: Int, allocated: Int) -> Bool {
         let (share, now, current) = read(allocated: allocated)
@@ -223,7 +230,7 @@ extension Stage {
         return lock.withLock {
             let group = Arena.allocation(bytes: bytes)
             guard keeping && loads == 0,
-                  now + (share - current) + promised + pending + group + left(share) + max(Stage.margin, share / 20) <= plan.budget,
+                  now + (share - current) + promised + pending + group + left(share) + max(Stage.keepClear, share / 20) <= plan.budget,
                   wired + promised + group <= Memory.wireLimit
             else { return false }
             promised += group

@@ -20,8 +20,8 @@ import SiliCore
 /// **Two arithmetics, by what the file holds** (`Qwen3Arithmetic`):
 ///   - **bf16 end to end** on a bf16 file, the GPU alone: transformers' own roundings, op by op (RMSNorm rounds the
 ///     normalized value, then the product by γ; RoPE's tables brought to bf16; SiLU computed in f32 and rounded once).
-///   - **f16, W8A16** on int8 codes (SDNQ's, or ComfyUI's with its `convrot` rotation): the codes dequantized in the
-///     function, the guard of f16 by its rules (`Guard.swift`) — the stream kept as (x̂, X), every product reading its
+///   - **f16, W8A8** on int8 codes (SDNQ's, or ComfyUI's with its `convrot` rotation): int8 × int8 in the function
+///     (`w8a8`), the guard of f16 by its rules (`Guard.swift`) — the stream kept as (x̂, X), every product reading its
 ///     input under its own target, each result entering the stream with its factor (`residual(plus:factor:)`).
 ///
 /// What a port by analogy would miss:

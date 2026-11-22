@@ -5,8 +5,8 @@ import SiliCore
 /// forms of the same functions, one a render:
 ///
 ///     bf16     the Standard, bf16 end to end, the GPU alone: diffusers' arithmetic, each norm's statistics in f32
-///     shared   the Compact, on the GPU alone (the Neural Engine off) or shared with the ANE (on): W8A16 (q64), or int8 × int8
-///              where this Mac's GPU runs it faster (`SharedWeights.integer`), on the int8 `convrot` codes (or the
+///     shared   the Compact, on the GPU alone (the Neural Engine off) or shared with the ANE (on): int8 × int8 on the GPU, q64
+///              on the ANE's copy of the codes (`SharedWeights`), on the int8 `convrot` codes (or the
 ///              Standard's weights in f16, `SharedWeights.half`) under the guard of f16 (`Guard.swift`), the forms both units take (`Neural.swift`), the residual
 ///              stream and its products' inputs as (t, F), F f16 `[1, rows, 1]`
 ///

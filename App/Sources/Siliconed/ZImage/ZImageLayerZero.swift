@@ -4,8 +4,8 @@ import Metal
 import SiliCore
 
 /// **Layer 0 alone, at its inner boundaries** (`siliconed check z-image block`): the render's block functions in the
-/// map's arithmetic under the process's Neural Engine switch (`Arithmetic.told`: `ZImageBlock`, the Standard's;
-/// `ZImageShared`, the Compact's on the products a render takes first on this Mac or `--products`', or the Standard's
+/// map's arithmetic under the process's Neural Engine switch (`Arithmetic.of`: `ZImageBlock`, the Standard's;
+/// `ZImageShared`, the Compact's, or the Standard's
 /// weights in f16 with the switch on, on the GPU), over the oracle's own
 /// stream and adaln, one call over every row of the sequence (keys = rows, every key real: diffusers masks nothing at
 /// batch 1), and before each the same function with boundaries for outputs (six at most a function). The stream given
@@ -54,9 +54,8 @@ package enum ZImageLayerZero {
                                   _ tapped: [ZImageDiT.BlockTap: UnsafeMutableBufferPointer<Float>]) async throws -> String {
         guard let device = MTLCreateSystemDefaultDevice() else { throw Failure("no Metal device") }
         let file = try ZImageDiT.file(path)
-        // The products a render takes first on this Mac, or a control's (`--products`): the block on the GPU.
-        let arithmetic = try await Arithmetic.told(codes: Arithmetic.codes(file, marker: ZImageDiT.codesMarker),
-                                                   neuralEngine: CoreAI.neuralEngineInForce, device)
+        // The products a render takes: the block on the GPU.
+        let arithmetic = Arithmetic.of(codes: Arithmetic.codes(file, marker: ZImageDiT.codesMarker), neuralEngine: CoreAI.neuralEngineInForce)
         let (form, weights) = (ZImageFunctions.Form(arithmetic), arithmetic.weights)
         let g = try ZImageTransformer.Geometry(latentHeight: h, latentWidth: w, capLength: capLength)
         let (rows, d, c) = (g.sequence, ZImageBlock.d, ZImageDiT.Config.published)
@@ -81,7 +80,6 @@ package enum ZImageLayerZero {
             + [SiliCore.Stage.Tensor(Tap.adaln.rawValue, bytes: width(.adaln) * 4)]
         n.groups = [Block.Group("layers.0", form: "\(form)", weights: ZImageFunctions.entries("layers.0", form: form, weights: weights))]
         n.cycle = ["layers.0"]
-        n.sharedWeights = shared ? weights : nil
         let functions = shared ? ["modulation", "pre", "heads", "attention", "out", "ffn"] : ZImageBlock.functions
         let calls = functions.flatMap { f in Self.taps(form).filter { $0.function == f } + [(f, [])] }
         let steps = calls.filter { $0.function != "modulation" }
@@ -92,11 +90,11 @@ package enum ZImageLayerZero {
             Block.Step(step(f, taps), on: .gpu, whole: ["post", "attention"].contains(f) ? ["k", "v"] : [], bind: shared ? binds[f] ?? [:] : [:])
         }, bind: shared ? [:] : ["scale1": .row("scales", 0), "gate1": .row("gates", 1), "scale2": .row("scales", 2), "gate2": .row("gates", 3)]) { name, b in
             let (f, taps) = steps.first { step($0.function, $0.taps) == name }!
-            return shared ? ZImageShared.module(f, rows: b.rows, keys: rows, weights: weights, taps: taps) : ZImageBlock.module(f, rows: b.rows, keys: rows, form: form, codes: b.codes, taps: taps)
+            return shared ? ZImageShared.module(f, rows: b.rows, keys: rows, weights: weights, taps: taps) : ZImageBlock.module(f, rows: b.rows, keys: rows, form: form, taps: taps)
         }]
         n.passes = [Block.Pass("rows", rows: 0..<rows)]
         for (f, taps) in calls where f == "modulation" {
-            n.edges[step(f, taps)] = { b in shared ? ZImageShared.modulation(weights: weights, taps: taps) : ZImageBlock.module(f, rows: 1, keys: 1, form: form, codes: b.codes, taps: taps) }
+            n.edges[step(f, taps)] = { b in shared ? ZImageShared.modulation(weights: weights, taps: taps) : ZImageBlock.module(f, rows: 1, keys: 1, form: form, taps: taps) }
         }
         let block = try await Block.open(device, n, files: [file], budget: MemoryBudget.machineCeiling(), share: .gpu)
         defer { block.close() }
@@ -136,6 +134,6 @@ package enum ZImageLayerZero {
             let y = await block.values("x", rows: 0..<rows)
             for i in 0..<rows * d { into[i] = y[i] }
         }
-        return "\(form)\(shared ? " on \(weights)" : ""), codes \(block.stage.plan.codes.rawValue), " + block.stage.plan.line
+        return "\(form)\(shared ? " on \(weights)" : ""), " + block.stage.plan.line
     }
 }

@@ -49,7 +49,7 @@ extension Aicode.Block {
 }
 
 extension Aicode.Module {
-    /// **The shared forms' product of `name`** on the unit x (`[1, rows, in]`, its input rotated before codes): `q64`
+    /// **The shared forms' product of `name`** on the unit x (`[1, rows, in]`, its input rotated before codes): `codes`
     /// on its codes `name` and scales `name_scale`, or `product16` on its f16 weight `name` — which, its argument's
     /// element says (`SharedWeights`). `adapted`, its low-rank path beside it (`name_down`, `name_up`,
     /// `Aicode.Block.lowRank`) reading `input`, the unit before its rotation under the same factor (`rotated16`'s): the
@@ -61,20 +61,19 @@ extension Aicode.Module {
     /// back to the GPU without a word (a preferred unit's fallback) and the ANE's share computed at the GPU's pace; each
     /// half a product of its own compiles (20/11, the M1 Pro).
     ///
-    /// `weights`, `neural`: on `integer` codes (`[1, out, in]`), the GPU's function multiplies int8 × int8 (`w8a8`), the
-    /// ANE's `q64` on them transposed; on `codes` and halves, both units the same.
+    /// `neural`: on codes, the GPU's function multiplies int8 × int8 on the codes by pieces `[p, out, in / p]`
+    /// (`w8a8`), the ANE's `q64` on its copy `[1, in, out]`; on halves, both units the same.
     public func product(_ x: Int, _ name: String, input: @autoclosure () -> Int, adapted: Bool, columns: Range<Int>? = nil,
-                        weights: SharedWeights = .codes, neural: Bool = false, constants: inout Aicode.ScalingConstants) -> Int {
+                        neural: Bool = false, constants: inout Aicode.ScalingConstants) -> Int {
         let b = body
         /// The columns of `t` along `axis` (its last, unless told).
         func part(_ t: Int, axis: Int? = nil) -> Int {
             guard let columns else { return t }
             return b.slice(t, axis: axis ?? Aicode.shape(b.types[t]).shape.count - 1, start: columns.lowerBound, size: columns.count)
         }
-        let laid = weights == .integer
-        let w = part(argument(name), axis: laid ? 1 : nil), s = { part(self.argument(name + "_scale")) }
-        let y = Aicode.shape(b.types[w]).element != .si8 ? b.product16(x, weight: w)
-            : b.codes(x, w, scale: s(), weights: weights, neural: neural, constants: &constants)
+        let codes = Aicode.shape(b.types[argument(name)]).element == .si8
+        let w = part(argument(name), axis: codes && !neural ? 1 : nil), s = { part(self.argument(name + "_scale")) }
+        let y = codes ? b.codes(x, w, scale: s(), neural: neural, constants: &constants) : b.product16(x, weight: w)
         guard adapted else { return y }
         let input = input(), shape = Aicode.shape(b.types[y]).shape, inn = Aicode.shape(b.types[input]).shape.last!, out = shape.last!
         let rows = shape.reduce(1, *) / out

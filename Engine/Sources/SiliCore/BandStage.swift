@@ -73,7 +73,7 @@ public final class BandStage: @unchecked Sendable {
                 + p.smalls.map { Stage.Tensor($0.name, bytes: $0.bytes, $0.apart ? .apart : .heap) }
             d.residents = residents
             d.inFlight = inFlight
-            d.extent = p.extent(prefix, inFlight: inFlight)
+            d.extent = try p.extent(prefix, inFlight: inFlight)
             var assets: [Bands.Shaped: String] = [:]
             for (key, module) in try p.modules() {
                 let asset = Functions.name(module, prefix: prefix)

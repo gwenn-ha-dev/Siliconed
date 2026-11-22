@@ -57,17 +57,9 @@ package final class QwenImage21Loop {
 
     package enum Pass: Sendable { case prefix, target }
 
-    /// **The path of a DiT's arithmetic** (`Arithmetic`): the Standard's bf16; the Compact's codes on the GPU alone in
-    /// W8A16 (the Neural Engine off: the stream under the guard of f16); the shared forms beside the ANE (or told 0 rows of it), on
-    /// the Compact's codes or the Standard's weights in f16, and on the GPU alone where its products are int8 × int8
-    /// (`SharedWeights.integer`: the guarded forms read the codes in W8A16 only).
-    static func path(_ a: Arithmetic) -> Path {
-        switch a {
-        case .standard: .bfloat
-        case .shared(.codes, .gpu): .half
-        case .shared: .shared
-        }
-    }
+    /// **The path of a DiT's arithmetic** (`Arithmetic`): the Standard's bf16; the shared forms otherwise, on the
+    /// Compact's codes (beside the ANE or on the GPU alone) or the Standard's weights in f16.
+    static func path(_ a: Arithmetic) -> Path { a == .standard ? .bfloat : .shared }
 
     static let layers = QwenImage21DiT.Config.published.layers
     static let d = QwenImage21Functions.d, hd = QwenImage21Functions.hd, heads = QwenImage21Functions.heads
@@ -113,7 +105,6 @@ package final class QwenImage21Loop {
         var n = Block.Declaration("Qwen-Image-2.1's DiT (\(path.rawValue), \(g.target) rows, \(g.prefixKeys) prefix keys)", rows: g.rows)
         switch path {
         case .bfloat: n.perRow = [.init("x", width: w, .float32, next: "y")]
-        case .half: n.perRow = [.init("x", width: w, .float16, next: "y", factor: "x_factor"), .init("x_factor", width: 1, .float32, next: "y_factor")]
         case .shared: n.perRow = [.init("x", width: w, .float16, next: "y", factor: "x_factor"), .init("x_factor", width: 1, .float16, next: "y_factor")]
         }
         n.perRow += [.init("q", width: w, e), .init("kt", width: w, e, rows: g.targetKeys), .init("vt", width: w, e, rows: g.targetKeys),
@@ -137,12 +128,11 @@ package final class QwenImage21Loop {
         n.residents = QwenImage21Functions.others()
         let form = path.rawValue
         n.groups = groups.enumerated().map { Block.Group($1, form: form, weights: QwenImage21Functions.layer($0, path: path, weights: weights)) }
-        n.sharedWeights = path == .shared ? weights : nil
         (n.once, n.cycle) = (groups, groups)
         let (pk, tk) = (g.prefixKeys, g.targetKeys)
         let keys: Set<String> = ["kp", "vp", "kt", "vt"]
         let module: @Sendable (String, Block.Build) -> Aicode.Module = { step, b in
-            QwenImage21Functions.module(step, path: path, weights: weights, codes: b.codes, rows: b.rows, prefix: pk, target: tk, ranks: ranks,
+            QwenImage21Functions.module(step, path: path, weights: weights, rows: b.rows, prefix: pk, target: tk, ranks: ranks,
                                         neural: b.neural)
         }
         if path == .shared {
@@ -160,7 +150,7 @@ package final class QwenImage21Loop {
         for f in ["timestep", "embed-prefix", "embed-target", "final"] {
             let rows = edgeRows(f, g)
             n.edges[f] = { b in
-                QwenImage21Functions.module(f, path: path, weights: weights, codes: b.codes, rows: rows, prefix: pk, target: tk, ranks: ranks, tapped: tapped)
+                QwenImage21Functions.module(f, path: path, weights: weights, rows: rows, prefix: pk, target: tk, ranks: ranks, tapped: tapped)
             }
         }
         return n

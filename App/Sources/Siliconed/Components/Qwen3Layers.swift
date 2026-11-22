@@ -38,7 +38,7 @@ extension Qwen3Encoder {
         if a.half { d.perRow.append(.init("x_factor", width: 1, .float32, next: "y_factor", apart: true)) }
         d.layers = (0..<c.layers).map { Block.Group(Self.layer($0), form: "layer", weights: entries($0, a)) }
         let cached = writing != nil
-        d.kinds["layer"] = { b in model.layerModule(a, b.codes, .causal(rows: b.rows), cache: cached) }
+        d.kinds["layer"] = { b in model.layerModule(a, .causal(rows: b.rows), cache: cached) }
         if let writing {
             let n = writing.capacity
             for i in 0..<c.layers {
@@ -47,7 +47,7 @@ extension Qwen3Encoder {
             d.tensors = [.init("token", bytes: c.width * e), .init("token_cos", bytes: c.headDim * 4), .init("token_sin", bytes: c.headDim * 4),
                          .init("mask", bytes: (n + 1) * e)]
             if a.half { d.tensors.append(.init("token_factor", bytes: 4)) }
-            d.edges["decode"] = { b in model.layerModule(a, b.codes, .cached(capacity: n), cache: true) }
+            d.edges["decode"] = { b in model.layerModule(a, .cached(capacity: n), cache: true) }
             d.again = true
         }
         if let head { Qwen3Head.declare(head, self, a, in: &d) }

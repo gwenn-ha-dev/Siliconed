@@ -2,14 +2,14 @@ import CoreAI
 import Foundation
 import SiliCore
 
-/// **Qwen-Image-2.1's DiT in functions at fixed shapes** (the loop is `QwenImage21Loop`), on one of three paths:
+/// **Qwen-Image-2.1's DiT in functions at fixed shapes** (the loop is `QwenImage21Loop`), on one of two paths:
 ///
 ///     bfloat   the Standard's bf16 weights, bf16 products on the GPU, the residual stream in f32
-///     half     the Compact's int8 codes in W8A16: dequantized in f16 inside the function, every activation under the
-///              guard of f16 (`Guard.swift`), the stream as (x̂ f16, a row's factor f32); its input rotated by ConvRot's
-///              Hadamard (256) before each product, as the codes were
-///     shared   the same codes in the forms the GPU and the ANE both take (`QwenImage21Shared`): f16 at every border,
-///              the stream as (x̂ f16, a row's factor f16), the layer in five functions of which the ANE takes three
+///     shared   the Compact's int8 codes, or the Standard's weights in f16, in the forms the GPU and the ANE both take
+///              (`QwenImage21Shared`): f16 at every border under the guard of f16 (`Guard.swift`), the stream as
+///              (x̂ f16, a row's factor f16), the layer in five functions of which the ANE takes three. The Compact on the
+///              GPU alone too: its own guarded form (two functions a layer, the stream's factor f32) went 3 % faster on
+///              the M5 Pro at 1024² and 160 MiB of arena lighter, a second form of the Compact on the GPU (22/11/2026)
 ///
 ///     timestep        one row, f32   temb = linear_2(SiLU(linear_1 t_freq)); m = modulation(SiLU temb) as the rows
 ///                                    1 + s₁, tanh g₁, 1 + s₂, tanh g₂; final_scale = 1 + norm_out(SiLU temb)
@@ -37,13 +37,11 @@ import SiliCore
 /// `ranged` found for it): the change then comes out under the product's own factor, added to its result as it lies.
 package enum QwenImage21Functions {
     package enum Path: String, Sendable {
-        case bfloat, half, shared
+        case bfloat, shared
 
         /// The element of what a layer reads and writes.
         var element: Aicode.Element { self == .bfloat ? .bf16 : .f16 }
         var scalar: NDArray.ScalarType { self == .bfloat ? .bfloat16 : .float16 }
-        /// The element of the stream's row factors: f32 under the GPU's guard, f16 in the shared forms.
-        var factor: Aicode.Element { self == .shared ? .f16 : .f32 }
         /// The modulation's rows as the layers read them: f32 beside the bf16 path's f32 stream, f16 under the guard.
         var gains: Aicode.Element { self == .bfloat ? .f32 : .f16 }
         var gainsScalar: NDArray.ScalarType { self == .bfloat ? .float32 : .float16 }
@@ -125,7 +123,6 @@ package enum QwenImage21Functions {
     static func layer(_ i: Int, path: Path, weights: SharedWeights = .codes) -> [Weights.Entry] {
         let p = "transformer_blocks.\(i)."
         switch path {
-        case .half: return products.map { ($0.0, p + $0.1, Recipe.codes) } + gains.map { ($0.0, p + $0.1, Recipe.half) }
         case .shared:
             return products.map { weights.entry($0.0, key: p + $0.1) } + gains.map { ($0.0, p + $0.1, Recipe.half) }
                 + QwenImage21Shared.targets.map { ($0.name, "", Recipe.target($0.products)) }
@@ -194,19 +191,19 @@ package enum QwenImage21Functions {
 
     /// A function's arguments in the order it declares them. `rows`: a tile's, or the prefix's or the target's keys for
     /// the outer functions; `prefix`, `target`: the keys of each (a post's).
-    static func arguments(_ f: String, path: Path, weights: SharedWeights = .codes, codes: CodesLayout, rows: Int, prefix: Int = 0,
+    static func arguments(_ f: String, path: Path, weights: SharedWeights = .codes, rows: Int, prefix: Int = 0,
                           target: Int = 0, ranks: Ranks = [:]) -> [Argument] {
-        own(f, path: path, weights: weights, codes: codes, rows: rows, prefix: prefix, target: target) + factors(f, path: path, ranks: ranks)
+        own(f, path: path, weights: weights, rows: rows, prefix: prefix, target: target) + factors(f, path: path, ranks: ranks)
     }
 
-    private static func own(_ f: String, path: Path, weights: SharedWeights, codes: CodesLayout, rows: Int, prefix: Int, target: Int) -> [Argument] {
+    private static func own(_ f: String, path: Path, weights: SharedWeights, rows: Int, prefix: Int, target: Int) -> [Argument] {
         if path == .shared, !outer.contains(f) { return QwenImage21Shared.arguments(f, rows: rows, prefix: prefix, target: target, weights: weights) }
         let (d, e, hd, h) = (Self.d, path.element, Self.hd, Self.heads)
         func stream(_ name: String) -> [Argument] {
-            path == .bfloat ? [(name, [rows, d], .f32)] : [(name, [rows, d], .f16), (name + "_factor", [1, rows], path.factor)]
+            path == .bfloat ? [(name, [rows, d], .f32)] : [(name, [rows, d], .f16), (name + "_factor", [1, rows], .f16)]
         }
         func weight(_ name: String, _ inn: Int, _ out: Int) -> [Argument] {
-            path == .half ? [(name, codes == .inOut ? [inn, out] : [out, inn], .si8), (name + "_scale", [out], .f16)] : [(name, [inn, out], .bf16)]
+            [(name, [inn, out], .bf16)]
         }
         switch f {
         case "timestep":
@@ -232,17 +229,16 @@ package enum QwenImage21Functions {
 
     // MARK: - The modules
 
-    /// `codes`: the int8 codes' layout on this Mac (`CodesLayout`), what the half path's products read.
     /// `weights`: the shared forms' (`SharedWeights`).
     /// `tapped`: `final` also gives `normed`, the head's norm, which only the check reads (a render left it in P,
     /// `[targetKeys, d]` in f32 written at every step).
     /// `neural`: the ANE's function of a step both units take (`Block.Build.neural`, `QwenImage21Shared.module`).
-    static func module(_ f: String, path: Path, weights: SharedWeights = .codes, codes: CodesLayout, rows: Int, prefix: Int = 0, target: Int = 0,
+    static func module(_ f: String, path: Path, weights: SharedWeights = .codes, rows: Int, prefix: Int = 0, target: Int = 0,
                        ranks: Ranks = [:], tapped: Bool = false, neural: Bool = false) -> Aicode.Module {
         if path == .shared, !outer.contains(f) {
             return QwenImage21Shared.module(f, rows: rows, prefix: prefix, target: target, weights: weights, ranks: ranks, neural: neural)
         }
-        let arguments = arguments(f, path: path, codes: codes, rows: rows, prefix: prefix, target: target, ranks: ranks)
+        let arguments = arguments(f, path: path, rows: rows, prefix: prefix, target: target, ranks: ranks)
         var m = Aicode.Module(arguments: arguments.map { ($0.name, Aicode.tensor($0.shape, $0.element)) })
         let b = m.body
         let names = m.argumentNames
@@ -256,18 +252,10 @@ package enum QwenImage21Functions {
         func f32(_ x: Int, _ w: String) -> Int {
             adapt(b.matmul(x, a(w), result: Aicode.tensor([Aicode.shape(b.types[x]).shape[0], Aicode.shape(b.types[a(w)]).shape[1]], .f32)), x, w)
         }
-        /// A layer's product: W8A16 on the codes, or bf16. `unrotated`: the input before its rotation, under the same
-        /// factor (the half path's).
-        func product(_ x: Int, _ w: String, unrotated: Int? = nil) -> Int {
-            switch path {
-            case .half, .shared: return adapt(b.w8a16(x, codes: a(w), scale: a(w + "_scale"), layout: codes, constants: &constants), unrotated!, w)
-            case .bfloat: return adapt(b.matmul(x, a(w), result: Aicode.tensor([Aicode.shape(b.types[x]).shape[0], Aicode.shape(b.types[a(w)]).shape[1]], .bf16)), x, w)
-            }
+        /// A layer's bf16 product (the shared forms' are `QwenImage21Shared`'s).
+        func product(_ x: Int, _ w: String) -> Int {
+            adapt(b.matmul(x, a(w), result: Aicode.tensor([Aicode.shape(b.types[x]).shape[0], Aicode.shape(b.types[a(w)]).shape[1]], .bf16)), x, w)
         }
-        /// A value before its rotation over the row factor `factor` `[rows, 1]` the rotated one was ranged by: a power of
-        /// two, exact.
-        func under(_ t: Int, _ factor: Int) -> Int { b.binary(.divide, t, b.castUnlessSame(factor, to: Aicode.shape(b.types[t]).element)) }
-        func aim(_ ws: [String]) -> Int { b.target(codes: ws.map { (a($0), a($0 + "_scale")) }, layout: codes) }
         func column(_ f: Int) -> Int { b.reshape(f, [rows, 1]) }
         func line(_ f: Int) -> Int { b.reshape(f, [1, rows]) }
         func layerNorm(_ x: Int, epsilon: Int) -> Int { b.layerNorm(x, axes: [1], epsilon: epsilon) }
@@ -280,9 +268,6 @@ package enum QwenImage21Functions {
         func streamOut(_ x: Int) -> [(String, Int)] {
             switch path {
             case .bfloat: return [("x", x)]
-            case .half:
-                let (s, sf) = b.ranged(x, under: b.stream)
-                return [("x", s), ("x_factor", line(sf))]
             case .shared:
                 let sf = b.scale("minimum", b.scale("maximum", b.ranged(x, under: b.stream).factor, 0x1p-13), 0x1p15)
                 return [("x", b.cast(b.binary(.divide, x, sf), to: .f16)), ("x_factor", line(b.cast(sf, to: .f16)))]
@@ -331,16 +316,6 @@ package enum QwenImage21Functions {
 
         case (_, .shared):
             preconditionFailure("\(f): the shared forms' (`QwenImage21Shared`)")
-        case ("pre", .half):
-            let n1 = b.binary(.mul, layerNorm(a("x"), epsilon: b.epsilon(column(a("x_factor")), eps)), a("scale1"))
-            let (unit, f) = b.ranged(b.convrot(n1), under: aim(["to_q", "to_k", "to_v"]))
-            let x1 = under(n1, f)
-            let eh = b.reshape(b.epsilon(f, eps), [rows, 1, 1])
-            func headNormed(_ t: Int, _ gain: String) -> Int { b.binary(.mul, b.rmsNorm(split(t), axes: [2], epsilon: eh), a(gain)) }
-            // v multiplied out: the attention reads it across rows, where no row's factor can go.
-            let v = b.binary(.mul, split(product(unit, "to_v", unrotated: x1)), b.reshape(b.cast(f, to: .f16), [rows, 1, 1]))
-            m.outputs = [("q", headsFirst(rope(headNormed(product(unit, "to_q", unrotated: x1), "norm_q")))),
-                         ("k", tokenFirst(rope(headNormed(product(unit, "to_k", unrotated: x1), "norm_k")))), ("v", tokenFirst(v))]
         case ("pre", .bfloat):
             let n1 = b.cast(b.binary(.mul, layerNorm(a("x"), epsilon: b.scalar(eps, .f32)), a("scale1")), to: .bf16)
             // `diffusers.RMSNorm` rounds twice: the normalized value to bf16, then × γ.
@@ -348,24 +323,6 @@ package enum QwenImage21Functions {
             m.outputs = [("q", headsFirst(rope(headNormed(product(n1, "to_q"), "norm_q")))),
                          ("k", tokenFirst(rope(headNormed(product(n1, "to_k"), "norm_k")))), ("v", tokenFirst(split(product(n1, "to_v"))))]
 
-        case (_, .half):
-            let o = attention(b, a, rows: rows)
-            let (attended, f1) = b.ranged(b.convrot(o), under: aim(["to_out"]))
-            let (x1, x1f) = b.residual(a("x"), column(a("x_factor")), plus: b.binary(.mul, a("gate1"), product(attended, "to_out", unrotated: under(o, f1))),
-                                       factor: f1)
-            let n3 = b.binary(.mul, layerNorm(x1, epsilon: b.epsilon(x1f, eps)), a("scale2"))
-            let (r, f2) = b.ranged(b.convrot(n3), under: aim(["gate_up"]))
-            let both = product(r, "gate_up", unrotated: under(n3, f2))
-            let w1 = b.slice(both, axis: 1, start: 0, size: c.hidden), w3 = b.slice(both, axis: 1, start: c.hidden, size: c.hidden)
-            // Under 2¹⁰ (`gatedSiLU`), its rotation under 2¹⁴; the LoRA's path reads it unrotated, under the same g₄.
-            var (gated, g4) = (0, 0)
-            let (hidden, factor) = b.gatedSiLU(w1, w3, factor: f2) { t in
-                let r = b.ranged(b.convrot(t), under: aim(["down"]))
-                (gated, g4) = (t, r.factor)
-                return r
-            }
-            let (y, yf) = b.residual(x1, x1f, plus: b.binary(.mul, a("gate2"), product(hidden, "down", unrotated: under(gated, g4))), factor: factor)
-            m.outputs = [("y", y), ("y_factor", line(yf))]
         case (_, .bfloat):
             let o = attention(b, a, rows: rows)
             let x1 = b.binary(.add, a("x"), b.binary(.mul, a("gate1"), b.cast(product(o, "to_out"), to: .f32)))

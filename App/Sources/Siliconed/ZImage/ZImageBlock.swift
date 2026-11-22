@@ -15,7 +15,7 @@ import SiliCore
 ///
 /// **bf16**, the Standard, is diffusers' arithmetic: the weights bf16, the norms' statistics in f32 rounded once, the
 /// RoPE in f32, the residual stream bf16. The Compact's block is the shared forms' (`ZImageShared`) on the GPU alone or
-/// beside the ANE; its modulation is this one's under the guard of f16 (`Guard.swift`): W8A16 on the Compact's codes,
+/// beside the ANE; its modulation is this one's under the guard of f16 (`Guard.swift`): int8 × int8 on the Compact's codes,
 /// adaln rotated by the file's Hadamard (`convrot`) under its factor; on the Standard's weights in f16 beside the ANE
 /// (`SharedWeights.half`), adaln as it is, under the weight's target (the edges' guard, `ZImageFunctions`).
 ///
@@ -52,13 +52,13 @@ enum ZImageBlock {
         }
     }
 
-    /// The function's arguments in the order it declares them; the Compact's codes lie in `codes` (`CodesLayout`).
+    /// The function's arguments in the order it declares them; the Compact's codes by pieces of k (`Weights.codesShape`).
     static func arguments(_ function: String, rows: Int, keys: Int, form: ZImageFunctions.Form, weights: SharedWeights = .codes,
-                          codes: CodesLayout = .inOut, ranks: [String: Int] = [:]) -> [Argument] {
+                          ranks: [String: Int] = [:]) -> [Argument] {
         let e = form.element
         func product(_ name: String, _ k: Int, _ n: Int) -> [Argument] {
             if form == .bf16 { return [(name, [k, n], .bf16)] }
-            return weights == .half ? [(name, [k, n], .f16)] : [(name, codes == .inOut ? [k, n] : [n, k], .si8), (name + "_scale", [n], .f16)]
+            return weights == .half ? [(name, [k, n], .f16)] : [(name, Weights.codesShape(inn: k, out: n), .si8), (name + "_scale", [n], .f16)]
         }
         var all: [Argument]
         switch function {
@@ -78,10 +78,10 @@ enum ZImageBlock {
 
     /// `weights`: the shared modulation's (`SharedWeights`); nothing to the bf16 form.
     static func module(_ function: String, rows: Int, keys: Int, form: ZImageFunctions.Form, weights: SharedWeights = .codes,
-                       codes: CodesLayout = .inOut, ranks: [String: Int] = [:], taps: [ZImageDiT.BlockTap] = []) -> Aicode.Module {
+                       ranks: [String: Int] = [:], taps: [ZImageDiT.BlockTap] = []) -> Aicode.Module {
         precondition(taps.count <= 6, "six outputs at most")
         precondition(form == .bf16 || function == "modulation", "the Compact's block is `ZImageShared`'s")
-        let arguments = arguments(function, rows: rows, keys: keys, form: form, weights: weights, codes: codes, ranks: ranks)
+        let arguments = arguments(function, rows: rows, keys: keys, form: form, weights: weights, ranks: ranks)
         var m = Aicode.Module(arguments: arguments.map { ($0.name, Aicode.tensor($0.shape, $0.element)) })
         let b = m.body
         let names = m.argumentNames
@@ -92,10 +92,10 @@ enum ZImageBlock {
         func product(_ x: Int, _ name: String, input: @autoclosure () -> Int? = nil) -> Int {
             let y = form == .bf16 ? b.matmul(x, a(name), result: Aicode.tensor([Aicode.shape(b.types[x]).shape[0], Aicode.shape(b.types[a(name)]).shape[1]], .bf16))
                 : weights == .half ? b.product(x, a(name))
-                : b.w8a16(x, codes: a(name), scale: a(name + "_scale"), layout: codes, constants: &constants)
+                : b.w8a8(x, codes: a(name), scale: a(name + "_scale"), constants: &constants)
             return (ranks[name] ?? 0) > 0 ? b.lowRank(y, input() ?? x, down: a(name + "_down"), up: a(name + "_up")) : y
         }
-        func target(_ names: [String]) -> Int { b.target(codes: names.map { (a($0), a($0 + "_scale")) }, layout: codes) }
+        func target(_ names: [String]) -> Int { b.target(codes: names.map { (a($0), a($0 + "_scale")) }) }
         func normed(_ x: Int, _ gain: String, axis: Int) -> Int { b.binary(.mul, b.rmsNorm(x, axes: [axis], eps: eps), a(gain)) }
         // RoPE on interleaved pairs in f32, rounded once (diffusers' `apply_rotary_emb`): x · cos + swap(x) · sin, the
         // tables `[rows, 1, 128]` holding each pair's angle twice and the sine's sign: (−sin, sin).

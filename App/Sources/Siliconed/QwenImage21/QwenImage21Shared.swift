@@ -3,8 +3,8 @@ import Foundation
 import SiliCore
 
 /// **A Qwen-Image-2.1 layer as the GPU and the ANE share it** (Z's `ZImageShared`, the engine's forms in
-/// `Neural.swift`): f16 at every border and inside, `[1, rows, n]`, products on the codes q64 on `[in, out]`, or int8 ×
-/// int8 on `[out, in]` where this Mac's GPU runs it faster (`SharedWeights.integer`), norms by their peak, the guard's
+/// `Neural.swift`): f16 at every border and inside, `[1, rows, n]`, products on the codes int8 × int8 on the GPU, q64
+/// on the ANE's copy of them (`SharedWeights`), norms by their peak, the guard's
 /// powers of two in f16; what reads across rows or computes in f32 is the GPU's:
 ///
 ///     pre          both   n = LN(x̂ · X) · (1 + s₁), rotated, under 2^e₀ by F: q̂, k̂, v̂ = q64, and F
@@ -37,11 +37,11 @@ enum QwenImage21Shared {
     /// The modulation's rows, each a tensor `[1, 1, d]` (`timestep`'s outputs in the shared forms).
     static let gains = ["scale1", "gate1", "scale2", "gate2"]
 
-    static func arguments(_ f: String, rows: Int, prefix: Int, target: Int, weights: SharedWeights) -> [Argument] {
+    static func arguments(_ f: String, rows: Int, prefix: Int, target: Int, weights: SharedWeights, neural: Bool = false) -> [Argument] {
         let (d, hd, h, hidden) = (Self.d, Self.hd, Self.heads, c.hidden)
         let row = [1, 1, d], one = [1, 1, 1]
         func stream(_ name: String) -> [Argument] { [(name, [1, rows, d], .f16), (name + "_factor", [1, rows, 1], .f16)] }
-        func weight(_ name: String, _ inn: Int, _ out: Int) -> [Argument] { weights.arguments(name, inn: inn, out: out) }
+        func weight(_ name: String, _ inn: Int, _ out: Int) -> [Argument] { weights.arguments(name, inn: inn, out: out, neural: neural) }
         switch f {
         case "pre":
             return stream("x") + [("scale1", row, .f16)] + weight("to_q", d, d) + weight("to_k", d, d) + weight("to_v", d, d)
@@ -62,11 +62,11 @@ enum QwenImage21Shared {
         }
     }
 
-    /// `neural`: the ANE's function of a step both units take: on `integer` codes, its products q64 where the GPU's
-    /// multiply int8 × int8 (`Aicode.Module.product`).
+    /// `neural`: the ANE's function of a step both units take: its products q64 on the ANE's copy of the codes, the
+    /// GPU's int8 × int8 (`Aicode.Module.product`).
     static func module(_ f: String, rows: Int, prefix: Int, target: Int, weights: SharedWeights, ranks: QwenImage21Functions.Ranks = [:],
                        neural: Bool = false) -> Aicode.Module {
-        let all = arguments(f, rows: rows, prefix: prefix, target: target, weights: weights) + QwenImage21Functions.factors(f, path: .shared, ranks: ranks)
+        let all = arguments(f, rows: rows, prefix: prefix, target: target, weights: weights, neural: neural) + QwenImage21Functions.factors(f, path: .shared, ranks: ranks)
         var m = Aicode.Module(arguments: all.map { ($0.name, Aicode.tensor($0.shape, $0.element)) })
         let b = m.body
         let names = m.argumentNames
@@ -75,7 +75,7 @@ enum QwenImage21Shared {
         var constants = Aicode.ScalingConstants()
         /// The product `name` on x, the rotation of `unrotated` over its factor, with its LoRA's change when one adapts it.
         func product(_ x: Int, _ name: String, unrotated: Int, columns: Range<Int>? = nil) -> Int {
-            m.product(x, name, input: unrotated, adapted: (ranks[name] ?? 0) > 0, columns: columns, weights: weights, neural: neural, constants: &constants)
+            m.product(x, name, input: unrotated, adapted: (ranks[name] ?? 0) > 0, columns: columns, neural: neural, constants: &constants)
         }
         func layerNorm(_ x: Int, _ xf: Int) -> Int { b.layerNorm16(x, xf, eps: eps) }
         func rotation(_ t: Int) -> Int { b.rotation(t, of: weights) }
@@ -88,7 +88,7 @@ enum QwenImage21Shared {
             m.outputs = [("qh", product(unit, "to_q", unrotated: x)), ("kh", product(unit, "to_k", unrotated: x)),
                          ("vh", product(unit, "to_v", unrotated: x)), ("qkv_factor", factor)]
         case "heads":
-            // The GPU's half path past its products, in f32 where it was.
+            // Past the products, in f32.
             func split(_ t: Int) -> Int { b.reshape(t, [rows, h, hd]) }
             func headNormed(_ t: Int, _ gain: String) -> Int { b.headNorm(t, factor: a("qkv_factor"), gain: a(gain), eps: eps, heads: h) }
             func rope(_ x: Int) -> Int {

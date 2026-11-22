@@ -14,12 +14,11 @@ import SiliCore
 /// diagonal: Core AI's kernel subtracts each row's largest score); the decode's is an argument, the cache's rows past the
 /// token masked the same way.
 /// **The arithmetic a file's weights are computed in**, read from the file: bf16 end to end on bf16 weights; f16
-/// (W8A16) on int8 codes, SDNQ's (`<key>.scale`, bf16 `[out, 1]`) or ComfyUI's (`<key>.weight_scale`, f32 `[out, 1]`,
-/// `comfy_quant` saying whether the codes carry the `convrot` rotation). The layout its products' weights lie in is the
-/// engine's, read as the layers open (`Block.Build`, `layout`).
+/// (W8A8, `w8a8`) on int8 codes, SDNQ's (`<key>.scale`, bf16 `[out, 1]`) or ComfyUI's (`<key>.weight_scale`, f32 `[out,
+/// 1]`, `comfy_quant` saying whether the codes carry the `convrot` rotation), laid by pieces of k (`Weights.codesShape`).
 enum Qwen3Arithmetic: Equatable {
     case bf16
-    case w8a16(scale: String, rotated: Bool)
+    case w8a8(scale: String, rotated: Bool)
 
     init(_ file: SafeTensors, prefix: String) throws {
         let probe = prefix + "layers.0.self_attn.q_proj"
@@ -27,9 +26,9 @@ enum Qwen3Arithmetic: Equatable {
         switch t.dtype {
         case "BF16": self = .bf16
         case "I8":
-            if file.tensors[probe + ".scale"] != nil { self = .w8a16(scale: ".scale", rotated: false); return }
+            if file.tensors[probe + ".scale"] != nil { self = .w8a8(scale: ".scale", rotated: false); return }
             guard file.tensors[probe + ".weight_scale"] != nil else { throw ProgramError("\(probe): int8 codes without their scales") }
-            self = .w8a16(scale: ".weight_scale", rotated: try Self.rotated(file, probe))
+            self = .w8a8(scale: ".weight_scale", rotated: try Self.rotated(file, probe))
         default: throw ProgramError("\(probe).weight: \(t.dtype), neither bf16 nor int8")
         }
     }
@@ -43,14 +42,14 @@ enum Qwen3Arithmetic: Equatable {
         return true
     }
 
-    var half: Bool { if case .w8a16 = self { true } else { false } }
-    var rotated: Bool { if case .w8a16(_, let r) = self { r } else { false } }
+    var half: Bool { if case .w8a8 = self { true } else { false } }
+    var rotated: Bool { if case .w8a8(_, let r) = self { r } else { false } }
     /// The element of the stream, the gains and (bf16) the weights.
     var element: Aicode.Element { half ? .f16 : .bf16 }
     var scalar: NDArray.ScalarType { half ? .float16 : .bfloat16 }
     /// Its name in the layers'.
     var name: String {
-        switch self { case .bf16: "bf16"; case .w8a16(_, let r): r ? "w8a16r" : "w8a16" }
+        switch self { case .bf16: "bf16"; case .w8a8(_, let r): r ? "w8a8r" : "w8a8" }
     }
 }
 
@@ -59,12 +58,11 @@ typealias Qwen3Argument = (name: String, shape: [Int], element: Aicode.Element)
 
 extension Qwen3Encoder {
     /// **A layer's weights as its function reads them**: the products that share an input fused side by side along
-    /// `out` (q k v; gate up, `Recipe.product`), the codes in the stage's layout (`CodesLayout`, `inOut`: Core AI's GPU
-    /// read codes in the file's `[out, in]` 1.6 × slower at 32 rows and 7 × past 128 on the M1 Pro, 18/11), the bf16
-    /// weights `[out, in]`; the gains in the stream's element.
-    func weightArguments(_ a: Qwen3Arithmetic, _ layout: CodesLayout) -> [Qwen3Argument] {
+    /// `out` (q k v; gate up, `Recipe.product`), the codes by pieces of k (`Weights.codesShape`), the bf16 weights `[out,
+    /// in]`; the gains in the stream's element.
+    func weightArguments(_ a: Qwen3Arithmetic) -> [Qwen3Argument] {
         let c = config, d = c.width, hd = c.headDim, e = a.element
-        func lies(_ inn: Int, _ out: Int) -> [Int] { layout == .inOut ? [inn, out] : [out, inn] }
+        func lies(_ inn: Int, _ out: Int) -> [Int] { Weights.codesShape(inn: inn, out: out) }
         guard a.half else {
             return [("norm1", [d], e), ("qkv", [c.qkvWidth, d], e), ("q_norm", [hd], e), ("k_norm", [hd], e),
                     ("o", [d, c.heads * hd], e), ("norm2", [d], e), ("gate_up", [2 * c.hidden, d], e), ("down", [d, c.hidden], e)]
@@ -91,7 +89,7 @@ extension Qwen3Encoder {
 
     /// **One layer over `rows` rows** (the encoder; with `cache`, the prefill: `k` and `v` `[rows, kvHeads, headDim]` out
     /// beside the stream, rotated keys and true values), or **over one token reading the cache** (`decode`).
-    func layerModule(_ a: Qwen3Arithmetic, _ layout: CodesLayout, _ attending: Attending, cache: Bool) -> Aicode.Module {
+    func layerModule(_ a: Qwen3Arithmetic, _ attending: Attending, cache: Bool) -> Aicode.Module {
         let c = config, d = c.width, hd = c.headDim, e = a.element
         let rows: Int
         var head: [Qwen3Argument]
@@ -104,7 +102,7 @@ extension Qwen3Encoder {
             head = [("x", [1, d], e)] + (a.half ? [("x_factor", [1, 1], .f32)] : []) + [("cos", [1, 1, hd], .f32), ("sin", [1, 1, hd], .f32),
                     ("mask", [capacity + 1], e), ("cache_k", [capacity, c.kvHeads, hd], e), ("cache_v", [capacity, c.kvHeads, hd], e)]
         }
-        head += weightArguments(a, layout)
+        head += weightArguments(a)
         var m = Aicode.Module(arguments: head.map { ($0.name, Aicode.tensor($0.shape, $0.element)) })
         var mask: Int?
         if case .causal = attending {
@@ -149,7 +147,7 @@ extension Qwen3Encoder {
 
         let outputs: [(String, Int)]
         if a.half {
-            outputs = f16Layer(b, a, layout, rows: rows, arg: arg, attend: attend, rotatedHalves: rotatedHalves)
+            outputs = f16Layer(b, a, rows: rows, arg: arg, attend: attend, rotatedHalves: rotatedHalves)
         } else {
             outputs = bf16Layer(b, a, rows: rows, arg: arg, attend: attend, rotatedHalves: rotatedHalves)
         }
@@ -161,12 +159,12 @@ extension Qwen3Encoder {
 
     /// **The f16 layer**: the stream (x̂, X), each product's input under its own target, a
     /// rotated file's input rotated first (`convrot`: x · Wᵀ = (x · R) · (q · s)ᵀ). Outputs y, y_factor, k, v.
-    private func f16Layer(_ b: Aicode.Block, _ a: Qwen3Arithmetic, _ layout: CodesLayout, rows: Int, arg: (String) -> Int, attend: (Int, Int, Int) -> Int,
+    private func f16Layer(_ b: Aicode.Block, _ a: Qwen3Arithmetic, rows: Int, arg: (String) -> Int, attend: (Int, Int, Int) -> Int,
                           rotatedHalves: (Int, Aicode.Element) -> Int) -> [(String, Int)] {
         let c = config, hd = c.headDim, eps = c.eps
         var constants = Aicode.ScalingConstants()
-        func product(_ x: Int, _ name: String) -> Int { b.w8a16(x, codes: arg(name), scale: arg(name + "_scale"), layout: layout, constants: &constants) }
-        func target(_ name: String) -> Int { b.target(codes: [(arg(name), arg(name + "_scale"))], layout: layout) }
+        func product(_ x: Int, _ name: String) -> Int { b.w8a8(x, codes: arg(name), scale: arg(name + "_scale"), constants: &constants) }
+        func target(_ name: String) -> Int { b.target(codes: [(arg(name), arg(name + "_scale"))]) }
         func entering(_ t: Int, _ name: String) -> (unit: Int, factor: Int) { b.ranged(a.rotated ? b.convrot(t) : t, under: target(name)) }
         func column(_ f: Int) -> Int { b.reshape(f, [rows, 1]) }
 
@@ -235,7 +233,7 @@ extension Qwen3Encoder {
     func headModule(_ a: Qwen3Arithmetic, rows: Int, stretch: Int) -> Aicode.Module {
         let d = config.width, e = a.element
         var args: [Qwen3Argument] = [("x", [rows, d], e)]
-        if a.half { args += [("x_factor", [1, rows], .f32), ("norm", [d], e), ("w", [stretch, d], .si8), ("w_scale", [stretch], e)] }
+        if a.half { args += [("x_factor", [1, rows], .f32), ("norm", [d], e), ("w", Weights.codesShape(inn: d, out: stretch), .si8), ("w_scale", [stretch], e)] }
         else { args += [("norm", [d], e), ("w", [stretch, d], e)] }
         var m = Aicode.Module(arguments: args.map { ($0.name, Aicode.tensor($0.shape, $0.element)) })
         let b = m.body, names = m.argumentNames
@@ -248,10 +246,10 @@ extension Qwen3Encoder {
         var constants = Aicode.ScalingConstants()
         let xf = b.reshape(arg("x_factor"), [rows, 1])
         let n = b.binary(.mul, b.rmsNorm(arg("x"), axes: [1], epsilon: b.epsilon(xf, config.eps)), arg("norm"))
-        let e0 = b.target(codes: [(arg("w"), arg("w_scale"))], layout: .outIn)
+        let e0 = b.target(codes: [(arg("w"), arg("w_scale"))])
         let (u, f) = b.ranged(a.rotated ? b.convrot(n) : n, under: e0)
-        let w = b.dequantize(arg("w"), scale: arg("w_scale"), axis: 0, constants: &constants)
-        m.outputs = [("logits", b.reshape(b.binary(.mul, b.cast(b.linear(u, w), to: .f32), f), [rows * stretch]))]
+        let y = b.w8a8(u, codes: arg("w"), scale: arg("w_scale"), constants: &constants)
+        m.outputs = [("logits", b.reshape(b.binary(.mul, b.cast(y, to: .f32), f), [rows * stretch]))]
         return m
     }
 }

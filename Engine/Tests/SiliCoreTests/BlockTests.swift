@@ -264,7 +264,7 @@ import Testing
         #expect(tapped.keys.sorted() == ["s.attention-16", "s.heads+taps-16", "s.heads-16", "s.pre-16", "s.pre-8"])
         #expect(tapped["s.heads+taps-16"]?.tapped == true && tapped["s.heads-16"]?.tapped == false && tapped["s.pre-16"]?.tapped == false)
         #expect(Block.gpu("s", "heads", 16, tapped: true) == "s.heads+taps-16" && Block.gpu("s", "heads", 16) == "s.heads-16")
-        #expect(Block.Build(rows: 16, codes: .inOut).tapped == false)
+        #expect(Block.Build(rows: 16).tapped == false)
     }
 
     @Test func aSignatureIsTheModulesShapes() {

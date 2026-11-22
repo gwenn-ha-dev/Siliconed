@@ -19,12 +19,12 @@ extension AnimaEvaluation {
                            "cq": "cross_attn.q_proj", "ck": "cross_attn.k_proj", "cv": "cross_attn.v_proj", "co": "cross_attn.output_proj",
                            "m1": "mlp.layer1", "m2": "mlp.layer2"]
 
-    /// Block i's function of `kind`: its own products on codes, the codes laid out as `codes`.
-    static func function(_ kind: AnimaFunction.Kind, _ path: Path, block q: Set<String>, codes: CodesLayout, rows: Int = 1, keys: Int = 0,
+    /// Block i's function of `kind`: its own products on codes.
+    static func function(_ kind: AnimaFunction.Kind, _ path: Path, block q: Set<String>, rows: Int = 1, keys: Int = 0,
                          context: Int = 0, taps: Bool = false, ranks: [String: Int] = [:]) -> AnimaFunction {
         let own = q.intersection(AnimaFunction.products(kind)), adapted = AnimaFunction.adapted(kind)
         return AnimaFunction(kind: kind, path: path, quantized: own, rows: rows, keys: keys, context: context, taps: taps,
-                             codes: own.isEmpty ? .inOut : codes, ranks: ranks.filter { adapted.contains($0.key) })
+                             ranks: ranks.filter { adapted.contains($0.key) })
     }
 
     // MARK: - The LoRAs
@@ -156,7 +156,6 @@ extension AnimaEvaluation {
                         held: contextEntries(block: i, path, quantized: quantized[i]))
         }
         n.cycle = blocks
-        n.sharedWeights = arithmetic.sharedWeights
         // The guarded forms read the f32 factors; the activations' q beside the product's weight q.
         let factors: [String: Block.Bind] = path == .f16 ? ["x_factor": .rows("f"), "y_factor": .next("f")] : [:]
         var made = Set<String>()
@@ -164,8 +163,8 @@ extension AnimaEvaluation {
             let (q, tapping) = (quantized[i], taps && i == 0)
             n.forms.append(Block.Form(form(i), steps: [.init("pre", on: .gpu), .init("post", on: .gpu, whole: ["k", "v"], bind: ["q": .rows("q")])],
                                       bind: rows.merging(factors) { a, _ in a }) { step, b in
-                step == "pre" ? function(.pre, path, block: q, codes: b.codes, rows: b.rows, ranks: ranks).module()
-                    : function(.post, path, block: q, codes: b.codes, rows: b.rows, keys: k, context: c, taps: tapping, ranks: ranks).module()
+                step == "pre" ? function(.pre, path, block: q, rows: b.rows, ranks: ranks).module()
+                    : function(.post, path, block: q, rows: b.rows, keys: k, context: c, taps: tapping, ranks: ranks).module()
             })
         }
         if !shared.isEmpty {
@@ -182,11 +181,11 @@ extension AnimaEvaluation {
         }
         n.passes = [Block.Pass("image", rows: 0..<g.tokens, shareable: 0..<g.tokens)]
         n.edges["time"] = { _ in AnimaFunction(kind: .time, path: path).module() }
-        n.edges["modulation"] = { b in function(.modulation, path, block: [], codes: b.codes, ranks: ranks).module() }
+        n.edges["modulation"] = { b in function(.modulation, path, block: [], ranks: ranks).module() }
         n.edges["embed"] = { _ in AnimaFunction(kind: .embed, path: path, rows: g.tokens, height: g.height, width: g.width).module() }
         n.edges["final"] = { _ in AnimaFunction(kind: .final, path: path, rows: g.tokens, height: g.height, width: g.width).module() }
         for q in Set(quantized.map { $0.intersection(["ck", "cv"]) }) {
-            n.edges[contextEdge(q)] = { b in function(.context, path, block: q, codes: b.codes, context: c, ranks: ranks).module() }
+            n.edges[contextEdge(q)] = { b in function(.context, path, block: q, context: c, ranks: ranks).module() }
         }
         return n
     }

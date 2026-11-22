@@ -193,7 +193,7 @@ extension Block {
         // The ANE's functions loaded now: both units' while the unit is under trial.
         var loaded = stage.plan.declaration.functions.filter { functions[$0.key] != nil && ($0.key.hasPrefix("edge-") || $0.key.hasPrefix("ane-")) }
         for (name, spec) in Self.steps(declaration, declaration.used, neural: units * u, cut: cut) {
-            nonisolated(unsafe) let m = try Self.module(spec, codes: codes)
+            nonisolated(unsafe) let m = try Self.module(spec)
             loaded[name] = Stage.Function(Functions.name(m, prefix: "block"), unit: .gpu) { m }
         }
         return (Stage.key(loaded.values.map { ($0.asset, $0.unit) }), try Self.extent(loaded, inFlight: stage.plan.declaration.inFlight))
@@ -214,7 +214,7 @@ extension Block {
     private func load() async throws {
         let need = Self.steps(declaration, declaration.used, neural: units * unit, cut: cut)
         for (name, spec) in need.sorted(by: { $0.key < $1.key }) where functions[name] == nil {
-            let m = try Self.module(spec, codes: codes)
+            let m = try Self.module(spec)
             let asset = try Functions.named(m, prefix: "block")
             signatures[name] = Signature(m)
             functions[name] = try await Functions.load(try Functions.asset(asset) { m }, unit: .gpu)

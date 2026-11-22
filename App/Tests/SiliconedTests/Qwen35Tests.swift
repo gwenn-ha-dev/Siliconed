@@ -67,19 +67,18 @@ final class Qwen35Tests: XCTestCase {
         XCTAssertEqual(masks.above[0 * t + 1], -1e30); XCTAssertEqual(masks.above[1 * t + 0], 0)
     }
 
-    /// The half path: every argument a weight of the layer's entries, the products' codes in the layout given, the stream
+    /// The half path: every argument a weight of the layer's entries, the products' codes by pieces of k, the stream
     /// and its factors a row.
     func testTheHalfPathDeclaresItsCodes() {
         let e = Qwen35Encoder(), c = e.config
         for i in [0, 3] {
-            let names = Set(e.halfArguments(full: c.isFull(i), rows: 1, codes: .outIn).dropFirst(2).map(\.name))
+            let names = Set(e.halfArguments(full: c.isFull(i), rows: 1).dropFirst(2).map(\.name))
             let entries = e.halfEntries(i)
             let codes = entries.filter { $0.recipe == .codes }.map(\.name)
             XCTAssertEqual(names, Set(entries.map(\.name) + codes.map { $0 + "_scale" }), "layer \(i)")
         }
-        let q = e.halfArguments(full: true, rows: 1, codes: .outIn).first { $0.name == "q" }
-        XCTAssertEqual(q?.shape, [2 * c.heads * c.headDim, c.width])
-        XCTAssertEqual(e.halfArguments(full: true, rows: 1, codes: .inOut).first { $0.name == "q" }?.shape, [c.width, 2 * c.heads * c.headDim])
+        let q = e.halfArguments(full: true, rows: 1).first { $0.name == "q" }
+        XCTAssertEqual(q?.shape, Weights.codesShape(inn: c.width, out: 2 * c.heads * c.headDim))
         let d = e.declaration(rows: 128, path: .half)
         XCTAssertEqual(d.perRow.map(\.name), ["x", "x_factor"])
         XCTAssertEqual(d.perRow.map(\.next), ["y", "y_factor"])

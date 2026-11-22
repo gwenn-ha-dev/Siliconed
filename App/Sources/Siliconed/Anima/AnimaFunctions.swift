@@ -5,8 +5,8 @@ import SiliCore
 /// an argument, written op by op. Two paths, one per variant:
 ///
 ///   - **bf16**, the Standard: every value in bf16 as diffusers runs it, the GPU alone;
-///   - **f16**, the Compact: W8A16 on Bedovyy's int8 `convrot` codes (the activation rotated by the file's Hadamard,
-///     then the codes dequantized in f16), the products the file leaves in bf16 (blocks 0 and 27, the MLP of blocks 1 to 3) rounded once to f16, under the guard
+///   - **f16**, the Compact: int8 × int8 on Bedovyy's int8 `convrot` codes (the activation rotated by the file's
+///     Hadamard, then brought to int8 codes by its rows' peaks: `w8a8`), the products the file leaves in bf16 (blocks 0 and 27, the MLP of blocks 1 to 3) rounded once to f16, under the guard
 ///     of f16 (`Guard.swift`): the residual stream kept as (x̂, X), each product's input brought under its target.
 ///
 /// The one-row functions (`time`, `modulation`) compute in f32 on both paths, the bf16 weights widened inside (exact):
@@ -39,8 +39,6 @@ package struct AnimaFunction: Sendable {
     var height = 0, width = 0
     /// post: block 0's three branches as outputs besides (the oracle's boundaries; a check's alone).
     var taps = false
-    /// How the codes lie (the stage's plan's, this Mac's measure): `[in, out]` or the file's `[out, in]`.
-    var codes: CodesLayout = .inOut
     /// The low-rank path beside the products a LoRA adapts (`LoRAStack`): each one's rank, the same for every block that
     /// calls the function; none, the function as it is.
     var ranks: [String: Int] = [:]
@@ -91,9 +89,10 @@ package struct AnimaFunction: Sendable {
 
     // MARK: - Arguments
 
-    /// A product's weight as the function reads it: int8 codes `[in, out]` and their scales `[out]`, or the float weight.
+    /// A product's weight as the function reads it: int8 codes by pieces of k (`Weights.codesShape`) and their scales
+    /// `[out]`, or the float weight.
     private func product(_ name: String, _ inn: Int, _ out: Int) -> [Argument] {
-        if guarded && quantized.contains(name) { return [(name, codes == .inOut ? [inn, out] : [out, inn], .si8), (name + "_scale", [out], .f16)] }
+        if guarded && quantized.contains(name) { return [(name, Weights.codesShape(inn: inn, out: out), .si8), (name + "_scale", [out], .f16)] }
         return [(name, [inn, out], element)]
     }
 
@@ -198,9 +197,9 @@ package struct AnimaFunction: Sendable {
         func guardedProducts(_ x: Int, _ names: [String]) -> (results: [Int], factors: [Int]) {
             let (results, f): ([Int], Int)
             if names.allSatisfy(quantized.contains) {
-                let target = b.target(codes: names.map { (a($0), a($0 + "_scale")) }, layout: codes)
+                let target = b.target(codes: names.map { (a($0), a($0 + "_scale")) })
                 let (unit, g) = b.ranged(b.convrot(x), under: target)
-                (results, f) = (names.map { b.w8a16(unit, codes: a($0), scale: a($0 + "_scale"), layout: codes, constants: &constants) }, g)
+                (results, f) = (names.map { b.w8a8(unit, codes: a($0), scale: a($0 + "_scale"), constants: &constants) }, g)
             } else {
                 precondition(!names.contains(where: quantized.contains), "\(kind): products of one input on codes and on floats")
                 let target = b.target(weights: names.map { a($0) })

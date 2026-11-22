@@ -101,19 +101,19 @@ private func bf16(_ x: Float) -> UInt16 { UInt16(x.bitPattern >> 16) }
 extension Weights {
     /// `entries` read from `file` into `arena` as a stage reads them (`Weights.place`, then `Weights.read` through a
     /// staging), the staging in `Pages` of its own.
-    static func load(_ entries: [Entry], from file: SafeTensors, into arena: Arena, codes: CodesLayout = .inOut) throws -> [String: Placed] {
-        let placed = place(try layout(entries, in: file, codes: codes), in: arena)
-        let staging = Pages(bytes: try Self.staging(entries, in: file, codes: codes))
+    static func load(_ entries: [Entry], from file: SafeTensors, into arena: Arena) throws -> [String: Placed] {
+        let placed = place(try layout(entries, in: file), in: arena)
+        let staging = Pages(bytes: try Self.staging(entries, in: file))
         try withExtendedLifetime(staging) {
-            try read(entries, from: file, into: placed, arena: arena, staging: staging.base, codes: codes)
+            try read(entries, from: file, into: placed, arena: arena, staging: staging.base)
         }
         return placed
     }
 }
 
-/// **A shared form's product, by its weights**: the arguments its function declares are the slots its entry lays in the
-/// arena, a leading 1 before each — the codes `[in, out]` (`codes`) or as the file lays them `[out, in]` (`integer`, the
-/// plan's layout `outIn`), their scales `[1, 1, out]`; the Standard's weight `<key>.weight` rounded to f16 `[in, out]`.
+/// **A shared form's product, by its weights**: the arguments its GPU function declares are the slots its entry lays in
+/// the arena — the codes by pieces `[p, out, in / p]`, their scales `[1, 1, out]` — the ANE's the copy `[1, in, out]`
+/// (`Block`'s); the Standard's weight `<key>.weight` rounded to f16 `[in, out]`, a leading 1 before it.
 @Test func aSharedProductsArgumentsAreItsEntrysSlots() throws {
     let (out, inn) = (96, 64)
     let path = try safetensors("shared-weights.safetensors", [
@@ -122,19 +122,46 @@ extension Weights {
         ("q.weight", "BF16", [out, inn], bytes([UInt16](repeating: bf16(0.5), count: out * inn))),
     ])
     let file = try SafeTensors(path)
-    #expect(SharedWeights.codes.layout == .inOut && SharedWeights.integer.layout == .outIn && SharedWeights.half.layout == .inOut)
-    #expect(SharedWeights.codes.isCodes && SharedWeights.integer.isCodes && !SharedWeights.half.isCodes)
-    for (weights, key, shape) in [(SharedWeights.codes, "p", [1, inn, out]), (.integer, "p", [1, out, inn]), (.half, "q", [1, inn, out])] {
+    #expect(SharedWeights.codes.isCodes && !SharedWeights.half.isCodes)
+    for (weights, key, neural, shape) in [(SharedWeights.codes, "p", false, [1, out, inn]), (.codes, "p", true, [1, inn, out]), (.half, "q", false, [1, inn, out])] {
         let entry = weights.entry("w", key: key)
         #expect(entry.name == "w" && entry.key == (weights.isCodes ? key : key + ".weight") && entry.recipe == (weights.isCodes ? .codes : .halfTransposed))
-        let arguments = weights.arguments("w", inn: inn, out: out)
-        let slots = try Weights.layout([entry], in: file, codes: weights.layout)
+        let arguments = weights.arguments("w", inn: inn, out: out, neural: neural)
+        let slots = try Weights.layout([entry], in: file)
         #expect(arguments.map(\.name) == slots.map(\.name), "\(weights)")
-        #expect(arguments.map(\.shape) == slots.map { $0.shape.count == 1 ? [1, 1] + $0.shape : [1] + $0.shape }, "\(weights)")
         #expect(arguments[0].shape == shape, "\(weights)")
+        if !neural { #expect(arguments.map(\.shape) == slots.map { $0.shape.count == 1 ? [1, 1] + $0.shape : $0.shape.count == 2 ? [1] + $0.shape : $0.shape }, "\(weights)") }
         #expect(arguments.map(\.element) == (weights.isCodes ? [.si8, .f16] : [.f16]), "\(weights)")
         #expect(slots.map(\.type) == (weights.isCodes ? [.int8, .float16] : [.float16]), "\(weights)")
     }
+}
+
+/// **The codes by pieces of k**: k cut in equal pieces of at most 4096, a multiple of 64 each (one piece where k is no
+/// wider), every row's piece i after every row's piece i − 1, the parts of a joined product side by side in each; the
+/// ANE's copy of them, `[k, out]`, the transpose of the file's rows (`Weights.transposedPieces`).
+@Test func theCodesLieByPiecesOfK() throws {
+    #expect(Weights.pieces(64) == (1, 64) && Weights.pieces(3) == (1, 3) && Weights.pieces(4096) == (1, 4096))
+    #expect(Weights.pieces(10240) == (4, 2560) && Weights.pieces(16384) == (4, 4096) && Weights.pieces(6912) == (2, 3456))
+    let (a, b, inn) = (16, 32, 8192)
+    func code(_ o: Int, _ i: Int) -> Int8 { Int8(truncatingIfNeeded: o &* 31 &+ i &* 7) }
+    let path = try safetensors("pieces.safetensors", [
+        ("a.weight", "I8", [a, inn], (0..<a * inn).map { UInt8(bitPattern: code($0 / inn, $0 % inn)) }),
+        ("a.weight_scale", "F32", [a, 1], bytes([Float](repeating: 0.01, count: a))),
+        ("b.weight", "I8", [b, inn], (0..<b * inn).map { UInt8(bitPattern: code(a + $0 / inn, $0 % inn)) }),
+        ("b.weight_scale", "F32", [b, 1], bytes([Float](repeating: 0.02, count: b))),
+    ])
+    let file = try SafeTensors(path), entries: [Weights.Entry] = [("w", "a", .product(joined: ["b"]))]
+    let out = a + b
+    #expect(try Weights.layout(entries, in: file).map(\.shape) == [[2, out, 4096], [out]])
+    guard let device = MTLCreateSystemDefaultDevice() else { return }
+    let arena = try Arena(device, bytes: try Weights.size(entries, in: file))
+    let placed = try Weights.load(entries, from: file, into: arena)
+    let w = arena.pointer(placed["w"]!.offset).assumingMemoryBound(to: Int8.self)
+    #expect((0..<2 * out * 4096).allSatisfy { j in let (p, o, i) = (j / (out * 4096), j / 4096 % out, j % 4096); return w[j] == code(o, p * 4096 + i) })
+    let copy = UnsafeMutablePointer<Int8>.allocate(capacity: inn * out)
+    defer { copy.deallocate() }
+    Weights.transposedPieces(w, count: 2, out: out, piece: 4096, into: copy)
+    #expect((0..<inn * out).allSatisfy { j in copy[j] == code(j % out, j / out) })
 }
 
 /// What a file's weights become in the arena by their recipes, from its header alone: codes transposed with their
@@ -154,7 +181,7 @@ extension Weights {
     let layout = try Weights.layout(entries, in: file)
     let slots = Dictionary(uniqueKeysWithValues: layout.map { ($0.name, $0) })
     #expect(layout.map(\.name) == ["a", "a_scale", "gain", "gain32", "bias", "w", "w32", "e0"])
-    #expect(slots["a"]!.shape == [inn, out] && slots["a"]!.type == .int8 && slots["a"]!.bytes == out * inn)
+    #expect(slots["a"]!.shape == [1, out, inn] && slots["a"]!.type == .int8 && slots["a"]!.bytes == out * inn)
     #expect(slots["a_scale"]!.shape == [out] && slots["a_scale"]!.type == .float16 && slots["a_scale"]!.bytes == 2 * out)
     #expect(slots["gain"]!.shape == [inn] && slots["gain"]!.type == .float16 && slots["gain"]!.bytes == 2 * inn)
     #expect(slots["gain32"]!.type == .float32 && slots["gain32"]!.bytes == 4 * inn)
@@ -180,7 +207,7 @@ extension Weights {
     #expect(Set(try dit.reopened(uncached: true).tensors.keys) == ["a.weight"])
 }
 
-/// The weights read into the arena by their recipes: the codes transposed, the reals rounded once, the target
+/// The weights read into the arena by their recipes: the codes as the file lays them (one piece), the reals rounded once, the target
 /// computed from the scales once read.
 @Test(.enabled(if: device != nil)) func recipesReadTheWeightsIntoTheArena() throws {
     let (out, inn) = (48, 80)
@@ -199,7 +226,7 @@ extension Weights {
     let s = arena.pointer(placed["a_scale"]!.offset).assumingMemoryBound(to: Float16.self)
     let g = arena.pointer(placed["gain"]!.offset).assumingMemoryBound(to: Float16.self)
     let wt = arena.pointer(placed["w"]!.offset).assumingMemoryBound(to: Float16.self)
-    for o in 0..<out { for i in 0..<inn { #expect(q[i * out + o] == codes[o * inn + i]); #expect(wt[i * out + o] == Float16(w[o * inn + i])) } }
+    for o in 0..<out { for i in 0..<inn { #expect(q[o * inn + i] == codes[o * inn + i]); #expect(wt[i * out + o] == Float16(w[o * inn + i])) } }
     for o in 0..<out { #expect(s[o] == Float16(scales[o])) }
     for i in 0..<inn { #expect(g[i] == Float16(Float(i) / 8)) }
     let e0 = arena.pointer(placed["e0"]!.offset).assumingMemoryBound(to: Float16.self).pointee

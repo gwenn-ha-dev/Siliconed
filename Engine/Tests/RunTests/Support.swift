@@ -73,6 +73,25 @@ func relative(_ got: [Float], _ want: [Float]) -> Double {
 }
 
 /// `x [rows, k] · w [k, n]` in f64 on the CPU, w read as `w(i, o)`.
+/// **The exact int8 product by rows** (`w8a8`'s): each row of x (f16) brought to int8 codes by its peak (127 · 2⁻¹⁴ at
+/// least), its scale in f16, the codes a half away from zero; the sums exact in integers, times the row's scale and the
+/// code's `scales[o]`. `code(o, i)`: the weight's code at output o, input i.
+func int8Product(_ xs: [Float], rows: Int, k: Int, n: Int, scales: [Double], _ code: (Int, Int) -> Int8) -> [Float] {
+    // Nothing of the weights' size held beside them: a stage's run reads its footprint (`aStageHoldsUnderItsP`).
+    var exact = [Float](repeating: 0, count: rows * n)
+    let rowScales = (0..<rows).map { r in Float(Float16(max(xs[r * k ..< (r + 1) * k].reduce(Float(0)) { max($0, abs($1)) }, 127 * 0x1p-14) / 127)) }
+    let q = (0..<rows * k).map { j in Int32(max(-128, min(127, (xs[j] / rowScales[j / k]).rounded(.toNearestOrAwayFromZero)))) }
+    for o in 0..<n {
+        let column = (0..<k).map { Int32(code(o, $0)) }
+        for r in 0..<rows {
+            var sum = 0
+            for i in 0..<k { sum += Int(q[r * k + i] * column[i]) }
+            exact[r * n + o] = Float(Double(sum) * Double(rowScales[r]) * scales[o])
+        }
+    }
+    return exact
+}
+
 func product(_ x: [Float], rows: Int, k: Int, n: Int, _ w: (Int, Int) -> Double) -> [Float] {
     var y = [Float](repeating: 0, count: rows * n)
     for o in 0..<n {
@@ -113,11 +132,11 @@ func share(_ call: () async throws -> Void) async throws -> Int {
 extension Weights {
     /// `entries` read from `file` into `arena` as a stage reads them (`Weights.place`, then `Weights.read` through a
     /// staging), the staging in `Pages` of its own.
-    static func load(_ entries: [Entry], from file: SafeTensors, into arena: Arena, codes: CodesLayout = .inOut) throws -> [String: Placed] {
-        let placed = place(try layout(entries, in: file, codes: codes), in: arena)
-        let staging = Pages(bytes: try Self.staging(entries, in: file, codes: codes))
+    static func load(_ entries: [Entry], from file: SafeTensors, into arena: Arena) throws -> [String: Placed] {
+        let placed = place(try layout(entries, in: file), in: arena)
+        let staging = Pages(bytes: try Self.staging(entries, in: file))
         try withExtendedLifetime(staging) {
-            try read(entries, from: file, into: placed, arena: arena, staging: staging.base, codes: codes)
+            try read(entries, from: file, into: placed, arena: arena, staging: staging.base)
         }
         return placed
     }

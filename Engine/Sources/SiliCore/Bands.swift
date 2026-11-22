@@ -313,14 +313,16 @@ public struct Bands: Sendable {
 
     /// **What its calls hold, by names the same at any size** (`Stage.Extent`): of each function in the order of its
     /// first call, numbered among those of its key, each window's elements (its rows each side counted) and each
-    /// output's; its kin named from these names, their elements' type, `prefix` and the calls kept in flight. A plane of
-    /// another size moves a function's widths and rows, not its place in the network.
-    public func extent(_ prefix: String, inFlight: Int) -> Stage.Extent {
+    /// output's; its kin named from these names, their elements' type, what each function computes (`Block.walk`: its
+    /// ops), `prefix` and the calls kept in flight. A plane of another size moves a function's widths and rows, not its
+    /// place in the network nor its ops.
+    public func extent(_ prefix: String, inFlight: Int) throws -> Stage.Extent {
         var named: [Shaped: String] = [:], count: [String: Int] = [:], elements: [String: Int] = [:], lines = ["prefix \(prefix)"]
         for call in calls where named[call.function] == nil {
             let key = call.function.key, name = "\(key)#\(count[key, default: 0])"
             count[key, default: 0] += 1
             named[call.function] = name
+            lines.append("\(name) ops \(Block.walk(try functions[call.function]!.build(call.function.geometry).body).ops)")
             for (n, w) in call.geometry.windows {
                 elements["\(name) \(n)"] = (w.held + (w.before ? 1 : 0) + (w.after ? 1 : 0)) * w.width * w.channels
                 lines.append("\(name) \(n) \(w.element)")

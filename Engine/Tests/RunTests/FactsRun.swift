@@ -45,7 +45,8 @@ extension Runs {
     /// are copied at every call, and the copy is held while the function's calls read the view (measured 17/11 on the
     /// M1 Pro, 1024 × 3840 × 10240: 277 ms a call against 24.5, +37 MiB of share; 18/11 on the M5 Pro, 512 rows: 145 ms
     /// against 2.4, +37.5 MiB of the device's, given back by the next call on the codes themselves). Hence the codes
-    /// written once into the arena in the layout the function reads (`Recipe.codes`, `CodesLayout`). The bar: the view's
+    /// written once into the arena in the layout the GPU's function reads (`Recipe.codes`), and the ANE's copy made once
+    /// a group (`Block`'s). The bar: the view's
     /// call at least 2 × the plain call's time, the settled footprint after it at least half the codes' size above the
     /// one after the plain call, and the same product.
     @Test(.enabled(if: metalEnabled))
@@ -159,19 +160,19 @@ private struct CodesBench {
 
     /// The product of the codes `[in, out]`, read as they lie.
     func function() async throws -> InferenceFunction {
-        var m = Aicode.Module(arguments: [("x", Aicode.tensor([rows, k], .f16)), ("w", Aicode.tensor([k, n], .si8)), ("w_scale", Aicode.tensor([n], .f16))])
+        var m = Aicode.Module(arguments: [("x", Aicode.tensor([1, rows, k], .f16)), ("w", Aicode.tensor([1, k, n], .si8)), ("w_scale", Aicode.tensor([1, 1, n], .f16))])
         var constants = Aicode.ScalingConstants()
-        m.outputs = [("y", m.body.w8a16(m.argument("x"), codes: m.argument("w"), scale: m.argument("w_scale"), constants: &constants))]
+        m.outputs = [("y", m.body.q64(m.argument("x"), codes: m.argument("w"), scale: m.argument("w_scale"), constants: &constants))]
         return try await Functions.load(try Functions.asset(m, "run-codes-\(rows)-\(k)-\(n)"))
     }
 
     /// One call reading `codes` as `[in, out]`: the transposed codes as they lie or, with `strides`, a view of the file's.
     func call(_ f: InferenceFunction, codes: Int, strides: [Int]) async throws {
-        let shape = [k, n]
-        try await Run.call(f, bench.stream, inputs: ["x": View(buffer: arena.buffer(x), type: .float16, shape: [rows, k]),
-                                                    "w": View(buffer: arena.buffer(codes), type: .int8, shape: shape, strides: strides),
-                                                    "w_scale": View(buffer: arena.buffer(scale), type: .float16, shape: [n])],
-                           outputs: [("y", View(buffer: arena.buffer(y), type: .float16, shape: [rows, n]))])
+        let shape = [1, k, n]
+        try await Run.call(f, bench.stream, inputs: ["x": View(buffer: arena.buffer(x), type: .float16, shape: [1, rows, k]),
+                                                    "w": View(buffer: arena.buffer(codes), type: .int8, shape: shape, strides: strides.isEmpty ? [] : [k * n] + strides),
+                                                    "w_scale": View(buffer: arena.buffer(scale), type: .float16, shape: [1, 1, n])],
+                           outputs: [("y", View(buffer: arena.buffer(y), type: .float16, shape: [1, rows, n]))])
     }
 }
 

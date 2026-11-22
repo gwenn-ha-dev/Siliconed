@@ -7,9 +7,10 @@ import Metal
 /// anywhere a function's graph shows it.
 ///
 ///     peak       max(max|t| along the last axis, 2⁻¹⁴), kept `[1, rows, 1]`: what brings a row to 1
-///     q64        x · (codes over 64) · 64 s: a `dequantize` by the constant 2⁻⁶, the scales after the sum (W8A16)
-///     w8a8       x's rows brought to int8 by their peaks, int8 × int8 summed on the GPU, the sums · 64 s · peak (W8A8,
-///                `integer`: the GPU's only)
+///     q64        x · (codes over 64) · 64 s: a `dequantize` by the constant 2⁻⁶, the scales after the sum (W8A16, the
+///                ANE's, on its copy of the codes `[in, out]`)
+///     w8a8       x's rows brought to int8 by their peaks, int8 × int8 summed on the GPU, the sums · peak · 64 s (W8A8,
+///                the GPU's, on the codes by pieces of k)
 ///     norm       u = t / peak, u · rsqrt(mean(u²) + (√eps / (peak · F))²): RMS of the true value t · F
 ///     rotation   ConvRot's Hadamard by groups of 256 as a product at rank 4, `[1, rows, n / 256, 256] · K`
 ///
@@ -19,7 +20,7 @@ import Metal
 /// multiplied by 2⁻⁶ run at 4.8 and 5.6, and a `dequantize` by a vector of scales falls whole to the GPU (wrong on the
 /// ANE besides, measured 12/11). Core AI's GPU runs q64 at the rate of its f16 product (22.1 ms for 22.0), nearer the
 /// CPU (2.1e-4 for 3.0e-4: the scales multiply the sums, never a code), and both units compute at once (0.95 – 0.99 ×
-/// the longer alone). The codes as the file lays them, transposed in the function, cost q64 on the GPU 1.7 ×.
+/// the longer alone).
 extension Aicode.Block {
     /// `[1, rows, 1]`: each row's largest magnitude, f16's smallest normal at least.
     public func peak(_ t: Int) -> Int {
@@ -33,59 +34,69 @@ extension Aicode.Block {
         return reduceMean(t, integers([shape.count - 1], .si32), result: Aicode.tensor(Array(shape.dropLast()) + [1], element))
     }
 
-    /// `x · W` for W int8 codes `[1, k, n]` with their scales `[1, 1, n]`: x times the codes over 64, the sums times 64 s.
-    /// The sums stay in f16 while k · 2 · max|x| does: x brought to 1 first (`peak`). k cut as `pieces` cuts it.
-    /// `laid`: the codes `[1, n, k]` as the file lays them (`SharedWeights.integer`), transposed after the dequantize.
-    public func q64(_ x: Int, codes: Int, scale s: Int, laid: Bool = false, constants: inout Aicode.ScalingConstants) -> Int {
+    /// **`x · W` on the ANE** for W int8 codes `[1, k, n]` with their scales `[1, 1, n]` (the ANE's copy of a group's codes,
+    /// `Block`): x times the codes over 64, the sums times 64 s. The sums stay in f16 while k · 2 · max|x| does: x brought
+    /// to 1 first (`peak`). k cut as `Weights.pieces` cuts it. Measured 22/11/2026 on the M5 Pro (1024 × 3840 → 10 240):
+    /// 17.8 TFLOP/s on `[in, out]`; the same codes `[out, in]` transposed in the function 15.7 (a fixed cost a call, the
+    /// same from 512 to 3072 rows: W transposed at every call; on the M1 Pro 0.54 to 0.87 ×), transposed before their
+    /// dequantize 15.7, read as W · xᵀ 11.8 (11.9 with x and y given channels first), as a 1 × 1 convolution 0.37.
+    public func q64(_ x: Int, codes: Int, scale s: Int, constants: inout Aicode.ScalingConstants) -> Int {
         let w = dequantize(codes, scale: scalar(1.0 / 64, .f16), axis: 0, constants: &constants)
-        return binary(.mul, pieces(x, laid ? transpose(w, [0, 2, 1]) : w), scale("mul", s, 64))
+        return binary(.mul, pieces(x, w), scale("mul", s, 64))
     }
 
-    /// **`x · W` int8 × int8 on the GPU** (`SharedWeights.integer`), W the codes `[1, n, k]` as the file lays them with
-    /// their scales `[1, 1, n]`: each row of x brought to its codes by its peak p (`round(x · 127 / p)`, a half away
-    /// from zero: the Compact's witness, int8 per row), the codes read under the constant 1/127 and W's under 1/64, the
-    /// product NT, the sums times 64 s and p. Both operands of the product a `dequantize` by a scalar constant is the
-    /// form Core AI's GPU runs as int8 × int8 summed in int32 (MPS's affine int8 product); a scale a row of x in its
-    /// `dequantize` runs at 0.74 TFLOP/s and wrong (1.13 relative, measured 21/11/2026 on the M5 Pro), so the row's
-    /// scale is taken out of the product and multiplied after: the same codes, the same sums. The sums stay in f16: each
-    /// term within 2 (|code| / 127 ≤ 1, |code| / 64 ≤ 2), k · 2 at most. Scales in f32 take MPS's fallback (0.3 – 1.1
-    /// TFLOP/s): every one here is f16. **The row's peak at 127 · 2⁻¹⁴ at least**, not `peak`'s 2⁻¹⁴: its scale p / 127
-    /// then stays among f16's normals (2⁻¹⁴ / 127 is a subnormal, which a unit may flush to 0: a row of zeros quantized by
-    /// 0 / 0). A row whose peak lies under it takes fewer than 127 codes, its error still within half its scale.
+    /// **`x · W` int8 × int8 on the GPU** (W8A8), W the codes `[p, n, k / p]` by pieces of k (`Weights.pieces`) with their
+    /// scales `[1, 1, n]` or `[n]`, x `[1, rows, k]` or `[rows, k]`: each row of x brought to its codes by its peak p over
+    /// the whole row (`round(x · 127 / p)`, a half away from zero: the Compact's witness, int8 per row), each piece of x
+    /// quantized under it and read under the constant 1/127, each piece of W under 1/64, each product NT, the pieces'
+    /// sums summed, times p, times 64 s. Both operands of a product a `dequantize` by a scalar constant is the form Core
+    /// AI's GPU runs as int8 × int8 summed in int32 (MPS's affine int8 product); a scale a row of x in its `dequantize`
+    /// runs at 0.74 TFLOP/s and wrong (1.13 relative, measured 21/11/2026 on the M5 Pro), so the row's scale is taken out
+    /// of the product and multiplied after: the same codes, the same sums. x's codes sliced after their quantization, or
+    /// W's rows sliced, lose Core AI's fusion (≈ 24 TFLOP/s against 45, 22/11 on the M5 Pro); x's pieces quantized each
+    /// and W's pieces whole keep it. **The sums stay in f16**: each term within 2 (|code| / 127 ≤ 1, |code| / 64 ≤ 2),
+    /// k · 2 at most; times p · 64 s, the result the guard bounds (k · 128 · max s · p ≤ 65 504, `target`). Scales in f32 take MPS's fallback (0.3 – 1.1 TFLOP/s): every one here is f16. **The row's peak at 127 · 2⁻¹⁴
+    /// at least**, not `peak`'s 2⁻¹⁴: its scale p / 127 then stays among f16's normals (2⁻¹⁴ / 127 is a subnormal, which a
+    /// unit may flush to 0: a row of zeros quantized by 0 / 0). A row whose peak lies under it takes fewer than 127 codes,
+    /// its error still within half its scale.
     public func w8a8(_ x: Int, codes: Int, scale s: Int, constants: inout Aicode.ScalingConstants) -> Int {
-        let shape = Aicode.shape(types[x]).shape, rows = shape[1], n = Aicode.shape(types[codes]).shape[1]
-        precondition(2 * shape[2] <= 65504, "w8a8: \(shape[2]) inputs, past what f16's sums hold (each term within 2)")
-        let p = scale("maximum", reduceMax(primitive("abs", x), axes: [shape.count - 1]), 127 * 0x1p-14)
-        let q = quantize(x, scale: reshape(scale("divide", p, 127), [rows]), axis: 1, constants: &constants)
-        let xq = dequantize(q, scale: scalar(1.0 / 127, .f16), axis: 0, constants: &constants)
-        let w = dequantize(codes, scale: scalar(1.0 / 64, .f16), axis: 0, constants: &constants)
-        let sums = matmul(xq, transpose(w, [0, 2, 1]), result: Aicode.tensor([1, rows, n], .f16))
-        return binary(.mul, binary(.mul, sums, scale("mul", s, 64)), p)
+        let flat = Aicode.shape(types[x]).shape.count == 2
+        let u = flat ? reshape(x, [1] + Aicode.shape(types[x]).shape) : x
+        let shape = Aicode.shape(types[u]).shape, rows = shape[1], k = shape[2]
+        let ws = Aicode.shape(types[codes]).shape, (count, piece, n) = (ws[0], ws[2], ws[1])
+        precondition(count * piece == k, "w8a8: codes \(ws) for \(k) inputs")
+        precondition(2 * k <= 65504, "w8a8: \(k) inputs, past what f16's sums hold (each term within 2)")
+        let p = scale("maximum", reduceMax(primitive("abs", u), axes: [2]), 127 * 0x1p-14)
+        let rs = reshape(scale("divide", p, 127), [rows])
+        var sums: Int? = nil
+        for i in 0..<count {
+            let xi = count == 1 ? u : slice(u, axis: 2, start: i * piece, size: piece)
+            let xq = dequantize(quantize(xi, scale: rs, axis: 1, constants: &constants), scale: scalar(1.0 / 127, .f16), axis: 0, constants: &constants)
+            let wi = count == 1 ? codes : slice(codes, axis: 0, start: i, size: 1)
+            let w = dequantize(wi, scale: scalar(1.0 / 64, .f16), axis: 0, constants: &constants)
+            let y = matmul(xq, transpose(w, [0, 2, 1]), result: Aicode.tensor([1, rows, n], .f16))
+            sums = sums.map { binary(.add, $0, y) } ?? y
+        }
+        // Under the guard (each row's peak p in [2^(e₀−1), 2^e₀], K · 128 · max s · 2^e₀ ≤ 65 504, `target`), p · 64 s is
+        // within 65 504 / 2K, and its product with the sums is the result the guard bounds: no step past f16. The sums
+        // times p (to 2K · 2^e₀) pass it where max s < 1/64; the sums times 64 s (to 128 K max s) where e₀ < 0.
+        let y = binary(.mul, sums!, binary(.mul, p, scale("mul", s, 64)))
+        return flat ? reshape(y, [rows, n]) : y
     }
 
-    /// **A shared form's product on the Compact's codes**, as `weights` lays them: `codes`, q64 on `[in, out]`;
-    /// `integer`, int8 × int8 on the GPU (`w8a8`) and q64 on the codes transposed in the ANE's function (`neural`).
-    public func codes(_ x: Int, _ w: Int, scale s: Int, weights: SharedWeights, neural: Bool,
-                      constants: inout Aicode.ScalingConstants) -> Int {
-        weights == .integer && !neural ? w8a8(x, codes: w, scale: s, constants: &constants)
-            : q64(x, codes: w, scale: s, laid: weights == .integer, constants: &constants)
+    /// **A product on the Compact's codes**: int8 × int8 on the GPU (`w8a8`, the codes by pieces `[p, n, k / p]`), q64 on
+    /// the ANE (`neural`, its copy of the codes `[1, k, n]`).
+    public func codes(_ x: Int, _ w: Int, scale s: Int, neural: Bool, constants: inout Aicode.ScalingConstants) -> Int {
+        neural ? q64(x, codes: w, scale: s, constants: &constants) : w8a8(x, codes: w, scale: s, constants: &constants)
     }
 
     /// `x · W` for W f16 `[1, k, n]` (`SharedWeights.half`): the same product, its sums the result, k cut as `q64`'s.
     public func product16(_ x: Int, weight w: Int) -> Int { pieces(x, w) }
 
-    /// **The widest input a product of the shared forms reads at once**: past it, the ANE's rate falls. Measured by the
-    /// former engine, then again on 20/11 on the M1 Pro, a transformer block of width 6144 at 1024 rows (the ANE alone):
-    /// its feed-forward 194 ms read whole, 82 cut in two pieces of 3072 (3.2 → 7.5 TFLOP/s), the block 245 → 118 ms; the
-    /// GPU's the same (171 ms either way). Every product: one that reads no more is one piece, unchanged.
-    static let widest = 4096
-
-    /// `x · w` in f16 `[1, rows, n]`, k cut in equal pieces of at most `widest` (multiples of 64), each a product, summed.
+    /// `x · w` in f16 `[1, rows, n]`, k cut as `Weights.pieces` cuts it, each piece a product, summed.
     private func pieces(_ x: Int, _ w: Int) -> Int {
         let rows = Aicode.shape(types[x]).shape[1], (k, n) = (Aicode.shape(types[w]).shape[1], Aicode.shape(types[w]).shape[2])
-        var pieces = (k + Self.widest - 1) / Self.widest
-        while k % pieces != 0 || (k / pieces) % 64 != 0 { pieces += 1 }
-        let piece = k / pieces
+        let (pieces, piece) = Weights.pieces(k)
         var sum: Int? = nil
         for i in 0..<pieces {
             let xp = pieces == 1 ? x : slice(x, axis: 2, start: i * piece, size: piece)

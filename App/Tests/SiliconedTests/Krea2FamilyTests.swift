@@ -56,12 +56,10 @@ final class Krea2FamilyTests: XCTestCase {
     }
 
     /// An asset's name says its LoRA's ranks, in one order.
-    /// **No layout this Mac keeps reaches Krea 2's functions** (`CodesLayout`, `ThisMac.forms`): the functions are written
-    /// for one layout each, so a plan that took another (the kept `out-in` of a former measure) would hand them weights
-    /// laid otherwise — it crashed the worker before 78a6f09, a `precondition` on the codes of the W8A16 path since gone.
-    /// The Standard's and the fusion's products are `bfloat16`, read as the file lays them `[out, in]` whatever is kept
-    /// (the function transposes); the shared forms' codes are surfaces, which the plan lays `[in, out]` whatever is kept.
-    func testNoKeptLayoutReachesTheFunctions() {
+    /// **Each form reads its weights by the recipe its functions are written for**: the Standard's and the fusion's
+    /// products `bfloat16`, as the file lays them `[out, in]` (the function transposes); the shared forms' the Compact's
+    /// codes (`Recipe.codes`, by pieces of k) or the Standard's rounded to f16 `[in, out]`.
+    func testEachFormReadsItsWeightsByItsRecipe() {
         let g = Krea2Session.Geometry(latentHeight: 64, latentWidth: 64, text: 512)
         func free(_ r: Recipe) -> Bool {
             switch r {
@@ -75,7 +73,7 @@ final class Krea2FamilyTests: XCTestCase {
             for e in standard.residents + standard.groups.flatMap({ $0.weights }) { XCTAssertTrue(free(e.recipe), "the Standard's \(e.name): \(e.recipe)") }
             let fusion = Krea2Fusion.declaration(palier: 512, ranks: ["layerwise": ranks, "refiner": ranks])
             for e in fusion.residents + fusion.groups.values.flatMap({ $0 }) { XCTAssertTrue(free(e.recipe), "the fusion's \(e.name): \(e.recipe)") }
-            // The shared forms' products: the codes laid [in, out] by the plan, or the Standard's rounded to f16 [in, out].
+            // The shared forms' products: the codes by pieces of k, or the Standard's rounded to f16 [in, out].
             for arithmetic in [Arithmetic.shared(.codes, .gpu), .shared(.codes, .told(512)), .shared(.codes, .inFlight), .shared(.half, .inFlight)] {
                 let shared = Krea2Session.declaration(g, arithmetic, ranks: ranks, taps: false)
                 XCTAssertTrue(shared.forms.contains { $0.steps.contains { $0.unit == .either } }, "\(arithmetic): the shared forms")
@@ -103,7 +101,7 @@ final class Krea2FamilyTests: XCTestCase {
             XCTAssertEqual(form.steps.filter(\.taps).map(\.name), arithmetic == .standard ? ["post"] : ["out", "ffn"])
             for step in form.steps {
                 for tapped in [false, true] {
-                    let m = try form.module(step.name, Block.Build(rows: 1088, codes: .inOut, tapped: tapped && step.taps))
+                    let m = try form.module(step.name, Block.Build(rows: 1088, tapped: tapped && step.taps))
                     let names = Set(m.outputs.map(\.0))
                     XCTAssertEqual(names.contains("attention") || names.contains("feed"), tapped && step.taps, "\(step.name) tapped \(tapped)")
                 }

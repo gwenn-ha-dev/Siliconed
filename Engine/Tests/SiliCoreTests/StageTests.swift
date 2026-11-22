@@ -96,33 +96,19 @@ import Testing
         #expect(plan.p == finest)
     }
 
-    /// The weights as surfaces: apart from the heap, their codes laid as the declaration says (the ANE reads `[out, in]`
-    /// transposed in its function: `SharedWeights.integer`).
+    /// The weights as surfaces: apart from the heap.
     @Test func weightsOnSurfacesLieApart() throws {
         var d = Self.declaration()
         d.surfaces = true
-        d.codes = .outIn
         let plan = try Self.plan(1 << 30, d)
         #expect(plan.heap == Self.tensors + Self.staging)
         #expect(plan.apart == Self.apart + Self.resident + 2 * Self.group)
-        #expect(plan.codes == .outIn)
-        var e = Self.declaration()
-        e.codes = .outIn
-        #expect(try Self.plan(1 << 30, e).codes == .outIn)
-    }
-
-    /// The codes' layout is the declaration's (the plan reads no measure of this Mac): the functions are written for it
-    /// (19/11: a measure kept between two reads handed the functions weights laid otherwise, and the worker stopped).
-    @Test func theLayoutIsTheDeclarations() throws {
-        #expect(try Self.plan(1 << 30).codes == .inOut)
-        var d = Self.declaration()
-        d.codes = .outIn
-        #expect(try Self.plan(1 << 30, d).codes == .outIn)
     }
 }
 
 /// **The signal on a live stage** (the arena on this Mac's GPU, nothing called): the socle's plan, a ring of 2; a footprint
-/// simulated — a base the test sets, and the arena's heaps — that leaves room under B for two groups beside the margin.
+/// simulated — a base the test sets, and the arena's heaps — that leaves room under B for two groups beside what kept groups
+/// leave clear (`Stage.keepClear`).
 /// The bars, counted by hand: past the signal, two groups kept, the others the ring's; a reserve of a group, one; a
 /// reserve never read, nothing kept before the cycle's third turn, then two; past a climb that expects a group's growth,
 /// nothing kept before two turns past it, then one.
@@ -134,14 +120,14 @@ import Testing
         var bytes: Int { lock.withLock { base + (arena.map { $0.allocated - start } ?? 0) } }
     }
 
-    /// Room for `room` groups beside the margin, the cycle run four turns, the signal after the uses in `signals`, a climb
+    /// Room for `room` groups beside what kept groups leave clear, the cycle run four turns, the signal after the uses in `signals`, a climb
     /// after use `climb.use` expecting `climb.expects`: the groups kept, and the first use that was no slot's.
     static func run(reserve: Int?, room: Int, signals: Set<Int>, climb: (use: Int, expects: Int)? = nil) async throws -> (kept: [String], firstKept: Int?)? {
         guard let device = MTLCreateSystemDefaultDevice() else { return nil }
         var d = StagePlans.declaration()
         d.functions = [:]
         let socle = Arena.allocation(bytes: StagePlans.tensors + StagePlans.resident + 2 * StagePlans.group + StagePlans.staging) + StagePlans.apart
-        let budget = StagePlans.floor + socle + Stage.margin
+        let budget = StagePlans.floor + socle + Stage.keepClear
         let plan = try Stage.plan(d, files: [StagePlans.file], budget: budget, floor: StagePlans.floor, depth: 2)
         #expect(plan.kept.isEmpty && plan.depth == 2)
         var measured = ThisMac()
@@ -150,7 +136,7 @@ import Testing
         let stage = try await Stage(device, plan: plan, files: [StagePlans.file], measured: measured) { footprint.bytes }
         defer { stage.close() }
         footprint.lock.withLock { (footprint.arena, footprint.start) = (stage.arena, stage.arena.allocated) }
-        footprint.lock.withLock { footprint.base = budget - Stage.margin - room * Arena.allocation(bytes: StagePlans.group) }
+        footprint.lock.withLock { footprint.base = budget - Stage.keepClear - room * Arena.allocation(bytes: StagePlans.group) }
         var firstKept: Int?
         for (m, g) in (["first"] + Array(repeating: d.cycle, count: 4).flatMap { $0 }).enumerated() {
             let held = try stage.acquire(g)
@@ -265,10 +251,19 @@ import Testing
     @Test func aShorterFormIsNeverBelowATallerReading() throws {
         let e = Stage.estimates(extents: Self.forms, measured: Self.measured(["tall": 400 << 20]))
         #expect(e == [.read(400 << 20), .scaled(Self.bound(400 << 20)), .scaled(Self.bound(400 << 20))])
-        // The tallest read does not hold, nor the bound of the others: refused, the least known its number.
+        // The tallest read does not hold, nor the bound of the others: B lowered under every form read, the soberest
+        // never read goes as on a Mac with no reading, not a refusal (decided 22/11/2026).
         let socle = try Self.plans(1 << 40)[0].p, budget = socle + Stage.margin + (300 << 20)
+        #expect(try Stage.choose(try Self.plans(budget), e) == 2)
+    }
+
+    /// **The soberest read does not hold**: a taller form never read holds more — refused, the soberest read its number.
+    @Test func noFormPastTheSoberestReadIsRefused() throws {
+        let e = Stage.estimates(extents: Self.forms, measured: Self.measured(["mid": 200 << 20, "low": 100 << 20]))
+        #expect(e == [.scaled(Self.bound(400 << 20)), .read(200 << 20), .read(100 << 20)])
+        let socle = try Self.plans(1 << 40)[0].p, budget = socle + Stage.margin + (50 << 20)
         let refusal = #expect(throws: OverBudget.self) { try Stage.choose(try Self.plans(budget), e) }
-        #expect(refusal?.needed == socle + (400 << 20) + Stage.margin)
+        #expect(refusal?.needed == socle + (100 << 20) + Stage.margin)
     }
 
     /// Several read: a form's own reading; the others from the least of the bounds their kin's readings give.

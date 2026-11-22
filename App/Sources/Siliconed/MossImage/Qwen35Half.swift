@@ -2,7 +2,7 @@ import CoreAI
 import Foundation
 import SiliCore
 
-/// **The Compact's path: Qwen3.5-9B in W8A16, f16 under the guard** (`Guard.swift`). The file is ComfyUI's int8
+/// **The Compact's path: Qwen3.5-9B in W8A8, f16 under the guard** (`Guard.swift`). The file is ComfyUI's int8
 /// `convrot` (`qwen3.5_9b_int8_convrot.safetensors`): every product of the 32 layers int8 `[out, in]` with a scale a row,
 /// its codes rotated by the Hadamard by 256 (`W = (q · s) · R`, so `x · Wᵀ = (x · R) · (q · s)ᵀ`); the embedding table
 /// too; `in_proj_b`, `in_proj_a` (32 rows), the conv, the norms, `A_log` and `dt_bias` as the Standard's.
@@ -19,24 +19,24 @@ import SiliCore
 ///   - **the attention's gate and v are true values**: σ(gate · F) in f32, v · F in f16 (bounded: a product of a
 ///     normed row), what the attention reads across rows; the causal mask −10⁴ in f16 (a score is under 2⁸ there).
 extension Qwen35Encoder {
-    /// How a layer's function computes: the Standard's bf16, or the Compact's W8A16 in f16; its products' weights, bf16
-    /// or int8 codes, in the layout the engine reads as the layers open (`Block.Build`).
+    /// How a layer's function computes: the Standard's bf16, or the Compact's W8A8 in f16 (`w8a8`); its products' weights,
+    /// bf16 or int8 codes by pieces of k (`Weights.codesShape`).
     package enum Path: Equatable, Sendable {
         case bfloat
         case half
 
         /// Its name in the layers'.
-        var suffix: String { self == .bfloat ? "bf16" : "w8a16" }
+        var suffix: String { self == .bfloat ? "bf16" : "w8a8" }
 
         var isBFloat: Bool { if case .bfloat = self { true } else { false } }
     }
 
-    /// A half layer's arguments: the stream and its factor, then the weights; the products `[in, out]` or `[out, in]`
-    /// int8 as `codes` lays them, each with its scales `[out]` f16 (`Recipe.codes`).
-    func halfArguments(full: Bool, rows: Int, codes: CodesLayout) -> [Argument] {
+    /// A half layer's arguments: the stream and its factor, then the weights; the products int8 by pieces of k, each
+    /// with its scales `[out]` f16 (`Recipe.codes`).
+    func halfArguments(full: Bool, rows: Int) -> [Argument] {
         let c = config
         func product(_ name: String, _ out: Int, _ inn: Int) -> [Argument] {
-            [(name, codes == .inOut ? [inn, out] : [out, inn], .si8), (name + "_scale", [out], .f16)]
+            [(name, Weights.codesShape(inn: inn, out: out), .si8), (name + "_scale", [out], .f16)]
         }
         let mixer: [Argument] = full
             ? product("q", 2 * c.heads * c.headDim, c.width) + product("k", c.kvHeads * c.headDim, c.width)
@@ -69,11 +69,11 @@ extension Qwen35Encoder {
 
     /// A half function's writer: the arguments by name, the guard's products and norms.
     final class Guarded {
-        let b: Aicode.Block, names: [String], eps: Double, codes: CodesLayout, rows: Int
+        let b: Aicode.Block, names: [String], eps: Double, rows: Int
         private var constants = Aicode.ScalingConstants()
 
-        init(_ m: Aicode.Module, eps: Double, codes: CodesLayout, rows: Int) {
-            (b, names, self.eps, self.codes, self.rows) = (m.body, m.argumentNames, eps, codes, rows)
+        init(_ m: Aicode.Module, eps: Double, rows: Int) {
+            (b, names, self.eps, self.rows) = (m.body, m.argumentNames, eps, rows)
         }
 
         func a(_ name: String) -> Int { names.firstIndex(of: name)! }
@@ -88,12 +88,12 @@ extension Qwen35Encoder {
         }
         /// `t` (f16 or f32) rotated as the codes were, then brought under the smallest target of the products that read it.
         func entering(_ t: Int, _ products: [String]) -> (unit: Int, factor: Int) {
-            func target(_ name: String) -> Int { b.target(codes: [(a(name), a(name + "_scale"))], layout: codes) }
+            func target(_ name: String) -> Int { b.target(codes: [(a(name), a(name + "_scale"))]) }
             let e0 = products.dropFirst().reduce(target(products[0])) { b.elementwise("minimum", $0, target($1)) }
             return b.ranged(b.convrot(t), under: e0)
         }
         func product(_ x: Int, _ name: String) -> Int {
-            b.w8a16(x, codes: a(name), scale: a(name + "_scale"), layout: codes, constants: &constants)
+            b.w8a8(x, codes: a(name), scale: a(name + "_scale"), constants: &constants)
         }
         /// The feed-forward half and its residual (`Qwen3Functions.swift`'s): SiLU(g F₂) · u F₂ by `gatedSiLU`.
         func feedForward(_ x: Int, _ xf: Int, hidden: Int) -> (value: Int, factor: Int) {
@@ -103,15 +103,15 @@ extension Qwen35Encoder {
         }
     }
 
-    private func halfModule(full: Bool, rows: Int, codes: CodesLayout) -> (Aicode.Module, Guarded) {
-        let m = Aicode.Module(arguments: halfArguments(full: full, rows: rows, codes: codes).map { ($0.name, Aicode.tensor($0.shape, $0.element)) })
-        return (m, Guarded(m, eps: config.eps, codes: codes, rows: rows))
+    private func halfModule(full: Bool, rows: Int) -> (Aicode.Module, Guarded) {
+        let m = Aicode.Module(arguments: halfArguments(full: full, rows: rows).map { ($0.name, Aicode.tensor($0.shape, $0.element)) })
+        return (m, Guarded(m, eps: config.eps, rows: rows))
     }
 
     /// **A full-attention layer on `rows`, half**: outputs y, y_factor.
-    func halfAttentionModule(rows n: Int, codes: CodesLayout) -> Aicode.Module {
+    func halfAttentionModule(rows n: Int) -> Aicode.Module {
         let c = config, hd = c.headDim, r = c.rotaryDim
-        let (made, g) = halfModule(full: true, rows: n, codes: codes)
+        let (made, g) = halfModule(full: true, rows: n)
         var m = made
         let tables = rotaryTables(length: n)
         let cos = m.constant("rope_cos", Self.bytes(tables.cos), Aicode.tensor([n, 1, r], .f32))
@@ -150,9 +150,9 @@ extension Qwen35Encoder {
     }
 
     /// **A Gated DeltaNet layer on `rows`, half**: outputs y, y_factor.
-    func halfDeltaModule(rows n: Int, codes: CodesLayout) -> Aicode.Module {
+    func halfDeltaModule(rows n: Int) -> Aicode.Module {
         let c = config
-        let (made, g) = halfModule(full: false, rows: n, codes: codes)
+        let (made, g) = halfModule(full: false, rows: n)
         var m = made
         let b = g.b, x = g.a("x"), xf = g.column("x_factor")
         let n1 = g.normed(x, xf, "norm1")
@@ -197,7 +197,7 @@ extension Qwen35Encoder {
     func halfNormModule(rows n: Int) -> Aicode.Module {
         var m = Aicode.Module(arguments: [("x", Aicode.tensor([n, config.width], .f16)), ("x_factor", Aicode.tensor([1, n], .f32)),
                                           ("norm", Aicode.tensor([config.width], .bf16))])
-        let g = Guarded(m, eps: config.eps, codes: .inOut, rows: n)
+        let g = Guarded(m, eps: config.eps, rows: n)
         m.outputs = [("hidden", g.normed(g.a("x"), g.column("x_factor"), "norm"))]
         return m
     }

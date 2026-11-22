@@ -32,7 +32,7 @@ package struct Invocation: Sendable {
     package let extras: [String: String]
 
     /// The options every stage accepts.
-    package static let common: Set<String> = ["--size", "--goldens", "--neural-engine", "--products"]
+    package static let common: Set<String> = ["--size", "--goldens", "--neural-engine"]
 
     /// Parses `arguments` (what follows `check <model> <stage>`), refusing any option outside `accepted`
     /// and `common`. `defaultSize`: the stage's own, when `--size` is absent.
@@ -68,10 +68,6 @@ package struct Invocation: Sendable {
                 (CoreAI.neuralEngine, CoreAI.neuralEngineRows) = (true, n)
             }
         }
-        if let products = values["--products"]?.last {
-            guard products == "int8" || products == "q64" else { throw UsageError("--products \(products): int8 or q64") }
-            CoreAI.integerProducts = products == "int8"
-        }
         long = flags.contains("--long")
         goldens = Goldens(directory: values["--goldens"]?.last)
         extras = values.compactMapValues(\.last).filter { !Self.known.contains($0.key) }
@@ -81,7 +77,7 @@ package struct Invocation: Sendable {
     private static let flags: Set<String> = ["--long"]
 
     /// The options parsed above; any other accepted option lands in `extras`.
-    private static let known: Set<String> = ["--size", "--goldens", "--edit", "--map", "--neural-engine", "--products"]
+    private static let known: Set<String> = ["--size", "--goldens", "--edit", "--map", "--neural-engine"]
 
     /// The DiT map: `--map`, else the installed one named `standard`; missing or of another variant than the golden's, the stage is skipped.
     /// `golden`: the variant the stage's golden was made for; another one is skipped (`MapCheck`).
@@ -169,7 +165,7 @@ package struct Goldens: Sendable {
 
     /// **The reference run with the publisher's int8 products** (ComfyUI's `int8_linear`: the activation rotated,
     /// cast into int8 with a scale a row, int8 × int8 exact, the rest in bf16), which a Compact's DiT is judged beside
-    /// in place of the bf16 one: its publisher's own arithmetic on the same codes, which the engine's W8A16 is held to.
+    /// in place of the bf16 one: its publisher's own arithmetic on the same codes, which the engine's W8A8 is held to.
     /// Missing, the stage is skipped.
     package func int8(_ file: String, script: String) throws -> Safetensors {
         guard exists(file) else { throw Skip("W8A8 reference missing: \(path(file)) — \(script)") }

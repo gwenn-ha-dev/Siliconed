@@ -79,6 +79,9 @@ extension Block {
     /// Everything let go, and the footprint waited for (`Stage.close`): the functions the block loaded itself first.
     @discardableResult
     public func close() -> Stage.Settled {
+        // A copy prepared ahead writes into the arena: done, or its wait for the ring's next use given up, first.
+        stage.stopPeeking()
+        copier.sync {}
         cycled(until: DispatchTime.now().uptimeNanoseconds)
         functions = [:]
         return stage.close()

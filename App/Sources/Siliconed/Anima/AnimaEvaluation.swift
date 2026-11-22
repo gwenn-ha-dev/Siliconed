@@ -52,15 +52,15 @@ package final class AnimaEvaluation {
     /// The guarded forms' path: the Standard's bf16, f16 otherwise.
     static func path(_ a: Arithmetic) -> Path { a == .standard ? .bf16 : .f16 }
 
-    /// **The blocks the shared forms take**: beside the ANE (or told 0 rows of it), the Compact's whose ten products are
-    /// codes (0 and 27 are float weights, the MLP of 1 to 3 too: the guarded forms'), every block of the Standard's in
-    /// f16; none on the GPU alone, where the Compact is the guarded forms' — but where its products are int8 × int8
-    /// (`SharedWeights.integer`: the guarded forms read the codes in W8A16 only).
+    /// **The blocks the shared forms take**: the Compact's whose ten products are codes, beside the ANE or on the GPU
+    /// alone (0 and 27 are float weights, the MLP of 1 to 3 too: the guarded forms'), every block of the Standard's in
+    /// f16. On the GPU alone the Compact's blocks of codes went 10 % faster in the shared forms than in the guarded
+    /// ones, for 112 MiB more of arena (the M5 Pro at 1024², 22/11/2026).
     static func sharedBlocks(_ a: Arithmetic, _ quantized: [Set<String>]) -> Set<Int> {
         switch a {
-        case .standard, .shared(.codes, .gpu): []
+        case .standard: []
         case .shared(.half, _): Set(quantized.indices)
-        case .shared(.codes, _), .shared(.integer, _): Set(quantized.indices.filter { quantized[$0] == Set(products.keys) })
+        case .shared(.codes, _): Set(quantized.indices.filter { quantized[$0] == Set(products.keys) })
         }
     }
 
@@ -100,8 +100,7 @@ package final class AnimaEvaluation {
     }
 
     /// **The DiT of the file at `path` under B** (`budget`), in the work's arithmetic (`Arithmetic.block`): the Standard's
-    /// bf16; the Compact's guarded forms with the Neural Engine off; with it on the shared forms (`sharedBlocks`) with the ANE's
-    /// share.
+    /// bf16; the Compact's shared forms (`sharedBlocks`), with the ANE's share when the Neural Engine is on.
     package static func open(_ path: String, geometry: Geometry, taps: Bool = false, loras: LoRAStack = .none, budget: Int) async throws -> AnimaEvaluation {
         let file = try Self.file(path)
         let quantized = blocks.indices.map { Self.quantized($0, in: file) }, ranks = ranks(loras)

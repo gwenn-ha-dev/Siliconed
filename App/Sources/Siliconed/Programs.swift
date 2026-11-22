@@ -140,46 +140,21 @@ package enum Arithmetic: Equatable, Sendable, CustomStringConvertible {
         return neuralEngine ? .shared(.half, share) : .standard
     }
 
-    /// What the engine offers the Compact's codes on `device` (`SharedWeights.offered`, a trial once a system), `codes`
-    /// alone for a map of other weights or where a control decides (`CoreAI.integerProducts`).
-    package static func offered(codes: Bool, _ device: MTLDevice) async throws -> [SharedWeights] {
-        codes && CoreAI.integerProducts == nil ? try await SharedWeights.offered(device) : [.codes]
-    }
-
-    /// The Compact's weights a control says (`--products int8` or `q64`), nil where the engine chooses.
-    private static var toldWeights: SharedWeights? { CoreAI.integerProducts.map { $0 ? .integer : .codes } }
-
-    /// **A check's**, where nothing is timed (`check z-image block`, `block-lora`): `of`'s, the Compact's weights a
-    /// control's word (`--products`), else the first the engine offers this Mac (`offered`) — the one a render tries
-    /// first, the faster where the trial measured it.
-    package static func told(codes: Bool, neuralEngine: Bool, _ device: MTLDevice) async throws -> Arithmetic {
-        let a = of(codes: codes, neuralEngine: neuralEngine)
-        guard case .shared(.codes, let share) = a else { return a }
-        if let told = toldWeights { return .shared(told, share) }
-        return .shared(try await offered(codes: true, device)[0], share)
-    }
-
     /// **A render's**, `of`'s — but for the Standard beside the ANE in flight, the engine's choice between it and the
     /// Standard's bf16 on the GPU alone, each `declaration` timed on this Mac (`Block.choose`). Measured 20/11/2026 on
     /// the mini at 1024², whose GPU runs bf16 as fast as f16: the shared forms cost its GPU alone 7 to 16 % over bf16,
     /// and the ANE won that back on one DiT of five (−15 %), two even, two still slower (+7 to +9 %). Where bf16 runs
     /// slower than f16 (the M1 Pro: 2.16 TFLOP/s against 3.50), the shared forms should win everywhere.
     ///
-    /// **The Compact's codes**: the weights the engine offered this Mac's GPU (`offered`, `SharedWeights.offered`:
-    /// `codes`, and `integer` where its product int8 × int8 was measured the faster), each timed by `Block.choose`; a
-    /// control's word (`CoreAI.integerProducts`) in place of the choice. Beside the ANE in flight, each on the GPU alone
-    /// too: the ANE kept only where the block is faster with it, as the Settings say. Measured 21/11/2026 on the mini at
-    /// 1024², int8 × int8: Krea 2 and Anima a step 3 % slower beside the ANE than alone, at its least share.
-    package static func opened(codes: Bool, neuralEngine: Bool, offered: [SharedWeights] = [.codes],
-                               _ declaration: (Arithmetic) -> Block.Declaration) throws -> Arithmetic {
+    /// **The Compact's codes**, one arithmetic on each unit (`SharedWeights`): beside the ANE in flight, on the GPU alone
+    /// too, each timed by `Block.choose`: the ANE kept only where the block is faster with it, as the Settings say.
+    /// Measured 21/11/2026 on the mini at 1024², int8 × int8: Krea 2 and Anima a step 3 % slower beside the ANE than
+    /// alone, at its least share (the ANE then read the codes `[out, in]`, transposed at every call).
+    package static func opened(codes: Bool, neuralEngine: Bool, _ declaration: (Arithmetic) -> Block.Declaration) throws -> Arithmetic {
         let a = of(codes: codes, neuralEngine: neuralEngine)
         let alternatives: [Arithmetic]
-        if case .shared(.codes, let share) = a {
-            let told = toldWeights
-            // A control's rows: nothing timed (no pace is kept under them), the weights offered first.
-            if case .told = share { return .shared(told ?? offered[0], share) }
-            let shares: [Block.Share] = share == .inFlight ? [.inFlight, .gpu] : [share]
-            alternatives = (told.map { [$0] } ?? offered).flatMap { w in shares.map { Arithmetic.shared(w, $0) } }
+        if a == .shared(.codes, .inFlight) {
+            alternatives = [a, .shared(.codes, .gpu)]
         } else if a == .shared(.half, .inFlight) {
             alternatives = [a, .standard]
         } else {
@@ -192,16 +167,14 @@ package enum Arithmetic: Equatable, Sendable, CustomStringConvertible {
     /// stored I8.
     package static func codes(_ file: SafeTensors, marker: String) -> Bool { file.tensors[marker]?.dtype == "I8" }
 
-    /// **A render's DiT, opened**: its arithmetic `opened` under the Neural Engine switch, from what the engine offers
-    /// this Mac's GPU (`offered`), each alternative's `declaration` timed where there is a choice; then the block of that
+    /// **A render's DiT, opened**: its arithmetic `opened` under the Neural Engine switch, each alternative's
+    /// `declaration` timed where there is a choice; then the block of that
     /// declaration under `budget` (`Block.open`), on the share the arithmetic says. `marker`: the product whose element
     /// says the Compact (`codes`).
     package static func block(file: SafeTensors, codes marker: String, budget: Int,
                               _ declaration: (Arithmetic) -> Block.Declaration) async throws -> (block: Block, arithmetic: Arithmetic) {
         guard let device = MTLCreateSystemDefaultDevice() else { throw ProgramError("no Metal device") }
-        let codes = Self.codes(file, marker: marker)
-        let offered = try await Self.offered(codes: codes, device)
-        let arithmetic = try opened(codes: codes, neuralEngine: CoreAI.neuralEngineInForce, offered: offered, declaration)
+        let arithmetic = try opened(codes: Self.codes(file, marker: marker), neuralEngine: CoreAI.neuralEngineInForce, declaration)
         let block = try await Block.open(device, declaration(arithmetic), files: [file], budget: budget, share: arithmetic.share)
         return (block, arithmetic)
     }
@@ -215,11 +188,6 @@ package enum Arithmetic: Equatable, Sendable, CustomStringConvertible {
     package var share: Block.Share {
         if case .shared(_, let s) = self { s } else { .gpu }
     }
-    /// The shared forms' weights, nil for the Standard's: what a block's declaration lays its codes by
-    /// (`Block.Declaration.sharedWeights`).
-    package var sharedWeights: SharedWeights? {
-        if case .shared(let w, _) = self { w } else { nil }
-    }
     /// The residual stream's element, and the low-rank factors': f16 in the shared forms, bf16 in the Standard's.
     package var element: NDArray.ScalarType { shared ? .float16 : .bfloat16 }
 
@@ -227,7 +195,7 @@ package enum Arithmetic: Equatable, Sendable, CustomStringConvertible {
         switch self {
         case .standard: "standard"
         case .shared(let w, let s):
-            (w == .codes ? "compact" : w == .integer ? "compact, int8 × int8 on the GPU" : "standard in f16") + (s == .gpu ? "" : s == .inFlight ? ", the ANE in flight" : ", the ANE told")
+            (w == .codes ? "compact" : "standard in f16") + (s == .gpu ? "" : s == .inFlight ? ", the ANE in flight" : ", the ANE told")
         }
     }
 }
@@ -236,7 +204,7 @@ package enum Arithmetic: Equatable, Sendable, CustomStringConvertible {
 /// AI's assets are written.
 package enum CoreAI {
     private static let lock = NSLock()
-    nonisolated(unsafe) private static var chosen: (neuralEngine: Bool, rows: Int?, integer: Bool?) = (false, nil, nil)
+    nonisolated(unsafe) private static var chosen: (neuralEngine: Bool, rows: Int?) = (false, nil)
     /// The switch of the work in hand (`under`), which the process's does not reach until it ends.
     nonisolated(unsafe) private static var held: Bool?
 
@@ -253,13 +221,6 @@ package enum CoreAI {
     package static var neuralEngineRows: Int? {
         get { lock.withLock { chosen.rows } }
         set { lock.withLock { chosen.rows = newValue } }
-    }
-
-    /// **A control's word**: the Compact's products int8 × int8 on the GPU (`SharedWeights.integer`) or not, in place of
-    /// the engine's choice between them (`--products int8` or `q64`); `nil` leaves it to the engine.
-    package static var integerProducts: Bool? {
-        get { lock.withLock { chosen.integer } }
-        set { lock.withLock { chosen.integer = newValue } }
     }
 
     /// **One switch from end to end of a piece of work**: a render computes its text, its denoising and its decoder at

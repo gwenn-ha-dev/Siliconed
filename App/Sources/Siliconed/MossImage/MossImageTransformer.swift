@@ -102,7 +102,6 @@ final class MossDiT {
             + (0..<layers).flatMap { LoRAStack.tensors(MossFunctions.loraProducts($0), ranks: ranks, element: e, prefix: "layers.\($0).") }
         n.residents = MossFunctions.others
         let form = shared ? "shared" : "bf16"
-        n.sharedWeights = arithmetic.sharedWeights
         n.groups = (0..<2).map { Block.Group(textBlocks[$0], form: "text", weights: MossFunctions.textBlock($0)) }
             + allBlocks.enumerated().map { i, b in
                 Block.Group(b, form: tapped && i == 0 ? form + "-tapped" : form, weights: shared ? MossShared.layer(i, weights: arithmetic.weights) : MossFunctions.layer(i))

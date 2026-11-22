@@ -50,19 +50,17 @@ extension Block {
         }
     }
 
-    /// What a function is built for: its rows (a call's, a unit's; an edge's 0), the layout of the plan's int8 codes
-    /// (read once as the block opens: `Stage.Declaration.codes`; its bf16 weights lie as the file lays them, `[out, in]`).
+    /// What a function is built for: its rows (a call's, a unit's; an edge's 0), its unit.
     public struct Build: Sendable {
         public let rows: Int
-        public let codes: CodesLayout
         /// A tapped run's function of a step that taps (`Step.taps`): the module writes what the check listens to.
         public let tapped: Bool
         /// The ANE's function: a step's of either unit (`Unit.either`) at its unit's rows, or an edge the ANE computes
-        /// (`Declaration.neuralEdges`); false, the GPU's. The two may
-        /// differ where the GPU computes what the ANE cannot (`SharedWeights.integer`'s products).
+        /// (`Declaration.neuralEdges`); false, the GPU's. The two differ on the Compact's codes: the GPU's products int8 ×
+        /// int8 on the codes by pieces, the ANE's q64 on its copy `[in, out]` (`SharedWeights`).
         public let neural: Bool
-        public init(rows: Int, codes: CodesLayout, tapped: Bool = false, neural: Bool = false) {
-            self.rows = rows; self.codes = codes; self.tapped = tapped; self.neural = neural
+        public init(rows: Int, tapped: Bool = false, neural: Bool = false) {
+            self.rows = rows; self.tapped = tapped; self.neural = neural
         }
     }
 
@@ -127,12 +125,6 @@ extension Block {
         public var cuts = true
         public var forms: [Form] = []
         public var passes: [Pass] = []
-        /// The shared forms' weights (`SharedWeights`), nil where the block has none: how the plan lays the products'
-        /// int8 codes, and the functions read them, follows (`codes`).
-        public var sharedWeights: SharedWeights?
-        /// `[in, out]`, or `[out, in]` as the file lays them: the shared weights' layout (`SharedWeights.layout`), `[in,
-        /// out]` without them.
-        public var codes: CodesLayout { sharedWeights?.layout ?? .inOut }
         public var edges: [String: @Sendable (Build) throws -> Aicode.Module] = [:]
         /// The edges the ANE computes (`call` runs them there, every GPU call before them done): their tensors surfaces
         /// as declared, the weights surfaces.

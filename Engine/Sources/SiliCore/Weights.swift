@@ -9,13 +9,14 @@ public enum Weights {
 
     /// The tensors `entries` become in the arena, from the file's header alone: each argument's name, its shape and
     /// element as the functions read it, its bytes.
-    public static func layout(_ entries: [Entry], in file: SafeTensors, codes: CodesLayout = .inOut) throws -> [Slot] {
+    public static func layout(_ entries: [Entry], in file: SafeTensors) throws -> [Slot] {
         try entries.flatMap { e -> [Slot] in
             switch e.recipe {
             case .codes, .product:
                 let (_, out, inn, int8) = try product(e, in: file)
-                let shape = int8 && codes == .inOut ? [inn, out] : [out, inn]
-                return int8 ? [(e.name, shape, .int8, out * inn), (e.name + "_scale", [out], .float16, out * 2)] : [(e.name, shape, .bfloat16, 2 * out * inn)]
+                let (count, piece) = pieces(inn)
+                return int8 ? [(e.name, [count, out, piece], .int8, out * inn), (e.name + "_scale", [out], .float16, out * 2)]
+                    : [(e.name, [out, inn], .bfloat16, 2 * out * inn)]
             case .half, .float:
                 let t = try file.real(e.key), n = t.shape.reduce(1, *)
                 return e.recipe == .half ? [(e.name, t.shape, .float16, n * 2)] : [(e.name, t.shape, .float32, n * 4)]
@@ -45,19 +46,43 @@ public enum Weights {
     }
 
     /// What `entries` take in the arena.
-    public static func size(_ entries: [Entry], in file: SafeTensors, codes: CodesLayout = .inOut) throws -> Int {
-        try layout(entries, in: file, codes: codes).reduce(0) { $0 + Arena.aligned($1.bytes) }
+    public static func size(_ entries: [Entry], in file: SafeTensors) throws -> Int {
+        try layout(entries, in: file).reduce(0) { $0 + Arena.aligned($1.bytes) }
+    }
+
+    /// **The widest input a product on codes reads at once**: k cut in `count` equal pieces of `piece` inputs, at most
+    /// 4096 and a multiple of 64 each (one piece where k is no wider). The ANE's rate falls past it (measured by the former
+    /// engine, then on 20/11/2026 on the M1 Pro, a block of width 6144 at 1024 rows on the ANE alone: its feed-forward
+    /// 194 ms read whole, 82 cut in two, 3.2 → 7.5 TFLOP/s; the GPU's the same either way), and Core AI's int8 × int8 on a
+    /// GPU without int8 units falls with k (22/11 on the M1 Pro, 4096 rows: 16 384 → 6144 at 2.17 TFLOP/s whole, 3.96 in
+    /// pieces, q64 3.94; 10 240 → 3840 3.56 and 3.90; the M5 Pro 42.0 and 44.9 in pieces). The codes lie by these pieces
+    /// (`layout`), each whole: x's pieces read as slices keep Core AI's fusion, the codes' as slices of their rows lose it
+    /// (≈ 24 TFLOP/s against 45 on the M5 Pro).
+    public static func pieces(_ k: Int) -> (count: Int, piece: Int) {
+        guard k > widest else { return (1, k) }
+        guard let count = ((k + widest - 1) / widest...(k / 64)).first(where: { k % $0 == 0 && (k / $0) % 64 == 0 }) else {
+            preconditionFailure("k = \(k): no equal pieces of at most \(widest), a multiple of 64 each")
+        }
+        return (count, k / count)
+    }
+
+    static let widest = 4096
+
+    /// The shape a product's codes `[out, in]` take in the arena, and their argument: `[p, out, in / p]` (`pieces`).
+    public static func codesShape(inn: Int, out: Int) -> [Int] {
+        let (count, piece) = pieces(inn)
+        return [count, out, piece]
     }
 
     /// What reading `entries` passes through before its recipe: the largest tensor converted (an f32 read as it is goes
     /// straight to its place).
-    public static func staging(_ entries: [Entry], in file: SafeTensors, codes: CodesLayout = .inOut) throws -> Int {
+    public static func staging(_ entries: [Entry], in file: SafeTensors) throws -> Int {
         try entries.map { e in
             switch e.recipe {
             case .codes, .product:
-                let (parts, _, _, int8) = try product(e, in: file)
-                // A transposed part through the staging; the scales through it, whatever the layout.
-                let transposed = int8 && codes == .inOut
+                let (parts, _, inn, int8) = try product(e, in: file)
+                // A part cut in pieces through the staging; the scales through it.
+                let transposed = int8 && pieces(inn).count > 1
                 return try parts.map { key, t in
                     let s = int8 ? try scales(key, in: file, out: t.shape[0]) : nil
                     return max(transposed ? t.end - t.start : 0, s.map { $0.end - $0.start } ?? 0)
@@ -84,7 +109,7 @@ public enum Weights {
     /// Each entry of `file` read into its place in `placed` (taken before, by `place` on the same layout or another
     /// block's of the same shapes), through `staging`.
     public static func read(_ entries: [Entry], from file: SafeTensors, into placed: [String: Placed], arena: Arena,
-                            staging: UnsafeMutableRawPointer, codes layout: CodesLayout = .inOut) throws {
+                            staging: UnsafeMutableRawPointer) throws {
         func place(_ name: String, _ shape: [Int]) -> UnsafeMutableRawPointer {
             guard let p = placed[name] else { preconditionFailure("no place for \(name)") }
             precondition(p.shape == shape, "\(name): \(shape) into a place of \(p.shape)")
@@ -94,22 +119,24 @@ public enum Weights {
             switch e.recipe {
             case .codes, .product:
                 let (parts, total, inn, int8) = try product(e, in: file)
-                let lies = !int8 || layout == .outIn
-                let to = place(e.name, lies ? [total, inn] : [inn, total])
+                let (count, piece) = pieces(inn)
+                let to = place(e.name, int8 ? [count, total, piece] : [total, inn])
                 var column = 0
                 for (key, t) in parts {
                     let out = t.shape[0], size = int8 ? 1 : 2
-                    if lies {
+                    if !int8 || count == 1 {
                         // The file's rows as they lie, each part's after the one before.
                         try file.read(t, into: to + column * inn * size)
                     } else {
+                        // Each row cut in its pieces, piece i of every row after piece i − 1's: copies, on every core.
                         try file.read(t, into: staging)
-                        // On every core, by NEON tiles where the shapes are multiples of 16 (`transposedTiles`, the
-                        // encoder's: 3.53 GB in 0.19 s, the same to the bit as the byte loop): 6 GB of codes took ~10 s
-                        // on one core at 0.7 GB/s.
-                        let from = UnsafePointer(staging.assumingMemoryBound(to: Int8.self)), codes = to.assumingMemoryBound(to: Int8.self) + column
-                        if out % 16 == 0 && inn % 16 == 0 { transposedTiles(from, out, inn, into: codes, rowLength: total) }
-                        else { transposedRows(from, out, inn, into: codes, rowLength: total) }
+                        nonisolated(unsafe) let (from, codes) = (UnsafeRawPointer(staging), to)
+                        let rows = column
+                        DispatchQueue.concurrentPerform(iterations: count) { i in
+                            for o in 0..<out {
+                                (codes + (i * total + rows + o) * piece).copyMemory(from: from + o * inn + i * piece, byteCount: piece)
+                            }
+                        }
                     }
                     if int8 {
                         let s = try scales(key, in: file, out: out)
@@ -151,7 +178,7 @@ public enum Weights {
                         return target16(weights: UnsafePointer(arena.pointer(w.offset).assumingMemoryBound(to: Float16.self)), count: w.shape.reduce(1, *), k: w.shape[0])
                     }
                     let s = UnsafePointer(arena.pointer(scales.offset).assumingMemoryBound(to: Float16.self))
-                    return target16(scales: s, count: scales.shape.reduce(1, *), k: w.shape[layout == .inOut ? 0 : 1])
+                    return target16(scales: s, count: scales.shape.reduce(1, *), k: w.shape[0] * w.shape[2])
                 }.min()!
                 place(e.name, [1, 1, 1]).assumingMemoryBound(to: Float16.self).pointee = Float16(e0)
             case .bfloatTransposed:

@@ -98,6 +98,9 @@ extension Block {
         precondition(!shared || neural <= p.shareable!.count, "\(pass): the ANE's \(neural) rows past its \(p.shareable!.count) shareable")
         let tiles = shared ? (0..<units).map { Tile(start: p.rows.lowerBound + $0 * ane, rows: ane) } : []
         let run = Self.steps(of: form, until: until)
+        let copying = shared && !copies.isEmpty
+        let reads = copying ? stretches(g, p, run, until: until) : []
+        var copied = copying ? prepare(weights, reads[0]) : nil, stretch = 0
         var written = Set<String>()
         // The ANE's calls, made before the pass, for the steps it runs: a step's views name the tensors it writes, whose
         // two buffers turn once the pass is over (`current`). A call beside the GPU's reads nothing of the loop's state.
@@ -126,11 +129,12 @@ extension Block {
                     let gpu = afterGPU ? last : nil
                     for u in tiles.indices {
                         let previous = launched.last?.task, c = calls[u][s.name]!
-                        let function = c.function
+                        let function = c.function, ready = copied
                         nonisolated(unsafe) let io = c.io
                         let task = Task { () async throws -> Double in
                             _ = try await previous?.value
                             _ = await gpu?.value
+                            _ = await ready?.value
                             let t = DispatchTime.now().uptimeNanoseconds
                             try await Run.neural(function, inputs: io.inputs, outputs: io.outputs)
                             return Functions.seconds(since: t)
@@ -138,7 +142,10 @@ extension Block {
                         launched.append((s.name, i, task))
                     }
                 } else if s.unit == .gpu {
+                    let idle = !launched.isEmpty
                     try await drain()
+                    // The ANE has nothing in flight until the GPU's steps are done: the codes of its next stretch copied now.
+                    if copying && idle { copied = copy(after: stretch, weights, reads); stretch += 1 }
                 }
                 for t in Self.calls(form, s, p, neural: neural, cut: cut, limit: p.limit ?? declaration.rows) {
                     let f = Self.gpu(g.form, s.name, t.rows, tapped: tapped && s.taps)
@@ -178,5 +185,97 @@ extension Block {
     func signal() async {
         await settled()
         stage.signal()
+    }
+
+    // MARK: - The ANE's copies of the codes
+
+    /// The name of the ANE's copy of the codes `w` (`places`).
+    static func copy(_ w: String) -> String { "ane.\(w)" }
+
+    /// **The ANE's copy of the codes, one each, written while the ANE is idle**: the ANE reads codes `[in, out]` only
+    /// (`[out, in]` transposed at every call, a fixed cost, 0.54 to 0.87 × the rate on the M1 Pro), the GPU's int8 × int8
+    /// `[out, in]` only; the codes lie the GPU's way, by pieces `[p, out, in / p]`, and the CPU writes the codes a stretch
+    /// of the ANE's steps reads `[1, in, out]` into their copy (`Weights.transposedPieces`, on every core: a block of 434 MB
+    /// of codes, the widest of today's, ≈ 7 ms on the M5 Pro, 10 to 35 ms on the M1 Pro). A stretch's codes are written at
+    /// the GPU step before it, every ANE call before it done (the heads and the attention of every shared form today, the
+    /// GPU alone); the first stretch's at the last such step of the turn before, its copies read already. Two copies a
+    /// code, one read while the other was written, cost the ANE 30 %: on the M1 Pro, a block of 28 groups by 4096 rows, its
+    /// 2560 rows 11.3 to 12.8 s a step whether the other copy was written beside its calls or beside the attention, 9.0
+    /// to 9.3 with one copy written before its calls, the GPU beside 10.6 every time (22/11/2026).
+    ///
+    /// This run's first stretch: its codes copied ahead, or copied now; a task done once they are.
+    private func prepare(_ held: Stage.Held, _ first: Set<String>) -> Task<Void, Never> {
+        let made = ahead?.turn == held.turn ? ahead!.names : []
+        ahead = nil
+        enqueue(held.weights, first.subtracting(made))
+        return marker()
+    }
+
+    /// **Past stretch `k`, the ANE idle**: stretch k + 1's codes copied, a task done once they are; past the last but one,
+    /// the next turn's first stretch's behind them, read already by this run's first (`Stage.upcoming`, `Ring.peek`: a
+    /// slot of the ring is not read again before its turn is released).
+    private func copy(after k: Int, _ held: Stage.Held, _ reads: [Set<String>]) -> Task<Void, Never> {
+        precondition(k + 1 < reads.count, "the ANE idle past its \(reads.count) stretches")
+        enqueue(held.weights, reads[k + 1])
+        let done = marker()
+        guard k + 2 == reads.count else { return done }
+        let next = held.turn + 1
+        let names = reads[0].subtracting(reads.dropFirst().reduce(into: Set()) { $0.formUnion($1) })
+        guard !names.isEmpty else { return done }
+        ahead = (next, names)
+        nonisolated(unsafe) let stage = self.stage
+        let shared = Set(groups.values.filter { forms[$0.form]!.shared }.map(\.name))
+        copier.async { [weak self] in
+            guard let self, let up = stage.upcoming(next), shared.contains(up.group) else { return }
+            self.write(up.weights, names)
+        }
+        return done
+    }
+
+    /// **The codes each stretch of a run's ANE steps reads**: a stretch ends at a GPU step past an ANE step, where the
+    /// run waits for the ANE's calls (`drain`).
+    private func stretches(_ g: Group, _ p: Pass, _ run: [(offset: Int, element: Step)], until: String?) -> [Set<String>] {
+        let key = "\(g.form) \(p.name) \(until ?? "")"
+        if let s = stretches[key] { return s }
+        var all: [Set<String>] = [[]], ane = false
+        for (_, s) in run {
+            guard s.unit == .either else {
+                if ane { all.append([]); ane = false }
+                continue
+            }
+            ane = true
+            let sig = signatures[Self.neural(g.form, s.name, unit)]!, outputs = Set(sig.outputs.map(\.0))
+            for (n, _, _) in sig.inputs {
+                if case .weight(let w) = resolver.resolve(n, input: true, shadowed: outputs.contains(n), group: g, pass: p, step: s, call: [:]),
+                   copies.contains(w) { all[all.count - 1].insert(w) }
+            }
+        }
+        stretches[key] = all
+        return all
+    }
+
+    /// A task done once every copy put on the copier so far is.
+    private func marker() -> Task<Void, Never> {
+        let m = DispatchWorkItem {}
+        copier.async(execute: m)
+        return Task { await withCheckedContinuation { c in m.notify(queue: .global(qos: .userInitiated)) { c.resume() } } }
+    }
+
+    /// The copy of `names` of `weights`, on the copier.
+    private func enqueue(_ weights: [String: Placed], _ names: Set<String>) {
+        guard !names.isEmpty else { return }
+        nonisolated(unsafe) let w = weights
+        copier.async { [weak self] in self?.write(w, names) }
+    }
+
+    /// Each code of `names`, `[p, out, in / p]`, written `[1, in, out]` into its copy.
+    private func write(_ weights: [String: Placed], _ names: Set<String>) {
+        for name in names.sorted() {
+            guard let p = weights[name] ?? stage.residents[name] else { preconditionFailure("\(name): no codes to copy") }
+            precondition(p.type == .int8 && p.shape.count == 3, "\(name): \(p.shape) \(p.type), not codes by pieces")
+            let from = UnsafePointer(stage.arena.pointer(p.offset).assumingMemoryBound(to: Int8.self))
+            Weights.transposedPieces(from, count: p.shape[0], out: p.shape[1], piece: p.shape[2],
+                                     into: stage.pointer(Self.copy(name)).assumingMemoryBound(to: Int8.self))
+        }
     }
 }

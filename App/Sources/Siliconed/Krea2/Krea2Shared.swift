@@ -3,8 +3,8 @@ import SiliCore
 
 /// **A Krea 2 block as the GPU and the ANE share it** (Z-Image's design, `ZImageShared`): the Compact's block cut where
 /// the ANE can take it, written in the forms both units run (`Neural.swift`: f16 at every border and inside, `[1, rows,
-/// n]`, products on the codes q64 on `[in, out]`, or int8 × int8 on `[out, in]` where this Mac's GPU runs it faster
-/// (`SharedWeights.integer`), norms by their peak, every factor a power of two `[1, rows, 1]` in f16); what reads across
+/// n]`, products on the codes int8 × int8 on the GPU, q64 on the ANE's copy of them (`SharedWeights`), norms
+/// by their peak, every factor a power of two `[1, rows, 1]` in f16); what reads across
 /// rows or computes in f32 is the GPU's:
 ///
 ///     modulation   GPU    temb_mod + mod.lin: (1 + prescale), preshift, pregate, (1 + postscale), postshift, postgate,
@@ -39,11 +39,11 @@ enum Krea2Shared {
                                                                 ("w13_target", ["mgate", "up"]), ("w2_target", ["down"])]
 
     /// The arguments of `function` over `rows`, `keys` the attention's.
-    static func arguments(_ function: String, rows: Int, keys: Int, weights: SharedWeights, ranks: [String: Int] = [:]) -> [Argument] {
+    static func arguments(_ function: String, rows: Int, keys: Int, weights: SharedWeights, ranks: [String: Int] = [:], neural: Bool = false) -> [Argument] {
         let row = [1, 1, d], one = [1, 1, 1]
         let x: [Argument] = [("x", [1, rows, d], .f16), ("x_factor", [1, rows, 1], .f16)]
         func product(_ name: String, _ inn: Int, _ out: Int) -> [Argument] {
-            weights.arguments(name, inn: inn, out: out)
+            weights.arguments(name, inn: inn, out: out, neural: neural)
                 + (ranks[name].map { [(name + "_down", [inn, $0], .f16), (name + "_up", [$0, out], .f16)] } ?? [])
         }
         switch function {
@@ -77,18 +77,18 @@ enum Krea2Shared {
 
     /// `function` written op by op; `out-taps` and `ffn-taps` (the GPU's, for a check's block 0) also give the attention's
     /// and the feed-forward's true values, `attention` and `feed` `[1, rows, d]` f16.
-    /// `neural`: the ANE's function of a step both units take (`Block.Build.neural`): on `integer` codes, its products
-    /// q64 where the GPU's multiply int8 × int8 (`Aicode.Module.product`).
+    /// `neural`: the ANE's function of a step both units take (`Block.Build.neural`): its products q64 on the ANE's copy
+    /// of the codes, the GPU's int8 × int8 (`Aicode.Module.product`).
     static func module(_ function: String, rows: Int, keys: Int, weights: SharedWeights, ranks: [String: Int] = [:],
                        neural: Bool = false) -> Aicode.Module {
-        var m = Aicode.Module(arguments: arguments(function, rows: rows, keys: keys, weights: weights, ranks: ranks).map { ($0.name, Aicode.tensor($0.shape, $0.element)) })
+        var m = Aicode.Module(arguments: arguments(function, rows: rows, keys: keys, weights: weights, ranks: ranks, neural: neural).map { ($0.name, Aicode.tensor($0.shape, $0.element)) })
         let b = m.body
         let names = m.argumentNames
         func a(_ name: String) -> Int { names.firstIndex(of: name)! }
         var constants = Aicode.ScalingConstants()
         /// The product of `name` on x (rotated, under F), its LoRA beside on `plain`, x before the rotation under F.
         func product(_ x: Int, _ name: String, plain: Int) -> Int {
-            m.product(x, name, input: plain, adapted: (ranks[name] ?? 0) > 0, weights: weights, neural: neural, constants: &constants)
+            m.product(x, name, input: plain, adapted: (ranks[name] ?? 0) > 0, neural: neural, constants: &constants)
         }
         func rotation(_ t: Int) -> Int { b.rotation(t, of: weights) }
         func clamped(_ x: Int, _ c: Double) -> Int { b.scale("minimum", b.scale("maximum", x, -c), c) }

@@ -13,8 +13,7 @@ import SiliCore
 ///     standard   the block's three functions (`ZImageBlock`): modulation, pre, post
 ///     shared     the shared forms (`ZImageShared`) on the GPU: modulation, pre, out, ffn; and pre, out, ffn on the ANE,
 ///                each with its products adapted together, against the GPU's — on the weights a render takes
-///                (`Arithmetic.told`): the Compact's codes, int8 × int8 where this Mac's GPU is offered them first or
-///                `--products int8` says, the Standard's in f16 under `--neural-engine on`
+///                (`Arithmetic.of`): the Compact's codes, the Standard's in f16 under `--neural-engine on`
 ///
 /// Without a LoRA: each function with every factor zero gives the bits of the function of no factor.
 package enum ZImageLowRankCheck {
@@ -52,7 +51,7 @@ package enum ZImageLowRankCheck {
     static let shapes = Dictionary(uniqueKeysWithValues: ZImageDiT.products("layers.0").map { ($0.name, (inn: $0.inn, out: $0.out)) })
 
     /// **The check on the map at `path`**: its arithmetic's block functions (the Standard's, or the shared forms on the
-    /// weights a render takes, `Arithmetic.told`). `x`: the oracle's stream `[rows ≥ 512, d]`, `adaln` its `[256]`.
+    /// weights a render takes, `Arithmetic.of`). `x`: the oracle's stream `[rows ≥ 512, d]`, `adaln` its `[256]`.
     package static func run(map path: String, x: [Float], adaln: [Float]) throws -> (described: String, results: [Result]) {
         try blocking { try await check(path, x, adaln) }
     }
@@ -60,8 +59,7 @@ package enum ZImageLowRankCheck {
     private static func check(_ path: String, _ x: [Float], _ adaln: [Float]) async throws -> (described: String, results: [Result]) {
         guard let device = MTLCreateSystemDefaultDevice() else { throw Failure("no Metal device") }
         let file = try ZImageDiT.file(path)
-        let arithmetic = try await Arithmetic.told(codes: Arithmetic.codes(file, marker: ZImageDiT.codesMarker),
-                                                   neuralEngine: CoreAI.neuralEngineInForce, device)
+        let arithmetic = Arithmetic.of(codes: Arithmetic.codes(file, marker: ZImageDiT.codesMarker), neuralEngine: CoreAI.neuralEngineInForce)
         precondition(x.count >= rows * d && adaln.count == ZImageBlock.adalnDim, "x of \(x.count) values, adaln of \(adaln.count)")
         // The seeded factors, made before any stage: what the stages' floor counts.
         let largest = shapes.values.map { max($0.inn, $0.out) }.max()!
@@ -173,7 +171,6 @@ package enum ZImageLowRankCheck {
             }
             n.tensors = t
             n.residents = ZImageFunctions.entries("layers.0", form: form, weights: weights)
-            n.sharedWeights = form == .shared ? weights : nil
             for c in calls {
                 let (f, ranks, taps, form, weights, rows, ane) = (c.f, c.ranks, c.taps, form, weights, ZImageLowRankCheck.rows, c.ane)
                 n.edges[name(f, ranks: ranks, taps: taps, ane: c.ane)] = { b in
@@ -182,7 +179,7 @@ package enum ZImageLowRankCheck {
                             : ZImageShared.module(f, rows: rows, keys: rows, weights: weights, ranks: ranks, taps: taps, neural: ane)
                     }
                     let r = f == "modulation" ? 1 : rows
-                    return ZImageBlock.module(f, rows: r, keys: r, form: form, codes: b.codes, ranks: ranks, taps: taps)
+                    return ZImageBlock.module(f, rows: r, keys: r, form: form, ranks: ranks, taps: taps)
                 }
                 if c.ane { n.neuralEdges.insert(name(f, ranks: ranks, taps: taps, ane: true)) }
             }
@@ -228,7 +225,7 @@ package enum ZImageLowRankCheck {
             let block = try await Block.open(device, declaration(), files: [file], budget: MemoryBudget.machineCeiling(), share: .gpu)
             defer { block.close() }
             let stage = block.stage
-            described = "\(form)" + (form == .bf16 ? "" : ", \(weights), codes \(stage.plan.codes.rawValue)") + ", " + stage.plan.line
+            described = "\(form)" + (form == .bf16 ? "" : ", \(weights)") + ", " + stage.plan.line
             try write(stage)
             func all(_ f: String) -> [String: Int] { Dictionary(uniqueKeysWithValues: Self.adapted(f, form).map { ($0, rank) }) }
             var results: [Result] = []

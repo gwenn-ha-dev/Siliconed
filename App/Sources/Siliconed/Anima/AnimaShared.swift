@@ -4,8 +4,8 @@ import SiliCore
 
 /// **An Anima block as the GPU and the ANE share it** (MOSS's `MossShared`, Qwen-Image-2.1's `QwenImage21Shared`, the
 /// engine's forms in `Neural.swift`): f16 at every border and inside, `[1, rows, n]`, products on the Compact's codes
-/// (Bedovyy's `convrot`: the input rotated by groups of 256) q64 on `[in, out]`, or int8 × int8 on `[out, in]` where this
-/// Mac's GPU runs it faster (`SharedWeights.integer`), norms by their peak, the guard's powers of two in f16; what reads
+/// (Bedovyy's `convrot`: the input rotated by groups of 256) int8 × int8 on the GPU, q64 on the ANE's copy of them
+/// (`SharedWeights`), norms by their peak, the guard's powers of two in f16; what reads
 /// across rows, or computes in f32, is the GPU's:
 ///
 ///     pre        both   n = LN(x̂ · X) · (1 + s₁) + t₁, rotated under 2^e₀ by F: q̂, k̂, v̂ = q64, and F
@@ -43,12 +43,12 @@ enum AnimaShared {
     static let gains = ["shift1", "scale1", "gate1", "shift2", "scale2", "gate2", "shift3", "scale3", "gate3"]
     static let gateFactors = ["gate1_factor", "gate2_factor", "gate3_factor"]
 
-    static func arguments(_ f: String, rows: Int, keys: Int, context: Int, weights: SharedWeights, ranks: [String: Int]) -> [Argument] {
+    static func arguments(_ f: String, rows: Int, keys: Int, context: Int, weights: SharedWeights, ranks: [String: Int], neural: Bool = false) -> [Argument] {
         let row = [1, 1, d], one = [1, 1, 1]
         let stream: [Argument] = [("x", [1, rows, d], .f16), ("x_factor", [1, rows, 1], .f16)]
         func weight(_ name: String) -> [Argument] {
             let (inn, out) = AnimaFunction.dims(name)
-            return weights.arguments(name, inn: inn, out: out)
+            return weights.arguments(name, inn: inn, out: out, neural: neural)
         }
         func gains(_ names: String...) -> [Argument] { names.map { ($0, $0.hasSuffix("_factor") || $0.hasSuffix("_target") ? one : row, .f16) } }
         let own: [Argument]
@@ -76,12 +76,12 @@ enum AnimaShared {
         }
     }
 
-    /// `neural`: the ANE's function of a step both units take: on `integer` codes, its products q64 where the GPU's
-    /// multiply int8 × int8 (`Aicode.Module.product`).
+    /// `neural`: the ANE's function of a step both units take: its products q64 on the ANE's copy of the codes, the
+    /// GPU's int8 × int8 (`Aicode.Module.product`).
     static func module(_ function: String, rows: Int, keys: Int, context: Int, weights: SharedWeights, ranks: [String: Int],
                        neural: Bool = false) -> Aicode.Module {
         let tapping = function.hasSuffix("-taps"), f = tapping ? String(function.dropLast(5)) : function
-        var m = Aicode.Module(arguments: arguments(f, rows: rows, keys: keys, context: context, weights: weights, ranks: ranks).map { ($0.name, Aicode.tensor($0.shape, $0.element)) })
+        var m = Aicode.Module(arguments: arguments(f, rows: rows, keys: keys, context: context, weights: weights, ranks: ranks, neural: neural).map { ($0.name, Aicode.tensor($0.shape, $0.element)) })
         let b = m.body
         let names = m.argumentNames
         func a(_ name: String) -> Int { names.firstIndex(of: name)! }
@@ -89,7 +89,7 @@ enum AnimaShared {
         func f32(_ x: Int) -> Int { b.castUnlessSame(x, to: .f32) }
         func f16(_ x: Int) -> Int { b.castUnlessSame(x, to: .f16) }
         func product(_ x: Int, _ name: String, input: Int) -> Int {
-            m.product(x, name, input: input, adapted: (ranks[name] ?? 0) > 0, weights: weights, neural: neural, constants: &constants)
+            m.product(x, name, input: input, adapted: (ranks[name] ?? 0) > 0, neural: neural, constants: &constants)
         }
         func rotated(_ t: Int, for target: String) -> (unit: Int, factor: Int, input: Int) { b.rotated16(t, target: a(target), of: weights) }
         /// LN(x̂ · X) · (1 + s) + t, the LN without affine (ε = 10⁻⁶).

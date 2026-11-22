@@ -84,7 +84,6 @@ public final class Block: @unchecked Sendable {
     /// The pace key now: none while the unit is under trial — a cycle at another unit is no pace of the unit kept —, else
     /// the key at the unit the block runs at.
     var pace: String { paceBase.isEmpty || trial != nil ? "" : paceBase + (paceByUnit ? Self.byUnit(unit) : "") }
-    let codes: CodesLayout
     var functions: [String: InferenceFunction]
     var signatures: [String: Signature]
     let groups: [String: Group]
@@ -92,6 +91,13 @@ public final class Block: @unchecked Sendable {
     let resolver: Resolver
     var current: [String: Int] = [:]
     var held: (group: Group, weights: Stage.Held)?
+    /// **The ANE's copies of the codes** (`copy`): the codes its functions read, by name, one copy each; the turn of the
+    /// loop whose first codes are copied or under way, and which; what each run reads in each of its stretches of the
+    /// ANE (`stretches`, by form, pass and last step); the serial queue that makes them.
+    let copies: Set<String>
+    var ahead: (turn: Int, names: Set<String>)?
+    var stretches: [String: [Set<String>]] = [:]
+    let copier = DispatchQueue(label: "block.copies", qos: .userInitiated)
     /// The last call of each function on the stream, and the last of all: each a task done when it is.
     var marks: [String: Task<UInt64, Never>] = [:], last: Task<UInt64, Never>?
     var cycleRecords: [[Timed]] = []
@@ -187,9 +193,9 @@ public final class Block: @unchecked Sendable {
         return all
     }
 
-    /// The module of a GPU call's function on codes laid as `codes`.
-    static func module(_ spec: Spec, codes: CodesLayout) throws -> Aicode.Module {
-        try spec.form.module(spec.step, Build(rows: spec.rows, codes: codes, tapped: spec.tapped))
+    /// The module of a GPU call's function.
+    static func module(_ spec: Spec) throws -> Aicode.Module {
+        try spec.form.module(spec.step, Build(rows: spec.rows, tapped: spec.tapped))
     }
 
     /// The names of per-row tensor `r`'s buffers: its own, or a stream's two.
@@ -203,41 +209,49 @@ public final class Block: @unchecked Sendable {
     static func extent(_ functions: [String: Stage.Function], inFlight: Int) throws -> Stage.Extent {
         var lines = Set<String>(), elements: [String: Int] = [:]
         for (name, f) in functions {
-            var ops: [String] = [], results = 0, largest = 0
-            func walk(_ b: Aicode.Block) {
-                for op in b.ops {
-                    ops.append(op.name)
-                    for t in op.results where t.kind == 2 {
-                        // A tensor type: its rank, its sizes, its element (`Aicode.tensor`); read here as it lies, since
-                        // a composite's types may carry sizes unknown (`Aicode.dynamic`) and elements `shape` refuses.
-                        let rank = if case .int(let r) = t.fields[0] { Int(r) } else { 0 }
-                        let sizes = t.fields.dropFirst().prefix(rank).map { if case .signed(let d) = $0 { Int(d) } else { -1 } }
-                        if case .type(let e)? = t.fields.dropFirst(rank + 1).first { ops.append("\(e.kind)") }
-                        guard sizes.allSatisfy({ $0 >= 0 }) else { continue }
-                        let n = sizes.reduce(1, *)
-                        (results, largest) = (results + n, max(largest, n))
-                    }
-                    if let inner = op.body { walk(inner) }
-                }
-            }
-            walk(try f.build().body)
+            let walked = walk(try f.build().body)
             let base = unsized(name)
-            lines.insert("\(base) \(f.unit == .neuralEngine ? "ane" : "gpu") \(digest(Data(ops.joined(separator: " ").utf8)))")
-            elements["\(base) results", default: 0] += results
-            elements["\(base) largest", default: 0] += largest
+            lines.insert("\(base) \(f.unit == .neuralEngine ? "ane" : "gpu") \(walked.ops)")
+            elements["\(base) results", default: 0] += walked.results
+            elements["\(base) largest", default: 0] += walked.largest
         }
         return Stage.Extent(Array(lines), inFlight: inFlight, elements: elements)
+    }
+
+    /// **What a function computes apart from its shapes**: the digest of its ops and of their results' elements, in
+    /// order, composites' insides included — what a kin names (`Stage.Extent`), so that a function written otherwise
+    /// under the same name is another kin, whatever engine wrote it —; and its results' elements, summed and the largest.
+    static func walk(_ body: Aicode.Block) -> (ops: String, results: Int, largest: Int) {
+        var ops: [String] = [], results = 0, largest = 0
+        func visit(_ b: Aicode.Block) {
+            for op in b.ops {
+                ops.append(op.name)
+                for t in op.results where t.kind == 2 {
+                    // A tensor type: its rank, its sizes, its element (`Aicode.tensor`); read here as it lies, since
+                    // a composite's types may carry sizes unknown (`Aicode.dynamic`) and elements `shape` refuses.
+                    let rank = if case .int(let r) = t.fields[0] { Int(r) } else { 0 }
+                    let sizes = t.fields.dropFirst().prefix(rank).map { if case .signed(let d) = $0 { Int(d) } else { -1 } }
+                    if case .type(let e)? = t.fields.dropFirst(rank + 1).first { ops.append("\(e.kind)") }
+                    guard sizes.allSatisfy({ $0 >= 0 }) else { continue }
+                    let n = sizes.reduce(1, *)
+                    (results, largest) = (results + n, max(largest, n))
+                }
+                if let inner = op.body { visit(inner) }
+            }
+        }
+        visit(body)
+        return (digest(Data(ops.joined(separator: " ").utf8)), results, largest)
     }
 
     /// A hash's first 8 bytes in hexadecimal: what a key on this Mac names (`paceKey`, `key`).
     static func digest(_ bytes: Data) -> String { Data(SHA256.hash(data: bytes)).prefix(8).map { String(format: "%02x", $0) }.joined() }
 
     init(_ d: Declaration, stage: Stage, heights: [Height], height: Int, unit: Int, total: Int, units: Int, share: Share, key: String,
-                 pace: (base: String, byUnit: Bool), trial: UnitTrial?, shareable: Int, neuralRows: Set<String>, codes: CodesLayout, named: Double,
+                 pace: (base: String, byUnit: Bool), trial: UnitTrial?, shareable: Int, neuralRows: Set<String>, copies: Set<String>, named: Double,
                  signatures: [String: Signature], forms: [String: Form], groups: [String: Group], resolver: Resolver) {
         (declaration, self.stage, self.heights, self.height, self.unit, self.total, self.units, self.share) = (d, stage, heights, height, unit, total, units, share)
         (self.key, self.paceBase, self.paceByUnit, self.trial, self.shareable, self.home, self.neuralRows) = (key, pace.base, pace.byUnit, trial, shareable, unit, neuralRows)
-        (self.codes, self.named, self.signatures, self.forms, self.groups, self.resolver) = (codes, named, signatures, forms, groups, resolver)
+        (self.copies, self.named, self.signatures, self.forms, self.groups, self.resolver) = (copies, named, signatures, forms, groups, resolver)
         functions = stage.functions
         passes = Dictionary(uniqueKeysWithValues: d.passes.map { ($0.name, $0) })
         perRow = resolver.perRow

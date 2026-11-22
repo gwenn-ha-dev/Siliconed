@@ -189,8 +189,8 @@ package enum QwenImage21Render {
     /// **The DiT**, opened once for a batch (`QwenImage21Loop`): its functions loaded, its weights kept under B or read
     /// through a ring, then the prefix — the text, an edit's reference tokens — computed once, each layer's keys and
     /// values kept. Each step then runs the target alone over them. The path is the file's: bf16 weights on the bf16
-    /// path, int8 codes in the shared forms under the guard of f16 (W8A16, or int8 × int8 where this Mac's GPU runs it
-    /// faster). A request's LoRAs beside the products they adapt.
+    /// path, int8 codes in the shared forms under the guard of f16 (int8 × int8 on the GPU, q64 on
+    /// the ANE's copy of the codes). A request's LoRAs beside the products they adapt.
     package final class Denoiser {
         let loop: QwenImage21Loop
 

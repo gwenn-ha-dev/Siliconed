@@ -19,7 +19,7 @@ import Siliconed
 //
 // The oracle writes the fp32 goldens; `--bf16` writes the witness, teacher-forced on them.
 //
-// `--variant compact` is the Compact's encoder (its int8 codes, W8A16) on the `system` case: the prompt and the decoding
+// `--variant compact` is the Compact's encoder (its int8 codes, W8A8) on the `system` case: the prompt and the decoding
 // are judged as above; the tokens are counted against the oracle's fp32 run on the same weights dequantized and said, not
 // judged — no reference computes the int8 products of this encoder, and a Compact is judged at its DiT.
 

@@ -10,7 +10,7 @@ Sur quoi Siliconed calcule, comment il reste dans son budget de mémoire et comm
 
 **La frontière.** Le moteur connaît des tenseurs, des poids par groupes, des fonctions, des octets et des secondes ; chaque modèle (une *famille*, dans `App/`) déclare ce qu'il lui faut dans ces mots-là et garde les siens. Le moteur ne contient aucun mot du domaine de l'image, et un test échoue s'il en apprend un.
 
-**L'arithmétique est celle de la famille**, écrite dans ses fonctions : codes int8 déquantifiés dans la fonction (W8A16) ou multipliés sur le Neural Engine, poids bf16 arrondis une fois en f16 à leur lecture là où la Standard partage ses rangées avec le Neural Engine, f16 tenu dans sa plage par des facteurs explicites, f32 là où une famille le demande. Le bruit de départ est celui de `torch.randn`, au bit près.
+**L'arithmétique est celle de la famille**, écrite dans ses fonctions : codes int8 multipliés int8 × int8 au GPU (W8A8) et déquantifiés dans la fonction sur le Neural Engine (W8A16, sur une copie des codes disposée comme il les lit), poids bf16 arrondis une fois en f16 à leur lecture là où la Standard partage ses rangées avec le Neural Engine, f16 tenu dans sa plage par des facteurs explicites, f32 là où une famille le demande. Le bruit de départ est celui de `torch.randn`, au bit près.
 
 **La compilation.** Core AI compile une fonction pour ses formes, et la garde. Le premier rendu d'un modèle à une taille neuve, dans une version (Standard ou Compact) pas encore lancée, ou avec un LoRA d'un rang neuf, compile d'abord et le paie une fois : Z-Image en Compact à 1024² sur un M1 Pro de 16 Go prend 93 s la première fois, 76 s ensuite. Chaque rendu suivant, à cette taille, démarre aussitôt.
 

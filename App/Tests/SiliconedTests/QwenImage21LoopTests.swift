@@ -14,7 +14,7 @@ final class QwenImage21LoopTests: XCTestCase {
         XCTAssertEqual(tensors.count, 9 + 32 * 8)
         XCTAssertEqual(tensors["transformer_blocks.31.img_mlp.gate_up.weight"], [24576, 4096])
         XCTAssertEqual(tensors["transformer_blocks.0.img_mlp.out.weight"], [4096, 12288])
-        for path in [F.Path.bfloat, .half, .shared] {
+        for path in [F.Path.bfloat, .shared] {
             let keys = (0..<32).flatMap { F.layer($0, path: path) } + F.others()
             for (name, key, recipe) in keys {
                 if case .target = recipe { continue }
@@ -49,7 +49,7 @@ final class QwenImage21LoopTests: XCTestCase {
     /// passes bound to their own keys, tables and modulation, the ANE's gains tensors in the shared forms only.
     func testTheDeclarationOfEachArithmetic() {
         let g = Loop.Geometry(QwenImage21DiT.Sequence(text: 19, height: 32, width: 32))
-        for (arithmetic, form) in [(Arithmetic.standard, "bfloat"), (.shared(.codes, .gpu), "half"), (.shared(.codes, .inFlight), "shared"),
+        for (arithmetic, form) in [(Arithmetic.standard, "bfloat"), (.shared(.codes, .gpu), "shared"), (.shared(.codes, .inFlight), "shared"),
                                    (.shared(.half, .inFlight), "shared")] {
             let shared = form == "shared"
             let d = Loop.declaration(g, arithmetic)
@@ -78,20 +78,19 @@ final class QwenImage21LoopTests: XCTestCase {
         let g = Loop.Geometry(QwenImage21DiT.Sequence(text: 19, height: 32, width: 32))
         let every = Dictionary(uniqueKeysWithValues: (F.outerLoRA() + F.layerLoRA(0)).map { ($0.name, 32) })
         for ranks in [F.Ranks(), every] {
-            for (arithmetic, codes) in [(Arithmetic.standard, CodesLayout.outIn), (.shared(.codes, .gpu), .outIn), (.shared(.codes, .gpu), .inOut),
-                                        (.shared(.codes, .inFlight), .inOut), (.shared(.half, .inFlight), .inOut)] {
+            for arithmetic in [Arithmetic.standard, .shared(.codes, .gpu), .shared(.codes, .inFlight), .shared(.half, .inFlight)] {
                 let d = Loop.declaration(g, arithmetic, ranks: ranks)
                 let path = Loop.path(arithmetic)
                 for step in d.forms[0].steps {
                     for rows in [64, 1024] {
-                        let m = try d.forms[0].module(step.name, Block.Build(rows: rows, codes: codes))
+                        let m = try d.forms[0].module(step.name, Block.Build(rows: rows))
                         XCTAssertFalse(m.outputs.isEmpty, "\(path) \(step.name)")
-                        XCTAssertEqual(F.arguments(step.name, path: path, weights: arithmetic.weights, codes: codes, rows: rows, prefix: g.prefixKeys, target: g.targetKeys, ranks: ranks).map(\.name),
+                        XCTAssertEqual(F.arguments(step.name, path: path, weights: arithmetic.weights, rows: rows, prefix: g.prefixKeys, target: g.targetKeys, ranks: ranks).map(\.name),
                                        m.argumentNames, "\(path) \(step.name)")
                     }
                 }
                 for (name, build) in d.edges.sorted(by: { $0.key < $1.key }) {
-                    XCTAssertFalse(try build(Block.Build(rows: 0, codes: codes)).outputs.isEmpty, "\(path) \(name)")
+                    XCTAssertFalse(try build(Block.Build(rows: 0)).outputs.isEmpty, "\(path) \(name)")
                 }
                 // The factors: outside the layers by their names, a layer's under its group.
                 let factors = d.tensors.filter { $0.name.hasSuffix("_down") || $0.name.hasSuffix("_up") }

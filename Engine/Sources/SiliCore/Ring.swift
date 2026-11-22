@@ -29,8 +29,9 @@ public final class Ring: @unchecked Sendable {
     private let condition = NSCondition()
     /// The ring's uses read and released; the slots never written yet.
     private var ringUses = 0, released = 0, unwritten: Int
-    private var stopped = false, finished = false, signalled = false
-    /// The loop's uses the ring holds, by their index in the loop's order: the ring use each is, and its group.
+    private var stopped = false, finished = false, signalled = false, peeking = true
+    /// The loop's uses the ring holds, by their index in the loop's order: the ring use each is, and its group — until
+    /// released (a use acquired stays, for `peek`).
     private var resolved: [Int: (use: Int, group: String)] = [:]
     /// The groups kept (from the start, or past the signal), their places; those read, in the order read.
     private var places: [String: [String: Placed]]
@@ -72,7 +73,7 @@ public final class Ring: @unchecked Sendable {
     }
 
     /// The group of the loop's use m, nil past the last.
-    private func group(_ m: Int) -> String? {
+    public func group(_ m: Int) -> String? {
         m < once.count ? once[m] : cycle.isEmpty ? nil : cycle[(m - once.count) % cycle.count]
     }
 
@@ -138,7 +139,7 @@ public final class Ring: @unchecked Sendable {
         condition.lock(); defer { condition.unlock() }
         while true {
             if let failure { throw failure }
-            if let r = resolved.removeValue(forKey: m) {
+            if let r = resolved[m] {
                 precondition(r.group == group, "the loop's use \(m) is \(r.group)'s, not \(group)'s")
                 return (slots[r.use % depth], r.use)
             }
@@ -146,6 +147,27 @@ public final class Ring: @unchecked Sendable {
             precondition(!finished, "\(group): the loop's use \(m), past what the reader read")
             condition.wait()
         }
+    }
+
+    /// **The loop's use m's weights, once read, left for the loop to acquire** (waits for them): the slot the reader read
+    /// it into — not written again before the loop releases use m —, or the group's own place. Nil past the loop's last
+    /// use, or once the ring stops or `stopPeeking` is called: a peek never outlives the arena.
+    public func peek(_ m: Int) -> [String: Placed]? {
+        condition.lock(); defer { condition.unlock() }
+        while true {
+            if failure != nil || stopped || !peeking { return nil }
+            // Acquired and released already: its slot may hold another use's weights.
+            if let r = resolved[m] { return r.use >= released ? slots[r.use % depth] : nil }
+            guard let g = group(m) else { return nil }
+            if read.contains(g) { return places[g]! }
+            if finished { return nil }
+            condition.wait()
+        }
+    }
+
+    /// Every peek under way returns nil, and none waits again.
+    public func stopPeeking() {
+        condition.lock(); peeking = false; condition.broadcast(); condition.unlock()
     }
 
     /// **The signal**: what Core AI holds has been read (`Stage.signal`); from now on the reader may keep. Given, never
@@ -161,7 +183,10 @@ public final class Ring: @unchecked Sendable {
 
     /// Ring use n done: its slot may take the use `depth` after it.
     public func release(_ n: Int) {
-        condition.lock(); released = max(released, n + 1); condition.broadcast(); condition.unlock()
+        condition.lock()
+        released = max(released, n + 1)
+        resolved = resolved.filter { $0.value.use >= released }
+        condition.broadcast(); condition.unlock()
     }
 
     /// The reader stopped, and waited for: a read under way finishes first. Past it, nothing the reader holds (the

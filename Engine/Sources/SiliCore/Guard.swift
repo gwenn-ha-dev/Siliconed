@@ -46,13 +46,13 @@ extension Aicode.Block {
         return (unit, f)
     }
 
-    /// The exponent e₀ the W8A16 products of `codes` (int8 in `layout`, each with its scales along `out`) read their one
-    /// input under: the largest with K · 128 · max s · 2^e₀ ≤ 65 504 for each, K the products' inputs (the codes' first
-    /// axis `[in, out]`, their second `[out, in]`).
-    public func target(codes: [(codes: Int, scale: Int)], layout: CodesLayout = .inOut) -> Int {
+    /// The exponent e₀ the products of `codes` (int8 by pieces `[p, out, in / p]`, each with its scales along `out`) read
+    /// their one input under: the largest with K · 128 · max s · 2^e₀ ≤ 65 504 for each, K the products' inputs — what
+    /// bounds the product's result, and its sums times the input's peak (`w8a8`).
+    public func target(codes: [(codes: Int, scale: Int)]) -> Int {
         minimum(codes.map { q, s in
             let top = castUnlessSame(reduceMax(primitive("abs", s), axes: [0]), to: .f32)
-            let k = Aicode.shape(types[q]).shape[layout == .inOut ? 0 : 1]
+            let shape = Aicode.shape(types[q]).shape, k = shape[0] * shape[2]
             return exponent(scale("mul", top, Double(k * 128)))
         })
     }
@@ -129,21 +129,6 @@ extension Aicode.Block {
                          binary(.mul, delta, cast(binary(.divide, g, c), to: .f16)))
         let (s, f) = ranged(sum, under: stream)
         return (s, binary(.mul, c, f))
-    }
-
-    /// `x · W` with W the codes int8 dequantized in f16 by their scales along `out` (W8A16): the scales follow the output,
-    /// never the contraction. `layout`: how the codes lie (`CodesLayout`, the stage's plan's), `[in, out]` read as they
-    /// lie, `[out, in]` transposed after the dequantize, as `linear` writes it.
-    public func w8a16(_ x: Int, codes: Int, scale s: Int, layout: CodesLayout = .inOut, constants: inout Aicode.ScalingConstants) -> Int {
-        let rows = Aicode.shape(types[x]).shape[0]
-        switch layout {
-        case .inOut:
-            let w = dequantize(codes, scale: s, axis: 1, constants: &constants)
-            return matmul(x, w, result: Aicode.tensor([rows, Aicode.shape(types[w]).shape[1]], .f16))
-        case .outIn:
-            let w = dequantize(codes, scale: s, axis: 0, constants: &constants)
-            return matmul(x, transpose(w, [1, 0]), result: Aicode.tensor([rows, Aicode.shape(types[w]).shape[0]], .f16))
-        }
     }
 
     /// `x · W` with W f16 `[in, out]`.

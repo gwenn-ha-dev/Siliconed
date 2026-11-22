@@ -9,38 +9,52 @@ import Testing
 /// the CPU in f64. Each bar was written before it ran: the f16 path's rounding, ~1e-3 relative, nothing that would
 /// hide a wrong layout or a wrong axis (those give errors of order 1).
 extension Runs {
-    /// W8A16: the file's codes `[out, in]` read by the `codes` recipe in either layout (`[in, out]` transposed as read, or
-    /// as they lie and transposed in the function), dequantized in the function by their scales along `out`, the product
-    /// in f16.
-    @Test(.enabled(if: metalEnabled), arguments: [CodesLayout.inOut, .outIn])
-    func aW8A16ProductIsTheCPUs(_ layout: CodesLayout) async throws {
+    /// **The Compact's product on either unit's codes**: the file's codes `[out, in]` read by the `codes` recipe by pieces
+    /// of k (k = 8192: two pieces of 4096), the GPU's int8 × int8 on them (`w8a8`), the ANE's q64 on their copy `[1, in,
+    /// out]` (`Weights.transposedPieces`), both called on the GPU. The bars, written before the run: each within 2e-3 of
+    /// the CPU's — the exact int8 product by rows for the first, x's own product by the codes (W8A16) for the second;
+    /// a wrong piece, layout or scale gives errors of order 1.
+    @Test(.enabled(if: metalEnabled))
+    func theCompactsProductIsTheCPUsOnEitherUnitsCodes() async throws {
         let bench = try await Bench()
-        let (rows, k, n) = (64, 256, 192)
+        let (rows, k, n) = (64, 8192, 192)
         var rng = Seeded(state: 3)
         let codes = (0..<n * k).map { _ in Int8(Int(rng.next() * 255) - 127) }
         let scales = rng.uniform(n, 0.001...0.01)
-        let file = try SafeTensors(try weightsFile("w8a16.safetensors", [
+        let file = try SafeTensors(try weightsFile("compact.safetensors", [
             ("w.weight", "I8", [n, k], codes.withUnsafeBytes { Array($0) }),
             ("w.weight_scale", "F32", [n, 1], scales.withUnsafeBytes { Array($0) }),
         ]))
         let entries: [Weights.Entry] = [("w", "w", .codes)]
-        let arena = try Arena(bench.device, bytes: try Weights.size(entries, in: file, codes: layout) + Arena.aligned(rows * k * 2) + Arena.aligned(rows * n * 2))
-        let w = try Weights.load(entries, from: file, into: arena, codes: layout)
-        let x = arena.take(rows * k * 2), y = arena.take(rows * n * 2)
+        let (count, piece) = Weights.pieces(k)
+        let arena = try Arena(bench.device, bytes: try Weights.size(entries, in: file) + Arena.aligned(k * n) + Arena.aligned(rows * k * 2) + 2 * Arena.aligned(rows * n * 2))
+        let w = try Weights.load(entries, from: file, into: arena)
+        #expect(w["w"]!.shape == [count, n, piece] && count == 2)
+        let copy = arena.take(k * n), x = arena.take(rows * k * 2), y8 = arena.take(rows * n * 2), y16 = arena.take(rows * n * 2)
+        Weights.transposedPieces(arena.pointer(w["w"]!.offset).assumingMemoryBound(to: Int8.self), count: count, out: n, piece: piece,
+                                 into: arena.pointer(copy).assumingMemoryBound(to: Int8.self))
         let xs = arena.write(rng.uniform(rows * k), at: x)
 
-        var m = Aicode.Module(arguments: [("x", Aicode.tensor([rows, k], .f16)), ("w", Aicode.tensor(layout == .inOut ? [k, n] : [n, k], .si8)), ("w_scale", Aicode.tensor([n], .f16))])
+        var m = Aicode.Module(arguments: [("x", Aicode.tensor([1, rows, k], .f16)), ("w", Aicode.tensor([count, n, piece], .si8)),
+                                          ("c", Aicode.tensor([1, k, n], .si8)), ("w_scale", Aicode.tensor([1, 1, n], .f16))])
         var constants = Aicode.ScalingConstants()
-        m.outputs = [("y", m.body.w8a16(m.argument("x"), codes: m.argument("w"), scale: m.argument("w_scale"), layout: layout, constants: &constants))]
-        let f = try await Functions.load(try Functions.asset(m, "run-w8a16-\(layout.rawValue)"))
-        func view(_ p: Placed) -> View { View(buffer: arena.buffer(p.offset), type: p.type, shape: p.shape) }
-        try await Run.call(f, bench.stream, inputs: ["x": View(buffer: arena.buffer(x), type: .float16, shape: [rows, k]), "w": view(w["w"]!), "w_scale": view(w["w_scale"]!)],
-                           outputs: [("y", View(buffer: arena.buffer(y), type: .float16, shape: [rows, n]))])
+        m.outputs = [("y8", m.body.w8a8(m.argument("x"), codes: m.argument("w"), scale: m.argument("w_scale"), constants: &constants)),
+                     ("y16", m.body.q64(m.argument("x"), codes: m.argument("c"), scale: m.argument("w_scale"), constants: &constants))]
+        let f = try await Functions.load(try Functions.asset(m, "run-compact-\(rows)x\(k)x\(n)"))
+        try await Run.call(f, bench.stream, inputs: ["x": View(buffer: arena.buffer(x), type: .float16, shape: [1, rows, k]),
+                                                     "w": View(buffer: arena.buffer(w["w"]!.offset), type: .int8, shape: [count, n, piece]),
+                                                     "c": View(buffer: arena.buffer(copy), type: .int8, shape: [1, k, n]),
+                                                     "w_scale": View(buffer: arena.buffer(w["w_scale"]!.offset), type: .float16, shape: [1, 1, n])],
+                           outputs: [("y8", View(buffer: arena.buffer(y8), type: .float16, shape: [1, rows, n])),
+                                     ("y16", View(buffer: arena.buffer(y16), type: .float16, shape: [1, rows, n]))])
 
         let s16 = scales.map { Double(Float16($0)) }
-        let want = product(xs, rows: rows, k: k, n: n) { i, o in Double(codes[o * k + i]) * s16[o] }
-        let e = relative(arena.halves(y, rows * n), want)
-        #expect(e < 2e-3, "relative error \(e)")
+        let exact = int8Product(xs, rows: rows, k: k, n: n, scales: s16) { o, i in codes[o * k + i] }
+        let own = product(xs, rows: rows, k: k, n: n) { i, o in Double(codes[o * k + i]) * s16[o] }
+        let (e8, e16) = (relative(arena.halves(y8, rows * n), exact), relative(arena.halves(y16, rows * n), own))
+        print(String(format: "compact %d × %d → %d: int8 × int8 by pieces %.2e, q64 on the copy %.2e", rows, k, n, e8, e16))
+        #expect(e8 < 2e-3, "W8A8 relative error \(e8)")
+        #expect(e16 < 2e-3, "W8A16 relative error \(e16)")
     }
 
     /// The RMS norm with its gain: `x · rsqrt(mean(x²) + eps) · γ`, the statistics in f32, f16 at its borders.

@@ -71,10 +71,10 @@ final class ZImageTransformer {
 
     // MARK: - The functions
 
-    static func module(_ f: String, _ g: Geometry, _ form: ZImageFunctions.Form, _ weights: SharedWeights, _ codes: CodesLayout,
+    static func module(_ f: String, _ g: Geometry, _ form: ZImageFunctions.Form, _ weights: SharedWeights,
                        ranks: [String: Int] = [:]) -> Aicode.Module {
         if f == "modulation" {
-            return form == .shared ? ZImageShared.modulation(weights: weights, ranks: ranks) : ZImageBlock.module(f, rows: 1, keys: 1, form: form, codes: codes, ranks: ranks)
+            return form == .shared ? ZImageShared.modulation(weights: weights, ranks: ranks) : ZImageBlock.module(f, rows: 1, keys: 1, form: form, ranks: ranks)
         }
         // embed-image's rows, the image's; embed-caption's, its palier.
         return ZImageFunctions.module(f, height: g.height, width: g.width, rows: f == "embed-caption" ? g.caption : g.image, form: form, ranks: ranks)
@@ -139,7 +139,6 @@ final class ZImageTransformer {
         n.tensors = (t + gains).map { SiliCore.Stage.Tensor($0.0, bytes: $0.1) } + [SiliCore.Stage.Tensor("velocity", bytes: latent, .apart)]
             + lowRankTensors(ranks, form)
         n.residents = ZImageFunctions.others(form: form)
-        n.sharedWeights = form == .shared ? weights : nil
         let name = "\(form)"
         n.groups = allBlocks.map { Block.Group($0, form: name, weights: ZImageFunctions.entries($0, form: form, weights: weights)) }
         (n.once, n.cycle) = (captionBlocks, cycle)
@@ -158,7 +157,7 @@ final class ZImageTransformer {
             func gains(_ s: String, _ g: String) -> [String: Block.Bind] { ["scale1": .row(s, 0), "gate1": .row(g, 1), "scale2": .row(s, 2), "gate2": .row(g, 3)] }
             n.forms = [Block.Form(name, steps: [.init("pre", on: .gpu), .init("post", on: .gpu, whole: ["k", "v"])],
                                   bind: gains("scales", "gates")) { step, b in
-                ZImageBlock.module(step, rows: b.rows, keys: keys, form: form, codes: b.codes, ranks: ranks)
+                ZImageBlock.module(step, rows: b.rows, keys: keys, form: form, ranks: ranks)
             }]
             ones = gains("ones", "ones")
         }
@@ -166,7 +165,7 @@ final class ZImageTransformer {
                     Block.Pass("caption", rows: g.image..<g.sequence, bind: ones.merging(["mask": .tensor("mask-caption")]) { a, _ in a }),
                     Block.Pass("sequence", rows: 0..<g.sequence, shareable: 0..<g.image, bind: ["mask": .tensor("mask-sequence")])]
         for f in ["timestep", "embed-image", "embed-caption", "modulation", "final"] {
-            n.edges[f] = { b in module(f, g, form, weights, b.codes, ranks: ranks) }
+            n.edges[f] = { b in module(f, g, form, weights, ranks: ranks) }
         }
         return n
     }

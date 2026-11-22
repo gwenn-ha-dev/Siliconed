@@ -56,14 +56,8 @@ extension Stage {
         public var once: [String] = []
         public var cycle: [String] = []
         public var functions: [String: Function] = [:]
-        /// The weights (residents, kept, slots) as surfaces, for the ANE, laid as `codes` says (the ANE reads `[out, in]`
-        /// codes transposed in its function as well, 21/11/2026: `SharedWeights.integer`).
+        /// The weights (residents, kept, slots) as surfaces, for the ANE.
         public var surfaces = false
-        /// The layout the functions are written for, of the products' int8 codes (their bf16 weights lie as the file lays
-        /// them, `[out, in]`): the plan lays the codes so and reads no measure of this Mac (`Block` reads it once, as it
-        /// writes its functions). Read twice, a measure kept between the two reads handed the functions weights laid
-        /// otherwise, and a precondition stopped the worker (19/11).
-        public var codes: CodesLayout = .inOut
         /// **The calls of one function its client keeps in flight at once** (`BandStage.inFlight`): each has its own
         /// intermediates in Core AI's share, so a reading taken at one count is not the reading at another (`key`).
         public var inFlight = 1
@@ -82,8 +76,6 @@ extension Stage {
         /// it); the ring's slots (0: no ring).
         public let kept: [String]
         public let depth: Int
-        /// The layout this stage's int8 codes take, and its functions are built for (`Recipe.product`).
-        public let codes: CodesLayout
         /// What the arena asks: the heap (its tensors, its weights, the staging) and what lies apart from it.
         public let heap: Int, apart: Int
         public let floor: Int, budget: Int
@@ -104,6 +96,12 @@ extension Stage {
     /// What P keeps clear under B: the footprint's sampling and Core AI's small allocations.
     public static let margin = 64 << 20
 
+    /// **What the groups kept past the signal leave clear under B, for the rest of the Mac**: a kept group is wired, so a
+    /// stage whose weights pass B kept groups up to B less `margin` and held the footprint there, wired, the whole render;
+    /// macOS then swapped other processes' pages out (a 16 GB M1 Pro, B = 10 GiB, 9.75 GiB: 4 to 283 pages a render,
+    /// 21–22/11/2026). Keeping is optional: the same step there with 2, 10 or 13 of 28 groups kept (22/11/2026).
+    public static let keepClear = 512 << 20
+
     /// **The plan of `d` under `budget`**, its weights in `files`. `floor`: the process's footprint before the stage;
     /// `depth`: the ring's slots. **The socle alone**: a group that rides the ring rides it from the start, and what of the
     /// cycle the stage keeps is decided in flight, once Core AI's share is read (`signal`): no share is known before the
@@ -111,11 +109,10 @@ extension Stage {
     /// how much it passes B. A client with several forms plans each and chooses among those that hold (`choose`).
     public static func plan(_ d: Declaration, files: [SafeTensors], budget: Int, floor: Int, depth: Int = 2) throws -> Plan {
         precondition(depth >= 1, "a ring of a slot at least")
-        let codes = d.codes
-        let sizes = try Sizes(d, files: files, codes: codes)
+        let sizes = try Sizes(d, files: files)
         func plan(_ kept: [String], _ depth: Int) -> Plan {
             let (heap, apart) = sizes.arena(kept: kept, depth: depth)
-            return Plan(declaration: d, kept: kept, depth: depth, codes: codes, heap: heap, apart: apart,
+            return Plan(declaration: d, kept: kept, depth: depth, heap: heap, apart: apart,
                         floor: floor, budget: budget, sizes: sizes)
         }
         let order = sizes.order
@@ -143,21 +140,21 @@ extension Stage {
         let order: [String]
         private let riding: Set<String>
 
-        init(_ d: Declaration, files: [SafeTensors], codes: CodesLayout) throws {
+        init(_ d: Declaration, files: [SafeTensors]) throws {
             declaration = d
             heapTensors = d.tensors.filter { $0.place == .heap }.reduce(0) { $0 + $1.size }
             apartTensors = d.tensors.filter { $0.place != .heap }.reduce(0) { $0 + $1.size }
             var staging = 0, residents = 0
             for (file, entries) in try Stage.byFile(d.residents, files) {
-                residents += try Weights.size(entries, in: file, codes: codes)
-                staging = max(staging, try Weights.staging(entries, in: file, codes: codes))
+                residents += try Weights.size(entries, in: file)
+                staging = max(staging, try Weights.staging(entries, in: file))
             }
             var groups: [String: Int] = [:], layouts: [String: [String]] = [:]
             for (g, entries) in d.groups {
                 let file = try Stage.file(of: entries, g, files)
-                groups[g] = try Weights.size(entries, in: file, codes: codes)
-                staging = max(staging, try Weights.staging(entries, in: file, codes: codes))
-                layouts[g] = try Weights.layout(entries, in: file, codes: codes).map { "\($0.name) \($0.shape) \($0.type)" }.sorted()
+                groups[g] = try Weights.size(entries, in: file)
+                staging = max(staging, try Weights.staging(entries, in: file))
+                layouts[g] = try Weights.layout(entries, in: file).map { "\($0.name) \($0.shape) \($0.type)" }.sorted()
             }
             var seen = Set<String>(), order: [String] = []
             for g in d.once + d.cycle where seen.insert(g).inserted {

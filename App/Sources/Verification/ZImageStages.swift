@@ -69,7 +69,7 @@ enum ZImageStages {
 
     static let block = Stage(
         model: model, name: "block",
-        proves: "layer 0 alone, from the oracle's own input, at its 19 inner boundaries: modulation, norms, projections, QK-norm, attention, SwiGLU (with --variant compact, the Compact's int8 codes, on the products a render takes first on this Mac or --products')",
+        proves: "layer 0 alone, from the oracle's own input, at its 19 inner boundaries: modulation, norms, projections, QK-norm, attention, SwiGLU (with --variant compact, the Compact's int8 codes)",
         options: ["--map", "--variant"],
         oracle: "tools/oracle/z-image.py dit --size {size}; block-bf16 --size {size}; with --variant compact, dit and w8a8 with --variant compact at 512", weights: ["DiT"],
         rule: "the rule against diffusers' layer 0 in bf16 on the same input"
@@ -115,7 +115,7 @@ enum ZImageStages {
 
     static let blockLoRA = Stage(
         model: model, name: "block-lora",
-        proves: "each block function's low-rank path (a LoRA beside each product) against the CPU, product by product, on layer 0 over the oracle's stream; with --variant compact, the Compact's shared forms on the products a render takes first on this Mac or --products', the ANE's against the GPU's; under --neural-engine on, the Standard's shared forms in f16 too",
+        proves: "each block function's low-rank path (a LoRA beside each product) against the CPU, product by product, on layer 0 over the oracle's stream; with --variant compact, the Compact's shared forms, the ANE's against the GPU's; under --neural-engine on, the Standard's shared forms in f16 too",
         options: ["--map", "--variant"],
         oracle: "tools/oracle/z-image.py dit --size {size}; with --variant compact, dit --variant compact (the inputs only)", weights: ["DiT"],
         rule: "each change (with its factors less without) against the CPU's x · down · up: ≤ 4 · 2⁻⁸ in bf16, ≤ 4 · 2⁻¹¹ in f16 (the result's and the path's roundings, the change as large as the result); each product's input and each function with every factor zero the same bits as without; on the ANE, the adapted function against the GPU's ≤ 2 × the same without + 2⁻⁹"

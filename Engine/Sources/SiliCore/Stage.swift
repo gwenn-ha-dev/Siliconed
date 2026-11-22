@@ -106,14 +106,14 @@ public final class Stage: @unchecked Sendable {
             at[t.name] = key
             memset(arena.pointer(key), 0, t.size)
         }
-        let codes = plan.codes, surfaces = d.surfaces, sizes = plan.sizes
+        let surfaces = d.surfaces, sizes = plan.sizes
         // The staging: one, the reader's, the residents read through it before the reader starts.
         let staging = sizes.staging
         let stagingKey = staging > 0 ? arena.take(staging) : nil
         self.staging = stagingKey
         for (file, entries) in try Self.byFile(d.residents, files) {
-            let placed = Weights.place(try Weights.layout(entries, in: file, codes: codes), in: arena, surfaces: surfaces)
-            try Weights.read(entries, from: file, into: placed, arena: arena, staging: arena.pointer(stagingKey!), codes: codes)
+            let placed = Weights.place(try Weights.layout(entries, in: file), in: arena, surfaces: surfaces)
+            try Weights.read(entries, from: file, into: placed, arena: arena, staging: arena.pointer(stagingKey!))
             residents.merge(placed) { $1 }
         }
         // The kept groups' places, the ring's slots.
@@ -123,7 +123,7 @@ public final class Stage: @unchecked Sendable {
             groupFile[g] = files.firstIndex { $0 === f }!
         }
         var layouts: [String: [Weights.Slot]] = [:]
-        for (g, entries) in d.groups { layouts[g] = try Weights.layout(entries, in: files[groupFile[g]!], codes: codes) }
+        for (g, entries) in d.groups { layouts[g] = try Weights.layout(entries, in: files[groupFile[g]!]) }
         var bound: [String: [String: Placed]] = [:]
         for g in plan.kept { bound[g] = Weights.place(layouts[g]!, in: arena, surfaces: surfaces) }
         var slots: [[String: Placed]] = []
@@ -142,7 +142,7 @@ public final class Stage: @unchecked Sendable {
             }, keep: { [weak self] g, unwritten in
                 self?.keeps(sizes.groups[g]!, pending: unwritten * slotBytes, allocated: arena.allocated) ?? false
             }, kept: { [fromStart = plan.kept.count] in Stages.tell(.kept(fromStart + $0)) }, fill: { g, place in
-                try Weights.read(groups[g]!, from: uncached[fileOf[g]!], into: place, arena: arena, staging: arena.pointer(stagingKey!), codes: codes)
+                try Weights.read(groups[g]!, from: uncached[fileOf[g]!], into: place, arena: arena, staging: arena.pointer(stagingKey!))
             })
         }
         let floor = plan.floor
@@ -233,11 +233,12 @@ public final class Stage: @unchecked Sendable {
         return arena.pointer(key)
     }
 
-    /// A group's weights while the loop holds them: kept (`use` nil) or a slot of the ring.
+    /// A group's weights while the loop holds them: kept (`use` nil) or a slot of the ring; `turn`, the loop's use.
     public struct Held: @unchecked Sendable {
         public let group: String
         public let weights: [String: Placed]
         public let use: Int?
+        public let turn: Int
     }
 
     /// **The group's weights, once read**: kept, or the ring's next use, which must be the loop's next (the order
@@ -247,8 +248,19 @@ public final class Stage: @unchecked Sendable {
         let m = lock.withLock { () -> Int in defer { use += 1 }; return use }
         read()
         let (weights, n) = try ring.acquire(m, group)
-        return Held(group: group, weights: weights, use: n)
+        return Held(group: group, weights: weights, use: n, turn: m)
     }
+
+    /// **The loop's use `turn`, ahead of its acquisition**: its group and its weights once read (`Ring.peek`), the loop's
+    /// own order untouched — what the CPU prepares for a unit while the group before computes. Nil past the loop, or
+    /// once `stopPeeking`.
+    public func upcoming(_ turn: Int) -> (group: String, weights: [String: Placed])? {
+        guard let ring, let g = ring.group(turn), let w = ring.peek(turn) else { return nil }
+        return (g, w)
+    }
+
+    /// Every `upcoming` under way returns nil, and none waits again: what prepares ahead lets the stage close.
+    public func stopPeeking() { ring?.stopPeeking() }
 
     /// The held group done: its slot may take the ring's next read (a kept group stays).
     public func release(_ held: Held) {

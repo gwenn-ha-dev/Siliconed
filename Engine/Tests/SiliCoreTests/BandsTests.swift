@@ -40,10 +40,10 @@ import Testing
 
     /// **A plan's extent names its calls the same at any size and height** (`Bands.extent`): the planes taller, wider or
     /// in taller bands, the same kin and arguments, their elements those of the calls.
-    @Test func theExtentIsTheSameNetworkAtAnySize() {
-        let small = Self.plan(rows: 100).0.extent("p", inFlight: 2), wide = Self.plan(rows: 200, width: 96).0.extent("p", inFlight: 2)
-        let tall = Self.plan(rows: 100, positions: 1 << 12).0.extent("p", inFlight: 2)
-        #expect(small.kin == wide.kin && small.kin == tall.kin && small.kin != Self.plan(rows: 100).0.extent("q", inFlight: 2).kin)
+    @Test func theExtentIsTheSameNetworkAtAnySize() throws {
+        let small = try Self.plan(rows: 100).0.extent("p", inFlight: 2), wide = try Self.plan(rows: 200, width: 96).0.extent("p", inFlight: 2)
+        let tall = try Self.plan(rows: 100, positions: 1 << 12).0.extent("p", inFlight: 2), other = try Self.plan(rows: 100).0.extent("q", inFlight: 2)
+        #expect(small.kin == wide.kin && small.kin == tall.kin && small.kin != other.kin)
         #expect(Set(small.elements.keys) == ["conv#0 x", "conv#0 y out", "up#0 x", "up#0 y out"])
         // 2¹¹ positions over 64 columns: bands of 32 rows, the window's one row each side.
         #expect(small.elements["conv#0 x"] == 34 * 64 * 8 && small.elements["conv#0 y out"] == 32 * 64 * 8)
