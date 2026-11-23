@@ -4,7 +4,7 @@ import SiliCore
 
 /// **The language model's head on the layers' stage** (`lm_head(norm(x))`): the final norm's gain resident, `lm_head` in
 /// tensors by stretches of rows as the file lays them (`[stretch, width]`, a tensor each), one function over `rows` rows
-/// and a stretch, called once a stretch; the logits in f32, a tensor a stretch, apart (a function's last outputs:
+/// and every stretch, called once (`headModule`); the logits in f32, a tensor a stretch, apart (a function's last outputs:
 /// `Qwen3Encoder.declaration`). Qwen3-VL-8B's head is its own (151 936 × 4096, untied): 1.16 GiB in bf16, read as 16
 /// stretches of 9496 rows.
 final class Qwen3Head {
@@ -33,7 +33,7 @@ final class Qwen3Head {
             d.tensors.append(.init("head_x", bytes: rows * c.width * e))
             if a.half { d.tensors.append(.init("head_xf", bytes: rows * 4)) }
         }
-        d.edges["head"] = { _ in model.headModule(a, rows: rows, stretch: s) }
+        d.edges["head"] = { _ in model.headModule(a, rows: rows, stretch: s, count: n) }
     }
 
     /// The head of `layers`, its stretches read from `file` into their tensors.
@@ -57,9 +57,14 @@ final class Qwen3Head {
         var rows = [UInt8](repeating: 0, count: pieces > 1 ? s * d : 0)
         for k in 0..<count {
             let into = await layers.pointer("head_w\(k)")
-            if pieces == 1 { try file.read(table, at: k * s * d * size, count: s * d * size, into: into); continue }
-            try rows.withUnsafeMutableBytes { try file.read(table, at: k * s * d, count: s * d, into: $0.baseAddress!) }
-            for p in 0..<pieces { for o in 0..<s { rows.withUnsafeBytes { (into + (p * s + o) * piece).copyMemory(from: $0.baseAddress! + o * d + p * piece, byteCount: piece) } } }
+            if pieces == 1 {
+                try file.read(table, at: k * s * d * size, count: s * d * size, into: into)
+            } else {
+                try rows.withUnsafeMutableBytes { try file.read(table, at: k * s * d, count: s * d, into: $0.baseAddress!) }
+                for p in 0..<pieces { for o in 0..<s { rows.withUnsafeBytes { (into + (p * s + o) * piece).copyMemory(from: $0.baseAddress! + o * d + p * piece, byteCount: piece) } } }
+            }
+            // Every stretch's scales, whatever its pieces: left unwritten, the head's products are 0 and every token the
+            // first, « ! » (issue 19, 0.31).
             if a.half { Qwen3Encoder.write(Array(scales[(k * s)..<((k + 1) * s)]), as: .f16, to: await layers.pointer("head_s\(k)")) }
         }
     }
@@ -68,12 +73,15 @@ final class Qwen3Head {
     var input: [String: Block.Bind] { ["x": .tensor("head_x"), "x_factor": .tensor("head_xf")] }
 
     /// **The logits of the head's rows** — read from `values` (the decode's, as Core AI's values) or as `bind` says —
-    /// into their tensors (`logits`). The stretches put on the stream one after the other, one wait.
+    /// into their tensors (`logits<k>`): one call over every stretch, one wait.
     func run(_ layers: Layers, bind: [String: Block.Bind] = [:], values: [String: InferenceFunction.AsyncValue] = [:]) async throws {
+        var stretches: [String: Block.Bind] = [:]
         for k in 0..<count {
-            try layers.chain("head", bind: bind.merging(["w": .tensor("head_w\(k)"), "w_scale": .tensor("head_s\(k)"), "logits": .tensor("logits\(k)")]) { a, _ in a },
-                             values: values)
+            stretches["w\(k)"] = .tensor("head_w\(k)")
+            stretches["logits\(k)"] = .tensor("logits\(k)")
+            if arithmetic.half { stretches["w_scale\(k)"] = .tensor("head_s\(k)") }
         }
+        try layers.chain("head", bind: bind.merging(stretches) { a, _ in a }, values: values)
         await layers.finish()
     }
 

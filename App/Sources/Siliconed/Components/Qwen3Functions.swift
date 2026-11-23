@@ -224,32 +224,44 @@ extension Qwen3Encoder {
 
     // MARK: - The head
 
-    /// **The head over a stretch of the vocabulary** (`lm_head(norm(x))`), its logits written flat (`[rows · stretch]`: a
-    /// row of 9496 f32 is bound padded to 9504, its descriptor read 19/11): the final norm, then the product by `stretch`
-    /// rows of `lm_head` as the file lays it (`[stretch, width]`: a stretch of rows is one piece of the arena, and a
-    /// head reads one row a token), summed and kept in f32 — a bf16 logit near 20 is 0.125 wide, more than the gap between
-    /// the two best tokens at many a step. In f16 on codes: the normed row under the stretch's target, the logits its
-    /// factor times the product.
-    func headModule(_ a: Qwen3Arithmetic, rows: Int, stretch: Int) -> Aicode.Module {
+    /// **The head over the whole vocabulary, by stretches** (`lm_head(norm(x))`), each stretch's logits written flat
+    /// (`[rows · stretch]`: a row of 9496 f32 is bound padded to 9504, its descriptor read 19/11), `logits<k>`: the final
+    /// norm once, then the product by each stretch of `stretch` rows of `lm_head` as the file lays it (`w<k>`, `[stretch,
+    /// width]`: a stretch of rows is one piece of the arena, and a head reads one row a token), summed and kept in f32 — a
+    /// bf16 logit near 20 is 0.125 wide, more than the gap between the two best tokens at many a step. In f16 on codes:
+    /// the normed row under each stretch's own target, its logits its factor times the product.
+    ///
+    /// One call for the `count` stretches, not one a stretch: each product stays a stretch's, so what Core AI holds under
+    /// one is what it held, and a token pays 15 calls less. Measured 23/11/2026 on the M5 Pro (`xctrace`, the Compact):
+    /// a token is 388 command buffers one every 0.25 ms, the GPU busy 32 of 93 ms; a call a stretch cost each its norm and
+    /// some 2.6 command buffers of its own.
+    func headModule(_ a: Qwen3Arithmetic, rows: Int, stretch: Int, count: Int) -> Aicode.Module {
         let d = config.width, e = a.element
         var args: [Qwen3Argument] = [("x", [rows, d], e)]
-        if a.half { args += [("x_factor", [1, rows], .f32), ("norm", [d], e), ("w", Weights.codesShape(inn: d, out: stretch), .si8), ("w_scale", [stretch], e)] }
-        else { args += [("norm", [d], e), ("w", [stretch, d], e)] }
+        if a.half {
+            args += [("x_factor", [1, rows], .f32), ("norm", [d], e)]
+            args += (0..<count).flatMap { k in [("w\(k)", Weights.codesShape(inn: d, out: stretch), .si8), ("w_scale\(k)", [stretch], e)] }
+        } else {
+            args += [("norm", [d], e)] + (0..<count).map { ("w\($0)", [stretch, d], e) }
+        }
         var m = Aicode.Module(arguments: args.map { ($0.name, Aicode.tensor($0.shape, $0.element)) })
         let b = m.body, names = m.argumentNames
         func arg(_ name: String) -> Int { names.firstIndex(of: name)! }
         guard a.half else {
-            let n = b.binary(.mul, b.rmsNorm(arg("x"), axes: [1], eps: config.eps), arg("norm"))
-            m.outputs = [("logits", b.reshape(b.linear(b.cast(n, to: .f32), b.cast(arg("w"), to: .f32)), [rows * stretch]))]
+            let n = b.cast(b.binary(.mul, b.rmsNorm(arg("x"), axes: [1], eps: config.eps), arg("norm")), to: .f32)
+            m.outputs = (0..<count).map { k in ("logits\(k)", b.reshape(b.linear(n, b.cast(arg("w\(k)"), to: .f32)), [rows * stretch])) }
             return m
         }
         var constants = Aicode.ScalingConstants()
         let xf = b.reshape(arg("x_factor"), [rows, 1])
         let n = b.binary(.mul, b.rmsNorm(arg("x"), axes: [1], epsilon: b.epsilon(xf, config.eps)), arg("norm"))
-        let e0 = b.target(codes: [(arg("w"), arg("w_scale"))])
-        let (u, f) = b.ranged(a.rotated ? b.convrot(n) : n, under: e0)
-        let y = b.w8a8(u, codes: arg("w"), scale: arg("w_scale"), constants: &constants)
-        m.outputs = [("logits", b.reshape(b.binary(.mul, b.cast(y, to: .f32), f), [rows * stretch]))]
+        let entering = a.rotated ? b.convrot(n) : n
+        m.outputs = (0..<count).map { k in
+            let (w, s) = (arg("w\(k)"), arg("w_scale\(k)"))
+            let (u, f) = b.ranged(entering, under: b.target(codes: [(w, s)]))
+            let y = b.w8a8(u, codes: w, scale: s, constants: &constants)
+            return ("logits\(k)", b.reshape(b.binary(.mul, b.cast(y, to: .f32), f), [rows * stretch]))
+        }
         return m
     }
 }

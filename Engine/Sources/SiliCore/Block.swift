@@ -100,6 +100,12 @@ public final class Block: @unchecked Sendable {
     let copier = DispatchQueue(label: "block.copies", qos: .userInitiated)
     /// The last call of each function on the stream, and the last of all: each a task done when it is.
     var marks: [String: Task<UInt64, Never>] = [:], last: Task<UInt64, Never>?
+    /// **Core AI's value of each view a chained call reads** (`chain`), made once and given again at every call: a view of
+    /// the arena is the same bytes from call to call (a slot of the ring is rewritten in place, its call ordered as
+    /// before). Made at every call, 36 chained calls of one row made some 400 a pass; made once, Core AI's CPU fell by
+    /// 44 % and its `IOSurfaceCreate` from 384 to 42 ms over the same 3 s (23/11, the M5 Pro).
+    var values: [ValueKey: InferenceFunction.AsyncValue] = [:]
+    struct ValueKey: Hashable { let buffer: ObjectIdentifier, offset: Int, type: NDArray.ScalarType, shape: [Int], strides: [Int] }
     var cycleRecords: [[Timed]] = []
     /// The pass the last groups ran over, and how many in a row (`signal`).
     var pass: String?, inPass = 0

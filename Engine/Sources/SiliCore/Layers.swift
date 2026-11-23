@@ -165,7 +165,15 @@ extension Block {
         var written = Set<String>()
         let io = views(f, start: row, group: held?.group, pass: nil, step: nil, call: bind, neural: false,
                        skip: carry.union(values.keys), written: &written)
-        let left = try Run.encode(functions[f]!, stage.stream, inputs: io.inputs, chained: values, outputs: io.outputs)
+        var given = values
+        for (name, v) in io.inputs {
+            let key = ValueKey(buffer: ObjectIdentifier(v.buffer), offset: v.offset, type: v.type, shape: v.shape, strides: v.strides)
+            if let value = self.values[key] { given[name] = value; continue }
+            let value = Run.value(v)
+            self.values[key] = value
+            given[name] = value
+        }
+        let left = try Run.encode(functions[f]!, stage.stream, inputs: [:], chained: given, outputs: io.outputs)
         nonisolated(unsafe) let stream = stage.stream!
         let done = Task { await stream.currentWorkCompleted(); return DispatchTime.now().uptimeNanoseconds }
         (marks[f], last) = (done, done)
